@@ -9,14 +9,15 @@ import {
 import type { ProcessObservability } from "@langwatch/observability/node";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import {
+  type AgentSandboxKeyReapDatabase,
+  PostgresAgentSandboxKeyReapAdapter,
+} from "@langwatch/api-key-server";
+import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
-import {
-  ApiKeyWorkerFeatureInstaller,
-  type ApiKeyWorkerCapability,
-} from "../features/api-key/api-key-worker-feature.installer";
+import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer";
 import {
   AuthzWorkerFeatureInstaller,
   type AuthzWorkerCapability,
@@ -157,10 +158,17 @@ export type WorkerLangyMaintenanceCompositionOptions = {
   installer: LangyMaintenanceWorkerCapability;
 };
 
-/** The agent-sandbox credential sweep, on the same footing as Langy's reaper. */
-export type WorkerApiKeyCompositionOptions = {
-  installer: ApiKeyWorkerCapability;
-};
+/**
+ * The one Prisma client this process opened.
+ *
+ * Optional only while the platform root still composes this graph. That root
+ * hands its client over inside `topic` — `TopicClusteringDatabase` IS a
+ * `PrismaClient` — and a process opens exactly one, so the fallback below names
+ * the same object an explicit option would. Naming it here is what lets a
+ * feature that is not Topic compose its own Postgres adapter without reading
+ * another feature's option, and the fallback goes when the platform root does.
+ */
+export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase;
 
 /**
  * The four identity pipelines (ADR-101), which mount as one group.
@@ -286,6 +294,8 @@ type WorkerProductionCompositionBaseOptions = {
   transport: WorkerTransportPort;
   trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
+  /** The process's Prisma client; taken from `topic` when a root omits it. */
+  database?: WorkerDatabaseCompositionOptions;
   /**
    * Pipeline groups whose features have moved out of the legacy registry.
    * Each stays optional until every group in Wave 4 has landed: the shared
@@ -296,7 +306,6 @@ type WorkerProductionCompositionBaseOptions = {
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
   langyConversation?: WorkerLangyConversationCompositionOptions;
   langyMaintenance?: WorkerLangyMaintenanceCompositionOptions;
-  apiKey?: WorkerApiKeyCompositionOptions;
   github?: WorkerGithubCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
@@ -386,12 +395,15 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const apiKey = options.apiKey
-      ? ApiKeyWorkerFeatureInstaller.create({
-          installer: options.apiKey.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, unlike the groups still owned by the legacy registry: the
+    // sweep is composed from this package and the feature's own service, so
+    // there is no graph in which it is present but unbuildable.
+    const apiKey = ApiKeyWorkerFeatureInstaller.create({
+      eventing,
+      sandboxKeyReap: PostgresAgentSandboxKeyReapAdapter.create({
+        database: options.database ?? options.topic.database,
+      }).build(),
+    });
     const github = options.github
       ? GithubWorkerFeatureInstaller.create({
           installer: options.github.installer,

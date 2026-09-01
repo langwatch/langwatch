@@ -218,9 +218,12 @@ function createComposition(registered: string[]) {
       blobSweep: new BlobSweep(),
       retentionMetrics: new RetentionMetrics(),
     }),
+    // The real pipeline, because the API-key feature composes its own now: the
+    // name this asserts on comes from `@langwatch/api-key-server` rather than
+    // from a stub this file spelled.
     apiKey: ApiKeyWorkerFeatureInstaller.create({
-      installer: { buildMaintenance: () => namedDefinition("agent_sandbox_maintenance") },
       eventing,
+      sandboxKeyReap: { reap: async () => 0 },
     }),
     github: GithubWorkerFeatureInstaller.create({
       installer: { buildMaintenance: () => namedDefinition("github_maintenance") },

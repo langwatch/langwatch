@@ -144,6 +144,25 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
     });
     return result.count > 0;
   }
+  /**
+   * One bounded UPDATE over the (name, revokedAt, expiresAt) shape.
+   *
+   * `expiresAt: { not: null }` is carried explicitly rather than left to
+   * `lte`: a key created without an expiry must never be swept, and a NULL
+   * that a later Prisma or Postgres comparison treated as "before now" would
+   * revoke every key of this name in the product at once.
+   */
+  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+    const { count } = await this.database.apiKey.updateMany({
+      where: {
+        name: input.name,
+        revokedAt: null,
+        expiresAt: { not: null, lte: input.now },
+      },
+      data: { revokedAt: input.now },
+    });
+    return count;
+  }
   async tryFindPersonalWorkspaceOwner(input: {
     organizationId: string;
     scopeId: string;

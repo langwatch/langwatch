@@ -43,3 +43,41 @@ Feature: API key lifecycle
     Given a process supplies a named logger to the API-key service
     When a grant the service expected to revoke is already gone
     Then the logger receives the context and the message unchanged
+
+  # The agent-sandbox sweep. A sandbox key is minted per code agent run and
+  # nothing retires it at the end of one, so the hourly sweep is the only thing
+  # that revokes an elapsed key. It runs cross-tenant and by predicate, which is
+  # why the predicate is spelled out here rather than left to the query: a
+  # widened one revokes customer keys across every organization at once.
+
+  @unit
+  Scenario: The sandbox sweep revokes only elapsed sandbox keys
+    Given a sandbox key whose lifetime has passed
+    When the sweep runs
+    Then the key is revoked as of the moment the sweep read the clock
+    And only keys carrying the reserved sandbox name are considered
+
+  @unit
+  Scenario: The sandbox sweep leaves live and already-revoked keys alone
+    Given a sandbox key that has not yet elapsed and one already revoked
+    When the sweep runs
+    Then neither key is written again
+
+  @unit
+  Scenario: A key with no expiry is never swept
+    Given a sandbox-named key created without an expiry
+    When the sweep runs
+    Then the key is left untouched
+
+  @unit
+  Scenario: The sandbox sweep reports how many keys it retired
+    Given three elapsed sandbox keys
+    When the sweep runs
+    Then it answers three
+
+  @unit
+  Scenario: The worker composes the sandbox sweep from the feature package
+    Given a worker graph composed with the process database
+    When the API-key feature installs
+    Then it registers the agent-sandbox maintenance pipeline
+    And the pipeline's sweep runs the feature's own revoke

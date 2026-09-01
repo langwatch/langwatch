@@ -63,6 +63,15 @@ export abstract class ApiKeyRepository {
     projectId: string;
     token: string;
   }): Promise<boolean>;
+  /**
+   * Revokes every unrevoked key of one reserved name whose expiry has elapsed.
+   *
+   * Cross-tenant by design: the caller is a fleet-wide sweep, not a request, so
+   * there is no organization to scope to. The name is a parameter rather than a
+   * constant here because deciding WHICH reserved name may be swept is policy,
+   * and policy belongs above persistence.
+   */
+  abstract revokeExpiredByName(input: { name: string; now: Date }): Promise<number>;
   /** Resolves personal team/project ownership without leaking foreign persistence to the service. */
   abstract tryFindPersonalWorkspaceOwner(input: {
     organizationId: string;

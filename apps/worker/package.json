@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1080.0",
+    "@langwatch/api-key-server": "workspace:*",
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/automation-server": "workspace:*",

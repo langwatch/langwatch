@@ -57,6 +57,17 @@ class MemoryApiKeys extends ApiKeyRepository {
   activate({ id }: { id: string }): Promise<StoredApiKey> {
     return this.update({ id, revokedAt: null });
   }
+  revokeExpiredByName({ name, now }: { name: string; now: Date }): Promise<number> {
+    const matched = this.rows.filter(
+      (row) =>
+        row.name === name &&
+        row.revokedAt === null &&
+        row.expiresAt !== null &&
+        row.expiresAt.getTime() <= now.getTime(),
+    );
+    for (const row of matched) row.revokedAt = now;
+    return Promise.resolve(matched.length);
+  }
   tryFindByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> {
     return Promise.resolve(this.rows.find((row) => row.lookupId === lookupId) ?? null);
   }

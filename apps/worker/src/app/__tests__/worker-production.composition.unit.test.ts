@@ -463,4 +463,83 @@ describe("WorkerProductionComposition", () => {
     await resources.close();
     expect(closeResource).toHaveBeenCalledOnce();
   });
+
+  /**
+   * The API-key sweep is the first feature composed here from its own package
+   * rather than handed over built, so these two say what "composed" means: the
+   * pipeline is registered by this graph, and the revoke behind its schedule
+   * reaches the client this root was given. A sweep wired to the wrong client —
+   * or to nothing — registers exactly the same routing keys and retires nothing.
+   */
+  describe("when the API-key sweep is composed", () => {
+    function compositionWith(database: object, topicDatabase: object) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: topicDatabase as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(Object.keys(database).length > 0 ? { database: database as never } : {}),
+      });
+    }
+
+    async function sweepThrough(composition: WorkerProductionComposition) {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "api-key",
+      );
+      expect(installer, "the composition mounted no API-key feature").toBeDefined();
+      const registered: { name: string; run: (...args: never[]) => Promise<void> }[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push({
+          name: definition.metadata.name,
+          run: definition.processManagers.get("agentSandboxKeyReap")!.config.intents!.reap!
+            .run as never,
+        });
+        return {} as never;
+      });
+      await installer!.install();
+      expect(registered.map((entry) => entry.name)).toEqual(["agent_sandbox_maintenance"]);
+      await registered[0]!.run(...([{ scheduledFor: 0 }, {}] as never[]));
+    }
+
+    /** @scenario "The worker composes the sandbox sweep from the feature package" */
+    it("revokes through the client the root was given", async () => {
+      const updateMany = vi.fn(async () => ({ count: 0 }));
+      const unused = vi.fn(async () => ({ count: 0 }));
+
+      await sweepThrough(
+        compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
+      );
+
+      expect(updateMany).toHaveBeenCalledTimes(1);
+      expect(unused).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The fallback the platform composition root still relies on: it hands its
+     * one Prisma client over inside `topic` and names no `database`.
+     */
+    it("falls back to the client Topic was given when no database is named", async () => {
+      const updateMany = vi.fn(async () => ({ count: 0 }));
+
+      await sweepThrough(compositionWith({}, { apiKey: { updateMany } }));
+
+      expect(updateMany).toHaveBeenCalledTimes(1);
+    });
+  });
 });
