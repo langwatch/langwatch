@@ -193,6 +193,34 @@ describe("dataset search (s3_jsonl)", () => {
     expect(result.pagination.total).toBe(2);
   });
 
+  it("scans every chunk when the offsets index is only partly written", async () => {
+    // A half-written offsets array (an interrupted migration) has entries that
+    // pass a per-entry check and entries that do not. Trusting the survivors
+    // silently drops the chunks the broken entries described — here chunk 2,
+    // where every match lives, so the search would answer "no matches" for rows
+    // ordinary paging still displays. Ordinary paging already rejects the whole
+    // array on one bad entry and falls back to `chunkCount`; the search has to
+    // agree with it, or the same dataset answers two ways.
+    const { readChunk } = mockChunks();
+    const service = makeService({});
+
+    const result = await searchPage(
+      service,
+      {
+        ...baseS3Dataset,
+        chunkOffsets: [
+          { index: 0, startRow: 0, endRow: 2 },
+          { index: 1 }, // startRow/endRow never written
+          null,
+        ],
+      },
+      "escalation",
+    );
+
+    expect(readChunk).toHaveBeenCalledTimes(3);
+    expect(result.pagination.total).toBe(2);
+  });
+
   it("leaves the unsearched page read on its bounded windowed path", async () => {
     // Regression guard: adding search must not turn an ordinary page request
     // into a full scan. Page 1 of 2 rows overlaps chunk 0 only.

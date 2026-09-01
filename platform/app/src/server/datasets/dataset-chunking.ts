@@ -43,6 +43,36 @@ export type ChunkOffset = {
 };
 
 /**
+ * Read a persisted `chunkOffsets` JSON value back as a typed, VALIDATED offsets
+ * array — or an empty array, meaning "do not trust this index, fall back to
+ * `chunkCount`".
+ *
+ * All-or-nothing on purpose. A half-written array (an interrupted migration
+ * that somehow committed) has entries that pass a per-entry check and entries
+ * that do not, and keeping only the survivors is worse than keeping none: a
+ * paged read would serve an empty page against a positive `rowCount`, and a
+ * search would scan only the chunks the surviving entries describe and report
+ * "no matches" for rows the pager still displays. Both callers reject the whole
+ * array on one bad entry so the same dataset cannot answer two ways.
+ */
+export const readValidChunkOffsets = (chunkOffsets: unknown): ChunkOffset[] => {
+  const raw = Array.isArray(chunkOffsets)
+    ? (chunkOffsets as unknown as ChunkOffset[])
+    : [];
+  const valid =
+    raw.length > 0 &&
+    raw.every(
+      (o) =>
+        o != null &&
+        Number.isInteger(o.index) &&
+        Number.isFinite(o.startRow) &&
+        Number.isFinite(o.endRow) &&
+        o.endRow >= o.startRow,
+    );
+  return valid ? raw : [];
+};
+
+/**
  * Lightweight per-chunk metadata — everything `chunkedMeta` needs to build the
  * PG-authoritative addressing WITHOUT the chunk's `jsonl` payload (I-MEM). The
  * streaming normalize writer maps each freshly-written `DatasetChunk` to this

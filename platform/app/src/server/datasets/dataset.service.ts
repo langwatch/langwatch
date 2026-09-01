@@ -18,7 +18,7 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
-import type { ChunkOffset } from "./dataset-chunking";
+import { type ChunkOffset, readValidChunkOffsets } from "./dataset-chunking";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -795,20 +795,9 @@ export class DatasetService {
       // offsets-absent repair branch (read every chunk + slice) rather than
       // serve a wrong page. The offsets-absent branch already throws loudly on a
       // null chunkCount, so a genuinely-broken dataset surfaces, not silences.
-      const rawOffsets = Array.isArray(dataset.chunkOffsets)
-        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
-        : [];
-      const offsetsValid =
-        rawOffsets.length > 0 &&
-        rawOffsets.every(
-          (o) =>
-            o != null &&
-            Number.isInteger(o.index) &&
-            Number.isFinite(o.startRow) &&
-            Number.isFinite(o.endRow) &&
-            o.endRow >= o.startRow,
-        );
-      const offsets: ChunkOffset[] = offsetsValid ? rawOffsets : [];
+      const offsets: ChunkOffset[] = readValidChunkOffsets(
+        dataset.chunkOffsets,
+      );
 
       // Read only the chunks overlapping [windowStart, windowEnd). With offsets
       // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.
@@ -950,16 +939,18 @@ export class DatasetService {
       // offsets, stop early and report "no matches" for rows the user can page
       // to — the silent-wrong-answer this path exists to avoid. Offsets first,
       // `chunkCount` as the fallback for legacy rows that have none.
-      const rawOffsets = Array.isArray(dataset.chunkOffsets)
-        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
-        : [];
-      const offsetIndexes = rawOffsets
-        .filter((o) => o != null && Number.isInteger(o.index))
-        .map((o) => o.index);
+      // Same all-or-nothing validation the paged read uses. Keeping the
+      // individually-valid entries of a half-written array would scan only the
+      // chunks those entries name and report "no matches" for rows the pager,
+      // which rejects the whole array and falls back to `chunkCount`, still
+      // displays — the same dataset answering two ways.
+      const offsets = readValidChunkOffsets(dataset.chunkOffsets);
 
       let chunkIndexes: number[];
-      if (offsetIndexes.length > 0) {
-        chunkIndexes = [...new Set(offsetIndexes)].sort((a, b) => a - b);
+      if (offsets.length > 0) {
+        chunkIndexes = [...new Set(offsets.map((o) => o.index))].sort(
+          (a, b) => a - b,
+        );
       } else {
         // I-COUNT: a `ready` s3_jsonl dataset with no offsets MUST have a
         // chunkCount. `?? 0` would scan zero chunks and report "no matches" for
