@@ -683,17 +683,20 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The period picker opens upward at the foot of the rail" */
-  it("offers the three windows and names what it cannot reach", async () => {
+  it("offers the same ranges as the shared period control, any date included", async () => {
     const user = userEvent.setup();
     renderRail();
 
     await user.click(screen.getByTestId("results-period-picker"));
 
     expect(await screen.findByText("Last 7 days")).toBeInTheDocument();
-    expect(screen.getByText("Last 15 days")).toBeInTheDocument();
-    expect(
-      screen.getByText("Runs older than 30 days are in cold storage."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Last 90 days")).toBeInTheDocument();
+    expect(screen.getByText("Last 1 year")).toBeInTheDocument();
+    // A free start and end date, so windows older than thirty days can be
+    // read too.
+    expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
+    expect(screen.getByLabelText("End Date")).toBeInTheDocument();
+    expect(screen.queryByText(/cold storage/i)).not.toBeInTheDocument();
   });
 
   /** @scenario "Changing the period reloads the last results and the runs" */

@@ -237,6 +237,7 @@ export function PeriodSelector({
   size = "sm",
   triggerVariant = "outline",
   placement = "bottom-end",
+  triggerProps,
 }: {
   period: Period;
   mode: PeriodMode;
@@ -260,6 +261,11 @@ export function PeriodSelector({
   triggerVariant?: ButtonProps["variant"];
   /** Where the range list opens. A control at the foot of a rail wants "top-start". */
   placement?: PeriodSelectorPlacement;
+  /**
+   * Spread onto the trigger button, for a surface that needs a test id or a
+   * height the size scale does not offer.
+   */
+  triggerProps?: ButtonProps & { "data-testid"?: string };
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
@@ -298,6 +304,7 @@ export function PeriodSelector({
           size={size}
           minWidth="fit-content"
           onClick={onOpen}
+          {...triggerProps}
         >
           <LuCalendar />
           <Text>{label ?? getDateRangeLabel()}</Text>

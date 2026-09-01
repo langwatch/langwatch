@@ -5,29 +5,21 @@
  * the runs rail and opens upwards, so the window stays reachable without
  * taking a line of the rail.
  *
- * The list offers the three short windows. A window the page widened on its
- * own is still named on the trigger, so a plan whose last run is months old
- * says which window it opened.
+ * Both forms are the shared {@link PeriodSelector}: the same presets and the
+ * same free start and end dates as everywhere else in the app, so any window
+ * can be read, not only the short ones.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { chakra, HStack, Text } from "@chakra-ui/react";
 import { differenceInCalendarDays } from "date-fns";
-import { Calendar, ChevronDown } from "lucide-react";
-import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
-import { Menu } from "~/components/ui/menu";
+import type {
+  Period,
+  PeriodMode,
+  RelativePresetKey,
+} from "~/components/PeriodSelector";
+import { PeriodSelector } from "~/components/PeriodSelector";
 import { FG_MUTED } from "./design";
-
-/** The windows the list offers, shortest first. */
-const WINDOWS: { key: RelativePresetKey; days: number; label: string }[] = [
-  { key: "7d", days: 7, label: "Last 7 days" },
-  { key: "15d", days: 15, label: "Last 15 days" },
-  { key: "30d", days: 30, label: "Last 30 days" },
-];
-
-/** What the picker says about the runs it cannot reach. */
-export const COLD_STORAGE_NOTE = "Runs older than 30 days are in cold storage.";
 
 /**
  * How many days the window spans, counted the way the shared period control
@@ -54,127 +46,54 @@ export function compactPeriodLabel(period: Period): string {
 
 export type AgentTestingPeriodPickerProps = {
   period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   /** The rail form: shorter, quieter, and opening upwards. */
   compact?: boolean;
 };
 
-/** The control that opens the window list, in its wide and its rail form. */
-function PeriodTrigger({
-  period,
-  compact,
-  ...rest
-}: {
-  period: Period;
-  compact?: boolean;
-}) {
-  const label = periodLabel(period);
-
-  return (
-    <chakra.button
-      type="button"
-      display="flex"
-      alignItems="center"
-      gap={compact ? 1 : 1.5}
-      whiteSpace="nowrap"
-      cursor="pointer"
-      title={label}
-      aria-label={label}
-      {...(compact
-        ? {
-            borderRadius: "md",
-            paddingX: 1.5,
-            paddingY: 1,
-            fontSize: "11px",
-            fontWeight: "medium",
-            color: FG_MUTED,
-            _hover: { background: "bg.muted" },
-          }
-        : {
-            height: "32px",
-            borderRadius: "lg",
-            borderWidth: "1px",
-            borderColor: "border",
-            background: "bg.panel",
-            paddingX: "10px",
-            fontSize: "12.5px",
-            fontWeight: "medium",
-            color: "fg",
-            _hover: {
-              borderColor: "border.emphasized",
-              background: "bg.muted",
-            },
-          })}
-      data-testid="results-period-picker"
-      {...rest}
-    >
-      <Calendar
-        size={compact ? 12 : 13}
-        color="var(--chakra-colors-fg-muted)"
-      />
-      {compact ? compactPeriodLabel(period) : label}
-      <ChevronDown
-        size={compact ? 11 : 13}
-        color="var(--chakra-colors-fg-muted)"
-      />
-    </chakra.button>
-  );
-}
-
-/** The windows on offer, and the note about what is kept for how long. */
-function PeriodMenuContent({
-  days,
-  setRelativePeriod,
-}: {
-  days: number;
-  setRelativePeriod: (key: RelativePresetKey) => void;
-}) {
-  return (
-    <Menu.Content paddingY={0.5} minWidth="auto">
-      {WINDOWS.map((window) => (
-        <Menu.Item
-          key={window.key}
-          value={window.key}
-          paddingX={3}
-          paddingY={1.5}
-          fontSize="12.5px"
-          fontWeight={window.days === days ? "semibold" : "normal"}
-          whiteSpace="nowrap"
-          onClick={() => setRelativePeriod(window.key)}
-        >
-          {window.label}
-        </Menu.Item>
-      ))}
-      <HStack
-        borderTopWidth="1px"
-        borderColor="border"
-        paddingX={3}
-        paddingY={1.5}
-      >
-        <Text fontSize="10.5px" color={FG_MUTED}>
-          {COLD_STORAGE_NOTE}
-        </Text>
-      </HStack>
-    </Menu.Content>
-  );
-}
-
+/** The control that opens the range list, in its wide and its rail form. */
 export function AgentTestingPeriodPicker({
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
   compact,
 }: AgentTestingPeriodPickerProps) {
   return (
-    <Menu.Root
-      positioning={{ placement: compact ? "top-start" : "bottom-end" }}
-    >
-      <Menu.Trigger asChild>
-        <PeriodTrigger period={period} compact={compact} />
-      </Menu.Trigger>
-      <PeriodMenuContent
-        days={periodDays(period)}
-        setRelativePeriod={setRelativePeriod}
-      />
-    </Menu.Root>
+    <PeriodSelector
+      period={period}
+      mode={periodMode}
+      setPeriod={setPeriod}
+      setRelativePeriod={setRelativePeriod}
+      size={compact ? "xs" : "sm"}
+      triggerVariant={compact ? "ghost" : "outline"}
+      placement={compact ? "top-start" : "bottom-end"}
+      label={compact ? compactPeriodLabel(period) : undefined}
+      triggerProps={{
+        "data-testid": "results-period-picker",
+        // The trigger sits among controls that share one height and one type
+        // size, so it takes theirs rather than the size scale's.
+        ...(compact
+          ? {
+              "aria-label": periodLabel(period),
+              title: periodLabel(period),
+              height: "auto",
+              paddingX: 1.5,
+              paddingY: 1,
+              fontSize: "11px",
+              fontWeight: "medium",
+              color: FG_MUTED,
+            }
+          : {
+              height: "32px",
+              fontSize: "12.5px",
+              fontWeight: "medium",
+              borderRadius: "lg",
+              background: "bg.panel",
+            }),
+      }}
+    />
   );
 }
