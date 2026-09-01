@@ -25,6 +25,29 @@ type Input struct {
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
+	// LangWatchQL access model (issue langwatch-saas#1168, Design C). When the
+	// chart mounts CLICKHOUSE_LWQL_PASSWORD_FILE the server owns the LWQL access
+	// model: renderLwql emits the langwatch_lwql restricted user, its
+	// lwql_restricted profile, grants and row filters as config. Absent on
+	// installs that do not use LangWatchQL (or that point it at an external
+	// ClickHouse) — the renderer self-gates on LwqlPassword and skips otherwise.
+	//
+	// LwqlPassword is read from CLICKHOUSE_LWQL_PASSWORD_FILE in Load() (like
+	// Password), never from a plain env, so it is hashed from the same mounted
+	// Secret the app authenticates with.
+	LwqlPassword string
+	LwqlDatabase string `env:"CLICKHOUSE_LWQL_DATABASE" default:"langwatch"`
+
+	// lwql_postgres named collection — the ClickHouse→PostgreSQL bridge the
+	// LWQL PostgreSQL-resident views read through. Rendered only when both the
+	// host and the (plaintext, unhashable) reader password are provided.
+	// LwqlPgPassword is read from CLICKHOUSE_LWQL_PG_PASSWORD_FILE in Load().
+	LwqlPgHost     string `env:"CLICKHOUSE_LWQL_PG_HOST"`
+	LwqlPgPort     int    `env:"CLICKHOUSE_LWQL_PG_PORT" default:"5432"`
+	LwqlPgDatabase string `env:"CLICKHOUSE_LWQL_PG_DATABASE"`
+	LwqlPgUser     string `env:"CLICKHOUSE_LWQL_PG_USER"`
+	LwqlPgPassword string
+
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
 
@@ -142,6 +165,32 @@ func Load() (*Input, error) {
 			return nil, fmt.Errorf("CLICKHOUSE_PASSWORD_FILE: %w", err)
 		}
 		i.Password = strings.TrimSpace(string(data))
+	}
+
+	// LWQL passwords are file-only: never a plain env, and a missing file is not
+	// an error — it simply leaves the LWQL access model unprovisioned (the same
+	// fail-open-to-skip contract as the SaaS render-config.sh). An empty file is
+	// treated as absent so an operator Secret without the key stays inert rather
+	// than provisioning a user with an empty password.
+	for _, lwqlSecret := range []struct {
+		envKey string
+		dest   *string
+	}{
+		{"CLICKHOUSE_LWQL_PASSWORD_FILE", &i.LwqlPassword},
+		{"CLICKHOUSE_LWQL_PG_PASSWORD_FILE", &i.LwqlPgPassword},
+	} {
+		path := os.Getenv(lwqlSecret.envKey)
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("%s: %w", lwqlSecret.envKey, err)
+		}
+		*lwqlSecret.dest = strings.TrimSpace(string(data))
 	}
 
 	return i, nil

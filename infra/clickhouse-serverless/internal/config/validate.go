@@ -23,6 +23,14 @@ func (i *Input) Validate() error {
 		}
 	}
 
+	// The LWQL database name is interpolated into config tag names (the
+	// <databases> row-filter section) and into GRANT statements, so anything
+	// that is not a plain identifier must fail the render rather than produce
+	// malformed config or an unintended grant (mirrors render-config.sh).
+	if i.LwqlDatabase != "" && !isPlainIdentifier(i.LwqlDatabase) {
+		errs = append(errs, fmt.Sprintf("CLICKHOUSE_LWQL_DATABASE: not a plain identifier: %q", i.LwqlDatabase))
+	}
+
 	// Conditional: replicated fields required when CH_REPLICATED=true
 	if i.Replicated {
 		if err := validateReplicated(i); err != nil {
@@ -55,6 +63,26 @@ func validateReplicated(i *Input) []string {
 		errs = append(errs, "CH_DATA_NODES is required when CH_REPLICATED=true (comma-separated data node hostnames)")
 	}
 	return errs
+}
+
+// isPlainIdentifier reports whether s is a non-empty run of [A-Za-z0-9_], the
+// same character class render-config.sh enforces before interpolating a name
+// into config tag names or GRANT statements.
+func isPlainIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func validateObjectStorage(i *Input) []string {
