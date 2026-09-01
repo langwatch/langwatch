@@ -36,8 +36,22 @@ type ProceduresFrom<TMap> = {
       : ProceduresFrom<TMap[K]>;
 };
 
+/**
+ * The root types a feature's router is built on.
+ *
+ * Only `transformer` is stated, and it has to be. `AnyTRPCRootTypes` leaves it
+ * `any`, and tRPC reads that flag to decide whether an output crossed JSON on
+ * the way here: with the flag unknown it hands back BOTH answers, so a
+ * procedure returning `{ archivedAt: Date | null }` infers as a union with
+ * `{ archivedAt: string | null }` and every consumer of a date fails to
+ * typecheck against itself. Every client this package builds runs superjson
+ * (`apps/ui`'s transport and the application's alike), so a Date really does
+ * arrive as a Date and `true` is the honest value.
+ */
+type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer: true };
+
 /** The router type a feature's map describes. */
-export type RouterFromMap<TMap> = TRPCBuiltRouter<AnyTRPCRootTypes, ProceduresFrom<TMap>>;
+export type RouterFromMap<TMap> = TRPCBuiltRouter<FeatureApiRootTypes, ProceduresFrom<TMap>>;
 
 /**
  * The feature's typed tRPC hooks.

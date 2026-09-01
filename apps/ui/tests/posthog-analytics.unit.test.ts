@@ -18,10 +18,7 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
-import {
-  type PostHogPublicConfig,
-  usePostHog,
-} from "../src/behavior/posthog-analytics";
+import { type PostHogPublicConfig, usePostHog } from "../src/behavior/posthog-analytics";
 
 let publicEnvData: PostHogPublicConfig | undefined = {
   POSTHOG_KEY: "test-key",

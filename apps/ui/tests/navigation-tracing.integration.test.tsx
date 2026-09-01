@@ -24,12 +24,7 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 import { act, cleanup, render } from "@testing-library/react";
-import {
-  createMemoryRouter,
-  Outlet,
-  type RouteObject,
-  RouterProvider,
-} from "react-router";
+import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useNavigationTracing } from "../src/behavior/navigation-tracing";
 

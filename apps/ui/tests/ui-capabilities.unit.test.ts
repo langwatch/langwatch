@@ -5,6 +5,7 @@ import {
   UiCapabilityUnavailableError,
   UiFeedbackPort,
   UiNavigationPort,
+  UiRoutePort,
   UiSessionPort,
   type UiFailureNotice,
   type UiSuccessNotice,
@@ -25,6 +26,20 @@ class RecordingNavigation extends UiNavigationPort {
     this.moves.push("back");
   }
 }
+
+class RecordingRoute extends UiRoutePort {
+  readonly writes: Readonly<Record<string, string | undefined>>[] = [];
+
+  reading() {
+    return { params: {}, query: {} };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.writes.push(next);
+  }
+}
+
+const recordingRoute = (): UiRoutePort => new RecordingRoute();
 
 class RecordingFeedback extends UiFeedbackPort {
   readonly notices: (UiSuccessNotice | UiFailureNotice)[] = [];
@@ -52,7 +67,11 @@ class UnusableSession extends UiSessionPort {
     throw new Error("the installed session should have answered");
   }
 
-  isFeatureEnabled(): never {
+  isSettled(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  featureFlag(): never {
     throw new Error("the installed session should have answered");
   }
 }
@@ -70,7 +89,11 @@ class StubSession extends UiSessionPort {
     return permission === "prompt:read";
   }
 
-  isFeatureEnabled(): boolean {
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
     return false;
   }
 }
@@ -81,7 +104,12 @@ describe("given the capability ports a screen asks instead of reaching for the b
       const navigation = new RecordingNavigation();
       const documentTitle = BrowserUiDocumentTitle.create({ title: "" });
 
-      const capabilities = resolveUiCapabilities({ install: {}, documentTitle, navigation });
+      const capabilities = resolveUiCapabilities({
+        install: {},
+        documentTitle,
+        navigation,
+        route: recordingRoute(),
+      });
 
       expect(capabilities.navigation).toBe(navigation);
       expect(capabilities.documentTitle).toBe(documentTitle);
@@ -92,6 +120,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
+        route: recordingRoute(),
       });
 
       expect(() =>
@@ -107,6 +136,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
+        route: recordingRoute(),
       });
 
       expect(() => capabilities.session.hasPermission("prompt:read")).toThrow(
@@ -128,6 +158,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         install: {},
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
+        route: recordingRoute(),
         session,
       });
 
@@ -141,6 +172,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         install: { session: installed },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
+        route: recordingRoute(),
         session: new UnusableSession(),
       });
 
@@ -158,6 +190,7 @@ describe("given the capability ports a screen asks instead of reaching for the b
         install: { feedback, session, navigation: installedNavigation },
         documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
         navigation: new RecordingNavigation(),
+        route: recordingRoute(),
       });
 
       capabilities.feedback.succeeded({ title: "Saved" });

@@ -40,9 +40,45 @@ HoverableBigText refused — needs a render-prop seam). Destination
 relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
 `0559f563df`, automation-web `648ed49987`.
 
+Governance moved first, and it is the reference every later family
+copies. What it added on top of the four gates, all of it reusable:
+
+- `apps/ui` self-installs. `src/features/installed-ui-features.ts` is the
+  standing declaration (loaders, feature-api Providers, the feedback
+  capability, `useBrowserUiSession`); the package entry's
+  `createUiApplication` merges a host's install over it, and
+  `platform/app`'s shell adapter passes nothing and was not edited.
+- Two capability ports were added to `ui-capabilities`: `UiRoutePort`
+  (path parameters, the query string, and a whole-query write) and the
+  tri-state `featureFlag` plus `isSettled` on `UiSessionPort`, which a
+  page guard needs and a screen deliberately does not get.
+- `ui/sections/ui-page-guard` carries the policy the two platform
+  higher-order components carried: flags before permissions, and nothing
+  refused while an answer is still arriving.
+- `BrowserUiFeedback` is a real feedback capability over the Design
+  System toaster with a four-code copy table. The full presentation
+  registry harvest is still owed.
+- A feature-web package answers the application through ONE port it
+  declares itself (`model/governance-host.ts`), adapted in the frontend
+  feature. That is what lets eight thousand lines of screen move with
+  their `api.x.y.useQuery` call sites unchanged.
+
+Known costs, all reported rather than suppressed: the governed screen
+closure rejects `@langwatch/platform-api-client` (one import, in
+`behavior/governance-api.ts`, which is what buys the content-faithful
+move), a web-to-web surface import (authz-web, coding-agent-web — the
+same finding prompt-web already carries for workflow-web), the package's
+root `.` export, which ~6 non-governance `platform/app` files still
+import and deletes-only forbids repointing, and `enterprise-direction`:
+`apps/ui` is a core package and cannot depend on an enterprise one. The
+last is structural and blocks the gateway family too — it wants an
+enterprise UI composition the way `packages/enterprise/composition/api`
+serves the server side.
+
 ## Family facts (keys = legacy-page-loaders.ts entries to DELETE)
 
-### governance — 11 keys, ~20 prod files + 15 tests, ~8.3k page LOC (largest)
+### governance — MOVED. 11 keys, ~20 prod files + 15 tests, ~8.3k page LOC (largest)
+
 - Pages under `pages/governance/`; `inventory.enterprise.tsx` is 3,431 lines
   and exports `SourceEditDrawer` used by `ingestion-source-detail` — move together.
 - Exclusive: `components/governance/*` EXCEPT `AdminViewingAsBanner.tsx`
@@ -57,6 +93,7 @@ relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
   in the apps/ui table.
 
 ### gateway — 11 keys, ~38 prod files + 27 tests, ~5.7k page LOC
+
 - Exclusive: all of `components/gateway/` except ConfirmDialog; all of
   `components/webhooks/`; `components/settings/governance/routingPolicies/`
   (misfiled — gateway owns it; baseline lines file it under governance);
@@ -71,6 +108,7 @@ relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
   `VirtualKeyUsageSnippet` drags shiki + openai deps.
 
 ### me — 5 keys, ~44 prod files + 13 tests (widen by 2 keys recommended)
+
 - `PullRequestsTable`/`SessionsTable` are also the entire bodies of
   `pages/[project]/{pull-requests,sessions}` (52/63 lines) — widen the family
   to take those two keys rather than duplicating.
@@ -89,6 +127,7 @@ relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
   was found — resolve before dispatch.
 
 ### automations — 5 keys (all → ONE module), 25 prod files + ~16 tests
+
 - Page `pages/[project]/automations.tsx` (965 L) + entire
   `features/automations/` subtree (exclusive) + `components/automations/FilterDisplay`
   (leaks to analytics `GraphFilterIndicator` — cheap copy).
@@ -115,14 +154,14 @@ relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
 
 ## Cross-family collisions (settle before dispatching pairs)
 
-| Component | Families | Resolution |
-|---|---|---|
-| `gateway/ConfirmDialog` | gateway+governance | design-system `./confirm-dialog` (dispatched) |
-| `me/InstallCliCard` | me+governance | each takes own copy |
-| `modelProviders/iconsMap` | me+gateway | copy or model-provider-web promotion |
-| `ui/{ListTable,Pagination}` | me+governance | design-system (dispatched) |
-| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | NEW shared package (authz-web or scope-web) — undecided |
-| traces-v2 deep imports | me+automations | trace-web surface or placeholder — undecided |
+| Component                                       | Families           | Resolution                                                                                                               |
+| ----------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (dispatched)                                                                            |
+| `me/InstallCliCard`                             | me+governance      | each takes own copy (governance's is `ui/elements/install-cli-card`)                                                     |
+| `modelProviders/iconsMap`                       | me+gateway         | copy or model-provider-web promotion                                                                                     |
+| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (dispatched)                                                                                               |
+| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; one surface, because the picker renders the chips) |
+| traces-v2 deep imports                          | me+automations     | trace-web surface or placeholder — undecided                                                                             |
 
 ## Single-owner files (serialize)
 

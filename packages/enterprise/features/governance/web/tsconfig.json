@@ -14,7 +14,13 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
+      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
+      "@langwatch/authz-contract": ["../../../../features/authz/contract/src/index.ts"],
+      "@langwatch/authz-web/surfaces/scope-picker": [
+        "../../../../features/authz/web/src/surfaces/scope-picker/index.ts"
+      ],
+      "@langwatch/coding-agent-web": ["../../../../features/coding-agent/web/src/index.ts"],
+      "@langwatch/platform-api-client": ["../../../../platform-api-client/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

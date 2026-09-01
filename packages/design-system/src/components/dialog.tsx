@@ -69,15 +69,23 @@ export const DialogCloseTrigger = React.forwardRef<
   );
 });
 
+export const DialogFooter = ChakraDialog.Footer;
+export const DialogHeader = ChakraDialog.Header;
+export const DialogBody = ChakraDialog.Body;
+export const DialogTitle = ChakraDialog.Title;
+export const DialogDescription = ChakraDialog.Description;
+export const DialogTrigger = ChakraDialog.Trigger;
+export const DialogActionTrigger = ChakraDialog.ActionTrigger;
+
 export const Dialog = {
   Root: DialogRoot,
   Content: DialogContent,
   CloseTrigger: DialogCloseTrigger,
-  Footer: ChakraDialog.Footer,
-  Header: ChakraDialog.Header,
-  Body: ChakraDialog.Body,
-  Title: ChakraDialog.Title,
-  Description: ChakraDialog.Description,
-  Trigger: ChakraDialog.Trigger,
-  ActionTrigger: ChakraDialog.ActionTrigger,
+  Footer: DialogFooter,
+  Header: DialogHeader,
+  Body: DialogBody,
+  Title: DialogTitle,
+  Description: DialogDescription,
+  Trigger: DialogTrigger,
+  ActionTrigger: DialogActionTrigger,
 };

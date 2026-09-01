@@ -492,6 +492,24 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  it("reads a method named fetch on an object as the method it is", () => {
+    const promptWeb = webPackage("prompt", {
+      "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
+    });
+    writeCatalogue([
+      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+    ]);
+    write(
+      "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+      // The transport client's own imperative read, which is the shape every
+      // page that walks a cursor uses. Catching it as the browser global made
+      // the rule unusable for exactly the pages it governs.
+      "export const load = (utils: any) => utils.prompts.list.fetch({ limit: 20 });",
+    );
+
+    expect(policies([promptWeb]).filter((policy) => policy === "ui-screen-closure")).toEqual([]);
+  });
+
   it("keeps a shareable surface out of every external implementation boundary", () => {
     const promptWeb = webPackage("prompt", {
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",

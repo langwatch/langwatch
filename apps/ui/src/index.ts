@@ -132,12 +132,16 @@ export {
   type UiRedirectRouteDescriptor,
   type UiRouteDescriptor,
 } from "./model/ui-route-table";
-export {
-  createUiApplication,
-  type UiApplication,
-  type UiApplicationInstall,
-  type UiFeatureInstall,
+export type {
+  UiApplication,
+  UiApplicationInstall,
+  UiFeatureInstall,
 } from "./ui/sections/ui-application";
+export { createUiApplication } from "./features/installed-ui-features.composition";
+export {
+  installedUiFeatures,
+  mergeUiFeatureInstalls,
+} from "./features/installed-ui-features";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
 export {
   createUiInnerProvider,

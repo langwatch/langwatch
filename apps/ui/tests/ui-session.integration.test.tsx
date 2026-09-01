@@ -98,7 +98,11 @@ class StubSession extends UiSessionPort {
     return true;
   }
 
-  isFeatureEnabled(): boolean {
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
     return true;
   }
 }

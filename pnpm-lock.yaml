@@ -448,6 +448,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@langwatch/enterprise-governance-web':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/governance/web
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../packages/platform-api-client
@@ -466,6 +469,9 @@ importers:
       better-auth:
         specifier: ^1.7.1
         version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.22.0)(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10)
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
       nprogress:
         specifier: ^0.2.0
         version: 0.2.0

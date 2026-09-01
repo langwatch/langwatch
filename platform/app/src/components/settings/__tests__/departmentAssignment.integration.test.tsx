@@ -12,7 +12,6 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imported at the top: vitest hoists the vi.mock / vi.hoisted calls below above
 // these statements, so the modules under test still resolve the mocks.
-import PeoplePage from "~/pages/governance/people";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
@@ -108,10 +107,6 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn(), dismiss: vi.fn() },
 }));
 
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-}));
-
 vi.mock("~/components/WithFeatureFlagGuard", () => ({
   withFeatureFlagGuard: () => (C: any) => C,
 }));
@@ -147,28 +142,6 @@ describe("department assignment UI", () => {
     ffEnabled.current = true;
     departmentList.current = [{ id: "dept_mkt", name: "Marketing" }];
     assignments.current = { users: [], teams: [], projects: [] };
-  });
-
-  describe("given the departments page", () => {
-    /** @scenario The departments page manages departments and links out to assign them */
-    it("manages departments and links to the members and teams pages instead of listing every person", () => {
-      renderWithChakra(<PeoplePage />);
-
-      expect(screen.getByText("Create a department")).toBeDefined();
-      expect(screen.getByRole("link", { name: /People/i }).getAttribute("href")).toBe(
-        "/settings/members",
-      );
-      // Anchored to the link title: the Projects link now also mentions the
-      // "teams page" in its description and points to /settings/teams too.
-      expect(screen.getByRole("link", { name: /^Teams/i }).getAttribute("href")).toBe(
-        "/settings/teams",
-      );
-      expect(screen.getByRole("link", { name: /^Projects/i }).getAttribute("href")).toBe(
-        "/settings/teams",
-      );
-      // The per-person assignment list is gone: no <select> on the page.
-      expect(document.querySelector("select")).toBeNull();
-    });
   });
 
   describe("given a member row on the members page", () => {

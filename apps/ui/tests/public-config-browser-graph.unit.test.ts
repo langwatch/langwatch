@@ -20,11 +20,9 @@ import { describe, expect, it } from "vitest";
  * projection to explain why it does not import it — a substring check would
  * fail on the explanation and pass once someone deleted it.
  */
-const MODULE_EDGE =
-  /^\s*(?:import|export)\b[^;]*?["'][^"']*public-config\.projection["']/m;
+const MODULE_EDGE = /^\s*(?:import|export)\b[^;]*?["'][^"']*public-config\.projection["']/m;
 const here = dirname(fileURLToPath(import.meta.url));
-const readSource = (relative: string) =>
-  readFileSync(resolve(here, "..", "src", relative), "utf8");
+const readSource = (relative: string) => readFileSync(resolve(here, "..", "src", relative), "utf8");
 
 describe("given the browser's public-config reader", () => {
   describe("when it is imported by client code", () => {

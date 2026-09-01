@@ -105,6 +105,8 @@ export type BrowserUiSessionState = {
   readonly scope: UiActiveScope;
   /** Undefined until the server has answered for this scope. */
   readonly permissions: ReadonlySet<string> | undefined;
+  /** Whether the scope and its permissions have both answered. */
+  readonly settled: boolean;
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
 };
@@ -141,11 +143,15 @@ export class BrowserUiSession extends UiSessionPort {
     return permissionSatisfiedBy({ granted, requested: permission });
   }
 
-  isFeatureEnabled(flag: string): boolean {
+  isSettled(): boolean {
+    return this.state.settled;
+  }
+
+  featureFlag(flag: string): boolean | undefined {
     const answer = this.state.flags.get(flag);
     if (answer === void 0) {
       this.state.askFlag(flag);
-      return false;
+      return void 0;
     }
     return answer;
   }
@@ -230,6 +236,12 @@ export function useBrowserUiSession({
     [permissions.data],
   );
 
+  // Settled means "the answers are the server's, not the fail-closed default".
+  // A caller with no scope at all has nothing to ask about, and waiting for an
+  // answer that will never be requested would leave a guard loading forever.
+  const settled =
+    !organizations.isLoading && (granted !== void 0 || (!project?.id && !organizationId));
+
   const requestedFlags = useSyncExternalStore(
     flagRequests.subscribe,
     flagRequests.requested,
@@ -276,9 +288,10 @@ export function useBrowserUiSession({
           projectId: project?.id ?? null,
         },
         permissions: granted,
+        settled,
         flags,
         askFlag,
       }),
-    [actor, organizationId, project?.id, granted, flags, askFlag],
+    [actor, organizationId, project?.id, granted, settled, flags, askFlag],
   );
 }

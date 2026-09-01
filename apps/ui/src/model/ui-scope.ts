@@ -34,6 +34,8 @@ export type UiScopeProject = {
 export type UiScopeTeam = {
   readonly id: string;
   readonly slug: string;
+  /** Read by a screen that names a team, never by the resolution. */
+  readonly name?: string;
   readonly isPersonal?: boolean | null;
   readonly ownerUserId?: string | null;
   /** Narrowed by `organization.getAll` to the caller's own row, when there is one. */
@@ -44,6 +46,8 @@ export type UiScopeTeam = {
 export type UiScopeOrganization = {
   readonly id: string;
   readonly slug?: string;
+  /** Read by a screen that names an organization, never by the resolution. */
+  readonly name?: string;
   /** Narrowed by `organization.getAll` to the caller's own row. */
   readonly members?: readonly { readonly role: string }[];
   readonly teams: readonly UiScopeTeam[];

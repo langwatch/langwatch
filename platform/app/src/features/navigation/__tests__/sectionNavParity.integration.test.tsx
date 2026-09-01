@@ -52,7 +52,6 @@ vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
 }));
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 describe("given the gateway section navigation data", () => {
@@ -99,59 +98,6 @@ describe("given the gateway section navigation data", () => {
         projectId: NOT_TARGETED,
         organizationId: "org-1",
         enabled: false,
-      });
-    });
-  });
-});
-
-describe("given the governance section navigation data", () => {
-  beforeEach(() => {
-    harness.enabledFlags = [];
-    harness.flagCallOptions = {};
-  });
-
-  describe("when the governance layout renders with the billed-cost flag off", () => {
-    /** @scenario With the billed-cost flag off, Costs and Billed do not exist */
-    it("renders the pinned item list without Costs and Billed", () => {
-      render(<GovernanceLayout>x</GovernanceLayout>);
-
-      expect(
-        capturedItems.map((item) => ({ label: item.label, href: item.href })),
-      ).toEqual([
-        { label: "Overview", href: "/governance" },
-        { label: "Inventory", href: "/governance/inventory" },
-        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
-        { label: "People", href: "/governance/people" },
-      ]);
-    });
-  });
-
-  describe("when the governance layout renders with the billed-cost flag on", () => {
-    /** @scenario With the billed-cost flag on, Costs and Billed appear as placeholders */
-    it("lists Costs and Billed between Overview and Inventory", () => {
-      harness.enabledFlags = ["release_ui_governance_billed_cost_enabled"];
-      render(<GovernanceLayout>x</GovernanceLayout>);
-
-      expect(
-        capturedItems.map((item) => ({ label: item.label, href: item.href })),
-      ).toEqual([
-        { label: "Overview", href: "/governance" },
-        { label: "Costs", href: "/governance/costs" },
-        { label: "Billed", href: "/governance/billed" },
-        { label: "Inventory", href: "/governance/inventory" },
-        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
-        { label: "People", href: "/governance/people" },
-      ]);
-
-      // The flag must resolve in organization context, gated on the org
-      // being loaded — flags resolved without it silently read as off. The
-      // layout holds no project, and says so.
-      expect(
-        harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
-      ).toEqual({
-        projectId: NOT_TARGETED,
-        organizationId: "org-1",
-        enabled: true,
       });
     });
   });

@@ -71,6 +71,30 @@ export abstract class UiNavigationPort {
   abstract back(): void;
 }
 
+/** The path parameters and query string a screen was opened with. */
+export type UiRouteReadingValues = {
+  /** The `:id` style segments the matched route captured. */
+  params: Readonly<Record<string, string | undefined>>;
+  /** The query string, single-valued — the last write of a repeated key wins. */
+  query: Readonly<Record<string, string | undefined>>;
+};
+
+/**
+ * The address a screen is rendering, as data.
+ *
+ * A screen that reads `useSearchParams` reaches the router, which is one of the
+ * imports ADR-004 seals off; it asks this instead. `setQuery` takes the WHOLE
+ * next query rather than a patch, because a screen that keeps view state in the
+ * URL has to be able to remove a key as well as set one.
+ */
+export abstract class UiRoutePort {
+  abstract reading(): UiRouteReadingValues;
+  abstract setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void;
+}
+
 /** Who is signed in, as a screen needs to know them. */
 export type UiActor = {
   id: string;
@@ -96,7 +120,31 @@ export abstract class UiSessionPort {
   abstract currentUser(): UiActor | null;
   abstract activeScope(): UiActiveScope;
   abstract hasPermission(permission: string): boolean;
-  abstract isFeatureEnabled(flag: string): boolean;
+
+  /**
+   * Whether the answers above have arrived for the current scope.
+   *
+   * A page guard needs the difference that `hasPermission` deliberately hides:
+   * "no, you may not" and "we have not asked yet" are the same `false` to a
+   * screen, and must not be the same to the guard that would otherwise show a
+   * refusal notice for a frame to everyone who has the grant.
+   */
+  abstract isSettled(): boolean;
+
+  /**
+   * Whether a flag is on, off, or not yet answered.
+   *
+   * The tri-state exists for the same reason as `isSettled`: a guard that reads
+   * an unanswered flag as off renders its not-found fallback on the first frame
+   * of every load. A screen wants the two-state answer and uses
+   * {@link isFeatureEnabled}.
+   */
+  abstract featureFlag(flag: string): boolean | undefined;
+
+  /** Fail-closed: not yet answered reads the same as off. */
+  isFeatureEnabled(flag: string): boolean {
+    return this.featureFlag(flag) === true;
+  }
 }
 
 class UnavailableUiFeedback extends UiFeedbackPort {
@@ -122,7 +170,15 @@ class UnavailableUiSession extends UiSessionPort {
     throw new UiCapabilityUnavailableError("session");
   }
 
-  isFeatureEnabled(): never {
+  isSettled(): never {
+    throw new UiCapabilityUnavailableError("session");
+  }
+
+  featureFlag(): never {
+    throw new UiCapabilityUnavailableError("session");
+  }
+
+  override isFeatureEnabled(): never {
     throw new UiCapabilityUnavailableError("session");
   }
 }
@@ -155,6 +211,7 @@ export type UiCapabilities = {
   documentTitle: UiDocumentTitlePort;
   feedback: UiFeedbackPort;
   navigation: UiNavigationPort;
+  route: UiRoutePort;
   session: UiSessionPort;
 };
 
@@ -165,8 +222,9 @@ export type UiCapabilityResolution = {
   install: UiCapabilityInstall;
   /** The default only the browser can build. */
   documentTitle: UiDocumentTitlePort;
-  /** The default only router context can build. */
+  /** The defaults only router context can build. */
   navigation: UiNavigationPort;
+  route: UiRoutePort;
   /**
    * The default only a live host can build: the reader, the scope and what
    * they may do, all read from the deployment this page came from. Absent for
@@ -184,12 +242,14 @@ export function resolveUiCapabilities({
   install,
   documentTitle,
   navigation,
+  route,
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
     documentTitle: install.documentTitle ?? documentTitle,
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     navigation: install.navigation ?? navigation,
+    route: install.route ?? route,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
   };
 }

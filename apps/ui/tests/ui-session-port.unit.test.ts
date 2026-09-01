@@ -37,6 +37,7 @@ function sessionWith({
     actor: { id: "user-jane", name: "Jane", email: null, image: null },
     scope: SOMEWHERE,
     permissions,
+    settled: permissions !== void 0,
     flags,
     askFlag,
   });

@@ -33,7 +33,7 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "../../behavior/ui-feature-transport";
-import { useRouterUiNavigation } from "../../behavior/ui-router-navigation";
+import { useRouterUiNavigation, useRouterUiRoute } from "../../behavior/ui-router-navigation";
 import type { UiSessionSource } from "../../behavior/ui-session";
 import type { UiProviderShell } from "./ui-outer-providers";
 
@@ -72,6 +72,7 @@ export function createUiFeatureShell({
     children: ReactNode;
   }) {
     const navigation = useRouterUiNavigation();
+    const route = useRouterUiRoute();
     const [documentTitle] = useState(() => BrowserUiDocumentTitle.create());
     const sessionPort: UiSessionPort = useSessionCapability({ transport: sessionTransport });
     const resolved = useMemo(
@@ -80,9 +81,10 @@ export function createUiFeatureShell({
           install: capabilities,
           documentTitle,
           navigation,
+          route,
           session: sessionPort,
         }),
-      [documentTitle, navigation, sessionPort],
+      [documentTitle, navigation, route, sessionPort],
     );
 
     return <UiCapabilityContextProvider value={resolved}>{children}</UiCapabilityContextProvider>;

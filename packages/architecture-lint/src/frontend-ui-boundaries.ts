@@ -105,7 +105,10 @@ const BROWSER_CAPABILITY_IMPORTS: ReadonlyArray<readonly [RegExp, string]> = [
 const BROWSER_CAPABILITY_SOURCE: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bAppRouter\b/, "AppRouter"],
   [/\bprocess\.env\b/, "process.env"],
-  [/\bfetch\s*\(/, "fetch"],
+  // Not `a.fetch(...)`: a tRPC utils client, a repository port and a queue
+  // client all name a method `fetch`, and calling one is not reaching for the
+  // browser global. The lookbehind is what tells the two apart.
+  [/(?<![.\w$])fetch\s*\(/, "fetch"],
   [/\b(?:XMLHttpRequest|WebSocket|EventSource)\b/, "a browser transport global"],
   [/\bnavigator\.sendBeacon\b/, "navigator.sendBeacon"],
   [/(?:\bwindow\.)?\blocation\.(?:assign|replace|href)\b/, "location navigation"],
