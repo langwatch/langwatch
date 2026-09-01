@@ -1,21 +1,18 @@
 {
   "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/data-privacy-web.tsbuildinfo",
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
-    "types": [],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true,
-    "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/data-privacy-web.tsbuildinfo",
-    "paths": {
-      "@langwatch/data-privacy-contract": ["../contract/src/index.ts"]
-    }
+    "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }

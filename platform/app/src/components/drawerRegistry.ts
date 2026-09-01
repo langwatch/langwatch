@@ -163,10 +163,6 @@ const InviteMemberDrawer = lazyDefault({
   factory: () => import("./settings/InviteMemberDrawer"),
   key: "InviteMemberDrawer",
 });
-const DataPrivacyRuleDrawer = lazyDefault({
-  factory: () => import("./settings/DataPrivacyRuleDrawer"),
-  key: "DataPrivacyRuleDrawer",
-});
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
   key: "DefaultModelOverrideDrawer",
@@ -261,8 +257,6 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Agent Testing v2 draws the same run plan in a dialog of its own.
   agentTestingPlanEditor: AgentTestingPlanModal,
-  // Data privacy
-  dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
   // Project management
   createProject: CreateProjectDrawer,

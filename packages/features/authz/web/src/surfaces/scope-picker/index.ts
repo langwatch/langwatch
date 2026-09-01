@@ -12,8 +12,25 @@
  * router-aware `~/components/ui/link` — a surface may not navigate, and every
  * href these chips carry is an in-app address the browser can follow on its own.
  * The platform copies stay for the settings screens that still consume them.
+ *
+ * `ScopeFilter` joined them with the data-governance move: it is the read-side
+ * twin — which scope the page is LOOKING at rather than which scopes a rule is
+ * written to — and every page that offers one offers the other. Its pure half
+ * (the `?scope=` address and the row predicate) travels beside it so two
+ * packages share one reading of the URL contract instead of two.
  */
 
+export {
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+  type ResolvedScopeFilter,
+  type ScopeFilterAddressWrite,
+  type ScopeHierarchy,
+} from "./scope-filter-address";
+export { ScopeFilter, type AvailableScopes, type ScopeFilterValue } from "./scope-filter";
 export {
   ProviderScopeChips,
   scopeChipTooltip,

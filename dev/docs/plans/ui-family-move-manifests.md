@@ -560,6 +560,7 @@ Known costs, all reported rather than suppressed:
 | `modelProviders/iconsMap`                       | me+gateway         | gateway drew ten locally; me took only the Design System's five marks and falls back to the generic model mark for the rest, on the legacy `iconKey` path only |
 | `ui/{ListTable,Pagination}`                     | me+governance      | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                               |
 | `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                              |
+| `settings/ScopeFilter` + `useUrlScopeFilter`      | data-retention+data-privacy | the SAME surface (`@langwatch/authz-web/surfaces/scope-picker`), component and pure address half both. Free, because every consumer of one already imports the other and `ui-screen-closure` counts import LINES. The platform copies stay for model-providers, api-keys and default-models |
 | traces-v2 deep imports                          | me+automations     | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided                                   |
 
 ## Single-owner files (serialize)
@@ -568,6 +569,10 @@ Known costs, all reported rather than suppressed:
   host-capability agent only, then frozen as reference.
 - `packages/architecture-lint/src/frontend-ui-boundaries.ts` — only if a
   new source root is ever added; prefer not.
+- `apps/ui/src/ui/sections/ui-settings-layout.tsx` + `model/ui-settings-menu.ts`
+  + `behavior/ui-organization-facts.ts` — the settings-chrome harvest, landed
+  with S5. Additive only from here: a settings family imports
+  `withUiSettingsLayout` and changes neither.
 - `apps/ui/src/features/catalogue.json`, `legacy-page-loaders.ts` (+ its
   unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
   filed under governance for routingPolicies and took them; me deleted the two
@@ -701,6 +706,227 @@ Known costs, all reported rather than suppressed:
   `getAgentEditorDrawer`. They are internal to the package now. What stays public
   is what `platform/app`'s HTTP editor and type-selector drawers still import.
 
+### settings S5 data governance — MOVED. 2 keys (not 4), 13 platform files, 0 insertions, 2,967 deletions
+
+Moved seventh, and the first SETTINGS family — which is the whole point of it.
+Every `pages/settings/*` page wraps `SettingsLayout`, a feature-web package can
+own neither host chrome nor `apps/ui`, and until this move nothing above a
+package-served page framed it. The harvest is the structural addition; the two
+screens are ordinary.
+
+**THE SURVEY'S FOUR KEYS ARE TWO.** The re-ranking row counted
+`pages/settings/{data-retention,data-privacy,topic-clustering,email-suppressions}`
+as one family because a reader would call them all "data governance". Ownership
+disagrees, and ownership is what a move follows:
+
+- `topic-clustering` reads `@langwatch/topic-contract` and calls `api.topicClustering.*`.
+  It is the TOPIC feature's page, and `packages/features/topic` has no web
+  package at all. Moving it would mean creating one for a page that shares
+  nothing with these two.
+- `email-suppressions` calls `api.emailSuppression.*`, whose transport is
+  `packages/features/automation/server/src/transport/api-trpc/email-suppression.api.ts`.
+  It is the AUTOMATION feature's page, and that family already moved — its
+  destination `@langwatch/automation-web` exists and is governed. It is a
+  ride-along for whoever next touches automations, not this family's.
+
+Both are recorded here rather than forced, and the effort estimate was right for
+the two that remain.
+
+Two destination packages rather than one, which is what makes this family look
+bigger than its key count: `@langwatch/data-retention-web` and
+`@langwatch/data-privacy-web` are separate features with separate contracts, so
+there are two host ports, two procedure maps, two `apps/ui` features and two
+catalogue entries. They travel together because they are one family to a reader
+— what LangWatch keeps, and who may read it.
+
+#### The SettingsLayout harvest
+
+`apps/ui/src/ui/sections/ui-settings-layout.tsx` is `SettingsLayout`'s
+collapsible menu and content frame, copied. `platform/app`'s copy stays for its
+remaining twenty settings pages and dies with the last of them.
+
+- **The menu is DATA**, in `apps/ui/src/model/ui-settings-menu.ts`, because the
+  harvest's whole risk is a silently dropped link and a list is assertable in a
+  way a tree of JSX is not. `tests/ui-settings-menu.unit.test.ts` pins every
+  address under every gate; dropping one entry fails two cases.
+- **An entry is an href, not a loader.** The twenty addresses `platform/app`
+  still serves are unchanged and its router still answers them, so the menu is
+  complete regardless of which half of the product renders the page behind it.
+  Nothing about the harvest couples the menu to the migration.
+- **Four gates, four answers, none of them invented.** `hasPermission` and both
+  operator grants come off `UiSessionPort` (`ops:view` opens the workspace,
+  `ops:manage` the Backoffice — the ops family's decoupling, restated). The plan
+  tier, the `EXTERNAL` membership role and `IS_SAAS` are NOT permissions, so
+  they are read in `apps/ui/src/behavior/ui-organization-facts.ts` over the
+  application's own transport, under `trpcQueryKey` — `limits.getUsage` lands on
+  the same cache entry as the application's `useActivePlan`, and the
+  organization graph is the one the shell already holds. A feature could not do
+  this for itself: `@tanstack/react-query` is sealed off from `src/features/*`.
+- **`DashboardLayout` does not travel**, and that is the same chrome gap every
+  family since the gateway has recorded: 738 lines of header, product menu,
+  command bar, Langy dock and drawer registry. This layout frames the settings
+  content and nothing above it.
+- **The navigation-v2 branch does not travel either.** `SettingsLayout` stands
+  its own menu down when the v2 shell is active because that shell carries a
+  richer settings menu (`features/navigation/useSettingsMenu.ts`, 410 lines). No
+  v2 shell exists above a page served from `apps/ui`, so the harvested menu
+  always renders — and harvesting the v2 menu is navigation's move.
+- **The chrome goes OUTSIDE the guard.** `withPermissionGuard({ layoutComponent })`
+  wrapped its own refusal in the layout, so a reader who lacks the grant still
+  sees the settings frame they navigated into. Getting this backwards is
+  invisible until someone is refused; `tests/data-governance-page-policy.integration.test.tsx`
+  mounts a refusal and reads the menu out of it.
+- **`settings-page-chrome.unit.test.ts` HAD to move with the first settings
+  family.** It read each `/settings` page key's source out of
+  `platform/app/src/pages/settings`, so two keys that are now a package screen
+  and an `apps/ui` loader made it fail for pages that are in fact framed. The
+  invariant spans two source trees now, so it is stated where the route table is
+  — `apps/ui/tests/settings-page-chrome.unit.test.ts` — and each key is checked
+  against whichever half serves it. Its `@scenario` binding travels intact.
+  WHOEVER MOVES THE NEXT SETTINGS FAMILY inherits a guard that already knows how
+  to answer for both halves and needs no further edits.
+
+#### The two contract moves, and why they are restatements
+
+`RetentionPolicySnapshot` and `DataPrivacySnapshot` are the shapes the two pages
+render, and both are declared in `platform/app/src/server`, which a browser
+package may not reach. The obvious move — put the type in the contract and
+repoint the read model — is FORBIDDEN by the deletes-only ruling: repointing an
+import in `platform/app` is an insertion.
+
+So both are DECLARED in their feature's contract
+(`data-retention.snapshot.ts`, `data-privacy.snapshot.ts`) and the platform read
+model keeps its own identical copy until it moves into its feature's server
+package. The docblocks say so, and name the alignment obligation — the same
+promise `@langwatch/enterprise-billing-contract` makes about its Prisma enum
+copies. Whoever moves those read models deletes the platform copies and the two
+files stop being restatements.
+
+`PLATFORM_DEFAULT_RETENTION_DAYS` moved for real, and it is smaller than it
+looks: the platform module already resolved to the production constant in the
+browser (`typeof process === "undefined"` — vite substitutes only enumerated
+`process.env.<KEY>` reads, and a bare `process.env` threw at module load), so
+the contract's `49` is exactly the value every browser surface has rendered. The
+dev-only `LANGWATCH_DEFAULT_RETENTION_DAYS` override is server-side and stays.
+
+#### What actually happened, against what was surveyed
+
+- **`ScopeFilter` went to `@langwatch/authz-web/surfaces/scope-picker`, not into
+  two family-local copies.** Both screens need it, both already import that
+  surface for `ScopeChipPicker`, and `ui-screen-closure` is counted PER IMPORT
+  LINE — so adding it to a surface both screens already name cost ZERO extra
+  findings, against ~200 duplicated lines for the copy-each approach. Its pure
+  half (`scope-filter-address.ts`: the `?scope=` contract, `resolveScopeFilter`,
+  `isScopeInFilter`) travels with it, harvested from `useUrlScopeFilter` and
+  `~/utils/filterProvidersByScope`, both of which keep three non-family callers
+  in `platform/app`. THE COLLISION TABLE'S ANSWER FOR A SHARED SETTINGS CONTROL
+  IS NOW "THE SURFACE ITS SIBLING ALREADY LIVES IN", not "a copy each".
+- **The scope filter reads the address instead of mirroring it.**
+  `useUrlScopeFilter` kept a `useState` synced to `?scope=` by an effect. The
+  screens read `host.route().query.scope` directly and write through
+  `setQuery`. Every value the hook could hold survives the round trip (a
+  "This Team" pick is written and read back as `TEAM:<id>`, and both render the
+  same label and resolve the same way), so the mirror only ever risked
+  disagreeing with the URL.
+- **`dataPrivacyRule` was a pure registry deletion.** The page was its only
+  opener, so the entry, its lazy factory and
+  `components/settings/DataPrivacyRuleDrawer.tsx` — the URL shell that rebuilt
+  the drawer from `drawer.*` params — die together. The screen addresses it with
+  `?rule=new` / `?rule=<tier>:<id>:<personal>`, the gateway shape, third use.
+  The spec's four scenarios still bind; its comment block, which named
+  `drawer.open`, was corrected to describe the address rather than a parameter.
+- **Both root `.` exports were DELETED**, and this family paid nothing for it:
+  the only importers of either package were the two pages and three tests, all
+  of which moved. Neither package carries a `ui-web-public-entry` finding.
+- **The privacy drawer takes a `scopePicker` RENDER PROP**, copying its sibling
+  `AddOverrideDrawer`, which already had one. One import of the authz surface per
+  package rather than two, and the drawer stays free of scope vocabulary it does
+  not own.
+- **`isSafeRegex` came over as a family-local copy** (`model/data-privacy-patterns.ts`):
+  `~/utils/safeRegex` has six non-family callers. The over-broad secret probe is
+  `@langwatch/redaction`'s own and is imported directly, which is the one closure
+  finding below that is not shared with an earlier family.
+- **The team is DERIVED, not asked.** `UiActiveScope` carries the organization
+  and the project; both pages also need the team, for "This Team" and for the
+  cascade. Retention takes it out of the organization graph its provider already
+  reads; privacy takes it off its own snapshot, where a project row carries its
+  team. Neither adds a query.
+
+#### Hazards, as they actually resolved
+
+- **`UiFeedbackPort` HAS TWO LEVELS AND `toaster` HAD FOUR.** The amber
+  "Saved 7 of 9 updates" line and the blue "Applying retention to existing data…"
+  line are both success-lane notices now. The words are unchanged and the error
+  toast beside the first still says something failed; only the colour is gone.
+  Widening the capability is a change to a port every family shares, and a page
+  move is not where that belongs. THE FIRST RECORDED COST OF THE TWO-LEVEL
+  FEEDBACK PORT — the four families before this one happened to need only two.
+- **The design system's `Drawer` is not `~/components/ui/drawer`.** The platform
+  wrapper adds the Langy dodge and an inline error boundary; a package may reach
+  for neither. Ten package drawers already made this substitution, so it is
+  precedent rather than a decision, but it is a behaviour difference and the ops
+  family's warning stands: diff before substituting.
+- **`isPlatformAdmin` is on the HOST PORT, not the procedure map, and it is not a
+  permission.** Only a platform administrator may turn retention off; that is an
+  email allowlist, and folding it into an organization grant would widen it. The
+  first host port to answer a capability question that the authz registry
+  deliberately does not model.
+- **THE PII LABEL PARITY TEST WAS REBUILT, NOT MOVED, AND IT LOST TWO PINS.**
+  `piiEntityLabels.unit.test.ts` pinned the two label maps against
+  `ESSENTIAL_PII_ENTITIES` and `PRESIDIO_STRICT_ENTITIES`, both in
+  `platform/app/src/server`. The rebuild uses `@langwatch/redaction`'s
+  `REDACTION_MARKER_ENTITIES`, which is the union of the analyzer list with the
+  one native-only identifier, so coverage is pinned MORE completely than before
+  — but the two assertions naming WHICH SIDE of the essential/strict split each
+  entity falls on, and the one naming the Brazilian CPF as native-only, are gone.
+  They return when the two engine lists move into `@langwatch/redaction`.
+
+#### Known costs, all reported rather than suppressed
+
+- 7 new architecture-lint findings (784 → 790, and one pre-existing
+  `legacy-feature-fragment` for the data-privacy page retired): two
+  `cross-feature` package edges for `@langwatch/authz-web` — the same edge
+  governance and gateway already carry — and five `ui-screen-closure`: the
+  `@langwatch/platform-api-client` import in each procedure map (the exception
+  every family carries), one `@langwatch/authz-web/surfaces/scope-picker` per
+  screen (the same class governance carries fourteen of), and
+  `@langwatch/redaction` in the privacy patterns module, which is this family's
+  own and is what keeps the form's over-broad verdict identical to the
+  pipeline's.
+- ZERO new `platform/app` typecheck errors. Nothing outside the family imported
+  either page, either web package's root export, or the deleted drawer registry
+  entry, so the deletions break nothing — the first family since the gateway to
+  leave `platform/app` no redder than it found it.
+- The `legacy-feature-fragment-baseline` row for the retention page and two
+  `legacy-application-boundary-baseline` entries were deleted with their files;
+  a stale baseline entry is itself a finding.
+- `specs/data-retention/retention-policy-configuration.feature` GRADUATED OUT OF
+  `LEGACY_INERT`: it had 18 untagged scenarios and enforced nothing, and six
+  tagged `@integration` scenarios describing what the page itself does now bind
+  to the screen suite. Removing the file from the inert list in
+  `check-feature-parity.ts` is a pure deletion, which the ruling allows. The
+  other 18 describe server resolution and are left untagged rather than bound to
+  tests that do not prove them.
+
+#### The seventh family's own additions, for whoever moves the eighth
+
+- **Settings chrome exists now.** `withUiSettingsLayout` is one import and one
+  wrapper, outside the guard and inside the host. A settings family costs a host
+  port, a procedure map, a routes section and that one line.
+- **Check feature OWNERSHIP before accepting a survey's key grouping.** Two of
+  the four keys belonged to other features, and the tell was one import each —
+  the contract the page names and the package its procedures are mounted from.
+  A key belongs to the family that owns its transport, not to the section of the
+  menu it appears under.
+- **A shared settings control belongs in the surface its sibling already lives
+  in.** `ui-screen-closure` counts import LINES, so adding a name to a surface
+  every consumer already imports is free, and a second family-local copy is not.
+- **A source-reading guard in `platform/app` is a migration hazard, and the fix
+  is to move it rather than to leave it red.** `settings-page-chrome.unit.test.ts`
+  read page source off disk; the first settings move broke two of its cases for
+  pages that were still framed. Whoever moves a family should grep the tests that
+  read `platform/app/src/<their keys>` BEFORE deleting anything.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -714,7 +940,7 @@ closures are computed net of that.
 | # | Family | Keys | Effort | Gate |
 |---|---|---|---|---|
 | 1 | agents | 1 | ~2+0 | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies. |
-| 2 | settings S5 data governance | 4 | 5+5 | relayout data-retention/privacy-web first; 2 server-type contract moves; lands the SettingsLayout harvest |
+| 2 | settings S5 data governance | 4 | 5+5 | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one. |
 | 3 | datasets | 2 | 6+6 | relayout dataset-web; one AppRouter type → contract DTO; touches NO drawer entries |
 | 4 | settings S4 model config | 2 | 7+6 | create model-provider-web; 2 one-line platform breaks |
 | 5 | prompts | 1 | 44+14 | "model out first" is now just NINE family-local copies (5 optimization_studio consumers die with workflows); ~70 prompt fragment lines retire; prompt-web governed, 57% adapter ratio |

@@ -26,9 +26,7 @@ export const retroactiveMutationProgressSchema = z
     category: retentionCategorySchema.nullable(),
   })
   .strict();
-export type RetroactiveMutationProgress = z.infer<
-  typeof retroactiveMutationProgressSchema
->;
+export type RetroactiveMutationProgress = z.infer<typeof retroactiveMutationProgressSchema>;
 
 export type RetentionChangeKind = "expansion" | "contraction" | "noop";
 
@@ -94,6 +92,21 @@ export const INDEFINITE_RETENTION_DAYS = 0;
 export const MIGRATION_DEFAULT_RETENTION_DAYS = 308;
 
 /**
+ * The retention a tenant's data is stamped with when no override exists
+ * anywhere in its scope cascade: 7 weeks. Retention is default-on — the absence
+ * of an override does not mean indefinite, it means "use the platform default".
+ *
+ * A SERVER process may lower this for a local stack through
+ * `LANGWATCH_DEFAULT_RETENTION_DAYS`, which is validated at boot and injected;
+ * that override is dev-only and fails loud outside development and test. The
+ * BROWSER has no such override to honour and no `process` to read it from, so
+ * the constant is the value every browser surface has always rendered. It is
+ * here because the settings page names the default in its empty state, and a
+ * browser package may not import the server module that resolves it.
+ */
+export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+
+/**
  * Boot validates and injects this value. The portable contract never reads
  * process environment state at import time.
  */
@@ -116,9 +129,8 @@ export const retentionDaysSchema = z
   })
   .refine(
     (days) =>
-      PAID_RETENTION_PRESET_DAYS.includes(
-        days as (typeof PAID_RETENTION_PRESET_DAYS)[number],
-      ) || days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+      PAID_RETENTION_PRESET_DAYS.includes(days as (typeof PAID_RETENTION_PRESET_DAYS)[number]) ||
+      days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
     {
       message: `Retention under ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days is only available as a fixed plan option.`,
     },
@@ -136,20 +148,14 @@ export const retroactiveRetentionUpdateInputSchema = z
     newRetentionDays: retentionDaysInputSchema,
   })
   .strict();
-export type RetroactiveRetentionUpdateInput = z.infer<
-  typeof retroactiveRetentionUpdateInputSchema
->;
+export type RetroactiveRetentionUpdateInput = z.infer<typeof retroactiveRetentionUpdateInputSchema>;
 
 export const retroactiveMutationProjectInputSchema = z
   .object({ projectId: z.string().min(1) })
   .strict();
-export type RetroactiveMutationProjectInput = z.infer<
-  typeof retroactiveMutationProjectInputSchema
->;
+export type RetroactiveMutationProjectInput = z.infer<typeof retroactiveMutationProjectInputSchema>;
 
-export const storageMeterTenantInputSchema = z
-  .object({ tenantId: z.string().min(1) })
-  .strict();
+export const storageMeterTenantInputSchema = z.object({ tenantId: z.string().min(1) }).strict();
 export type StorageMeterTenantInput = z.infer<typeof storageMeterTenantInputSchema>;
 
 export const storageMeterTenantsInputSchema = z
@@ -163,9 +169,7 @@ export const killRetroactiveMutationInputSchema = z
     mutationId: z.string().min(1),
   })
   .strict();
-export type KillRetroactiveMutationInput = z.infer<
-  typeof killRetroactiveMutationInputSchema
->;
+export type KillRetroactiveMutationInput = z.infer<typeof killRetroactiveMutationInputSchema>;
 
 export const retentionPolicySchema = z
   .object({

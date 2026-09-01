@@ -396,7 +396,6 @@ const LEGACY_INERT: string[] = [
   "specs/data-retention/ingestion-stamping.feature",
   "specs/data-retention/monitoring.feature",
   "specs/data-retention/plan-gated-retention-menu.feature",
-  "specs/data-retention/retention-policy-configuration.feature",
   "specs/data-retention/retroactive-update.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",

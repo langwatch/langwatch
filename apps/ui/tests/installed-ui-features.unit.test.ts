@@ -32,6 +32,15 @@ const AUTOMATION_PAGE_KEYS = [
   "pages/[project]/automations/activity",
 ];
 
+const DATA_GOVERNANCE_PAGE_KEYS = [
+  // Two settings keys, two packages, two frontend features. They travel
+  // together because they are one family to a reader — what LangWatch keeps and
+  // who may read it — and separately in the source because the two features
+  // already owned a package each.
+  "pages/settings/data-retention",
+  "pages/settings/data-privacy",
+];
+
 const GATEWAY_PAGE_KEYS = [
   "pages/gateway/virtual-keys",
   "pages/gateway/virtual-keys/[id]",
@@ -128,6 +137,7 @@ describe("given what apps/ui serves itself", () => {
         [
           ...AGENT_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...DATA_GOVERNANCE_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
@@ -137,12 +147,14 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Seven rather than six: the personal workspace mounts two, because the
+      // Nine for eight features: the personal workspace mounts two, because the
       // coding-agent tables its screens render call procedures of their own and
       // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
         "@langwatch/automation-web",
+        "@langwatch/data-privacy-web",
+        "@langwatch/data-retention-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
         "@langwatch/ops-web",
@@ -195,13 +207,14 @@ describe("given what apps/ui serves itself", () => {
         [
           ...AGENT_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...DATA_GOVERNANCE_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(7);
+      expect(merged.apis).toHaveLength(9);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

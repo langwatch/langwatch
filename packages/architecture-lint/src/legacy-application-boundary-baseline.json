@@ -808,13 +808,6 @@
       "platform/app/src/pages/settings/audit-log.tsx": [
         "~/server/app-layer/organizations/repositories/organization.repository"
       ],
-      "platform/app/src/pages/settings/data-privacy.tsx": [
-        "~/server/data-privacy/dataPrivacy.types",
-        "~/server/data-privacy/dataPrivacyPolicy.read"
-      ],
-      "platform/app/src/pages/settings/data-retention.tsx": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
       "platform/app/src/pages/settings/members.tsx": [
         "../../server/app-layer/organizations/repositories/organization.repository"
       ],

@@ -53,7 +53,6 @@
     {"feature":"billing","file":"platform/app/src/server/app-layer/billing/nurturing/subscriptionSync.ts","kind":"legacy-implementation"},
     {"feature":"billing","file":"platform/app/src/server/app-layer/billing/nurturing/userSync.ts","kind":"legacy-implementation"},
     {"feature":"coding-agent","file":"platform/app/src/runtime/app/features/coding-agent.ts","kind":"composition"},
-    {"feature":"data-retention","file":"platform/app/src/pages/settings/data-retention.tsx","kind":"page-shell"},
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/metering/storage-meter.read.ts","kind":"legacy-implementation"},
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/policy/dataRetentionPolicy.authz.ts","kind":"legacy-implementation"},
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/policy/dataRetentionPolicy.read.ts","kind":"legacy-implementation"},

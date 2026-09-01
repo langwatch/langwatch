@@ -3,6 +3,8 @@
   "governedWebPackages": [
     "@langwatch/agent-web",
     "@langwatch/automation-web",
+    "@langwatch/data-privacy-web",
+    "@langwatch/data-retention-web",
     "@langwatch/enterprise-governance-web",
     "@langwatch/gateway-web",
     "@langwatch/ops-web",
@@ -23,6 +25,22 @@
       "root": "automations",
       "uses": {
         "screens": ["@langwatch/automation-web/screens/automations"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "data-privacy",
+      "root": "data-privacy",
+      "uses": {
+        "screens": ["@langwatch/data-privacy-web/screens/data-privacy"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "data-retention",
+      "root": "data-retention",
+      "uses": {
+        "screens": ["@langwatch/data-retention-web/screens/data-retention"],
         "surfaces": []
       }
     },
