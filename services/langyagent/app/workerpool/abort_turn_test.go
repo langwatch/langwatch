@@ -104,7 +104,7 @@ func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 // An agent without the abort capability was fail-open until ADR-131: the
 // cancel was a silent no-op, because the removed harness could not abort. Every
 // agent aborts now, so the case has no subject — and a test kept here would
-// pass by exercising a fake's no-op rather than any product behaviour.
+// pass by exercising a fake's no-op rather than any product behavior.
 
 // A failing abort is best-effort: logged, never propagated — the durable
 // stopped terminal upstream already made the stop truthful.

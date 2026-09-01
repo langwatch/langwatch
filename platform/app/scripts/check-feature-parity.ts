@@ -461,12 +461,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
-  // ADR-131's contract, written before the removal it describes. Every
-  // scenario asserts behaviour of a codebase with one harness, which cannot be
-  // tested while there are two — so the file is inert by construction rather
-  // than by neglect. It comes off this list in the same PR that removes the
-  // harness: at that point every scenario is testable, and most are cheap.
-  "specs/langy/langy-opencode-harness-removal.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",

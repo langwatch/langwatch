@@ -197,7 +197,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # not a credential file — there isn't one.
 
   @unit @unimplemented
-  Scenario: An unrecognised isolation setting fails closed
+  Scenario: An unrecognized isolation setting fails closed
     Given the agent is configured with an isolation value the manager does not know
     When the manager starts
     Then it refuses to start
