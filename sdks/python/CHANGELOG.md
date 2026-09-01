@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.0...python-sdk@v1.3.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **agents:** a finished connected-agent run reaches its verdict, and the transcript stays whole ([#7696](https://github.com/langwatch/langwatch/issues/7696)) ([4f7b665](https://github.com/langwatch/langwatch/commit/4f7b665623e1e453e8f505c259f2351bd074ad72))
+* **python-sdk:** read the rejected field out of the REST refusal envelope ([#7684](https://github.com/langwatch/langwatch/issues/7684)) ([730f161](https://github.com/langwatch/langwatch/commit/730f161e73e0da2c5fb2aa31cc788d39edaadc6f))
+
+
+### Documentation
+
+* **agent-testing:** connect from a function beside your service startup ([#7698](https://github.com/langwatch/langwatch/issues/7698)) ([60e7d4c](https://github.com/langwatch/langwatch/commit/60e7d4cedd0b0d70ed271891b24b507a0258a05e))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.2.1...python-sdk@v1.3.0) (2026-08-31)
 
 
