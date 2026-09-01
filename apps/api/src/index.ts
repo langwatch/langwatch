@@ -12,9 +12,6 @@ export {
 export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition";
 export {
   ApiProductionComposition,
-  composeApiDatabase,
-  composeApiLifecycleProcess,
-  composeApiSecretEncryption,
   LoggedApiAgentsAbsence,
   LoggedApiAuthAbsence,
   LoggedApiAuthzAbsence,
@@ -24,7 +21,6 @@ export {
   LoggedApiQueueAbsence,
   LoggedApiSecretEncryptionAbsence,
   LoggedApiTenancyAbsence,
-  resolveApiMetrics,
   type ApiOwnedRestFeaturePorts,
   type ApiProductionCompositionOptions,
 } from "./app/api-production.composition";
@@ -55,8 +51,6 @@ export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter
 export {
   API_UNAVAILABLE_PRODUCT_ADAPTERS,
   ApiStandaloneComposition,
-  type ApiProductAdapters,
-  type ApiStandaloneCompositionOptions,
 } from "./app/api-standalone.composition";
 export {
   describeApiFailure,

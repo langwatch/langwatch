@@ -41,24 +41,53 @@ export const nonNegativeSecondsSchema = z.coerce
   .max(10 * 365 * 24 * 60 * 60);
 
 export type RuntimeConfigIssue = {
+  /** The configuration leaf, spelled the way the service consumes it. */
   path: string;
   code: string;
+  /**
+   * The environment variable that leaf reads, where a definition binds one.
+   *
+   * Absent when a runtime hands `RuntimeConfig` a bare Zod schema: nothing then
+   * knows which variable a field came from, and inventing one would name a
+   * variable the deployment may not have.
+   */
+  env?: string;
 };
 
+/**
+ * The refusal a runtime raises before it constructs anything, addressed to the
+ * operator who has to fix it.
+ *
+ * It identifies each rejected value by its LEAF PATH rather than by the
+ * environment variable behind it. The path is what the service consumes and
+ * what its declaration is written in, so it survives a variable being renamed
+ * or read under a compatibility alias, and it matches what a reader finds in
+ * the definition. The variable is still what an operator has to set, so it
+ * rides along in parentheses whenever the definition knows it.
+ */
 export class InvalidRuntimeConfigError extends Error {
   override readonly name = "InvalidRuntimeConfigError";
+  readonly runtime: string;
   readonly issues: RuntimeConfigIssue[];
 
-  constructor(
-    readonly runtime: string,
-    error: z.ZodError,
-  ) {
-    const issues = error.issues.map((issue) => ({
-      path: issue.path.join("."),
-      code: issue.code,
-    }));
-    const locations = issues.map((issue) => `${issue.path || "<root>"} (${issue.code})`).join(", ");
-    super(`Invalid ${runtime} configuration: ${locations}.`);
+  constructor(input: {
+    runtime: string;
+    error: z.ZodError;
+    bindings?: ReadonlyMap<string, string>;
+  }) {
+    const issues = input.error.issues.map((issue) => {
+      const path = issue.path.join(".");
+      const env = input.bindings?.get(path);
+      return { path, code: issue.code, ...(env === undefined ? {} : { env }) };
+    });
+    const locations = issues
+      .map(
+        (issue) =>
+          `${issue.path || "<root>"} (${issue.env === undefined ? "" : `${issue.env}, `}${issue.code})`,
+      )
+      .join(", ");
+    super(`Invalid ${input.runtime} configuration: ${locations}.`);
+    this.runtime = input.runtime;
     this.issues = issues;
   }
 }
@@ -132,11 +161,15 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
     const definition = options.definition;
     const schema =
       ("schema" in options ? options.schema : undefined) ?? compileRuntimeConfig(definition ?? {});
-    const input = definition ? resolveDefinition(definition, options.source) : options.source;
-    const result = schema.safeParse(input);
+    const resolved = definition ? resolveDefinition(definition, options.source) : undefined;
+    const result = schema.safeParse(resolved ? resolved.value : options.source);
 
     if (!result.success) {
-      throw new InvalidRuntimeConfigError(options.name, result.error);
+      throw new InvalidRuntimeConfigError({
+        runtime: options.name,
+        error: result.error,
+        bindings: resolved?.bindings,
+      });
     }
 
     return new RuntimeConfig(
@@ -195,7 +228,17 @@ function envName(path: readonly string[]): string {
 }
 
 function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
-  const seen = new Set<string>();
+  const claimed = new Map<string, string>();
+
+  const claim = (binding: string, path: string[]): void => {
+    const owner = claimed.get(binding);
+    if (owner !== undefined) {
+      throw new Error(
+        `Duplicate configuration environment binding: ${path.join(".")} (${binding}) is already bound by ${owner}.`,
+      );
+    }
+    claimed.set(binding, path.join("."));
+  };
 
   const compile = (node: RuntimeConfigDefinition, path: string[]): z.ZodTypeAny => {
     const shape: Record<string, z.ZodTypeAny> = {};
@@ -204,20 +247,12 @@ function compileDefinition(definition: RuntimeConfigDefinition): z.ZodTypeAny {
       const nextPath = [...path, key];
 
       if (isConfigLeaf(value)) {
-        const binding = value.env ?? envName(nextPath);
-        if (seen.has(binding)) {
-          throw new Error(`Duplicate configuration environment binding: ${binding}.`);
-        }
-        seen.add(binding);
+        claim(value.env ?? envName(nextPath), nextPath);
         shape[key] = value.schema;
       } else if (typeof value === "object" && value !== null) {
         shape[key] = compile(value, nextPath);
       } else {
-        const binding = envName(nextPath);
-        if (seen.has(binding)) {
-          throw new Error(`Duplicate configuration environment binding: ${binding}.`);
-        }
-        seen.add(binding);
+        claim(envName(nextPath), nextPath);
         shape[key] = primitiveSchema(value as boolean | number | string);
       }
     }
@@ -244,26 +279,47 @@ function primitiveSchema(value: boolean | number | string): z.ZodTypeAny {
   return z.string().default(value);
 }
 
+/**
+ * The definition read against one source, plus the map a refusal is written
+ * from: leaf path to the environment variable that leaf was read under.
+ *
+ * Collected on the same walk that reads the values, so the two can never
+ * disagree about which variable a leaf binds.
+ */
+type ResolvedDefinition = {
+  value: Record<string, unknown>;
+  bindings: ReadonlyMap<string, string>;
+};
+
 function resolveDefinition(
   definition: RuntimeConfigDefinition,
   source: Readonly<Record<string, unknown>>,
-  path: string[] = [],
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+): ResolvedDefinition {
+  const bindings = new Map<string, string>();
 
-  for (const [key, value] of Object.entries(definition)) {
-    if (isConfigLeaf(value)) {
-      const binding = value.env ?? envName([...path, key]);
-      result[key] = source[binding] === undefined ? undefined : source[binding];
-    } else if (typeof value === "object" && value !== null) {
-      result[key] = resolveDefinition(value, source, [...path, key]);
-    } else {
-      const binding = envName([...path, key]);
-      result[key] = source[binding] === undefined ? value : source[binding];
+  const resolve = (node: RuntimeConfigDefinition, path: string[]): Record<string, unknown> => {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(node)) {
+      const nextPath = [...path, key];
+
+      if (isConfigLeaf(value)) {
+        const binding = value.env ?? envName(nextPath);
+        bindings.set(nextPath.join("."), binding);
+        result[key] = source[binding];
+      } else if (typeof value === "object" && value !== null) {
+        result[key] = resolve(value, nextPath);
+      } else {
+        const binding = envName(nextPath);
+        bindings.set(nextPath.join("."), binding);
+        result[key] = source[binding] === undefined ? value : source[binding];
+      }
     }
-  }
 
-  return result;
+    return result;
+  };
+
+  return { value: resolve(definition, []), bindings };
 }
 
 function configValue<T>(value: z.ZodType<T>, options?: { env?: string }): ConfigLeaf<T>;
@@ -489,9 +545,7 @@ export function positiveSafeIntegerOrUndefined(raw: string | undefined): number 
  * budgets and caps where zero means "unbounded" or "off" and negatives are
  * still nonsense.
  */
-export function nonNegativeSafeIntegerOrUndefined(
-  raw: string | undefined,
-): number | undefined {
+export function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
   const parsed = Number(raw);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }

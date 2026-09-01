@@ -11,12 +11,12 @@ import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
 } from "../app/api-auth.composition";
+import type { ApiProductionCompositionOptions } from "../app/api-production.composition";
 import { API_UNAVAILABLE_PRODUCT_ADAPTERS } from "../app/api-standalone.composition";
 import {
   startStandaloneApi,
   type ApiExecutableHost,
   type ApiExecutableHostEvent,
-  type ApiStandaloneExecutableOptions,
 } from "../app/api-standalone.executable";
 import { apiLoggerConfiguration, resolveApiConfig } from "../platform/config/api.config";
 
@@ -132,7 +132,7 @@ describe("the standalone API executable", () => {
 
       const started = await startStandaloneApi({
         host: new RecordingHost(environment),
-        products: hostProducts(),
+        ...hostProducts(),
       });
 
       const secretDoor = await fetch(`http://127.0.0.1:${environment.API_PORT}/api/secret`, {
@@ -264,7 +264,7 @@ function logged(spy: MockInstance): string[] {
  * asserts which transports a supplied graph mounts, not what any of them
  * answers.
  */
-function hostProducts(): NonNullable<ApiStandaloneExecutableOptions["products"]> {
+function hostProducts(): ApiProductionCompositionOptions {
   return {
     agents: new Proxy(AgentService.prototype, {}),
     secrets: new Proxy(SecretService.prototype, {}),

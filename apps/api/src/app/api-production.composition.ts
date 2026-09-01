@@ -87,12 +87,26 @@ import { ApiRestObservabilityComposition } from "./api-rest-observability.compos
  */
 export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminKey" | "rateLimit">;
 
-/** What a host hands the production composition, and what it may leave out. */
+/**
+ * What a host hands the production composition, and what it may leave out.
+ *
+ * One flat object, and every field on it is optional. A host supplies a field
+ * to OVERRIDE what this process would compose for itself — a test binding a
+ * double, or a deployment that already owns one instance of the service graph
+ * — rather than to unlock a graph that would not exist without it. Leaving any
+ * of them out is a supported shape with the consequence each one names, and
+ * one of them is not a service at all: `browserSessions` is the deployment's
+ * own Better Auth instance, the last collaborator on this list no package
+ * implements.
+ */
 export type ApiProductionCompositionOptions = {
   /**
    * A host's already-composed agent service, when it has one.
    *
-   * Optional since this process can build its own: see
+   * Optional since this process can build its own over its guarded client, with
+   * the one gap that composition names: it holds no Workflow application, so
+   * copying a workflow agent refuses rather than writing an agent pointing at
+   * another project's graph. See
    * {@link ApiProductionComposition.resolveAgents} for which wins and what an
    * unresolvable agent service means for the door that serves it.
    */
@@ -136,8 +150,11 @@ export type ApiProductionCompositionOptions = {
    * only that.
    *
    * This is the collaborator the API package cannot build — see
-   * {@link ApiAuthComposition}. Ignored when `auth` is supplied, because that
-   * pair already carries its own transport.
+   * {@link ApiAuthComposition} — and the one entry on
+   * `API_UNAVAILABLE_PRODUCT_ADAPTERS`. Without it, and without `auth`, this
+   * process can authenticate no browser caller and mounts no product
+   * transports at all. Ignored when `auth` is supplied, because that pair
+   * already carries its own transport.
    */
   browserSessions?: ApiBrowserSessionTransportPort;
   audit?: ApiAuditPort;
@@ -690,7 +707,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
  * build it: through the packaged construction path, with the packaged tenancy
  * guard. Nothing in this process can ask for a client without them.
  */
-export function composeApiDatabase(
+function composeApiDatabase(
   options: ApiRuntimeCompositionOptions,
 ): ApiDatabaseInfrastructure | undefined {
   const logger = createLogger(options.config.serviceName);
@@ -709,7 +726,7 @@ export function composeApiDatabase(
  * different facts: a deployment can have a database and no key, or a key and
  * no database, and each one is worth naming on its own.
  */
-export function composeApiSecretEncryption(
+function composeApiSecretEncryption(
   options: ApiRuntimeCompositionOptions,
 ): ApiSecretEncryptionInfrastructure | undefined {
   const logger = createLogger(options.config.serviceName);
@@ -738,7 +755,7 @@ export function composeApiSecretEncryption(
  * Decided once, here, so a process serving product transports and one serving
  * only its lifecycle surface answer a scrape by the same rule.
  */
-export function resolveApiMetrics(input: {
+function resolveApiMetrics(input: {
   options: ApiRuntimeCompositionOptions;
   injected: ApiMetricsPort | undefined;
 }): ApiMetricsPort | undefined {
@@ -940,7 +957,7 @@ export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
  * caller — so a deployment's health route, metrics gate, readiness order and
  * drain behaviour do not depend on WHICH of those gaps it has.
  */
-export function composeApiLifecycleProcess(input: {
+function composeApiLifecycleProcess(input: {
   options: ApiRuntimeCompositionOptions;
   metrics: ApiMetricsPort | undefined;
   readiness: ApiReadinessPort | undefined;

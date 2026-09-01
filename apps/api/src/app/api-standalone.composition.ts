@@ -1,103 +1,13 @@
-import type { AgentService } from "@langwatch/agent-contract";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { SecretService } from "@langwatch/secret-contract";
-import { ApiMetricsPort, ApiReadinessPort } from "../api-process.lifecycle";
-import { ApiAuditPort } from "../api-request.policy";
-import { ApiFeatureDrainPort } from "../api.process";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
 } from "../api.main";
-import type {
-  ApiAuthSessionCompositionPort,
-  ApiBrowserSessionTransportPort,
-} from "./api-auth.composition";
-import { ApiProductionComposition } from "./api-production.composition";
-
-/**
- * The product services an API host hands over.
- *
- * None of them is mandatory any more, and one of them is not a service at all:
- * `browserSessions` is the deployment's own Better Auth instance, the last
- * thing on this list no package implements
- * (see API_UNAVAILABLE_PRODUCT_ADAPTERS). Everything else a host supplies
- * overrides what this process would compose for itself, and leaving any of
- * them out is a supported shape rather than a gap — with the consequences each
- * one names.
- */
-export type ApiProductAdapters = Readonly<{
-  /**
-   * A host's already-composed agent service, when it has one.
-   *
-   * Optional since this process can build its own over its guarded client
-   * ({@link ApiProductionComposition.resolveAgents}), with the one gap that
-   * composition names: it holds no Workflow application, so copying a workflow
-   * agent refuses rather than writing an agent pointing at another project's
-   * graph.
-   */
-  agents?: AgentService;
-  /**
-   * The one product service on this list the API package CAN build.
-   *
-   * A host supplies it to override what the process would compose — a test
-   * binding a double, or a deployment that already owns one instance of the
-   * service graph. Left out, the process composes its own from its guarded
-   * client and its configured key
-   * ({@link ApiProductionComposition.resolveSecrets}), and mounts no secret
-   * door if it has neither.
-   */
-  secrets?: SecretService;
-  /**
-   * The third and fourth product services this package CAN build, and the one
-   * pair on this list a host must supply together or not at all.
-   *
-   * Left out, the process composes both — with the project service they reach
-   * through — over its guarded client, its own AuthZ and its own cipher
-   * ({@link ApiProductionComposition.resolveTenancy}). Supplying one without
-   * the other is refused at boot: they are one graph, and half of it composed
-   * elsewhere is two.
-   */
-  apiKeys?: ApiKeyService;
-  /**
-   * The second product service this package CAN build.
-   *
-   * A host supplies it to override what the process would compose — a test
-   * binding a double, or a deployment that already owns one instance of the
-   * service graph. Left out, the process composes its own over its guarded
-   * client and its own producer-only Eventing runtime
-   * ({@link ApiProductionComposition.resolveAuthz}); with neither, it mounts
-   * no product transports at all, because every route it would mount is
-   * authorized.
-   */
-  authz?: AuthzService;
-  /** The pair to `apiKeys`; see it for what supplying only one means. */
-  organizations?: OrganizationService;
-  /**
-   * A host's already-composed Auth service and Better Auth transport.
-   *
-   * Optional since this process composes the Auth half itself, over its
-   * guarded client, the organization service it already serves from and its
-   * own Redis ({@link ApiProductionComposition.resolveAuth}). Supply it to
-   * override that, or supply `browserSessions` alone and let the process build
-   * the rest.
-   */
-  auth?: ApiAuthSessionCompositionPort;
-  /**
-   * The deployment's Better Auth request boundary — the one entry on
-   * {@link API_UNAVAILABLE_PRODUCT_ADAPTERS}.
-   *
-   * Without it, and without `auth`, this process can authenticate no browser
-   * caller and mounts no product transports at all.
-   */
-  browserSessions?: ApiBrowserSessionTransportPort;
-  audit?: ApiAuditPort;
-  queueStorage?: GroupQueueStoragePort;
-}>;
+import {
+  ApiProductionComposition,
+  type ApiProductionCompositionOptions,
+} from "./api-production.composition";
 
 /**
  * The adapters a host must supply before the standalone process can serve
@@ -164,8 +74,8 @@ export type ApiProductAdapters = Readonly<{
  * all. It was here because no LangWatch package exposed a scrape surface for a
  * standalone process to compose, so the Group Queue samples this process
  * records went into a registry nothing could ever read. This process now
- * renders that registry itself, behind the credential every tier already
- * reads ({@link resolveApiMetrics}). It unlocks no product transport, and it
+ * renders that registry itself, behind the credential every tier already reads
+ * ({@link ApiProductionComposition}). It unlocks no product transport, and it
  * is worth saying so: what a process can be scraped for is not what it can
  * serve.
  *
@@ -244,14 +154,6 @@ export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
   "The deployment's Better Auth browser-session transport",
 ] as const;
 
-export type ApiStandaloneCompositionOptions = {
-  /** Supplied by a host that already owns the product service graph. */
-  products?: ApiProductAdapters;
-  readiness?: ApiReadinessPort;
-  metrics?: ApiMetricsPort;
-  featureDrain?: ApiFeatureDrainPort;
-};
-
 /**
  * The composition the physical API executable boots.
  *
@@ -278,23 +180,17 @@ export type ApiStandaloneCompositionOptions = {
  * route and bounded drain.
  */
 export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
-  static create(options: ApiStandaloneCompositionOptions = {}): ApiStandaloneComposition {
+  static create(options: ApiProductionCompositionOptions = {}): ApiStandaloneComposition {
     return new ApiStandaloneComposition(options);
   }
 
-  private constructor(private readonly options: ApiStandaloneCompositionOptions) {
+  private constructor(private readonly options: ApiProductionCompositionOptions) {
     super();
   }
 
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
-    const products = this.options.products ?? {};
-    this.announceUnsuppliedAdapters(options, products);
-    return ApiProductionComposition.create({
-      ...products,
-      ...(this.options.readiness ? { readiness: this.options.readiness } : {}),
-      ...(this.options.metrics ? { metrics: this.options.metrics } : {}),
-      ...(this.options.featureDrain ? { featureDrain: this.options.featureDrain } : {}),
-    }).compose(options);
+    this.announceUnsuppliedAdapters(options);
+    return ApiProductionComposition.create(this.options).compose(options);
   }
 
   /**
@@ -308,11 +204,8 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
    * it must actually hand over. This one is the executable's own, and it does
    * not depend on how far composition got.
    */
-  private announceUnsuppliedAdapters(
-    options: ApiRuntimeCompositionOptions,
-    products: ApiProductAdapters,
-  ): void {
-    if (products.auth !== undefined || products.browserSessions !== undefined) return;
+  private announceUnsuppliedAdapters(options: ApiRuntimeCompositionOptions): void {
+    if (this.options.auth !== undefined || this.options.browserSessions !== undefined) return;
 
     createLogger(options.config.serviceName).warn(
       { adapters: API_UNAVAILABLE_PRODUCT_ADAPTERS },

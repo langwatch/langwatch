@@ -13,10 +13,10 @@ import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
 } from "../api-auth.composition";
+import type { ApiProductionCompositionOptions } from "../api-production.composition";
 import {
   API_UNAVAILABLE_PRODUCT_ADAPTERS,
   ApiStandaloneComposition,
-  type ApiStandaloneCompositionOptions,
 } from "../api-standalone.composition";
 import { resolveApiConfig, type ApiConfig } from "../../platform/config/api.config";
 
@@ -269,9 +269,7 @@ describe("ApiStandaloneComposition", () => {
   describe("when a host supplied every product adapter except the secret service", () => {
     it("serves the rest of the process without a secret door, rather than refusing to boot", async () => {
       const { secrets: _injected, ...withoutSecrets } = testProducts();
-      const composed = await ApiStandaloneComposition.create({
-        products: withoutSecrets,
-      }).compose({
+      const composed = await ApiStandaloneComposition.create(withoutSecrets).compose({
         config: ephemeralConfig(),
         graph: new TestGraph(),
         observability: { serviceName: "langwatch-api-test" },
@@ -310,7 +308,7 @@ describe("ApiStandaloneComposition", () => {
       expect(unmounted.status).toBe(404);
       await bare.close();
 
-      const composed = await ApiStandaloneComposition.create({ products: testProducts() }).compose({
+      const composed = await ApiStandaloneComposition.create(testProducts()).compose({
         config: ephemeralConfig(),
         graph: new TestGraph(),
         observability: { serviceName: "langwatch-api-test" },
@@ -337,7 +335,7 @@ describe("ApiStandaloneComposition", () => {
  * The six services a host owns. Only their identity matters here: the test
  * asserts which transports get mounted, not what any of them return.
  */
-function testProducts(): NonNullable<ApiStandaloneCompositionOptions["products"]> {
+function testProducts(): ApiProductionCompositionOptions {
   return {
     agents: new Proxy(AgentService.prototype, {}),
     secrets: new Proxy(SecretService.prototype, {}),

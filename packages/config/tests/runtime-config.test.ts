@@ -37,6 +37,7 @@ describe("RuntimeConfig", () => {
     expect(environmentLegacyTruthySchema.parse("false")).toBe(false);
   });
 
+  /** @scenario Nested semantic keys derive environment bindings */
   it("resolves nested semantic definitions from environment bindings", () => {
     const definition = RuntimeConfig.define({
       rateLimit: { ttlMs: 15_000, enabled: true },
@@ -168,14 +169,72 @@ describe("RuntimeConfig", () => {
     expect(definition).toHaveProperty("endpoint");
   });
 
-  it("rejects duplicate normalized environment bindings", () => {
+  /** @scenario Two leaves cannot claim one environment variable */
+  it("rejects duplicate normalized environment bindings, naming both leaves", () => {
     expect(() =>
       RuntimeConfig.create({
         name: "duplicate service",
         definition: { fooBar: 1, foo_bar: 2 },
         source: {},
       }),
-    ).toThrow("Duplicate configuration environment binding: FOO_BAR");
+    ).toThrow(
+      "Duplicate configuration environment binding: foo_bar (FOO_BAR) is already bound by fooBar.",
+    );
+  });
+
+  describe("given a definition that binds environment variables", () => {
+    /** @scenario A refusal names the configuration leaf and the variable behind it */
+    it("names the leaf path a service consumes rather than the variable alone", () => {
+      let error: unknown;
+      try {
+        RuntimeConfig.create({
+          name: "api",
+          definition: RuntimeConfig.define({
+            infrastructure: { redis: { url: Config.url() } },
+          }),
+          source: {},
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toBeInstanceOf(InvalidRuntimeConfigError);
+      expect(error).toMatchObject({
+        runtime: "api",
+        issues: [
+          {
+            path: "infrastructure.redis.url",
+            code: "invalid_type",
+            env: "INFRASTRUCTURE_REDIS_URL",
+          },
+        ],
+      });
+    });
+
+    /** @scenario A refusal names the configuration leaf and the variable behind it */
+    it("carries the variable an operator has to set beside the leaf that refused", () => {
+      let error: unknown;
+      try {
+        RuntimeConfig.create({
+          name: "api",
+          definition: RuntimeConfig.define({
+            infrastructure: { redis: { url: Config.url({ env: "REDIS_URL" }) } },
+          }),
+          source: { REDIS_URL: "not a url" },
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      // The compatibility alias, not the derived name: a leaf that declares its
+      // own binding is exactly the case where the derived one would send an
+      // operator to a variable the deployment does not read.
+      expect(error).toMatchObject({
+        issues: [{ path: "infrastructure.redis.url", env: "REDIS_URL" }],
+      });
+      expect(String(error)).toContain("infrastructure.redis.url (REDIS_URL,");
+      expect(String(error)).not.toContain("not a url");
+    });
   });
 
   it("supports required and defaulted semantic leaves", () => {
@@ -226,6 +285,8 @@ describe("RuntimeConfig", () => {
 
   /** @scenario Invalid runtime configuration fails before service construction */
   it("reports paths and issue codes without echoing source values", () => {
+    // The schema form, where the runtime owns the field names and nothing knows
+    // which variable each one came from, so no binding rides along.
     let error: unknown;
     try {
       RuntimeConfig.create({
@@ -242,6 +303,7 @@ describe("RuntimeConfig", () => {
       runtime: "example service",
       issues: [{ path: "PORT", code: "invalid_type" }],
     });
+    expect((error as InvalidRuntimeConfigError).issues[0]).not.toHaveProperty("env");
     expect(String(error)).not.toContain("a-secret-looking-invalid-value");
   });
 });

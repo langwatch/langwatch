@@ -41,3 +41,18 @@ Feature: Shared JavaScript runtime configuration
     Then each runtime owns and composes its own Zod schema
     And the shared package reads no process environment itself
     And feature packages receive only narrow typed configuration values
+
+  @unit @configuration
+  Scenario: A refusal names the configuration leaf and the variable behind it
+    Given a service declares a required leaf under a nested semantic path
+    And the environment does not supply a valid value for it
+    When RuntimeConfig parses the source
+    Then the refusal identifies the leaf by the path the service consumes
+    And it names the environment variable the operator has to set beside it
+    And the raw invalid value is not included in the error
+
+  @unit @configuration
+  Scenario: Two leaves cannot claim one environment variable
+    Given two semantic paths normalize to the same environment name
+    When the definition is compiled
+    Then it refuses and names both leaf paths and the variable they collide on

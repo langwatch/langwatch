@@ -2,7 +2,8 @@ import process from "node:process";
 import { ApiBootFailurePort, startApiExecutable } from "../api.executable";
 import type { ApiRuntimeBootstrap } from "../api.main";
 import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers";
-import { ApiStandaloneComposition, type ApiProductAdapters } from "./api-standalone.composition";
+import type { ApiProductionCompositionOptions } from "./api-production.composition";
+import { ApiStandaloneComposition } from "./api-standalone.composition";
 
 /**
  * Everything the standalone executable subscribes to on the process it runs
@@ -28,11 +29,16 @@ export type ApiExecutableHost = Readonly<{
   write(line: string): void;
 }>;
 
-export type ApiStandaloneExecutableOptions = Readonly<{
-  host?: ApiExecutableHost;
-  /** A host that already owns the product service graph supplies it here. */
-  products?: ApiProductAdapters;
-}>;
+/**
+ * The executable's own seam, plus the composition overrides a host hands it.
+ *
+ * One flat object: the composition's options ARE these options, because a
+ * host's services override what this process would compose rather than
+ * selecting a different graph. Only `host` belongs to the executable itself.
+ */
+export type ApiStandaloneExecutableOptions = Readonly<
+  { host?: ApiExecutableHost } & ApiProductionCompositionOptions
+>;
 
 /**
  * The physical API executable: one table of what this process is made of.
@@ -55,13 +61,12 @@ export type ApiStandaloneExecutableOptions = Readonly<{
 export async function startStandaloneApi(
   options: ApiStandaloneExecutableOptions = {},
 ): Promise<ApiRuntimeBootstrap> {
-  const host = options.host ?? nodeApiExecutableHost();
+  const { host: injectedHost, ...composition } = options;
+  const host = injectedHost ?? nodeApiExecutableHost();
   installFatalHandlers(host);
   return startApiExecutable({
     source: host.env,
-    composition: ApiStandaloneComposition.create(
-      options.products ? { products: options.products } : {},
-    ),
+    composition: ApiStandaloneComposition.create(composition),
     failures: WrittenApiBootFailure.create(host),
     signals: { host: signalHostOf(host), exit: (code) => host.exit(code) },
   });
