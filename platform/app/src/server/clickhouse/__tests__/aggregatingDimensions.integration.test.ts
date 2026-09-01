@@ -1,5 +1,6 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { holdClickHouseSchemaLockForFile } from "./holdSchemaLock";
 
 /**
  * The static guard (aggregatingDimensionGuard.unit.test.ts) reads the migration
@@ -8,7 +9,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * caught as well. ClickHouse 26 and newer reject a rollup column without a
  * merge rule at CREATE TABLE time, so a database that satisfies this test can
  * also be recreated from scratch on those versions.
+ *
+ * It reads a schema other suites rebuild: replaying the rollup rebuild drops
+ * and re-derives `gateway_budget_scope_totals` for every tenant at once, and
+ * a read taken partway through sees the shape the older migration created.
+ * The schema lock is what keeps this file and those replays apart.
  */
+
+holdClickHouseSchemaLockForFile();
+
 describe("given a ClickHouse database the migrations have run against", () => {
   let client: ClickHouseClient;
   let database: string;

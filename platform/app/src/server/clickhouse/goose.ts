@@ -62,7 +62,7 @@ interface ClickHouseConfig {
   gooseConnectionString: string; // HTTP connection string for goose
   clusterName: string | undefined; // If set, enables replication with this cluster name
   hasLocalPrimaryPolicy?: boolean; // Set during bootstrap — true if 'local_primary' storage policy exists
-  rejectsAggregatingDimensions?: boolean; // Set during bootstrap — true if the server refuses an AggregatingMergeTree column outside the sorting key
+  requiresDimensionCompat?: boolean; // Set during bootstrap — true if the server refuses an AggregatingMergeTree column outside the sorting key
 }
 
 /**
@@ -369,7 +369,7 @@ async function bootstrapDatabase(
       query_params: { setting: AGGREGATING_DIMENSION_SETTING },
       format: "JSONEachRow",
     });
-    config.rejectsAggregatingDimensions = (await result.json()).length > 0;
+    config.requiresDimensionCompat = (await result.json()).length > 0;
   });
 
   logger.info("Bootstrap completed");
@@ -377,7 +377,7 @@ async function bootstrapDatabase(
 
 function buildMigrationEnvVars({
   config,
-  relaxAggregatingDimensions = false,
+  allowDimensionsOutsideSortingKey = false,
 }: {
   config: ClickHouseConfig;
   /**
@@ -385,7 +385,7 @@ function buildMigrationEnvVars({
    * that replays migrations up to LAST_MIGRATION_NEEDING_DIMENSION_COMPAT
    * asks for this, and only when the server enforces the check.
    */
-  relaxAggregatingDimensions?: boolean;
+  allowDimensionsOutsideSortingKey?: boolean;
 }): NodeJS.ProcessEnv {
   // In Replicated databases, use empty args - the DB handles replication automatically
   const vars: Record<string, string | undefined> = {
@@ -430,7 +430,7 @@ function buildMigrationEnvVars({
     // alike, and ClickHouse only applies it to a table that aggregates.
     CLICKHOUSE_STORAGE_POLICY_SETTING: [
       config.hasLocalPrimaryPolicy ? ", storage_policy = 'local_primary'" : "",
-      relaxAggregatingDimensions
+      allowDimensionsOutsideSortingKey
         ? `, ${AGGREGATING_DIMENSION_SETTING} = 1`
         : "",
     ].join(""),
@@ -456,18 +456,18 @@ function executeGoose({
   command,
   config,
   options = {},
-  relaxAggregatingDimensions = false,
+  allowDimensionsOutsideSortingKey = false,
 }: {
   /** The goose command and its arguments, e.g. ["up"] or ["up-to", "86"]. */
   command: string[];
   config: ClickHouseConfig;
   options?: GooseOptions;
-  relaxAggregatingDimensions?: boolean;
+  allowDimensionsOutsideSortingKey?: boolean;
 }): string {
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars({
     config,
-    relaxAggregatingDimensions,
+    allowDimensionsOutsideSortingKey,
   });
 
   if (options.verbose) {
@@ -553,7 +553,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   // dimension check, the merged history runs first with the compatibility
   // setting, then everything from 00087 on runs without it. On every other
   // server this is a single pass, exactly as before.
-  if (config.rejectsAggregatingDimensions) {
+  if (config.requiresDimensionCompat) {
     logger.info(
       { throughVersion: LAST_MIGRATION_NEEDING_DIMENSION_COMPAT },
       `This ClickHouse enforces ${AGGREGATING_DIMENSION_SETTING}; replaying the migrations that predate 00087 with it relaxed`,
@@ -562,7 +562,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
       command: ["up-to", String(LAST_MIGRATION_NEEDING_DIMENSION_COMPAT)],
       config,
       options,
-      relaxAggregatingDimensions: true,
+      allowDimensionsOutsideSortingKey: true,
     });
   }
 
