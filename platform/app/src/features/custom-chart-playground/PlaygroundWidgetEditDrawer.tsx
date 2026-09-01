@@ -2,36 +2,18 @@
  * Per-widget editor: a drawer with two Monaco panes — the sandboxed author
  * HTML and the LangWatchQL statement — plus Save. Save persists both through
  * the parent; the drawer holds only the in-flight draft.
+ *
+ * A card's own Chart | Code toggle edits the HTML in place against the same
+ * mutation. This drawer is the surface that also reaches the SQL.
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import type { editor } from "monaco-editor";
 import { useEffect, useState } from "react";
 
-import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
-import dynamic from "~/utils/compat/next-dynamic";
 
+import { PlaygroundCodeEditor } from "./PlaygroundCodeEditor";
 import type { PlaygroundWidget } from "./PlaygroundWidgetCard";
-
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => (
-    <Box padding={4} color="fg.muted">
-      Loading the editor
-    </Box>
-  ),
-});
-
-const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
-  minimap: { enabled: false },
-  fontSize: 12,
-  wordWrap: "on",
-  automaticLayout: true,
-  scrollBeyondLastLine: false,
-  lineNumbers: "on",
-  folding: true,
-};
 
 interface PlaygroundWidgetEditDrawerProps {
   widget: PlaygroundWidget | null;
@@ -46,9 +28,6 @@ export function PlaygroundWidgetEditDrawer({
   onSave,
   isSaving,
 }: PlaygroundWidgetEditDrawerProps) {
-  const { colorMode } = useColorMode();
-  const monacoTheme = colorMode === "dark" ? "vs-dark" : "vs";
-
   const [html, setHtml] = useState("");
   const [sql, setSql] = useState("");
 
@@ -86,13 +65,10 @@ export function PlaygroundWidgetEditDrawer({
                 flex={1}
                 minHeight="240px"
               >
-                <MonacoEditor
-                  height="100%"
+                <PlaygroundCodeEditor
                   language="html"
                   value={html}
-                  theme={monacoTheme}
-                  onChange={(v: string | undefined) => setHtml(v ?? "")}
-                  options={EDITOR_OPTIONS}
+                  onChange={setHtml}
                 />
               </Box>
             </VStack>
@@ -108,13 +84,10 @@ export function PlaygroundWidgetEditDrawer({
                 flex={1}
                 minHeight="200px"
               >
-                <MonacoEditor
-                  height="100%"
+                <PlaygroundCodeEditor
                   language="sql"
                   value={sql}
-                  theme={monacoTheme}
-                  onChange={(v: string | undefined) => setSql(v ?? "")}
-                  options={EDITOR_OPTIONS}
+                  onChange={setSql}
                 />
               </Box>
             </VStack>

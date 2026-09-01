@@ -4,7 +4,8 @@
  *
  * "+ New widget" persists a blank widget immediately (starter HTML + SQL).
  * Widgets live in the same 2-column grid the reports dashboard uses — drag to
- * reorder, pick a size preset, delete, or edit the HTML/SQL in a drawer. The
+ * reorder, pick a size preset, delete, flip a card to Code to edit its HTML
+ * in place, or edit both the HTML and the SQL in a drawer. The
  * frame's bridge tears itself down 1.5s after its last heartbeat, so widgets
  * stay mounted while the page is up; a Save re-keys only the touched frame.
  */
@@ -155,17 +156,20 @@ export function CustomChartPlayground({
     );
   };
 
-  const handleSave = (input: {
-    id: string;
-    srcdocHtml: string;
-    sql: string;
-  }) => {
+  // Shared by the drawer and by each card's own Code view, so both save paths
+  // are the same mutation and the same refetch. `onSuccess` lets the caller
+  // close itself only once the write landed.
+  const handleSave = (
+    input: { id: string; srcdocHtml: string; sql: string },
+    options?: { onSuccess?: () => void },
+  ) => {
     updateWidget.mutate(
       { projectId, ...input },
       {
         onSuccess: () => {
           setEditingId(null);
           void widgetsQuery.refetch();
+          options?.onSuccess?.();
         },
         onError: () => showError("Error saving widget"),
       },
@@ -224,9 +228,13 @@ export function CustomChartPlayground({
           onWidgetDelete={handleDelete}
           onWidgetSizeChange={handleSizeChange}
           onWidgetEdit={setEditingId}
+          onWidgetSave={handleSave}
           onWidgetsReorder={handleReorder}
           deletingWidgetId={
             deleteWidget.isPending ? (deleteWidget.variables?.id ?? null) : null
+          }
+          savingWidgetId={
+            updateWidget.isPending ? (updateWidget.variables?.id ?? null) : null
           }
         />
       )}

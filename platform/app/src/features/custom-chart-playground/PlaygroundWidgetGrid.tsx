@@ -31,8 +31,13 @@ interface PlaygroundWidgetGridProps {
   onWidgetDelete: (id: string) => void;
   onWidgetSizeChange: (id: string, size: SizeOption) => void;
   onWidgetEdit: (id: string) => void;
+  onWidgetSave: (
+    input: { id: string; srcdocHtml: string; sql: string },
+    options?: { onSuccess?: () => void },
+  ) => void;
   onWidgetsReorder: (layouts: GridLayout[]) => void;
   deletingWidgetId: string | null;
+  savingWidgetId: string | null;
 }
 
 export function PlaygroundWidgetGrid({
@@ -42,8 +47,10 @@ export function PlaygroundWidgetGrid({
   onWidgetDelete,
   onWidgetSizeChange,
   onWidgetEdit,
+  onWidgetSave,
   onWidgetsReorder,
   deletingWidgetId,
+  savingWidgetId,
 }: PlaygroundWidgetGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -88,7 +95,9 @@ export function PlaygroundWidgetGrid({
               onDelete={() => onWidgetDelete(widget.id)}
               onSizeChange={(size) => onWidgetSizeChange(widget.id, size)}
               onEdit={() => onWidgetEdit(widget.id)}
+              onSave={onWidgetSave}
               isDeleting={deletingWidgetId === widget.id}
+              isSaving={savingWidgetId === widget.id}
             />
           ))}
         </Grid>
