@@ -138,10 +138,7 @@ export type {
   UiFeatureInstall,
 } from "./ui/sections/ui-application";
 export { createUiApplication } from "./features/installed-ui-features.composition";
-export {
-  installedUiFeatures,
-  mergeUiFeatureInstalls,
-} from "./features/installed-ui-features";
+export { installedUiFeatures, mergeUiFeatureInstalls } from "./features/installed-ui-features";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
 export {
   createUiInnerProvider,
@@ -154,8 +151,6 @@ export {
 } from "./ui/sections/ui-outer-providers";
 export { createUiRouteObjects, type UiRouteObjectsOptions } from "./ui/sections/ui-route-objects";
 export { createUiRootLayout, type UiRootLayoutInstall } from "./ui/sections/ui-root-layout";
-export { RpcClientPort } from "./features/agent/behavior/rpc-client.port";
-export { TrpcAgentBrowserAdapter } from "./features/agent/behavior/trpc-agent-browser.adapter";
 export {
   createPublicAppConfigMetaTag,
   injectPublicAppConfigIntoHtml,

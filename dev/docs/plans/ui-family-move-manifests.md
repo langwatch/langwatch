@@ -623,6 +623,84 @@ setQuery/navigate/succeeded/failed` is now written out three times. Promotion
   mounts it around the four screens that render a table. That is what an
   ungoverned package's presentation costs, and it is cheaper than governing it.
 
+### agents — MOVED. 1 key, 2 prod files + 1 test (the whole family)
+
+Moved sixth, and the cheapest by a wide margin: `platform/app` loses 4 files and
+712 lines against ops' 13,646, and the whole platform side was ONE adapter and
+its test. `@langwatch/agent-web` already owned the list page, the card, the
+history drawer and the type selector, was already governed and already declared
+in `apps/ui`'s catalogue, and `apps/ui` already carried the browser port adapter.
+
+What the estimate missed: the adapter was 100% adapter, but it rendered THREE
+generic application dialogs — `CascadeArchiveDialog`, `ReplicateToProjectDialog`
+and `PushToCopiesDialog` — each with non-Agents callers (the evaluator and
+prompt push wrappers, the monitor copy dialog, the Agent list drawer). Deletes-only
+forbids repointing those, so the family took narrowed copies:
+`agent-archive-dialog`, `agent-replicate-dialog` and `agent-push-dialog` under
+`features/management/ui/blocks`. Each lost the toaster and the logger it reached
+for directly — a feature-web package may reach neither — so the outcome is handed
+back to the screen and the screen tells the host.
+
+Two shapes a seventh family should copy rather than reinvent:
+
+- **The by-path dispatcher is a GLOBAL, not a package's.**
+  `AgentBrowserPort` names eleven procedures as strings, which is what let the
+  whole family move without eleven hand-written map entries. Building the client
+  that dispatches them means holding the tRPC client and the QueryClient, and
+  ADR-004 seals both off from `apps/ui/src/features/*` — so the first attempt put
+  it in `@langwatch/agent-web` and bought three `ui-screen-closure` findings for
+  it. It belongs in `apps/ui/src/behavior/ui-rpc.ts` instead:
+  `UiFeatureShell` has both halves already, mounts one `BrowserUiRpc` beside the
+  capability ports, and a feature asks for it with `useUiRpc()`. Net cost of the
+  family: ONE new architecture-lint finding, the `@langwatch/platform-api-client`
+  import in the procedure map that every family carries.
+- **`useProjectsForCopy` did not need `~/server/api/rbac`.**
+  `@langwatch/authz-contract` publishes `permissionSatisfiedBy`,
+  `roleKeyForTeamRole` and `builtinRoleGrants`, and its own docblock says they are
+  parity-tested against the two rbac functions the platform hook imported. The
+  replication picker's per-team answer is rebuilt over them in
+  `apps/ui/src/features/agent/model/agent-copy-targets.ts`, with the empty-custom-role
+  fallthrough and the no-membership-means-no-projects rule intact. Settings S2 RBAC
+  and governance both list that rbac import as a gate; for a picker, it is not one.
+
+Overlays, and this is the family's whole drawer story:
+
+- `agentHistory` was a pure deletion. Its lazy factory imported the platform
+  adapter itself and the agents page was its only opener, so the registry entry
+  and the module die together. The screen addresses the drawer with its own
+  `?history=<agentId>` and renders it inline, the gateway shape.
+- The type selector is the screen's too, at `?new=agent`.
+- THE THREE EDITORS ARE NOT, and this is the move's one recorded gap.
+  `agentCodeEditor`, `agentHttpEditor` and `agentWorkflowEditor` stay registered
+  in `platform/app` — the scenario editor, the experiments workbench, the
+  agent-testing dialog and the Agent list drawer all still open them, and their
+  closures reach `~/optimization_studio`, `~/components/suites` and the
+  application's own variables surface. The screen names the drawer and the host
+  writes `?drawer.open=…&drawer.agentId=…`, the same address
+  `agent-platform-url.ts` and Langy's deep links already produce, INCLUDING
+  `openDrawer`'s clearing of every stale `drawer.*` key. Nothing mounts that
+  registry above a screen served from `apps/ui` until the chrome layout route
+  exists, so creating or editing an agent from this page writes the right address
+  and opens nothing. Same gap the me family recorded for `traceV2Details` and
+  automations recorded for `addOrEditDataset`; it closes with the same work.
+
+Known costs, all reported rather than suppressed:
+
+- **The Langy context chip is gone from the agent cards.** The adapter wrapped
+  each card in `LangyContextTarget` with `agentContextChip`; `@langwatch/langy-web`
+  is ungoverned and `apps/ui` may not import it. The same loss the me and
+  automations families took.
+- ONE new architecture-lint finding (783 → 784), the procedure map's
+  `@langwatch/platform-api-client`.
+- `@langwatch/ui`'s `RpcClientPort` and `TrpcAgentBrowserAdapter` root exports
+  were deleted: `platform/app`'s adapter was their only importer, and the port
+  itself moved to the global layer as `UiRpcPort`. The adapter stays a private
+  feature module.
+- The screen entry lost seven exports that only the deleted adapter imported —
+  `AgentCard`, `AgentHistoryDrawer`, `AgentManagementPage` with its five ports and
+  `getAgentEditorDrawer`. They are internal to the package now. What stays public
+  is what `platform/app`'s HTTP editor and type-selector drawers still import.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -635,7 +713,7 @@ closures are computed net of that.
 
 | # | Family | Keys | Effort | Gate |
 |---|---|---|---|---|
-| 1 | agents | 1 | ~2+0 | none — agent-web governed+catalogued, transport half already in apps/ui; take query-key overlays, platform drawer entries stay for their other callers |
+| 1 | agents | 1 | ~2+0 | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies. |
 | 2 | settings S5 data governance | 4 | 5+5 | relayout data-retention/privacy-web first; 2 server-type contract moves; lands the SettingsLayout harvest |
 | 3 | datasets | 2 | 6+6 | relayout dataset-web; one AppRouter type → contract DTO; touches NO drawer entries |
 | 4 | settings S4 model config | 2 | 7+6 | create model-provider-web; 2 one-line platform breaks |

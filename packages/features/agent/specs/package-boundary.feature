@@ -120,10 +120,57 @@ Feature: Agents package boundary
 
   @architecture @web
   Scenario: Remaining Agent drawers are recorded as incomplete migration work
-    Given the Agent Management screen, history drawer, and HTTP editor are package-owned
-    Then the platform host composes their project, route, drawer, RPC, and generic-dialog actions
-    And Agent list, code-editor, workflow-editor, workflow-target-editor, workflow-selector, and type-selector drawers remain platform-owned behaviour
+    Given the Agent Management screen, history drawer, type selector, and HTTP editor are package-owned
+    Then the browser application composes their project, route, transport, replication targets, and notices
+    And Agent list, code-editor, workflow-editor, workflow-target-editor, and workflow-selector drawers remain platform-owned behaviour
     And those retained drawers are explicit next vertical slices rather than compatibility-only adapters
+
+  Rule: The Agents page is served from the browser application
+
+    # The page moved out of platform/app with the family. What the application
+    # keeps is everything a feature-web package may not own: which grant the
+    # address is behind, the transport, where an agent may be replicated to, and
+    # the address of an editor the application still registers for other callers.
+
+    @unit @agents
+    Scenario: The agents page is behind the grant its platform page asked for
+      Given a reader holds a grant the agents page does not ask for
+      When they open the agents address
+      Then the page does not render
+      And the refusal names the grant they are missing
+      # evaluations:view, carried over one for one from the platform page's
+      # permission guard. Widening it here would admit a reader the platform
+      # page refused.
+
+    @unit @agents
+    Scenario: An overlay the package owns is addressed by the screen's own query key
+      Given the reader asks to see one agent's history
+      When the screen opens that overlay
+      Then it writes its own query key rather than a drawer-registry name
+      And the same key read back off the address renders the history
+
+    @unit @agents
+    Scenario: An editor the application still registers is addressed by the application
+      Given the reader opens an agent whose editor the application registers
+      When the screen asks for that editor
+      Then it names the drawer and the application writes the address
+      And the address is the one the rest of the product already produces for that agent
+
+    @unit @agents
+    Scenario: A stale editor address is cleared before a new one is written
+      Given the address already carries the parameters of a previously opened drawer
+      When an editor is opened for a different agent
+      Then only the new drawer's parameters remain
+      And the reader's other query parameters are untouched
+      # A leftover agent id opens the editor on the agent the reader looked at
+      # before this one, which reads as the product losing their click.
+
+    @unit @agents
+    Scenario: Replication targets are the teams the reader may create agents in
+      Given the reader belongs to a team whose role does not allow creating agents
+      When the replication picker is offered
+      Then that team's projects are listed and cannot be chosen
+      And a team the reader holds no membership on contributes no projects at all
 
   @web @http-agent
   Scenario: HTTP editor preserves stored and default scenario mappings

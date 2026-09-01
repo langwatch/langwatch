@@ -11,6 +11,15 @@ import { describe, expect, it } from "vitest";
 import { UiFeedbackPort, UiSessionPort } from "../src/behavior/ui-capabilities";
 import { installedUiFeatures, mergeUiFeatureInstalls } from "../src/features/installed-ui-features";
 
+const AGENT_PAGE_KEYS = [
+  // ONE key for ONE screen, and it still names the platform adapter that used
+  // to serve it. The route transcript is the parity bar for the URL surface and
+  // fails on any page-key change, so the key was left alone rather than spent
+  // on a cosmetic rename — several other families' keys name platform modules
+  // that no longer exist either.
+  "runtime/ui/features/agent-ui-host.adapter",
+];
+
 const AUTOMATION_PAGE_KEYS = [
   // Five keys for ONE screen: the four tabs are four URLs of the same page, and
   // `/activity` is a fifth address that has shown the overview since the
@@ -117,6 +126,7 @@ describe("given what apps/ui serves itself", () => {
     it("registers a loader for every page key the families it serves name", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
         [
+          ...AGENT_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
@@ -127,10 +137,11 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Six rather than five: the personal workspace mounts two, because the
+      // Seven rather than six: the personal workspace mounts two, because the
       // coding-agent tables its screens render call procedures of their own and
       // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
+        "@langwatch/agent-web",
         "@langwatch/automation-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
@@ -182,6 +193,7 @@ describe("given what apps/ui serves itself", () => {
 
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
         [
+          ...AGENT_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
@@ -189,7 +201,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(6);
+      expect(merged.apis).toHaveLength(7);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

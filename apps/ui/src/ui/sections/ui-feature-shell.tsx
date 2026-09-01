@@ -33,6 +33,7 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "../../behavior/ui-feature-transport";
+import { BrowserUiRpc, UiRpcContextProvider } from "../../behavior/ui-rpc";
 import { useRouterUiNavigation, useRouterUiRoute } from "../../behavior/ui-router-navigation";
 import type { UiSessionSource } from "../../behavior/ui-session";
 import type { UiProviderShell } from "./ui-outer-providers";
@@ -101,6 +102,14 @@ export function createUiFeatureShell({
     const [ownTransport] = useState(() => transport ?? createUiFeatureApiClient());
     const queryClient = hostQueryClient ?? ownQueryClient;
 
+    // The by-path dispatcher a screen too wide for a procedure map asks for.
+    // Built here because this is where both halves of it are: the transport and
+    // the QueryClient a feature may not reach for itself.
+    const rpc = useMemo(
+      () => BrowserUiRpc.create({ transport: ownTransport, queryClient }),
+      [ownTransport, queryClient],
+    );
+
     // Innermost first, so the list reads in mount order at the call site.
     const mounted = apis.reduceRight<ReactNode>(
       (inner, { Provider }) => (
@@ -108,7 +117,9 @@ export function createUiFeatureShell({
           {inner}
         </Provider>
       ),
-      <UiCapabilities transport={ownTransport}>{children}</UiCapabilities>,
+      <UiRpcContextProvider value={rpc}>
+        <UiCapabilities transport={ownTransport}>{children}</UiCapabilities>
+      </UiRpcContextProvider>,
     );
 
     // Always mounted, host client or own: a Provider that appears only in one

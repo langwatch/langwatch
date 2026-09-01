@@ -16,6 +16,7 @@
 import { BrowserUiFeedback } from "../behavior/ui-feedback";
 import { useBrowserUiSession } from "../behavior/ui-session";
 import type { UiFeatureInstall } from "../ui/sections/ui-application";
+import { agentApiBinding, agentPageLoaders } from "./agent";
 import { automationsApiBinding, automationsPageLoaders } from "./automations";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
@@ -24,6 +25,7 @@ import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./pe
 
 export const installedUiFeatures: UiFeatureInstall = {
   loaders: {
+    ...agentPageLoaders,
     ...automationsPageLoaders,
     ...gatewayPageLoaders,
     ...governancePageLoaders,
@@ -31,6 +33,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...personalWorkspacePageLoaders,
   },
   apis: [
+    agentApiBinding,
     automationsApiBinding,
     gatewayApiBinding,
     governanceApiBinding,

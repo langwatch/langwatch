@@ -22,7 +22,7 @@ import {
   type AgentSyncFromSourceInput,
 } from "@langwatch/agent-web/surfaces/browser-port";
 import { z } from "zod";
-import type { RpcClientPort } from "./rpc-client.port";
+import type { UiRpcPort } from "../../../behavior/ui-rpc";
 
 type AgentArchiveInput = {
   id: string;
@@ -48,11 +48,11 @@ const agentSyncResultSchema = z.object({ ok: z.literal(true) });
 type AgentCascadeArchive = z.infer<typeof agentCascadeArchiveSchema>;
 
 export class TrpcAgentBrowserAdapter extends AgentBrowserPort {
-  static create(rpc: RpcClientPort): TrpcAgentBrowserAdapter {
+  static create(rpc: UiRpcPort): TrpcAgentBrowserAdapter {
     return new TrpcAgentBrowserAdapter(rpc);
   }
 
-  private constructor(private readonly rpc: RpcClientPort) {
+  private constructor(private readonly rpc: UiRpcPort) {
     super();
   }
 

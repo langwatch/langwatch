@@ -69,8 +69,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/email-suppressions": () => import("~/pages/settings/email-suppressions"),
   "pages/cli/auth": () => import("~/pages/cli/auth"),
   "pages/[project]/index": () => import("~/pages/[project]/index"),
-  "runtime/ui/features/agent-ui-host.adapter": () =>
-    import("~/runtime/ui/features/agent-ui-host.adapter"),
   "pages/[project]/datasets": () => import("~/pages/[project]/datasets"),
   "pages/[project]/datasets/[id]": () => import("~/pages/[project]/datasets/[id]"),
   "pages/[project]/evaluators": () => import("~/pages/[project]/evaluators"),

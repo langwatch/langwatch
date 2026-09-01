@@ -51,10 +51,6 @@ const AddOrEditDatasetDrawer = lazyDefault({
   factory: () => import("./AddOrEditDatasetDrawer"),
   key: "AddOrEditDatasetDrawer",
 });
-const AgentHistoryDrawer = lazyDefault({
-  factory: () => import("~/runtime/ui/features/agent-ui-host.adapter"),
-  key: "AgentHistoryDrawer",
-});
 const AgentListDrawer = lazyDefault({
   factory: () => import("./agents/AgentListDrawer"),
   key: "AgentListDrawer",
@@ -242,7 +238,6 @@ export const drawers = {
   promptList: PromptListDrawer,
   promptEditor: PromptEditorDrawer,
   agentList: AgentListDrawer,
-  agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
