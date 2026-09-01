@@ -81,35 +81,7 @@ export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
               <SetupWithAgentButton surface="connectedAgents" />
             </HStack>
 
-            {/* Without a colorPalette the line variant paints the selected
-                trigger with the default palette's fg, which reads fainter
-                than the unselected one. Same palette as the integrate
-                drawer's language tabs. */}
-            <Tabs.Root
-              defaultValue="python"
-              variant="line"
-              size="sm"
-              colorPalette="orange"
-            >
-              <Tabs.List>
-                {SNIPPET_LANGUAGES.map((language) => (
-                  <Tabs.Trigger key={language} value={language}>
-                    {SNIPPET_LANGUAGE_LABELS[language]}
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-              {SNIPPET_LANGUAGES.map((language) => (
-                <Tabs.Content key={language} value={language} paddingTop={3}>
-                  <VStack align="stretch" gap={2}>
-                    <CodeBlock
-                      code={INSTALL_COMMANDS[language]}
-                      label="Install command"
-                    />
-                    <CodeBlock code={snippets[language]} label="Snippet" />
-                  </VStack>
-                </Tabs.Content>
-              ))}
-            </Tabs.Root>
+            <SnippetTabs snippets={snippets} />
 
             <ListeningIndicator />
           </VStack>
@@ -119,7 +91,43 @@ export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
   );
 }
 
-/** One block of code with the button that copies it. */
+function SnippetTabs({
+  snippets,
+}: {
+  snippets: Record<(typeof SNIPPET_LANGUAGES)[number], string>;
+}) {
+  return (
+    // Without a colorPalette the line variant paints the selected trigger
+    // with the default palette's fg, which reads fainter than the unselected
+    // one. Same palette as the integrate drawer's language tabs.
+    <Tabs.Root
+      defaultValue="python"
+      variant="line"
+      size="sm"
+      colorPalette="orange"
+    >
+      <Tabs.List>
+        {SNIPPET_LANGUAGES.map((language) => (
+          <Tabs.Trigger key={language} value={language}>
+            {SNIPPET_LANGUAGE_LABELS[language]}
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+      {SNIPPET_LANGUAGES.map((language) => (
+        <Tabs.Content key={language} value={language} paddingTop={3}>
+          <VStack align="stretch" gap={2}>
+            <CodeBlock
+              code={INSTALL_COMMANDS[language]}
+              label="Install command"
+            />
+            <CodeBlock code={snippets[language]} label="Snippet" />
+          </VStack>
+        </Tabs.Content>
+      ))}
+    </Tabs.Root>
+  );
+}
+
 function CodeBlock({ code, label }: { code: string; label: string }) {
   return (
     <HStack
@@ -145,7 +153,6 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
   );
 }
 
-/** The line that says the page is waiting for the process to connect. */
 function ListeningIndicator() {
   return (
     <HStack gap={2} data-testid="connect-agent-listening">

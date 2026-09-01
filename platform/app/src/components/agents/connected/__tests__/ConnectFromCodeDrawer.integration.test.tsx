@@ -40,7 +40,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 describe("<ConnectFromCodeDrawer />", () => {
   afterEach(cleanup);
 
-  describe("when the drawer is open", () => {
+  describe("given the drawer is open", () => {
     /** @scenario "The connect drawer leads with the agent setup" */
     it("offers the agent setup for the connect-agent surface first", () => {
       render(<ConnectFromCodeDrawer open />, { wrapper: Wrapper });

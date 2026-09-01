@@ -117,7 +117,6 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
               Select how you want to integrate your agent for testing.
             </Text>
 
-            {/* Agent type cards */}
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
               <ConnectFromCodeCard
                 onClick={() => openDrawer("agentConnectFromCode")}

@@ -98,7 +98,7 @@ describe("AgentTypeSelectorDrawer", () => {
     });
   });
 
-  describe("when the connect-from-code choice leads the list", () => {
+  describe("given the connect-from-code choice leads the list", () => {
     /** @scenario "Connect from code is the first choice of the new agent flow" */
     it("draws Connect from Code first, with the green dot before the words", async () => {
       renderDrawer();
