@@ -20,6 +20,40 @@ const logger = createLogger("langwatch:simulation-processing:compute-run-metrics
 const MAX_RETRIES = 3;
 export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
 
+/**
+ * The retry above, as the queue that carries it is told to stage it.
+ *
+ * Every other routing key on `event-sourcing/jobs` travels between the legacy
+ * registry and the packaged worker inside a pipeline definition, which is a
+ * static description handed across intact. This one does not: the retry is a
+ * queue job registered against the pipeline SERVICE after registration, so its
+ * name, delay and deduplication are spelled at the registration site rather
+ * than declared by `simulation_processing`. Two spellings would be two keys on
+ * one queue, and the consumer that did not stage a key never drains it — which
+ * is why they are decided here, beside the handler that schedules them, and
+ * read by whichever composition holds the live service.
+ */
+export const scenarioDeferredComputeRunMetricsJob = {
+  name: "deferredComputeRunMetrics",
+  delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
+  /**
+   * A run that is still waiting on its trace summary reschedules on every
+   * attempt, so the id has to collapse those onto one queue entry rather than
+   * accumulate one per attempt — `retryCount` is deliberately absent from it.
+   */
+  makeJobId(payload: ComputeRunMetricsCommandData): string {
+    return `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
+  },
+  spanAttributes(payload: ComputeRunMetricsCommandData): Record<string, string | number | boolean> {
+    return {
+      "deferred.tenant_id": payload.tenantId,
+      "deferred.scenario_run_id": payload.scenarioRunId,
+      "deferred.trace_id": payload.traceId,
+      "deferred.retry_count": payload.retryCount,
+    };
+  },
+};
+
 export interface ComputeRunMetricsDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;

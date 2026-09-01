@@ -39,7 +39,6 @@ import type {
   WorkerEventingHandoff,
   WorkerEventingSubstrate,
 } from "~/server/app-layer/worker-eventing-handoff";
-import { scenarioDeferredComputeRunMetricsJob } from "~/runtime/worker/scenario-deferred-metrics.job";
 import {
   autoStub,
   buildLegacyRegistry,
@@ -424,22 +423,6 @@ describe("packaged worker composition root", () => {
         "orgBillableEventsMeter",
         "orgBillableEventsMeter/billingMeterDispatch",
       ]);
-    });
-
-    /**
-     * Scenario's delayed metrics retry is a queue job rather than a pipeline
-     * declaration, so its name is the one routing key no definition carries
-     * across. Both graphs register the promoted spec, or they register two.
-     */
-    it("registers the promoted scenario retry job rather than a spelling of its own", () => {
-      const capabilities = packagedWorkerCapabilities({
-        handoff: handoffWith(),
-        billingUsageDispatch: () => async () => void 0,
-      });
-
-      expect(capabilities.scenario?.installer.deferredComputeRunMetricsJob).toBe(
-        scenarioDeferredComputeRunMetricsJob,
-      );
     });
 
     /**

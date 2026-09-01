@@ -1,3 +1,7 @@
+import {
+  COMPUTE_METRICS_RETRY_DELAY_MS,
+  scenarioDeferredComputeRunMetricsJob,
+} from "@langwatch/scenario-server";
 import { describe, expect, it, vi } from "vitest";
 
 import { BillingReportingWorkerFeatureInstaller } from "../billing/billing-reporting-worker-feature.installer";
@@ -123,23 +127,14 @@ describe("worker feature installers", () => {
       const eventing = eventingStub(["computeRunMetrics"]);
       const connect = vi.fn();
       const scenario = ScenarioWorkerFeatureInstaller.create({
-        installer: {
-          buildProcessing: () => definition,
-          deferredComputeRunMetricsJob: {
-            name: "deferredComputeRunMetrics",
-            delayMs: 30_000,
-            makeJobId: () => "job-1",
-            spanAttributes: () => ({}),
-          },
-          connect,
-        },
+        installer: { buildProcessing: () => definition, connect },
         eventing: eventing.runtime,
       });
 
       await scenario.install();
 
       expect(eventing.registeredJobs).toEqual([
-        { name: "deferredComputeRunMetrics", delay: 30_000 },
+        { name: scenarioDeferredComputeRunMetricsJob.name, delay: COMPUTE_METRICS_RETRY_DELAY_MS },
       ]);
       expect(connect).toHaveBeenCalledOnce();
       expect(Object.keys(connect.mock.calls[0]?.[0] ?? {})).toEqual([
@@ -217,16 +212,7 @@ describe("worker feature installers", () => {
     it("fails when Scenario's retry has no durable queue instead of degrading to a timer", async () => {
       const eventing = eventingStub(["computeRunMetrics"], { queue: false });
       const scenario = ScenarioWorkerFeatureInstaller.create({
-        installer: {
-          buildProcessing: () => definition,
-          deferredComputeRunMetricsJob: {
-            name: "deferredComputeRunMetrics",
-            delayMs: 30_000,
-            makeJobId: () => "job-1",
-            spanAttributes: () => ({}),
-          },
-          connect: vi.fn(),
-        },
+        installer: { buildProcessing: () => definition, connect: vi.fn() },
         eventing: eventing.runtime,
       });
 

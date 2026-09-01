@@ -179,14 +179,6 @@ function createEventing(registered: string[]) {
   return eventing;
 }
 
-/** Scenario's package-owned retry spec, reduced to what the installer reads. */
-const scenarioDeferredMetricsJob = {
-  name: "deferredComputeRunMetrics",
-  delayMs: 1_000,
-  makeJobId: () => "retry",
-  spanAttributes: () => ({}),
-};
-
 function createComposition(registered: string[]) {
   const eventing = createEventing(registered);
   const traceAssignments = new TraceAssignments();
@@ -264,7 +256,6 @@ function createComposition(registered: string[]) {
     scenario: ScenarioWorkerFeatureInstaller.create({
       installer: {
         buildProcessing: () => namedDefinition("simulation_processing"),
-        deferredComputeRunMetricsJob: scenarioDeferredMetricsJob,
         connect: vi.fn(),
       },
       eventing,

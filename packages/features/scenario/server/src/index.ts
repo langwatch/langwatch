@@ -56,6 +56,7 @@ export {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsAdapter,
   ComputeRunMetricsCommand,
+  scenarioDeferredComputeRunMetricsJob,
 } from "./adapters/compute-run-metrics.adapter";
 export {
   SimulationProcessingPipelineAdapter,

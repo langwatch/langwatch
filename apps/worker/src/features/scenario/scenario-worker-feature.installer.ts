@@ -1,4 +1,5 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import { scenarioDeferredComputeRunMetricsJob } from "@langwatch/scenario-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
@@ -26,7 +27,6 @@ export interface ScenarioWorkerCapability<
   TComputeRunMetrics extends Record<string, unknown> = Record<string, unknown>,
 > {
   buildProcessing(): WorkerPipelineDefinition;
-  readonly deferredComputeRunMetricsJob: ScenarioDeferredMetricsJobSpec<TComputeRunMetrics>;
   /**
    * Resolves the two dispatchers the definition was built against: the
    * self-referencing `computeRunMetrics` its own suite sync re-enters, and the
@@ -54,6 +54,12 @@ export interface ScenarioWorkerCapability<
  * own the durable graph has no such case, and silently degrading to a timer
  * there would lose every scheduled retry on restart. A missing queue is
  * therefore a boot failure, stated rather than absorbed.
+ *
+ * What that job is called and how it deduplicates is not this installer's to
+ * choose, and no longer arrives with the composed capability either: it is read
+ * from `@langwatch/scenario-server`, so the graph that still registers the same
+ * job from the legacy registry cannot disagree with this one about the routing
+ * key both consumers stage.
  */
 export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {
@@ -100,7 +106,10 @@ export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       const dispatch: CommandDispatcher<Record<string, unknown>> = (data) =>
         computeRunMetrics.send(data);
 
-      const job = this.installer.deferredComputeRunMetricsJob;
+      // Annotated rather than inferred: this is where the package's object is
+      // held to the shape the registration below reads, so a drift in it fails
+      // the worker's own build rather than at the first scheduled retry.
+      const job: ScenarioDeferredMetricsJobSpec = scenarioDeferredComputeRunMetricsJob;
       const retryQueue = pipeline.service.registerJob<Record<string, unknown>>({
         name: job.name,
         process: (payload) => dispatch(payload),

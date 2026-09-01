@@ -11,7 +11,6 @@ import type {
 } from "~/server/app-layer/worker-eventing-handoff";
 import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
 import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
-import { scenarioDeferredComputeRunMetricsJob } from "./scenario-deferred-metrics.job";
 
 /**
  * The handoff, once it is known to describe a graph that can consume.
@@ -196,7 +195,6 @@ export function packagedWorkerCapabilities(options: {
     scenario: {
       installer: {
         buildProcessing: () => definition("simulation_processing"),
-        deferredComputeRunMetricsJob: scenarioDeferredComputeRunMetricsJob,
         connect: workerCapabilityAlreadyConnected,
       },
     },
