@@ -42,6 +42,10 @@
       "types": "./src/components/column-type-icon.tsx",
       "default": "./src/components/column-type-icon.tsx"
     },
+    "./confirm-dialog": {
+      "types": "./src/components/confirm-dialog.tsx",
+      "default": "./src/components/confirm-dialog.tsx"
+    },
     "./metric-value-formatters": {
       "types": "./src/metric-value-formatters.ts",
       "default": "./src/metric-value-formatters.ts"
@@ -62,6 +66,10 @@
       "types": "./src/components/drawer.tsx",
       "default": "./src/components/drawer.tsx"
     },
+    "./field-info-tooltip": {
+      "types": "./src/components/field-info-tooltip.tsx",
+      "default": "./src/components/field-info-tooltip.tsx"
+    },
     "./icons": {
       "types": "./src/components/icons/index.ts",
       "default": "./src/components/icons/index.ts"
@@ -78,9 +86,25 @@
       "types": "./src/json-value-text.ts",
       "default": "./src/json-value-text.ts"
     },
+    "./list-table": {
+      "types": "./src/components/list-table.tsx",
+      "default": "./src/components/list-table.tsx"
+    },
     "./menu": {
       "types": "./src/components/menu.tsx",
       "default": "./src/components/menu.tsx"
+    },
+    "./meter-bar": {
+      "types": "./src/components/meter-bar.tsx",
+      "default": "./src/components/meter-bar.tsx"
+    },
+    "./page-layout": {
+      "types": "./src/components/page-layout.tsx",
+      "default": "./src/components/page-layout.tsx"
+    },
+    "./pagination": {
+      "types": "./src/components/pagination.tsx",
+      "default": "./src/components/pagination.tsx"
     },
     "./popover": {
       "types": "./src/components/popover.tsx",
@@ -89,6 +113,10 @@
     "./radio": {
       "types": "./src/components/radio.tsx",
       "default": "./src/components/radio.tsx"
+    },
+    "./rotating-colors": {
+      "types": "./src/rotating-colors.ts",
+      "default": "./src/rotating-colors.ts"
     },
     "./shiki": {
       "types": "./src/shiki-adapter.ts",
@@ -113,6 +141,10 @@
     "./slider": {
       "types": "./src/components/slider.tsx",
       "default": "./src/components/slider.tsx"
+    },
+    "./small-label": {
+      "types": "./src/components/small-label.tsx",
+      "default": "./src/components/small-label.tsx"
     },
     "./switch": {
       "types": "./src/components/switch.tsx",

@@ -1,3 +1,13 @@
+export { AnthropicIcon } from "./anthropic-icon";
+export { AWSIcon } from "./aws-icon";
+export { CustomIcon } from "./custom-icon";
+export { DatabricksIcon } from "./databricks-icon";
 export { EqualsIcon } from "./equals-icon";
+export { GitHubIcon } from "./github-icon";
+export { IconGlyph } from "./icon-glyph";
 export { LLMIcon } from "./llm-icon";
+export { MicrosoftIcon } from "./microsoft-icon";
+export { OpenAIIcon } from "./openai-icon";
+export { OpenTelemetryIcon } from "./opentelemetry-icon";
 export { WeaviateIcon } from "./weaviate-icon";
+export { WorkatoIcon } from "./workato-icon";

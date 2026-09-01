@@ -21,6 +21,20 @@ export function renderWithDesignSystem(
       }),
     });
   }
+  if (typeof window !== "undefined" && !window.ResizeObserver) {
+    // Overlays position themselves through floating-ui, which observes the
+    // trigger's box. jsdom ships no ResizeObserver, and the missing global
+    // surfaces as an unhandled rejection from an animation frame rather than
+    // as a test failure, so the shard fails with its own summary all green.
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      value: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    });
+  }
   return render(element, {
     wrapper: ({ children }) => (
       <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
