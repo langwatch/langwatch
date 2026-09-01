@@ -158,6 +158,8 @@ export function RunsSidebar({
       <Box paddingLeft={1} paddingTop={4}>
         <AgentTestingPeriodPicker
           period={periodControls.period}
+          periodMode={periodControls.periodMode}
+          setPeriod={periodControls.setPeriod}
           setRelativePeriod={periodControls.setRelativePeriod}
           compact
         />

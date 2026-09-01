@@ -57,6 +57,33 @@ Feature: Hot-trace fold amplification is bounded
     Then the history is replayed with every missing delivered event merged in occurred-at order
     And an event the read did return is folded exactly once
 
+  # The same lag can hide an event that is ALREADY folded into the loaded
+  # state. A replay of that incomplete history would overwrite the state and
+  # silently drop the event, so the replay must not replace state it cannot
+  # account for.
+  @unit
+  Scenario: A re-fold never replaces state from a history read missing an applied event
+    Given a fold whose loaded state was committed with a set of applied events
+    And the event log read does not return one of those applied events, even on retry
+    When an event that occurred before the checkpoint is folded
+    Then the loaded state is kept and the delivered event is applied on top
+    And no already-folded event is lost from the committed state
+
+  @unit
+  Scenario: A re-fold retries a history read that has not caught up yet
+    Given a fold whose loaded state was committed with a set of applied events
+    And the first event log read does not return one of those applied events
+    And a later read returns the full history
+    When an event that occurred before the checkpoint is folded
+    Then the full history is replayed after the retry
+
+  @unit
+  Scenario: A re-fold never replaces state from a history read behind the checkpoint
+    Given a fold whose state carries an occurred-at checkpoint
+    And the event log read returns no event reaching that checkpoint, even on retry
+    When an event that occurred before the checkpoint is folded
+    Then the loaded state is kept and the delivered event is applied on top
+
   @unit
   Scenario: Two events of the same business time replay in the order they arrived
     Given a fold that has not opted out of re-folding on out-of-order events

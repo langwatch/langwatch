@@ -8,6 +8,7 @@ import {
   useLegacySimulationsPreference,
 } from "~/hooks/useLegacySimulationsPreference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../ui/link";
 
 /**
@@ -23,11 +24,21 @@ import { Link } from "../ui/link";
  * project; the key carries a `:v1:` version segment so a future announcement
  * can recycle the card by bumping the version.
  *
+ * The card retires on {@link SUNSET}: the retirement is read per render, so
+ * a sidebar already on screen keeps the card until it next renders. The
+ * `?simulations-welcome=1` address parameter brings it back past the
+ * dismissal, the retirement and the recorded preference, so a person who
+ * wants the way back to the previous screens can still reach it.
+ *
  * @see specs/suites/new-simulations-callout.feature
  */
 const SNOOZE_DAYS = 14;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 const STORAGE_PREFIX = "langwatch:new-simulations-callout-dismissed:v1:";
+/** Three weeks after the new screens shipped, the announcement retires. */
+const SUNSET = Date.parse("2026-09-22T00:00:00Z");
+/** The address parameter that brings the retired or dismissed card back. */
+export const WELCOME_CALLOUT_QUERY_PARAM = "simulations-welcome";
 
 const storageKey = (projectId: string) => `${STORAGE_PREFIX}${projectId}`;
 
@@ -53,6 +64,20 @@ function snooze(projectId: string) {
   }
 }
 
+/**
+ * Forgets a dismissal, so the card shows again. The return banner on the
+ * previous screens calls this: a person going back to the new screens gets
+ * the way back offered again.
+ */
+export function clearNewSimulationsCalloutSnooze(projectId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(storageKey(projectId));
+  } catch {
+    // Best-effort.
+  }
+}
+
 export function NewSimulationsCallout({
   target,
 }: {
@@ -71,6 +96,11 @@ export function NewSimulationsCallout({
   // Someone who already chose the previous screens does not need the offer
   // again while they browse the new ones.
   const legacyPreferred = useLegacySimulationsPreference(projectId);
+  const router = useRouter();
+  // The parameter is the escape hatch once the card retired: it overrides
+  // the dismissal, the retirement and the recorded preference.
+  const revived = router.query[WELCOME_CALLOUT_QUERY_PARAM] === "1";
+  const retired = Date.now() >= SUNSET;
 
   useEffect(() => {
     setHasMounted(true);
@@ -80,8 +110,8 @@ export function NewSimulationsCallout({
     if (projectId) setDismissed(isSnoozed(projectId));
   }, [projectId]);
 
-  if (!hasMounted || !projectId || !projectSlug || dismissed || legacyPreferred)
-    return null;
+  if (!hasMounted || !projectId || !projectSlug) return null;
+  if (!revived && (dismissed || legacyPreferred || retired)) return null;
 
   const href =
     target === "scenarios"

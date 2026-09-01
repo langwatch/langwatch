@@ -173,6 +173,8 @@ function ResultsBody({
   view,
   results,
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
   days,
   onSelectPlan,
@@ -184,6 +186,8 @@ function ResultsBody({
   view: ReturnType<typeof useResultsView>;
   results: UseResultGroupsResult;
   period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   days: number;
   onSelectPlan: (planSlug: string) => void;
@@ -205,6 +209,8 @@ function ResultsBody({
         isChartsShown={view.isChartsShown}
         onChartsToggle={view.onChartsToggle}
         period={period}
+        periodMode={periodMode}
+        setPeriod={setPeriod}
         setRelativePeriod={setRelativePeriod}
       />
 
@@ -254,6 +260,7 @@ export function ResultsList({
   isPlansLoading,
   period,
   periodMode,
+  setPeriod,
   setRelativePeriod,
   onSelectPlan,
   onSelectRun,
@@ -297,6 +304,8 @@ export function ResultsList({
           view={view}
           results={results}
           period={period}
+          periodMode={periodMode}
+          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
           days={periodDays(period)}
           onSelectPlan={onSelectPlan}

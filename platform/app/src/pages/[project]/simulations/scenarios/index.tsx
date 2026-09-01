@@ -16,6 +16,7 @@ import {
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
 } from "~/components/scenarios/ScenarioWelcomeScreen";
+import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
 import { useAgentTestingRedirect } from "~/components/suites/useAgentTestingRedirect";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -182,6 +183,8 @@ function ScenarioLibraryPage() {
           </PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>
+
+      <ReturnToNewSimulationsBanner target="scenarios" />
 
       <PageLayout.Container padding={0}>
         {isLoading && (
