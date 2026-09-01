@@ -204,6 +204,54 @@ For development, set `autogen.enabled: true` to auto-generate all secrets.
 
 For a complete installation guide, visit the [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
 
+### LangWatchQL (LWQL) — BYO ClickHouse prerequisites
+
+`lwql.enabled` (default `true`) provisions the LangWatchQL backend: a
+restricted `langwatch_lwql` user, an `lwql_restricted` settings profile, row
+policies, and a `lwql_postgres` PostgreSQL-bridge named collection. **Who
+provisions these depends on who owns the ClickHouse server** — see
+[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)
+for the full contract. One rule either way: **one owner per entity name.**
+Two systems defining the same user, profile, or named collection is fatal,
+not redundant — a duplicate named collection blocks server boot with
+`NAMED_COLLECTION_ALREADY_EXISTS`, and a duplicate access entity fails every
+repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
+
+- **`clickhouse.chartManaged: true` (default):** the `clickhouse-serverless`
+  subchart renders `langwatch_lwql`, `lwql_restricted`, the row policies, and
+  `lwql_postgres` as config at pod boot. The application issues no LWQL DDL
+  on this path.
+- **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
+  cannot render config into a server it does not run, so the application
+  self-provisions the same objects via SQL DDL at startup, and fails closed
+  (a logged refusal, not a crash) if the server rejects a statement. Your
+  external ClickHouse must satisfy three prerequisites before enabling
+  `lwql.enabled`, none of which this chart can set on the external path:
+
+  | Prerequisite | Why | Where it lives on the chart-managed path |
+  | --- | --- | --- |
+  | `custom_settings_prefixes` includes `custom_` | The `lwql_restricted` profile carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
+  | The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, `lwql_restricted`, and the row policies. | Rendered via a `zz`-prefixed users config — see `platform/app/src/server/analytics/lwql/provisioning.ts` (`clickHouseAccessManagementConfigXml`). The `zz-` prefix is load-bearing: `users.d` files merge lexicographically and the later file wins, so a name that sorts before the official image's own `default-user` config would be silently overridden. |
+  | `named_collection_control: 1` on that same administrative user | Required specifically to create/drop the `lwql_postgres` named collection via SQL (`CREATE NAMED COLLECTION`), distinct from the general `access_management` grant. | Same file as above. |
+
+  Grant these on your ClickHouse server before pointing this chart at it with
+  `lwql.enabled: true`; see `examples/overlays/clickhouse-external.yaml`.
+
+**Plaintext-password caveat (chart-managed path only).** When ClickHouse
+renders `lwql_postgres` as config, the PostgreSQL reader password is written
+in plaintext into `config.d/lwql-server.yaml` on the pod's disk
+(`infra/clickhouse-serverless/internal/render/lwql.go:140-153`). This is not
+an oversight: ClickHouse must dial PostgreSQL with the real credential to use
+the named collection, so unlike every other credential this chart renders,
+this one cannot be stored as a hash. Mitigations in place: the file lives
+under `config.d/`, mounted read-only to the `clickhouse` container user only
+(standard container file permissions, no world/group read); the password
+itself reaches the pod as a Kubernetes Secret
+(`clickhouse.auth.*` / `LWQL_POSTGRES_READER_PASSWORD`), never committed to a
+values file or version control. Treat any node or volume snapshot that can
+read `config.d/` as able to read this password, and scope filesystem access
+to the ClickHouse pod accordingly.
+
 ### Pod security
 
 Every LangWatch pod (including the cron pods) and every bundled datastore

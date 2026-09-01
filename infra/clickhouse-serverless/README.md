@@ -27,6 +27,24 @@ All other parameters (memory limits, pool sizes, merge settings, logging, networ
 
 For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
 
+## LangWatchQL (LWQL)
+
+Given a PostgreSQL bridge host and password (via env), `ch-config` also
+renders the LangWatchQL access model into `config.d/` and `users.d/` at pod
+start: the restricted `langwatch_lwql` user, the `lwql_restricted` settings
+profile, row policies, and the `lwql_postgres` named collection bridging into
+PostgreSQL. See `internal/render/lwql.go` for the implementation and
+[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)
+for why this image — not the application — owns these objects whenever it is
+the one running the server (chart-managed / SaaS-managed ClickHouse); on a
+BYO/external server the application self-provisions the same objects via SQL
+instead, and the two paths must never both define the same name.
+
+The `lwql_postgres` reader password is rendered in plaintext in
+`config.d/lwql-server.yaml`, since ClickHouse needs the real value to dial
+PostgreSQL — see the [chart README](../../charts/langwatch/README.md) for the
+full caveat and mitigations.
+
 ## What Gets Computed
 
 From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
