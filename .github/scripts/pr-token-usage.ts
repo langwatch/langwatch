@@ -218,6 +218,36 @@ const modelTable = (breakdown: ModelBreakdownRow[]): string[] => {
   return out;
 };
 
+/** An empty report is a finding, not a non-event: an agent almost certainly
+ * did the work, and nothing recorded it. Saying only "no sessions" leaves the
+ * reader to guess whether the work was manual or the wiring is broken, so the
+ * comment carries what to check, folded away so it costs a line until someone
+ * wants it. */
+const nothingAttributed = (): string[] => [
+  "No coding agent usage was attributed to this pull request.",
+  "",
+  "<details>",
+  "<summary>If an agent did work here, something is not reporting</summary>",
+  "",
+  "Usage is attributed by the repository and branch a session declares.",
+  "Check these in order:",
+  "",
+  "1. **Telemetry wiring.** Run `langwatch instrument claude` once per machine",
+  "   (`langwatch claude` does it too). It writes the settings a plain agent",
+  "   run needs to report at all.",
+  "2. **The declared checkout.** A session declares the directory it started",
+  "   in. Work in a git worktree other than the one the session opened lands",
+  "   on *that* worktree's branch instead. Run `langwatch ingest context` from",
+  "   the checkout you are editing to move it.",
+  "3. **The agent.** Only agents that report to LangWatch appear here. A review",
+  "   bot that is not instrumented spends tokens that nothing records.",
+  "",
+  "`langwatch ingest context` prints the repository and branch it declared, so",
+  "it is the quickest way to see what a session is attributed to.",
+  "",
+  "</details>",
+];
+
 export const buildCommentBody = ({
   usage,
   shortSha,
@@ -236,7 +266,7 @@ export const buildCommentBody = ({
   const parts = [MARKER, "### Coding agent usage on this pull request", ""];
 
   if (usage.totals.sessionsCount === 0) {
-    parts.push("No coding agent sessions recorded for this pull request.");
+    parts.push(...nothingAttributed());
   } else {
     parts.push(...usageTable(usage.rows, usage.totals));
     const details: string[] = [];
@@ -543,14 +573,9 @@ export const reportUsage = async ({
   if (!token) throw new Error("Missing required env var GITHUB_TOKEN");
   const existing = await findExistingComment({ apiUrl, token, repository, prNumber });
 
-  // No usage and no comment: stay silent rather than stamp every dependency
-  // bump with an empty table. An existing comment is still refreshed, so a
-  // rollup that empties never leaves stale numbers behind.
-  if (usage.totals.sessionsCount === 0 && !existing) {
-    console.log(`No usage recorded for ${repository}#${prNumber}; skipping.`);
-    return;
-  }
-
+  // An empty report is posted too. Staying silent made a broken pipeline look
+  // exactly like a pull request nobody used an agent on, and the difference
+  // is the whole point: the empty comment says what to check.
   await upsertComment({ apiUrl, token, repository, prNumber, body, existing });
   console.log(
     `${existing ? "Updated" : "Created"} usage comment on ${repository}#${prNumber}.`,

@@ -23,12 +23,22 @@ Feature: PR token usage comment
     Then the existing comment is updated in place
     And no additional comment is created
 
-  Scenario: A pull request with no recorded usage gets no comment
-    Given LangWatch has no sessions recorded for the pull request
-    And the pull request has no comment carrying the usage marker
+  Scenario: A pull request with no attributed usage still gets a comment
+    Given LangWatch has no sessions attributed to the pull request
     When the workflow runs
-    Then no comment is created
-    And the workflow does not fail
+    Then a comment carrying the usage marker is posted
+    And it states that no usage was attributed
+    And staying silent is not an option, because a broken pipeline would then
+      look exactly like a pull request nobody used an agent on
+
+  @unit
+  Scenario: An empty report says what to check
+    Given a rollup with no sessions
+    When the comment body is built
+    Then the comment names the telemetry wiring, the declared checkout and the
+      agent as the things to check
+    And the guidance is folded, so an empty report costs one line
+    And a comment with usage carries no such guidance
 
   Scenario: An existing comment is refreshed even when usage drops to zero
     Given a pull request already has a comment carrying the usage marker

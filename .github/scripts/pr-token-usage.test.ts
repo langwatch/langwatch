@@ -262,13 +262,25 @@ describe("given the LangWatch API's answer", () => {
 });
 
 describe("given a rollup with no sessions", () => {
-  describe("when the comment body is built anyway (an existing comment is refreshed)", () => {
-    it("states that no sessions are recorded instead of an empty table", () => {
+  describe("when the comment body is built", () => {
+    /** @scenario "An empty report says what to check" */
+    it("says nothing was attributed and folds away what to check", () => {
       const body = build(
         usage({ rows: [], totals: { ...usage().totals, sessionsCount: 0 }, modelBreakdown: [] }),
       );
-      assert.ok(body.includes("No coding agent sessions recorded"));
+      assert.ok(body.includes("No coding agent usage was attributed"));
       assert.ok(!body.includes("| Contributor |"));
+      // Folded, so an empty report costs one line until someone opens it.
+      assert.match(body, /<details>\n<summary>If an agent did work here/);
+      assert.ok(body.includes("</details>"));
+      // The three things worth checking, in order.
+      assert.ok(body.includes("langwatch instrument claude"));
+      assert.ok(body.includes("langwatch ingest context"));
+      assert.match(body, /worktree other than the one the session opened/);
+    });
+
+    it("carries no troubleshooting note when there is usage to show", () => {
+      assert.ok(!build(usage()).includes("If an agent did work here"));
     });
   });
 });
