@@ -119,6 +119,59 @@ Feature: One cost screen, three honest lanes
     Then the screen states cost data is unavailable
     And no lane displays a zero amount
 
+  @unit
+  Scenario: A lane with usage we cannot state in US dollars holds no total
+    # The partial-sum defect. When part of a lane has an amount we cannot
+    # state in US dollars, adding up only the rest produces a smaller
+    # number that still reads as the lane's whole figure — and nothing on
+    # the screen says how much was left out. A lane we cannot total is a
+    # lane with no total, and the screen would rather say nothing than
+    # understate what an organization spent.
+    Given one lane has usage billed in a currency other than US dollars
+    And that same lane also has usage billed in US dollars
+    When the cost screen reads that window
+    Then that lane holds no total
+    And the total of only its US dollar usage is not offered as the lane figure
+
+  @integration
+  Scenario: A lane with no total says why instead of showing a figure
+    # The note is the whole reason withholding is acceptable rather than
+    # broken. It must describe what actually happened: for the dominant
+    # cause the provider DID state an amount, in another currency, and
+    # nothing converts it — so copy claiming the amount is missing is
+    # wrong, and a reader who checks against the provider invoice finds it
+    # wrong.
+    Given a lane whose total is withheld because some usage is billed in another currency
+    When a permitted viewer opens the cost screen
+    Then that lane shows no amount
+    And that lane says some of its usage is billed in a currency other than US dollars
+    And that lane names that currency
+
+  @unit
+  Scenario: A day mixing stated and unstated amounts holds no figure for that lane
+    # The same rule for the chart. A day whose figure covers only part of
+    # what was spent must be a gap in the line, because a point drawn at a
+    # partial amount is a claim about that day nobody can stand behind —
+    # and a gap is the one shape a reader cannot misread as a low-spend
+    # day.
+    Given a day where one lane has both US dollar usage and usage billed in another currency
+    When the cost screen reads that window
+    Then that lane holds no figure for that day
+    And the other lane keeps its own figure for that day
+
+  @integration
+  Scenario: Rows written by an older summary shape are not counted
+    # Every summary row carries the stamp of the shape that wrote it, and
+    # the writer already refuses to read back a row carrying an older
+    # stamp. The screen reads the same table and must apply the same rule:
+    # without it a superseded row keeps contributing money to the total
+    # forever, and no compaction ever removes it because a row under an
+    # older stamp is not a replacement for the current one.
+    Given the summary table holds a row for a day written by an older version of the summary
+    And a row for the same day and lane written by the current version
+    When the cost screen reads that day
+    Then only the amount from the current version is counted
+
   @integration
   Scenario: A refund-heavy billed day renders negative as reported
     # Render-only in wave 1: the screen shows what the bill says, without
