@@ -114,3 +114,6 @@ func TestPool_ShutdownHandoff_NoWorkersIsNoop(t *testing.T) {
 		t.Errorf("ShutdownHandoff with no workers should return immediately")
 	}
 }
+
+func (a *notifyRecordingAgent) AbortTurn(context.Context, string, string) error { return nil }
+func (a *notifyRecordingAgent) TurnEnded()                                      {}

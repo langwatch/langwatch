@@ -9,6 +9,16 @@ Feature: Langy runs a conversation on the pi worker
   #     tool surface look like)
   #   - specs/langy/langy-stop-and-resume.feature  (the user-facing stop this
   #     feature's cancel path completes)
+  #   - specs/langy/langy-opencode-harness-removal.feature  (ADR-131; what
+  #     happens to a turn that still names the harness that was removed)
+  #
+  # Four scenarios here described SELECTING between two harnesses: a turn
+  # naming none, a turn flipping to pi, an unrecognized value, and a probe that
+  # compared harnesses. ADR-131 removed the second harness, so all four
+  # described a choice that no longer exists. What survived of them — that a
+  # turn naming no harness runs, and that a turn naming the removed one is
+  # served rather than refused — moved to the removal spec, where it is about
+  # tolerating an old envelope rather than about picking a worker.
 
   # The wrapper generates pi's model registry from the manager's config. That
   # entry must not LOSE what pi's own catalog knows about the model: Claude 5

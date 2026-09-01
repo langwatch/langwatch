@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -158,3 +159,25 @@ func TestSignatureOf_MirrorTierChangeRecyclesWorker(t *testing.T) {
 		t.Fatalf("an unrecognized tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
 	}
 }
+
+// An envelope naming a harness must still decode. A control plane mid-rollout
+// sends `harness`, and ADR-131 left the field out of the struct rather than
+// keeping a value nothing selects — so the property that matters is that the
+// unknown key is ignored, not that it maps to something.
+//
+// @scenario "A turn that names the removed harness still runs"
+func TestCredentials_IgnoreAHarnessTheEnvelopeStillNames(t *testing.T) {
+	var creds Credentials
+	raw := `{"model":"openai/gpt-5-mini","harness":"opencode"}`
+	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
+		t.Fatalf("an envelope naming a harness must decode, got %v", err)
+	}
+	if creds.Model != "openai/gpt-5-mini" {
+		t.Errorf("the rest of the envelope must survive, got model %q", creds.Model)
+	}
+}
+
+// A harness folded into the signature until ADR-131, so that flipping between
+// the two replaced the worker. With one harness every worker is built the same
+// way, so there is nothing left for the signature to distinguish and the test
+// that proved the distinction has no subject.

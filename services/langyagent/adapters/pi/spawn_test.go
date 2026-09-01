@@ -9,6 +9,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 )
 
 // A stand-in for the embedded AGENTS.md. It carries no placeholder, because
@@ -80,7 +81,7 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	home, cfg := provisionHome(t, creds)
 
 	persona, _ := cfg["personaPrompt"].(string)
-	if persona != langyAgentPrompt {
+	if persona != assets.LangyAgentPrompt {
 		t.Errorf("personaPrompt diverged from the Langy persona")
 	}
 	if !strings.Contains(persona, "Langy") || !strings.Contains(persona, "AGENTS.md") {

@@ -66,7 +66,7 @@ Feature: Langy runs one harness
   # Harness selection stops being a concept
   # ===========================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: A turn that names no harness runs
     Given a turn arrives whose credentials name no harness
     When the manager provisions a worker for it
@@ -78,7 +78,7 @@ Feature: Langy runs one harness
   # That must degrade to a served turn, not a failed one — the alternative is
   # an outage confined to whatever was in flight during the deploy, which is
   # the hardest kind to attribute afterwards.
-  @unit @unimplemented
+  @unit
   Scenario: A turn that names the removed harness still runs
     Given a turn arrives naming a harness this manager no longer has
     When the manager provisions a worker for it
