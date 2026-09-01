@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clickHouseAccessManagementConfigXml,
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLNames,
   lwqlKeyMapTableStatement,
@@ -156,6 +157,43 @@ describe("given the LangWatchQL row policy", () => {
       // above is what must still be carrying the invariant.
       expect(statement).toContain("ENGINE = MergeTree");
       expect(statement).not.toContain("ReplacingMergeTree");
+    });
+  });
+});
+
+/**
+ * The administrative user's access-management config, as XML text.
+ *
+ * The `lwql_postgres` named collection holds a plaintext PostgreSQL password,
+ * so `show_named_collections_secrets` would expose it through
+ * `SHOW CREATE NAMED COLLECTION`. It must never be granted — parity with the
+ * chart-managed renderer (`infra/clickhouse-serverless`, commit ec0005aadf) —
+ * and this asserts the *absence*, which no integration suite would catch: a
+ * suite that never runs `SHOW CREATE NAMED COLLECTION` stays green whether the
+ * secret is exposed or not.
+ */
+describe("given the LangWatchQL access-management config", () => {
+  describe("when it is rendered for the administrative user", () => {
+    const xml = clickHouseAccessManagementConfigXml({
+      administrativeUser: "lwql_admin",
+    });
+
+    it.each([
+      ["access_management", "<access_management>1</access_management>"],
+      [
+        "named_collection_control",
+        "<named_collection_control>1</named_collection_control>",
+      ],
+      [
+        "show_named_collections",
+        "<show_named_collections>1</show_named_collections>",
+      ],
+    ])("grants %s", (_label, expected) => {
+      expect(xml).toContain(expected);
+    });
+
+    it("does NOT grant show_named_collections_secrets (exposes lwql_postgres plaintext password)", () => {
+      expect(xml).not.toContain("show_named_collections_secrets");
     });
   });
 });

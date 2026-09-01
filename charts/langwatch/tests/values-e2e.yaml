@@ -69,6 +69,18 @@ clickhouse:
     size: 1Gi
   auth:
     password: "e2etest"
+  # LangWatchQL PostgreSQL bridge. Wiring the named collection to the in-cluster
+  # PostgreSQL is what makes the clickhouse-serverless renderer emit
+  # lwql_postgres, which the single-replica scenario asserts exists
+  # (specs/analytics/lwql-api.feature). The collection is lazy config — never
+  # dialed at ClickHouse boot — so pointing it at the chart's own PostgreSQL
+  # Service is sufficient for that existence check. Host is coupled to
+  # RELEASE="lw" in e2e.sh (Service <release>-postgresql).
+  lwql:
+    postgres:
+      host: "lw-postgresql"
+      database: "langwatch"
+      user: "lwql_ro"
 
 # ── PostgreSQL ─────────────────────────────────────────────────────────────────
 postgresql:

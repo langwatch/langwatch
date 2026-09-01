@@ -66,6 +66,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [092](./092-unified-authorization-engine.md)                      | Unified authorization engine — one registry, one resolver, every principal                  | Proposed                                          |
 | [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
 | [098](./098-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
+| [101](./101-lwql-clickhouse-access-model-ownership.md) | The ClickHouse server owner owns the LangWatchQL access model — rendered config vs. app self-provisioning | Accepted |
 
 ## When to Write an ADR
 

@@ -258,10 +258,13 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
-{{- if .Values.lwql.enabled }}
-    - LWQL_CLICKHOUSE_PASSWORD        (lwql.enabled=true; optional — if
-    - LWQL_POSTGRES_READER_PASSWORD    absent, LangWatchQL simply stays
-                                       unprovisioned instead of failing)
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+    - LWQL_CLICKHOUSE_PASSWORD        (external ClickHouse only; optional —
+    - LWQL_POSTGRES_READER_PASSWORD    if absent, LangWatchQL simply stays
+                                       unprovisioned instead of failing. On
+                                       chart-managed ClickHouse these live in
+                                       the ClickHouse credentials Secret, not
+                                       here — see Section 8.)
 {{- end }}
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
@@ -298,9 +301,9 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or (include "langwatch.lwql.selfProvisionActive" .) (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
 {{- end }}
-{{- if .Values.lwql.enabled }}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
       --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
       --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
 {{- end }}
@@ -315,31 +318,68 @@ message.
     kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
 {{- end }}
+{{- if and .Values.clickhouse.chartManaged (not .Values.autogen.enabled) }}
+{{- $chSecret := include "langwatch.clickhouse.secretName" . }}
+{{- $chLwql := .Values.clickhouse.lwql | default dict }}
+{{- $lwqlKey := $chLwql.passwordSecretKey | default "lwql_password" }}
+{{- $lwqlPgKey := ($chLwql.postgres | default dict).passwordSecretKey | default "lwql_pg_password" }}
+
+  {{ $chSecret }} keys (chart-managed ClickHouse, autogen.enabled=false):
+  With autogen off, templates/clickhouse/url-secret.yaml does NOT render, so
+  the chart never creates the ClickHouse credentials Secret — you must
+  pre-create it. The app composes CLICKHOUSE_URL from `password`, and a
+  replicated cluster shares `clusterSecret` for inter-node/Keeper auth;
+  NOTES never documented these keys before.
+    - password         (ClickHouse `default` user password)
+    - clusterSecret    (inter-node/Keeper auth for replicated clusters)
+{{- if .Values.lwql.enabled }}
+    - {{ $lwqlKey }}       (LangWatchQL restricted identity password)
+    - {{ $lwqlPgKey }}    (LangWatchQL PostgreSQL bridge role password)
+
+  The app mounts {{ $lwqlKey }} / {{ $lwqlPgKey }} from this Secret with
+  optional:true, so a MISSING key is SILENT — no CreateContainerConfigError,
+  the pod boots and langwatch_lwql is simply never created. If LangWatchQL
+  never appears, confirm both keys exist on this Secret.
+{{- end }}
+
+  Pre-create command:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $chSecret }} \
+      --from-literal=password="$(openssl rand -hex 32)" \
+      --from-literal=clusterSecret="$(openssl rand -hex 32)"{{ if .Values.lwql.enabled }} \
+      --from-literal={{ $lwqlKey }}="$(openssl rand -hex 32)" \
+      --from-literal={{ $lwqlPgKey }}="$(openssl rand -hex 32)"{{ end }}
+{{- end }}
 
 ──────────────────────────────────────────────────────────────────────
 8. LangWatchQL (LWQL) — governed analytics SQL
 ──────────────────────────────────────────────────────────────────────
-{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
-The app self-provisions the LangWatchQL backend on every boot: a
-restricted ClickHouse identity, settings profile, row policies, a
-read-only PostgreSQL role, and the analytics views. The
-`release_lwql_workbench` feature flag still gates the HTTP endpoint —
-until it is on for a project, queries are refused with
-`lwql_not_enabled` while the backend objects sit ready.
+{{- if .Values.lwql.enabled }}
+The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with `lwql_not_enabled`
+while the backend objects sit ready.
 
-{{- if not .Values.clickhouse.chartManaged }}
-Your ClickHouse is external: self-provisioning needs its admin user to
-be allowed access-management DDL (`access_management`,
-`named_collection_control`) and the server to declare the `custom_`
-settings prefix. The `langwatch/clickhouse-serverless` image ships
-both; on other servers, add them or set lwql.enabled=false. If the
-server refuses the DDL the app logs it and LangWatchQL stays
-unavailable — nothing else breaks.
+{{- if .Values.clickhouse.chartManaged }}
+Whoever owns the ClickHouse server owns the access model. Your ClickHouse is
+chart-managed, so the ClickHouse pods render the LangWatchQL restricted
+identity, its settings profile, grants, tenant row filters and the
+`lwql_postgres` bridge as config at boot — set `clickhouse.lwql.enabled=true`
+on the clickhouse-serverless subchart and supply the two LWQL passwords
+(`lwql_password`, `lwql_pg_password`) in the ClickHouse credentials Secret.
+With autogen.enabled=true the chart generates them; with autogen off you
+pre-create that Secret yourself — Section 7 lists the exact Secret name and
+keys. The application does NOT issue that DDL (one owner per entity name), and
+still creates the views, engine tables and key-map rows it must.
 {{- else }}
-For chart-managed ClickHouse, LangWatchQL access entities are stored in
-ClickHouse Keeper and shared by all replicas. Changing the replica count
-across the 1↔N boundary rolls the application automatically (its environment
-changes), requiring no operator action.
+Your ClickHouse is external, so the chart cannot render config into it: the app
+self-provisions the LangWatchQL backend on every boot — a restricted identity,
+settings profile, row policies, a read-only PostgreSQL role and the analytics
+views. This needs the admin user allowed access-management DDL
+(`access_management`, `named_collection_control`) and the server to declare the
+`custom_` settings prefix. The `langwatch/clickhouse-serverless` image ships
+both; on other servers, add them or set lwql.enabled=false. If the server
+refuses the DDL the app logs it and LangWatchQL stays unavailable — nothing
+else breaks.
 {{- end }}
 {{- else }}
 Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned

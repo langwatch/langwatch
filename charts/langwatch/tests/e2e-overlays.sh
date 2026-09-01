@@ -66,6 +66,46 @@ assert_not_contains() {
   fi
 }
 
+# Assert a projected-Secret volume actually resolves: extract the secretName and
+# the first item key the named volume references, then prove the Secret of that
+# name in the SAME render carries that key under data. This is the check env-var
+# assertions cannot make — an optional:true volume silently drops an unresolved
+# key, so "the env var is wired" is not "the mount resolves".
+assert_secret_key_resolves() {
+  local label="$1" haystack="$2" volume="$3"
+  local sname skey pair
+  # Anchor to the VOLUME definition, not the volumeMount of the same name: the
+  # `- name: <volume>` we want is the one followed by `secret:` (the mount is
+  # followed by mountPath). Reset on every list item so the mount block cannot
+  # bleed into the unrelated `secrets` volume's secretName that follows it.
+  # Emit "secretName firstItemKey" (the subchart lists key before path).
+  pair=$(awk -v v="$volume" '
+      $1=="-" && $2=="name:" && $3==v {inblk=1; sawsec=0; sname=""; next}
+      $1=="-" && $2=="name:" {inblk=0}
+      inblk && $1=="secret:" {sawsec=1}
+      inblk && sawsec && $1=="secretName:" {sname=$2; next}
+      inblk && sname!="" && $1=="-" && $2=="key:" {print sname, $3; exit}
+    ' <<< "$haystack")
+  sname="${pair%% *}"; skey="${pair##* }"
+  if [[ -z "$sname" || -z "$skey" || "$sname" == "$skey" ]]; then
+    fail "$label: could not locate secretName/key for volume '$volume' in render"
+    return
+  fi
+  # Walk the multi-doc render: within the Secret whose metadata.name == sname,
+  # look for a data key == skey. metadata precedes data in helm output, so name
+  # is set before the data line is seen.
+  if awk -v want="$sname" -v key="${skey}:" '
+      /^---/ {kind=""; name=""}
+      /^kind: / {kind=$2}
+      kind=="Secret" && /^  name: / {name=$2}
+      kind=="Secret" && name==want && $1==key {print "yes"; exit}
+    ' <<< "$haystack" | grep -q yes; then
+    pass "$label (Secret '$sname' carries key '$skey')"
+  else
+    fail "$label: volume '$volume' references Secret '$sname' key '$skey', but no such key in the rendered Secret"
+  fi
+}
+
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"
@@ -945,7 +985,7 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
-# @scenario "Self-provisioning is enabled for chart-managed ClickHouse at any replica count"
+# @scenario "App self-provisioning is exclusive to external ClickHouse under Design C"
 # @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
@@ -958,6 +998,9 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-external.yaml")
   assert_not_contains "ext-ch: no CH StatefulSet" "$ch_ext" "clickhouse-serverless/templates"
   assert_contains "ext-ch: CLICKHOUSE_URL env" "$ch_ext" "name: CLICKHOUSE_URL"
+  # Design C: the chart cannot render config into a server it does not run, so
+  # the app self-provisions the LWQL access model for external ClickHouse.
+  assert_contains "ext-ch: LWQL_SELF_PROVISION on for external CH" "$ch_ext" "name: LWQL_SELF_PROVISION"
 
   # postgres-external: DATABASE_URL from secret
   local pg_ext
@@ -984,15 +1027,50 @@ test_infra_overlays() {
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
 
-  # LWQL self-provisioning: enabled at replicas=3 via keeper-backed access storage
-  assert_contains "repl-ch: LWQL_SELF_PROVISION enabled at replicas=3" "$ch_repl" "name: LWQL_SELF_PROVISION"
+  # Design C: chart-managed ClickHouse renders the LWQL access model as config
+  # in the subchart, so the app must NOT self-provision it — LWQL_SELF_PROVISION
+  # is absent at replicas=3.
+  assert_not_contains "repl-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_repl" "name: LWQL_SELF_PROVISION"
 
-  # LWQL self-provisioning: also enabled at replicas=1
+  # ...and also absent at replicas=1 (chart-managed at any replica count).
   local ch_single
   ch_single=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_contains "single-ch: LWQL_SELF_PROVISION enabled at replicas=1" "$ch_single" "name: LWQL_SELF_PROVISION"
+  assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
+
+  # Design C: with app-side provisioning DDL off for chart-managed ClickHouse,
+  # the provisioner MOVES to the subchart — it does not vanish. Three ends of
+  # that contract are assertable from the parent chart here. The vendored
+  # clickhouse-serverless-0.3.0 tarball DOES render the LWQL volume/env (checked
+  # in #3 below); only the XML config CONTENT (langwatch_lwql user, grants, row
+  # policies, lwql_postgres named collection) is written inside the container at
+  # boot by ch-config rather than by helm, so that content stays covered by the
+  # subchart's own Go render tests, not this parent-chart harness.
+  #
+  #   1. The subchart is switched ON by default. Helm cannot derive
+  #      clickhouse.lwql.enabled from lwql.enabled, so the parent values set it,
+  #      and langwatch.lwql.provisioningGuard fails the render if an operator
+  #      turns it off while leaving LWQL enabled — otherwise NOBODY provisions.
+  assert_render_refuses "chart-managed: guard refuses LWQL-on with subchart-off" \
+    "requires clickhouse.lwql.enabled=true" \
+    --set clickhouse.lwql.enabled=false
+  #   2. The app still gets the query-time LWQL password on the chart-managed
+  #      path: it authenticates as langwatch_lwql regardless of who provisioned,
+  #      so cutting the password (the old selfProvisionActive gate) would break
+  #      every query even though the identity exists.
+  assert_contains "chart-managed: app still wired with LWQL query password" \
+    "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
+  #   3. The provisioning password actually REACHES the ClickHouse pod. The
+  #      clickhouse-serverless lwql-secrets volume mounts ONE Secret by name and
+  #      projects a key from it into /mnt/secrets/lwql, and the volume is
+  #      optional:true — so a Secret/key name that does not resolve is silently
+  #      skipped, config.go skips the absent file, and the langwatch_lwql user is
+  #      never created with no error anywhere. Env-var wiring (#2) does not prove
+  #      the mount resolves. Extract the secretName + key the volume references
+  #      and assert the RESOLVED Secret in the SAME render carries that key.
+  assert_secret_key_resolves "chart-managed: lwql-secrets volume key exists in rendered Secret" \
+    "$ch_single" "lwql-secrets"
 
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then

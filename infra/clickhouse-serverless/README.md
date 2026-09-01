@@ -21,11 +21,29 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `BACKUP_ENABLED` | `false` | Enable S3 disk for native `BACKUP`/`RESTORE` SQL |
 | `S3_ENDPOINT` | — | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA) |
-| `CH_REPLICATED` | `false` | Enable ReplicatedMergeTree with keeper-backed replicated access storage for LangWatchQL (requires keeper + data node env vars) |
+| `CH_REPLICATED` | `false` | Enable ReplicatedMergeTree with Keeper-backed data replication (requires keeper + data node env vars). Keeper replicates table data only — LangWatchQL access objects (users, profiles, row policies) are rendered as config at pod start, never stored in Keeper; see [ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md) |
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
 For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
+
+## LangWatchQL (LWQL)
+
+Given a PostgreSQL bridge host and password (via env), `ch-config` also
+renders the LangWatchQL access model into `config.d/` and `users.d/` at pod
+start: the restricted `langwatch_lwql` user, the `lwql_restricted` settings
+profile, row policies, and the `lwql_postgres` named collection bridging into
+PostgreSQL. See `internal/render/lwql.go` for the implementation and
+[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)
+for why this image — not the application — owns these objects whenever it is
+the one running the server (chart-managed / SaaS-managed ClickHouse); on a
+BYO/external server the application self-provisions the same objects via SQL
+instead, and the two paths must never both define the same name.
+
+The `lwql_postgres` reader password is rendered in plaintext in
+`config.d/lwql-server.yaml`, since ClickHouse needs the real value to dial
+PostgreSQL — see the [chart README](../../charts/langwatch/README.md) for the
+full caveat and mitigations.
 
 ## What Gets Computed
 

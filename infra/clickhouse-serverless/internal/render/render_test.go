@@ -1,7 +1,6 @@
 package render_test
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -439,11 +438,16 @@ func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
 		"access_management: 1",
 		"named_collection_control: 1",
 		"show_named_collections: 1",
-		"show_named_collections_secrets: 1",
 	} {
 		if !strings.Contains(accessContent, want) {
 			t.Errorf("zz-access-management.yaml should contain %q", want)
 		}
+	}
+	// show_named_collections_secrets is deliberately withheld (SaaS parity): it
+	// would expose the lwql_postgres plaintext PG password via SHOW CREATE NAMED
+	// COLLECTION.
+	if strings.Contains(accessContent, "show_named_collections_secrets") {
+		t.Error("zz-access-management.yaml must NOT grant show_named_collections_secrets (exposes lwql_postgres plaintext password)")
 	}
 }
 
@@ -489,121 +493,210 @@ func TestRenderAll_AccessPrerequisitesPresentInBothModes(t *testing.T) {
 	}
 }
 
-// @scenario "Replicated mode configures keeper-backed access storage"
-// @scenario "Replicated access storage replaces the server default rather than merging"
-func TestRenderAll_UserDirectoriesWrittenForReplicated(t *testing.T) {
-	dir := t.TempDir()
-	input := replicatedInput()
-	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
-
-	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
-		t.Fatalf("RenderAll: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "config.d/user-directories.yaml"))
-	if err != nil {
-		t.Fatalf("read user-directories.yaml: %v", err)
-	}
-	content := string(data)
-
-	for _, want := range []string{
-		"user_directories:",
-		// The replace attribute is the whole point of the file. Without it the
-		// block merges with the server's default local_directory, entities keep
-		// landing node-local, and the config is inert while looking correct.
-		"'@replace': replace",
-		// Retaining users_xml is what keeps the XML-defined admin user
-		// reachable; dropping it locks the operator out on restart.
-		"users_xml:",
-		"path: /etc/clickhouse-server/users.xml",
-		"replicated:",
-		"zookeeper_path: /clickhouse/mycluster/access/",
+// Design C (issue langwatch-saas#1168) deletes the keeper-backed access and
+// named-collection stores outright: a chart-managed server renders the
+// LangWatchQL access model as config rather than accepting SQL-created
+// entities into a replicated directory. renderUserDirectories and
+// renderNamedCollectionsStorage no longer exist, so neither file is ever
+// written — asserted for both modes by TestRenderAll_NoKeeperBackedAccessStores.
+// @scenario "No keeper-backed access or named-collection store is written in any mode"
+func TestRenderAll_NoKeeperBackedAccessStores(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *config.Input
+	}{
+		{"standalone", testInput()},
+		{"replicated", replicatedInput()},
 	} {
-		if !strings.Contains(content, want) {
-			t.Errorf("user-directories.yaml missing %q\n--- actual content ---\n%s", want, content)
-		}
-	}
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			computed := config.ComputeFromResources(tc.input.CPU, tc.input.RAMBytes, tc.input)
 
-	// Order is precedence: users_xml must be listed ahead of replicated so
-	// XML-defined users stay XML-defined and writes fall through to keeper.
-	if xml, repl := strings.Index(content, "users_xml:"), strings.Index(content, "replicated:"); xml > repl {
-		t.Errorf("users_xml must be listed before replicated\n--- actual content ---\n%s", content)
-	}
-}
-
-// @scenario "Replicated mode configures keeper-backed named collections"
-func TestRenderAll_NamedCollectionsStorageWrittenForReplicated(t *testing.T) {
-	dir := t.TempDir()
-	input := replicatedInput()
-	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
-
-	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
-		t.Fatalf("RenderAll: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "config.d/named-collections-storage.yaml"))
-	if err != nil {
-		t.Fatalf("read named-collections-storage.yaml: %v", err)
-	}
-	content := string(data)
-
-	for _, want := range []string{
-		"named_collections_storage:",
-		"type: zookeeper",
-		"path: /clickhouse/mycluster/named_collections/",
-		"update_timeout_ms: 5000",
-	} {
-		if !strings.Contains(content, want) {
-			t.Errorf("named-collections-storage.yaml missing %q\n--- actual content ---\n%s", want, content)
-		}
-	}
-
-	// The encrypted variant needs a key_hex the chart neither generates nor
-	// rotates; picking it up by accident would fail the server at start.
-	if strings.Contains(content, "zookeeper_encrypted") {
-		t.Error("named-collections-storage.yaml should use the unencrypted zookeeper type")
-	}
-}
-
-// Both files address cluster-wide keeper paths, so every replica must render
-// them byte-identically. A per-replica difference would point one node at
-// storage the others do not share, and the access model would silently stop
-// being cluster-wide the moment the replica count changed.
-// @scenario "Access configuration does not depend on the replica identity"
-func TestRenderAll_AccessStorageIndependentOfReplicaIdentity(t *testing.T) {
-	renderFor := func(t *testing.T, replica, node string) map[string][]byte {
-		t.Helper()
-		dir := t.TempDir()
-		input := replicatedInput()
-		input.Replica = replica
-		input.DataNodes = node
-		computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
-
-		if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
-			t.Fatalf("RenderAll: %v", err)
-		}
-
-		rendered := make(map[string][]byte)
-		for _, name := range []string{
-			"config.d/user-directories.yaml",
-			"config.d/named-collections-storage.yaml",
-		} {
-			data, err := os.ReadFile(filepath.Join(dir, name))
-			if err != nil {
-				t.Fatalf("read %s: %v", name, err)
+			if err := render.RenderAll(testLogger(), tc.input, computed, dir); err != nil {
+				t.Fatalf("RenderAll: %v", err)
 			}
-			rendered[name] = data
-		}
-		return rendered
+
+			// No chart-written user_directories anywhere: the merge/precedence
+			// hazard (AC8) that file caused is deleted, not mitigated.
+			for _, f := range []string{
+				"config.d/user-directories.yaml",
+				"config.d/named-collections-storage.yaml",
+			} {
+				if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+					t.Errorf("%s must never be written under Design C", f)
+				}
+			}
+		})
+	}
+}
+
+// Without a mounted LWQL password the renderer writes no LWQL config at all —
+// an install that does not use LangWatchQL (or points it at external
+// ClickHouse) carries no langwatch_lwql identity.
+// @scenario "No LangWatchQL config is written without a mounted password"
+func TestRenderAll_LwqlSkippedWithoutPassword(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
 	}
 
-	first := renderFor(t, "node-0", "ch-0.ch-headless")
-	second := renderFor(t, "node-2", "ch-2.ch-headless")
-
-	for name, want := range first {
-		got := second[name]
-		if !bytes.Equal(want, got) {
-			t.Errorf("%s differs between replica identities\n--- node-0 ---\n%s\n--- node-2 ---\n%s", name, want, got)
+	for _, f := range []string{"users.d/lwql.yaml", "config.d/lwql-server.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			t.Errorf("%s must not be written when no LWQL password is mounted", f)
 		}
+	}
+}
+
+// With the LWQL password mounted, a chart-managed server owns the access model:
+// the restricted user, its profile, the fixed grants and the tenant row filters
+// are rendered as config, and the PostgreSQL bridge collection appears when its
+// host and password are supplied.
+// @scenario "A chart-managed server renders the LangWatchQL access model as config"
+func TestRenderAll_LwqlRendersAccessModel(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlDatabase = "langwatch"
+	input.LwqlPgHost = "pg.internal"
+	input.LwqlPgPort = 5432
+	input.LwqlPgDatabase = "langwatch"
+	input.LwqlPgUser = "lwql_ro"
+	input.LwqlPgPassword = "pg-secret"
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	usersData, err := os.ReadFile(filepath.Join(dir, "users.d/lwql.yaml"))
+	if err != nil {
+		t.Fatalf("read users.d/lwql.yaml: %v", err)
+	}
+	users := string(usersData)
+	h := sha256.Sum256([]byte("lwql-secret"))
+	for _, want := range []string{
+		"langwatch_lwql:",
+		"lwql_restricted:",
+		fmt.Sprintf("%x", h),
+		"profile: lwql_restricted",
+		"GRANT SELECT ON langwatch.lwql_*",
+		"GRANT SELECT ON langwatch.trace_summaries",
+		"GRANT SELECT ON langwatch.traces",
+		"GRANT SELECT ON langwatch.prompt_versions",
+		"KeyHash = getSetting('custom_api_key_hash')",
+		"HAVING uniqExact(TenantId) = 1",
+		"changeable_in_readonly",
+	} {
+		if !strings.Contains(users, want) {
+			t.Errorf("users.d/lwql.yaml missing %q\n--- actual ---\n%s", want, users)
+		}
+	}
+	// The plaintext LWQL password must never reach the rendered config; only its
+	// hash does.
+	if strings.Contains(users, "lwql-secret") {
+		t.Error("users.d/lwql.yaml must not contain the plaintext LWQL password")
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	server := string(serverData)
+	for _, want := range []string{
+		"settings_constraints_replace_previous: true",
+		"named_collections:",
+		"lwql_postgres:",
+		"host: pg.internal",
+		"user: lwql_ro",
+		"password: pg-secret",
+	} {
+		if !strings.Contains(server, want) {
+			t.Errorf("config.d/lwql-server.yaml missing %q\n--- actual ---\n%s", want, server)
+		}
+	}
+}
+
+// The named collection needs the real PostgreSQL password; without it the LWQL
+// user still renders but the bridge collection is omitted rather than written
+// with an empty password.
+// @scenario "The lwql_postgres bridge is omitted without its PostgreSQL password"
+func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgPassword(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlPgHost = "pg.internal"
+	// LwqlPgPassword deliberately empty.
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "named_collections") {
+		t.Error("named_collections must be omitted when the PostgreSQL password is absent")
+	}
+}
+
+// The named collection needs a database to connect to as well; without one the
+// bridge collection is omitted, matching the bash renderer + terraform contract
+// which requires host, database, and password together.
+// @scenario "The lwql_postgres bridge is omitted without its PostgreSQL database"
+func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgDatabase(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlPgHost = "pg.internal"
+	input.LwqlPgPassword = "pg-secret"
+	// LwqlPgDatabase deliberately empty.
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "named_collections") {
+		t.Error("named_collections must be omitted when the PostgreSQL database is absent")
+	}
+}
+
+// With host, password and database all set but no explicit user, the rendered
+// named collection defaults to lwql_ro, matching the bash renderer's
+// ${CLICKHOUSE_LWQL_PG_USER:-lwql_ro}.
+// @scenario "The lwql_postgres bridge user defaults to lwql_ro when unset"
+func TestRenderAll_LwqlNamedCollectionDefaultsPgUser(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlPgHost = "pg.internal"
+	input.LwqlPgDatabase = "langwatch"
+	input.LwqlPgPassword = "pg-secret"
+	// LwqlPgUser deliberately empty.
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	server := string(serverData)
+	if !strings.Contains(server, "named_collections") {
+		t.Fatalf("named_collections must be rendered when host, database, and password are all set\n--- actual ---\n%s", server)
+	}
+	if !strings.Contains(server, "user: lwql_ro") {
+		t.Errorf("user must default to lwql_ro when unset\n--- actual ---\n%s", server)
 	}
 }

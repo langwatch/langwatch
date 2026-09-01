@@ -1,4 +1,5 @@
 {{- include "langwatch.validateSecrets" . }}
+{{- include "langwatch.lwql.provisioningGuard" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

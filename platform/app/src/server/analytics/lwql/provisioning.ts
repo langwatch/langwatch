@@ -75,6 +75,14 @@ export const CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH =
  *
  * Nothing here widens what the restricted identity can do — it must never
  * carry these. Belongs at {@link CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH}.
+ *
+ * `show_named_collections_secrets` is deliberately NOT granted, for parity with
+ * the chart-managed renderer (`infra/clickhouse-serverless`): the `lwql_postgres`
+ * named collection holds a plaintext PostgreSQL password — ClickHouse must dial
+ * PG with the real value — and that grant would expose it through
+ * `SHOW CREATE NAMED COLLECTION`. `show_named_collections` (existence, secrets
+ * redacted) is enough to administer the collection, and nothing here reads the
+ * collection back: `./postgresMapping.ts` only ever writes it.
  */
 export function clickHouseAccessManagementConfigXml({
   administrativeUser,
@@ -88,7 +96,6 @@ export function clickHouseAccessManagementConfigXml({
             <access_management>1</access_management>
             <named_collection_control>1</named_collection_control>
             <show_named_collections>1</show_named_collections>
-            <show_named_collections_secrets>1</show_named_collections_secrets>
         </${administrativeUser}>
     </users>
 </clickhouse>

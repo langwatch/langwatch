@@ -54,28 +54,26 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"network", func() error { return renderNetwork(computed, configD) }},
 		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
 		{"access-management", func() error { return renderAccessManagement(usersD) }},
+		{"lwql", func() error { return renderLwql(input, usersD, configD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	// Replicated mode: zookeeper client, macros and remote_servers, plus the
-	// two keeper-backed stores that make per-node state cluster-wide.
-	//
-	// renderCustomSettingsPrefixes and renderAccessManagement stay above and
-	// unconditional on purpose: the permission to run access DDL and the
-	// declared `custom_` prefix are properties of every server regardless of
-	// topology, and replicated storage does not carry either of them.
+	// Replicated mode: zookeeper client, macros and remote_servers for the
+	// ReplicatedMergeTree engine. The server writes NO keeper-backed access or
+	// named-collection store (Design C, issue langwatch-saas#1168): whoever
+	// owns the ClickHouse server owns the access model, so a chart-managed
+	// server renders the LangWatchQL user, profile, grants, row filters and the
+	// lwql_postgres named collection directly as config (renderLwql, above,
+	// self-gated on the mounted password) rather than accepting SQL-created
+	// entities into a replicated directory. That deletes the AC8 defect class
+	// outright — no `user_directories` merge hazard, no startup-fatal
+	// keeper-backed named-collection dependency — instead of patching it.
 	if input.Replicated {
 		if err := renderKeeper(input, configD); err != nil {
 			return fmt.Errorf("keeper: %w", err)
-		}
-		if err := renderUserDirectories(input, configD); err != nil {
-			return fmt.Errorf("user-directories: %w", err)
-		}
-		if err := renderNamedCollectionsStorage(input, configD); err != nil {
-			return fmt.Errorf("named-collections-storage: %w", err)
 		}
 	}
 
