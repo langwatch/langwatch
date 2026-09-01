@@ -22,7 +22,11 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { reportUsage } from "./pr-token-usage.ts";
+import { nextPageUrl, reportUsage } from "./pr-token-usage.ts";
+
+/** A push whose `before` is all zeros created the branch: there is no range
+ * to compare against, only the tip. */
+const NO_PARENT = "0".repeat(40);
 
 export type AssociatedPullRequest = {
   number: number;
@@ -66,6 +70,63 @@ export const mergeTargets = ({
   };
 };
 
+/** The push tip alone is not the push. One push can land several merge
+ * commits: a merge queue empties a batch at once, and a rebase merge lands
+ * each of a pull request's commits. Only the last of them is `github.sha`, so
+ * resolving from the tip would leave every earlier pull request in the push
+ * without its final refresh. The tip is always included, which is also the
+ * whole answer for a push that created the branch. */
+export const commitsToResolve = ({
+  after,
+  compared,
+}: {
+  after: string;
+  compared: string[];
+}): string[] => [...new Set([...compared, after])].filter(Boolean);
+
+const githubHeaders = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
+const fetchPushedCommits = async ({
+  apiUrl,
+  token,
+  repository,
+  before,
+  after,
+}: {
+  apiUrl: string;
+  token: string;
+  repository: string;
+  before: string;
+  after: string;
+}): Promise<string[]> => {
+  if (!before || before === NO_PARENT || before === after) return [];
+  let url: string | null =
+    `${apiUrl}/repos/${repository}/compare/${before}...${after}?per_page=100`;
+  const shas: string[] = [];
+  while (url) {
+    const response: Response = await fetch(url, {
+      headers: githubHeaders(token),
+    });
+    // A force push leaves `before` unreachable and the compare 404s. The tip
+    // is still a real commit, so fall back to it rather than fail the job.
+    if (!response.ok) {
+      console.log(
+        `::warning title=pr-token-usage::Comparing ${before}...${after} ` +
+          `answered ${response.status}; resolving the push tip alone`,
+      );
+      return [];
+    }
+    const page = (await response.json()) as { commits?: { sha: string }[] };
+    shas.push(...(page.commits ?? []).map((commit) => commit.sha));
+    url = nextPageUrl(response.headers.get("link"));
+  }
+  return shas;
+};
+
 const fetchAssociatedPullRequests = async ({
   apiUrl,
   token,
@@ -79,13 +140,7 @@ const fetchAssociatedPullRequests = async ({
 }): Promise<AssociatedPullRequest[]> => {
   const response = await fetch(
     `${apiUrl}/repos/${repository}/commits/${sha}/pulls?per_page=100`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    },
+    { headers: githubHeaders(token) },
   );
   if (!response.ok) {
     throw new Error(
@@ -110,13 +165,36 @@ const run = async (): Promise<void> => {
   const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
   const token = requireEnv("GITHUB_TOKEN");
 
-  const { refresh, forks } = mergeTargets({
-    pullRequests: await fetchAssociatedPullRequests({
+  const commits = commitsToResolve({
+    after: sha,
+    compared: await fetchPushedCommits({
       apiUrl,
       token,
       repository,
-      sha,
+      before: process.env.PUSH_BEFORE ?? "",
+      after: sha,
     }),
+  });
+
+  const associated: AssociatedPullRequest[] = [];
+  // Which commit carried which pull request, so a batch stamps each one with
+  // the commit it actually landed on rather than the whole batch's tip.
+  const landedOn = new Map<number, string>();
+  for (const commit of commits) {
+    const pulls = await fetchAssociatedPullRequests({
+      apiUrl,
+      token,
+      repository,
+      sha: commit,
+    });
+    for (const pull of pulls) {
+      if (!landedOn.has(pull.number)) landedOn.set(pull.number, commit);
+    }
+    associated.push(...pulls);
+  }
+
+  const { refresh, forks } = mergeTargets({
+    pullRequests: associated,
     branch,
     repository,
   });
@@ -126,7 +204,10 @@ const run = async (): Promise<void> => {
   }
 
   if (refresh.length === 0) {
-    console.log(`${sha.slice(0, 7)} merged no pull request into ${branch}.`);
+    console.log(
+      `${commits.length} commit(s) up to ${sha.slice(0, 7)} merged no pull ` +
+        `request into ${branch}.`,
+    );
     return;
   }
 
@@ -136,7 +217,7 @@ const run = async (): Promise<void> => {
     await reportUsage({
       repository,
       prNumber,
-      shortSha: sha.slice(0, 7),
+      shortSha: (landedOn.get(prNumber) ?? sha).slice(0, 7),
       endpoint,
       apiKey: requireEnv("LANGWATCH_API_KEY"),
       apiUrl,

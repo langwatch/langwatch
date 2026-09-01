@@ -157,6 +157,20 @@ Feature: PR token usage comment
       Then every merged pull request is named exactly once
 
     @unit
+    Scenario: Every commit in the push is resolved, not just the tip
+      Given a push that landed more than one commit
+      When the commits to resolve are chosen
+      Then every commit in the push is resolved
+      And no pull request merged earlier in the push is left behind
+
+    @unit
+    Scenario: A push with no comparable range still resolves its tip
+      Given a push that created the branch, or a range that could not be read
+      When the commits to resolve are chosen
+      Then the push tip alone is resolved
+      And the job does not fail
+
+    @unit
     Scenario: A merged fork pull request is still not commented on
       Given a merged pull request whose head branch is in another repository
       When the pull requests for the pushed commit are read

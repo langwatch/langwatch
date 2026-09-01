@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  commitsToResolve,
   mergeTargets,
   type AssociatedPullRequest,
 } from "./pr-token-usage-merged.ts";
@@ -63,6 +64,32 @@ describe("given a merged pull request whose head branch is in another repository
       ]);
       assert.deepEqual(result.refresh, [62]);
       assert.deepEqual(result.forks, [60, 61]);
+    });
+  });
+});
+
+describe("given a push that landed more than one commit", () => {
+  describe("when the commits to resolve are chosen", () => {
+    /** @scenario "Every commit in the push is resolved, not just the tip" */
+    it("resolves every commit in the range, tip included", () => {
+      assert.deepEqual(
+        commitsToResolve({ after: "ccc", compared: ["aaa", "bbb", "ccc"] }),
+        ["aaa", "bbb", "ccc"],
+      );
+    });
+
+    it("names the tip once when the range already ends there", () => {
+      assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["ccc"] }), [
+        "ccc",
+      ]);
+    });
+
+    /** @scenario "A push with no comparable range still resolves its tip" */
+    it("falls back to the tip alone when there is no range", () => {
+      // A branch creation, or a compare that could not be read.
+      assert.deepEqual(commitsToResolve({ after: "ccc", compared: [] }), [
+        "ccc",
+      ]);
     });
   });
 });

@@ -71,5 +71,9 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
           PR_REPOSITORY: ${{ github.repository }}
           PUSH_SHA: ${{ github.sha }}
+          # One push can land several merge commits, and only the last is
+          # `github.sha`. The range says which commits arrived, so a batch
+          # leaves none of its pull requests unrefreshed.
+          PUSH_BEFORE: ${{ github.event.before }}
           PUSH_BRANCH: ${{ github.ref_name }}
         run: node --experimental-strip-types .github/scripts/pr-token-usage-merged.ts
