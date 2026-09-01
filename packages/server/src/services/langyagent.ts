@@ -43,8 +43,16 @@ const UNSAFE_ISOLATION_ENVIRONMENTS = new Set(["local", "development", "dev", "t
 /**
  * The Langy assistant's manager, the process that owns one worker per
  * conversation. Same `cmd/service` mono-binary as the gateway and the NLP
- * engine, dispatched as `langyagent`, so the assistant adds no download of its
- * own.
+ * engine, dispatched as `langyagent`.
+ *
+ * KNOWN GAP: nothing here installs the `langy-worker` binary the manager
+ * spawns. The opencode predep used to put a worker runtime in ~/.langwatch/bin;
+ * ADR-131 deleted it and no predep replaced it, so the manager boots and
+ * reports healthy and the first message fails at spawn with exec-not-found.
+ * This predates ADR-131 — the pi harness has been the default for a while and
+ * already spawned `langy-worker` — but the deletion removed the last artefact
+ * that made the omission visible. Fixing it means either a `langy-worker`
+ * predep or setting LANGY_PI_WORKER_BINARY_PATH from here.
  *
  * Health: /health.
  *
@@ -106,9 +114,10 @@ export async function startLangyagent(
         // Production's ceilings are much higher and set in the chart.
         LANGY_MAX_WORKERS: envFromFile.LANGY_MAX_WORKERS ?? "2",
         LANGY_WORKER_IDLE_MS: envFromFile.LANGY_WORKER_IDLE_MS ?? "120000",
-        // The worker binary and the `langwatch` CLI both live in ~/.langwatch/bin; the
-        // workers inherit exactly this PATH (the manager's allowlist passes it
-        // through), which is how their tool calls resolve.
+        // The `langwatch` CLI lives in ~/.langwatch/bin and the workers inherit
+        // exactly this PATH (the manager's allowlist passes it through), which is
+        // how their tool calls resolve. The worker binary itself is NOT installed
+        // here — see the gap noted on this function.
         PATH: [ctx.paths.bin, process.env.PATH ?? ""].filter(Boolean).join(delimiter),
         LOG_FORMAT: "pretty",
       },

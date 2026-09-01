@@ -52,6 +52,11 @@ var _ app.Runner = Runner{}
 // well beyond this decision.
 func New() Runner { return Runner{} }
 
+// AppliesIdentity is false: Chown and Lchown are no-ops and SysProcAttr sets
+// no Credential, so a uid handed to this runner is never applied to
+// anything. The pool reads this to stop reserving one (ADR-130 §4).
+func (Runner) AppliesIdentity() bool { return false }
+
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "shared-identity" }
 

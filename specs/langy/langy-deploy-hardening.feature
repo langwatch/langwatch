@@ -152,7 +152,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
       another's live credentials and conversation content
     And the failure names the value that accepts that risk deliberately
 
-  @unit @unimplemented
+  @e2e
   Scenario: An operator can accept the reduced isolation and render a non-root pod
     Given the chart manages the langy-agent pod
     And the operator has turned per-worker identity isolation off
@@ -165,7 +165,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # Admission "restricted" and the common policy-engine rules without any
     # per-namespace or per-RuntimeClass exemption.
 
-  @unit @unimplemented
+  @e2e
   Scenario: The default install keeps per-worker identity isolation
     Given an operator installs the umbrella chart with default values
     When the chart renders
@@ -196,7 +196,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # exposure is the worker's process environment and its session directory,
     # not a credential file — there isn't one.
 
-  @unit @unimplemented
+  @unit
   Scenario: An unrecognized isolation setting fails closed
     Given the agent is configured with an isolation value the manager does not know
     When the manager starts
@@ -204,7 +204,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     And it never falls back to running workers under one identity
     # The dangerous posture is never what a typo selects.
 
-  @unit @unimplemented
+  @unit
   Scenario: The manager does not reserve worker identities it cannot enforce
     Given the agent is running without per-worker identity isolation
     When a conversation's worker is provisioned
