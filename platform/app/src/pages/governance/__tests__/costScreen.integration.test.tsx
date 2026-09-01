@@ -403,7 +403,7 @@ describe("the governance cost screen", () => {
     });
   });
 
-  describe("given a contributing source has stopped pulling", () => {
+  describe("given a source whose pulls have been failing", () => {
     /** @scenario "The cost screen says where its numbers stop being complete" */
     it("names the source and the day, next to the lanes it undercounts", () => {
       harness.query = {
@@ -424,12 +424,19 @@ describe("the governance cost screen", () => {
       expect(
         within(notice).getByText(/unknown rather than zero/i),
       ).toBeInTheDocument();
+      // The day itself, not merely the words around it. Asserting only the
+      // phrase let a title that had lost its date pass. Matching the digits
+      // rather than a formatted string keeps this locale-independent: every
+      // locale renders a numeric day and year as those numerals.
+      const since = within(notice).getByText(/^No data since /);
+      expect(since.textContent).toMatch(/\b20\b/);
+      expect(since.textContent).toMatch(/\b2026\b/);
       // The lanes still render. A stalled pull caveats the figures; it does
       // not withdraw them.
       expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
     });
 
-    /** @scenario "A screen whose sources are all pulling carries no outage notice" */
+    /** @scenario "A screen whose sources are all pulling carries no warning" */
     it("stays silent while every source is still pulling", () => {
       renderScreen();
 

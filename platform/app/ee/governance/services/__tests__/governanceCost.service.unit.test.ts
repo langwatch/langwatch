@@ -488,8 +488,8 @@ describe("GovernanceCostService.summary", () => {
         });
       });
 
-      /** @scenario "The gap is dated from the first source that fell over" */
-      it("dates the gap from the first source that fell over, not the last", async () => {
+      /** @scenario "The gap is dated from the first source that started failing" */
+      it("dates the gap from the first source that started failing, not the last", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1", [
             brokenSince("2026-08-25T09:00:00.000Z", "OpenAI Compliance"),
@@ -517,25 +517,44 @@ describe("GovernanceCostService.summary", () => {
 
   describe("given every source is still pulling", () => {
     describe("when requesting the summary", () => {
-      /** @scenario "A source nobody asked to run is not reported as an outage" */
-      it("says nothing, rather than caveating figures that are whole", async () => {
+      const healthy = {
+        name: "Azure Billing",
+        status: "active",
+        errorCount: 0,
+        lastSuccessAt: new Date("2026-09-01T09:00:00.000Z"),
+      } as const;
+
+      /** @scenario "A source nobody asked to run is not reported as having stopped" */
+      it("ignores a source that was switched off while failing", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1", [
-            {
-              name: "Azure Billing",
-              status: "active",
-              errorCount: 0,
-              lastSuccessAt: new Date("2026-09-01T09:00:00.000Z"),
-            },
+            healthy,
             // Switched off on purpose. A source nobody asked to run has not
-            // stopped pulling, and an outage notice here would be a lie.
+            // stopped pulling, and a warning here would be a lie.
             {
               name: "Retired Source",
               status: "disabled",
               errorCount: 9,
               lastSuccessAt: new Date("2026-01-01T09:00:00.000Z"),
             },
-            // Never succeeded, so there is no "since" to name.
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.staleSources).toBeNull();
+      });
+
+      /** @scenario "A source that has never pulled has no day to report" */
+      it("ignores a failing source that has never once succeeded", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            healthy,
+            // Failing hard, but there is no last success to date the gap from.
             {
               name: "Brand New",
               status: "active",
