@@ -171,10 +171,6 @@ const FoundryDrawer = lazyDefault({
   factory: () => import("~/features/ops/foundry-drawer.transport"),
   key: "FoundryDrawer",
 });
-const PullRequestDetailDrawer = lazyDefault({
-  factory: () => import("./me/PullRequestDetailDrawer"),
-  key: "PullRequestDetailDrawer",
-});
 const CreateProjectDrawer = lazyDefault({
   factory: () => import("./projects/CreateProjectDrawer"),
   key: "CreateProjectDrawer",
@@ -335,8 +331,6 @@ export const drawers = {
   opsProcessInstances: ProcessInstancesDrawer,
   opsBlobs: OpsBlobsDrawer,
   opsReplay: OpsReplayDrawer,
-  // Coding agents
-  pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

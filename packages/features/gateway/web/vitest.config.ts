@@ -4,6 +4,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     setupFiles: ["./vitest.setup.ts"],
+    // Drawer suites drive real user events through Chakra overlays; under a
+    // fully loaded worker pool the slowest of them clears 5s while passing
+    // comfortably alone, so the budget reflects the suite, not the default.
+    testTimeout: 30_000,
   },
   resolve: {
     alias: {

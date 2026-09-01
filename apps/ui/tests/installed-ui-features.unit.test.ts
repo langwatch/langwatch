@@ -2,8 +2,8 @@
  * What this package installs for itself, and how a host's install meets it.
  *
  * The governance move made `apps/ui` a package that serves pages, and this is
- * the seam that made that possible without editing the host: eleven loaders and
- * a feature transport declared here, merged under whatever the composing
+ * the seam that made that possible without editing the host: the loaders and
+ * the feature transports are declared here, merged under whatever the composing
  * application passes.
  */
 
@@ -22,6 +22,19 @@ const GATEWAY_PAGE_KEYS = [
   "pages/gateway/guardrails",
   "pages/gateway/billing-events",
   "pages/gateway/webhooks",
+];
+
+const PERSONAL_WORKSPACE_PAGE_KEYS = [
+  "pages/me/index",
+  "pages/me/configure",
+  "pages/me/sessions",
+  "pages/me/pull-requests",
+  "pages/me/budget/request",
+  // Two project-scoped keys, and they belong to this family because their
+  // whole page bodies were its tables. They are children of a layout route the
+  // host still serves, which the merge point makes possible.
+  "pages/[project]/sessions",
+  "pages/[project]/pull-requests",
 ];
 
 const GOVERNANCE_PAGE_KEYS = [
@@ -65,14 +78,19 @@ describe("given what apps/ui serves itself", () => {
   describe("when the standing declaration is read", () => {
     it("registers a loader for every page key the families it serves name", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
-        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS].sort(),
+        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS, ...PERSONAL_WORKSPACE_PAGE_KEYS].sort(),
       );
     });
 
     it("mounts each feature's own transport Provider", () => {
+      // Four rather than three: the personal workspace mounts two, because the
+      // coding-agent tables its screens render call procedures of their own and
+      // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
+        "@langwatch/user-web",
+        "@langwatch/coding-agent-web",
       ]);
     });
 
@@ -117,9 +135,9 @@ describe("given what apps/ui serves itself", () => {
       const merged = mergeUiFeatureInstalls(installedUiFeatures);
 
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
-        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS].sort(),
+        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS, ...PERSONAL_WORKSPACE_PAGE_KEYS].sort(),
       );
-      expect(merged.apis).toHaveLength(2);
+      expect(merged.apis).toHaveLength(4);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

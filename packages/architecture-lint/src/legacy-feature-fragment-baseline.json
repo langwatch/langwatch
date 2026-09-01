@@ -450,8 +450,6 @@
     {"feature":"project","file":"platform/app/src/pages/[project]/index.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/[project]/online-evaluations/index.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/[project]/prompts.tsx","kind":"page-shell"},
-    {"feature":"project","file":"platform/app/src/pages/[project]/pull-requests.tsx","kind":"page-shell"},
-    {"feature":"project","file":"platform/app/src/pages/[project]/sessions.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/[project]/setup.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/[project]/simulations/[[...path]].tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/[project]/simulations/scenarios/index.tsx","kind":"page-shell"},

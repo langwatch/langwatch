@@ -170,24 +170,118 @@ Known costs, all reported rather than suppressed:
   move takes it to 21. Teaching it that `apps/ui` serves some keys itself is an
   insertion in a `platform/app` file.
 
-### me — 5 keys, ~44 prod files + 13 tests (widen by 2 keys recommended)
+### me — MOVED. 7 keys (5 personal + 2 project-scoped), 37 prod files + 14 tests
 
-- `PullRequestsTable`/`SessionsTable` are also the entire bodies of
-  `pages/[project]/{pull-requests,sessions}` (52/63 lines) — widen the family
-  to take those two keys rather than duplicating.
-- DO NOT move (filed under `components/me/` but owned by others):
-  `PersonalFeatureGateDialog` + `usePersonalFeatureGate` (traces-v2/annotations),
-  `PasskeyNudge` (DashboardLayout), `PasskeysSection`/`SignInMethodsSection`
-  (settings/authentication).
-- Hard problems: `PersonalRecentTracesTable` reaches six deep paths into
-  `features/traces-v2/` (ship placeholder or build a trace-web surface —
-  never copy traces-v2); `AvatarUploadControl` reaches better-auth via
-  `~/utils/auth-client` (banned — inject the action).
-- Destination ambiguous: recommend apps/ui hub feature `personal-workspace`
-  composing `user-web` (owner, gains `screens/personal-workspace`),
-  `gateway-web` (budgets), coding-agent presentation, trace surface.
-  NOTE: 5 files import `@langwatch/coding-agent-web` but no such directory
-  was found — resolve before dispatch.
+Moved third, and the widening the survey recommended was taken:
+`/:project/sessions` and `/:project/pull-requests` came with the family, because
+their whole page bodies were its tables and leaving them behind would have meant
+two platform pages importing a package this move had just created. They are
+children of `features/langy/ProjectLangyLayout`, a layout route `platform/app`
+still serves, and nothing had to change for that — `createUiRouteObjects`
+resolves a child's page key through the same merged registry as a top-level one.
+
+Three destinations rather than one, which is what makes this family different
+from the first two:
+
+- **`@langwatch/user-web`** gains `screens/personal-workspace` and becomes the
+  third governed web package. It was three flat files; it is now the ADR-004
+  layout with all seven screens, the host port, the procedure map, and the
+  package-owned `vitest.setup.ts` the gateway family introduced.
+- **`@langwatch/coding-agent-web`** takes the coding-agent presentation the
+  survey named — both tables, the pull-request detail drawer, the session row
+  and toolbar, the replay hook — plus a NARROW port of its own
+  (`CodingAgentActivityHostPort`: one permission, the address, two notices) and
+  its own procedure map. It stays UNGOVERNED and flat, which is deliberate: its
+  root entry is imported by six `platform/app` trace-explorer files and by a
+  server-side test, so governing it would cost a full relayout plus a permanent
+  `ui-web-public-entry`, and `apps/ui` may not import an ungoverned package. Its
+  new surface is a second entry, `./activity`, so the root entry keeps its
+  transport-free import graph.
+- **`@langwatch/gateway-web`** gains `surfaces/budget-overview` — the budget
+  list, the exceeded banner, `spentSubline` and `formatBudgetUsd`. A surface
+  rather than a screen because the screens that render them belong to another
+  feature. The banner's two contact links became plain anchors: a surface
+  renders inside another feature's page and cannot ask a host of its own.
+
+What that costs at the composition seam, and it is the one shape a fourth family
+should expect to copy: `apps/ui`'s `personal-workspace` feature registers TWO
+api bindings, not one. `codingAgentApi` reaches it through
+`@langwatch/user-web`'s screen entry, which names it on the shell's behalf,
+because the shell may not import the package that owns it.
+
+Hazards, as they actually resolved:
+
+- `PersonalRecentTracesTable` is now a PLACEHOLDER that renders the integrate
+  pitch and never the ten rows. `@langwatch/trace-web` publishes the explorer's
+  stores and formatters, not its table, and the six deep imports into
+  `features/traces-v2` had no other home. THE ONE FEATURE LOSS OF THIS MOVE.
+- `AvatarUploadControl`'s `useSession()` became `host.currentUser()` plus one
+  new port action, `refreshSession()`, answered in `apps/ui` by invalidating the
+  session query. It is the only action on the port that is neither a navigation
+  nor a notice, and it exists because writing a photo has to stop the header
+  showing the old one.
+- The terminal replay keeps writing `drawer.open=traceV2Details` and the
+  pull-request detail moved to its OWN query key (`?pullRequest=<host>|<repo>|<n>`,
+  rendered inline), the gateway routing-policy answer. `setQueryParams` merges
+  rather than replacing, which is what leaves a pull request standing under a
+  replay opened from it. KNOWN GAP: `traceV2Details` is registered in
+  `platform/app` and mounted by `DashboardPageBody`, so on a screen served from
+  `apps/ui` the address changes and nothing opens until a chrome layout route
+  exists — the same chrome gap `GatewayLayout` and `GovernanceLayout` state.
+- `usePersonalContext` lost its `switcher` field with `useWorkspaceData` and
+  `WorkspaceSwitcher`: nothing read it. Its session and scope reads are the
+  host's.
+- `MyLayout`'s `lastVisitedHomeKind` write is landing policy and a browser-storage
+  write, so it did not travel: `apps/ui/src/behavior/ui-home-kind.ts` writes it
+  for the five `/me` keys and neither project one.
+- The tiles name `@langwatch/enterprise-governance-contract` rather than the
+  enterprise WEB package — the contract carries `AiToolEntry`, `AiToolType` and
+  the config envelope, so only six lucide tool glyphs needed a local copy. That
+  is five fewer findings than the direct web import, and it removed the portal's
+  `as unknown as` cast.
+- `InstallCliCard`, `NoDataInfoBlock`, `PeriodSelector` (controlled half only),
+  `CostBreakdownTooltipContent`, `UserAvatar`, `useReducedMotion`,
+  `formatTimeAgoCompact`, `docsUrl` and the API-keys path all came over as
+  family-local copies. `ListTable`, `Pagination`, `PageLayout`, `Drawer`,
+  `Dialog`, `Checkbox`, `GitHubIcon` and `formatCost`/`formatTokens` came from
+  the Design System instead — the last two through
+  `@langwatch/design-system/display-formatters`, which is what
+  `@langwatch/trace-web` was re-exporting anyway.
+- `Markdown` did not travel. `ToolMarkdown` is `react-markdown` plus GFM, which
+  is what a tool description ever needed; the application's version carries an
+  image proxy, a code renderer and a router.
+
+Known costs, all reported rather than suppressed:
+
+- THREE SCENARIOS LOST, all from
+  `specs/ai-governance/personal-portal/connect-your-agent-button.feature`, and
+  they are lost because the FEATURE is: the "Explore via Langy" entry is gone
+  from the Connect-your-agent menu. `askLangy` and `useCanAskLangy` are
+  application state a feature-web package may not reach, `@langwatch/langy-web`
+  is an ungoverned web package `apps/ui` may not import either, and there is no
+  assistant capability to answer with. The menu offers the prompt and the guide,
+  and the test that used to bind the three-route scenario is deliberately
+  untagged rather than tagged to a scenario it no longer proves.
+- 20 new architecture-lint findings, every one an import: 15
+  `ui-screen-closure` (8 for `@langwatch/coding-agent-web`, 5 for the gateway
+  budget surface, one each for `@langwatch/platform-api-client` and
+  `@langwatch/handled-error`), 3 `cross-feature` package edges, one
+  `enterprise-direction` for the governance CONTRACT, and one
+  `ui-web-public-entry` for `@langwatch/user-web`'s root `.` export.
+- That root export exists for ONE caller and is the reason it was kept: the
+  avatar test in `platform/app` drives `processAvatarImage` against the
+  application's code-keyed presentation registry, and the registry has not
+  moved. Moving the test would have cost a fifth scenario; keeping it cost a
+  finding and zero platform edits.
+- `@langwatch/gateway-web`'s root `.` export now has NO importer anywhere — the
+  six `platform/app` files that forced the gateway family to keep it were this
+  family's, and they are gone. Deleting it is a one-line follow-up that belongs
+  to whoever owns gateway-web.
+- Two test fixtures were repaired rather than moved verbatim, and both were
+  already wrong: `meConnectYourAgent` handed `team.createdAt` where the hook has
+  read `createdAtMs` since the personal context grew its DTO, so every render in
+  that file threw, and the same file rendered five pages without ever calling
+  `cleanup`.
 
 ### automations — 5 keys (all → ONE module), 25 prod files + ~16 tests
 
@@ -217,14 +311,14 @@ Known costs, all reported rather than suppressed:
 
 ## Cross-family collisions (settle before dispatching pairs)
 
-| Component                                       | Families           | Resolution                                                                                                           |
-| ----------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (LANDED; the platform copy stays for its eight non-gateway consumers)               |
-| `me/InstallCliCard`                             | me+governance      | each takes own copy (governance's is `ui/elements/install-cli-card`)                                                 |
-| `modelProviders/iconsMap`                       | me+gateway         | gateway took the MAP only, into `ui/elements/model-provider-icons`: four marks from design-system, ten drawn locally |
-| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (dispatched)                                                                                           |
-| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)    |
-| traces-v2 deep imports                          | me+automations     | trace-web surface or placeholder — undecided                                                                         |
+| Component                                       | Families           | Resolution                                                                                                                                                     |
+| ----------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (LANDED; the platform copy stays for its eight non-gateway consumers)                                                         |
+| `me/InstallCliCard`                             | me+governance      | each took its own copy (governance's is `ui/elements/install-cli-card`; me's is `ui/blocks/install-cli-card`)                                                  |
+| `modelProviders/iconsMap`                       | me+gateway         | gateway drew ten locally; me took only the Design System's five marks and falls back to the generic model mark for the rest, on the legacy `iconKey` path only |
+| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                               |
+| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                              |
+| traces-v2 deep imports                          | me+automations     | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided                                   |
 
 ## Single-owner files (serialize)
 
@@ -234,5 +328,29 @@ Known costs, all reported rather than suppressed:
   new source root is ever added; prefer not.
 - `apps/ui/src/features/catalogue.json`, `legacy-page-loaders.ts` (+ its
   unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
-  filed under governance for routingPolicies and took them), `pnpm-lock.yaml` —
+  filed under governance for routingPolicies and took them; me deleted the two
+  `[project]` page-shell rows its keys took), `apps/ui/src/features/installed-ui-features.ts`
+  (+ `tests/installed-ui-features.unit.test.ts`), `pnpm-lock.yaml` —
   coordinator split-stages; one family commit at a time.
+- `apps/ui/src/behavior/ui-scope-resolution.ts` — me widened one union member
+  (`lastVisitedHomeKind` now takes `"personal"` as well as `"project"`) so a
+  `/me` page can leave the marker `MyLayout` used to write.
+
+## The third family's own additions, for whoever moves the fourth
+
+- A THIRD host port of the same shape (`PersonalWorkspaceHostPort`). The comment
+  on `GatewayHostPort` said a third repeat is the signal to promote them, and it
+  is: `scope/organization/project/currentUser/hasPermission/isFeatureEnabled/route/
+setQuery/navigate/succeeded/failed` is now written out three times. Promotion
+  is a change to three packages and was deliberately not smuggled into a page
+  move.
+- The first use of the `documentTitle` capability. `platform/app` set titles with
+  a `<Head><title>` inside each page body; the gateway and governance families
+  dropped theirs silently. The personal family carries the title as data on the
+  route map and sets it INSIDE the guard, so a page that turns out not to exist
+  never renames the tab. It is a local HOC in the feature until a second family
+  wants it.
+- A screen family that answers a SECOND package's port. `@langwatch/user-web`
+  adapts its own host into `@langwatch/coding-agent-web`'s narrower one and
+  mounts it around the four screens that render a table. That is what an
+  ungoverned package's presentation costs, and it is cheaper than governing it.

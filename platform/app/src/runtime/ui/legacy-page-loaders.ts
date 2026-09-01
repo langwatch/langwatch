@@ -67,17 +67,10 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/topic-clustering": () => import("~/pages/settings/topic-clustering"),
   "pages/settings/usage": () => import("~/pages/settings/usage"),
   "pages/settings/email-suppressions": () => import("~/pages/settings/email-suppressions"),
-  "pages/me/index": () => import("~/pages/me/index"),
-  "pages/me/configure": () => import("~/pages/me/configure"),
-  "pages/me/pull-requests": () => import("~/pages/me/pull-requests"),
-  "pages/me/sessions": () => import("~/pages/me/sessions"),
-  "pages/me/budget/request": () => import("~/pages/me/budget/request"),
   "pages/cli/auth": () => import("~/pages/cli/auth"),
   "pages/[project]/index": () => import("~/pages/[project]/index"),
   "runtime/ui/features/agent-ui-host.adapter": () =>
     import("~/runtime/ui/features/agent-ui-host.adapter"),
-  "pages/[project]/sessions": () => import("~/pages/[project]/sessions"),
-  "pages/[project]/pull-requests": () => import("~/pages/[project]/pull-requests"),
   "pages/[project]/automations": () => import("~/pages/[project]/automations"),
   // Four tabs of one screen. Each address kept a file whose whole body was
   // `export { default } from "../automations"`; the key names the shared

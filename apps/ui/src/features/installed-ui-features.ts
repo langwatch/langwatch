@@ -18,10 +18,15 @@ import { useBrowserUiSession } from "../behavior/ui-session";
 import type { UiFeatureInstall } from "../ui/sections/ui-application";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
+import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
 export const installedUiFeatures: UiFeatureInstall = {
-  loaders: { ...gatewayPageLoaders, ...governancePageLoaders },
-  apis: [gatewayApiBinding, governanceApiBinding],
+  loaders: {
+    ...gatewayPageLoaders,
+    ...governancePageLoaders,
+    ...personalWorkspacePageLoaders,
+  },
+  apis: [gatewayApiBinding, governanceApiBinding, ...personalWorkspaceApiBindings],
   capabilities: { feedback: BrowserUiFeedback.create() },
   session: useBrowserUiSession,
 };

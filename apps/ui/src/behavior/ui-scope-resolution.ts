@@ -309,7 +309,7 @@ export type UiScopeSelectionWrite =
   | { readonly key: "organizationId"; readonly value: string }
   | { readonly key: "teamId"; readonly value: string }
   | { readonly key: "projectSlug"; readonly value: string }
-  | { readonly key: "lastVisitedHomeKind"; readonly value: "project" };
+  | { readonly key: "lastVisitedHomeKind"; readonly value: "project" | "personal" };
 
 /**
  * What the resolution should leave behind for the next page.

@@ -14,6 +14,13 @@
  */
 
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+// Auto-cleanup only registers itself when a global afterEach exists at import
+// time; this package runs without vitest globals, so an explicit hook is what
+// keeps one test's rendered tree out of the next test's queries.
+afterEach(() => cleanup());
 
 if (typeof window !== "undefined") {
   if (!window.matchMedia) {

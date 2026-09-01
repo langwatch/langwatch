@@ -13,6 +13,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./activity": {
+      "types": "./src/activity.ts",
+      "default": "./src/activity.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.tsx",
+      "default": "./src/testing.tsx"
     }
   },
   "scripts": {
@@ -23,17 +31,22 @@
   "dependencies": {
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",
+    "numeral": "^2.0.6",
     "react-icons": "^5.5.0"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
+    "@langwatch/authz-contract": "workspace:*",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/numeral": "^2.0.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",

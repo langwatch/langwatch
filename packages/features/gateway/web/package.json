@@ -17,6 +17,10 @@
     "./screens/gateway": {
       "types": "./src/screens/gateway/index.ts",
       "default": "./src/screens/gateway/index.ts"
+    },
+    "./surfaces/budget-overview": {
+      "types": "./src/surfaces/budget-overview/index.ts",
+      "default": "./src/surfaces/budget-overview/index.ts"
     }
   },
   "scripts": {
