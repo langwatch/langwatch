@@ -90,15 +90,28 @@ vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div>loading</div>,
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    governanceCost: {
-      summary: {
-        useQuery: () => harness.query,
+vi.mock("~/utils/api", () => {
+  // The breakdown panels below the lanes read the activity monitor. They are
+  // not what these tests are about, so they answer with nothing — which is
+  // also the shape a viewer without `activityMonitor:view` sees. Leaving them
+  // out entirely would crash the render before a single lane assertion ran.
+  const empty = { useQuery: () => ({ data: undefined }) };
+  return {
+    api: {
+      governanceCost: {
+        summary: {
+          useQuery: () => harness.query,
+        },
+      },
+      activityMonitor: {
+        summary: empty,
+        spendByDepartment: empty,
+        spendByUser: empty,
+        spendOverTime: empty,
       },
     },
-  },
-}));
+  };
+});
 
 import CostsPage from "../costs";
 

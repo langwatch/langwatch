@@ -2,69 +2,135 @@ import {
   Alert,
   Heading,
   HStack,
+  SimpleGrid,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-
 import type { GovernanceCostSummaryDto } from "@ee/governance/services/governanceCost.service";
+import numeral from "numeral";
+import { useMemo, useState } from "react";
 
 import {
   CostLanePanel,
   SeatLanePanel,
 } from "~/components/governance/CostLanePanel";
 import { CostLanesChart } from "~/components/governance/CostLanesChart";
+import {
+  CostDonut,
+  CostForecastArea,
+  CostLine,
+  CostRankList,
+  CostStackedBars,
+  fmtCount,
+} from "~/components/governance/costs/CostCharts";
+import { CostFilterBar } from "~/components/governance/costs/CostFilterBar";
+import { CostPanel } from "~/components/governance/costs/CostPanel";
+import {
+  ALL_DEPARTMENTS,
+  aggregateBuckets,
+  aggregateLine,
+  type GroupBy,
+  type TimeInterval,
+} from "~/components/governance/costs/costsWindow";
+import {
+  type DailyBucket,
+  type RankRow,
+  recentDays,
+  SAMPLE_AGENTS,
+  SAMPLE_DEPARTMENTS,
+  sampleDaily,
+  sampleForecast,
+  sampleLine,
+  sampleRanked,
+} from "~/components/governance/costs/sampleSeries";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-const WINDOW_DAYS = 30;
-
 /**
- * The cost screen: three lanes, side by side, each labeled for what it is.
+ * The cost screen: three lanes, side by side, each labeled for what it is,
+ * and the breakdowns underneath them.
  *
  * The lanes are never added together. What a provider invoices and what the
  * gateway metered are two different measurements of overlapping traffic, and
  * the gap between them is the thing worth looking at — a combined figure would
- * hide exactly what the screen exists to show.
+ * hide exactly what the screen exists to show. That is why nothing on this page
+ * shows a single "total AI cost".
  *
  * Nothing here ever renders a zero it did not measure. A failed read, a
  * deployment without a cost store, and a lane with no figure all render as
  * such; `$0.00` is reserved for a lane that really did report no spend.
  *
+ * The breakdowns below the lanes are a mix. Cost over time, cost by
+ * department, cost by model and cost by user are real reads. Agents, prepaid
+ * seats, forecasts, token counts and Genie questions have no backing read yet
+ * and are drawn from `sampleSeries`, each badged `sample`.
+ *
  * Spec: specs/governance/governance-cost-screen.feature (ADR-128)
  */
+
+interface CostFilters {
+  department: string;
+  windowDays: number;
+  interval: TimeInterval;
+  groupBy: GroupBy;
+}
+
 function CostsPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const organizationId = organization?.id ?? "";
+  const [filters, setFilters] = useState<CostFilters>({
+    department: ALL_DEPARTMENTS,
+    windowDays: 30,
+    interval: "day",
+    groupBy: "team",
+  });
+  const patch = (next: Partial<CostFilters>) =>
+    setFilters((current) => ({ ...current, ...next }));
 
   const summary = api.governanceCost.summary.useQuery(
-    { organizationId, windowDays: WINDOW_DAYS },
+    { organizationId, windowDays: filters.windowDays },
     { enabled: !!organizationId },
   );
+  const breakdowns = useBreakdownQueries({
+    organizationId,
+    windowDays: filters.windowDays,
+    groupBy: filters.groupBy,
+    // The page opens on `governanceCost:view`, but the breakdowns read the
+    // activity monitor, which is its own grant. A viewer holding one and not
+    // the other gets the lanes and no failed queries underneath them.
+    enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
+  });
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full">
-        <VStack align="start" gap={1}>
-          <Heading size="md">Costs</Heading>
-          <Text color="fg.muted">
-            What your providers billed and what the gateway metered, side by
-            side. They measure different things, so they are shown separately
-            and never added together.
-          </Text>
-        </VStack>
+      <VStack align="stretch" gap={5} width="full">
+        <Heading size="md">Costs</Heading>
+        <CostFilterBar
+          department={filters.department}
+          departments={breakdowns.departments}
+          onDepartmentChange={(department) => patch({ department })}
+          windowDays={filters.windowDays}
+          onWindowDaysChange={(windowDays) => patch({ windowDays })}
+          interval={filters.interval}
+          onIntervalChange={(interval) => patch({ interval })}
+          groupBy={filters.groupBy}
+          onGroupByChange={(groupBy) => patch({ groupBy })}
+        />
 
         <CostsBody
           isLoading={summary.isLoading && !!organizationId}
           isError={summary.isError}
           data={summary.data}
         />
+
+        <CostBreakdowns filters={filters} breakdowns={breakdowns} />
       </VStack>
     </GovernanceLayout>
   );
@@ -145,6 +211,256 @@ function CostsBody({
         <SeatLanePanel testId="cost-lane-seats" seats={data.seats} />
       </HStack>
       <CostLanesChart series={data.series} />
+    </VStack>
+  );
+}
+
+interface Breakdowns {
+  departments: Array<{ id: string; name: string }>;
+  departmentRows: Array<{
+    departmentId: string | null;
+    departmentName: string;
+    spendUsd: string;
+  }>;
+  userRows: Array<{ actor: string; spendUsd: string; requests: number }>;
+  activeUsers: number;
+  overTime: DailyBucket[];
+  modelOverTime: DailyBucket[];
+}
+
+/** Wire buckets carry money as strings; the charts want numbers. */
+function toDailyBuckets(
+  buckets:
+    | Array<{
+        bucketIso: string;
+        points: Array<{ key: string; label: string; spendUsd: string }>;
+      }>
+    | undefined,
+): DailyBucket[] {
+  if (!buckets) return [];
+  return buckets.map((bucket) => ({
+    day: bucket.bucketIso,
+    points: bucket.points.map((point) => ({
+      key: point.key,
+      label: point.label,
+      value: Number(point.spendUsd),
+    })),
+  }));
+}
+
+function useBreakdownQueries({
+  organizationId,
+  windowDays,
+  groupBy,
+  enabled,
+}: {
+  organizationId: string;
+  windowDays: number;
+  groupBy: GroupBy;
+  enabled: boolean;
+}): Breakdowns {
+  const args = { organizationId, windowDays };
+  const options = { enabled, refetchOnWindowFocus: false };
+
+  const summary = api.activityMonitor.summary.useQuery(args, options);
+  const byDepartment = api.activityMonitor.spendByDepartment.useQuery(
+    args,
+    options,
+  );
+  const byUser = api.activityMonitor.spendByUser.useQuery(
+    { ...args, limit: 8 },
+    options,
+  );
+  const overTime = api.activityMonitor.spendOverTime.useQuery(
+    { ...args, groupBy },
+    options,
+  );
+  const byModel = api.activityMonitor.spendOverTime.useQuery(
+    { ...args, groupBy: "model" as const },
+    options,
+  );
+
+  const departmentRows = byDepartment.data ?? [];
+  return {
+    departmentRows,
+    departments: departmentRows.map((row) => ({
+      id: row.departmentId ?? "unassigned",
+      name: row.departmentName,
+    })),
+    userRows: byUser.data ?? [],
+    activeUsers: summary.data?.activeUsersThisWindow ?? 0,
+    overTime: toDailyBuckets(overTime.data),
+    modelOverTime: toDailyBuckets(byModel.data),
+  };
+}
+
+/** Total each series across the window, for the ranked and donut panels. */
+function totalPerSeries(buckets: DailyBucket[]): RankRow[] {
+  const totals = new Map<string, RankRow>();
+  for (const bucket of buckets) {
+    for (const point of bucket.points) {
+      const existing = totals.get(point.key);
+      if (existing) {
+        existing.value += point.value;
+      } else {
+        totals.set(point.key, { ...point });
+      }
+    }
+  }
+  return [...totals.values()];
+}
+
+function CostBreakdowns({
+  filters,
+  breakdowns,
+}: {
+  filters: CostFilters;
+  breakdowns: Breakdowns;
+}) {
+  const days = useMemo(
+    () => recentDays(filters.windowDays),
+    [filters.windowDays],
+  );
+  const sample = useSampleSeries(days, filters.interval);
+
+  const departmentRows = breakdowns.departmentRows
+    .filter(
+      (row) =>
+        filters.department === ALL_DEPARTMENTS ||
+        (row.departmentId ?? "unassigned") === filters.department,
+    )
+    .map((row) => ({
+      key: row.departmentId ?? "unassigned",
+      label: row.departmentName,
+      value: Number(row.spendUsd),
+    }));
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <AdoptionRow breakdowns={breakdowns} />
+      <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
+        <CostPanel title="Consumption forecast · by agent" sample>
+          <CostForecastArea
+            buckets={sample.forecast.buckets}
+            projectedFromDay={sample.forecast.projectedFromDay}
+          />
+        </CostPanel>
+        <CostPanel title="Subscriptions · by department" sample>
+          <CostStackedBars buckets={sample.subscriptions} />
+        </CostPanel>
+      </SimpleGrid>
+
+      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
+        <CostPanel title="% cost by agent" sample>
+          <CostDonut rows={sample.agents} />
+        </CostPanel>
+        <CostPanel title={`Cost over time · by ${filters.groupBy}`}>
+          <CostStackedBars
+            buckets={aggregateBuckets(breakdowns.overTime, filters.interval)}
+          />
+        </CostPanel>
+        <CostPanel title="Cost by department">
+          <CostRankList rows={departmentRows} />
+        </CostPanel>
+      </SimpleGrid>
+
+      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
+        <CostPanel title="Cost by agent" sample>
+          <CostRankList rows={sample.agents} />
+        </CostPanel>
+        <CostPanel title="Cost by model">
+          <CostRankList rows={totalPerSeries(breakdowns.modelOverTime)} />
+        </CostPanel>
+        <CostPanel title="Cost by user">
+          <CostRankList
+            rows={breakdowns.userRows.map((row) => ({
+              key: row.actor,
+              label: row.actor,
+              value: Number(row.spendUsd),
+            }))}
+          />
+        </CostPanel>
+      </SimpleGrid>
+
+      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
+        <CostPanel title="Genie questions over time" sample>
+          <CostStackedBars
+            buckets={sample.genie}
+            format={fmtCount}
+            showLegend={false}
+          />
+        </CostPanel>
+        <CostPanel title="Tokens over time" sample>
+          <CostLine points={sample.tokens} />
+        </CostPanel>
+        <CostPanel title="Subscriptions vs consumption" sample>
+          <CostStackedBars buckets={sample.seatsVsUsage} showLegend={false} />
+        </CostPanel>
+      </SimpleGrid>
+    </VStack>
+  );
+}
+
+function AdoptionRow({ breakdowns }: { breakdowns: Breakdowns }) {
+  const interactions = breakdowns.userRows.reduce(
+    (sum, row) => sum + row.requests,
+    0,
+  );
+  return (
+    <CostPanel title="Adoption">
+      <HStack gap={10} align="flex-end">
+        <Stat
+          label="Users"
+          value={numeral(breakdowns.activeUsers).format("0,0")}
+        />
+        <Stat label="Interactions" value={fmtCount(interactions)} />
+      </HStack>
+    </CostPanel>
+  );
+}
+
+/** Every placeholder series the page needs, folded to the chosen interval. */
+function useSampleSeries(days: string[], interval: TimeInterval) {
+  return useMemo(() => {
+    const forecast = sampleForecast(days, SAMPLE_AGENTS.slice(0, 5), 2200);
+    return {
+      agents: sampleRanked(SAMPLE_AGENTS, 2296),
+      forecast: {
+        buckets: aggregateBuckets(forecast.buckets, interval),
+        // The projection marker sits on a specific day, so it only lines up
+        // with the axis while the axis is days. Weekly and monthly folds drop
+        // it rather than point it at a bucket boundary it does not fall on.
+        projectedFromDay: interval === "day" ? forecast.projectedFromDay : null,
+      },
+      subscriptions: aggregateBuckets(
+        sampleDaily(days, SAMPLE_DEPARTMENTS, 3600),
+        interval,
+      ),
+      genie: aggregateBuckets(
+        sampleDaily(days, SAMPLE_AGENTS.slice(0, 6), 26),
+        interval,
+      ),
+      tokens: aggregateLine(
+        sampleLine(days, "tokens", 3_000_000_000),
+        interval,
+      ),
+      seatsVsUsage: aggregateBuckets(
+        sampleDaily(days, ["Usage", "Seat", "Cloud", "Activity"], 2400),
+        interval,
+      ),
+    };
+  }, [days, interval]);
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <VStack align="flex-start" gap={0}>
+      <Text fontSize="xs" color="fg.muted">
+        {label}
+      </Text>
+      <Text fontSize="2xl" fontWeight="semibold" lineHeight="1.1">
+        {value}
+      </Text>
     </VStack>
   );
 }
