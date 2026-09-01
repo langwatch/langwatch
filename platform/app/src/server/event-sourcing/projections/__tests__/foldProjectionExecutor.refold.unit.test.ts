@@ -280,7 +280,9 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       it("keeps the loaded state and applies the event on top when an applied event never appears", async () => {
         vi.useRealTimers();
         // No retry budget: the read stays incomplete for the whole call.
-        const strictExecutor = new FoldProjectionExecutor(1000, []);
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
         const checkpointEvent = eventAt(CHECKPOINT_MS);
         // The read returns the checkpoint but not the applied event "evt-a".
         const { fold, store } = makeAppliedFold({
@@ -302,7 +304,9 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       /** @scenario "A re-fold retries a history read that has not caught up yet" */
       it("replays the full history when a retry read returns it", async () => {
         vi.useRealTimers();
-        const retryingExecutor = new FoldProjectionExecutor(1000, [1]);
+        const retryingExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [1],
+        });
         const checkpointEvent = eventAt(CHECKPOINT_MS);
         const appliedEvent = { ...eventAt(4_000), id: "evt-a" };
         const fullHistory = [eventAt(2_000), appliedEvent, checkpointEvent];
@@ -322,7 +326,9 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       /** @scenario "A re-fold never replaces state from a history read behind the checkpoint" */
       it("keeps the loaded state when nothing read reaches the occurred-at checkpoint", async () => {
         vi.useRealTimers();
-        const strictExecutor = new FoldProjectionExecutor(1000, []);
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
         // The applied set is empty (a get()-only store), so only the
         // checkpoint fence can see that the read is missing the event that
         // set the state's high-water mark at CHECKPOINT_MS.
@@ -342,7 +348,9 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       /** @scenario "A re-fold never replaces state from a history read missing an applied event" */
       it("keeps the loaded state for an out-of-order batch too", async () => {
         vi.useRealTimers();
-        const strictExecutor = new FoldProjectionExecutor(1000, []);
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
         const checkpointEvent = eventAt(CHECKPOINT_MS);
         const { fold } = makeAppliedFold({
           historyReads: [[eventAt(2_000), checkpointEvent]],

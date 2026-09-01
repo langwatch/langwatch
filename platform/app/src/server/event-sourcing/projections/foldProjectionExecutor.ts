@@ -31,6 +31,15 @@ const MAX_LOGGED_EVENT_IDS = 10;
 const readWindowRecoveryWarned = new Set<string>();
 
 /**
+ * What a re-fold history read still misses before it may replace the loaded
+ * state. See `FoldProjectionExecutor.historyReadGap`.
+ */
+type HistoryReadGap = {
+  missingAppliedIds: string[];
+  isFrontierMissing: boolean;
+};
+
+/**
  * Arrival time, then the id: the order of two events the event log accepted,
  * and the tie-break for two that carry the same business time. The id is what
  * keeps two replays of one history from disagreeing.
@@ -156,16 +165,26 @@ function withAppliedEventIds(
  */
 export class FoldProjectionExecutor {
   /**
-   * @param refoldPageSize events per page for the streaming store-miss re-fold
-   *   (`streamRefoldUpToDelivered`). Bounds the working set; 1000 keeps the
-   *   per-page memory small while amortising the per-query round-trip. Injected
-   *   only so tests can force multi-page runs.
+   * Events per page for the streaming store-miss re-fold
+   * (`streamRefoldUpToDelivered`). Bounds the working set; 1000 keeps the
+   * per-page memory small while amortising the per-query round-trip. Injected
+   * only so tests can force multi-page runs.
    */
-  constructor(
-    private readonly refoldPageSize = 1000,
-    /** Backoff between re-reads of an incomplete re-fold history. */
-    private readonly refoldHistoryRetryDelaysMs: readonly number[] = [50, 150],
-  ) {}
+  private readonly refoldPageSize: number;
+
+  /** Backoff between re-reads of an incomplete re-fold history. */
+  private readonly refoldHistoryRetryDelaysMs: readonly number[];
+
+  constructor({
+    refoldPageSize = 1000,
+    refoldHistoryRetryDelaysMs = [50, 150],
+  }: {
+    refoldPageSize?: number;
+    refoldHistoryRetryDelaysMs?: readonly number[];
+  } = {}) {
+    this.refoldPageSize = refoldPageSize;
+    this.refoldHistoryRetryDelaysMs = refoldHistoryRetryDelaysMs;
+  }
 
   /**
    * Loads state along with the ids of the events already folded into it.
@@ -740,32 +759,14 @@ export class FoldProjectionExecutor {
     logFields: Record<string, unknown>;
     message: string;
   }): Promise<State | null> {
-    const loadHistory = () =>
-      // Callers guard eventLoader is set (canRefold).
-      projection.eventLoader!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
-        occurredAtMs,
-      });
-
-    let history = await loadHistory();
-    let gap = this.historyReadGap({
-      history,
+    const { history, gap } = await this.readHistoryUntilComplete({
+      projection,
       delivered,
+      context,
+      occurredAtMs,
       loadedAppliedIds,
       stateFrontierOccurredAtMs,
     });
-    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
-      if (!gap) break;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      history = await loadHistory();
-      gap = this.historyReadGap({
-        history,
-        delivered,
-        loadedAppliedIds,
-        stateFrontierOccurredAtMs,
-      });
-    }
     if (gap) {
       incrementEsFoldRefoldTotal(projection.name, "incomplete");
       logger.error(
@@ -779,7 +780,7 @@ export class FoldProjectionExecutor {
             0,
             MAX_LOGGED_EVENT_IDS,
           ),
-          frontierMissing: gap.frontierMissing,
+          isFrontierMissing: gap.isFrontierMissing,
           stateFrontierOccurredAtMs,
         },
         "Re-fold history read stayed incomplete after retries; keeping the loaded state and applying the delivery on top",
@@ -826,6 +827,56 @@ export class FoldProjectionExecutor {
   }
 
   /**
+   * Reads the aggregate's history, and re-reads it on a short backoff while a
+   * fence still reports a gap (see `historyReadGap`). Returns the last read
+   * with the gap that stands after the retries, null once the read accounts
+   * for everything the loaded state already holds.
+   */
+  private async readHistoryUntilComplete<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    occurredAtMs,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: readonly E[];
+    context: ProjectionStoreContext;
+    occurredAtMs: number;
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+  }): Promise<{
+    history: Event[];
+    gap: HistoryReadGap | null;
+  }> {
+    const loadHistory = () =>
+      // Callers guard eventLoader is set (canRefold).
+      projection.eventLoader!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        occurredAtMs,
+      });
+    const gapOf = (history: readonly Event[]) =>
+      this.historyReadGap({
+        history,
+        delivered,
+        loadedAppliedIds,
+        stateFrontierOccurredAtMs,
+      });
+
+    let history = await loadHistory();
+    let gap = gapOf(history);
+    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
+      if (!gap) break;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      history = await loadHistory();
+      gap = gapOf(history);
+    }
+    return { history, gap };
+  }
+
+  /**
    * What a history read is missing before it may replace the loaded state:
    * applied ids of the previous commit that neither the read nor the delivery
    * accounts for, and the state's occurred-at checkpoint when nothing in
@@ -841,7 +892,7 @@ export class FoldProjectionExecutor {
     delivered: readonly E[];
     loadedAppliedIds: readonly string[];
     stateFrontierOccurredAtMs: number;
-  }): { missingAppliedIds: string[]; frontierMissing: boolean } | null {
+  }): HistoryReadGap | null {
     const accounted = new Set<string>(history.map((e) => e.id));
     for (const e of delivered) accounted.add(e.id);
     const missingAppliedIds = loadedAppliedIds.filter(
@@ -855,12 +906,12 @@ export class FoldProjectionExecutor {
     for (const e of delivered) {
       maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
     }
-    const frontierMissing =
+    const isFrontierMissing =
       stateFrontierOccurredAtMs > 0 &&
       maxOccurredAt < stateFrontierOccurredAtMs;
 
-    if (missingAppliedIds.length === 0 && !frontierMissing) return null;
-    return { missingAppliedIds, frontierMissing };
+    if (missingAppliedIds.length === 0 && !isFrontierMissing) return null;
+    return { missingAppliedIds, isFrontierMissing };
   }
 
   /**
