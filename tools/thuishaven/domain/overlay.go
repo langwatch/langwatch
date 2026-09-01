@@ -179,6 +179,21 @@ func (s Stack) OverlayEnv() []string {
 		// haven's container, which has no backups, opts out explicitly. Otherwise
 		// every 15s stats tick would fail on a missing table for nothing.
 		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
+		// The container is configured with this admission cap (see
+		// clickhouse.go); telling the app lets its pool sizing clamp the
+		// fallback to what one process may claim of that budget, instead of
+		// opening a 64-connection pool against a 32-query server.
+		env = append(env, fmt.Sprintf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES=%d", ClickHouseMaxConcurrentQueries))
+		// The cap alone leaves the app clamping its fallback, which warns on
+		// every boot that uncounted siblings share the budget. Haven can
+		// count them: the app process, plus a second when the workers run as
+		// their own lane. With both numbers stated the app derives its pool
+		// size for real and boots quietly.
+		replicas := 1
+		if s.HasStandaloneWorkers {
+			replicas = 2
+		}
+		env = append(env, fmt.Sprintf("CLICKHOUSE_CLIENT_REPLICAS=%d", replicas))
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.
