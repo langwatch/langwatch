@@ -75,6 +75,24 @@ class FakeRepository extends MonitorRepository {
   async deleteForExperiment() {
     this.value = null;
   }
+  experimentUpserts: Array<Parameters<MonitorRepository["upsertForExperiment"]>[0]> = [];
+  async upsertForExperiment(input: Parameters<MonitorRepository["upsertForExperiment"]>[0]) {
+    this.experimentUpserts.push(input);
+    this.value = {
+      ...monitor,
+      id: input.id,
+      projectId: input.projectId,
+      experimentId: input.experimentId,
+      name: input.name,
+      slug: input.slug,
+      checkType: input.checkType,
+      executionMode: input.executionMode,
+      enabled: input.enabled,
+      sample: input.sample,
+      mappings: input.mappings,
+    };
+    return this.value;
+  }
   async isNameAvailable(input: { name: string }) {
     return input.name !== monitor.name;
   }
@@ -244,6 +262,94 @@ describe("MonitorService", () => {
       evaluatorId: null,
       enabled: false,
       experimentId: null,
+    });
+  });
+
+  describe("given an experiment being published as a monitor", () => {
+    const published = {
+      projectId: "project_1",
+      experimentId: "experiment_1",
+      name: "Answer relevancy",
+      checkType: "ragas/answer_relevancy",
+      slug: "answer-relevancy",
+      preconditions: [{ field: "input", rule: "contains", value: "hello" }],
+      parameters: { model: "gpt-5-mini" },
+      mappings: { mapping: {}, expansions: [] },
+      sample: 0.5,
+      enabled: true,
+      executionMode: "ON_MESSAGE",
+    };
+
+    describe("when the wizard saves it", () => {
+      it("hands the store the experiment it is published for", async () => {
+        const repository = new FakeRepository();
+        const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
+
+        await service.upsertForExperiment(published);
+
+        expect(repository.experimentUpserts[0]).toMatchObject({
+          projectId: "project_1",
+          experimentId: "experiment_1",
+          slug: "answer-relevancy",
+        });
+      });
+
+      it("supplies the id the row would need were it new", async () => {
+        const repository = new FakeRepository();
+        const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
+
+        await service.upsertForExperiment(published);
+
+        expect(repository.experimentUpserts[0]?.id).toBe("monitor_test");
+      });
+
+      it("stores the preconditions and parameters as the wizard left them", async () => {
+        const repository = new FakeRepository();
+        const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
+
+        await service.upsertForExperiment(published);
+
+        expect(repository.experimentUpserts[0]?.preconditions).toEqual([
+          { field: "input", rule: "contains", value: "hello" },
+        ]);
+        expect(repository.experimentUpserts[0]?.parameters).toEqual({ model: "gpt-5-mini" });
+      });
+
+      it("asks no evaluator to vouch for the check the experiment names", async () => {
+        const repository = new FakeRepository();
+        const evaluators = new FakeEvaluatorService();
+        const service = MonitorService.create({ repository, evaluators, generateId });
+
+        await service.upsertForExperiment(published);
+
+        expect(evaluators.getById).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the experiment never configured a trace mapping", () => {
+      it("canonicalises it, because the empty shape crashes the evaluator read", async () => {
+        const repository = new FakeRepository();
+        const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
+
+        await service.upsertForExperiment({ ...published, mappings: {} });
+
+        expect(repository.experimentUpserts[0]?.mappings).toEqual({
+          mapping: {},
+          expansions: [],
+        });
+      });
+    });
+
+    describe("when the stored execution mode is not one this platform runs", () => {
+      it("refuses the save rather than writing a monitor that never fires", async () => {
+        const repository = new FakeRepository();
+        const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
+
+        await expect(
+          service.upsertForExperiment({ ...published, executionMode: "WHENEVER" }),
+        ).rejects.toThrow();
+        expect(repository.experimentUpserts).toHaveLength(0);
+      });
     });
   });
 

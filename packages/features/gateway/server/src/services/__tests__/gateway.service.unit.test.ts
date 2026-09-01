@@ -235,6 +235,9 @@ class UnusedMonitorService extends MonitorService {
   deleteForExperiment(): never {
     throw new Error("not used");
   }
+  upsertForExperiment(): never {
+    throw new Error("not used");
+  }
   isNameAvailable(): never {
     throw new Error("not used");
   }

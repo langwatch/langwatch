@@ -9,6 +9,8 @@ import {
   type Monitor,
   type MonitorCreateInput,
   type MonitorEnabledGuardrailInput,
+  type MonitorExecutionMode,
+  type MonitorExperimentUpsertInput,
   type MonitorNameAvailabilityInput,
   type MonitorMappingState,
   type MonitorSummary,
@@ -211,6 +213,41 @@ export class PrismaMonitorRepository extends MonitorRepository {
 
   async deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     await this.database.monitor.deleteMany({ where: input });
+  }
+
+  async upsertForExperiment(
+    input: MonitorExperimentUpsertInput & {
+      id: string;
+      mappings: MonitorMappingState;
+      executionMode: MonitorExecutionMode;
+    },
+  ): Promise<Monitor> {
+    // The same values on both branches: an experiment republished is the same
+    // monitor rewritten, so nothing but the row's identity differs between the
+    // first save and the tenth.
+    const configuration = {
+      name: input.name,
+      checkType: input.checkType,
+      slug: input.slug,
+      preconditions: input.preconditions as Prisma.InputJsonValue,
+      parameters: input.parameters as Prisma.InputJsonValue,
+      mappings: input.mappings as Prisma.InputJsonValue,
+      sample: input.sample,
+      enabled: input.enabled,
+      executionMode: input.executionMode,
+    };
+
+    const row = await this.database.monitor.upsert({
+      where: { experimentId: input.experimentId, projectId: input.projectId },
+      update: configuration,
+      create: {
+        ...configuration,
+        id: input.id,
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+      },
+    });
+    return mapMonitor(row);
   }
 
   async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<boolean> {

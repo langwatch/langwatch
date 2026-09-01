@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import type {
-  DatasetMigrationDatabasePort,
-  DatasetMigrationFingerprintDatabase,
-} from "../ports/dataset-migration-database.port";
 import { StreamingChunkWriter } from "../services/dataset-chunk-writer";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
@@ -33,10 +30,18 @@ export type DatasetMigrationRunResult =
   | { status: "completed"; summary: DatasetMigrationSummary }
   | { status: "schema-pending" };
 
-/** Process adapter for the one-off Postgres-to-object-storage migration. */
+/**
+ * Process adapter for the one-off Postgres-to-object-storage migration.
+ *
+ * Takes the process's own typed client. The structural port that used to stand
+ * here promised more than Prisma delivers — `aggregate` returns a shape derived
+ * from the arguments it was called with, so no hand-written delegate can state
+ * its return type — and the promise was only kept because the composition root
+ * never had to prove it.
+ */
 export class PostgresDatasetMigrationAdapter {
   static create(options: {
-    database: DatasetMigrationDatabasePort;
+    database: PrismaClient;
     storage: DatasetStorageResolver;
   }): PostgresDatasetMigrationAdapter {
     return new PostgresDatasetMigrationAdapter(options);
@@ -44,7 +49,7 @@ export class PostgresDatasetMigrationAdapter {
 
   private constructor(
     private readonly options: {
-      database: DatasetMigrationDatabasePort;
+      database: PrismaClient;
       storage: DatasetStorageResolver;
     },
   ) {}
@@ -231,7 +236,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
   }
 
   private async readFingerprint(
-    records: DatasetMigrationFingerprintDatabase,
+    records: PrismaClient["datasetRecord"],
     input: { datasetId: string; projectId: string },
   ): Promise<DatasetFingerprint> {
     const result = await records.aggregate({

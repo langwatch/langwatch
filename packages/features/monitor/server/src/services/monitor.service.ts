@@ -4,6 +4,8 @@ import {
   MonitorService as MonitorServiceContract,
   monitorCreateInputSchema,
   monitorEnabledGuardrailInputSchema,
+  monitorExecutionModeSchema,
+  monitorExperimentUpsertInputSchema,
   monitorIdInputSchema,
   monitorMappingsInputSchema,
   monitorNameAvailabilityInputSchema,
@@ -14,6 +16,7 @@ import {
   type Monitor,
   type MonitorCreateInput,
   type MonitorEnabledGuardrailInput,
+  type MonitorExperimentUpsertInput,
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
   type MonitorReplicationInput,
@@ -149,6 +152,19 @@ export class MonitorService extends MonitorServiceContract {
 
   async deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     await this.options.repository.deleteForExperiment(input);
+  }
+
+  async upsertForExperiment(input: MonitorExperimentUpsertInput): Promise<Monitor> {
+    const parsed = monitorExperimentUpsertInputSchema.parse(input);
+
+    return this.options.repository.upsertForExperiment({
+      ...parsed,
+      // A monitor the experiment already owns keeps its id; the generator only
+      // answers for the row this call may have to create.
+      id: this.options.generateId(),
+      mappings: monitorMappingsInputSchema.parse(parsed.mappings),
+      executionMode: monitorExecutionModeSchema.parse(parsed.executionMode),
+    });
   }
 
   async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {

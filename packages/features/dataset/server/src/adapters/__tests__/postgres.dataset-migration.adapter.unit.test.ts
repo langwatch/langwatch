@@ -1,7 +1,6 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { PostgresDatasetMigrationAdapter } from "../postgres.dataset-migration.adapter";
-import type { DatasetMigrationDatabasePort } from "../../ports/dataset-migration-database.port";
 import type { DatasetStorage, PresignedUpload } from "../../ports/dataset-storage.port";
 import { DatasetStorageResolver } from "../../ports/dataset-storage.port";
 import {
@@ -106,11 +105,14 @@ function fixture(input: {
       aggregate: recordAggregate,
     },
     $transaction: runTransaction,
-  } satisfies DatasetMigrationDatabasePort;
+  };
   const storage = new FixtureStorage();
   const storageResolver = new FixtureStorageResolver(storage);
+  // Prisma's delegates derive their return types from the arguments each call
+  // was made with, so no hand-written stand-in can be declared to satisfy one.
+  // The fake records what it was asked, which is what every claim below reads.
   const migration = PostgresDatasetMigrationAdapter.create({
-    database,
+    database: database as never,
     storage: storageResolver,
   });
 

@@ -130,6 +130,40 @@ export const monitorUpdateInputSchema = z
   .strict();
 export type MonitorUpdateInput = z.infer<typeof monitorUpdateInputSchema>;
 
+/**
+ * The monitor an experiment is published as.
+ *
+ * Keyed by the experiment rather than by a monitor id: `Monitor.experimentId`
+ * is unique, so publishing the same experiment twice replaces the row it
+ * already owns instead of leaving one monitor behind per save. The slug is the
+ * experiment's own and arrives with the input rather than being derived here —
+ * the published monitor is that experiment under another name.
+ *
+ * The three JSON fields arrive unknown because that is what they are: they are
+ * read back out of the experiment's stored workbench state, which no schema
+ * guards on the way in, and they land in `Json` columns exactly as they arrive.
+ * Narrowing them here would turn an experiment that publishes today into one
+ * that throws. `mappings` is the single exception — the `{}` shape it can hold
+ * crashes the evaluator paths that read it back, so the service canonicalises
+ * it the same way `create` and `update` already do.
+ */
+export const monitorExperimentUpsertInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    experimentId: z.string().min(1),
+    name: z.string().min(1),
+    checkType: z.string().min(1),
+    slug: z.string().min(1),
+    preconditions: z.unknown(),
+    parameters: z.unknown(),
+    mappings: z.unknown(),
+    sample: z.number().min(0).max(1),
+    enabled: z.boolean(),
+    executionMode: z.string().min(1),
+  })
+  .strict();
+export type MonitorExperimentUpsertInput = z.infer<typeof monitorExperimentUpsertInputSchema>;
+
 export const monitorToggleInputSchema = z
   .object({ id: z.string().min(1), projectId: z.string().min(1), enabled: z.boolean() })
   .strict();

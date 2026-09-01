@@ -59,7 +59,6 @@ export {
   type DatasetMigrationRunResult,
   type DatasetMigrationSummary,
 } from "./adapters/postgres.dataset-migration.adapter";
-export { DatasetMigrationDatabasePort } from "./ports/dataset-migration-database.port";
 export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
 export * from "./services/dataset-chunking";
 export { DatasetChunkService } from "./services/dataset-chunk.service";

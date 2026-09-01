@@ -1499,30 +1499,20 @@ const appTrpcFeatures = createAppTrpcFeatures({
           where: { id: input.workflowId, projectId: input.projectId },
         }),
       coerceMonitorMappings,
-      upsertExperimentMonitor: async (ctx, { projectId, experimentId, monitor }) => {
-        const monitorData = {
+      upsertExperimentMonitor: async (ctx, { projectId, experimentId, monitor }) =>
+        await appContext(ctx).app.monitors.upsertForExperiment({
+          projectId,
+          experimentId,
           name: monitor.name,
           checkType: monitor.checkType,
           slug: monitor.slug,
-          preconditions: monitor.preconditions as object,
-          parameters: monitor.parameters as Record<string, unknown>,
-          mappings: monitor.mappings as object,
+          preconditions: monitor.preconditions,
+          parameters: monitor.parameters,
+          mappings: monitor.mappings,
           sample: monitor.sample,
           enabled: monitor.enabled,
-          executionMode: monitor.executionMode as "ON_MESSAGE",
-        };
-
-        return await (ctx as unknown as TRPCContext).prisma.monitor.upsert({
-          where: { experimentId, projectId },
-          update: monitorData,
-          create: {
-            ...monitorData,
-            id: `monitor_${nanoid()}`,
-            projectId,
-            experimentId,
-          },
-        });
-      },
+          executionMode: monitor.executionMode,
+        }),
       resolveAuthorNames: async (ctx, authorIds) =>
         await (ctx as unknown as TRPCContext).prisma.user.findMany({
           where: { id: { in: [...authorIds] } },

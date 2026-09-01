@@ -19,6 +19,7 @@ import type {
   EnabledGuardrailMonitor,
   MonitorCreateInput,
   MonitorEnabledGuardrailInput,
+  MonitorExperimentUpsertInput,
   Monitor,
   MonitorIdInput,
   MonitorSummary,
@@ -166,6 +167,10 @@ export class TestMonitorService extends MonitorService {
   }
 
   async deleteForExperiment(_input: { projectId: string; experimentId: string }): Promise<void> {}
+
+  async upsertForExperiment(_input: MonitorExperimentUpsertInput): Promise<Monitor> {
+    throw new Error("unused monitor capability");
+  }
 
   async isNameAvailable(_input: {
     projectId: string;

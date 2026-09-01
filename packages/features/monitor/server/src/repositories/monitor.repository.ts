@@ -3,6 +3,8 @@ import type {
   Monitor,
   MonitorCreateInput,
   MonitorEnabledGuardrailInput,
+  MonitorExecutionMode,
+  MonitorExperimentUpsertInput,
   MonitorMappingState,
   MonitorNameAvailabilityInput,
   MonitorSummary,
@@ -36,5 +38,12 @@ export abstract class MonitorRepository {
   ): Promise<Monitor>;
   abstract delete(input: { id: string; projectId: string }): Promise<void>;
   abstract deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void>;
+  abstract upsertForExperiment(
+    input: MonitorExperimentUpsertInput & {
+      id: string;
+      mappings: MonitorMappingState;
+      executionMode: MonitorExecutionMode;
+    },
+  ): Promise<Monitor>;
   abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<boolean>;
 }

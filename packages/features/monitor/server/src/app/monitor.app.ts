@@ -28,6 +28,7 @@ import {
   monitorSettingsSchema,
   type Monitor,
   type MonitorCreateInput,
+  type MonitorExperimentUpsertInput,
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
   type MonitorService,
@@ -184,6 +185,17 @@ export class MonitorApp {
   /** Replaces a monitor's configuration in full. */
   update(input: MonitorUpdateInput): Promise<Monitor> {
     return this.dependencies.monitors.update(input);
+  }
+
+  /**
+   * Creates or replaces the monitor an experiment is published as.
+   *
+   * A wizard experiment publishes to exactly one monitor, and the experiment id
+   * is what identifies it — so "Save as monitor" pressed a second time edits the
+   * monitor the first press created rather than adding another one beside it.
+   */
+  upsertForExperiment(input: MonitorExperimentUpsertInput): Promise<Monitor> {
+    return this.dependencies.monitors.upsertForExperiment(input);
   }
 
   /**
