@@ -1008,7 +1008,59 @@ function SourceRow({
   );
 }
 
-function SourceComposerDrawer({
+/**
+ * What the create drawer puts behind "Advanced": the two settings an admin
+ * rarely changes, and both safe to leave closed. Cadence arrives holding the
+ * recommended schedule for the source type, and a source with no destination
+ * ingests normally — it simply routes no conversations onward until someone
+ * says where.
+ *
+ * Returns `undefined` rather than an empty fragment for a type that offers
+ * neither, because an element that renders nothing still counts as content to
+ * the group, and would leave a push source's drawer showing an "Advanced"
+ * button that opens onto an empty box.
+ */
+function composerAdvancedExtras({
+  composer,
+  setComposer,
+  destinationCtx,
+}: {
+  composer: ComposerState;
+  setComposer: (next: ComposerState) => void;
+  destinationCtx: DestinationContext;
+}): ReactNode | undefined {
+  // The same two predicates the fields themselves gate on, read here so the
+  // group knows whether it has anything to hold before it offers itself.
+  const offersCadence = recommendedPullSchedule(composer.sourceType) !== null;
+  const offersDestination = routesConversations(composer.sourceType);
+  if (!offersCadence && !offersDestination) return undefined;
+  return (
+    <>
+      {offersCadence && (
+        <PullCadenceField
+          sourceType={composer.sourceType}
+          value={composer.pullSchedule}
+          onChange={(pullSchedule) =>
+            setComposer({ ...composer, pullSchedule })
+          }
+        />
+      )}
+      {offersDestination && (
+        <TraceDestinationField
+          sourceType={composer.sourceType}
+          value={composer.traceProjectId}
+          onChange={(traceProjectId) =>
+            setComposer({ ...composer, traceProjectId })
+          }
+          mode="create"
+          {...destinationCtx}
+        />
+      )}
+    </>
+  );
+}
+
+export function SourceComposerDrawer({
   isOpen,
   organizationId,
   destinationCtx,
@@ -1028,6 +1080,11 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
+  const advancedExtras = composerAdvancedExtras({
+    composer,
+    setComposer,
+    destinationCtx,
+  });
   // The type was picked from the Add source menu, which is where the plan
   // gate lives (see gatedSourceTypeOptions) — the composer is committed to
   // it. Changing type means closing and picking again, exactly like the
@@ -1092,6 +1149,7 @@ function SourceComposerDrawer({
               onChange={(parserConfig) =>
                 setComposer({ ...composer, parserConfig })
               }
+              advancedExtras={advancedExtras}
             />
 
             <OttlEditor
@@ -1102,24 +1160,6 @@ function SourceComposerDrawer({
                 setComposer({ ...composer, ottlStatements })
               }
               enabled={isOttlEnabledSourceType(composer.sourceType)}
-            />
-
-            <PullCadenceField
-              sourceType={composer.sourceType}
-              value={composer.pullSchedule}
-              onChange={(pullSchedule) =>
-                setComposer({ ...composer, pullSchedule })
-              }
-            />
-
-            <TraceDestinationField
-              sourceType={composer.sourceType}
-              value={composer.traceProjectId}
-              onChange={(traceProjectId) =>
-                setComposer({ ...composer, traceProjectId })
-              }
-              mode="create"
-              {...destinationCtx}
             />
           </VStack>
         </Drawer.Body>
@@ -1321,6 +1361,7 @@ function PullConfigEditFields({
   pullSchedule,
   onPullScheduleChange,
   hasPulled,
+  destinationField,
 }: {
   sourceType: SourceType;
   parserConfig: Record<string, string>;
@@ -1329,6 +1370,14 @@ function PullConfigEditFields({
   onPullScheduleChange: (next: string) => void;
   /** Whether the source already holds a poller cursor. */
   hasPulled: boolean;
+  /**
+   * The destination picker, when this source type routes conversations, so it
+   * joins the cadence in the one Advanced group instead of opening a second.
+   * No type reaches here with one today — the two that route conversations
+   * are both absent from `EDITABLE_PULL_CONFIG_SOURCE_TYPES` — but the day
+   * one does, the drawer must not sprout a second collapsible for it.
+   */
+  destinationField?: ReactNode;
 }) {
   const isStartLocked = isBackfillStartLocked({
     hasPulled,
@@ -1347,6 +1396,18 @@ function PullConfigEditFields({
         onChange={onParserConfigChange}
         mode="edit"
         readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
+        // Same group, same order as the create drawer: the two forms edit the
+        // same source and must not disagree about where a setting lives.
+        advancedExtras={
+          <>
+            <PullCadenceField
+              sourceType={sourceType}
+              value={pullSchedule}
+              onChange={onPullScheduleChange}
+            />
+            {destinationField}
+          </>
+        }
       />
       {isReportLocked && (
         <Text fontSize="xs" color="fg.muted">
@@ -1368,11 +1429,6 @@ function PullConfigEditFields({
           restates the figures already recorded for that window.
         </Text>
       )}
-      <PullCadenceField
-        sourceType={sourceType}
-        value={pullSchedule}
-        onChange={onPullScheduleChange}
-      />
     </>
   );
 }
@@ -1557,6 +1613,37 @@ function SourceEditBody({
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // Read here rather than left to the field's own early return, because the
+  // Advanced group has to know whether it holds anything before it offers
+  // itself — a disclosure that opens onto an empty box is worse than none.
+  const offersDestination = routesConversations(
+    source.sourceType as SourceType,
+  );
+
+  const destinationField = offersDestination ? (
+    <TraceDestinationField
+      sourceType={source.sourceType as SourceType}
+      // Both props describe `value`, so both have to move together. An
+      // untouched picker shows the stored destination and the archived
+      // notice that describes it; the moment a replacement is picked, the
+      // flag stops applying — it described the project that has just been
+      // replaced, not the one now on screen. Left true, the picker seeds
+      // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
+      // picks a project, sees nothing selected under an unchanged warning,
+      // and concludes the control is dead.
+      value={
+        form.destination === undefined
+          ? (source.traceProjectId ?? null)
+          : form.destination
+      }
+      onChange={form.setDestination}
+      mode="edit"
+      destinationArchived={
+        form.destination === undefined && (source.traceProjectArchived ?? false)
+      }
+      {...destinationCtx}
+    />
+  ) : null;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -1567,7 +1654,7 @@ function SourceEditBody({
         onDescriptionChange={form.setDescription}
       />
 
-      {isPullMode && (
+      {isPullMode ? (
         <PullConfigEditFields
           sourceType={sourceType}
           parserConfig={form.parserConfig}
@@ -1575,7 +1662,14 @@ function SourceEditBody({
           pullSchedule={form.pullSchedule}
           onPullScheduleChange={form.setPullSchedule}
           hasPulled={hasPulled}
+          destinationField={destinationField}
         />
+      ) : (
+        // A source type this form builds no adapter config for still has a
+        // destination to place, and no parser fields to hang the group off.
+        destinationField && (
+          <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
+        )
       )}
 
       <OttlEditor
@@ -1584,30 +1678,6 @@ function SourceEditBody({
         statements={form.statements}
         onChange={form.setStatements}
         enabled={isOttlEnabledSourceType(source.sourceType)}
-      />
-
-      <TraceDestinationField
-        sourceType={source.sourceType as SourceType}
-        // Both props describe `value`, so both have to move together. An
-        // untouched picker shows the stored destination and the archived
-        // notice that describes it; the moment a replacement is picked, the
-        // flag stops applying — it described the project that has just been
-        // replaced, not the one now on screen. Left true, the picker seeds
-        // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
-        // picks a project, sees nothing selected under an unchanged warning,
-        // and concludes the control is dead.
-        value={
-          form.destination === undefined
-            ? (source.traceProjectId ?? null)
-            : form.destination
-        }
-        onChange={form.setDestination}
-        mode="edit"
-        destinationArchived={
-          form.destination === undefined &&
-          (source.traceProjectArchived ?? false)
-        }
-        {...destinationCtx}
       />
 
       <Text fontSize="xs" color="fg.muted">
@@ -2861,12 +2931,46 @@ function ParserConfigField({
   );
 }
 
+/**
+ * The one collapsed group a source drawer offers.
+ *
+ * Unmounted while closed, so the collapsed state genuinely holds nothing the
+ * admin needs: create must produce a working source without it ever being
+ * opened. Which is also the constraint on what goes in — anything here that
+ * kept its own state would throw the admin's choice away on every collapse,
+ * so every child is driven from the drawer's state.
+ *
+ * Extracted rather than left inside `ParserConfigFields` because the edit
+ * drawer reaches the group down a path that renders no parser fields at all:
+ * the two source types that route conversations are both absent from
+ * `EDITABLE_PULL_CONFIG_SOURCE_TYPES`, so their destination has to be grouped
+ * by something that does not belong to the parser config.
+ */
+function AdvancedSettingsGroup({ children }: { children: ReactNode }) {
+  return (
+    <Collapsible.Root lazyMount unmountOnExit>
+      <Collapsible.Trigger asChild>
+        <Button size="xs" variant="ghost" color="fg.muted">
+          <ChevronRight />
+          Advanced
+        </Button>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <VStack align="stretch" gap={3} paddingTop={2}>
+          {children}
+        </VStack>
+      </Collapsible.Content>
+    </Collapsible.Root>
+  );
+}
+
 export function ParserConfigFields({
   sourceType,
   values,
   onChange,
   mode = "create",
   readOnlyKeys,
+  advancedExtras,
 }: {
   sourceType: SourceType;
   values: Record<string, string>;
@@ -2879,6 +2983,22 @@ export function ParserConfigFields({
    * nothing is worse than no input at all.
    */
   readOnlyKeys?: readonly string[];
+  /**
+   * Settings that belong in the Advanced group without being parser fields —
+   * the pull cadence and the trace destination. Passed in rather than given a
+   * collapsible of their own: two "Advanced" headings in one drawer would
+   * leave an admin guessing which holds the thing they came for.
+   *
+   * Pass `undefined` when the source type offers none of them. An element
+   * that happens to render nothing still counts as content here, and would
+   * leave a push source's drawer showing an "Advanced" button that opens onto
+   * an empty box.
+   *
+   * Whatever goes here must hold its value in the caller's state. The group
+   * unmounts its contents when it closes, so a child holding its own would
+   * silently discard the admin's choice on every collapse.
+   */
+  advancedExtras?: ReactNode;
 }) {
   // A held value can stop being offered without the admin touching its field —
   // switching the Anthropic report to `cost` retires every bucket width. Left
@@ -2893,13 +3013,17 @@ export function ParserConfigFields({
   const fields = PARSER_FIELDS[sourceType];
   const primaryFields = fields.filter((f) => !f.advanced);
   const advancedFields = fields.filter((f) => f.advanced);
-  if (fields.length === 0) return null;
+  // Extras alone are reason enough to render: a source type with no
+  // parser fields of its own still has a cadence to offer.
+  if (fields.length === 0 && !advancedExtras) return null;
   const isReadOnly = (key: string) => readOnlyKeys?.includes(key) ?? false;
   return (
     <VStack align="stretch" gap={3}>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Source-specific configuration
-      </Text>
+      {fields.length > 0 && (
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Source-specific configuration
+        </Text>
+      )}
       {primaryFields.map((f) => (
         <ParserConfigField
           key={f.key}
@@ -2910,31 +3034,20 @@ export function ParserConfigFields({
           readOnly={isReadOnly(f.key)}
         />
       ))}
-      {advancedFields.length > 0 && (
-        // Unmounted while closed so the collapsed state genuinely holds
-        // nothing the admin needs: create must work without ever opening it.
-        <Collapsible.Root lazyMount unmountOnExit>
-          <Collapsible.Trigger asChild>
-            <Button size="xs" variant="ghost" color="fg.muted">
-              <ChevronRight />
-              Advanced
-            </Button>
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <VStack align="stretch" gap={3} paddingTop={2}>
-              {advancedFields.map((f) => (
-                <ParserConfigField
-                  key={f.key}
-                  field={f}
-                  values={values}
-                  onChange={onChange}
-                  mode={mode}
-                  readOnly={isReadOnly(f.key)}
-                />
-              ))}
-            </VStack>
-          </Collapsible.Content>
-        </Collapsible.Root>
+      {(advancedFields.length > 0 || advancedExtras) && (
+        <AdvancedSettingsGroup>
+          {advancedFields.map((f) => (
+            <ParserConfigField
+              key={f.key}
+              field={f}
+              values={values}
+              onChange={onChange}
+              mode={mode}
+              readOnly={isReadOnly(f.key)}
+            />
+          ))}
+          {advancedExtras}
+        </AdvancedSettingsGroup>
       )}
     </VStack>
   );
