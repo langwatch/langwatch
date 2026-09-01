@@ -850,21 +850,34 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
 
-{{/* LangWatchQL self-provisioning (issue #6635; ownership model from
-     langwatch-saas#1168, Design C). Rendered ONLY for external ClickHouse —
-     for chart-managed ClickHouse the clickhouse-serverless subchart renders the
-     access model as config and this block is absent, keeping exactly one owner
-     per entity name. On the external path the app derives the restricted
-     connection from CLICKHOUSE_URL/DATABASE_URL and converges the whole access
-     model at boot; the chart contributes the mode switch and the two stable
-     passwords. `optional: true` is deliberate: an operator Secret without these
-     keys means LangWatchQL simply stays unprovisioned (fail-closed refusals)
-     instead of the pod dying in CreateContainerConfigError — a default-on
-     feature must degrade, not brick an upgrade. */}}
-{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+{{/* LangWatchQL passwords + provisioning switch (issue #6635; ownership model
+     from langwatch-saas#1168, Design C).
+
+     Two DIFFERENT gates on purpose:
+
+     - The two passwords are needed at QUERY time on EVERY path. The app always
+       authenticates to ClickHouse as langwatch_lwql and dials PostgreSQL
+       through the lwql_postgres reader, no matter who PROVISIONED those
+       identities (the subchart for chart-managed ClickHouse, the app itself for
+       external/BYO). So they are gated on `lwql.enabled` alone — cut them for
+       the chart-managed case and every LWQL query fails to authenticate even
+       though the identity exists.
+
+     - LWQL_SELF_PROVISION is the DDL switch, and only the app-owned (external)
+       path may run that DDL. It is gated on selfProvisionActive so a
+       chart-managed server — whose access model the subchart owns as config —
+       never has a second SQL owner wedging the same entity names.
+
+     `optional: true` is deliberate: an operator Secret without these keys means
+     LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of the
+     pod dying in CreateContainerConfigError — a default-on feature must degrade,
+     not brick an upgrade. */}}
+{{- if .Values.lwql.enabled }}
 {{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
 - name: LWQL_SELF_PROVISION
   value: "true"
+{{- end }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -1267,6 +1280,31 @@ true
 {{- if and .Values.lwql.enabled (not .Values.clickhouse.chartManaged) -}}
 true
 {{- end -}}
+{{- end -}}
+
+{{/*
+  Guard the one combination where LangWatchQL silently goes unprovisioned.
+
+  For chart-managed ClickHouse the app does NOT self-provision (selfProvisionActive
+  is false), so the ONLY provisioner is the clickhouse-serverless subchart, and it
+  renders the access model only when clickhouse.lwql.enabled is true. Helm cannot
+  derive a subchart value from a parent one, so the parent's values.yaml sets
+  clickhouse.lwql.enabled: true to match lwql.enabled's default — but an operator
+  can still turn one off and leave the other on. If they do (lwql.enabled=true,
+  clickhouse.chartManaged=true, clickhouse.lwql.enabled=false) NOBODY provisions
+  LWQL and the feature fails closed with no signal. Fail loudly instead.
+
+  Note the published-tarball caveat: the vendored clickhouse-serverless-0.3.0.tgz
+  predates the lwql values, but Helm passes the value through to the subchart
+  regardless of whether the subchart declares it, so reading it here is safe and
+  this guard never fires on the stock default path (clickhouse.lwql.enabled=true).
+*/}}
+{{- define "langwatch.lwql.provisioningGuard" -}}
+{{- $ch := .Values.clickhouse | default dict }}
+{{- $chLwql := $ch.lwql | default dict }}
+{{- if and .Values.lwql.enabled $ch.chartManaged (not $chLwql.enabled) }}
+{{- fail "lwql.enabled=true with clickhouse.chartManaged=true requires clickhouse.lwql.enabled=true: for chart-managed ClickHouse the app does not self-provision, so the clickhouse-serverless subchart is the only provisioner and it renders the LWQL access model only when clickhouse.lwql.enabled is true. Leaving it false silently disables LangWatchQL. Set clickhouse.lwql.enabled=true (the chart default), or disable the feature with lwql.enabled=false." }}
+{{- end }}
 {{- end -}}
 
 {{/*

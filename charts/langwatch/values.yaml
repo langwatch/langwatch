@@ -1843,6 +1843,17 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # LangWatchQL access model, rendered as ClickHouse config by the
+  # clickhouse-serverless subchart. Helm cannot derive this from the parent's
+  # lwql.enabled, so it is set here to match that default: for chart-managed
+  # ClickHouse the subchart is the ONLY provisioner (the app self-provisions only
+  # for external/BYO ClickHouse), so this must be on or LangWatchQL goes
+  # unprovisioned. langwatch.lwql.provisioningGuard fails the render if this is
+  # turned off while lwql.enabled stays true.
+  lwql:
+    ## @param clickhouse.lwql.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
+    enabled: true
+
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------
@@ -1963,20 +1974,33 @@ clickhouse:
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
 # =============================================================================
-# The governed analytics SQL API. When enabled, the app self-provisions the
-# whole backend on every boot — restricted ClickHouse identity, settings
-# profile, row policies, PostgreSQL reader role, named collection, views —
-# from two chart-generated passwords. The `release_lwql_workbench` feature
-# flag still gates the HTTP endpoint; backend objects exist regardless.
+# The governed analytics SQL API. Its backend is the restricted ClickHouse
+# identity (langwatch_lwql), the lwql_restricted settings profile, the tenant
+# row policies, the lwql_postgres named collection and the caller-facing views.
+# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
+# backend objects exist regardless.
 #
-# Requires a ClickHouse whose admin user may run access-management DDL
-# (`langwatch/clickhouse-serverless` ships this). Chart-managed ClickHouse
-# at any replica count is supported via keeper-backed replicated access
-# storage (requires clickhouse-serverless image newer than 0.3.0). External
-# ClickHouse is supported unchanged.
+# Ownership follows one rule (Design C, langwatch-saas#1168): whoever owns the
+# ClickHouse server owns the access model, and exactly one provisioner writes
+# each entity name.
+#
+#   - Chart-managed ClickHouse (clickhouse.chartManaged=true, the default):
+#     the clickhouse-serverless subchart renders the whole access model as
+#     ClickHouse config at pod boot (clickhouse.lwql.enabled, default true). The
+#     app does NOT run provisioning DDL — a second SQL owner of the same names
+#     is startup-fatal (named-collection collision) or wedges access entities
+#     (error 495 on every repair statement). Works at any replica count.
+#   - External / BYO ClickHouse (clickhouse.chartManaged=false): the chart
+#     cannot render config into a server it does not run, so the app
+#     self-provisions the same objects via SQL DDL on every boot, and degrades
+#     to a logged, fail-closed refusal if the server rejects a statement. This
+#     requires a ClickHouse whose admin user may run access-management DDL.
+#
+# Either way the app authenticates as langwatch_lwql at query time, so the two
+# stable passwords (chart-generated) reach the app on both paths.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, views) when the application starts. The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Chart-managed ClickHouse renders it as config via the clickhouse-serverless subchart; external ClickHouse has the app self-provision it. The feature flag still gates the endpoint.
   enabled: true
 
 # =============================================================================

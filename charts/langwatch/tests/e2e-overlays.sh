@@ -999,6 +999,27 @@ test_infra_overlays() {
     -f "${OVERLAYS}/access-nodeport.yaml")
   assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
 
+  # Design C: with app-side provisioning DDL off for chart-managed ClickHouse,
+  # the provisioner MOVES to the subchart — it does not vanish. Two ends of that
+  # contract are assertable from the parent chart here (the vendored
+  # clickhouse-serverless tarball predates the LWQL templates, so the subchart's
+  # rendered config itself is covered by the subchart's own Go render tests, not
+  # this parent-chart harness):
+  #
+  #   1. The subchart is switched ON by default. Helm cannot derive
+  #      clickhouse.lwql.enabled from lwql.enabled, so the parent values set it,
+  #      and langwatch.lwql.provisioningGuard fails the render if an operator
+  #      turns it off while leaving LWQL enabled — otherwise NOBODY provisions.
+  assert_render_refuses "chart-managed: guard refuses LWQL-on with subchart-off" \
+    "requires clickhouse.lwql.enabled=true" \
+    --set clickhouse.lwql.enabled=false
+  #   2. The app still gets the query-time LWQL password on the chart-managed
+  #      path: it authenticates as langwatch_lwql regardless of who provisioned,
+  #      so cutting the password (the old selfProvisionActive gate) would break
+  #      every query even though the identity exists.
+  assert_contains "chart-managed: app still wired with LWQL query password" \
+    "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
+
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then
     pass "mode-transition: app pod template differs between replicas=1 and replicas=3"
