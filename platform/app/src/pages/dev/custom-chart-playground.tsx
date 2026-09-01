@@ -33,6 +33,14 @@ const LANGY_PAGE_CONTEXT = [
       "export, may import react/react-dom/recharts) plus named LangWatchQL " +
       "queries. Format: server/analytics/playgroundWidgetDefinition.ts",
   },
+  {
+    id: "dashboard:custom-chart-playground-fetch-api",
+    kind: "dashboard" as const,
+    label:
+      "Fetch data with LW.useChartQuery(name, params) -> {data, loading, " +
+      "error}. Never throws; refetches on time-window changes. LW.query() " +
+      "is the low-level promise it wraps — prefer the hook.",
+  },
 ];
 
 function CustomChartPlaygroundPage() {

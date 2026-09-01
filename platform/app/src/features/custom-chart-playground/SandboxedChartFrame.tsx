@@ -51,7 +51,13 @@ export function SandboxedChartFrame({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
   const [tornDown, setTornDown] = useState(false);
-  const [height, setHeight] = useState(240);
+  // Fills the box the card gives it by default (a taller/wider card grows
+  // the chart with it); a widget can still call LW.setHeight to size to its
+  // own content instead, which is what onHeightChange below feeds.
+  const [height, setHeight] = useState(maxHeight);
+  useEffect(() => {
+    setHeight(maxHeight);
+  }, [maxHeight]);
 
   const srcdoc = useMemo(() => buildSrcdoc(code), [code]);
 

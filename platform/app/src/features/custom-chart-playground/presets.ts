@@ -31,43 +31,39 @@ export const STARTER_WIDGET_QUERIES: PlaygroundQuery[] = [
 /**
  * A real Recharts component wired to the widget's own "main" query, so
  * "+ New widget" proves the whole pipeline immediately: compile-and-mount,
- * `LW.query(name, params)` dispatch, parent-side validation (this call
- * passes no params, matching "main"'s zero declared parameters), and a real
- * ClickHouse round trip rendering as a bar chart.
+ * `LW.useChartQuery(name, params)` dispatch, parent-side validation (this
+ * call passes no params, matching "main"'s zero declared parameters), and a
+ * real ClickHouse round trip rendering as a bar chart that fills its card.
  */
-export const STARTER_WIDGET_CODE = `import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+export const STARTER_WIDGET_CODE = `import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function Widget() {
-  const [rows, setRows] = useState([]);
-  const [status, setStatus] = useState("Loading…");
+  const { data, loading, error } = LW.useChartQuery("main", {});
 
-  useEffect(function () {
-    LW.query("main", {}).then(
-      function (result) {
-        setStatus(result.rows.length + " rows · " + result.statistics.elapsedMs + "ms");
-        setRows(result.rows.map(function (row) {
-          return { bucket: String(row.bucket).slice(5, 16), events: Number(row.events) };
-        }));
-      },
-      function (err) {
-        setStatus(err.title + " [" + err.code + "]: " + err.message);
-      }
-    );
-  }, []);
+  const status = error
+    ? error
+    : loading
+      ? "Loading..."
+      : data.length + " rows";
+
+  const rows = (data || []).map(function (row) {
+    return { bucket: String(row.bucket).slice(5, 16), events: Number(row.events) };
+  });
 
   return (
-    <div>
-      <div style={{ fontSize: "11px", color: "#666", marginBottom: 4 }}>{status}</div>
-      <ResponsiveContainer width="100%" height={230}>
-        <BarChart data={rows}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey="events" fill="#f97316" />
-        </BarChart>
-      </ResponsiveContainer>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ fontSize: "11px", color: "#666", marginBottom: 4, flexShrink: 0 }}>{status}</div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Bar dataKey="events" fill="#f97316" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

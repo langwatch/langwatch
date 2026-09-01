@@ -71,13 +71,14 @@ export function createFrameBridge(
   let disposed = false;
   let lastHeartbeatAt = 0;
   let watchdog: ReturnType<typeof setInterval> | null = null;
-  let activeRequestId: number | null = null;
-  let activeAbort: AbortController | null = null;
+  // Keyed by requestId, not a single slot: a widget can have several
+  // LW.query calls in flight at once (e.g. Promise.all of two queries), and
+  // each needs its own abort lifecycle independent of the others.
+  const activeAborts = new Map<number, AbortController>();
 
-  const abortActive = () => {
-    activeAbort?.abort();
-    activeAbort = null;
-    activeRequestId = null;
+  const abortAll = () => {
+    for (const abort of activeAborts.values()) abort.abort();
+    activeAborts.clear();
   };
 
   const stop = () => {
@@ -85,7 +86,7 @@ export function createFrameBridge(
     disposed = true;
     if (watchdog !== null) clearInterval(watchdog);
     iframe.removeEventListener("load", onFrameLoad);
-    abortActive();
+    abortAll();
     port?.close();
     port = null;
   };
@@ -103,19 +104,21 @@ export function createFrameBridge(
     queryName: string,
     params: Readonly<Record<string, ChartQueryParamValue>>,
   ) => {
-    // One request at a time: a newer lw:query aborts the one in flight.
-    abortActive();
+    // Each request gets its own abort controller, so concurrent queries
+    // (e.g. Promise.all of two LW.query calls) don't cancel one another.
     const abort = new AbortController();
-    activeAbort = abort;
-    activeRequestId = requestId;
+    activeAborts.set(requestId, abort);
     executeQuery(queryName, params, abort.signal).then(
       (result) => {
-        // Stale replies (a newer request took over, or we tore down) drop.
-        if (disposed || activeRequestId !== requestId || !port) return;
+        // A reply for a request we've already forgotten (torn down, or this
+        // exact requestId already settled) is dropped.
+        if (disposed || !activeAborts.has(requestId) || !port) return;
+        activeAborts.delete(requestId);
         port.postMessage({ type: "lw:query-result", requestId, result });
       },
       (error: unknown) => {
-        if (disposed || activeRequestId !== requestId || !port) return;
+        if (disposed || !activeAborts.has(requestId) || !port) return;
+        activeAborts.delete(requestId);
         port.postMessage({
           type: "lw:query-error",
           requestId,

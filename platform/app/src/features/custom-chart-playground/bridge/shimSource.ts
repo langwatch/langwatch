@@ -11,10 +11,13 @@
  * params and theme, so author code can read `LW.params` synchronously at its
  * first line.
  *
- * The shim itself knows nothing about React, Babel or the module format —
- * that lives in `bridge/authorRuntime.ts`, which is what defines the hook
- * this file calls. Keeping the split means a future non-React chart kind
- * reuses this shim unchanged.
+ * The shim itself knows nothing about Babel or the module format — that
+ * lives in `bridge/authorRuntime.ts`, which is what defines the hook this
+ * file calls. It does know about React for exactly one thing:
+ * `LW.useChartQuery`, a hook wrapping `LW.query`'s promise in
+ * `window.React.useState`/`useEffect` (React is CDN-loaded ahead of this
+ * script — see `buildSrcdoc`). A future non-React chart kind can still reuse
+ * everything else in this file unchanged and simply not call that hook.
  *
  * Protocol constants are interpolated from `bridgeProtocol.ts` so the two
  * sides cannot drift.
@@ -88,14 +91,93 @@ export function buildShimScript(): string {
       var clamped = Math.max(${CHART_FRAME_MIN_HEIGHT_PX}, Math.min(${CHART_FRAME_MAX_HEIGHT_PX}, Number(px) || ${CHART_FRAME_MIN_HEIGHT_PX}));
       post({ type: "lw:set-height", px: clamped });
     },
+    // Returns an unsubscribe function — useChartQuery below relies on this to
+    // drop its listener on cleanup instead of accumulating one per mount.
     onParamsChange: function (callback) {
-      ready.then(function () { paramsCallbacks.push(callback); });
+      var removed = false;
+      ready.then(function () {
+        if (!removed) paramsCallbacks.push(callback);
+      });
+      return function () {
+        removed = true;
+        var index = paramsCallbacks.indexOf(callback);
+        if (index !== -1) paramsCallbacks.splice(index, 1);
+      };
     },
     error: function (err) {
       post({ type: "lw:error", source: "lw.error", message: messageOf(err) });
     }
   };
   window.LW = LW;
+
+  function chartQueryErrorMessage(err) {
+    if (err && typeof err === "object") {
+      var title = typeof err.title === "string" ? err.title : null;
+      var msg = typeof err.message === "string" ? err.message : null;
+      if (title && msg) return title + ": " + msg;
+      if (msg) return msg;
+      if (title) return title;
+    }
+    return messageOf(err);
+  }
+
+  /**
+   * The recommended way for widget code to fetch: wraps LW.query so authors
+   * never hand-roll the promise/useEffect/useState dance. Three footguns it
+   * closes that a naive Promise.all/.then would not:
+   *  - a rejection (undeclared param, SQL error, timeout) lands in 'error' as
+   *    a string, never as an uncaught rejection that would white-screen the
+   *    frame;
+   *  - a resolution arriving after the calling component unmounted (or after
+   *    'name'/'params' changed again) is dropped, so there is no
+   *    setState-on-unmounted race;
+   *  - 'params' is compared by value (JSON), not identity, so an inline
+   *    object literal in the widget's JSX does not cause a refetch loop.
+   * It also refetches on its own whenever the page-level time window or
+   * granularity changes, via the same onParamsChange feed LW.onParamsChange
+   * exposes directly - a widget using this hook stays live without its
+   * author ever touching that lower-level API.
+   */
+  LW.useChartQuery = function (name, params) {
+    var React = window.React;
+    var effectiveParams = params || {};
+    var paramsKey = stringify(effectiveParams);
+    var stateHook = React.useState({ data: null, loading: true, error: null });
+    var state = stateHook[0];
+    var setState = stateHook[1];
+
+    React.useEffect(function () {
+      var cancelled = false;
+
+      function run() {
+        if (cancelled) return;
+        setState({ data: null, loading: true, error: null });
+        LW.query(name, effectiveParams).then(
+          function (result) {
+            if (cancelled) return;
+            setState({ data: result.rows, loading: false, error: null });
+          },
+          function (err) {
+            if (cancelled) return;
+            setState({ data: null, loading: false, error: chartQueryErrorMessage(err) });
+          }
+        );
+      }
+
+      run();
+      var unsubscribe = LW.onParamsChange(run);
+
+      return function () {
+        cancelled = true;
+        unsubscribe();
+      };
+      // paramsKey stands in for effectiveParams: same dependency semantics,
+      // compared by value instead of by (always-new) object identity.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [name, paramsKey]);
+
+    return state;
+  };
 
   // Console + uncaught-error forwarding, installed before the author's code
   // ever runs so author-time failures are attributed.

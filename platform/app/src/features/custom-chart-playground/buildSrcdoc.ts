@@ -44,7 +44,16 @@ export function buildSrcdoc(code: string): string {
     "<!doctype html>",
     '<html><head><meta charset="utf-8">',
     "<style>",
-    "  body { margin: 8px; font-family: system-ui, sans-serif; font-size: 13px; }",
+    "  html, body { height: 100%; }",
+    "  body {",
+    "    margin: 0; padding: 8px; box-sizing: border-box;",
+    "    font-family: system-ui, sans-serif; font-size: 13px;",
+    "  }",
+    // The widget's root fills whatever height the parent gave the iframe —
+    // a widget wraps its own layout in height: 100% (and, for a chart,
+    // ResponsiveContainer height="100%") to actually fill it rather than
+    // being sized to a fixed pixel guess.
+    "  #lw-root { height: 100%; }",
     "  #lw-compile-error {",
     "    display: none; white-space: pre-wrap; font-family: ui-monospace, monospace;",
     "    font-size: 12px; color: #b91c1c; background: #fef2f2;",

@@ -53,7 +53,7 @@ const PREVIEW_DEBOUNCE_MS = 600;
 
 // The playground surfaces frame output in the chart itself; no log panel.
 const noopLog = () => {
-  /* discard frame logs */
+  // Intentionally empty.
 };
 
 /** Cheap and correct at this scale: a widget's queries are a handful of small objects. */
