@@ -187,6 +187,10 @@ export const datasetRecordRouter = createTRPCRouter({
         datasetId: z.string(),
         page: z.number().int().positive().default(1),
         limit: z.number().int().positive().max(200).default(50),
+        // When set, the page is a page of the rows whose cell values contain
+        // this text, and `count` is the number of matches — so the editor's
+        // pager pages the matches rather than the whole dataset.
+        search: z.string().optional(),
       }),
     )
     .permission("datasets:view")
@@ -197,6 +201,7 @@ export const datasetRecordRouter = createTRPCRouter({
           projectId: input.projectId,
           page: input.page,
           limit: input.limit,
+          search: input.search,
         });
       } catch (error) {
         // Parity with getAll/getFullDataset: an archived/missing dataset reads

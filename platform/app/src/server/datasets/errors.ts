@@ -246,6 +246,36 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
+ * A search was asked for over more rows than one search will read.
+ *
+ * Distinct from DatasetTooLargeToExportError on purpose: the presentation
+ * registry is keyed by code, so reusing the export error would show the user a
+ * message about exporting a dataset they were trying to search. The limits also
+ * differ in kind — export is bounded by bytes held in heap, search by rows read.
+ */
+export class DatasetTooLargeToSearchError extends HandledError {
+  declare readonly code: "dataset_too_large_to_search";
+
+  readonly rowCount: number;
+  readonly maxRows: number;
+
+  constructor({ rowCount, maxRows }: { rowCount: number; maxRows: number }) {
+    super(
+      "dataset_too_large_to_search",
+      `Dataset has ${rowCount} rows, more than the ${maxRows} a single search will read`,
+      {
+        meta: { rowCount, maxRows },
+        httpStatus: 413,
+        fault: "customer",
+      },
+    );
+    this.name = "DatasetTooLargeToSearchError";
+    this.rowCount = rowCount;
+    this.maxRows = maxRows;
+  }
+}
+
+/**
  * Thrown when a manual normalize retry is requested on a dataset that can't be
  * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
  * no staging key to re-read (no source to normalize). The route maps it to 409

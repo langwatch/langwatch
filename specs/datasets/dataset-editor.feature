@@ -77,6 +77,209 @@ Feature: Dataset editor
     And I am returned to the first page
 
   # ============================================================================
+  # Searching rows
+  # ============================================================================
+  # Paging is how you read a dataset in order; it is a poor way to find one row
+  # among hundreds. Search narrows the dataset to the rows whose cell values
+  # contain what was typed, and the pager then pages the matches.
+  #
+  # The narrowing happens over the whole dataset, not over the page already on
+  # screen: a search that could only find rows the user can already see would
+  # not be worth having. That is what the first scenario pins — the matched
+  # record starts on a page that was never loaded.
+
+  @integration
+  Scenario: Find a record that is not on the page I am looking at
+    Given the dataset has more records than fit on one page
+    And the only record containing "escalation" is on the last page
+    When I open the dataset in the editor
+    And I search for "escalation"
+    Then I see that record without leaving the first page
+    And I see only the records containing "escalation"
+
+  @unit
+  Scenario: Search matches regardless of letter case
+    Given a record contains "Escalation"
+    When I search for "escalation"
+    Then that record is shown
+
+  @integration
+  Scenario: The record count reports the matches, not the whole dataset
+    Given the dataset has more records than fit on one page
+    When I search for something matching fewer records than the whole dataset
+    Then the record count tells me how many records matched
+    And it tells me how many records the dataset holds in total
+    # Both numbers, because either alone is a trap: the match count alone reads
+    # as the dataset having shrunk, and the total alone hides the result of the
+    # search that was just run.
+
+  @integration
+  Scenario: The pager pages the matches
+    Given a search matches more records than fit on one page
+    Then the pager offers one page per page of matches
+    And moving to the next page shows the next page of matches
+
+  @integration
+  Scenario: Searching returns me to the first page of results
+    Given the dataset has more records than fit on one page
+    When I go to a later page
+    And I search for something that matches many records
+    Then I am shown the first page of the matches
+
+  @integration
+  Scenario: Clearing the search restores the whole dataset
+    Given I have searched for "escalation"
+    When I clear the search
+    Then I see the whole dataset again
+    And the record count reports the whole dataset again
+    # Deliberately says nothing about which page you land on. That is settled by
+    # "Clearing the search offers adding rows again", which requires the page you
+    # searched FROM. An unconditional "and I am on the first page" here
+    # contradicted that scenario, and was false about the editor as built.
+
+  @integration
+  Scenario: A search that matches nothing says so in the grid
+    When I search for something no record contains
+    Then the grid tells me no records match what I searched for
+    And it repeats what I searched for, so I can see what was actually run
+    And the row count reads zero matches
+
+  Rule: Search matches the cell values, not the column names
+
+    A row is a match when one of its values contains the text. Matching the
+    column names too would make searching "id" return every row of a dataset
+    with a "conversation_id" column — a result the user cannot explain from
+    what is on screen.
+
+    @unit
+    Scenario: A word that only appears in a column name matches nothing
+      Given the dataset has a column named "escalation"
+      And no record contains the word "escalation" in any of its values
+      When I search for "escalation"
+      Then no records match
+
+  Rule: A search never strands an unsaved edit
+
+    Changing the search reloads the grid from the server, which drops the rows
+    the previous search returned. An edit still on its way to being saved refers
+    to one of those rows, so it would be discarded with nothing shown to the
+    user — and the editor would go on believing a save was still pending. The
+    editor already blocks page navigation for this reason; searching moves the
+    same rows and gets the same gate.
+
+    @integration
+    Scenario: Searching waits for a pending save
+      Given I have edited a cell and the save has not finished
+      Then I cannot change the search until it has
+      And once it has saved I can search again
+
+  Rule: Changing the search clears the row selection
+
+    Rows are selected by their position in the grid. A search replaces which
+    records occupy those positions, so a selection made before it would, after
+    it, name different records — and deleting would delete rows the user never
+    picked. Paging already clears the selection for this reason.
+
+    @integration
+    Scenario: A selection made before a search does not survive it
+      Given I have selected a row
+      When I search for something that matches different records
+      Then nothing is selected
+      And I am not offered the delete action for rows I can no longer see
+
+  Rule: Rows cannot be added while a search is active
+
+    Every way of adding a row appends an empty or unrelated row to the end of
+    the dataset, which by construction does not match the search — so it would
+    be created and immediately vanish. All three ways are withdrawn together:
+    the add-row button, the trailing empty row at the end of the grid, and
+    adding rows from a CSV file. All three return once the search is cleared.
+
+    @integration
+    Scenario: No way to add a row is offered during a search
+      When I search for "escalation"
+      Then the add-row button is not offered
+      And the trailing empty row is not shown
+      And adding rows from a CSV file is not offered
+
+    @integration
+    Scenario: An import already open when the search lands is withdrawn too
+      Given I have opened the CSV import
+      When a search takes effect
+      Then the import is withdrawn
+      # Withdrawing only the button leaves the door open behind it: the search
+      # box waits for a pause in typing, so a click landing in that pause opens
+      # the import while no search is in effect yet. Rows imported through it
+      # land at the end of the dataset, outside the matches on screen.
+
+    @integration
+    Scenario: Clearing the search offers adding rows again
+      Given I have searched for "escalation"
+      When I clear the search
+      Then I am offered the ways to add a row that I had before searching
+      # "That I had" is the whole assertion: the add-row button and trailing row
+      # live on the LAST page, so returning the user to page 1 rather than the
+      # page they searched from withdraws them for the rest of the session. A
+      # search must not cost the user their place.
+
+  Rule: A dataset too large to scan is refused, not half-searched
+
+    Finding matches means reading the dataset's rows. Past a number of rows the
+    platform will read for one search, returning the matches found so far would
+    be a wrong answer wearing the clothes of a right one — the user cannot tell
+    an empty result from an abandoned scan. The search is refused with its own
+    reason, distinct from the one shown when a dataset is too large to export.
+
+    @unit
+    Scenario: A dataset over the row limit refuses the search
+      Given a dataset with more rows than one search will read
+      When a search is run against it
+      Then the search is refused as too large to search
+      And no partial set of matches is returned
+
+    @unit
+    Scenario: The refusal has its own words, not the export refusal's
+      Given a search was refused because the dataset is too large
+      Then the user is told the dataset is too large to search
+      And is not told something about exporting instead
+      # Separate codes because the message registry is keyed by code: reusing
+      # the export refusal would answer a search with export copy.
+
+    @integration
+    Scenario: A refused search does not leave unsearched rows on screen as if they matched
+      Given I am looking at a dataset
+      When I search it and the search is refused
+      Then the rows I was looking at before the search are withdrawn
+      And the record count does not report a number of matches
+      # The rows on screen were read BEFORE the search and never matched
+      # against it. Left in place under a search box, with a count chip
+      # reporting them, the screen reads as a finished search that found them —
+      # a wrong answer wearing the clothes of a right one, which is the same
+      # failure this Rule refuses a partial scan to avoid. The refusal is
+      # announced once in a toast that dismisses; what is left on screen has to
+      # go on being true after it does.
+
+  Rule: Search is offered for saved datasets only
+
+    Search narrows a dataset by asking the server for the matching rows. A
+    dataset being drafted in the editor has never been saved, so there is no
+    server to ask and every row is already on screen — the affordance would
+    promise something it could not do. The draft editor keeps its unfiltered
+    grid and its ways of adding rows.
+
+    KNOWN GAP: the workflow dataset modal opens saved datasets and drafts
+    through the same dialog, so the search box appears in one and not the other
+    with nothing on screen explaining the difference. Closing it means selecting
+    rows by identity rather than by grid position, which is a larger change than
+    this one.
+
+    @integration
+    Scenario: A draft dataset offers no search
+      Given I am editing a dataset that has not been saved
+      Then I am not offered a way to search it
+      And I am still offered the ways to add a row
+
+  # ============================================================================
   # Inline cell editing
   # ============================================================================
 

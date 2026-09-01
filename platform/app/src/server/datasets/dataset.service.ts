@@ -33,6 +33,12 @@ import {
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
+import {
+  DATASET_SEARCH_MAX_ROWS,
+  DATASET_SEARCH_SCAN_BATCH,
+  matchesDatasetSearch,
+  normalizeDatasetSearch,
+} from "./dataset-search";
 import { getDatasetStorage } from "./dataset-storage";
 import {
   ColumnTypeChangeNotSupportedError,
@@ -41,6 +47,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetNotRetryableError,
+  DatasetTooLargeToSearchError,
   DirectUploadUnavailableError,
   InvalidColumnError,
   MalformedColumnTypesError,
@@ -744,9 +751,21 @@ export class DatasetService {
     projectId: string;
     page: number;
     limit: number;
+    search?: string;
   }) {
     const { dataset } = params;
     const skip = (params.page - 1) * params.limit;
+
+    // A search narrows the dataset to the rows whose cell values contain the
+    // text, and the pager then pages the MATCHES — so `total` becomes the match
+    // count, not the row count. Neither storage layout can locate matches
+    // cheaply (there is no index over `entry`), so both scan; both bound that
+    // scan by DATASET_SEARCH_MAX_ROWS and refuse past it rather than return the
+    // matches found so far, which would be a wrong answer that looks right.
+    const search = normalizeDatasetSearch(params.search);
+    if (search) {
+      return await this.searchResolvedDataset({ ...params, search });
+    }
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
     // DatasetRecord table (I-PG → zero PG rows), so the PG-only paginator would
@@ -868,6 +887,166 @@ export class DatasetService {
   }
 
   /**
+   * One page of the rows MATCHING `search`, for either storage layout.
+   *
+   * There is no index over dataset content (`entry` is opaque JSON in PG,
+   * newline-delimited JSON in object storage), so finding matches means reading
+   * rows. Both branches therefore read incrementally — one chunk, or one batch,
+   * at a time — keeping only the matches that fall inside the requested page
+   * window. Heap holds one unit of input plus at most `limit` matched rows,
+   * whatever the dataset's size.
+   *
+   * Both branches refuse past DATASET_SEARCH_MAX_ROWS BEFORE reading anything,
+   * so a refused search costs no reads and never returns a partial result.
+   *
+   * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
+   * @throws {DatasetTooLargeToSearchError} past the row cap
+   */
+  private async searchResolvedDataset(params: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    search: string;
+  }) {
+    const { dataset, search } = params;
+    const windowStart = (params.page - 1) * params.limit;
+    const windowEnd = windowStart + params.limit; // exclusive
+
+    // Matches are counted as they are found, but only those inside the window
+    // are retained — `matchCount` is the pager's total, `matches` is the page.
+    let matchCount = 0;
+    const matches: DatasetRecord[] = [];
+    const collect = (record: DatasetRecord) => {
+      if (
+        !matchesDatasetSearch(record.entry as Record<string, unknown>, search)
+      )
+        return;
+      if (matchCount >= windowStart && matchCount < windowEnd) {
+        matches.push(record);
+      }
+      matchCount++;
+    };
+
+    if (dataset.contentLayout === "s3_jsonl") {
+      if (dataset.status !== "ready") {
+        throw new DatasetNotReadyError({
+          status: dataset.status,
+          statusError: dataset.statusError,
+        });
+      }
+
+      const rowCount = dataset.rowCount ?? 0;
+      if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
+
+      // Which chunks to read. `chunkOffsets` is what ordinary paging trusts to
+      // locate rows, so the search has to agree with it: enumerating by
+      // `chunkCount` alone would, on a dataset whose count has drifted below its
+      // offsets, stop early and report "no matches" for rows the user can page
+      // to — the silent-wrong-answer this path exists to avoid. Offsets first,
+      // `chunkCount` as the fallback for legacy rows that have none.
+      const rawOffsets = Array.isArray(dataset.chunkOffsets)
+        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
+        : [];
+      const offsetIndexes = rawOffsets
+        .filter((o) => o != null && Number.isInteger(o.index))
+        .map((o) => o.index);
+
+      let chunkIndexes: number[];
+      if (offsetIndexes.length > 0) {
+        chunkIndexes = [...new Set(offsetIndexes)].sort((a, b) => a - b);
+      } else {
+        // I-COUNT: a `ready` s3_jsonl dataset with no offsets MUST have a
+        // chunkCount. `?? 0` would scan zero chunks and report "no matches" for
+        // a dataset that has them.
+        if (dataset.chunkCount == null) {
+          throw new DatasetChunkCountMissingError(dataset.id);
+        }
+        chunkIndexes = Array.from({ length: dataset.chunkCount }, (_, i) => i);
+      }
+
+      const storage = await getDatasetStorage(params.projectId);
+      // `readChunk` per index, never `readChunks`: the plural form pulls every
+      // chunk into the heap at once, which is exactly what the row cap and the
+      // one-at-a-time read are here to prevent.
+      let rowsRead = 0;
+      for (const index of chunkIndexes) {
+        const rows = await storage.readChunk({
+          projectId: params.projectId,
+          datasetId: dataset.id,
+          index,
+        });
+        // Backstop for a `rowCount` that under-reports (or is null, which reads
+        // as 0 and would sail past the up-front check): the cap has to hold on
+        // what is actually read, not only on what the row claims.
+        rowsRead += rows.length;
+        if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+          throw new DatasetTooLargeToSearchError({
+            rowCount: rowsRead,
+            maxRows: DATASET_SEARCH_MAX_ROWS,
+          });
+        }
+        for (const line of rows) {
+          collect(adaptS3JsonlRecord(line, dataset));
+        }
+      }
+    } else {
+      // Postgres-backed (legacy) content. `sizeBytes` is null on these rows, so
+      // the export-time byte guard can never fire here — the row cap is the only
+      // thing bounding this scan.
+      const { count: rowCount } =
+        await this.recordRepository.countAndMaxUpdatedAt({
+          datasetId: dataset.id,
+          projectId: params.projectId,
+        });
+      if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
+
+      // Keyset-paginate, like the PG→S3 backfill's streaming scan: `skip`/`take`
+      // would re-run a count(*) alongside every page (listPaginated does), so a
+      // scan at the cap would issue ~50 redundant full counts, and OFFSET
+      // degrades as it walks. The cursor is the previous page's last id, in the
+      // same canonical [createdAt asc, id asc] order the paged read uses — so
+      // matches come back in the order the user sees them when not searching.
+      let cursorId: string | undefined;
+      for (;;) {
+        const records = await this.recordRepository.findDatasetRecordsPage({
+          datasetId: dataset.id,
+          projectId: params.projectId,
+          take: DATASET_SEARCH_SCAN_BATCH,
+          cursorId,
+        });
+        if (records.length === 0) break;
+        for (const record of records) collect(record);
+        if (records.length < DATASET_SEARCH_SCAN_BATCH) break;
+        cursorId = records[records.length - 1]?.id;
+        if (!cursorId) break;
+      }
+    }
+
+    return {
+      data: matches,
+      pagination: {
+        page: params.page,
+        limit: params.limit,
+        // The pager pages the MATCHES: a search that matched 3 rows of a
+        // 10,000-row dataset is one page, not two hundred.
+        total: matchCount,
+        totalPages: Math.ceil(matchCount / params.limit),
+      },
+    };
+  }
+
+  /**
    * One page of a dataset for the editor: the dataset's name + columnTypes plus
    * the page's records ({ id, entry }) and the PG-authoritative total. Replaces
    * the editor's whole-dataset `getFullDataset` read (which truncated past a
@@ -883,6 +1062,8 @@ export class DatasetService {
     projectId: string;
     page: number;
     limit: number;
+    /** When set, pages the rows MATCHING it instead of the whole dataset. */
+    search?: string;
   }) {
     const dataset = await this.getBySlugOrId({
       slugOrId: params.slugOrId,
@@ -893,6 +1074,7 @@ export class DatasetService {
       projectId: params.projectId,
       page: params.page,
       limit: params.limit,
+      search: params.search,
     });
     return {
       id: dataset.id,
