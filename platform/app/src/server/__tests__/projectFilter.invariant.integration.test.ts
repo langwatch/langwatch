@@ -25,10 +25,10 @@
  * Decision: ADR-128.
  */
 
-import { DepartmentService } from "@ee/governance/services/department/department.service";
-import { nanoid } from "nanoid";
 import fs from "node:fs";
 import path from "node:path";
+import { DepartmentService } from "@ee/governance/services/department/department.service";
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CostReferenceType,
@@ -96,7 +96,8 @@ interface ListingSurface {
 const surfaces: ListingSurface[] = [
   {
     name: "the projects REST list",
-    module: "src/server/app-layer/projects/repositories/project.prisma.repository.ts",
+    module:
+      "src/server/app-layer/projects/repositories/project.prisma.repository.ts",
     ids: async () => {
       const page = await new PrismaProjectRepository(
         prisma,
