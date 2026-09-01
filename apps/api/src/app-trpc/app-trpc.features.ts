@@ -137,6 +137,8 @@ export interface AppTrpcFeaturePorts<
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
+  TTimeseriesInputWire = unknown,
+  TReadInputWire = unknown,
 > {
   /**
    * One namespace, three transports, two owners — so one entry with a group
@@ -155,7 +157,13 @@ export interface AppTrpcFeaturePorts<
    * Analytics' or Dashboard's to know.
    */
   analytics: {
-    reads: AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>;
+    reads: AnalyticsTrpcPorts<
+      TTimeseriesInput,
+      TReadInput,
+      TFilterField,
+      TTimeseriesInputWire,
+      TReadInputWire
+    >;
     workbench: LangWatchQLTrpcPorts;
     savedCharts: SavedWorkbenchChartTrpcPorts;
   };
@@ -334,6 +342,8 @@ export function createAppTrpcFeatures<
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
+  TTimeseriesInputWire = unknown,
+  TReadInputWire = unknown,
 >(options: {
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
   ports: AppTrpcFeaturePorts<
@@ -351,7 +361,9 @@ export function createAppTrpcFeatures<
     TTimeseriesInput,
     TWorkbenchState,
     TWorkflowVersion,
-    TPublishedComponent
+    TPublishedComponent,
+    TTimeseriesInputWire,
+    TReadInputWire
   >;
 }) {
   const { mount, ports } = options;

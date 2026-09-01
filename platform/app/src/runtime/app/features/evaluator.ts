@@ -10,6 +10,24 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "~/utils/constants";
 import { nanoid } from "nanoid";
+import { z } from "zod";
+
+/**
+ * The NLP runtime answers `unknown`, and the port promises a shape the code
+ * evaluator reads three fields off. Parsed here rather than asserted: a
+ * malformed body is a failed evaluation, and the service already turns a throw
+ * from this call into the `CODE_EVALUATOR_ERROR` the customer sees.
+ */
+const codeExecutionResponseBodySchema = z.object({
+  status: z.string(),
+  result: z.record(z.string(), z.unknown()).optional(),
+  error: z
+    .object({
+      message: z.string().optional(),
+      traceback: z.string().optional(),
+    })
+    .optional(),
+});
 
 class AppEvaluatorCodeExecutionPort extends EvaluatorCodeExecutionPort {
   static create(nlpRuntime: WorkflowNlpRuntimePort): AppEvaluatorCodeExecutionPort {
@@ -37,7 +55,7 @@ class AppEvaluatorCodeExecutionPort extends EvaluatorCodeExecutionPort {
     return {
       ok: response.ok,
       statusText: response.statusText,
-      body: await response.json(),
+      body: codeExecutionResponseBodySchema.parse(await response.json()),
     };
   }
 }

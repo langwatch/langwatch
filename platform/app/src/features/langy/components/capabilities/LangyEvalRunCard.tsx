@@ -34,9 +34,18 @@ function readRun(output: unknown): {
   passRate: string | null;
   lines: string[];
 } {
-  const text = extractToolText(output);
-  const status = text.match(/\b(completed|running|failed|queued|passed|finished)\b/i);
-  const passRate = text.match(/([\d.]+\s*%)\s*(?:pass|passed|pass rate)?/i);
+  const document = runDocument(output);
+  if (!document) {
+    const text = extractToolText(output);
+    const status = text.match(/\b(completed|running|failed|queued|passed|finished)\b/i);
+    const passRate = text.match(/([\d.]+\s*%)\s*(?:pass|passed|pass rate)?/i);
+    return {
+      status: status ? status[1]! : null,
+      passRate: passRate ? passRate[1]!.replace(/\s+/g, "") : null,
+      lines: summaryLines(output, 2),
+    };
+  }
+
   return {
     status: typeof document.status === "string" ? document.status : null,
     passRate: reportedPassRate(document),

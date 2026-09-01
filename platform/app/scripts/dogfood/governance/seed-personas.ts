@@ -227,12 +227,14 @@ export async function runSeedPersonas(
     }
 
     const app = initializeDefaultApp({ processRole: "web" });
-    const workspace = await app.organizations.ensurePersonalWorkspace({
-      userId: user.id,
-      organizationId: org.id,
-      displayName: user.name ?? null,
-      displayEmail: user.email ?? args.email,
-    });
+    const workspace = await app.organizations.ensurePersonalWorkspace(
+      {
+        organizationId: org.id,
+        displayName: user.name ?? null,
+        displayEmail: user.email ?? args.email,
+      },
+      { id: user.id },
+    );
     process.stderr.write(
       `[seed-personas] personal workspace ${workspace.created ? "created" : "found"}: team=${workspace.team.id} project=${workspace.project.id}\n`,
     );

@@ -6,6 +6,7 @@
 import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { Hono, type MiddlewareHandler } from "hono";
+import type { z } from "zod";
 import { appRestSecurity } from "~/server/api/security";
 import {
   GatewayEndUserCapsAdapter,
@@ -98,11 +99,11 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
-import { getServerAuthSession } from "~/server/auth";
+import { getServerAuthSession, type Session } from "~/server/auth";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
-import { exportRequestSchema } from "~/server/export/types";
+import { exportRequestSchema, type ExportRequest } from "~/server/export/types";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { rateLimit } from "~/server/rateLimit";
 import { bodyLimit } from "./routes/_lib/body-limit";
@@ -209,7 +210,13 @@ export function createApiRouter(app: App) {
   // the route-authorization audit that reads that one list.
   api.route(
     "/",
-    createExportTracesRestApp({
+    // Explicit type arguments, not inferred. Every port on this object is a
+    // context-sensitive arrow, so `TSession` is fixed before any of them can
+    // supply a candidate and falls back to its constraint — which would take
+    // the session type off `probeProjectPermission` and `getViewerProtections`
+    // silently. Naming it is what keeps the browser session the one this
+    // process resolves.
+    createExportTracesRestApp<ExportRequest, z.input<typeof exportRequestSchema>, Session>({
       security: appRestSecurity,
       ports: {
         requestSchema: exportRequestSchema,
@@ -217,7 +224,11 @@ export function createApiRouter(app: App) {
         probeProjectPermission: (session, projectId, permission) =>
           probeProjectPermission({ session }, projectId, permission),
         getViewerProtections: (session, { projectId }) =>
-          getUserProtectionsForProject({ prisma, session, app }, { projectId }),
+          // The context this read takes is `{ prisma, session, publiclyShared? }`
+          // — it forwards to `probeProjectPermission`, which resolves the
+          // application itself. Same two fields the permission probe beside
+          // this one passes, and the same two the route passed before it moved.
+          getUserProtectionsForProject({ prisma, session }, { projectId }),
         exports: () => app.traceExport,
         broadcast: () => app.broadcast,
         unauthenticatedError: () => new ExportUnauthenticatedError(),
@@ -301,7 +312,9 @@ export function createApiRouter(app: App) {
         extractInlineMediaFromEvent({ ...input, service: app.storedObjects }),
       gatewaySpendBillingGate,
       instanceAdminKey: instanceAdminApiKey,
-      isSaas: () => app.config.isSaas,
+      // Unset means a self-hosted deployment; the composition root reads the
+      // same default when it decides which plan provider to build.
+      isSaas: () => app.config.isSaas ?? false,
       managementAudit: managementAuditPort,
       monitorMappingsSchema,
       organizationLedgerActor: orgRequestLedgerActor,

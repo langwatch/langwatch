@@ -15,6 +15,8 @@ describe("public environment compatibility projection", () => {
         posthog: { key: "public-key", host: "https://posthog.example.test" },
       },
       capabilities: { email: true, nlp: true, langevals: false },
+      passkeys: true,
+      identityFrontDoor: true,
       licensePaymentUrl: "https://billing.example.test/license",
     });
 
@@ -22,6 +24,8 @@ describe("public environment compatibility projection", () => {
       BASE_HOST: "https://app.example.test",
       DEMO_PROJECT_SLUG: "demo",
       NODE_ENV: "production",
+      IDENTITY_FRONT_DOOR: true,
+      PASSKEYS_ENABLED: true,
       HAS_EMAIL_PROVIDER_KEY: true,
       IS_SAAS: true,
       GATEWAY_BASE_URL: "https://gateway.example.test",

@@ -1,4 +1,4 @@
-import type { ReactJsonViewProps } from "@microlink/react-json-view";
+import type { CollapsedFieldProps } from "@microlink/react-json-view";
 import React from "react";
 import { TraceInputOutput, type TraceJsonViewOptions } from "@langwatch/trace-web";
 import { collectMediaParts, type MediaPartData } from "~/shared/traces/mediaParts";
@@ -17,8 +17,17 @@ const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
 type RenderInputOutputProps = {
   value: unknown;
   showTools?: boolean | "copy-only";
-  collapsed?: ReactJsonViewProps["collapsed"];
-  collapseStringsAfterLength?: ReactJsonViewProps["collapseStringsAfterLength"];
+  collapsed?: TraceJsonViewOptions["collapsed"];
+  collapseStringsAfterLength?: TraceJsonViewOptions["collapseStringsAfterLength"];
+  /**
+   * Per-node collapse decision, e.g. "start every array collapsed". Kept here
+   * rather than on `TraceJsonViewOptions`: the shared trace component knows
+   * only `collapsed` and `collapseStringsAfterLength`, and stays free of the
+   * JSON viewer this wrapper happens to render with.
+   */
+  shouldCollapse?: (field: CollapsedFieldProps) => boolean;
+  /** Show the entry count beside each object and array. */
+  displayObjectSize?: boolean;
 };
 
 export const RenderInputOutput = React.memo(function RenderInputOutput(
@@ -58,7 +67,8 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
       src={value}
       name={false}
       displayDataTypes={false}
-      displayObjectSize={false}
+      displayObjectSize={props.displayObjectSize ?? false}
+      shouldCollapse={props.shouldCollapse}
       enableClipboard={false}
       collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
       collapsed={options.collapsed}

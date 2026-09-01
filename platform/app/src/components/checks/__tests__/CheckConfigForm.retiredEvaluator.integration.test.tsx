@@ -79,7 +79,7 @@ vi.mock("~/utils/api", () => {
       mutateAsync: async () => ({ available: true }),
     }),
     "modelProvider.listAllForProjectForFrontend.useQuery": () => ({
-      data: { providers: [] },
+      data: [],
       isLoading: false,
     }),
   };

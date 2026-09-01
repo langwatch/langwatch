@@ -33,7 +33,7 @@ export const legacyModelProviderSchema = z
     rotationPolicy: z.literal("MANUAL").optional(),
     providerConfig: z.unknown().optional(),
     fallbackPriorityGlobal: z.number().int().nullable().optional(),
-    healthStatus: z.enum(["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]).optional(),
+    healthStatus: z.enum(["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]).nullable().optional(),
     circuitOpenedAt: z.date().nullable().optional(),
     lastHealthCheckAt: z.date().nullable().optional(),
     disabledAt: z.date().nullable().optional(),

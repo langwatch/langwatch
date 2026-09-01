@@ -58,10 +58,14 @@ export function EvaluatorSelection({
   retiredEvaluatorType?: string;
 }) {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const betaAnnotationsTrained = useFeatureFlag("release_ui_beta_annotations_trained_enabled", {
     projectId: project?.id,
-    enabled: !!project,
+    organizationId: organization?.id,
+    // Both ids come from the same workspace query, so an
+    // organization-targeted rule cannot resolve until the organization is
+    // known.
+    enabled: !!project?.id && !!organization?.id,
   });
   const betaAnnotationsQueryValue = router.query.NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED;
   const betaAnnotationsQueryEnabled = Array.isArray(betaAnnotationsQueryValue)

@@ -39,7 +39,7 @@ vi.mock("../../utils/api", () => ({
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({
-          data: { providers: [], modelMetadata: {} },
+          data: [],
           isLoading: false,
         }),
       },

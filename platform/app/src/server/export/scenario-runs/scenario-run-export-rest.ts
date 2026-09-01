@@ -17,23 +17,36 @@
 import { createScenarioRunExportRestApp } from "@langwatch/scenario-server";
 import { generate } from "@langwatch/ksuid";
 import type { Hono } from "hono";
+import type { z } from "zod";
 
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { appRestSecurity } from "~/server/api/security";
 import type { App } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { getServerAuthSession } from "~/server/auth";
+import { getServerAuthSession, type Session } from "~/server/auth";
 import {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
 } from "~/server/export/scenario-runs/errors";
-import { scenarioRunExportRequestSchema } from "~/server/export/scenario-runs/types";
+import {
+  scenarioRunExportRequestSchema,
+  type ScenarioRunExportRequest,
+} from "~/server/export/scenario-runs/types";
 import type { NextRequest } from "~/types/next-stubs";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /** `/api/export/scenario-runs`, bound to one process's application. */
 export function createScenarioRunExportApp(app: App): Hono {
-  return createScenarioRunExportRestApp({
+  // Explicit type arguments, not inferred. Every port below is a
+  // context-sensitive arrow, so `TSession` is fixed before any of them can
+  // supply a candidate and falls back to its constraint — the bare
+  // `{ user: { id } }` the family needs, not the browser session this process
+  // resolves and `probeProjectPermission` reads.
+  return createScenarioRunExportRestApp<
+    ScenarioRunExportRequest,
+    z.input<typeof scenarioRunExportRequestSchema>,
+    Session
+  >({
     security: appRestSecurity,
     ports: {
       requestSchema: scenarioRunExportRequestSchema,

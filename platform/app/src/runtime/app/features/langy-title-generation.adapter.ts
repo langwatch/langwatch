@@ -2,8 +2,22 @@ import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import type { LangyTitleGenerator } from "@langwatch/langy-server";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+
+/**
+ * The model services the title call runs on. `getVercelAIModel` resolves the
+ * cascade through the provider service and the managed-provider service, so
+ * both arrive from the composition root rather than being reached for here.
+ */
+type LangyTitleModelServices = {
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
+};
 
 type LangyTrustedMessageReader = {
   getRecordsByConversation(input: {
@@ -58,21 +72,34 @@ function buildTranscript(messages: { role: string; content: string }[]): string 
     .join("\n");
 }
 
-async function resolveTitleModel(projectId: string) {
+async function resolveTitleModel({
+  projectId,
+  modelProviders,
+  managedProviders,
+}: LangyTitleModelServices & { projectId: string }) {
   try {
-    return await getVercelAIModel({ projectId, featureKey: titleFeatureKey });
+    return await getVercelAIModel({
+      projectId,
+      featureKey: titleFeatureKey,
+      modelProviders,
+      managedProviders,
+    });
   } catch (error) {
     if (!(error instanceof ModelNotConfiguredError)) throw error;
     return getVercelAIModel({
       projectId,
       model: LANGY_TITLE_GENERATION.MODEL,
+      modelProviders,
+      managedProviders,
     });
   }
 }
 
-export function createLangyConversationTitleGenerator(input: {
-  messages: LangyTrustedMessageReader;
-}): LangyTitleGenerator {
+export function createLangyConversationTitleGenerator(
+  input: LangyTitleModelServices & {
+    messages: LangyTrustedMessageReader;
+  },
+): LangyTitleGenerator {
   return async ({ projectId, conversationId }) => {
     try {
       const records = await input.messages.getRecordsByConversation({
@@ -82,7 +109,11 @@ export function createLangyConversationTitleGenerator(input: {
       const transcript = buildTranscript(records);
       if (!transcript) return null;
 
-      const model = await resolveTitleModel(projectId);
+      const model = await resolveTitleModel({
+        projectId,
+        modelProviders: input.modelProviders,
+        managedProviders: input.managedProviders,
+      });
       const { text } = await generateText({
         model,
         system: titleSystemPrompt,

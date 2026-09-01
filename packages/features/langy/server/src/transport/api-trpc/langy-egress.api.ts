@@ -64,15 +64,31 @@ type LangyEgressTrpcProcedures<
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
+/**
+ * A value the audit trail can store. The trail's column is JSON, so the port
+ * says JSON: `unknown` would let a `Date`, a `Map` or a `bigint` past the
+ * declaration and into a sink that cannot hold one.
+ */
+type AuditedJson =
+  | string
+  | number
+  | boolean
+  | null
+  | AuditedJson[]
+  | { [key: string]: AuditedJson };
+
 /** The process capabilities this transport needs that are not Langy's own. */
 export type LangyEgressTrpcPorts = Readonly<{
-  /** The process's audit trail. */
+  /**
+   * The process's audit trail. The payload rides `metadata`, which is the
+   * column this action has always been recorded under.
+   */
   recordAudit(
     entry: Readonly<{
       userId: string;
       projectId: string;
       action: string;
-      metadata: Readonly<Record<string, unknown>>;
+      metadata: Readonly<Record<string, AuditedJson>>;
     }>,
   ): Promise<void>;
 }>;

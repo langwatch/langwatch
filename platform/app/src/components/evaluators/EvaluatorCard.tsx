@@ -42,7 +42,7 @@ export function EvaluatorCard({ evaluator, onUseFromApi, ...props }: EvaluatorCa
         <EvaluatorCardPresentation
           {...props}
           evaluator={evaluator}
-          updatedAtLabel={formatTimeAgo(new Date(evaluator.updatedAt).getTime())}
+          updatedAtLabel={formatTimeAgo(new Date(evaluator.updatedAt).getTime()) ?? ""}
           onUseFromApi={handleUseFromApi}
         />
       </LangyContextTarget>

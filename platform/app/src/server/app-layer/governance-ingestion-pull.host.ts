@@ -118,7 +118,7 @@ export class AppGovernanceIngestionPullMetrics implements GovernanceIngestionPul
   }
 
   observeDuration(durationMs: number): void {
-    observeIngestionPullDuration(durationMs);
+    observeIngestionPullDuration({ durationMs });
   }
 }
 

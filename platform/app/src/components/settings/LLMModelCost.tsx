@@ -17,6 +17,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { PageLayout } from "../ui/layouts/PageLayout";
+import { toLLMModelCostRow } from "./llmModelCostRow";
 
 /**
  * One per-token rate, rendered at full precision. Rates run to nine decimal
@@ -116,7 +117,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                   <Table.Cell padding={1}></Table.Cell>
                 </Table.Row>
               ))}
-            {llmModelCosts.data?.map((row) => (
+            {llmModelCosts.data?.map(toLLMModelCostRow).map((row) => (
               <Table.Row key={row.model} width="full">
                 <Table.Cell>
                   <Text truncate color={!!row.updatedAt ? "green.500" : undefined}>

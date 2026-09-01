@@ -1,3 +1,4 @@
+import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
 
 export const PROMPT_FEATURE_ID = "prompt" as const;
@@ -49,7 +50,11 @@ export const promptDemonstrationsSchema = z
       .object({
         records: z.record(z.string(), z.array(z.unknown())),
         columnTypes: z.array(
-          z.object({ id: z.string().optional(), name: z.string(), type: z.string() }),
+          z.object({
+            id: z.string().optional(),
+            name: z.string(),
+            type: datasetColumnTypeSchema,
+          }),
         ),
       })
       .optional(),

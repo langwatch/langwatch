@@ -34,6 +34,7 @@ import type {
   CreateDatasetRecordsInput,
   Dataset,
   DatasetColumns,
+  DatasetEntrySelection,
   DatasetHead,
   DatasetLookupInput,
   DatasetListResult,
@@ -212,12 +213,17 @@ export class DatasetApp {
   // ── Records ──────────────────────────────────────────────────────────────
 
   /**
-   * A dataset and its records, up to the byte budget the CALLER named. The
-   * budget stays an argument: the editor, an export and the public read all
-   * want a different one, and the dataset has no opinion about which.
+   * A dataset and its records, up to the byte budget the CALLER named, and in
+   * the slice the caller asked for. Both stay arguments: the editor, an export
+   * and an evaluation run all want a different budget, and a run reads the
+   * first, the last, a random or every entry depending on how it was set up.
+   * The dataset has no opinion about either.
    */
   getDatasetWithRecords(
-    input: DatasetLookupInput & { limitMb?: number | null },
+    input: DatasetLookupInput & {
+      limitMb?: number | null;
+      entrySelection?: DatasetEntrySelection;
+    },
   ): Promise<DatasetWithRecords> {
     return this.dependencies.dataset.getDatasetWithRecords(input);
   }

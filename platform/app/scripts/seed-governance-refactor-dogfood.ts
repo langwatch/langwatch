@@ -54,7 +54,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { nextResetAt, VirtualKeyCryptoAdapter } from "@langwatch/gateway-server";
+import { GatewayWindow, VirtualKeyCryptoAdapter } from "@langwatch/gateway-server";
 import {
   credentialWriteLog,
   decideCredentialWrite,
@@ -582,7 +582,7 @@ async function ensurePrincipalBudget(handles: SeedHandles): Promise<void> {
       window,
       limitUsd: new Prisma.Decimal("50.00"),
       onBreach: "BLOCK",
-      resetsAt: nextResetAt(window, new Date()),
+      resetsAt: GatewayWindow.nextResetAt(window, new Date()),
       createdById: handles.userId,
     },
     update: {

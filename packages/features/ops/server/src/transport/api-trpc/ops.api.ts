@@ -136,12 +136,41 @@ type OpsTrpcProcedures<
   probePolicy<TProcedure>(procedure: TProcedure): TProcedure;
 }>;
 
+/**
+ * One registered projection, as the process's pipeline registry knows it.
+ *
+ * Structural rather than imported: the registry is the process's, and this
+ * transport only publishes what it answers. Named fields, not `unknown` — a
+ * tRPC procedure publishes what its handler returns, so an `unknown` here is
+ * what the browser gets, and every ops surface reading a projection row was
+ * reading `kind`, `pipelineName` and `projectionName` off `{}`.
+ */
+export type OpsProjectionRegistration = Readonly<{
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** Whether the projection is declared on a pipeline or registered globally. */
+  source: "pipeline" | "global";
+  /** The queue path a pause targets. */
+  pauseKey: string;
+  kind: "fold" | "map" | "state";
+}>;
+
+/** One registered event subscriber, and the event types it reacts to. */
+export type OpsEventSubscriberRegistration = Readonly<{
+  subscriberName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** The event types this subscriber reacts to — its transition triggers. */
+  eventTypes: readonly string[];
+}>;
+
 /** The process capabilities this transport needs that are not operations' own. */
 export type OpsTrpcPorts = Readonly<{
   /** The registered projections and event subscribers. */
   listPipelineRegistrations(): {
-    projections: unknown;
-    eventSubscribers: unknown;
+    projections: OpsProjectionRegistration[];
+    eventSubscribers: OpsEventSubscriberRegistration[];
   };
   /**
    * The bound on an event-log search: the default lookback the explorer uses

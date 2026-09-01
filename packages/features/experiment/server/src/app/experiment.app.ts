@@ -29,6 +29,7 @@ import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
 import type {
   CommitWorkbenchVersionInput,
+  CompleteExperimentRunInput,
   CreateEvaluationsV3Input,
   DSPyRunsSummary,
   Experiment,
@@ -49,9 +50,12 @@ import type {
   ExperimentType,
   GetWorkbenchStateInput,
   ListWorkbenchVersionsInput,
+  RecordEvaluatorResultInput,
+  RecordTargetResultInput,
   RestoreWorkbenchVersionInput,
   SaveExperimentInput,
   SaveWorkbenchStateInput,
+  StartExperimentRunInput,
   WorkbenchActor,
   WorkbenchSaveResult,
   WorkbenchStateView,
@@ -308,6 +312,33 @@ export class ExperimentApp {
         lastRunAt: aggregate.lastRunAt,
       };
     });
+  }
+
+  // ── Run execution ──────────────────────────────────────────────
+  //
+  // What an execution reports as it goes. These take no caller: a run is
+  // already attributed by the run row the orchestrator opened, and the writes
+  // land against that run rather than against whoever is watching it. The
+  // orchestrator drives all four from a background job that has no session.
+
+  /** Opens a run: the row every later result is written against. */
+  startExperimentRun(input: StartExperimentRunInput): Promise<void> {
+    return this.dependencies.experiments.startExperimentRun(input);
+  }
+
+  /** One target's output for one dataset row. */
+  recordTargetResult(input: RecordTargetResultInput): Promise<void> {
+    return this.dependencies.experiments.recordTargetResult(input);
+  }
+
+  /** One evaluator's verdict on one target's output. */
+  recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void> {
+    return this.dependencies.experiments.recordEvaluatorResult(input);
+  }
+
+  /** Closes a run, whether it finished or was stopped. */
+  completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
+    return this.dependencies.experiments.completeExperimentRun(input);
   }
 
   // ── Optimization runs ──────────────────────────────────────────

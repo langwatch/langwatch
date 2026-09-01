@@ -159,7 +159,7 @@ describe("useAllModelProvidersList()", () => {
             scopeId: "proj-1",
           }),
         ];
-        primeBothQueries(readyQueryResult({ providers: rows, modelMetadata: {} }));
+        primeBothQueries(readyQueryResult(rows));
 
         const { result } = renderHook(() => useAllModelProvidersList());
 

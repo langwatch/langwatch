@@ -73,7 +73,7 @@ vi.mock("~/utils/api", () => ({
     },
     modelProvider: {
       listAllForOrganizationForFrontend: {
-        useQuery: () => ({ data: { providers: [] } }),
+        useQuery: () => ({ data: [] }),
       },
     },
   },

@@ -93,7 +93,7 @@ export function DeployPromptDialog({
       const next: TagSelections = {};
       for (const tagDef of nonLatestTags) {
         const found = tagDef.id
-          ? assignmentData.find((t) => t.tagId === tagDef.id)
+          ? assignmentData.find((t) => t.promptTag.id === tagDef.id)
           : undefined;
         next[tagDef.name] = prev[tagDef.name] ?? found?.versionId ?? "";
       }
@@ -110,7 +110,9 @@ export function DeployPromptDialog({
 
     for (const tagDef of nonLatestTags) {
       const selectedVersionId = tagSelections[tagDef.name] ?? "";
-      const currentTag = tagDef.id ? data.find((t) => t.tagId === tagDef.id) : undefined;
+      const currentTag = tagDef.id
+        ? data.find((t) => t.promptTag.id === tagDef.id)
+        : undefined;
       if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
         mutations.push(
           assignTag.mutateAsync({

@@ -11,12 +11,15 @@ import { closePrismaConnection, configurePrismaConnection } from "~/server/db";
  * build-time evaluation has no database — so the requirement is asserted when
  * the connection is opened rather than asserted by a type the caller cannot
  * satisfy. The object handed in is the whole environment: the cleanup task's
- * NLP-lambda config is resolved off the same value.
+ * NLP-lambda config is resolved off the same value, and reads it by its own
+ * variable names — which is why the two named here are an addition to the rest
+ * of the environment rather than the whole of it.
  */
-export interface LegacyPlatformTaskEnvironment {
-  readonly DATABASE_URL?: string | undefined;
-  readonly NODE_ENV: string;
-}
+export type LegacyPlatformTaskEnvironment = Readonly<{
+  DATABASE_URL?: string | undefined;
+  NODE_ENV: string;
+}> &
+  Readonly<Record<string, unknown>>;
 
 export interface LegacyPlatformTaskExecutorOptions {
   readonly environment: LegacyPlatformTaskEnvironment;

@@ -16,6 +16,7 @@
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import { createAnalyticsRestApp } from "@langwatch/analytics-server";
 import { flexibleDateSchema } from "@langwatch/platform-api/app-rest";
+import type { AppRestProjectVariables } from "@langwatch/api/rest";
 import type { Hono } from "hono";
 
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
@@ -33,7 +34,9 @@ const analyticsBodySchema = sharedFiltersInputSchema
   });
 
 /** `/api/analytics`, bound to one process's analytics application. */
-export function buildAnalyticsRestApp(analytics: () => AnalyticsApp): Hono {
+export function buildAnalyticsRestApp(
+  analytics: () => AnalyticsApp,
+): Hono<{ Variables: AppRestProjectVariables }> {
   return createAnalyticsRestApp({
     security: appRestSecurity,
     analytics,

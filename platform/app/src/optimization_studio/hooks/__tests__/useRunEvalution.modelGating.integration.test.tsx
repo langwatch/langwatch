@@ -78,22 +78,27 @@ vi.mock("@langwatch/workflow-web", () => ({
 vi.mock("../../components/History", () => ({
   useVersionState: () => ({
     latestVersion: { id: "v-1-auto", autoSaved: true },
-    previousVersion: {
-      id: "v-1",
+    previousVersion: { id: "v-1", version: "1.0" },
+    // `useVersionState` parses the stored envelope into the typed Studio
+    // refinement once, where the version is read, so the hook takes the
+    // parsed workflow rather than `previousVersion.dsl`.
+    previousVersionDsl: {
+      spec_version: "1.5",
+      workflow_id: "wf-1",
+      name: "Prev",
+      icon: "",
+      description: "",
       version: "1.0",
-      dsl: {
-        workflow_id: "wf-1",
-        name: "Prev",
-        nodes: [
-          {
-            id: "old_node",
-            type: "entry",
-            position: { x: 0, y: 0 },
-            data: {},
-          },
-        ],
-        edges: [],
-      },
+      nodes: [
+        {
+          id: "old_node",
+          type: "entry",
+          position: { x: 0, y: 0 },
+          data: {},
+        },
+      ],
+      edges: [],
+      state: {},
     },
     nextVersion: "1.1",
   }),

@@ -173,16 +173,14 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       isLoading: false,
     });
     mockListAllForProjectForFrontend.mockReturnValue({
-      data: {
-        providers: [
-          {
-            provider: "openai",
-            enabled: true,
-            customModels: [],
-            customEmbeddingsModels: [],
-          },
-        ],
-      },
+      data: [
+        {
+          provider: "openai",
+          enabled: true,
+          customModels: [],
+          customEmbeddingsModels: [],
+        },
+      ],
       isLoading: false,
       isError: false,
     });

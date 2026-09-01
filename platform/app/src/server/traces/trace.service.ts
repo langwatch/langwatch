@@ -10,8 +10,8 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   CODING_AGENT_ORIGIN,
   enrichCodingAgentSpansFromLogs,
+  type TraceLogRecordReader,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
-import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
@@ -187,14 +187,14 @@ export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
-  private readonly injectedLogRecordStorage?: LogRecordStorageService;
-  private cachedLogRecordStorage?: LogRecordStorageService;
+  private readonly injectedLogRecordStorage?: TraceLogRecordReader;
+  private cachedLogRecordStorage?: TraceLogRecordReader;
   private cachedEditOverlayService?: TraceEditOverlayService;
   private constructor(
     readonly prisma: PrismaClient,
     private readonly traceCanonicalisation: TraceCanonicalisationService,
     private readonly blobResolutionDeps?: BlobResolutionDeps,
-    logRecordStorage?: LogRecordStorageService,
+    logRecordStorage?: TraceLogRecordReader,
     private evaluationService?: EvaluationService,
     private readonly retentionResolver?: DataRetentionService,
     private readonly annotationService?: AnnotationService,
@@ -233,7 +233,7 @@ export class TraceService {
    * enriches (or a unit test that never exercises the coding-agent-origin
    * path) never touches the App singleton.
    */
-  private logRecordStorageService(): LogRecordStorageService {
+  private logRecordStorageService(): TraceLogRecordReader {
     if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
     return (this.cachedLogRecordStorage ??= getApp().traces.logRecords);
   }
@@ -334,7 +334,7 @@ export class TraceService {
     traceCanonicalisation: TraceCanonicalisationService;
     prisma?: PrismaClient;
     blobResolutionDeps?: BlobResolutionDeps;
-    logRecordStorage?: LogRecordStorageService;
+    logRecordStorage?: TraceLogRecordReader;
     evaluationService?: EvaluationService;
     retentionResolver?: DataRetentionService;
     annotationService?: AnnotationService;

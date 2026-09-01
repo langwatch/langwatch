@@ -15,6 +15,7 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AttributeFormat, ChatMessage } from "@langwatch/trace-web";
+import { contentToString } from "../TraceTable/chatContent";
 import {
   buildInlineDescriptor,
   KNOWN_CHAT_ROLES,
@@ -345,7 +346,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
         wordBreak="break-word"
         paddingLeft={4}
       >
-        {message.content || EM_DASH}
+        {contentToString(message.content) || EM_DASH}
       </Text>
     </Box>
   );

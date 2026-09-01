@@ -88,7 +88,7 @@ export async function seedManagementOrg({
     },
   });
 
-  const created = await getApp().apiKeys.create({
+  const created = await getApp().apiKeys.apiKeyService.create({
     name: `mgmt-admin-key-${nanoid(6)}`,
     userId: admin.id,
     createdByUserId: admin.id,

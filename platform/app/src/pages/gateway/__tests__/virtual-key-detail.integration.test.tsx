@@ -142,7 +142,7 @@ vi.mock("~/utils/api", () => ({
     },
     modelProvider: {
       listAllForOrganizationForFrontend: {
-        useQuery: () => ({ data: { providers: PROVIDERS }, isLoading: false }),
+        useQuery: () => ({ data: PROVIDERS, isLoading: false }),
       },
     },
     routingPolicy: {

@@ -36,6 +36,8 @@ import {
 } from "./scopeResolver";
 import {
   parseVirtualKeyConfig,
+  type GatewayBudgetResource,
+  type GatewayMoney,
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
@@ -915,7 +917,7 @@ type BudgetWire = GatewayConfigPayload["budgets"][number];
  * was loaded, falling back to the PG column when it was not.
  */
 function budgetSpentMicroUSD(
-  budget: GatewayBudget,
+  budget: GatewayBudgetResource,
   spendByBudgetId: Map<string, string>,
 ): number {
   if (budget.scopeType === "ATTRIBUTED_USER") return 0;
@@ -959,8 +961,13 @@ function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
   };
 }
 
-function decimalToMicroUSD(d: { toNumber(): number }): number {
-  return Math.round(d.toNumber() * 1_000_000);
+/**
+ * `GatewayMoney` is the contract's database-library-free decimal: it answers
+ * its exact value as a string and nothing more, so the conversion goes through
+ * the same string parse the ClickHouse rollup takes.
+ */
+function decimalToMicroUSD(d: GatewayMoney): number {
+  return decimalUSDStringToMicroUSD(d.toString());
 }
 
 function decimalUSDStringToMicroUSD(s: string): number {

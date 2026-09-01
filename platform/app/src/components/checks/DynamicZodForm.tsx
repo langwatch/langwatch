@@ -22,7 +22,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import type {
   EvaluatorDefinition,
-  Evaluators,
   EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
@@ -342,7 +341,7 @@ const DynamicZodForm = ({
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
-      evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]?.default;
+      evaluator?.settings?.[fieldName]?.default;
 
     if (fieldName === "model") {
       defaultValue = (resolvedDefaultModel.data?.model ?? "") as any;
@@ -595,8 +594,7 @@ const DynamicZodForm = ({
           const field = schema.shape[key];
           const isOptional = field instanceof z.ZodOptional;
           const helperText =
-            evaluatorDefinition?.settings?.[key as keyof Evaluators[T]["settings"]]
-              .description ?? "";
+            evaluatorDefinition?.settings?.[key]?.description ?? "";
           const isInvalid = errors && key in errors && !!(errors as any)[key];
           const helperOverride = FIELD_HELPER_OVERRIDES[key];
 

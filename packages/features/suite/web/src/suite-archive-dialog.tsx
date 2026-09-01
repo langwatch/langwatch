@@ -10,18 +10,33 @@
 import { Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 
+/** What the dialog says when the caller does not name the thing being archived. */
+const defaultTitle = "Archive run plan?";
+const defaultDescription =
+  "Archived run plans will no longer appear in the sidebar. Test runs are preserved.";
+
 export function SuiteArchiveDialog({
   open,
   onClose,
   onConfirm,
   suiteName,
   isLoading = false,
+  title = defaultTitle,
+  description = defaultDescription,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
   suiteName: string;
   isLoading?: boolean;
+  /**
+   * What the dialog asks, for a surface that calls the thing something else.
+   * The Test Runs rail archives a test suite, and a suite takes its test cases
+   * with it, so it says so rather than borrowing the run plan wording.
+   */
+  title?: string;
+  /** What archiving does, in the same surface's words as {@link title}. */
+  description?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
@@ -29,7 +44,7 @@ export function SuiteArchiveDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            Archive run plan?
+            {title}
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -40,8 +55,7 @@ export function SuiteArchiveDialog({
               </Text>
             </Text>
             <Text color="fg.muted" fontSize="sm">
-              Archived run plans will no longer appear in the sidebar. Test runs are
-              preserved.
+              {description}
             </Text>
           </VStack>
         </Dialog.Body>

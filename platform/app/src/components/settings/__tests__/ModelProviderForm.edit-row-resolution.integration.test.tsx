@@ -218,13 +218,11 @@ function primeQueries({
   flatList?: MaybeStoredModelProvider[] | "not-ready";
   collapsed?: Record<string, MaybeStoredModelProvider>;
 } = {}) {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue(
-    readyQueryResult({ providers: collapsed, modelMetadata: {} }),
-  );
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(readyQueryResult(collapsed));
   const flatResult =
     flatList === "not-ready"
       ? notReadyQueryResult()
-      : readyQueryResult({ providers: flatList, modelMetadata: {} });
+      : readyQueryResult(flatList);
   mockListAllForOrganizationForFrontendQuery.mockReturnValue(flatResult);
   mockListAllForProjectForFrontendQuery.mockReturnValue(flatResult);
 }

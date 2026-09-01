@@ -16,6 +16,12 @@ declare module "@tanstack/react-table" {
     columnType?: ColumnType;
     columnId?: string;
     dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
+    /**
+     * The column sits at a fixed pixel width rather than sharing the flexible
+     * remainder, and takes no resize handle. The selection checkbox column is
+     * the case this exists for.
+     */
+    isFixedWidth?: boolean;
   }
 }
 

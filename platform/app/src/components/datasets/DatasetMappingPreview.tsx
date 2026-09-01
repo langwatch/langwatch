@@ -14,10 +14,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
-import type { Dataset } from "~/generated/prisma/client";
 import type { Trace } from "@langwatch/trace-contract";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type {
+  Dataset,
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "@langwatch/dataset-contract";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import { ThreadMapping, type ThreadMappingState } from "../traces/ThreadMapping";
@@ -313,7 +316,7 @@ export function DatasetMappingPreview({
             >
               <DatasetPreviewTable
                 rows={previewRows}
-                columns={(selectedDataset.columnTypes as DatasetColumns) ?? []}
+                columns={selectedDataset.columnTypes ?? []}
                 maxColumns={50}
                 maxHeight="400px"
                 isSelectable

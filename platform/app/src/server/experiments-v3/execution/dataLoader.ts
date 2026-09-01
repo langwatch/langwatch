@@ -390,7 +390,7 @@ export const loadExecutionData = async (
     if (target.type === "prompt" && target.promptId) {
       if (loadedPrompts.has(promptLoadKey(target))) continue;
       try {
-        const prompt = await promptService.tryGetPromptByIdOrHandle({
+        const prompt = await promptService.tryGetByIdOrHandle({
           idOrHandle: target.promptId,
           projectId,
           version: target.promptVersionNumber ?? undefined,

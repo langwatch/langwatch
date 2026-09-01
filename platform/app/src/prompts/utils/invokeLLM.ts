@@ -71,8 +71,11 @@ export async function invokeLLM({
           result.status = executionState.status;
           result.executionState = executionState;
 
-          if (executionState.outputs?.output) {
-            result.output = executionState.outputs.output;
+          // A signature node's `output` is whatever the prompt declares it to
+          // be: a string for a plain output, an object for a json_schema one.
+          const output = executionState.outputs?.output;
+          if (output) {
+            result.output = typeof output === "string" ? output : JSON.stringify(output);
           }
 
           if (executionState.error) {

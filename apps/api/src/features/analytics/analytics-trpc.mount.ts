@@ -37,9 +37,19 @@ export function createAnalyticsTrpcRouter<
   TTimeseriesInput extends AnalyticsTimeseriesInput,
   TReadInput extends AnalyticsReadInput,
   TFilterField extends string,
+  TTimeseriesInputWire = unknown,
+  TReadInputWire = unknown,
 >(
   mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>>,
+    TrpcApiPorts<
+      AnalyticsTrpcPorts<
+        TTimeseriesInput,
+        TReadInput,
+        TFilterField,
+        TTimeseriesInputWire,
+        TReadInputWire
+      >
+    >,
 ) {
   return AnalyticsTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

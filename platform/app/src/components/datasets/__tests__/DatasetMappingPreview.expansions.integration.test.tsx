@@ -14,8 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { Dataset } from "~/generated/prisma/client";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

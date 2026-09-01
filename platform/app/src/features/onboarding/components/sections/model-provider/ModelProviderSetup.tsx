@@ -10,7 +10,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   getProviderModelOptions,
-  modelProviders as modelProvidersRegistry,
+  tryGetModelProviderDefinition,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
 import type React from "react";
@@ -295,9 +295,14 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       return;
     }
 
-    // Get provider definition for schema and endpoint key
+    // Get provider definition for schema and endpoint key. Read through the
+    // registry's own accessor rather than indexing the literal: the literal is
+    // declared with `satisfies`, so each entry's type carries only the keys it
+    // spells out and the ten providers that need no base URL have no
+    // `endpointKey` to ask for. The accessor answers `ModelProviderDefinition`,
+    // where the field is declared optional once for every provider.
     const providerDefinition = backendModelProviderKey
-      ? modelProvidersRegistry[backendModelProviderKey]
+      ? tryGetModelProviderDefinition(backendModelProviderKey)
       : void 0;
 
     // Get custom base URL if provided

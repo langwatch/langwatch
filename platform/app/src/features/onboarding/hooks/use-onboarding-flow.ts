@@ -39,6 +39,11 @@ export const useOnboardingFlow = () => {
   // onboarding.
   const { enabled: intentForkEnabled, isLoading: intentForkLoading } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
+    // Onboarding runs before either scope exists, so both targets are stated
+    // as absent rather than left out: a rule naming a project or organization
+    // can never match this read, and saying so is what the required fields
+    // are for.
+    { projectId: NOT_TARGETED, organizationId: NOT_TARGETED },
   );
 
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).

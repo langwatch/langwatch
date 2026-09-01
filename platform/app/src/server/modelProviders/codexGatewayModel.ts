@@ -25,10 +25,17 @@ export async function getCodexVercelAIModel({
   projectId,
   model,
   featureKey,
+  gatewayUrl,
 }: {
   projectId: string;
   model: string;
   featureKey: string;
+  /**
+   * The gateway base URL the process resolved into its `ModelClientConfig`.
+   * Absent for callers that hold no config, which fall back to the deployment
+   * variables below.
+   */
+  gatewayUrl?: string;
 }) {
   if (!isModelAllowedForFeature({ modelId: model, featureKey })) {
     throw new ModelRestrictedForExecutionError({ model, provider: null, featureKey });
@@ -56,7 +63,7 @@ export async function getCodexVercelAIModel({
   }
 
   const gateway = createOpenAI({
-    baseURL: codexGatewayV1BaseUrl(),
+    baseURL: codexGatewayV1BaseUrl(gatewayUrl),
     apiKey: virtualKey,
   });
   // The FULL id ("openai_codex/...") — the gateway routes to the codex
@@ -81,15 +88,21 @@ export async function getCodexVercelAIModel({
 
 /**
  * The gateway data plane as reached FROM the control plane, normalised to
- * /v1. `LW_GATEWAY_INTERNAL_URL` is the dedicated control-plane → gateway
- * var; the public URL and the legacy shared var are the documented
- * fallbacks (see env-create.mjs). `LW_GATEWAY_BASE_URL` alone would be
- * wrong-by-default: the Go gateway hijacks that name for the OPPOSITE
- * direction, so in dev it points at the app itself.
+ * /v1. An injected URL wins: the process resolves one into `ModelClientConfig`
+ * with exactly the precedence below, so a caller that has it should not make
+ * this function read the environment a second time. Otherwise
+ * `LW_GATEWAY_INTERNAL_URL` is the dedicated control-plane → gateway var; the
+ * public URL and the legacy shared var are the documented fallbacks (see
+ * env-create.mjs). `LW_GATEWAY_BASE_URL` alone would be wrong-by-default: the
+ * Go gateway hijacks that name for the OPPOSITE direction, so in dev it points
+ * at the app itself.
  */
-function codexGatewayV1BaseUrl(): string {
+function codexGatewayV1BaseUrl(injected: string | undefined): string {
   const base =
-    env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
+    injected ??
+    env.LW_GATEWAY_INTERNAL_URL ??
+    env.LW_GATEWAY_PUBLIC_URL ??
+    env.LW_GATEWAY_BASE_URL;
   if (!base) {
     throw new Error(
       "The AI gateway URL is not configured on the control plane (LW_GATEWAY_INTERNAL_URL / LW_GATEWAY_PUBLIC_URL); it is required for Codex models.",

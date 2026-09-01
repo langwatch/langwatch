@@ -12,7 +12,6 @@ import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
 import { api } from "../../utils/api";
 import { exactModelMatchRegex } from "../../utils/modelCostRegex";
 import { isSafeRegex } from "../../utils/safeRegex";
@@ -22,6 +21,7 @@ import {
   type MatchingSpansPreviewInput,
 } from "./LLMModelCostMatchingSpans";
 import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";
+import { toLLMModelCostRow, type LLMModelCostRow } from "./llmModelCostRow";
 
 export function LLMModelCostDrawer({
   id,
@@ -66,7 +66,7 @@ export function LLMModelCostDrawer({
               cloneModel={cloneModel}
               prefillModel={prefillModel}
               prefillRegex={prefillRegex}
-              llmModelCosts={llmModelCosts.data}
+              llmModelCosts={llmModelCosts.data.map(toLLMModelCostRow)}
             />
           )}
         </Drawer.Body>
@@ -86,7 +86,7 @@ function LLMModelCostForm({
   cloneModel?: string;
   prefillModel?: string;
   prefillRegex?: string;
-  llmModelCosts: MaybeStoredLLMModelCost[];
+  llmModelCosts: LLMModelCostRow[];
 }) {
   const { organization, team, project } = useOrganizationTeamProject();
 

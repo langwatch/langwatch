@@ -192,12 +192,12 @@ function primeHooksForProvider({
   });
   // Flat-list counterpart of the collapsed record above.
   mockListAllForOrgQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });
   mockListAllForProjectQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });

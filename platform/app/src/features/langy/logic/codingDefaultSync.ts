@@ -53,5 +53,5 @@ export async function syncLangyAfterDefaultModelWrite({
   }
   if (!nextDefault) return;
 
-  useLangyStore.getState().followCodingDefaultChange({ previousDefault, nextDefault });
+  useLangyStore.getState().followCodingDefaultChange({ nextDefault });
 }

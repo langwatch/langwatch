@@ -13,6 +13,7 @@ export function createAnnotationTestProjects(organizationId = "organization-1") 
     ensureInternal: unavailable,
     isPresenceEnabled: unavailable,
     getById: unavailable,
+    tryGetIdentity: unavailable,
     getOrganizationId: vi.fn(async () => organizationId),
     tryGetOrganizationId: unavailable,
     tryGetById: unavailable,

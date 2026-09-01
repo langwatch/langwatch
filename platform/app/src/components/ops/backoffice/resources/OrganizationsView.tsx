@@ -164,6 +164,8 @@ interface FormState {
   name: string;
   slug: string;
   phoneNumber: string;
+  ssoDomain: string;
+  ssoProvider: string;
   usageSpendingMaxLimit: string;
   signedDPA: boolean;
   promoCode: string;

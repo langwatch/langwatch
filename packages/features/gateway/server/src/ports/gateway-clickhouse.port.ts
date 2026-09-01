@@ -9,6 +9,13 @@
  * Nothing in this feature has ever passed a map setting — every call site
  * passes `async_insert`, `wait_for_async_insert` or `max_execution_time` — so
  * the narrow type is both correct and what makes the driver fit.
+ *
+ * `insert` answers `unknown` for the mirror-image reason. The driver resolves
+ * an `InsertResult`, and `Promise<InsertResult>` is not assignable to
+ * `Promise<void>` — the return-position void relaxation applies to a function
+ * type, not through a `Promise` instantiation — so declaring `void` here made
+ * the real client un-assignable again. No call site in this feature reads what
+ * `insert` answers; every one of the three awaits it and discards it.
  */
 export type GatewayClickHouseClient = {
   query(input: {
@@ -22,7 +29,7 @@ export type GatewayClickHouseClient = {
     values: Record<string, unknown>[];
     format?: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
-  }): Promise<void>;
+  }): Promise<unknown>;
 };
 
 export type GatewayClickHouseResolver = (tenantId: string) => Promise<GatewayClickHouseClient>;

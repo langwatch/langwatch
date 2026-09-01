@@ -7,6 +7,8 @@ export function toPublicEnvironment(config: PublicAppConfig): PublicEnvironment 
     BASE_HOST: config.appBaseUrl,
     DEMO_PROJECT_SLUG: config.demoProjectSlug,
     NODE_ENV: config.mode,
+    IDENTITY_FRONT_DOOR: config.identityFrontDoor,
+    PASSKEYS_ENABLED: config.passkeys,
     HAS_EMAIL_PROVIDER_KEY: config.capabilities.email,
     IS_SAAS: config.deployment === "saas",
     GATEWAY_BASE_URL: config.gatewayBaseUrl,

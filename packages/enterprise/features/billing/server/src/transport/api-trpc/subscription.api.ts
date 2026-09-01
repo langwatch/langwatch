@@ -35,6 +35,7 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { BillingDisplayInvoice } from "../../services/subscription.service";
 
 /**
  * The two billing collaborators, each narrowed to what this surface calls.
@@ -56,7 +57,7 @@ type BillingApplication = Readonly<{
       totalMembers: number;
       totalTraces: number;
       quotedAt?: number;
-    }): Promise<unknown>;
+    }): Promise<{ success: boolean }>;
     createOrUpdateSubscription(params: {
       organizationId: string;
       baseUrl: string;
@@ -66,12 +67,12 @@ type BillingApplication = Readonly<{
       customerId: string;
       currency?: string;
       billingInterval?: string;
-    }): Promise<unknown>;
+    }): Promise<{ url: string | null }>;
     createBillingPortalSession(params: {
       customerId: string;
       baseUrl: string;
       organizationId: string;
-    }): Promise<unknown>;
+    }): Promise<{ url: string }>;
     getLastNonCancelledSubscription(organizationId: string): Promise<unknown>;
     previewProration(params: { organizationId: string; newTotalSeats: number }): Promise<unknown>;
     notifyProspective(params: {
@@ -90,8 +91,8 @@ type BillingApplication = Readonly<{
       currency?: string;
       billingInterval?: string;
       invites: { email: string; role: string }[];
-    }): Promise<unknown>;
-    listInvoices(params: { organizationId: string }): Promise<unknown>;
+    }): Promise<{ url: string | null }>;
+    listInvoices(params: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
   };
 }>;
 

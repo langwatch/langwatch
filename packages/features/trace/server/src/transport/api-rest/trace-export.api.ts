@@ -19,6 +19,7 @@ import type { Env } from "hono";
 import type { z } from "zod";
 import { handlerManagedAuth } from "@langwatch/api";
 import {
+  type AppRestBroadcast,
   type AppRestSecurity,
   type SecuredApp,
   validator as zValidator,
@@ -81,9 +82,7 @@ export interface TraceExportRestPorts<
   /** The export itself. Resolved per request, never constructed at mount. */
   exports(): TraceExportPort<TRequest>;
   /** Fans one progress event out to every pod serving this tenant. */
-  broadcast(): Readonly<{
-    broadcastToTenant(tenantId: string, message: string, event: string): Promise<void>;
-  }>;
+  broadcast(): AppRestBroadcast;
   /**
    * No live session behind the request. Thrown, not hand-rolled: the boundary
    * serialises it with its code, which is what lets the browser render the

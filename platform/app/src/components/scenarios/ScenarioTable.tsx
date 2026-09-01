@@ -35,7 +35,7 @@ export function ScenarioTable({ scenarios, onArchive, ...props }: ScenarioTableP
     <ScenarioTableView
       {...props}
       scenarios={scenarioItems}
-      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.getTime())}
+      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.getTime()) ?? ""}
       renderLabels={(labels) => <TagList labels={labels} />}
       renderRow={(scenario, row) => (
         <LangyContextTarget

@@ -34,6 +34,24 @@ type VercelModelInput = {
   featureKey?: string;
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
+  /**
+   * Where the execution proxy (nlpgo's `/go/proxy/v1`) lives, from the
+   * process's own `ModelClientConfig`.
+   *
+   * Present so feature code does not read `LANGWATCH_NLP_SERVICE` itself —
+   * which is the entire reason that config object exists. The composition root
+   * has been passing it since `ModelClientConfig` was introduced; it just had
+   * nowhere to land, so this function went on reading the environment and the
+   * injected value was inert. The env var stays as the fallback for the call
+   * sites that have no config to hand.
+   */
+  executionProxyUrl?: string;
+  /**
+   * The AI gateway's base URL, same source and same reason. Codex models are
+   * the only ones that use it: their handle comes from the gateway's Responses
+   * endpoint rather than the execution proxy.
+   */
+  codexGatewayUrl?: string;
 };
 
 export const getVercelAIModel = async (input: VercelModelInput) => {
@@ -76,7 +94,12 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
   // the existence/enabled guards so an explicit "openai_codex/..." model
   // cannot bypass a disconnected or disabled provider row.
   if (isCodexModel(model_)) {
-    return getCodexVercelAIModel({ projectId, model: model_, featureKey });
+    return getCodexVercelAIModel({
+      projectId,
+      model: model_,
+      featureKey,
+      gatewayUrl: input.codexGatewayUrl,
+    });
   }
 
   const litellmParams = await prepareLitellmParams(input.modelProviders, managedProviders, {
@@ -93,7 +116,7 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
   // side reads x-litellm-* via the gatewayproxy package and dispatches
   // in-process.
   const baseURL = nlpgoProxyBaseURL({
-    baseURL: env.LANGWATCH_NLP_SERVICE!,
+    baseURL: input.executionProxyUrl ?? env.LANGWATCH_NLP_SERVICE!,
   });
   const vercelProvider = createOpenAICompatible({
     name: `${providerKey}`,

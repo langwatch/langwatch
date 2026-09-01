@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Portal } from "@chakra-ui/react";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { ExperimentsDialog } from "@langwatch/feature-flag-web";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 import {
@@ -55,7 +56,11 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const { organization, isLoading: isOrganizationLoading } = useOrganizationTeamProject({
+  const {
+    project,
+    organization,
+    isLoading: isOrganizationLoading,
+  } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -69,6 +74,11 @@ export function AppHeaderUserMenu({
   // show the menu entry while the page it links to 404s.
   const experiments = useExperimentsMenuEntry({ enabled: Boolean(session) && !publicPage });
   const { enabled: governancePreviewEnabled } = useFeatureFlag("release_ui_ai_governance_enabled", {
+    // The landing destination is decided at the organization, and
+    // governance.resolveHome reads the flag with the project opted out. The
+    // menu link matches so a project-scoped rule cannot send a person to a
+    // page that resolves as unavailable.
+    projectId: NOT_TARGETED,
     organizationId: organization?.id,
     enabled: !!organization?.id,
   });
@@ -79,6 +89,7 @@ export function AppHeaderUserMenu({
   // for a user with no organization: that persona reaches the new shells
   // on /me, so it must also reach the control that selects them.
   const { enabled: navigationV2Enabled } = useFeatureFlag("release_ui_navigation_v2_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     enabled: !isOrganizationLoading,
   });

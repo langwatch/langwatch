@@ -73,7 +73,7 @@ export const modelProviderRouter = (explicit: Record<string, unknown> = {}) => (
     }),
   },
   listAllForProjectForFrontend: {
-    useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+    useQuery: () => ({ data: [], isLoading: false }),
   },
   setRoleAssignmentForScope: { useMutation: noopMutation },
   setFeatureOverrideForScope: { useMutation: noopMutation },

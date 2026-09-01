@@ -296,7 +296,10 @@ export function runOrdinal({
  */
 export function batchNote(scenarioRuns: ScenarioRunData[]): string | null {
   for (const run of scenarioRuns) {
-    const note = run.metadata?.note?.trim();
+    // Run metadata is a loose record — a note is one agreed key in it, not a
+    // declared field — so it is read as one rather than assumed.
+    const raw = run.metadata?.note;
+    const note = typeof raw === "string" ? raw.trim() : "";
     if (note) return note;
   }
   return null;

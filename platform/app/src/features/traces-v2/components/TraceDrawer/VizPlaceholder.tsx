@@ -31,10 +31,10 @@ import type { VizTab } from "@langwatch/trace-web";
 import {
   FlameView,
   SequenceSkeleton,
-  SPAN_TYPE_COLORS,
   TopologySkeleton,
   useDrawerStore,
 } from "@langwatch/trace-web";
+import { spanTypeColor } from "../../utils/spanTypeColor";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { WaterfallView } from "./waterfallView";
 
@@ -708,7 +708,7 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
             ((span.endTimeMs - span.startTimeMs) / totalDuration) * 100,
           );
           const isError = span.status === "error";
-          const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+          const color = spanTypeColor(span.type);
 
           return (
             <Box

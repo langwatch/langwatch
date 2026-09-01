@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { type TargetValue, useFilteredAgents } from "~/components/scenarios/TargetSelector";
 import { unionParameterDefinitions } from "~/components/suites/useRunSuite";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -159,7 +160,20 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
   const isDialogOpen = !!project && !!subject;
 
   const { data: agents } = api.agents.getAll.useQuery({ projectId }, { enabled: isDialogOpen });
-  const scenarioAgents = useFilteredAgents(agents, "");
+  // The picker takes a target agent, not the stored row: same projection the
+  // other two target surfaces build, so all three offer the same agents.
+  const targetAgents = useMemo(
+    () =>
+      agents?.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        updatedAt: agent.updatedAt,
+        hasDevTunnel: agentHasDevTunnel(agent),
+      })),
+    [agents],
+  );
+  const scenarioAgents = useFilteredAgents(targetAgents, "");
   const { data: prompts } = useAllPromptsForProject();
   const { data: allScenarios } = api.scenarios.getAll.useQuery(
     { projectId },

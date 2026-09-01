@@ -12,7 +12,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
@@ -135,7 +135,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   // State for editable row data
   const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>([]);
   const rowsToAdd = editableRowData.filter((row) => row.selected);
-  const columnTypes = selectedDataset?.columnTypes as DatasetColumns | undefined;
+  const columnTypes = selectedDataset?.columnTypes;
 
   /**
    * Handle form submission
@@ -152,10 +152,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             .filter(([key, _]) => key !== "selected")
             .map(([key, value]) => {
               const column = columnTypes?.find((column) => column.name === key);
-              let entry: DatasetRecordEntry = value;
-              if (column?.type !== "string") {
+              // A cell holds one column's value, not a record: anything but a
+              // `string` column stores JSON, so it is read back out of the
+              // string the editor holds.
+              let entry: unknown = value;
+              if (column?.type !== "string" && typeof value === "string") {
                 try {
-                  entry = JSON.parse(value as string);
+                  entry = JSON.parse(value);
                 } catch {
                   /* this is just a safe json parse fallback */
                 }
@@ -300,7 +303,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               {selectedDataset && (
                 <DatasetMappingPreview
                   traces={tracesWithSpans.data ?? []}
-                  columnTypes={selectedDataset.columnTypes as DatasetColumns}
+                  columnTypes={selectedDataset.columnTypes}
                   rowData={rowDataFromDataset}
                   selectedDataset={selectedDataset}
                   onEditColumns={editDataset.onOpen}
@@ -348,7 +351,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 datasetId,
                 name: selectedDataset?.name ?? "",
                 datasetRecords: undefined,
-                columnTypes: (selectedDataset?.columnTypes as DatasetColumns) ?? [],
+                columnTypes: selectedDataset?.columnTypes ?? [],
               }
             : undefined
         }

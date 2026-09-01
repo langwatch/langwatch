@@ -101,26 +101,24 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       listAllForOrganizationForFrontend: {
         useQuery: () => ({
-          data: {
-            providers: [
-              {
-                id: "mp-openai",
-                name: "OpenAI",
-                provider: "openai",
-                enabled: true,
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
-                models: ["gpt-5-mini", "gpt-5"],
-              },
-              {
-                id: "mp-anthropic",
-                name: "Anthropic",
-                provider: "anthropic",
-                enabled: true,
-                scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
-                models: ["claude-sonnet-4-5"],
-              },
-            ],
-          },
+          data: [
+            {
+              id: "mp-openai",
+              name: "OpenAI",
+              provider: "openai",
+              enabled: true,
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+              models: ["gpt-5-mini", "gpt-5"],
+            },
+            {
+              id: "mp-anthropic",
+              name: "Anthropic",
+              provider: "anthropic",
+              enabled: true,
+              scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+              models: ["claude-sonnet-4-5"],
+            },
+          ],
           isLoading: false,
         }),
       },

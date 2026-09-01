@@ -22,7 +22,8 @@ import {
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
-import type { Dataset, DatasetRecord, Project } from "~/generated/prisma/client";
+import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
+import type { Project } from "~/generated/prisma/client";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";

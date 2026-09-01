@@ -29,8 +29,14 @@ import { Link } from "../../components/ui/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
-import { api } from "../../utils/api";
+import { api, type RouterOutputs } from "../../utils/api";
+
+/**
+ * One team as this form reads it: whatever `team.getTeamWithMembers` answers.
+ * Taken off the seam rather than off the Prisma model, because the procedure
+ * serves a browser-shaped team (no accounting columns) plus its projects.
+ */
+type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "@langwatch/design-system/select";
 import { toaster } from "../ui/toaster";
@@ -44,7 +50,7 @@ function TeamProjectsBody({
   team,
   onArchiveClick,
 }: {
-  team: TeamWithProjectsAndMembersAndUsers;
+  team: TeamWithProjectsAndMembers;
   onArchiveClick: (project: { id: string; name: string }) => void;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -106,7 +112,7 @@ export const TeamForm = ({
   isLoading,
 }: {
   organizationId: string;
-  team?: TeamWithProjectsAndMembersAndUsers;
+  team?: TeamWithProjectsAndMembers;
   form: UseFormReturn<TeamFormData, any, TeamFormData>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;
@@ -407,7 +413,7 @@ export const TeamForm = ({
 function TeamFormProjects({
   team,
 }: {
-  team: TeamWithProjectsAndMembersAndUsers;
+  team: TeamWithProjectsAndMembers;
 }): React.ReactElement {
   const { openDrawer } = useDrawer();
 

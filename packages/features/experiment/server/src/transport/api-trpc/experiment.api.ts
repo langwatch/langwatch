@@ -6,6 +6,7 @@
  *   saveEvaluationsV3:              the evaluations workbench autosave, with an
  *                                   optional compare-and-set on the version.
  *   getEvaluationsV3BySlug:         the workbench state a page opens on.
+ *   getWorkbenchVersion:            the cheap staleness probe: the version alone.
  *   onExperimentUpdate:             the freshness signal a second tab follows.
  *   listWorkbenchVersions:          the version history drawer.
  *   commitWorkbenchVersion:         naming the current state a version.
@@ -385,9 +386,14 @@ export class ExperimentTrpcApi {
             { kind: "user", id: ctx.actor().id },
           )
           .catch(mapExperimentError);
-        return await experiments
+        const updatedExperiment = await experiments
           .getById({ projectId: input.projectId, id: saved.experimentId })
           .catch(mapExperimentError);
+        // The row does not carry the version this save landed on — the counter
+        // it holds is whatever the last read saw. Autosave compares the version
+        // its own write produced against the staleness a concurrent broadcast
+        // may already have raised, so the save result's version rides along.
+        return { ...updatedExperiment, version: saved.version };
       }),
 
       getEvaluationsV3BySlug: policy("experiments:view")(
@@ -400,6 +406,33 @@ export class ExperimentTrpcApi {
           id: workbench.experimentId,
           slug: workbench.slug,
           workbenchState: workbench.state,
+          version: workbench.version,
+          updatedAt: workbench.updatedAt,
+          // Who wrote the version the probing tab is comparing against. A tab
+          // that has to tell its reader their work is out of date owes them the
+          // name: Langy usually wrote it, on their behalf, in the page they are
+          // looking at, and "somewhere else" reads as a stranger.
+          ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
+          // The run that wrote it, when a run did. A tab coming back from the
+          // background adopts a version its own run wrote instead of standing
+          // down over a write it already holds every cell of.
+          ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+        };
+      }),
+
+      /**
+       * The cheap staleness probe: the version and nothing else. A returning tab
+       * compares it with the version it loaded and only refetches the whole state
+       * when it is behind, so tab switching costs one point read, not one blob.
+       */
+      getWorkbenchVersion: policy("experiments:view")(
+        procedure.input(projectScopeSchema.extend({ experimentSlug: z.string() })),
+      ).query(async ({ ctx, input }) => {
+        const workbench = await ctx.app.experiments
+          .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
+          .catch(mapExperimentError);
+        return {
+          experimentId: workbench.experimentId,
           version: workbench.version,
           updatedAt: workbench.updatedAt,
           // Who wrote the version the probing tab is comparing against. A tab

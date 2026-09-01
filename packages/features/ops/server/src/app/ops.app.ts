@@ -424,7 +424,7 @@ export class OpsApp {
     tenantId: string;
     projectionName: string;
     eventIndex: number;
-  }): Promise<{ aggregateType?: unknown }> {
+  }): Promise<ProjectionStateAtEvent> {
     const state = await this.dependencies.ops.eventExplorer.computeProjectionState(input);
     if (!state.aggregateType) {
       throw new NotFoundError("not_found", "Projection", input.projectionName);

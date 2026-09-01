@@ -60,6 +60,8 @@ import type {
   RemoveOrganizationGroupBindingInput,
   RemoveOrganizationTeamMemberInput,
   RenameOrganizationGroupInput,
+  UpdateOrganizationSettingsInput,
+  UpdateOrganizationSettingsResult,
   UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
 import type {
@@ -138,9 +140,11 @@ type EnrichedAuditLog = {
  * The organization reads and writes this feature makes that the canonical
  * `OrganizationService` contract does not carry.
  *
- * Named structurally rather than picked, because these twelve are the legacy
- * organization surface the app process still owns — membership, invitations,
- * settings and the audit trail — and the contract does not declare them.
+ * Named structurally rather than picked, because these fourteen are the legacy
+ * organization surface the app process still owns — membership, invitations
+ * and the audit trail — and the contract does not declare them. Settings is
+ * no longer among them: the canonical contract declares that write, and it
+ * answers with the trace-share revocation signal this half used to swallow.
  */
 type OrganizationsAppService = Readonly<{
   createAndAssign(input: {
@@ -171,18 +175,6 @@ type OrganizationsAppService = Readonly<{
     demoProjectUserId: string;
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]>;
-  updateSettings(input: {
-    organizationId: string;
-    name: string;
-    s3Endpoint: string | null;
-    s3AccessKeyId: string | null;
-    s3SecretAccessKey: string | null;
-    s3Bucket?: string;
-    presenceEnabled?: boolean;
-    traceSharingEnabled?: boolean;
-    supportContact?: string | null;
-    primaryIntent?: OrganizationIntent | null;
-  }): Promise<void>;
   getOrganizationWithMembers(input: {
     organizationId: string;
     userId: string;
@@ -241,13 +233,18 @@ type OrganizationsAppService = Readonly<{
 }>;
 
 /**
- * The twenty-five contract reads and writes this feature makes, named rather
+ * The twenty-seven contract reads and writes this feature makes, named rather
  * than taking `OrganizationService` whole: it is the widest surface in the
  * platform, and an organization screen has no business depending on the parts
  * of it that answer ingestion or billing claims.
  */
 type OrganizationContractService = Pick<
   OrganizationService,
+  // the organization's own settings
+  | "updateSettings"
+  // membership, asked by the feature-flag resolver before it widens a
+  // project-scoped read into an organization-scoped one
+  | "isMember"
   // groups
   | "getBillingProfile"
   | "getTeam"
@@ -355,9 +352,30 @@ export class OrganizationApp {
     return this.dependencies.organizations.getAllForUser({ ...input, userId: by.id });
   }
 
-  /** Saves the organization settings form. */
-  updateSettings(input: Parameters<OrganizationsAppService["updateSettings"]>[0]): Promise<void> {
+  /**
+   * Saves the organization settings form, and hands back what the write
+   * decided: whether turning trace sharing off means every existing share link
+   * on the organization still has to be revoked (ADR-057). Only the write can
+   * answer that — it is the one thing that saw the stored value beforehand —
+   * so the answer is carried through rather than dropped here. A door that
+   * repeats the revocation pass on it is idempotent; a door that drops it is
+   * relying on the composed service having revoked for itself.
+   */
+  updateSettings(
+    input: UpdateOrganizationSettingsInput,
+  ): Promise<UpdateOrganizationSettingsResult> {
     return this.dependencies.organizations.updateSettings(input);
+  }
+
+  /**
+   * Whether a user is a member of an organization.
+   *
+   * A door rather than a `Pick` the caller reaches through: the feature-flag
+   * resolver asks it on every organization-targeted read, to decide whether a
+   * flag's answer for this organization is one this caller may see at all.
+   */
+  isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
+    return this.dependencies.organizations.isMember(input);
   }
 
   /** One organization with its members and each member's teams. */

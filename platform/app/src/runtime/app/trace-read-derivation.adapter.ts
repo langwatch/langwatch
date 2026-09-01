@@ -5,6 +5,7 @@ import {
 import { SpanCostService } from "@langwatch/trace-server";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {
@@ -73,7 +74,19 @@ interface MemoEntry<T> {
  * events it dispatches, while a fold that has advanced (new spans) re-reads.
  */
 export class TraceReadDerivationService {
-  private readonly spanCostService = new SpanCostService();
+  // The cost estimate is the app's own model-price matching; the packaged
+  // service owns only the token extraction that feeds it.
+  private readonly spanCostService = SpanCostService.create({
+    modelCosts: {
+      estimate: ({ attributes, model, promptTokens, completionTokens }) =>
+        computeSpanCost({
+          attrs: attributes,
+          model,
+          promptTokens,
+          completionTokens,
+        }),
+    },
+  });
   private readonly scenarioRoleMetricsMemo = new Map<string, MemoEntry<ScenarioRoleMetrics>>();
   private readonly eventsMemo = new Map<string, MemoEntry<DerivedTraceEvent[]>>();
 

@@ -33,6 +33,8 @@ if (!document.querySelector(`meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]`)) {
       mode: "test",
       telemetry: { browserTracing: false, sampleRatio: 1 },
       capabilities: { email: false, nlp: false, langevals: false },
+      passkeys: false,
+      identityFrontDoor: false,
     }),
   );
 }

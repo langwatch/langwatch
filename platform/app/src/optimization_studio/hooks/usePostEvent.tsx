@@ -317,7 +317,11 @@ export const useHandleServerMessage = ({
             { status: message.payload.execution_state?.status },
             "execution_state_change received",
           );
-          setWorkflowExecutionState(message.payload.execution_state);
+          // The event type allows the state to be absent; there is nothing to
+          // apply when it is, and the store reads `status` off what it is given.
+          if (message.payload.execution_state) {
+            setWorkflowExecutionState(message.payload.execution_state);
+          }
 
           // Auto-select the target node and expand properties when a
           // "Run workflow until here" execution succeeds, so the user

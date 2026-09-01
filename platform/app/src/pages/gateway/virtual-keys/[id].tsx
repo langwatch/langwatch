@@ -171,11 +171,11 @@ function VirtualKeyDetailPage() {
     () =>
       firstEligibleDefaultModel({
         scopes: vk?.scopes ?? [],
-        providers: (orgProvidersQuery.data?.providers ?? []) as OrgModelProvider[],
+        providers: (orgProvidersQuery.data ?? []) as OrgModelProvider[],
         availableProjects,
         organizationId: orgId,
       }),
-    [vk?.scopes, orgProvidersQuery.data?.providers, availableProjects, orgId],
+    [vk?.scopes, orgProvidersQuery.data, availableProjects, orgId],
   );
   const snippetModel = snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
 
@@ -509,7 +509,7 @@ function VirtualKeyDetailPage() {
                     availableTeams={availableTeams}
                     availableProjects={availableProjects}
                     isLoading={orgProvidersQuery.isLoading}
-                    providers={orgProvidersQuery.data?.providers ?? []}
+                    providers={orgProvidersQuery.data ?? []}
                     providersAllowed={providersAllowed}
                   />
                   <Box>
@@ -531,7 +531,7 @@ function VirtualKeyDetailPage() {
                       availableTeams={availableTeams}
                       availableProjects={availableProjects}
                       isLoading={orgProvidersQuery.isLoading}
-                      providers={orgProvidersQuery.data?.providers ?? []}
+                      providers={orgProvidersQuery.data ?? []}
                       providersAllowed={providersAllowed}
                       routingPolicyProviderIds={routingPolicyProviderIds}
                       selectedModel={snippetModel}

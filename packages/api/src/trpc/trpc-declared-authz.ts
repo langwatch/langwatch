@@ -84,12 +84,33 @@ export type TrpcDeclaredCheckParams<TContext> = {
 };
 
 /**
+ * What a check that reads nothing but the request context is handed.
+ *
+ * Naming `input` is what makes a check installable ONLY after a procedure's own
+ * `.input()` parser: before one runs, tRPC types the validated input as its
+ * `UnsetMarker`, which no scope shape accepts. That refusal is correct for the
+ * three checks that resolve a scope id — installed ahead of the parser they
+ * would read nothing and pass. `authorizeInService` reads no id at all, so
+ * omitting the field here says so, and lets a process mount it on a
+ * package-owned procedure whose parser it supplies later.
+ */
+export type TrpcContextOnlyCheckParams<TContext> = {
+  ctx: TrpcMiddlewareContext<TContext>;
+  next: DeclaredCheckNext;
+};
+
+/**
  * One declared check: the middleware, carrying the machine-readable
  * declaration the router sweep reads. `declareAuthzMiddleware(...)` is the only
  * way to produce the brand, so an undeclared function cannot stand in for one.
  */
 export type TrpcDeclaredCheck<TContext> = DeclaredAuthzMiddleware<
   (params: TrpcDeclaredCheckParams<TContext>) => Promise<any>
+>;
+
+/** The same, for a check that reads no validated input. */
+export type TrpcContextOnlyDeclaredCheck<TContext> = DeclaredAuthzMiddleware<
+  (params: TrpcContextOnlyCheckParams<TContext>) => Promise<any>
 >;
 
 const SENSITIVE_SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
@@ -112,8 +133,12 @@ export interface TrpcDeclaredAuthzMiddlewares<TContext> {
     options: Readonly<{ reason: string; allow?: Record<string, string> }>,
   ): TrpcDeclaredCheck<TContext>;
   serviceAuthorized(
-    options: Readonly<{ reason: string; permissions: readonly AuthzPermission[] }>,
-  ): TrpcDeclaredCheck<TContext>;
+    options: Readonly<{
+      reason: string;
+      permissions: readonly AuthzPermission[];
+      enforces?: EnforcedScopeFields;
+    }>,
+  ): TrpcContextOnlyDeclaredCheck<TContext>;
 }
 
 export type TrpcDeclaredAuthzPorts<TContext> = Readonly<{
@@ -288,7 +313,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     reason: string;
     permissions: readonly AuthzPermission[];
     enforces?: EnforcedScopeFields;
-  }>): TrpcDeclaredCheck<TContext> =>
+  }>): TrpcContextOnlyDeclaredCheck<TContext> =>
     declareAuthzMiddleware(
       {
         kind: "service-authorized",
@@ -296,7 +321,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
         permissions,
         ...(enforces === undefined ? {} : { enforces }),
       },
-      async ({ ctx, next }: TrpcDeclaredCheckParams<TContext>) => {
+      async ({ ctx, next }: TrpcContextOnlyCheckParams<TContext>) => {
         markPermissionChecked(ctx);
         return next();
       },

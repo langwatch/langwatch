@@ -177,9 +177,10 @@ export class ApiKeyApp {
         });
 
     const allBindings = apiKeys.flatMap((k) => k.roleBindings);
-    // Only the custom-role half of the enrichment is read here: a key row
-    // renders its scope ids, not their names.
-    const { customRoleName, customRoles } =
+    // A key row renders the scope's NAME — "Acme" and "Checkout", not two
+    // opaque ids — so the scope half of the enrichment is read alongside the
+    // custom-role half. Both come from the one call.
+    const { orgName, teamName, projectName, customRoleName, customRoles } =
       await this.dependencies.apiKeys.enrichBindingsWithNames({
         bindings: allBindings.map((rb): ApiKeyBinding => ({
           id: rb.id,
@@ -233,6 +234,12 @@ export class ApiKeyApp {
           : null,
         scopeType: rb.scopeType,
         scopeId: rb.scopeId,
+        scopeName:
+          rb.scopeType === "ORGANIZATION"
+            ? (orgName.get(rb.scopeId) ?? null)
+            : rb.scopeType === "TEAM"
+              ? (teamName.get(rb.scopeId) ?? null)
+              : (projectName.get(rb.scopeId) ?? null),
       })),
     }));
   }

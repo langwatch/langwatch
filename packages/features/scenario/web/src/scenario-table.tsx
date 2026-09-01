@@ -14,7 +14,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
-import { useMemo, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import type { ScenarioListItem } from "./scenario-list.types";
 
 export type ScenarioTableProps = {
@@ -27,7 +33,15 @@ export type ScenarioTableProps = {
   onArchive(scenario: ScenarioListItem): void;
   formatUpdatedAt(updatedAt: Date): string;
   renderLabels(labels: string[]): ReactNode;
-  renderRow(scenario: ScenarioListItem, row: ReactElement): ReactElement;
+  /**
+   * Wraps one rendered row. `row` is the single `<Table.Row>` element: the app's
+   * wrapper `cloneElement`s it to add `className` and `style`, so the element
+   * type has to say those props are accepted.
+   */
+  renderRow(
+    scenario: ScenarioListItem,
+    row: ReactElement<{ className?: string; style?: CSSProperties }>,
+  ): ReactElement;
 };
 
 const columnHelper = createColumnHelper<ScenarioListItem>();

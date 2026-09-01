@@ -92,22 +92,11 @@ export const LANGY_TURN_SKILL_IDS = [
   "support.bug-reports",
 ] as const;
 
-export type LangyResourceContext = {
-  kind: LangyResourceKind;
-  ref?: string;
-  label: string;
-};
+export type LangyResourceContext = z.infer<typeof langyResourceContextSchema>;
 
-export type LangySkillContext = {
-  id: string;
-  label: string;
-  on?: string;
-};
+export type LangySkillContext = z.infer<typeof langySkillContextSchema>;
 
-export type LangyTurnContext = {
-  pageContext?: LangyResourceContext[];
-  skills?: LangySkillContext[];
-};
+export type LangyTurnContext = z.infer<typeof langyTurnContextSchema>;
 
 export const MAX_LANGY_CONTEXT_LABEL_LENGTH = 200;
 const maxRefLength = 4_000;

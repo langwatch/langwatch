@@ -75,7 +75,7 @@ async function main() {
       continue;
     }
 
-    const existing = await app.modelProviders.tryGetProviderForProject({
+    const existing = await app.modelProviders.providerService.tryGetProviderForProject({
       projectId: project.id,
       provider,
     });
@@ -84,7 +84,7 @@ async function main() {
       continue;
     }
 
-    await app.modelProviders.upsert({
+    await app.modelProviders.providerService.upsert({
       id: existing.id,
       projectId: project.id,
       provider,

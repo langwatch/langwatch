@@ -220,7 +220,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
       isLoading: false,
     });
     mockListAllForProjectForFrontend.mockReturnValue({
-      data: { providers: [PROVIDER_ROW] },
+      data: [PROVIDER_ROW],
       isLoading: false,
       isError: false,
     });

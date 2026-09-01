@@ -14,6 +14,8 @@ const config: PublicAppConfig = {
   mode: "production",
   telemetry: { browserTracing: false, sampleRatio: 1 },
   capabilities: { email: true, nlp: false, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
 };
 
 describe("public application config browser codec", () => {

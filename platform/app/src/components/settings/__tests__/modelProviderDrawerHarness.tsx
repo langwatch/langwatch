@@ -100,10 +100,8 @@ export function makePrimeQueries({
 }) {
   return (rows: MaybeStoredModelProvider[]) => {
     const collapsed = Object.fromEntries(rows.map((row) => [row.provider, row]));
-    collapsedQuery.mockReturnValue(
-      readyQueryResult({ providers: collapsed, modelMetadata: {} }),
-    );
-    const flat = readyQueryResult({ providers: rows, modelMetadata: {} });
+    collapsedQuery.mockReturnValue(readyQueryResult(collapsed));
+    const flat = readyQueryResult(rows);
     organizationListQuery.mockReturnValue(flat);
     projectListQuery.mockReturnValue(flat);
   };

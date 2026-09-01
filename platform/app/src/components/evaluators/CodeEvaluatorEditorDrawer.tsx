@@ -338,6 +338,10 @@ function EditorHeader({
 }
 
 function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
+  // Read once, so the mapping renderer below closes over a value rather than a
+  // property the compiler has to re-check inside the callback.
+  const mappingsConfig = form.showMappings ? form.mappingsConfig : void 0;
+
   return (
     <CodeEvaluatorEditor
       name={form.name}
@@ -357,7 +361,7 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
         />
       )}
       renderInputMappings={
-        form.showMappings && form.mappingsConfig
+        mappingsConfig
           ? ({ inputs, onInputsChange }) => (
               <VariablesSection
                 title="Inputs"
@@ -376,7 +380,7 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
                 showMappings
                 mappings={form.mappings}
                 onMappingChange={form.handleMappingChange}
-                availableSources={form.mappingsConfig.availableSources}
+                availableSources={mappingsConfig.availableSources}
                 canAddRemove
               />
             )

@@ -46,7 +46,9 @@ export type ModelProviderEditorValue = {
   rotationPolicy?: "MANUAL";
   providerConfig?: unknown;
   fallbackPriorityGlobal?: number | null;
-  healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
+  // Nullable like every other stored column on this row: the wire always
+  // carries the key, and null is "no health check has recorded a verdict".
+  healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
   circuitOpenedAt?: Date | null;
   lastHealthCheckAt?: Date | null;
   disabledAt?: Date | null;

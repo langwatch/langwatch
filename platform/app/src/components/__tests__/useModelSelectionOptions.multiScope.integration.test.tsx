@@ -20,24 +20,22 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => {
   const response = {
-    data: {
-      providers: [
-        {
-          provider: "custom",
-          enabled: true,
-          customModels: [{ modelId: "stealth/ox-alpha" }],
-          customEmbeddingsModels: null,
-        },
-        // The same provider again, from a wider scope, carrying the same model
-        // plus one of its own.
-        {
-          provider: "custom",
-          enabled: true,
-          customModels: [{ modelId: "stealth/ox-alpha" }, { modelId: "stealth/ox-beta" }],
-          customEmbeddingsModels: null,
-        },
-      ],
-    },
+    data: [
+      {
+        provider: "custom",
+        enabled: true,
+        customModels: [{ modelId: "stealth/ox-alpha" }],
+        customEmbeddingsModels: null,
+      },
+      // The same provider again, from a wider scope, carrying the same model
+      // plus one of its own.
+      {
+        provider: "custom",
+        enabled: true,
+        customModels: [{ modelId: "stealth/ox-alpha" }, { modelId: "stealth/ox-beta" }],
+        customEmbeddingsModels: null,
+      },
+    ],
     isLoading: false,
   };
   return {

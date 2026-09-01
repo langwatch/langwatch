@@ -39,6 +39,8 @@ export {
 export { callerTraceContext } from "./trpc-caller-trace.js";
 export {
   createDeclaredAuthzMiddlewares,
+  type TrpcContextOnlyCheckParams,
+  type TrpcContextOnlyDeclaredCheck,
   type TrpcDeclaredAuthzContext,
   type TrpcDeclaredAuthzMiddlewares,
   type TrpcDeclaredAuthzPorts,

@@ -32,6 +32,10 @@ export const FRONTEND_FEATURE_FLAGS = [
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
+  // Composes ON TOP of `release_ui_ai_governance_enabled` to reveal the
+  // governance Costs and Billed pages and their two sidebar items. Off by
+  // default; the section flag being off still hides both.
+  "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
   // Gates the Optimize this prompt menu item alongside the UI-action channel

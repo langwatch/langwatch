@@ -38,6 +38,22 @@ export type AzureCredentials =
       audience?: string;
     };
 
+/**
+ * The federated identity the process platform injected, as a composition root
+ * that already parsed it hands it in.
+ *
+ * Declared structurally rather than imported from `~/runtime`: the runtime
+ * composition reaches down into this module, and importing back up would close
+ * that loop. Absent, the values are read off `process.env` exactly as before —
+ * these are Microsoft's own variable names, written by the AKS
+ * azure-workload-identity webhook.
+ */
+export type AzureInjectedIdentity = Readonly<{
+  tenantId?: string;
+  clientId?: string;
+  federatedTokenFile?: string;
+}>;
+
 export type AzureTokenAuthMode = Extract<
   AzureCredentials,
   { mode: "workloadIdentity" | "managedIdentity" | "azureCli" }
@@ -152,11 +168,16 @@ function assertSovereignAuthority({
  * them. Their absence means the webhook never mutated this pod — never that
  * the operator forgot to set them by hand, so the error must not suggest that.
  */
-function assertWorkloadIdentityInjectedValues(): void {
+function assertWorkloadIdentityInjectedValues(identity: AzureInjectedIdentity | undefined): void {
+  const clientId = identity?.clientId ?? process.env.AZURE_CLIENT_ID;
+  const tenantId = identity?.tenantId ?? process.env.AZURE_TENANT_ID;
+  const federatedTokenFile =
+    identity?.federatedTokenFile ?? process.env.AZURE_FEDERATED_TOKEN_FILE;
+
   const missing: string[] = [];
-  if (!process.env.AZURE_CLIENT_ID?.trim()) missing.push("AZURE_CLIENT_ID");
-  if (!process.env.AZURE_TENANT_ID?.trim()) missing.push("AZURE_TENANT_ID");
-  if (!process.env.AZURE_FEDERATED_TOKEN_FILE?.trim()) {
+  if (!clientId?.trim()) missing.push("AZURE_CLIENT_ID");
+  if (!tenantId?.trim()) missing.push("AZURE_TENANT_ID");
+  if (!federatedTokenFile?.trim()) {
     missing.push("AZURE_FEDERATED_TOKEN_FILE");
   }
   if (missing.length === 0) return;
@@ -302,8 +323,15 @@ export function assertTokenModeTransportSafety({
  */
 export function resolveAzureCredentials({
   purpose = "write",
+  identity,
 }: {
   purpose?: "read" | "write";
+  /**
+   * The platform-injected federated identity, when the composition root
+   * already parsed it. Omitted, the same three variables are read off
+   * `process.env`.
+   */
+  identity?: AzureInjectedIdentity;
 } = {}): AzureCredentials {
   // env.mjs is JavaScript, so TypeScript infers `any` for its values. Pinning
   // the type here is what makes the exhaustiveness check at the bottom of this
@@ -341,7 +369,7 @@ export function resolveAzureCredentials({
   assertTokenModeTransportSafety({ endpointBaseUrl, authorityHost });
 
   if (mode === "workloadIdentity") {
-    assertWorkloadIdentityInjectedValues();
+    assertWorkloadIdentityInjectedValues(identity);
   }
 
   switch (mode) {

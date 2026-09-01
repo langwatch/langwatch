@@ -99,6 +99,18 @@ export class ProjectApp {
   }
 
   /**
+   * The organization a project belongs to.
+   *
+   * A door in its own right rather than something the caller reaches through
+   * `projectService`: the feature-flag resolver asks this on every
+   * project-targeted read, to widen a project-scoped question into the
+   * organization the operator store's rules are written against.
+   */
+  getOrganizationId(projectId: string): Promise<string> {
+    return this.dependencies.projects.getOrganizationId(projectId);
+  }
+
+  /**
    * The service itself, for the process functions that still take it whole.
    *
    * None of them is a project door: the LangWatchQL rollout gate resolves the

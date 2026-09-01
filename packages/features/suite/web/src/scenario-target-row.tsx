@@ -18,15 +18,20 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { formatRunStatusLabel } from "./format-run-status-label";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./run-status";
 
+/**
+ * Wraps one rendered scenario row. `children` is the single row element, not
+ * arbitrary nodes: the app's wrapper `cloneElement`s it to add `className` and
+ * `style`, so the element type has to say those props are accepted.
+ */
 export type ScenarioRunContextRenderer = (input: {
   scenarioRunId: string;
   name: string;
-  children: ReactNode;
+  children: ReactElement<{ className?: string; style?: CSSProperties }>;
 }) => ReactNode;
 
 type ScenarioTargetRowProps = {

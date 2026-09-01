@@ -101,7 +101,7 @@ async function dispatchDeepTrace({
   });
   for (const rawSpan of payload.spans) {
     const span = spanValidatorSchema.parse(rawSpan);
-    await app.traces.recordSpan({
+    await app.commands.traces.recordSpan({
       tenantId: PROJECT_ID,
       span: CollectorSpanUtils.convertSpanToOtlp(span),
       resource,
@@ -192,7 +192,7 @@ async function dispatchTimeline({
   }
 
   for (const exp of timeline.experimentRuns) {
-    await app.experimentRuns.startExperimentRun({
+    await app.experiments.experimentService.startExperimentRun({
       tenantId: PROJECT_ID,
       occurredAt: exp.startedAt,
       runId: exp.runId,
@@ -211,7 +211,7 @@ async function dispatchTimeline({
     });
     for (const [index, row] of EXPERIMENT_ROWS.entries()) {
       const occurredAt = exp.startedAt + (index + 1) * 60_000;
-      await app.experimentRuns.recordTargetResult({
+      await app.experiments.experimentService.recordTargetResult({
         tenantId: PROJECT_ID,
         occurredAt,
         runId: exp.runId,
@@ -224,7 +224,7 @@ async function dispatchTimeline({
         duration: 1_400 + index * 120,
       });
       const score = exp.scores[index]!;
-      await app.experimentRuns.recordEvaluatorResult({
+      await app.experiments.experimentService.recordEvaluatorResult({
         tenantId: PROJECT_ID,
         occurredAt: occurredAt + 500,
         runId: exp.runId,
@@ -242,7 +242,7 @@ async function dispatchTimeline({
         cost: 0.0008,
       });
     }
-    await app.experimentRuns.completeExperimentRun({
+    await app.experiments.experimentService.completeExperimentRun({
       tenantId: PROJECT_ID,
       occurredAt: exp.startedAt + 9 * 60_000,
       runId: exp.runId,

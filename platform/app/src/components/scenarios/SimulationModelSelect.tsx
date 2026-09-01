@@ -52,7 +52,7 @@ export function SimulationModelSelect({
   // entries from enabled providers. Same source the default-models drawer
   // narrows from, so the two pickers never disagree about what's available.
   const options = useMemo(() => {
-    const providers = projectProviders.data?.providers ?? [];
+    const providers = projectProviders.data ?? [];
     const enabled = providers.filter((p) => p.enabled === true);
     const enabledKeys = new Set(enabled.map((p) => p.provider));
 
@@ -78,7 +78,7 @@ export function SimulationModelSelect({
 
   // Configured custom-model display names, keyed by `<provider>/<modelId>`.
   const displayNames = useMemo(
-    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    () => buildCustomModelDisplayNames(projectProviders.data ?? []),
     [projectProviders.data],
   );
 

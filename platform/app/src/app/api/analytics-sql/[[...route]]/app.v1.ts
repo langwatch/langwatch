@@ -194,8 +194,13 @@ function registerQuery(secured: ReturnType<typeof createProjectApp>): void {
         "Running LangWatchQL analytics SQL",
       );
 
+      // The restricted tenant capability is hashed from the project's own
+      // LangWatchQL secret, which the request's identity deliberately does not
+      // carry. Read it here, and hand the service only the two fields it names.
+      const { lwqlKey } = await c.app.projects.projectService.getById(project.id);
+
       const result = await c.app.langWatchQL.execute({
-        project,
+        project: { id: project.id, lwqlKey },
         protections: await getProtectionsForProject(prisma, {
           projectId: project.id,
         }),

@@ -16,6 +16,8 @@ const publicConfig: PublicAppConfig = {
   mode: "test",
   telemetry: { browserTracing: false, sampleRatio: 1 },
   capabilities: { email: false, nlp: false, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
 };
 
 function rawRequest(

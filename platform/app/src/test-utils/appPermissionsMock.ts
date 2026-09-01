@@ -136,6 +136,13 @@ class ResolverBackedTestAuthzService {
     allowed: boolean;
     organizationRole: PermissionDecision["organizationRole"];
   }> {
+    // The legacy resolvers behind this double answer for a signed-in user,
+    // and an anonymous principal names none. Denying matches what the real
+    // service answers when it cannot resolve a scope for the caller.
+    if (principal.type === "anonymous") {
+      return { allowed: false, organizationRole: null };
+    }
+
     const decision = await this.getDecision({
       userId: principal.id,
       permission,

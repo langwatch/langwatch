@@ -36,8 +36,19 @@ const storedStudioDatasetSchema = z
 export type StoredStudioDatasetRecord = z.input<typeof storedStudioDatasetRecordSchema>;
 export type StoredStudioDataset = z.input<typeof storedStudioDatasetSchema>;
 
+/**
+ * Turns a column-first inline dataset into the row-first records the editor
+ * and the executor read.
+ *
+ * The values stay `unknown`: an inline dataset column can be any
+ * `DatasetColumnType` (`number`, `boolean`, `json`, `spans`, …), the parsed
+ * `NodeDataset.inline.records` is `Record<string, unknown[]>`, and
+ * `DatasetRecordEntry` holds `unknown` too — so nothing here narrows to
+ * strings, and declaring that it did only made every caller's real data
+ * unassignable.
+ */
 export function transposeColumnsFirstToRowsFirstWithId(
-  data: Record<string, string[]>,
+  data: Record<string, unknown[]>,
 ): DatasetRecordEntry[] {
   const rows: DatasetRecordEntry[] = [];
 

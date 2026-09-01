@@ -1490,8 +1490,8 @@ const appTrpcFeatures = createAppTrpcFeatures({
             id: `workflow_${nanoid()}`,
             projectId: input.projectId,
             name: input.name,
-            icon: input.icon ?? null,
-            description: input.description ?? null,
+            icon: input.icon ?? "",
+            description: input.description ?? "",
           },
         }),
       tryFindWorkflow: async (ctx, input) =>
@@ -1583,7 +1583,7 @@ const appTrpcFeatures = createAppTrpcFeatures({
       reject: (ctx: TRPCContext, input) => joinRequestsFor(ctx).reject(input),
       readJoining: (ctx: TRPCContext, input) => joinRequestsFor(ctx).readJoining(input),
       setJoining: (ctx: TRPCContext, input) => joinRequestsFor(ctx).setJoining(input),
-      tryResolveVerifiedEmail: verifiedEmailFor,
+      tryResolveVerifiedEmail: (ctx, input) => verifiedEmailFor(appContext(ctx), input),
       listUserNames: (ctx: TRPCContext, { userIds }) =>
         ctx.prisma.user.findMany({
           where: { id: { in: [...userIds] } },
@@ -1907,13 +1907,17 @@ const appTrpcFeatures = createAppTrpcFeatures({
           }),
 
         listMonitorsForEvaluators: async (ctx, input) =>
-          await appContext(ctx).prisma.monitor.findMany({
-            where: {
-              evaluatorId: { in: [...input.evaluatorIds] },
-              projectId: input.projectId,
-            },
-            select: { id: true, name: true, evaluatorId: true },
-          }),
+          (
+            await appContext(ctx).prisma.monitor.findMany({
+              where: {
+                evaluatorId: { in: [...input.evaluatorIds] },
+                projectId: input.projectId,
+              },
+              select: { id: true, name: true, evaluatorId: true },
+            })
+          ).flatMap(({ id, name, evaluatorId }) =>
+            evaluatorId === null ? [] : [{ id, name, evaluatorId }],
+          ),
 
         cascadeArchiveWorkflow: async (ctx, input) => {
           const now = input.unarchive ? null : new Date();

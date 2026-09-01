@@ -261,7 +261,7 @@ export function VirtualKeyEditDrawer({
     },
   });
 
-  const providers = (orgProvidersQuery.data?.providers ?? []) as OrgModelProvider[];
+  const providers = (orgProvidersQuery.data ?? []) as OrgModelProvider[];
   const policies = (policiesQuery.data ?? []) as Array<{
     id: string;
     name: string;

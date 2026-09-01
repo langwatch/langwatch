@@ -19,6 +19,7 @@ import {
   TraceIngressPayloadPort,
   TraceListClickHouseRepository,
   TraceQueryClassificationAdapter,
+  TraceQueryClickHouse,
   TraceSpanDedupPort,
   TraceSummaryReaderPort,
   TraceEventDerivationPort,
@@ -400,6 +401,14 @@ export function createTracesV2TrpcPorts(): TracesV2TrpcPorts<TraceMetadataUpdate
         managedProviders: (ctx as TraceAiComposerContext).app.managedProviders,
         traces: (ctx as TraceAiComposerContext).app.traces.tree,
       }),
+    // The query language's own translator, which the package owns. Named as a
+    // port only because the strict layout forbids the transport from importing
+    // its feature's ClickHouse adapter; there is no second implementation.
+    queryTranslation: {
+      translateFilterToClickHouse: (queryText, tenantId, timeRange) =>
+        TraceQueryClickHouse.translateFilter(queryText, tenantId, timeRange),
+      extractFreeTextTerms: (queryText) => TraceQueryClickHouse.extractFreeTextTerms(queryText),
+    },
     traceMetadataUpdateSchema,
     updateTraceMetadata,
     deriveUnmappedCostSuggestion,

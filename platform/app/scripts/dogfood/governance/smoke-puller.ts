@@ -106,7 +106,7 @@ async function runGovernancePull(input: {
     const worker = AppIngestionPullWorkerAdapter.create({
       sources: PostgresIngestionPullSourceAdapter.create(prisma),
       host: AppGovernanceIngestionPullHost.create(input.app.featureFlags, aws),
-      projects: input.app.projects,
+      projects: input.app.projects.projectService,
       events: new AppGovernanceOcsfEventsAdapter(input.app.clickhouse.resolveClient),
     }).build();
     return await worker.run({ sourceId: input.sourceId, cursor: null });
@@ -178,7 +178,7 @@ async function main(): Promise<void> {
   const outcome = await runGovernancePull({ app, sourceId: source.id });
   console.log(`[smoke-puller] runIngestionPull completed`);
 
-  const govProject = await app.projects.ensureInternal({
+  const govProject = await app.projects.projectService.ensureInternal({
     organizationId: org.id,
     kind: "internal_governance",
   });

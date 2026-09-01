@@ -24,14 +24,14 @@ async function probe(secret: string) {
 
   const eligibleMPs = await eligibleModelProvidersForVk(prisma, vk);
   const traceProject = vk.traceProjectId
-    ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
+    ? await app.projects.projectService.tryGetTraceDestination(vk.traceProjectId)
     : null;
 
   const materialiser = new GatewayConfigMaterialiser(
     prisma,
-    app.projects,
+    app.projects.projectService,
     null,
-    app.gateway.service,
+    app.gateway.budgetDecisions,
   );
   const bundle = await materialiser.materialise(vk);
 

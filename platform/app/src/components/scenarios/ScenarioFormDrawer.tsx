@@ -21,7 +21,7 @@ import {
   readHandledError,
   showErrorToast,
 } from "~/features/errors";
-import type { Scenario } from "~/generated/prisma/client";
+import type { Scenario } from "@langwatch/scenario-contract";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   clearFlowCallbacks,

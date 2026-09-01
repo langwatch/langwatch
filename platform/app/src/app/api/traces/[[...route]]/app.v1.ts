@@ -410,7 +410,7 @@ export function registerTracesRoutes(
       }
 
       const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
-        app: c.app,
+        app: c.app.traces,
         ports: createTraceViewReadPorts(),
         projectId: project.id,
         traceId: trace.trace_id,

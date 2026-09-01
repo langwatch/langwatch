@@ -1410,7 +1410,14 @@ async function mintRunSandboxApiKey({
   const organizationId = project?.team?.organizationId;
   if (!organizationId) return undefined;
 
-  return tryMintAgentSandboxApiKey({ apiKeys: getApp().apiKeys, projectId, organizationId });
+  // The application's own service seam. Minting here has no signed-in member
+  // to authorize — a run mints for itself — so this goes to the service rather
+  // than to a management operation that would ask who `by` is.
+  return tryMintAgentSandboxApiKey({
+    apiKeys: getApp().apiKeys.apiKeyService,
+    projectId,
+    organizationId,
+  });
 }
 
 /**

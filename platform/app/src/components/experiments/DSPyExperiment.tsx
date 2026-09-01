@@ -33,7 +33,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Experiment, Project, WorkflowVersion } from "~/generated/prisma/client";
+import type { Experiment, Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
@@ -44,6 +44,7 @@ import type {
   DSPyPredictor,
   DSPyRunsSummary,
   DSPyStepSummary,
+  ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
@@ -513,7 +514,7 @@ export const RunDetails = React.memo(
     project: Project;
     experiment: Experiment;
     dspyStepSummary: DSPyStepSummary;
-    workflowVersion?: WorkflowVersion;
+    workflowVersion?: ExperimentRunWorkflowVersion;
     size?: "md" | "sm";
   }) {
     const dspyStep = api.experiments.getExperimentDSPyStep.useQuery(

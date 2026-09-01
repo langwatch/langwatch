@@ -24,22 +24,33 @@
  * the process must supply ONE implementation of each check that accepts both
  * vocabularies, rather than the two it used to supply.
  *
- * ## The two type parameters
+ * ## The budget rows, and why they are not type parameters
  *
- * `TApplicableBudgets` and `TDirectBudget` are shapes the PROCESS owns and this
- * package cannot name. They stay generic, with `unknown` defaults, for the same
- * reason the transports' `TPorts extends …TrpcPorts` generic existed: a tRPC
- * router's output type is what the browser types against, and collapsing either
- * of these to `unknown` would take the shape off the wire contract. A process
- * that composes `GatewayApp` with its concrete shapes gets them back out of
- * every router built over it.
+ * The applicable-budget list and a key's own direct budget used to be
+ * `TApplicableBudgets` and `TDirectBudget`, generic with `unknown` defaults, on
+ * the theory that only the composing process could name them and that a
+ * process composing `GatewayApp` with its concrete shapes would get them back
+ * out of every router built over it. It did not work that way. Every tRPC
+ * transport declares `app: Readonly<{ gateway: GatewayApp }>` with no type
+ * arguments, which under the old declaration meant `GatewayApp<unknown,
+ * unknown>`, and a generic router body is checked once against its constraint
+ * — so `unknown` was what the browser typed against no matter what the process
+ * wired in. `VirtualKeyBudgetSection`, `VirtualKeyEditDrawer` and the
+ * virtual-keys page all read fields off those rows.
+ *
+ * They are wire shapes, so they now live in `@langwatch/gateway-contract` as
+ * {@link GatewayApplicableBudget} and {@link GatewayVirtualKeyDirectBudget},
+ * where the browser and this package name the same declaration and there is
+ * nothing left for a type parameter to carry.
  */
 import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   parseVirtualKeyConfig,
+  type GatewayApplicableBudget,
   type GatewayService,
+  type GatewayVirtualKeyDirectBudget,
   type GuardrailAttachment,
   type VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
@@ -254,7 +265,7 @@ export type GatewayApplicableBudgetTarget = Readonly<{
  * money formatting, the DTO projections themselves — lives in this package and
  * is imported directly rather than passed through.
  */
-export interface GatewayAppDependencies<TApplicableBudgets = unknown, TDirectBudget = unknown> {
+export interface GatewayAppDependencies {
   // ── The feature's own services and stores ────────────────────────────────
 
   /** The virtual-key read and write capability. */
@@ -456,13 +467,13 @@ export interface GatewayAppDependencies<TApplicableBudgets = unknown, TDirectBud
   /** Every budget that would constrain a draft or existing key. */
   resolveApplicableBudgets(input: {
     target: GatewayApplicableBudgetTarget;
-  }): Promise<TApplicableBudgets>;
+  }): Promise<GatewayApplicableBudget[]>;
   /** The budget each named key carries of its own, with this period's spend. */
   loadDirectBudgetsForKeys(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
     now: Date;
-  }): Promise<Map<string, TDirectBudget>>;
+  }): Promise<Map<string, GatewayVirtualKeyDirectBudget>>;
   /**
    * Spend and request count per key over a window, from the cost path — the
    * same source the dashboard's key list and the Usage tab read, so the number
@@ -475,16 +486,12 @@ export interface GatewayAppDependencies<TApplicableBudgets = unknown, TDirectBud
   }): Promise<Map<string, { spentUsd: string; requests: number }>>;
 }
 
-export class GatewayApp<TApplicableBudgets = unknown, TDirectBudget = unknown> {
-  static create<TApplicableBudgets = unknown, TDirectBudget = unknown>(
-    dependencies: GatewayAppDependencies<TApplicableBudgets, TDirectBudget>,
-  ): GatewayApp<TApplicableBudgets, TDirectBudget> {
+export class GatewayApp {
+  static create(dependencies: GatewayAppDependencies): GatewayApp {
     return new GatewayApp(dependencies);
   }
 
-  private constructor(
-    private readonly dependencies: GatewayAppDependencies<TApplicableBudgets, TDirectBudget>,
-  ) {}
+  private constructor(private readonly dependencies: GatewayAppDependencies) {}
 
   // ── The services and stores, as the doors reach them ─────────────────────
 
@@ -667,7 +674,7 @@ export class GatewayApp<TApplicableBudgets = unknown, TDirectBudget = unknown> {
 
   resolveApplicableBudgets(input: {
     target: GatewayApplicableBudgetTarget;
-  }): Promise<TApplicableBudgets> {
+  }): Promise<GatewayApplicableBudget[]> {
     return this.dependencies.resolveApplicableBudgets(input);
   }
 
@@ -675,7 +682,7 @@ export class GatewayApp<TApplicableBudgets = unknown, TDirectBudget = unknown> {
     organizationId: string;
     virtualKeyIds: readonly string[];
     now: Date;
-  }): Promise<Map<string, TDirectBudget>> {
+  }): Promise<Map<string, GatewayVirtualKeyDirectBudget>> {
     return this.dependencies.loadDirectBudgetsForKeys(input);
   }
 

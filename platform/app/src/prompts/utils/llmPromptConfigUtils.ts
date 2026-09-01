@@ -697,6 +697,9 @@ export function versionedPromptToOptimizationStudioNodeData(
     | "promptId"
     | "promptVersionId"
     | "promptDraft"
+    // The legacy root slot. A current graph carries its LLM config in
+    // `parameters` under the "llm" identifier, which is what this builds.
+    | "llm"
   >
 > {
   return {

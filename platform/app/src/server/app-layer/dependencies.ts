@@ -39,9 +39,7 @@ import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
 import type { GatewayService } from "@langwatch/gateway-server";
 import type { GatewayVirtualKeySpendPort } from "@langwatch/gateway-server";
 import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
-import type { ApplicableBudget } from "~/server/gateway/applicableBudgets.service";
 import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import type { VirtualKeyDirectBudget } from "~/server/gateway/virtualKeyDirectBudget.service";
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import type { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
@@ -236,7 +234,7 @@ export interface AppDependencies {
    * package cannot name. They are pinned here rather than left `unknown` so a
    * tRPC router built over the application keeps them on its wire contract.
    */
-  gatewayApp: GatewayApp<ApplicableBudget[], VirtualKeyDirectBudget>;
+  gatewayApp: GatewayApp;
   /**
    * The Licensing feature's application, which its two tRPC transports read
    * off the request context rather than take as ports.

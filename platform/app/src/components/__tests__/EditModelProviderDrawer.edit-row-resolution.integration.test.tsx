@@ -226,10 +226,8 @@ function notReadyQueryResult() {
 
 /** Collapsed record has only rowB; flat list has both rows; every query resolved. */
 function primeQueriesLoaded() {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue(
-    readyQueryResult({ providers: { openai: rowB }, modelMetadata: {} }),
-  );
-  const flat = readyQueryResult({ providers: [rowA, rowB], modelMetadata: {} });
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(readyQueryResult({ openai: rowB }));
+  const flat = readyQueryResult([rowA, rowB]);
   mockListAllForOrganizationForFrontendQuery.mockReturnValue(flat);
   mockListAllForProjectForFrontendQuery.mockReturnValue(flat);
 }
@@ -243,9 +241,7 @@ function primeQueriesLoaded() {
  * variant; priming both keeps this fixture correct regardless of branch.
  */
 function primeQueriesFlatListLoading() {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue(
-    readyQueryResult({ providers: { openai: rowB }, modelMetadata: {} }),
-  );
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(readyQueryResult({ openai: rowB }));
   const flat = notReadyQueryResult();
   mockListAllForOrganizationForFrontendQuery.mockReturnValue(flat);
   mockListAllForProjectForFrontendQuery.mockReturnValue(flat);

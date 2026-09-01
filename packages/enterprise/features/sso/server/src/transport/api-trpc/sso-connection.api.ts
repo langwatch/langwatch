@@ -39,13 +39,53 @@ import { z } from "zod";
 type OperatorActor = Readonly<{ userId: string }>;
 
 /**
+ * One connection as the back office reads it.
+ *
+ * Structural rather than imported, for the same reason the port below is: the
+ * service is the process's. Named fields, not `unknown` — a tRPC procedure
+ * publishes what its handler returns, so an `unknown` here is what the browser
+ * gets, and the back-office list was reading `total`, `connections` and every
+ * row field off `{}`.
+ */
+export type BackofficeSsoConnection = Readonly<{
+  connectionId: string;
+  organizationId: string;
+  /** Null when the organization no longer exists. */
+  organizationName: string | null;
+  type: string;
+  state: string;
+  claimedDomains: string[];
+  approvedDomains: string[];
+  verifiedDomains: string[];
+  domainVerifications: {
+    domain: string;
+    method: string;
+    actorId: string | null;
+    verifiedAtMs: number;
+  }[];
+  providerId: string;
+  issuer: string | null;
+  allowsJit: boolean;
+  source: string;
+  testLoginAccountId: string | null;
+  rejection: { domain: string; note: string } | null;
+  pendingVerificationDomain: string | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}>;
+
+/**
  * What the back office reads and commands. Structural rather than imported:
  * the service is the process's, composed over its own identity storage, and
  * this surface only ever gates it and hands the operator through.
  */
 type SsoConnectionBackoffice = Readonly<{
-  list(input: { page: number; pageSize: number; search?: string }): Promise<unknown>;
-  getById(input: { connectionId: string }): Promise<unknown>;
+  list(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<{ connections: BackofficeSsoConnection[]; total: number }>;
+  getById(input: { connectionId: string }): Promise<BackofficeSsoConnection | null>;
   registerConnection(input: {
     organizationId: string;
     type: string;

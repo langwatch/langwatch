@@ -289,7 +289,8 @@ export default async function execute() {
   const codingAgentSpec = await generateSpecs(
     createCodingAgentRestApp({
       security: appRestSecurity,
-      codingAgents: specOnlyServices.codingAgents,
+      app: specOnlyServices.codingAgents,
+      audit: specOnlyServices.codingAgentAudit,
     }).hono,
   );
   console.log("Building dashboards spec...");
@@ -304,7 +305,7 @@ export default async function execute() {
   const datasetSpec = await generateSpecs(
     createDatasetRestApp({
       security: appRestSecurity,
-      dataset: specOnlyServices.datasets,
+      app: specOnlyServices.datasets,
       platformUrl: specOnlyPorts.platformUrl,
       authorizeDirectUpload: specOnlyPorts.authorizeDatasetDirectUpload,
     }).hono,
@@ -313,8 +314,7 @@ export default async function execute() {
   const evaluatorsSpec = await generateSpecs(
     createEvaluatorsRestApp({
       security: appRestSecurity,
-      evaluators: specOnlyServices.evaluators,
-      modelProviders: specOnlyServices.modelProviders,
+      app: specOnlyServices.evaluators,
       platformUrl: specOnlyPorts.platformUrl,
       organizationMiddleware: specOnlyPorts.organizationMiddleware,
     }).hono,
@@ -330,7 +330,7 @@ export default async function execute() {
   const experimentsSpec = await generateSpecs(
     createExperimentsRestApp({
       security: appRestSecurity,
-      experiments: specOnlyServices.experiments,
+      app: specOnlyServices.experiments,
     }).hono,
   );
   console.log("Building legacy evaluations spec...");
@@ -350,8 +350,7 @@ export default async function execute() {
   const governanceSpec = await generateSpecs(
     createGovernanceRestApp({
       security: appRestSecurity,
-      governance: specOnlyServices.governance,
-      projects: specOnlyServices.projects,
+      app: specOnlyServices.governance,
     }).hono,
   );
   console.log("Building graphs spec...");
@@ -384,13 +383,14 @@ export default async function execute() {
       extractInlineMedia: specOnlyPorts.extractInlineMedia,
       traceUsageGuard: specOnlyPorts.traceUsageGuard,
       bodyLimit: specOnlyPorts.bodyLimit,
+      platformUrl: specOnlyPorts.platformUrl,
     }).hono,
   );
   console.log("Building monitors spec...");
   const monitorsSpec = await generateSpecs(
     createMonitorRestApp({
       security: appRestSecurity,
-      monitors: specOnlyServices.monitors,
+      app: specOnlyServices.monitors,
       platformUrl: specOnlyPorts.platformUrl,
       mappingsSchema: monitorMappingsSchema,
     }).hono,
@@ -460,7 +460,7 @@ export default async function execute() {
     createScimTokensRestApp({
       security: appRestSecurity,
       enterpriseGate: requireEnterprisePlanRest("SCIM"),
-      scim: specOnlyIdentity.scim,
+      app: specOnlyIdentity.scim,
       audit: specOnlyIdentity.managementAudit,
     }),
     FRAMEWORK_SPEC_OPTIONS,
@@ -500,8 +500,6 @@ export default async function execute() {
     createSuiteRestApp({
       security: appRestSecurity,
       suites: specOnlyServices.suites,
-      scenarios: specOnlyServices.scenarios,
-      projects: specOnlyServices.projects,
       platformUrl: specOnlyPorts.platformUrl,
     }).hono,
   );

@@ -24,6 +24,22 @@ import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
  *
  * Exported for unit testing.
  */
+/**
+ * The avatar an OIDC profile carries, or nothing.
+ *
+ * better-auth types `picture` as `unknown` on a generic-OAuth profile, because
+ * a provider may answer anything there — Auth0 sends a URL string, some IdPs
+ * send an object, most SAML connections send nothing at all. `OAuthMappedUser`
+ * accepts only a string, so the narrowing happens here rather than at each
+ * provider, in the same shape `fallbackNameImplementation` uses.
+ */
+function profilePicture(...candidates: readonly unknown[]): string | undefined {
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim() !== "") return candidate;
+  }
+  return undefined;
+}
+
 const fallbackNameImplementation = {
   execute(profile: Record<string, any>): string {
     return (
@@ -274,8 +290,8 @@ const oidcProviderImplementation = {
       redirectURI: BetterAuthSsoAdapter.legacyCallbackUrl({ baseUrl, providerId }),
       mapProfileToUser: (profile) => ({
         name: BetterAuthSsoAdapter.fallbackName(profile),
-        email: profile.email,
-        image: profile.picture,
+        email: profile.email ?? undefined,
+        image: profilePicture(profile.picture),
       }),
     };
   },
@@ -433,12 +449,12 @@ const genericOAuthImplementation = {
           const mapped: {
             name: string;
             email: string | undefined;
-            image: string | null | undefined;
+            image: string | undefined;
             emailVerified?: true;
           } = {
             name: BetterAuthSsoAdapter.fallbackName(profile),
-            email: profile.email,
-            image: profile.picture,
+            email: profile.email ?? undefined,
+            image: profilePicture(profile.picture),
           };
           // SAML sign-ins count as verified: the email was asserted by the
           // organization's own IdP, but Auth0 reports `email_verified: false`
@@ -481,8 +497,8 @@ const genericOAuthImplementation = {
         }),
         mapProfileToUser: (profile) => ({
           name: BetterAuthSsoAdapter.fallbackName(profile),
-          email: profile.email,
-          image: profile.image ?? profile.picture,
+          email: profile.email ?? undefined,
+          image: profilePicture(profile.image, profile.picture),
         }),
       });
     }

@@ -141,7 +141,7 @@ export function BudgetCreateDrawer({
   );
   const providerOptions = useMemo(
     () =>
-      (providersQuery.data?.providers ?? [])
+      (providersQuery.data ?? [])
         .filter((p) => p.id)
         .map((p) => ({ id: p.id!, name: p.name ?? p.provider })),
     [providersQuery.data],

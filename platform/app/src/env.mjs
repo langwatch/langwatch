@@ -55,7 +55,12 @@ export function getEnvironmentConfig() {
  * @type {AppEnvironment}
  */
 export const env = new Proxy(
-  {},
+  // The target is never read: every trap below answers from the installed
+  // configuration, which `getEnvironmentConfig` types as `AppEnvironment`.
+  // `Proxy` takes the presented type from its target, and TypeScript has no
+  // way to say "presents X over an empty object", so the target is named as
+  // the type the traps make it behave as.
+  /** @type {AppEnvironment} */ ({}),
   {
     get(_target, property) {
       return Reflect.get(getEnvironmentConfig(), property);

@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
-import { ExperimentType } from "../../src/generated/prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { prisma } from "../../src/server/db";
 import { encrypt } from "../../src/utils/encryption";
 

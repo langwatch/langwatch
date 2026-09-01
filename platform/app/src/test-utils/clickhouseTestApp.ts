@@ -172,9 +172,9 @@ export function installClickHouseTestApp({
   const baseApp = createTestApp();
   const governanceVirtualKeys = baseApp.gatewayStores.virtualKeys;
   const governanceOptions = {
-    organizations: baseApp.organizations,
-    projects: baseApp.projects,
-    apiKeys: baseApp.apiKeys,
+    organizations: baseApp.organizationService,
+    projects: baseApp.projects.projectService,
+    apiKeys: baseApp.apiKeys.apiKeyService,
     gatewayBaseUrl: "http://localhost:5563",
     setupActivity: governanceTraceActivity,
     ocsfEvents: governanceOcsfEvents,
@@ -182,7 +182,7 @@ export function installClickHouseTestApp({
     virtualKeys: governanceVirtualKeys,
     budgetOverview: BudgetOverviewService.create({
       database: prisma,
-      organizations: baseApp.organizations,
+      organizations: baseApp.organizationService,
       featureFlags: baseApp.featureFlags,
       personalVirtualKeys: governanceVirtualKeys,
       personalUsage,
@@ -238,7 +238,7 @@ export function installClickHouseTestApp({
     execution: AppEvaluationExecutionPort.create(async () => ({
       status: "skipped",
     })),
-    workflows: baseApp.workflows,
+    workflows: baseApp.workflows.workflowService,
     featureFlags: baseApp.featureFlags,
     storedObjects: baseApp.storedObjects,
     inputsOffloadConfig: baseApp.config.evaluationInputsOffload,
@@ -265,8 +265,8 @@ export function installClickHouseTestApp({
       }),
     },
     governance,
-    organizations: baseApp.organizations,
-    projects: baseApp.projects,
+    organizations: baseApp.organizationService,
+    projects: baseApp.projects.projectService,
     billableEvents: ClickHouseBillingAdapter.create({
       resolveClient: required,
       resolveOrganizationClient: requiredOrg,

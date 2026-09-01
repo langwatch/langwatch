@@ -241,7 +241,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const modelOptionsByRole = useMemo(() => {
     const isLoading = projectProviders.isLoading;
     const hasProviderLoadError = projectProviders.isError;
-    const providers = projectProviders.data?.providers ?? [];
+    const providers = projectProviders.data ?? [];
     const enabledEntries: Array<[string, (typeof providers)[number]]> = providers
       .filter((p) => p.enabled === true)
       .map((p) => [p.provider, p]);
@@ -309,7 +309,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // Configured custom-model display names for every provider row this
   // project can see, keyed by `<provider>/<modelId>`.
   const displayNames = useMemo(
-    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    () => buildCustomModelDisplayNames(projectProviders.data ?? []),
     [projectProviders.data],
   );
 

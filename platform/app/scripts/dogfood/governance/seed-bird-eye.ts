@@ -553,7 +553,7 @@ export async function runSeedBirdEye(args: Args): Promise<SeedBirdEyeSummary> {
       `data-spread=${args.days * 2}d rows=${args.rows}`,
   );
 
-  const govProject = await getApp().projects.ensureInternal({
+  const govProject = await getApp().projects.projectService.ensureInternal({
     organizationId: args.organizationId,
     kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
   });

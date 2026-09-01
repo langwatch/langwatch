@@ -17,9 +17,7 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       listAllForProjectForFrontend: {
         useQuery: vi.fn(() => ({
-          data: {
-            providers: [{ provider: "openai", enabled: true, customModels: [] }],
-          },
+          data: [{ provider: "openai", enabled: true, customModels: [] }],
         })),
       },
       getResolvedDefault: {

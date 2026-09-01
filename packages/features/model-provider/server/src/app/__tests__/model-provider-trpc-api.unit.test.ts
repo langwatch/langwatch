@@ -50,7 +50,12 @@ function harness({
   const recordAudit = vi.fn();
   const validateProviderApiKey = vi.fn(async () => ({ outcome: "verified", valid: true }));
   const validateKeyWithCustomUrl = vi.fn(async () => ({ outcome: "verified", valid: true }));
-  const startCodexDeviceSignIn = vi.fn(async () => ({ userCode: "ABCD-EFGH" }));
+  const startCodexDeviceSignIn = vi.fn(async () => ({
+    userCode: "ABCD-EFGH",
+    deviceAuthId: "device-auth-1",
+    verificationUrl: "https://auth.openai.com/codex/device",
+    intervalSeconds: 5,
+  }));
   const pollCodexDeviceSignIn = vi.fn(async () => pollResult);
 
   /** Every input the policy middleware saw, keyed by nothing — order only. */
@@ -229,6 +234,13 @@ describe("ModelProviderTrpcApi", () => {
         openai: {
           id: "mp_openai",
           provider: "openai",
+          // The row's own name and its scopes are part of the wire shape: the
+          // settings table labels and orders by them, and the gateway pickers
+          // fail closed on `disabledAt`. Named here rather than left off,
+          // because `toEqual` treats a missing key and an `undefined` one
+          // alike — so an omitted field asserts nothing at all.
+          name: "OpenAI",
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
           enabled: true,
           customKeys: { OPENAI_API_KEY: "**redacted**" },
           customModels: [{ id: "my-model", label: "My Model", type: "chat" }],
@@ -246,7 +258,13 @@ describe("ModelProviderTrpcApi", () => {
       expect(result.openai).toEqual({
         id: "mp_openai",
         provider: "openai",
+        name: "OpenAI",
+        scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
         enabled: true,
+        // Absent on the row means "never withdrawn" and "not yet probed"; both
+        // travel as null so the browser reads an answer rather than a gap.
+        disabledAt: null,
+        healthStatus: null,
         customKeys: { OPENAI_API_KEY: "**redacted**" },
         deploymentMapping: null,
         models: ["gpt-5"],

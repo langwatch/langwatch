@@ -26,7 +26,7 @@ import { dirname, resolve } from "node:path";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import { nextResetAt } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-server";
 
 const TAG = "vkpolish";
 
@@ -172,7 +172,7 @@ async function createInheritedBudgets(target: SeedTarget) {
     createdById: target.userId,
     // The same computation the service uses, so a monthly budget shows a
     // month boundary rather than "resets in about 24 hours".
-    resetsAt: nextResetAt("MONTH"),
+    resetsAt: GatewayWindow.nextResetAt("MONTH"),
   };
   await prisma.gatewayBudget.create({
     data: {

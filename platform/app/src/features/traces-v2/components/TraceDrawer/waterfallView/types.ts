@@ -12,7 +12,7 @@ import {
   LuWrench,
 } from "react-icons/lu";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { SPAN_TYPE_COLORS } from "@langwatch/trace-web";
+import { spanTypeColor } from "../../../utils/spanTypeColor";
 import { isSkillSpan } from "../transcript/skillInvocation";
 
 export interface WaterfallViewProps {
@@ -130,5 +130,5 @@ export function getSpanBarColor(
   name: string | null | undefined,
 ): string {
   if (isSkillSpan({ type, name })) return "purple.solid";
-  return (SPAN_TYPE_COLORS[type ?? "span"] as string) ?? "gray.solid";
+  return spanTypeColor(type);
 }

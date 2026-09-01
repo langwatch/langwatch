@@ -31,6 +31,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "nanoid": "^5.1.5",

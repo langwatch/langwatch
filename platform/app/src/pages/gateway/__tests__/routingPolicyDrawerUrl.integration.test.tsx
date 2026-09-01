@@ -112,24 +112,22 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       listAllForOrganizationForFrontend: {
         useQuery: () => ({
-          data: {
-            providers: [
-              {
-                id: "mp-openai",
-                name: "ACME OpenAI",
-                provider: "openai",
-                disabledAt: null,
-                healthStatus: "HEALTHY",
-              },
-              {
-                id: "mp-anthropic",
-                name: "ACME Anthropic",
-                provider: "anthropic",
-                disabledAt: null,
-                healthStatus: "HEALTHY",
-              },
-            ],
-          },
+          data: [
+            {
+              id: "mp-openai",
+              name: "ACME OpenAI",
+              provider: "openai",
+              disabledAt: null,
+              healthStatus: "HEALTHY",
+            },
+            {
+              id: "mp-anthropic",
+              name: "ACME Anthropic",
+              provider: "anthropic",
+              disabledAt: null,
+              healthStatus: "HEALTHY",
+            },
+          ],
           isLoading: false,
         }),
       },

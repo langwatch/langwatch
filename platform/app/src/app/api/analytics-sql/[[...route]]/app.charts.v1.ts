@@ -34,8 +34,8 @@
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { LWQL_VEGA_LIMITS, measureSpecBytes } from "@langwatch/analytics-web/visualization";
-import type { Project } from "~/generated/prisma/client";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
@@ -197,7 +197,7 @@ function chartResource({
   project,
 }: {
   chart: SavedWorkbenchChart;
-  project: Project;
+  project: ProjectIdentity;
 }): z.infer<typeof chartSchema> {
   return {
     id: chart.id,
@@ -377,16 +377,19 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const protections =
+      const definitionUpdate =
         definition === undefined
           ? undefined
-          : await getProtectionsForProject(prisma, { projectId: project.id });
+          : {
+              definition,
+              protections: await getProtectionsForProject(prisma, { projectId: project.id }),
+            };
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.updateSavedWorkbenchChart({
           chartId: chartIdOf(c.req.param("chartId")),
           projectId: project.id,
           ...(name === undefined ? {} : { name }),
-          ...(definition === undefined ? {} : { definitionUpdate: { definition, protections } }),
+          ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
         }),
       );
       return c.json(chartResource({ chart, project }));

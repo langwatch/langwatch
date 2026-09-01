@@ -1,4 +1,8 @@
-import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCQueryProcedure } from "@trpc/server";
+import type {
+  TRPCBuiltRouter,
+  TRPCDefaultErrorShape,
+  TRPCQueryProcedure,
+} from "@trpc/server";
 import {
   type WorkflowVersionHistoryEntry,
   type WorkflowWithVersion,
@@ -41,11 +45,28 @@ type Query<TInput, TOutput> = TRPCQueryProcedure<{
 }>;
 
 /**
+ * The root types the clients of this router actually run with.
+ *
+ * `AnyTRPCRootTypes` leaves `transformer` as `any`, and tRPC's output
+ * inference branches on it — so `any extends false` takes both branches and
+ * every procedure's output came back as `Serialize<T> | T`. A `Date` reached
+ * the caller as `string | Date` and nothing could read it as the `Date` it is.
+ * Every client of this router goes through the app's superjson transport, so
+ * the transformer is pinned here rather than left unknown.
+ */
+type WorkflowApiRootTypes = {
+  ctx: object;
+  meta: object;
+  errorShape: TRPCDefaultErrorShape;
+  transformer: true;
+};
+
+/**
  * Portable type map for workflow procedures still implemented by the legacy
  * application router. API-side conformance keeps this temporary seam honest.
  */
 export type WorkflowApiRouter = TRPCBuiltRouter<
-  AnyTRPCRootTypes,
+  WorkflowApiRootTypes,
   {
     workflow: {
       engineMode: Query<WorkflowApiEngineModeInput, WorkflowApiEngineModeOutput>;

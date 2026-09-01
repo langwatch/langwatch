@@ -45,22 +45,20 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       listAllForProjectForFrontend: {
         useQuery: () => ({
-          data: {
-            providers: [
-              {
-                provider: "azure",
-                enabled: true,
-                customModels: [
-                  {
-                    modelId: "gpt-5.1",
-                    displayName: "Marketing GPT-5.1",
-                    mode: "chat",
-                  },
-                ],
-                customEmbeddingsModels: null,
-              },
-            ],
-          },
+          data: [
+            {
+              provider: "azure",
+              enabled: true,
+              customModels: [
+                {
+                  modelId: "gpt-5.1",
+                  displayName: "Marketing GPT-5.1",
+                  mode: "chat",
+                },
+              ],
+              customEmbeddingsModels: null,
+            },
+          ],
           isLoading: false,
         }),
       },

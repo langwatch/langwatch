@@ -42,11 +42,12 @@ export const useRunEvalution = () => {
     },
   });
 
-  const { previousVersion, nextVersion, latestVersion } = useVersionState({
-    project,
-    form: form,
-    allowSaveIfAutoSaveIsCurrentButNotLatest: true,
-  });
+  const { previousVersion, previousVersionDsl, nextVersion, latestVersion } =
+    useVersionState({
+      project,
+      form: form,
+      allowSaveIfAutoSaveIsCurrentButNotLatest: true,
+    });
 
   const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
 
@@ -131,9 +132,7 @@ export const useRunEvalution = () => {
 
       const hasChanges =
         latestVersion?.autoSaved &&
-        (previousVersion?.dsl
-          ? hasDSLChanged(workflow, previousVersion.dsl, false)
-          : true);
+        (previousVersionDsl ? hasDSLChanged(workflow, previousVersionDsl, false) : true);
 
       let versionId =
         workflow_version_id ??
@@ -141,11 +140,11 @@ export const useRunEvalution = () => {
       // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
       if (hasChanges && !workflow_version_id) {
         let commitMessage = previousVersion ? "autosaved" : "first version";
-        if (previousVersion?.dsl && resolvedCommitMessageModel.data != null) {
+        if (previousVersionDsl && resolvedCommitMessageModel.data != null) {
           try {
             const commitMessageResponse = await generateCommitMessage.mutateAsync({
               projectId: project?.id ?? "",
-              prevDsl: previousVersion?.dsl,
+              prevDsl: previousVersionDsl,
               newDsl: getWorkflow(),
             });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
@@ -220,6 +219,7 @@ export const useRunEvalution = () => {
       getWorkflow,
       latestVersion,
       previousVersion,
+      previousVersionDsl,
       setEvaluationState,
       postEvent,
       generateCommitMessage,

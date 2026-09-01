@@ -3,7 +3,7 @@ import type { Experiment, ExperimentService } from "@langwatch/experiment-contra
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import type { ExperimentType, Project } from "~/generated/prisma/client";
+import type { ExperimentType } from "~/generated/prisma/client";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -85,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const experiment = await findOrCreateExperiment({
-    experiments: app.experiments,
+    experiments: app.experiments.experimentService,
     project,
     experiment_slug: params.experiment_slug,
     experiment_type: params.experiment_type,
@@ -116,7 +116,12 @@ export const findOrCreateExperiment = async ({
   workflowId,
 }: {
   experiments: ExperimentService;
-  project: Project;
+  /**
+   * Only the id is read. The API boundary carries a `ProjectIdentity` rather
+   * than a project row, so naming the row here would ask three call sites for
+   * a read none of them makes.
+   */
+  project: Readonly<{ id: string }>;
   experiment_id?: string | null;
   experiment_slug?: string | null;
   experiment_type: ExperimentType;

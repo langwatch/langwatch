@@ -11,6 +11,7 @@ import type z from "zod";
 import {
   buildWorkflowLlmConfig,
   buildLlmSignatureNode,
+  type ChatMessage,
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
   type StudioClientEvent,
@@ -23,7 +24,6 @@ import {
   type PromptConfigFormValues,
   versionMetadataToNodeFormat,
 } from "@langwatch/prompt-web/forms";
-import type { ChatMessage } from "@langwatch/trace-contract";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";

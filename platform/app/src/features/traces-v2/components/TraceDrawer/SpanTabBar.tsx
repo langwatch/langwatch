@@ -21,7 +21,8 @@ import {
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import { formatDuration, SPAN_TYPE_COLORS, useDrawerStore } from "@langwatch/trace-web";
+import { formatDuration, useDrawerStore } from "@langwatch/trace-web";
+import { spanTypeColor } from "../../utils/spanTypeColor";
 import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**
@@ -454,8 +455,7 @@ function SpanTab({
   presence,
   overflowId,
 }: SpanTabProps) {
-  const activeBorderColor =
-    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const activeBorderColor = spanTypeColor(span.type);
   return (
     <Tooltip
       content={

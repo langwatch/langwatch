@@ -54,6 +54,14 @@ export const publicAppConfigProjectionDefinition = RuntimeConfig.define({
     nlpLambdaConfig: Config.value(z.string().optional(), { env: "LANGWATCH_NLP_LAMBDA_CONFIG" }),
     langevalsEndpoint: Config.value(z.string().optional(), { env: "LANGEVALS_ENDPOINT" }),
   },
+  identity: {
+    passkeys: Config.value(z.enum(["off", "on"]).optional().default("off"), {
+      env: "PASSKEYS_ENABLED",
+    }),
+    router: Config.value(z.enum(["off", "shadow", "enforce"]).optional().default("off"), {
+      env: "IDENTITY_ROUTER_V2",
+    }),
+  },
   licensePaymentUrl: Config.value(z.string().min(1).optional(), {
     env: "STRIPE_LICENSE_PAYMENT_LINK_URL",
   }),
@@ -85,7 +93,7 @@ export type UiPublicBootstrap = Readonly<{
 export type PublicAppConfigSource = Readonly<{
   BASE_HOST?: string;
   DEMO_PROJECT_SLUG?: string;
-  NODE_ENV: "development" | "test" | "production";
+  NODE_ENV?: string;
   UI_PROCESS_ROLE?: string;
   EMAIL_PROVIDER?: string;
   USE_AWS_SES?: string | boolean;
@@ -105,6 +113,8 @@ export type PublicAppConfigSource = Readonly<{
   LANGWATCH_NLP_SERVICE?: string;
   LANGWATCH_NLP_LAMBDA_CONFIG?: string;
   LANGEVALS_ENDPOINT?: string;
+  PASSKEYS_ENABLED?: string;
+  IDENTITY_ROUTER_V2?: string;
   STRIPE_LICENSE_PAYMENT_LINK_URL?: string;
 }> &
   Readonly<Record<string, unknown>>;
@@ -181,6 +191,11 @@ function projectPublicAppConfig(config: PublicAppConfigValues): PublicAppConfig 
       nlp: Boolean(config.capabilities.nlpService || config.capabilities.nlpLambdaConfig),
       langevals: Boolean(config.capabilities.langevalsEndpoint),
     },
+    // `deploymentOffersPasskeys()` and `signInRouterMode()` are the server
+    // halves of these two reads; keeping the derivation identical is what
+    // stops the button and the endpoint behind it from disagreeing.
+    passkeys: config.identity.passkeys === "on",
+    identityFrontDoor: config.identity.router === "enforce",
     licensePaymentUrl: config.licensePaymentUrl,
   });
 }

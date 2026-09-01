@@ -22,7 +22,9 @@ import type { PrismaClient } from "~/generated/prisma/client";
  */
 export class AdminEmailPlatformOperators implements SsoPlatformOperatorRepository {
   private readonly access = AdminAccessService.create({
-    adminEmails: env.ADMIN_EMAILS,
+    // Unset means nobody: an empty operator list is the fail-closed answer,
+    // and it is the same reading the back office itself takes.
+    adminEmails: env.ADMIN_EMAILS ?? "",
   });
 
   constructor(private readonly prisma: PrismaClient) {}

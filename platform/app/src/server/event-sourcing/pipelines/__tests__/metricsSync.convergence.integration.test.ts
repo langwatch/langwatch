@@ -36,6 +36,7 @@ import {
 import { AssignTopicCommand } from "@langwatch/trace-server";
 import { RecordSpanCommand } from "@langwatch/trace-server";
 import { SpanCostService } from "@langwatch/trace-server";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import { SpanStorageMapProjection } from "@langwatch/trace-server";
 import { SpanStorageStore } from "@langwatch/trace-server";
 import { TraceSummaryFoldProjection } from "@langwatch/trace-server";
@@ -372,7 +373,17 @@ describe.skipIf(!hasTestcontainers)(
         });
         const { scenarioRoleCosts, scenarioRoleLatencies } = deriveScenarioRoleMetricsFromSpans({
           spans,
-          spanCostService: new SpanCostService(),
+          spanCostService: SpanCostService.create({
+            modelCosts: {
+              estimate: ({ attributes, model, promptTokens, completionTokens }) =>
+                computeSpanCost({
+                  attrs: attributes,
+                  model,
+                  promptTokens,
+                  completionTokens,
+                }),
+            },
+          }),
         });
 
         expect(scenarioRoleCosts.Agent).toBeGreaterThan(0);

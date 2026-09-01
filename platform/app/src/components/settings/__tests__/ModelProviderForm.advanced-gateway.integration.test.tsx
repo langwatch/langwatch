@@ -188,12 +188,12 @@ function primeHooks({ gatewayEnabled }: { gatewayEnabled: boolean }) {
   // Flat-list counterpart of the collapsed record above — same row, so
   // the id-based lookup in ModelProviderForm still resolves "mp_existing".
   mockListAllForOrgQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });
   mockListAllForProjectQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });

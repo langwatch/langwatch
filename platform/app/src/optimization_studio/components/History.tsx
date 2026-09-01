@@ -22,7 +22,11 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { workflowApi } from "../../utils/workflow-api";
 import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
-import { hasDSLChanged, parseStudioWorkflow } from "@langwatch/workflow-contract";
+import {
+  hasDSLChanged,
+  parseStudioWorkflow,
+  studioWorkflowSchema,
+} from "@langwatch/workflow-contract";
 import { NewVersionFields } from "./VersionToBeUsed";
 
 export function History() {
@@ -330,6 +334,20 @@ export const useVersionState = ({
   const currentVersion = versions.data?.find((version) => version.isCurrentVersion);
   const previousVersion = versions.data?.find((version) => version.isPreviousVersion);
   const latestVersion = versions.data?.find((version) => version.isLatestVersion);
+  /**
+   * `getVersions` publishes the open `WorkflowDsl` envelope, while the diff and
+   * the commit-message autogen both need the typed Studio refinement. Parse it
+   * once here, where the version is read, rather than at each call site.
+   *
+   * A persisted version this Studio schema cannot read comes back as
+   * `undefined`, which is the same "there is no previous DSL" branch the
+   * callers already take on a version fetched without one.
+   */
+  const previousVersionDsl = useMemo(() => {
+    if (!previousVersion?.dsl) return undefined;
+    const parsed = studioWorkflowSchema.safeParse(previousVersion.dsl);
+    return parsed.success ? parsed.data : undefined;
+  }, [previousVersion?.dsl]);
   const hasChanges = autosavedWorkflow
     ? hasDSLChanged(getWorkflow(), autosavedWorkflow, false)
     : false;
@@ -382,6 +400,7 @@ export const useVersionState = ({
     versions,
     currentVersion,
     previousVersion,
+    previousVersionDsl,
     latestVersion,
     hasChanges,
     canSaveNewVersion,

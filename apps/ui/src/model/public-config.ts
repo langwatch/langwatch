@@ -23,6 +23,18 @@ export const publicAppConfigSchema = z.strictObject({
     nlp: z.boolean(),
     langevals: z.boolean(),
   }),
+  /**
+   * Whether this deployment mounted the passkey plugin at boot. A derived
+   * boolean rather than the raw setting, because the only thing a browser may
+   * act on is "is there an endpoint behind the button".
+   */
+  passkeys: z.boolean(),
+  /**
+   * Whether the identifier-first screens are the front door on this
+   * deployment (ADR-117 §7). Derived rather than the flag's value: the router
+   * also runs in shadow, and the screens never render then.
+   */
+  identityFrontDoor: z.boolean(),
   licensePaymentUrl: z.string().min(1).optional(),
 });
 

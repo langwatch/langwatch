@@ -134,6 +134,74 @@ export type GatewayResolvedBudget = {
   endUserId: string | null;
 };
 
+/**
+ * One budget that already constrains a virtual key, as the drawers' "already
+ * applies" list renders it.
+ *
+ * A WIRE shape, which is why it is in the contract rather than in the process
+ * that resolves it: the `virtualKeys.applicableBudgets` tRPC procedure answers
+ * an array of these and the browser types against every field below. It used
+ * to be a type parameter on `GatewayApp` (`TApplicableBudgets`) on the theory
+ * that only the process could name it — but a generic constraint does not
+ * carry a shape out to a router's inferred output, so what actually reached
+ * the browser was `unknown`.
+ *
+ * `scopeType`, `window` and `onBreach` are `string` rather than the enums
+ * above because that is what the resolver already emits; tightening them is a
+ * change to the resolver, not to this declaration.
+ */
+export type GatewayApplicableBudget = {
+  id: string;
+  name: string;
+  scopeType: string;
+  scopeId: string;
+  /** Human label for the target, e.g. the team or group name. */
+  scopeLabel: string;
+  window: string;
+  limitUsd: string;
+  spentUsd: string;
+  onBreach: string;
+  /** Null means resets are computed in the default timezone (UTC). */
+  timezone: string | null;
+  /** Null when the budget counts every provider. */
+  providerKey: string | null;
+  /** Display name for `providerKey`, so the list can say "OpenAI only". */
+  providerLabel: string | null;
+  /**
+   * True when the budget is per member of a group rather than a shared pot,
+   * which changes what its limit means to the person reading.
+   */
+  isPerMember: boolean;
+  /**
+   * Set when this row is the budget a key's drawer field manages. The edit
+   * drawer seeds its field from this row and hides it from the inherited
+   * list; independently created key-targeted budgets show as inherited
+   * constraints like any other.
+   */
+  managedByVirtualKeyId: string | null;
+};
+
+/**
+ * The budget a key carries on itself, with what it has spent in that budget's
+ * own current period — the period bar in the virtual-keys table.
+ *
+ * Distinct from the key's calendar-month spend: a daily cap is measured
+ * against today, so a key that spent $2.50 this month can still be at $0.50 of
+ * its $1.00 day. Both numbers travel in `virtualKeys.spendThisMonth`, so both
+ * are wire shapes and both belong here. Same history as
+ * {@link GatewayApplicableBudget}: this was `TDirectBudget`, and the browser
+ * received `unknown`.
+ */
+export type GatewayVirtualKeyDirectBudget = {
+  budgetId: string;
+  window: GatewayBudgetWindow;
+  limitUsd: string;
+  /** Null when the rollup could not be read: unknown, not zero. */
+  periodSpentUsd: string | null;
+  /** End of the period the spend is measured over, ISO-8601. */
+  resetsAt: string;
+};
+
 export type GatewayBudgetScopeTarget = {
   kind: string;
   id: string;

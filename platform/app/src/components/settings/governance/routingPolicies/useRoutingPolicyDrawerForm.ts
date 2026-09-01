@@ -75,7 +75,7 @@ export function useRoutingPolicyDrawerForm({
 
   const values = watch();
   const { providerOptions, boundProviderTypes } = useProviderOptions({
-    providers: providersQuery.data?.providers,
+    providers: providersQuery.data,
     selectedIds: values.modelProviderIds,
   });
 

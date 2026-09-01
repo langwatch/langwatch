@@ -132,8 +132,16 @@ export const componentTypeSchema = z.enum([
 
 export type ComponentType = z.infer<typeof componentTypeSchema>;
 
-// Define the execution state type
-export interface ExecutionState {
+/**
+ * The per-node execution state the engine streams back.
+ *
+ * Written as a type alias, not an interface, so it carries the implicit index
+ * signature every other graph value in this file has: `executionStateSchema`
+ * is a `looseObject` and keeps whatever a newer engine sends, so the TypeScript
+ * shape has to stay open the same way or a `StudioWorkflow` cannot be handed
+ * back to the wire schema it was parsed from.
+ */
+export type ExecutionState = {
   status: ExecutionStatus;
   trace_id?: string;
   span_id?: string;
@@ -191,7 +199,7 @@ export interface ExecutionState {
     started_at?: number;
     finished_at?: number;
   };
-}
+};
 
 export type BaseComponent = {
   _library_ref?: string;

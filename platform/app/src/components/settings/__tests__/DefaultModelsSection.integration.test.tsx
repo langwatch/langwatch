@@ -86,18 +86,16 @@ vi.mock("~/utils/api", () => ({
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({
-          data: {
-            providers: [
-              {
-                id: "mp_test",
-                name: "OpenAI",
-                provider: "openai",
-                enabled: true,
-                customModels: null,
-                customEmbeddingsModels: null,
-              },
-            ],
-          },
+          data: [
+            {
+              id: "mp_test",
+              name: "OpenAI",
+              provider: "openai",
+              enabled: true,
+              customModels: null,
+              customEmbeddingsModels: null,
+            },
+          ],
           isLoading: false,
         }),
       },

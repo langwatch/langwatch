@@ -73,7 +73,7 @@ export function NewVersionFields({
   );
   const canSave = canSaveOverride ?? checkCanCommitNewVersion();
 
-  const { previousVersion, nextVersion } = useVersionState({
+  const { previousVersion, previousVersionDsl, nextVersion } = useVersionState({
     project,
     form,
   });
@@ -143,7 +143,7 @@ export function NewVersionFields({
   );
 
   useEffect(() => {
-    if (canSave && previousVersion?.dsl && !hasTriggeredGeneration.current) {
+    if (canSave && previousVersionDsl && !hasTriggeredGeneration.current) {
       // Hold the one-shot trigger until the model resolution answers,
       // so a slow query doesn't read as "not configured".
       if (!resolvedDefault.isFetched) return;
@@ -158,7 +158,7 @@ export function NewVersionFields({
       if (isModelConfigured) {
         generateCommitMessageTimerRef.current = setTimeout(() => {
           generateCommitMessageTimerRef.current = null;
-          debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
+          debouncedGenerateCommitMessage(previousVersionDsl, getWorkflow());
         }, 0);
       }
     } else if (canSave && !previousVersion) {
@@ -168,7 +168,13 @@ export function NewVersionFields({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, previousVersion?.dsl, resolvedDefault.isFetched, isModelConfigured]);
+  }, [
+    canSave,
+    previousVersion,
+    previousVersionDsl,
+    resolvedDefault.isFetched,
+    isModelConfigured,
+  ]);
 
   useEffect(
     () => () => {
@@ -220,7 +226,7 @@ export function NewVersionFields({
             endElement={
               generateCommitMessage.isPending ? (
                 <AISparklesLoader />
-              ) : canSave && resolvedDefault.isFetched && previousVersion?.dsl ? (
+              ) : canSave && resolvedDefault.isFetched && previousVersionDsl ? (
                 // Always offer an explicit generate affordance: a manual retry
                 // after a failed autogen, a re-roll of a description the user
                 // does not like, or (with no model configured) the trigger that
@@ -235,7 +241,7 @@ export function NewVersionFields({
                   data-testid="generate-commit-message-button"
                   onClick={() => {
                     userEditedCommitMessage.current = false;
-                    generateCommitMessageCallback(previousVersion.dsl!, getWorkflow(), {
+                    generateCommitMessageCallback(previousVersionDsl, getWorkflow(), {
                       force: true,
                     });
                   }}

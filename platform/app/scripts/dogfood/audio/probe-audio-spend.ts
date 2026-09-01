@@ -163,12 +163,14 @@ async function resolveTenant(args: Args): Promise<Tenant> {
   }
   const workspace = await initializeDefaultApp({
     processRole: "web",
-  }).organizations.ensurePersonalWorkspace({
-    userId: user.id,
-    organizationId: picked.id,
-    displayName: null,
-    displayEmail: args.email,
-  });
+  }).organizations.ensurePersonalWorkspace(
+    {
+      organizationId: picked.id,
+      displayName: null,
+      displayEmail: args.email,
+    },
+    { id: user.id },
+  );
   return {
     userId: user.id,
     organizationId: picked.id,

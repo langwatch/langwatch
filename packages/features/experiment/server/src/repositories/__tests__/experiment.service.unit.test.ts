@@ -47,6 +47,7 @@ const row = (overrides: Partial<Experiment> = {}): Experiment => ({
   updatedAt: new Date(0),
   archivedAt: null,
   workbenchState: null,
+  workbenchVersion: 0,
   ...overrides,
 });
 

@@ -11,6 +11,20 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore, WorkflowRunningStatus } from "@langwatch/workflow-web";
 import { getEntryInputs } from "@langwatch/workflow-contract";
+import { z } from "zod";
+
+/**
+ * What the public workflow-run endpoint answers with.
+ *
+ * The chat panel runs the workflow over that endpoint rather than through a
+ * typed procedure, so the body reaches the client as another service's JSON.
+ * `result` is keyed by the workflow's own output field names, which differ per
+ * workflow and so stay open.
+ */
+const workflowRunResultSchema = z.object({
+  status: z.string(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+});
 
 interface ChatWindowProps {
   open: boolean;
@@ -109,12 +123,13 @@ export const ChatBox = ({
 
   useEffect(() => {
     if (executionStatus === "success") {
-      const result = workflow.state.execution?.result;
+      // The engine keys the run result by node id; the chat panel shows the
+      // end node's outputs.
+      const end = workflow.state.execution?.result?.end;
 
-      if (result && typeof result === "object") {
-        const formattedOutput = Object.entries(result.end)
-          .map(([key, value]: [any, any]) => `${key}: ${value}`)
-
+      if (end && typeof end === "object") {
+        const formattedOutput = Object.entries(end)
+          .map(([key, value]) => `${key}: ${String(value)}`)
           .join("\n");
 
         setChatMessages([
@@ -163,9 +178,11 @@ export const ChatBox = ({
       projectId: project?.id ?? "",
     });
 
-    if (optimizationResponse.status === "success") {
-      const formattedOutput = Object.entries(optimizationResponse.result)
-        .map(([key, value]: [any, any]) => `${key}: ${value}`)
+    const run = workflowRunResultSchema.safeParse(optimizationResponse);
+
+    if (run.success && run.data.status === "success" && run.data.result) {
+      const formattedOutput = Object.entries(run.data.result)
+        .map(([key, value]) => `${key}: ${String(value)}`)
         .join("\n");
 
       setChatMessages([{ input: [message], output: [formattedOutput] }]);

@@ -13,7 +13,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { z } from "zod";
 import { AnnotationAvatarGroup } from "./annotation-avatar-group";
 import { AnnotationCommentsChip } from "./annotation-comments-chip";
@@ -44,7 +44,15 @@ export type AnnotationTableProps = {
   onRemoveFromQueue: (queueItemId: string) => void;
   renderAvatar: (user: AnnotationUser) => ReactNode;
   renderTraceField: (field: AnnotationTableTraceField) => ReactNode;
-  renderRowContext?: (row: AnnotationRow, children: ReactNode) => ReactNode;
+  /**
+   * Wraps one rendered row. `children` is the single `<Table.Row>` element, not
+   * arbitrary nodes: the app's wrapper `cloneElement`s it to add `className` and
+   * `style`, so the element type has to say those props are accepted.
+   */
+  renderRowContext?: (
+    row: AnnotationRow,
+    children: ReactElement<{ className?: string; style?: CSSProperties }>,
+  ) => ReactNode;
 };
 
 export function AnnotationTable({

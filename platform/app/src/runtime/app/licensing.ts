@@ -46,7 +46,7 @@ class PrismaLicenseRepository extends LicenseStoragePort {
     );
   }
 
-  async readLicense(organizationId: string): Promise<string | null> {
+  async tryReadLicense(organizationId: string): Promise<string | null> {
     const organization = await this.prismaClient.organization.findUnique({
       where: { id: organizationId },
       select: { license: true },

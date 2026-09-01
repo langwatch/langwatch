@@ -13,6 +13,28 @@ import type { PrismaConnection } from "@langwatch/prisma-client";
 import { PostgresAuthAdapter } from "@langwatch/auth-server";
 import { identityEmail, signUpVerification } from "~/server/app-layer/identity/runtime";
 import { PrismaIdentityReservationRepository } from "~/server/app-layer/identity/repositories/identity-reservations.prisma.repository";
+import { LocalDoorBreakGlassBinding } from "~/server/app-layer/identity/break-glass-binding";
+import {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+} from "~/server/app-layer/identity/join-request-adapters";
+import { AdminEmailPlatformOperators } from "~/server/app-layer/identity/platform-operators";
+import { PrismaIdentityHeadsRepository } from "~/server/app-layer/identity/repositories/identity-heads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "~/server/app-layer/identity/repositories/identity-projection.prisma.repository";
+import { PrismaIdentityUsersRepository } from "~/server/app-layer/identity/repositories/identity-users.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "~/server/app-layer/identity/repositories/join-request-projection.prisma.repository";
+import { PrismaJoinRequestReadRepository } from "~/server/app-layer/identity/repositories/join-request.prisma.repository";
+import { PrismaMfaEnrollmentProjectionRepository } from "~/server/app-layer/identity/repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "~/server/app-layer/identity/repositories/mfa-enrollment.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "~/server/app-layer/identity/repositories/scim-sync-projection.prisma.repository";
+import { PrismaSsoConnectionProjectionRepository } from "~/server/app-layer/identity/repositories/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "~/server/app-layer/identity/repositories/sso-connection-reads.prisma.repository";
+import { ScimSyncLedgerWriter } from "~/server/app-layer/identity/scim-sync-ledger";
+import { ScimSyncLifecycle } from "~/server/app-layer/identity/scim-sync-lifecycle";
+import { SsoConnectionTeardownDispatcher } from "~/server/app-layer/identity/sso-connection-teardown";
 import { createAuth } from "~/server/better-auth";
 import {
   REPORT_SCHEDULER_TARGET_TYPE,
@@ -179,6 +201,7 @@ import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
 import { AppDashboardGraphVisibilityPolicy } from "~/runtime/app/features/dashboard-graph-visibility-policy.adapter";
 import { PostgresScimAdapter } from "@langwatch/enterprise-scim-server";
+import { ScimSyncGuards } from "@langwatch/identity-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import {
@@ -261,11 +284,9 @@ import {
 } from "@langwatch/gateway-server";
 import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { createGatewayVirtualKeysPort } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
 import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
-import {
-  type ApplicableBudget,
-  resolveApplicableBudgetsForDraftKey,
-} from "~/server/gateway/applicableBudgets.service";
+import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
@@ -288,10 +309,7 @@ import {
   VirtualKeyService,
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
-import {
-  loadDirectBudgetsForKeys,
-  type VirtualKeyDirectBudget,
-} from "~/server/gateway/virtualKeyDirectBudget.service";
+import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
   getLangyGithubPrUsage,
@@ -331,7 +349,7 @@ import {
   createStorageRegistry,
   createProcessStoredObjectsService,
 } from "~/server/stored-objects/stored-objects-factory";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { UsageLimitService } from "./billing/enterprise/usage-limit.service";
@@ -377,8 +395,6 @@ import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { AppWorkflowEvaluationAdapter } from "~/runtime/app/features/evaluation";
-import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsupportedLLMParams";
-import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
 import { BroadcastService } from "./broadcast/broadcast.service";
@@ -826,7 +842,7 @@ function composeLicensingApp(input: { prisma: PrismaClient }): LicensingApp {
       licenseLogger.error({ organizationId, error }, "failed to sign a license"),
     checkLimit: ({ organizationId, limitType, user }) =>
       createLicenseEnforcementService(input.prisma).checkLimit(organizationId, limitType, user),
-    reportError: (error) => captureException(error),
+    reportError: (error) => captureException(toError(error)),
   });
 }
 
@@ -841,15 +857,19 @@ function composeGatewayApp(input: {
   const virtualKeys = stores.virtualKeys;
   const usage = GatewayUsageService.create({
     projects,
-    virtualKeys,
+    // The usage rollup needs a label per key the ledger reported spend
+    // against, which is a repository read; `stores.virtualKeys` is the
+    // operations service the gateway application itself is built on.
+    virtualKeys: createGatewayVirtualKeysPort(prisma),
     chRepo: stores.budgets,
     spendRepo: stores.virtualKeySpend,
   });
 
-  // Explicit type arguments, not inferred: they are the two shapes the wire
-  // contract of every router built over this application carries, and an
-  // inference that fell back to `unknown` would take them off it silently.
-  return GatewayApp.create<ApplicableBudget[], VirtualKeyDirectBudget>({
+  // No type arguments: the two budget row shapes the wire contract carries are
+  // named by `@langwatch/gateway-contract` now (`GatewayApplicableBudget`,
+  // `GatewayVirtualKeyDirectBudget`), so the application declares them itself
+  // instead of taking them as parameters a router could not propagate.
+  return GatewayApp.create({
     virtualKeys,
     budgetDecisions: stores.budgetDecisions,
     budgetSpend: stores.budgets,
@@ -1794,6 +1814,8 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const langyTokenBuffer = redis ? LangyTokenBuffer.create({ redis }) : null;
   const langyTitleGenerator = createLangyConversationTitleGenerator({
     messages: langyPersistence.trustedMessages,
+    modelProviders,
+    managedProviders,
   });
   const langySessionKeys = langyAdapter.createSessionKeys({
     apiKeys,
@@ -1814,6 +1836,11 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   // The address lock is shared: the guards claim through it and the fold
   // releases through it, so the two must be the same instance (ADR-116 §6).
   const identityReservations = new PrismaIdentityReservationRepository(prisma);
+
+  // One repository, two roles (D08): the fold's store and the guards' read
+  // are the same `ScimSyncState` rows, so composing them separately would be
+  // two objects that must agree about a JSON column and eventually would not.
+  const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -1875,6 +1902,29 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     }),
     processStore,
     langyTurnAdmission: langyPersistence.langyTurnAdmission,
+    identityProjection: new PrismaIdentityProjectionRepository(prisma, identityReservations),
+    identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityReservations,
+    mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
+    mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(prisma),
+    ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
+    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    // A provider, not the service: the pipeline takes this port at
+    // registration time and `scim` is composed below, once the governance
+    // runtime it needs exists. The wake is the only moment it is read.
+    ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(() => scim),
+    scimSyncProjection: scimSyncProjectionRepository,
+    scimSyncReads: scimSyncProjectionRepository,
+    joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
+    joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
+    joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
+      prisma,
+      new EmailJoinRequestNotifier(prisma, mailer),
+    ),
   };
 
   const traceSummaryStore = createAppTraceSummaryStore({
@@ -2464,8 +2514,14 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     database: prisma,
     writer: authzFeature.grants,
     users,
+    auth,
     governance,
     entitlements: planProvider,
+    lifecycle: ScimSyncLifecycle.create({
+      guards: new ScimSyncGuards({ syncs: scimSyncProjectionRepository }),
+      ledger: new ScimSyncLedgerWriter(),
+    }),
+    provenOffboarding: env.SCIM_V2_GRANTS === "on",
   }).build();
   // The package-owned migration starts only after the pipeline has connected
   // its command dispatcher. The app process exposes metadata but runs no
@@ -3417,8 +3473,16 @@ export function createTestApp(
     database: testPrisma,
     writer: testAuthz.grants,
     users: testUsers,
+    auth: testAuth,
     governance: testGovernance,
     entitlements: testPlanProvider,
+    lifecycle: ScimSyncLifecycle.create({
+      guards: new ScimSyncGuards({
+        syncs: new PrismaScimSyncProjectionRepository(testPrisma),
+      }),
+      ledger: new ScimSyncLedgerWriter(),
+    }),
+    provenOffboarding: env.SCIM_V2_GRANTS === "on",
   }).build();
 
   const testOpsService = AppOpsRuntime.create({

@@ -577,13 +577,17 @@ export type EvaluationsV3State = {
   workbenchVersion?: number | undefined;
 
   /**
-   * True once someone else's save has landed on top of this board.
+   * Set when the server holds a newer version than this store and the
+   * workbench has unsaved edits, so reloading is the user's call. A clean
+   * workbench reloads silently and never sets this.
    *
-   * Autosave refuses while it is set — writing then would overwrite a version
-   * this session never saw. Clearing it is what resumes autosave, so it is
-   * state rather than a derived flag.
+   * It carries the version to reload to and, when the server named one, who
+   * wrote it: the banner says "Langy changed this" rather than telling the
+   * reader the change came from somewhere else while Langy was driving their
+   * own tab. Clearing it is what resumes autosave, so it is state rather than
+   * a derived flag.
    */
-  staleWorkbench?: boolean | undefined;
+  staleWorkbench?: { serverVersion: number; actorLabel?: string } | undefined;
 
   /**
    * Run ids this session started, so a refusal naming one can be told apart
@@ -603,11 +607,10 @@ export type EvaluationsV3Actions = {
   setExperimentSlug: (slug: string) => void;
 
   // Version and freshness — the three fields at the end of the state above.
-  // The store has always implemented these; they were simply never declared,
-  // so every reader of `state.workbenchVersion` and every caller of
-  // `setStaleWorkbench` was reading a property the type said was not there.
   setWorkbenchVersion: (workbenchVersion: number | undefined) => void;
-  setStaleWorkbench: (staleWorkbench: boolean | undefined) => void;
+  setStaleWorkbench: (
+    staleWorkbench: { serverVersion: number; actorLabel?: string } | undefined,
+  ) => void;
   /** Appends a run id, skipping one already recorded. */
   rememberRunStartedHere: (runId: string) => void;
 
@@ -647,8 +650,36 @@ export type EvaluationsV3Actions = {
 
   // Target actions
   addTarget: (target: TargetConfig) => void;
+  /**
+   * Copy a target, keeping its wiring: its own mappings and every evaluator's
+   * mappings for it. Returns the copy's id.
+   *
+   * `name` only lands for evaluator targets, the one kind that carries a name
+   * in workbench state; prompt, agent and workflow targets take their name from
+   * the entity they reference.
+   */
+  duplicateTarget: (args: { targetId: string; name?: string }) => string | undefined;
+  /**
+   * Run one transform-backed workbench action from the host's action manifest
+   * against the live store — the browser leg of the agent's UI-action channel
+   * (specs/langy/langy-ui-actions.feature). Parses the payload with the
+   * action's own schema, applies its transform in ONE `set` (one undo entry),
+   * and returns the transform's result. THROWS on an unknown or non-transform
+   * kind, an invalid payload, or a transform refusal — unlike the silent
+   * no-op UI actions, the caller here is a machine that needs the reason.
+   * Typed loosely because this contract cannot import the manifest: the
+   * manifest's schemas are built from the shapes in this file.
+   */
+  applyWorkbenchAction: (args: { kind: string; payload: unknown }) => unknown;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
+  /** Write a target's unsaved prompt draft, and the variables that came with it */
+  setTargetPrompt: (payload: {
+    targetId: string;
+    localPromptConfig: LocalPromptConfig;
+    inputs?: Field[];
+    outputs?: Field[];
+  }) => void;
   /** Set a mapping for a target input field for a specific dataset */
   setTargetMapping: (
     targetId: string,
@@ -774,6 +805,8 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
+  /** Absent while the Langy UI-action channel is flagged off. */
+  handleOptimizeTarget?: ({ target, name }: { target: TargetConfig; name: string }) => void;
   handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;

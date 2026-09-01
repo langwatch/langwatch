@@ -24,7 +24,7 @@
 import type { Logger } from "pino";
 import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { capPayloadString } from "@langwatch/trace-server";
+import { capPayloadString, type TraceApp } from "@langwatch/trace-server";
 import type { Span } from "@langwatch/trace-contract";
 import {
   type ClaudeContentLog,
@@ -36,9 +36,21 @@ import {
   computeClaudeToolSpanEnrichment,
 } from "./claude-code-span-enrichment";
 import { DERIVED_ATTRS } from "./log-content-derivation";
-import type { LogRecordStorageService } from "./log-record-storage.service";
-import type { StoredLogRecordRow } from "./repositories/log-record-storage.repository";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
+
+/**
+ * The trace-log read this join issues for itself, and the row it answers with.
+ *
+ * Taken off the trace application rather than off this process's storage
+ * service, because `getApp().traces.logRecords` is what both read paths hand
+ * in and what the packaged traces-v2 transport declares its port with. The
+ * storage service still satisfies it: the read row is the stored row without
+ * the `traceId` this join never looks at.
+ */
+export type TraceLogRecordReader = TraceApp["logRecords"];
+type TraceLogRecordReadRow = Awaited<
+  ReturnType<TraceLogRecordReader["getLogsByTraceId"]>
+>[number];
 
 /**
  * The trace-origin value Claude Code (and other coding assistants) carry. Only
@@ -217,7 +229,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
  * `user_prompt` carries its text on `prompt` instead.
  */
 export function mapLogRowsToClaudeContentLogs(
-  rows: StoredLogRecordRow[],
+  rows: TraceLogRecordReadRow[],
   codingAgents?: CodingAgentService,
 ): ClaudeContentLog[] {
   return rows.map((row) => {
@@ -253,7 +265,7 @@ export function enrichSpansWithClaudeLogContent({
   codingAgents,
 }: {
   spans: Span[];
-  logRows: StoredLogRecordRow[];
+  logRows: TraceLogRecordReadRow[];
   traceCanonicalisation: TraceCanonicalisationService;
   codingAgents?: CodingAgentService;
 }): Span[] {
@@ -306,7 +318,7 @@ export function enrichSpansWithClaudeLogContent({
  * events only). Success arrives as the string "true"/"false"; numbers as
  * stringified numerics — both parsed here so the pure join sees clean types.
  */
-export function mapLogRowsToClaudeToolLogs(rows: StoredLogRecordRow[]): ClaudeToolLog[] {
+export function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): ClaudeToolLog[] {
   const out: ClaudeToolLog[] = [];
   for (const row of rows) {
     const attrs = row.attributes;
@@ -364,7 +376,7 @@ export async function enrichCodingAgentSpansFromLogs({
   traceCanonicalisation,
   codingAgents,
 }: {
-  logRecords: LogRecordStorageService;
+  logRecords: TraceLogRecordReader;
   tenantId: string;
   traceId: string;
   spans: Span[];
@@ -433,7 +445,7 @@ export function enrichSingleSpanWithClaudeLogContent({
   span: Span;
   /** All model-call refs for the trace, [] when the span has no request_id. */
   modelCallRefs: ClaudeSpanRef[];
-  logRows: StoredLogRecordRow[];
+  logRows: TraceLogRecordReadRow[];
   traceCanonicalisation: TraceCanonicalisationService;
   codingAgents?: CodingAgentService;
 }): Span {

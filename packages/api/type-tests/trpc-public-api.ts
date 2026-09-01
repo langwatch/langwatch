@@ -1,4 +1,9 @@
-import { TrpcRootDefinition, type PendingPermissionProcedureBuilder } from "@langwatch/api/trpc";
+import {
+  createTrpcErrorFormatter,
+  TrpcRootDefinition,
+  trpcFailureTraceIds,
+  type PendingPermissionProcedureBuilder,
+} from "@langwatch/api/trpc";
 import { z } from "zod";
 
 type Equal<Left, Right> =
@@ -46,3 +51,28 @@ type _DeclarationIsMandatoryByConstruction = Assert<
     "input" | "use" | "permission" | "permissionAny" | "noPermission" | "authorizeInService"
   >
 >;
+
+/**
+ * The second structural guarantee: the options a root is created with reach
+ * its `$types`, so `errorShape` is the shape this package's error formatter
+ * returns.
+ *
+ * tRPC derives `errorShape` from the LITERAL type of the options object handed
+ * to `create`, which means the root has to be created on the builder itself.
+ * Forwarding the options through a wrapper method of our own passes a type
+ * parameter instead, the inference reads it as `never`, and every router in
+ * the process reports `errorShape: never` — at which point every
+ * `error.data.code` / `error.data.httpStatus` read in a browser is a read off
+ * `never`. Nothing else notices, so this assertion is what refuses the
+ * wrapper.
+ */
+const errorFormatter = createTrpcErrorFormatter({
+  causePayload: { payloadFor: () => null },
+  traceIds: trpcFailureTraceIds,
+});
+const configuredRoot = TrpcRootDefinition.forContext<{ actor: { id: string } }>().create({
+  errorFormatter,
+});
+type ConfiguredErrorData = (typeof configuredRoot)["_config"]["$types"]["errorShape"]["data"];
+
+type _ErrorShapeReachesTheRoot = Assert<Equal<ConfiguredErrorData["httpStatus"], number>>;

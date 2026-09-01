@@ -134,7 +134,7 @@ describe("<DefaultModelOverrideDrawer/> — scenarios.agent_under_test row", () 
       isLoading: false,
     });
     mockListAllForProjectForFrontend.mockReturnValue({
-      data: { providers: [] },
+      data: [],
       isLoading: false,
       isError: false,
     });

@@ -182,7 +182,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
 
   for (const [variantIndex, variant] of EXPERIMENT_VARIANTS.entries()) {
     const runStartedAt = BASE_TIME + variantIndex * 60 * 60_000;
-    await app.experimentRuns.startExperimentRun({
+    await app.experiments.experimentService.startExperimentRun({
       tenantId: PROJECT_ID,
       occurredAt: runStartedAt,
       runId: variant.runId,
@@ -203,7 +203,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
     for (const [index, row] of EXPERIMENT_ROWS.entries()) {
       const traceId = `demo-platform-exp-${variant.name}-${index + 1}`;
       const occurredAt = runStartedAt + (index + 1) * 60_000;
-      await app.experimentRuns.recordTargetResult({
+      await app.experiments.experimentService.recordTargetResult({
         tenantId: PROJECT_ID,
         occurredAt,
         runId: variant.runId,
@@ -221,7 +221,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         traceId,
       });
       const score = variant.scores[index]!;
-      await app.experimentRuns.recordEvaluatorResult({
+      await app.experiments.experimentService.recordEvaluatorResult({
         tenantId: PROJECT_ID,
         occurredAt: occurredAt + 500,
         runId: variant.runId,
@@ -254,7 +254,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
       });
     }
 
-    await app.experimentRuns.completeExperimentRun({
+    await app.experiments.experimentService.completeExperimentRun({
       tenantId: PROJECT_ID,
       occurredAt: runStartedAt + 8 * 60_000,
       runId: variant.runId,

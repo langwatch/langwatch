@@ -212,7 +212,7 @@ export const useModelSelectionOptions = (
   // `selectOptions` / `groupedByProvider` arrays, so every downstream
   // `useMemo` keyed on them recomputed too — the langy composer's model pill
   // rebuilt its whole combobox collection per parent render because of it.
-  const providers = modelProviders.data?.providers;
+  const providers = modelProviders.data;
   const featureKey = opts?.featureKey;
   const { selectOptions, groupedByProvider } = useMemo(() => {
     const providersByKey = mergeProviderRowsByKey(providers ?? []);

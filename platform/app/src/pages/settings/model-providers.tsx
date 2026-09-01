@@ -141,10 +141,11 @@ export default function ModelsPage() {
       const fallback = (p as { scopeType?: string }).scopeType;
       return fallback ? [fallback] : [];
     };
-    const labelOf = (p: (typeof filtered)[number]): string =>
-      (p as { name?: string }).name ??
-      modelProvidersRegistry[p.provider as keyof typeof modelProvidersRegistry]?.name ??
-      p.provider;
+    // The row's own name, which the list procedure carries: a multi-instance
+    // setup has "OpenAI" and "OpenAI2" and they must not sort or read alike.
+    // Every row has one — the column is NOT NULL and the env-fed pseudo-rows
+    // take the registry's name — so there is nothing to fall back to.
+    const labelOf = (p: (typeof filtered)[number]): string => p.name;
     return [...filtered].sort(
       (a, b) =>
         broadestScopeRank(scopeTypesOf(a)) - broadestScopeRank(scopeTypesOf(b)) ||
@@ -340,11 +341,6 @@ export default function ModelsPage() {
                       modelProviderIcons[
                         provider.provider as keyof typeof modelProviderIcons
                       ];
-                    const providerSpec =
-                      modelProvidersRegistry[
-                        provider.provider as keyof typeof modelProvidersRegistry
-                      ];
-
                     const isSystem = !!(provider as any).isSystem;
                     return (
                       <Table.Row key={provider.id ?? `system-${provider.provider}`}>
@@ -354,11 +350,7 @@ export default function ModelsPage() {
                               {providerIcon}
                             </Box>
                             <VStack gap={0} align="start">
-                              <Text>
-                                {(provider as { name?: string }).name ??
-                                  providerSpec?.name ??
-                                  provider.provider}
-                              </Text>
+                              <Text>{provider.name}</Text>
                               <ConnectionTestVerdict
                                 state={
                                   provider.id
@@ -446,10 +438,7 @@ export default function ModelsPage() {
                                         // e.g. "OpenAI2") instead of the generic
                                         // registry name so the dialog names the
                                         // exact provider the user clicked.
-                                        name:
-                                          (provider as { name?: string }).name ??
-                                          providerSpec?.name ??
-                                          provider.provider,
+                                        name: provider.name,
                                         projectId,
                                         organizationId,
                                       });

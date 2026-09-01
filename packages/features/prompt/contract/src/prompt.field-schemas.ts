@@ -1,3 +1,4 @@
+import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
 import { SchemaVersion } from "./prompt.enums";
 
@@ -22,7 +23,11 @@ export const nodeDatasetSchema = z.object({
     .object({
       records: z.record(z.string(), z.array(z.unknown())),
       columnTypes: z.array(
-        z.object({ id: z.string().optional(), name: z.string(), type: z.string() }),
+        z.object({
+          id: z.string().optional(),
+          name: z.string(),
+          type: datasetColumnTypeSchema,
+        }),
       ),
     })
     .optional(),

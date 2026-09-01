@@ -180,14 +180,15 @@ export function usePersonalContext(): PersonalContext {
       label: row.name,
       deviceHint: row.description ?? "Personal device",
       os: "Unknown",
-      lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      lastUsedAt:
+        row.lastUsedAtMs === null ? null : new Date(row.lastUsedAtMs).toISOString(),
       // `fmtRelative` reads back this field via `Date.now() -
       // new Date(iso).getTime()` and renders "N min/h/d ago". Sending
       // a date-only `YYYY-MM-DD` made the JS Date parse as midnight
       // UTC, so a key minted 3min ago rendered as "Created 18h ago"
       // (Ariana QA option-C dogfood — visible regression on a
       // freshly-minted key).
-      createdAt: row.createdAt.toISOString(),
+      createdAt: new Date(row.createdAtMs).toISOString(),
     }));
   }, [personalKeysQuery.data]);
 
@@ -216,9 +217,11 @@ export function usePersonalContext(): PersonalContext {
     ready: !!session && !!organization,
     email: userEmail,
     fullName: userName,
-    joinedOn:
-      personalContextQuery.data?.workspace.team.createdAt?.toISOString()?.slice(0, 10) ??
-      "—",
+    joinedOn: personalContextQuery.data
+      ? new Date(personalContextQuery.data.workspace.team.createdAtMs)
+          .toISOString()
+          .slice(0, 10)
+      : "—",
     organizationName: orgName,
     organizationId: orgId,
     routingPolicyName: personalContextQuery.data?.routingPolicy?.name ?? null,

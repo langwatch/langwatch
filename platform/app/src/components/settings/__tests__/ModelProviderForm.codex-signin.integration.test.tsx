@@ -226,12 +226,12 @@ function primeHooksForProvider({
     hasEnabledProviders: false,
   });
   mockListAllForOrgQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });
   mockListAllForProjectQuery.mockReturnValue({
-    data: { providers: [provider], modelMetadata: {} },
+    data: [provider],
     isLoading: false,
     refetch: vi.fn(),
   });

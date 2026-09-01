@@ -23,7 +23,7 @@ async function main() {
   if (!vk) return;
 
   const traceProject = vk.traceProjectId
-    ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
+    ? await app.projects.projectService.tryGetTraceDestination(vk.traceProjectId)
     : null;
   console.log("traceProject:", traceProject);
 

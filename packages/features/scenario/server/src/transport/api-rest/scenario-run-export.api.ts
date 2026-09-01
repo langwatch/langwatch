@@ -18,6 +18,7 @@
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import {
+  type AppRestBroadcast,
   type AppRestSecurity,
   type SecuredApp,
   validator as zValidator,
@@ -96,9 +97,7 @@ export interface ScenarioRunExportRestPorts<
   /** The export itself. Resolved per request, never constructed at mount. */
   exports(): ScenarioRunExportPort<TRequest>;
   /** Fans one progress event out to every pod serving this tenant. */
-  broadcast(): Readonly<{
-    broadcastToTenant(tenantId: string, message: string, event: string): Promise<void>;
-  }>;
+  broadcast(): AppRestBroadcast;
   /** The correlation handle the browser subscribes to progress under. */
   newExportId(): string;
   /**
@@ -265,9 +264,7 @@ function buildExportStream<TRequest extends ScenarioRunExportRequestFields>({
   exportId: string;
   totalCount: number;
   signal: AbortSignal;
-  broadcast: Readonly<{
-    broadcastToTenant(tenantId: string, message: string, event: string): Promise<void>;
-  }>;
+  broadcast: AppRestBroadcast;
 }) {
   const encoder = new TextEncoder();
   const publish = (payload: Record<string, unknown>) =>

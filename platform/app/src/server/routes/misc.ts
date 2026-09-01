@@ -26,7 +26,6 @@ import type Stripe from "stripe";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
-import type { Project } from "~/generated/prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "~/generated/prisma/client";
 import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
@@ -1543,7 +1542,8 @@ const extractLLMCallInfo =
 
 const processDSPyStep = async (
   experiments: import("@langwatch/experiment-contract").ExperimentService,
-  project: Project,
+  /** Only the id is read; the credential resolves an identity, not a row. */
+  project: Readonly<{ id: string }>,
   param: DSPyStepRESTParams,
 ) => {
   const { run_id, index, experiment_id, experiment_slug } = param;

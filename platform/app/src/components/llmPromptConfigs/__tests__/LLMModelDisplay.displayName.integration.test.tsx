@@ -28,22 +28,20 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       listAllForProjectForFrontend: {
         useQuery: () => ({
-          data: {
-            providers: [
-              {
-                provider: "custom",
-                enabled: true,
-                customModels: [
-                  {
-                    modelId: "gpt-5.1",
-                    displayName: "Ada Prod Model",
-                    mode: "chat",
-                  },
-                ],
-                customEmbeddingsModels: null,
-              },
-            ],
-          },
+          data: [
+            {
+              provider: "custom",
+              enabled: true,
+              customModels: [
+                {
+                  modelId: "gpt-5.1",
+                  displayName: "Ada Prod Model",
+                  mode: "chat",
+                },
+              ],
+              customEmbeddingsModels: null,
+            },
+          ],
           isLoading: false,
         }),
       },

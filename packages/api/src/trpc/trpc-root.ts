@@ -23,14 +23,23 @@ export type TrpcRoot<
   "procedure" | "router" | "middleware"
 >;
 
-export class TrpcRootDefinition<TContext extends object> {
+/**
+ * The one place `initTRPC` is called. Feature packages ask for a root here
+ * rather than initializing tRPC themselves, so every root in the process
+ * carries the same context discipline.
+ *
+ * The builder is answered as tRPC hands it over, un-narrowed, and `create` is
+ * called on it directly. A wrapper `create` of our own cannot forward the
+ * options object without erasing it: `TRPCBuilder.create` derives the root's
+ * `errorShape` and `transformer` from the literal type of the options it is
+ * given, and a forwarding method can only pass a type parameter, which the
+ * inference reads as `never`. The root then reports `errorShape: never` and
+ * every `error.data.<field>` read on the client is a read off `never`.
+ */
+export class TrpcRootDefinition {
   private constructor() {}
 
-  static forContext<TContext extends object>(): TrpcRootDefinition<TContext> {
-    return new TrpcRootDefinition<TContext>();
-  }
-
-  create<TOptions extends TRPCRuntimeConfigOptions<TContext, object>>(options: TOptions) {
-    return initTRPC.context<TContext>().create(options as never);
+  static forContext<TContext extends object>() {
+    return initTRPC.context<TContext>();
   }
 }

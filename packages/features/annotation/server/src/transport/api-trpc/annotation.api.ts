@@ -53,6 +53,7 @@ import {
 } from "@langwatch/annotation-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
+import type { Trace } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { AnnotationApp } from "#app/annotation.app";
@@ -198,7 +199,13 @@ export type AnnotationQueueStore = Readonly<{
     Readonly<{
       totalCount: number;
       items: ReadonlyArray<
-        Readonly<{ id: string; traceId: string; annotationQueueId: string | null }>
+        Readonly<{
+          id: string;
+          traceId: string;
+          annotationQueueId: string | null;
+          /** When the reviewer finished it, or null while it is still open. */
+          doneAt: Date | null;
+        }>
       >;
     }>
   >;
@@ -255,11 +262,17 @@ export type AnnotationTrpcPorts = Readonly<{
    * The trace content behind a set of queue items, with the caller's own
    * redactions applied. Resolved in full (#4991) because annotators label the
    * whole value, not a preview.
+   *
+   * A whole `Trace`, not the id alone: what this returns is joined onto each
+   * queue item and published from `getQueueItems` and
+   * `getOptimizedAnnotationQueues`, so it IS what the review page reads the
+   * trace's metadata, timestamps and spans from. Naming only `trace_id` here
+   * did not narrow what the host sent, only what the client could see.
    */
   loadTraces(
     ctx: unknown,
     input: Readonly<{ projectId: string; traceIds: readonly string[] }>,
-  ): Promise<ReadonlyArray<Readonly<{ trace_id: string }>>>;
+  ): Promise<ReadonlyArray<Trace>>;
   /** Records on the trace that a human has commented on it. Best effort. */
   recordAnnotationOnTrace(
     ctx: unknown,

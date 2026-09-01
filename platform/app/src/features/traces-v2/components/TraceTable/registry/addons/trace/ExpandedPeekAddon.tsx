@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
 import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
-import { formatDuration, SPAN_TYPE_COLORS } from "@langwatch/trace-web";
+import { formatDuration } from "@langwatch/trace-web";
+import { spanTypeColor } from "../../../../../utils/spanTypeColor";
 import { Td, Tr } from "../../../TablePrimitives";
 import { evalChipColor, formatEvalScore } from "../../sharedChips";
 import type { AddonDef } from "../../types";
@@ -204,7 +205,7 @@ const PeekSpanRow: React.FC<{
   traceDuration: number;
 }> = ({ node, traceStart, traceDuration }) => {
   const { span, depth } = node;
-  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color = spanTypeColor(span.type);
   const icon = PEEK_SPAN_TYPE_ICONS[span.type ?? "span"] ?? "\u25CB";
   const isError = span.status === "error";
 

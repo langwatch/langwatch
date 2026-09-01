@@ -10,6 +10,7 @@ import {
   type DatasetTableContextValue,
   DatasetTableProvider,
 } from "@langwatch/dataset-web";
+import { renderDatasetImage } from "~/components/datasets/editor/renderDatasetImage";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 export function EvaluationsV3DatasetTableProvider({
@@ -25,6 +26,7 @@ export function EvaluationsV3DatasetTableProvider({
     setSelectedCell: state.setSelectedCell,
     toggleCellExpanded: state.toggleCellExpanded,
     toggleRowSelection: state.toggleRowSelection,
+    renderImage: renderDatasetImage,
   }));
 
   return <DatasetTableProvider value={value}>{children}</DatasetTableProvider>;

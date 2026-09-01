@@ -172,7 +172,7 @@ vi.mock("~/utils/api", async () => {
           }),
         },
         listAllForProjectForFrontend: {
-          useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+          useQuery: () => ({ data: [], isLoading: false }),
         },
       },
       virtualKeys: {

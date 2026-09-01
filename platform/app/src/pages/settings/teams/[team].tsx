@@ -27,8 +27,14 @@ import {
 } from "../../../components/settings/TeamUserRoleField";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
-import { api } from "../../../utils/api";
+import { api, type RouterOutputs } from "../../../utils/api";
+
+/**
+ * One team as this page reads it: whatever `team.getTeamWithMembers` answers.
+ * Taken off the seam rather than off the Prisma model, because the procedure
+ * serves a browser-shaped team (no accounting columns) plus its projects.
+ */
+type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
 import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 
 // Type guards for safe access to custom role data
@@ -75,7 +81,7 @@ function memberToRoleFormOption(
 
 // Helper function to convert team member to form member
 function teamMemberToFormMember(
-  member: TeamWithProjectsAndMembersAndUsers["members"][number],
+  member: TeamWithProjectsAndMembers["members"][number],
 ) {
   return {
     userId: {
@@ -156,9 +162,9 @@ function EditTeamPage() {
   return <EditTeam team={team.data} />;
 }
 
-function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
+function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
   const getInitialValues = useCallback(
-    (teamData: TeamWithProjectsAndMembersAndUsers): TeamFormData => ({
+    (teamData: TeamWithProjectsAndMembers): TeamFormData => ({
       name: teamData.name,
       members: teamData.members.map(teamMemberToFormMember),
     }),

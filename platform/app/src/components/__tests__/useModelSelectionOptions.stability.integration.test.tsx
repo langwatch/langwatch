@@ -23,22 +23,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 // unchanged, and the hook's stability contract builds on that.
 vi.mock("~/utils/api", () => {
   const response = {
-    data: {
-      providers: [
-        {
-          provider: "openai",
-          enabled: true,
-          customModels: null,
-          customEmbeddingsModels: null,
-        },
-        {
-          provider: "custom",
-          enabled: true,
-          customModels: [{ modelId: "stealth/ox-alpha" }],
-          customEmbeddingsModels: null,
-        },
-      ],
-    },
+    data: [
+      {
+        provider: "openai",
+        enabled: true,
+        customModels: null,
+        customEmbeddingsModels: null,
+      },
+      {
+        provider: "custom",
+        enabled: true,
+        customModels: [{ modelId: "stealth/ox-alpha" }],
+        customEmbeddingsModels: null,
+      },
+    ],
     isLoading: false,
   };
   return {

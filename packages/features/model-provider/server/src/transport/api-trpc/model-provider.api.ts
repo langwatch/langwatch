@@ -50,6 +50,7 @@ import {
   modelProviderUpdateTrpcInputSchema,
   modelProviderValidateApiKeyTrpcInputSchema,
   modelProviderValidateKeyWithCustomUrlTrpcInputSchema,
+  type CodexTokenKeys,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -119,29 +120,51 @@ type ModelProviderTrpcProcedures<
  * Provider service's own: the outbound credential probes, the Codex device
  * flow, and the audit trail.
  *
- * Declared as a constraint and consumed through the generic below, so the
- * concrete return shapes the process wires in survive into the router's
- * inferred output types instead of collapsing to the loose shape here.
+ * The two credential-probe verdicts are type PARAMETERS rather than
+ * `unknown`, because a generic constraint does not carry a concrete shape out
+ * to the caller. `create` used to declare `TPorts extends
+ * ModelProviderTrpcPorts` and take `ports: TPorts`: a generic body is checked
+ * once against its constraint, so `ports.validateProviderApiKey(...)` was
+ * `Promise<unknown>` at the declaration site and the router's output type
+ * baked in `unknown` whatever the process wired in — which is what left
+ * `useModelProviderApiKeyValidation` reading `result.valid` off `unknown`.
+ * Naming them here and passing `ports:
+ * ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>` instead
+ * lets inference fill them from the object the process actually passes, and
+ * the verdict union reaches the browser.
  */
-type ModelProviderTrpcPorts = Readonly<{
+type ModelProviderTrpcPorts<TApiKeyValidation = unknown, TStoredKeyValidation = unknown> = Readonly<{
   /** Probes a caller-supplied credential against the provider. */
-  validateProviderApiKey(provider: string, customKeys: Record<string, string>): Promise<unknown>;
+  validateProviderApiKey(
+    provider: string,
+    customKeys: Record<string, string>,
+  ): Promise<TApiKeyValidation>;
   /** Probes a stored (or environment-fed) credential against a base URL. */
   validateKeyWithCustomUrl(input: {
     projectId: string;
     provider: string;
     customBaseUrl: string | undefined;
     modelProviders: ModelProviderService;
-  }): Promise<unknown>;
+  }): Promise<TStoredKeyValidation>;
   /** Codex sign-in step 1: ask the issuer for a device code. */
-  startCodexDeviceSignIn(): Promise<unknown>;
-  /** Codex sign-in step 2..n: one poll of the pending device authorization. */
+  startCodexDeviceSignIn(): Promise<{
+    userCode: string;
+    deviceAuthId: string;
+    verificationUrl: string;
+    /** Seconds the caller should wait between polls. */
+    intervalSeconds: number;
+  }>;
+  /**
+   * Codex sign-in step 2..n: one poll of the pending device authorization.
+   *
+   * A completed exchange carries the full `CodexTokenKeys` set, so the account
+   * email and plan tier the response hands back are known strings rather than
+   * maybes.
+   */
   pollCodexDeviceSignIn(input: {
     deviceAuthId: string;
     userCode: string;
-  }): Promise<
-    { status: "pending" } | { status: "complete"; keys: Record<string, string | undefined> }
-  >;
+  }): Promise<{ status: "pending" } | { status: "complete"; keys: CodexTokenKeys }>;
   /** The process's audit trail. */
   recordAudit(entry: {
     userId: string;
@@ -161,7 +184,33 @@ type ModelProviderTrpcPorts = Readonly<{
 type CanonicalProvider = {
   id: string;
   provider: string;
+  /**
+   * The row's own display name. Carried because a multi-instance setup names
+   * its rows ("OpenAI" at organization scope, "OpenAI2" on a project) and every
+   * surface that lists providers labels them with it: the settings table, the
+   * routing-policy credential picker, the budget drawer's provider select. With
+   * it narrowed away those all fell back to the registry name, so two rows for
+   * the same vendor rendered identically. Not sensitive: a name is what an
+   * admin typed into the form, never a credential.
+   */
+  name: string;
   enabled: boolean;
+  /**
+   * When set, an admin has withdrawn the credential. Carried because the
+   * gateway pickers fail closed on it — `isRoutable` in
+   * `components/gateway/eligibleModelProviders.ts` requires
+   * `enabled === true && !disabledAt` — and a row that arrives without the
+   * field reads as "never withdrawn", so a disabled credential was being
+   * advertised as eligible. The routing-policy picker renders it too.
+   */
+  disabledAt?: Date | null;
+  /**
+   * Last known reachability of the credential. The routing-policy credential
+   * picker renders it per row (`useRoutingPolicyDrawerForm`), and defaults to
+   * "UNKNOWN" when absent — which is what every row showed while this was
+   * narrowed away.
+   */
+  healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
   customModels: Array<{ id: string; label: string; type: string }>;
   customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
@@ -181,7 +230,10 @@ function toLegacyProvider(provider: CanonicalProvider) {
   return {
     id: provider.id,
     provider: provider.provider,
+    name: provider.name,
     enabled: provider.enabled,
+    disabledAt: provider.disabledAt ?? null,
+    healthStatus: provider.healthStatus ?? null,
     customKeys: provider.customKeys,
     deploymentMapping: null,
     scopes: provider.scopes,
@@ -217,11 +269,12 @@ export class ModelProviderTrpcApi {
     TContext extends ModelProviderTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends ModelProviderTrpcPorts,
+    TApiKeyValidation,
+    TStoredKeyValidation,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: ModelProviderTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
+    ports: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>,
   ) {
     const {
       protected: procedure,

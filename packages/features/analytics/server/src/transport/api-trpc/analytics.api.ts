@@ -65,16 +65,28 @@ type AnalyticsTrpcProcedures<
  * shapes are the REST analytics body and the traces filter input: one
  * definition, in the host, is what keeps those three surfaces from drifting
  * while the analytics input vertical is still application-owned.
+ *
+ * Each schema names BOTH of its types, because a tRPC procedure publishes its
+ * schema's INPUT to the client and its OUTPUT to the handler, and for these two
+ * they differ: `filters` carries a default, so the wire may omit it while the
+ * parsed value always has it. `z.ZodType` defaults its input parameter to
+ * `unknown`, and `unknown` intersected with the per-read selection collapses to
+ * the selection alone — which is how `dataForFilter` came to publish `field`,
+ * `key`, `subkey` and `query` and nothing else, rejecting the project and period
+ * every caller actually sends. The two wire parameters are what keep the
+ * client's half of each contract.
  */
 export type AnalyticsTrpcPorts<
   TTimeseriesInput extends AnalyticsTimeseriesInput,
   TReadInput extends AnalyticsReadInput,
   TFilterField extends string,
+  TTimeseriesInputWire = unknown,
+  TReadInputWire = unknown,
 > = Readonly<{
   /** The full timeseries request: shared filters plus the series to compute. */
-  timeseriesInputSchema: z.ZodType<TTimeseriesInput>;
+  timeseriesInputSchema: z.ZodType<TTimeseriesInput, TTimeseriesInputWire>;
   /** Project, period, query and filters — everything a read is scoped by. */
-  sharedFiltersSchema: z.ZodType<TReadInput>;
+  sharedFiltersSchema: z.ZodType<TReadInput, TReadInputWire>;
   /** The filter fields this deployment offers. */
   filterFieldSchema: z.ZodType<TFilterField>;
   /** Whether a field is meaningless without a key, or without a subkey. */
@@ -98,10 +110,18 @@ export class AnalyticsTrpcApi {
     TTimeseriesInput extends AnalyticsTimeseriesInput,
     TReadInput extends AnalyticsReadInput,
     TFilterField extends string,
+    TTimeseriesInputWire = unknown,
+    TReadInputWire = unknown,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: AnalyticsTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>,
+    ports: AnalyticsTrpcPorts<
+      TTimeseriesInput,
+      TReadInput,
+      TFilterField,
+      TTimeseriesInputWire,
+      TReadInputWire
+    >,
   ) {
     const { protected: procedure, policy } = procedures;
 

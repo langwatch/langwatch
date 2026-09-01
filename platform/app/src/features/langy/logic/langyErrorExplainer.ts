@@ -481,6 +481,7 @@ function toRegistryReasons(
   return (reasons ?? []).map((reason) => ({
     code: reason.kind,
     kind: reason.kind,
+    retryable: reason.retryable,
     reasons: toRegistryReasons(reason.reasons),
   }));
 }

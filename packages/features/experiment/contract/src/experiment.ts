@@ -21,6 +21,12 @@ export const experimentSchema = z.object({
   updatedAt: z.date(),
   archivedAt: z.date().nullable(),
   workbenchState: z.json().nullable(),
+  /**
+   * The monotonic counter behind the workbench compare-and-set. Every accepted
+   * write bumps it by one, and a writer names the version it read so a write
+   * against a stale one is refused. Rows that predate the counter read 0.
+   */
+  workbenchVersion: z.number(),
 });
 export type Experiment = z.infer<typeof experimentSchema>;
 

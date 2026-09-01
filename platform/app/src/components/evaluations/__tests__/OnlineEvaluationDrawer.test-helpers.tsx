@@ -383,7 +383,7 @@ export function createApiMock() {
         },
         getAllForProjectForFrontend: {
           useQuery: vi.fn(() => ({
-            data: { providers: {}, modelMetadata: {} },
+            data: {},
             isLoading: false,
             refetch: vi.fn(),
           })),

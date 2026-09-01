@@ -90,6 +90,10 @@ const registryMessage = (key: string): string | null => {
     meta: {},
     httpStatus: 500,
     fault: "platform",
+    // A probe, not a failure: only `isRegistered` is read below. The envelope
+    // fields carry the reader's own defaults for an absent value, which is
+    // what `readHandledError` writes when the wire says nothing.
+    retryable: false,
     tips: [],
     docsUrl: undefined,
     traceId: undefined,

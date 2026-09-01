@@ -24,7 +24,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
-import type { Project } from "~/generated/prisma/client";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import { CostReferenceType, CostType, ExperimentType } from "~/generated/prisma/client";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
@@ -143,7 +143,7 @@ async function authenticateRequest(
   permission: Permission,
 ): Promise<
   | {
-      project: Project & { team?: { id: string; organizationId: string } };
+      project: ProjectIdentity;
       markUsed: () => void;
     }
   | { error: string; status: 401 | 403; body: object }
@@ -1484,7 +1484,8 @@ const processTargets = (
 
 const processBatchEvaluation = async (
   app: Pick<RequestAppServices, "evaluations" | "experiments">,
-  project: Project,
+  /** Only the id is read; the credential resolves an identity, not a row. */
+  project: Readonly<{ id: string }>,
   param: ESBatchEvaluationRESTParams,
 ): Promise<void> => {
   const { experiment_id, experiment_slug } = param;
@@ -1523,7 +1524,8 @@ const processBatchEvaluation = async (
 
 const dispatchToClickHouse = async (
   app: Pick<RequestAppServices, "evaluations" | "experiments">,
-  project: Project,
+  /** Only the id is read; the credential resolves an identity, not a row. */
+  project: Readonly<{ id: string }>,
   experimentId: string,
   batchEvaluation: ESBatchEvaluation,
 ): Promise<void> => {

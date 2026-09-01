@@ -234,7 +234,7 @@ vi.mock("~/utils/api", () => ({
       // The Composer's ModelSelector lists the project's providers; the
       // model-setup branch doesn't depend on it, so an empty list is fine.
       listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+        useQuery: () => ({ data: [], isLoading: false }),
       },
     },
     virtualKeys: {
