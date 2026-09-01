@@ -41,6 +41,11 @@ import {
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import {
+  type AzureBillReader,
+  assertAzureBillNotAlreadyClaimed,
+  readClaimedSubscription,
+} from "./azureBillOwnership";
+import {
   encryptParserConfigCredentials,
   isEncryptedCredentials,
 } from "./ingestionCredentials";
@@ -543,6 +548,85 @@ export class IngestionSourceService {
     return null;
   }
 
+  /**
+   * The config guards that run on an edit, in one place.
+   *
+   * The adapter comes from the stored row, not from `incoming`. The edit form
+   * sends back only the fields it renders and `adapter` is not one of them, so
+   * dispatching on the incoming value would make the destination check do
+   * nothing on precisely the request that repoints the host — leaving the
+   * destination pinned at create and free afterwards.
+   *
+   * `sourceId` is the row being edited, excluded from the bill check so that a
+   * source resending the subscription it already holds does not collide with
+   * itself.
+   */
+  private async assertEditedConfigAllowed(params: {
+    organizationId: string;
+    incoming: Record<string, unknown>;
+    storedAdapter: string;
+    sourceId: string;
+  }): Promise<void> {
+    assertPullDestinationAllowed({
+      parserConfig: params.incoming,
+      adapterId: params.storedAdapter,
+    });
+    await this.assertAzureBillIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.incoming,
+      sourceId: params.sourceId,
+    });
+  }
+
+  /**
+   * Refuse a write whose config claims an Azure bill another source reads.
+   *
+   * The claim is read before anything is fetched. A config naming no
+   * subscription is the common case by a wide margin, and it cannot collide
+   * with anything, so it must not cost a query on every source write.
+   */
+  private async assertAzureBillIsFree(params: {
+    organizationId: string;
+    parserConfig: Record<string, unknown>;
+    sourceId?: string;
+  }): Promise<void> {
+    if (readClaimedSubscription(params.parserConfig) === null) return;
+    assertAzureBillNotAlreadyClaimed({
+      parserConfig: params.parserConfig,
+      claimedBy: await this.azureBillReaders(params.organizationId),
+      sourceId: params.sourceId,
+    });
+  }
+
+  /**
+   * Every live source in the org that already reads an Azure bill.
+   *
+   * Archived sources are left out: they do not pull, so they read nothing, and
+   * holding a subscription against one would strand that bill behind a source
+   * nobody can see.
+   *
+   * The org's sources are read whole rather than filtered in the database. The
+   * comparison is case- and space-insensitive and a JSON-path filter is neither,
+   * so filtering there would quietly match nothing on exactly the input that
+   * needs catching. Admin writes are rare and an org's source count is small.
+   */
+  private async azureBillReaders(
+    organizationId: string,
+  ): Promise<AzureBillReader[]> {
+    const rows = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true, parserConfig: true },
+    });
+    return rows.flatMap((row) => {
+      const subscriptionId = readClaimedSubscription(
+        row.parserConfig as Record<string, unknown> | null,
+      );
+      return subscriptionId
+        ? [{ id: row.id, name: row.name, subscriptionId }]
+        : [];
+    });
+  }
+
   // ---------------------------------------------------------------------
   // Writes
   // ---------------------------------------------------------------------
@@ -611,6 +695,10 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
+    await this.assertAzureBillIsFree({
+      organizationId: input.organizationId,
+      parserConfig: requestedParserConfig,
+    });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
@@ -713,14 +801,11 @@ export class IngestionSourceService {
         existing,
         incoming,
       }));
-      // The adapter comes from the stored row, not from `incoming`. The edit
-      // form sends back only the fields it renders and `adapter` is not one of
-      // them, so dispatching on the incoming value would make this check do
-      // nothing on precisely the request that repoints the host — leaving the
-      // destination pinned at create and free afterwards.
-      assertPullDestinationAllowed({
-        parserConfig: incoming,
-        adapterId: stored.adapter as string,
+      await this.assertEditedConfigAllowed({
+        organizationId: input.organizationId,
+        incoming,
+        storedAdapter: stored.adapter as string,
+        sourceId: existing.id,
       });
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
