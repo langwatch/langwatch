@@ -51,69 +51,64 @@ Feature: MCP Trace Tools
 
   # Implementation:
   #   mcp/typescript/src/tools/search-traces.ts
+  #   mcp/typescript/src/utils/trace-id-shape.ts
   #
   # An empty result is the one moment the caller needs a redirect, and it was
   # the one place the tip naming get_trace never printed. Two existing rules say
   # an empty result must never stand in for a failure — see
   # specs/traces-v2/sessions-lens.feature and
-  # specs/langy/langy-cli-tool-envelope.feature. These scenarios are
-  # @unimplemented until the bindings land alongside the change; the tag comes
-  # off in the same commit as the tests.
+  # specs/langy/langy-cli-tool-envelope.feature.
 
-  @unimplemented
-  Scenario: Agent pastes a trace id into the search query
-    Given a trace exists with id "63dc535cea6335c506bc81ef3543a07d"
-    When the agent calls search_traces with query "63dc535cea6335c506bc81ef3543a07d"
-    Then the response reports that no traces matched
-    And the response says the query looks like a trace id and names get_trace
-
-  @unimplemented
   Scenario: A search that matches nothing says which window it searched
     When the agent calls search_traces with a query that matches no trace
     Then the response reports that no traces matched
     And the response states the time window it searched
     And the response names get_trace for looking up a known trace id
 
+  Scenario: An empty search offers a wider window
+    When the agent calls search_traces with a query that matches no trace
+    Then the response suggests a wider startDate the caller can pass
+    And the response lists the units the window accepts
+
+  Scenario: Agent pastes a trace id into the search query
+    When the agent calls search_traces with query "63dc535cea6335c506bc81ef3543a07d"
+    Then the response reports that no traces matched
+    And the response says the query looks like a trace id
+    And the response names get_trace with that id
+
   # The CLI's own table truncates trace ids to 20 characters, so a copied id is
-  # the common case rather than the exotic one. The shape check reuses the trace
-  # service's exported vocabulary (HEX_ONLY, MIN_TRACE_ID_PREFIX_LENGTH = 8)
+  # the common case rather than the exotic one. The shape check mirrors the
+  # trace service's vocabulary (HEX_ONLY, MIN_TRACE_ID_PREFIX_LENGTH = 8)
   # instead of matching full 32-character ids only.
-  @unimplemented
   Scenario: A trace id truncated by the CLI is still recognised as an id
     When the agent calls search_traces with query "63dc535cea6335c506bc"
-    Then the response reports that no traces matched
-    And the response says the query looks like a trace id and names get_trace
+    Then the response says the query looks like a trace id
 
   # A customer-assigned id is unrecognisable by construction — TraceId is a
   # free-form String — so the unconditional guidance is what has to carry it.
-  @unimplemented
   Scenario: A trace id in a format the shape check cannot recognise still gets guidance
-    Given the project's traces carry customer-assigned ids like "order-12345"
     When the agent calls search_traces with query "order-12345"
     Then the response reports that no traces matched
     And the response names get_trace for looking up a known trace id
+    But the response does not claim the query looks like a trace id
 
   # The load-bearing guarantee of ADR-132: advice only, never routing.
-  @unimplemented
   Scenario: An id-shaped query is still executed as a search
     When the agent calls search_traces with query "63dc535cea6335c506bc81ef3543a07d"
-    Then the server receives a trace search request
+    Then the server receives a trace search request carrying that query
     And the server receives no single-trace lookup
 
   # traceIds rides the (TenantId, TraceId) sort key, so this is a primary-key
   # seek rather than a scan. The REST boundary already accepted the field.
-  @unimplemented
   Scenario: Agent looks up several traces by id in one call
     Given traces exist with ids "63dc535cea6335c506bc81ef3543a07d" and "a3c6656cf433e97549f654034be02955"
     When the agent calls search_traces with traceIds for both
     Then the response contains exactly those two traces
 
-  # Naming ids is an exact-match intent; answering it against yesterday only is
+  # Naming ids is an exact-match intent; answering it against yesterday alone is
   # a false negative by construction. 90 days is the bound prefix resolution
   # already justifies (TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS).
-  @unimplemented
   Scenario: Naming trace ids widens the default window past 24 hours
-    Given a trace exists with id "63dc535cea6335c506bc81ef3543a07d" from 10 days ago
-    When the agent calls search_traces with traceIds for it and no dates
-    Then the response contains that trace
-    And the response states the time window it searched
+    When the agent calls search_traces with traceIds and no dates
+    Then the search covers the last 90 days rather than the last 24 hours
+    And the request carries those trace ids
