@@ -27,6 +27,8 @@
 
 import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { nanoid } from "nanoid";
+import fs from "node:fs";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CostReferenceType,
@@ -40,6 +42,8 @@ import { createInnerTRPCContext } from "~/server/api/trpc";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { PrismaTeamRepository } from "~/server/app-layer/teams/repositories/team.prisma.repository";
+import { TeamRestService } from "~/server/app-layer/teams/team.service";
 import { getDataPrivacySnapshot } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { prisma } from "~/server/db";
@@ -77,15 +81,22 @@ function readCtx() {
  * `name` is the words the failure message uses, so a leak names the screen a
  * customer would have seen it on rather than a method the reader has to go
  * look up.
+ *
+ * `module` is the source file whose project listing this surface drives,
+ * relative to `platform/app`. It is what the registration sweep at the bottom
+ * of this file matches against: a listing that filters the governance home
+ * but names no surface here is a screen nobody proved is filtered.
  */
 interface ListingSurface {
   name: string;
+  module: string;
   ids: () => Promise<string[]>;
 }
 
 const surfaces: ListingSurface[] = [
   {
     name: "the projects REST list",
+    module: "src/server/app-layer/projects/repositories/project.prisma.repository.ts",
     ids: async () => {
       const page = await new PrismaProjectRepository(
         prisma,
@@ -95,6 +106,8 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the organization project tree behind the project selector",
+    module:
+      "src/server/app-layer/organizations/repositories/organization.prisma.repository.ts",
     ids: async () => {
       const orgs = await new PrismaOrganizationRepository(prisma).getAllForUser(
         {
@@ -110,6 +123,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "team and RBAC settings",
+    module: "src/server/teams/team.service.ts",
     ids: async () => {
       const teams = await new TeamService({ prisma }).getTeamsWithRoleBindings({
         organizationId,
@@ -119,6 +133,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the API-key scope picker",
+    module: "src/server/api-key/api-key.repository.ts",
     ids: async () => {
       const projects = await ApiKeyRepository.create(prisma).findProjectsInOrg({
         organizationId,
@@ -128,6 +143,8 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the plan-limit alert's per-project lines",
+    module:
+      "src/server/app-layer/organizations/repositories/organization.prisma.repository.ts",
     ids: async () => {
       const projects = await new PrismaOrganizationRepository(
         prisma,
@@ -137,6 +154,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the data-privacy scope picker",
+    module: "src/server/data-privacy/dataPrivacyPolicy.read.ts",
     ids: async () => {
       const snapshot = await getDataPrivacySnapshot(readCtx(), {
         projectId: applicationProjectId,
@@ -146,6 +164,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the data-retention scope picker",
+    module: "src/server/data-retention/policy/dataRetentionPolicy.read.ts",
     ids: async () => {
       const snapshot = await getRetentionPolicySnapshot(readCtx(), {
         projectId: applicationProjectId,
@@ -155,6 +174,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the model-defaults scope picker",
+    module: "src/server/modelProviders/modelDefaults.read.ts",
     ids: async () => {
       const snapshot = await getDefaultModelsSnapshot(readCtx(), {
         projectId: applicationProjectId,
@@ -164,6 +184,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "department assignment",
+    module: "ee/governance/services/department/department.service.ts",
     ids: async () => {
       const assignments = await DepartmentService.create(prisma).getAssignments(
         { organizationId },
@@ -173,6 +194,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "the caller project scope map",
+    module: "src/server/organizations/resolveCallerProjectScope.ts",
     ids: async () => {
       const scope = await resolveCallerProjectScope({
         userId,
@@ -184,6 +206,7 @@ const surfaces: ListingSurface[] = [
   },
   {
     name: "cost by project",
+    module: "src/server/api/routers/costs.ts",
     ids: async () => {
       const rows = await caller.costs.getAggregatedCostsForOrganization({
         organizationId,
@@ -193,7 +216,80 @@ const surfaces: ListingSurface[] = [
       return rows.map((r) => r.project.id);
     },
   },
+  {
+    name: "the team's projects REST list",
+    module: "src/server/app-layer/teams/repositories/team.prisma.repository.ts",
+    ids: async () => {
+      const projects = await new TeamRestService(
+        new PrismaTeamRepository(prisma),
+      ).listProjects({ teamId });
+      return projects.map((p) => p.id);
+    },
+  },
 ];
+
+/**
+ * Source roots the registration sweep reads, relative to `platform/app`.
+ *
+ * `import.meta.dirname` is `src/server/__tests__`, so the package root is
+ * three levels up — resolved rather than hardcoded so moving this file does
+ * not silently point the sweep at nothing.
+ */
+const PACKAGE_ROOT = path.resolve(import.meta.dirname, "../../..");
+const SWEPT_ROOTS = ["src", "ee"];
+
+/**
+ * The predicate that hides the governance home, in either spelling.
+ *
+ * Matched as text rather than through the query it sits in, because the same
+ * predicate reaches Prisma three different ways here — inline in a
+ * `findMany`, hoisted into a shared `where` const, and nested inside a team's
+ * `projects` include. A matcher anchored on `findMany` sees only the first,
+ * which is how a filtered listing could stay off this registry while looking
+ * swept.
+ */
+const GOVERNANCE_EXCLUSION =
+  /not:\s*(?:"internal_governance"|PROJECT_KIND\.INTERNAL_GOVERNANCE)/;
+
+/**
+ * Reads that carry the predicate but hand the caller no project id, so there
+ * is nothing for a member to see and nothing for a surface to drive. Listed
+ * one by one rather than pattern-matched: an entry here is a claim somebody
+ * made deliberately, and a new listing cannot join it by accident.
+ */
+const NOT_A_LISTING: Record<string, string> = {
+  "src/server/gateway/scopeResolver.ts":
+    "counts the alternatives to the governance project when resolving a key's trace destination; returns a number",
+  "ee/governance/services/setupState.service.ts":
+    "counts application projects that have ingested, to decide one onboarding flag; returns a number",
+};
+
+/** Every source file that hides the governance home from a project read. */
+function modulesFilteringTheGovernanceHome(): string[] {
+  const found: string[] = [];
+  for (const root of SWEPT_ROOTS) {
+    for (const file of walkTypeScript(path.join(PACKAGE_ROOT, root))) {
+      if (GOVERNANCE_EXCLUSION.test(fs.readFileSync(file, "utf8"))) {
+        found.push(path.relative(PACKAGE_ROOT, file));
+      }
+    }
+  }
+  return found.sort();
+}
+
+function* walkTypeScript(dir: string): Generator<string> {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__" || entry.name === "generated") continue;
+      yield* walkTypeScript(full);
+      continue;
+    }
+    if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".tsx")) continue;
+    if (entry.name.includes(".test.")) continue;
+    yield full;
+  }
+}
 
 /**
  * One surface, by the name it declares rather than its position.
@@ -395,6 +491,38 @@ describe("the hidden governance project as a member sees it", () => {
         expect(teamIds).not.toContain(governanceProjectId);
         expect(apiKeyIds).toContain(applicationProjectId);
         expect(apiKeyIds).not.toContain(governanceProjectId);
+      });
+    });
+
+    describe("when a new project listing is added to the codebase", () => {
+      /** @scenario "Every filtered project listing is a surface the leak gate drives" */
+      it("fails unless the listing registers itself as a driven surface", () => {
+        const filtering = modulesFilteringTheGovernanceHome();
+
+        // The sweep's own guard: a walker that found nothing, or a regex that
+        // stopped matching the predicate, would otherwise report a clean
+        // registry while looking at zero readers.
+        expect(filtering).toContain(
+          "src/server/app-layer/projects/repositories/project.prisma.repository.ts",
+        );
+
+        const registered = new Set(surfaces.map((s) => s.module));
+        const unaccounted = filtering.filter(
+          (m) => !registered.has(m) && !(m in NOT_A_LISTING),
+        );
+
+        expect(
+          unaccounted,
+          "these readers filter the governance home but no surface above drives them, so nothing proves they keep filtering it",
+        ).toEqual([]);
+
+        // And the other direction: a surface naming a module that no longer
+        // filters is a surface pointed at the wrong reader.
+        const stale = [...registered].filter((m) => !filtering.includes(m));
+        expect(
+          stale,
+          "registered surfaces whose module no longer filters",
+        ).toEqual([]);
       });
     });
 
