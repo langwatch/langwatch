@@ -8,11 +8,13 @@ import {
   type LangyCredentialSession,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
 import {
   LangySessionKeyPort,
   LangySessionKeyScopeError,
 } from "../ports/langy-turn-runtime.port";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository";
+import { LangySessionKeyReapService } from "./langy-session-key-reap.service";
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
@@ -39,13 +41,6 @@ export type LangySessionKeyRevocation =
   | "already_revoked"
   | "not_found"
   | "refused";
-
-export abstract class LangySessionKeyMetricsPort {
-  abstract record(input: {
-    operation: "minted" | "revoked" | "reaped";
-    count?: number;
-  }): void;
-}
 
 export class LangySessionKeyService extends LangySessionKeyPort {
   private constructor(
@@ -162,11 +157,20 @@ export class LangySessionKeyService extends LangySessionKeyPort {
     return "revoked";
   }
 
-  async reapExpired(now = new Date()): Promise<number> {
-    const count = await this.repository.reapExpired(now, LANGY_SESSION_API_KEY_NAME);
-    if (count > 0) {
-      this.metrics.record({ operation: "reaped", count });
-    }
-    return count;
+  /**
+   * The fleet-wide sweep, delegated rather than repeated.
+   *
+   * Two graphs run this reap — the App's registered pipeline and the packaged
+   * worker's — and only one of them reaches it through this service. Composing
+   * the sweep here means both run the same reserved-name gate and the same
+   * single clock read, so the two can never come to disagree about which keys
+   * are in scope.
+   */
+  reapExpired(now = new Date()): Promise<number> {
+    return LangySessionKeyReapService.create({
+      repository: this.repository,
+      metrics: this.metrics,
+      now: () => now,
+    }).reap();
   }
 }

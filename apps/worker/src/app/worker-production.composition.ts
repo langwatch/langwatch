@@ -18,6 +18,11 @@ import {
   PostgresGithubBranchMaintenanceAdapter,
 } from "@langwatch/github-server";
 import {
+  type LangySessionKeyReapDatabase,
+  OtelLangySessionKeyMetricsAdapter,
+  PostgresLangySessionKeyReapAdapter,
+} from "@langwatch/langy-server";
+import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
@@ -59,10 +64,7 @@ import {
   LangyConversationWorkerFeatureInstaller,
   type LangyConversationWorkerCapability,
 } from "../features/langy/langy-conversation-worker-feature.installer";
-import {
-  LangyMaintenanceWorkerFeatureInstaller,
-  type LangyMaintenanceWorkerCapability,
-} from "../features/langy/langy-maintenance-worker-feature.installer";
+import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer";
 import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer";
 import {
   GovernanceEventsWorkerFeatureInstaller,
@@ -155,11 +157,6 @@ export type WorkerLangyConversationCompositionOptions = {
   installer: LangyConversationWorkerCapability;
 };
 
-/** Langy's session-key reaper, on the same footing as the substrate sweeps. */
-export type WorkerLangyMaintenanceCompositionOptions = {
-  installer: LangyMaintenanceWorkerCapability;
-};
-
 /**
  * The one Prisma client this process opened.
  *
@@ -171,7 +168,8 @@ export type WorkerLangyMaintenanceCompositionOptions = {
  * another feature's option, and the fallback goes when the platform root does.
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
-  GithubBranchMaintenanceDatabase;
+  GithubBranchMaintenanceDatabase &
+  LangySessionKeyReapDatabase;
 
 /**
  * The four identity pipelines (ADR-101), which mount as one group.
@@ -316,7 +314,6 @@ type WorkerProductionCompositionBaseOptions = {
   automation?: WorkerAutomationCompositionOptions;
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
   langyConversation?: WorkerLangyConversationCompositionOptions;
-  langyMaintenance?: WorkerLangyMaintenanceCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
   gatewaySpend?: WorkerGatewaySpendCompositionOptions;
@@ -393,18 +390,24 @@ export class WorkerProductionComposition {
           retentionMetrics: options.eventingMaintenance.retentionMetrics,
         })
       : undefined;
-    const langyMaintenance = options.langyMaintenance
-      ? LangyMaintenanceWorkerFeatureInstaller.create({
-          installer: options.langyMaintenance.installer,
-          eventing,
-        })
-      : undefined;
     const langyConversation = options.langyConversation
       ? LangyConversationWorkerFeatureInstaller.create({
           installer: options.langyConversation.installer,
           eventing,
         })
       : undefined;
+    // Unconditional, unlike the groups still owned by the legacy registry: the
+    // sweep is composed from this package and the feature's own service, so
+    // there is no graph in which it is present but unbuildable. The metrics
+    // adapter is the feature's own because this process has no prom-client
+    // registry to lend it; it writes the same series name the App writes.
+    const langyMaintenance = LangyMaintenanceWorkerFeatureInstaller.create({
+      eventing,
+      sessionKeyReap: PostgresLangySessionKeyReapAdapter.create({
+        database: options.database ?? options.topic.database,
+        metrics: OtelLangySessionKeyMetricsAdapter.create(),
+      }).build(),
+    });
     // Unconditional, unlike the groups still owned by the legacy registry: the
     // sweep is composed from this package and the feature's own service, so
     // there is no graph in which it is present but unbuildable.
@@ -765,8 +768,9 @@ export class WorkerProductionComposition {
  *                        and governance graphs is written through its command
  *   eventing-maintenance the substrate's own blob and retention sweeps, which
  *                        belong to no feature and must not depend on one
- *   langy-maintenance    the session-key reaper, unconditional like the
- *                        substrate sweeps and mounted with them
+ *   langy-maintenance    the session-key reaper, composed from its own feature
+ *                        package and so unconditional, like the substrate
+ *                        sweeps it is mounted with
  *   api-key              the agent-sandbox key sweep, the same kind of
  *                        unconditional reaper, and where the legacy registry
  *                        mounts it: after Langy's, before GitHub's

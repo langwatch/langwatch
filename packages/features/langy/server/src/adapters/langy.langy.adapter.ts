@@ -41,10 +41,8 @@ import type {
   LangySessionKeyMintingService,
   LangyVirtualKeyService,
 } from "../services/langy-credential.service";
-import {
-  LangySessionKeyService,
-  type LangySessionKeyMetricsPort,
-} from "../services/langy-session-key.service";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
+import { LangySessionKeyService } from "../services/langy-session-key.service";
 import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository";
 import { LangyTurnService, type LangyTurnTechnicalPorts } from "../services/langy-turn.service";
 

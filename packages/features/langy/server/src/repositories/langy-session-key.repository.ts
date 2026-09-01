@@ -1,3 +1,5 @@
+import { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository";
+
 export type LangySessionKeyRecord = {
   id: string;
   name: string;
@@ -5,7 +7,7 @@ export type LangySessionKeyRecord = {
   isScopedToProject: boolean;
 };
 
-export abstract class LangySessionKeyRepository {
+export abstract class LangySessionKeyRepository extends LangySessionKeyReapRepository {
   abstract tryFindProjectScope(projectId: string): Promise<{
     teamId: string;
     organizationId: string;
@@ -17,6 +19,4 @@ export abstract class LangySessionKeyRepository {
   }): Promise<LangySessionKeyRecord | null>;
 
   abstract revoke(apiKeyId: string, revokedAt: Date): Promise<void>;
-
-  abstract reapExpired(revokedAt: Date, name: string): Promise<number>;
 }

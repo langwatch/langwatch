@@ -645,4 +645,96 @@ describe("WorkerProductionComposition", () => {
       expect(warn).not.toHaveBeenCalled();
     });
   });
+
+  /**
+   * The Langy session-key sweep, composed here rather than handed over built.
+   *
+   * The reaper was written, tested and routed for cron, and then never
+   * scheduled, because the chart ships no CronJobs — so for the whole time it
+   * existed the backstop for keys orphaned by a SIGKILLed manager had no caller
+   * at all. What these cases hold is that the pipeline is registered by THIS
+   * graph and that the revoke behind its schedule reaches the client this root
+   * was given. A sweep wired to the wrong client — or to nothing — registers
+   * exactly the same routing keys and retires nothing.
+   */
+  describe("when the Langy session-key sweep is composed", () => {
+    function compositionWith(database: object, topicDatabase: object) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: topicDatabase as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(Object.keys(database).length > 0 ? { database: database as never } : {}),
+      });
+    }
+
+    async function sweepThrough(composition: WorkerProductionComposition) {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "langy-maintenance",
+      );
+      expect(installer, "the composition mounted no Langy maintenance feature").toBeDefined();
+      const registered: { name: string; run: (...args: never[]) => Promise<void> }[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push({
+          name: definition.metadata.name,
+          run: definition.processManagers.get("langySessionKeyReap")!.config.intents!.reap!
+            .run as never,
+        });
+        return {} as never;
+      });
+      await installer!.install();
+      expect(registered.map((entry) => entry.name)).toEqual(["langy_maintenance"]);
+      await registered[0]!.run(...([{ scheduledFor: 0 }, {}] as never[]));
+    }
+
+    /** @scenario "The worker composes the session-key sweep from the feature package" */
+    it("revokes through the client the root was given", async () => {
+      const updateMany = vi.fn(async () => ({ count: 0 }));
+      const unused = vi.fn(async () => ({ count: 0 }));
+
+      await sweepThrough(
+        compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
+      );
+
+      expect(updateMany).toHaveBeenCalledTimes(1);
+      expect(unused).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The session-key sweep revokes only elapsed Langy session keys" */
+    it("sweeps only the reserved Langy session name", async () => {
+      const updateMany = vi.fn(async (_update: { where: { name: string } }) => ({ count: 0 }));
+
+      await sweepThrough(compositionWith({ apiKey: { updateMany } }, {}));
+
+      expect(updateMany.mock.calls[0]![0].where.name).toBe("Langy session");
+    });
+
+    /**
+     * The fallback the platform composition root still relies on: it hands its
+     * one Prisma client over inside `topic` and names no `database`.
+     */
+    it("falls back to the client Topic was given when no database is named", async () => {
+      const updateMany = vi.fn(async () => ({ count: 0 }));
+
+      await sweepThrough(compositionWith({}, { apiKey: { updateMany } }));
+
+      expect(updateMany).toHaveBeenCalledTimes(1);
+    });
+  });
 });

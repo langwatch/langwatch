@@ -9,9 +9,19 @@ export {
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
-  LangySessionKeyMetricsPort,
   LangySessionKeyService,
 } from "./services/langy-session-key.service";
+export { LangySessionKeyMetricsPort } from "./ports/langy-session-key-metrics.port";
+export { LangySessionKeyReapService } from "./services/langy-session-key-reap.service";
+export { LangySessionKeyReapRepository } from "./repositories/langy-session-key-reap.repository";
+export {
+  OtelLangySessionKeyMetricsAdapter,
+  LANGY_SESSION_KEYS_METRIC_NAME,
+} from "./adapters/otel.langy-session-key-metrics.adapter";
+export {
+  PostgresLangySessionKeyReapAdapter,
+  type LangySessionKeyReapDatabase,
+} from "./adapters/postgres.langy-session-key-reap.adapter";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service";
 export { ADOPTABLE_CONVERSATION_ID } from "./services/langy.service";
 export type {

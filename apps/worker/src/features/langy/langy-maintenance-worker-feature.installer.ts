@@ -1,17 +1,11 @@
+import { EventingLangyMaintenanceAdapter } from "@langwatch/langy-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
-
-/** Langy credential maintenance's worker-facing capability. */
-export interface LangyMaintenanceWorkerCapability {
-  /**
-   * Builds the maintenance definition: one scheduled process, no events and
-   * no commands, so it registers no subscriber and costs nothing beyond the
-   * wake it exists for.
-   */
-  buildProcessing(): WorkerPipelineDefinition;
+/** The revoke half of the sweep, so a caller can supply one without a database. */
+export abstract class WorkerLangySessionKeyReapPort {
+  /** Revokes every elapsed, unrevoked Langy session key; answers how many. */
+  abstract reap(): Promise<number>;
 }
 
 /**
@@ -22,28 +16,41 @@ export interface LangyMaintenanceWorkerCapability {
  * never scheduled, because the chart ships no CronJobs. Mounting it here is
  * what finally gives the backstop for keys orphaned by a SIGKILLed manager a
  * caller.
+ *
+ * The pipeline is built HERE rather than received, for the same reason the
+ * API-key sweep's is: the outbox rows the reap writes have to be the ones this
+ * graph's own process store prunes, and a definition built against another
+ * store prunes another process's rows.
  */
 export class LangyMaintenanceWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {
-    installer: LangyMaintenanceWorkerCapability;
     eventing: WorkerEventingRuntime;
+    sessionKeyReap: WorkerLangySessionKeyReapPort;
   }): LangyMaintenanceWorkerFeatureInstaller {
-    return new LangyMaintenanceWorkerFeatureInstaller(options.installer, options.eventing);
+    return new LangyMaintenanceWorkerFeatureInstaller(options.eventing, options.sessionKeyReap);
   }
 
   readonly name = "langy-maintenance";
   private installed = false;
 
   private constructor(
-    private readonly installer: LangyMaintenanceWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
+    private readonly sessionKeyReap: WorkerLangySessionKeyReapPort,
   ) {
     super();
   }
 
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
-      this.eventing.eventSourcing.register(this.installer.buildProcessing());
+      const processStore = this.eventing.processStore;
+      this.eventing.eventSourcing.register(
+        EventingLangyMaintenanceAdapter.create({
+          sessionKeyReap: {
+            reap: () => this.sessionKeyReap.reap(),
+            deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+          },
+        }).buildProcessing(),
+      );
       this.installed = true;
     }
     return LangyMaintenanceWorkerFeatureHandle.create();

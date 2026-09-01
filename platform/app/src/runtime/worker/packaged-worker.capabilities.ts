@@ -177,7 +177,6 @@ export function packagedWorkerCapabilities(options: {
   return {
     automation: { installer: { buildPipeline: () => definition("automations") } },
     eventingMaintenance: capabilities.eventingMaintenance,
-    langyMaintenance: { installer: { buildProcessing: () => definition("langy_maintenance") } },
     evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
     codingAgent: { installer: { buildProcessing: () => definition("coding_agent_processing") } },
     gatewaySpend: {

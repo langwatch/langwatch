@@ -29,8 +29,8 @@ class SessionKeyRepository extends LangySessionKeyRepository {
     this.revocations.push({ apiKeyId, revokedAt });
   }
 
-  async reapExpired(revokedAt: Date, name: string): Promise<number> {
-    this.reaperCalls.push({ revokedAt, name });
+  async revokeExpiredByName(input: { name: string; now: Date }): Promise<number> {
+    this.reaperCalls.push({ revokedAt: input.now, name: input.name });
     return this.reapedCount;
   }
 }
