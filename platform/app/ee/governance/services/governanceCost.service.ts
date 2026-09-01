@@ -39,12 +39,10 @@ import type {
 import { resolveGovProjectId } from "@ee/governance/services/govProject";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
 
 const logger = createLogger("langwatch:governance:cost");
-
-/** Nano-USD per USD. The rollup stores integer nano units, never floats. */
-const NANO_PER_USD = 1_000_000_000;
 
 /**
  * Why the screen holds no figures at all.
@@ -180,11 +178,6 @@ function unavailable({
     series: [],
     windowDays,
   };
-}
-
-/** Integer nano-USD to USD, preserving null. */
-function toUsd(amountNanoUsd: number | null): number | null {
-  return amountNanoUsd === null ? null : amountNanoUsd / NANO_PER_USD;
 }
 
 /** `YYYY-MM-DD` for a UTC instant. */
@@ -375,7 +368,15 @@ function figureFor(rows: readonly LaneRow[]): number | null {
   );
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
   if (withoutAmount > 0 || priced.length === 0) return null;
-  return toUsd(priced.reduce((sum, row) => sum + (row.amountNanoUsd ?? 0), 0));
+  // Summed in BigInt and divided by reading the digits out, per ADR-128 §3.
+  // A window total is nano-USD, so a lane past roughly nine million dollars
+  // crosses 2^53 and a float accumulator starts dropping the low digits
+  // silently — a wrong total wearing the same label as a right one.
+  const totalNanoUsd = priced.reduce(
+    (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
+    0n,
+  );
+  return Number(nanoUsdToDecimalString(totalNanoUsd));
 }
 
 /**
