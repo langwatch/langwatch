@@ -270,6 +270,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
   describe("GET /governance/status", () => {
     describe("when called with a valid Bearer token", () => {
+      /** @scenario "setupState returns boolean OR for nav-promotion signal" */
       it("returns the org's setup-state OR-of-flags shape", async () => {
         const res = await callGovernance("/status", `Bearer ${TOKEN_A}`);
         expect(res.status).toBe(200);

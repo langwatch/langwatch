@@ -126,7 +126,7 @@ describe("PrismaOrganizationRepository — internal_governance project filter", 
       expect(projectIds).toContain(applicationProject.id);
     });
 
-    /** @scenario Lane-B test suite asserts every Project consumer filters */
+    /** @scenario The Lane-B suite asserts every Project consumer filters out internal governance projects */
     it("filters out the internal_governance project", async () => {
       const orgs = await repository.getAllForUser({
         userId: testUser.id,
