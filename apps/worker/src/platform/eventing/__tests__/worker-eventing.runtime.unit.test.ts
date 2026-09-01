@@ -1,7 +1,57 @@
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
+import {
+  InMemoryProcessStore,
+  type Event,
+  type EventSourcedQueueProcessor,
+  type MapProjectionDefinition,
+  type SubscriberDispatchDefinition,
+} from "@langwatch/eventing";
+import { createBlobMaintenancePipeline } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 import { WorkerEventingRuntime } from "../worker-eventing.runtime";
+
+/**
+ * A cross-pipeline map projection and the subscriber that follows it, reduced
+ * to the shape the registry needs. The live SaaS pair is the billable-events
+ * meter and its usage-reporting dispatch; what matters here is that both land
+ * in the shared job registry under `global:`, because that is the namespace a
+ * consumer of `event-sourcing/jobs` has to be able to route.
+ */
+const meterProjection: MapProjectionDefinition<{ eventId: string }, Event> = {
+  name: "orgBillableEventsMeter",
+  eventTypes: ["lw.obs.trace.span_received"],
+  map: (event) => ({ eventId: event.id }),
+  store: { append: async () => void 0 },
+};
+
+const meterDispatch: SubscriberDispatchDefinition<Event> = {
+  name: "billingMeterDispatch",
+  options: { runIn: ["worker"] },
+  handle: async () => void 0,
+};
+
+/** A real registration, so the projection registry initializes its queues. */
+function anyPipeline() {
+  return createBlobMaintenancePipeline({
+    cleanup: {
+      sweep: async () => ({
+        queues: [],
+        totals: {
+          scanned: 0,
+          truncated: false,
+          leased: 0,
+          repaired: 0,
+          reclaimed: 0,
+          bookkeeping: 0,
+          pending: 0,
+        },
+        dryRun: false,
+        durationMs: 0,
+      }),
+      deleteDispatchedBefore: async () => 0,
+    },
+  });
+}
 
 class TestQueue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);
@@ -74,5 +124,58 @@ describe("WorkerEventingRuntime", () => {
     await runtime.close();
 
     await expect(runtime.start()).rejects.toThrow("Worker Eventing runtime is closed.");
+  });
+});
+
+describe("WorkerEventingRuntime global projections", () => {
+  describe("given cross-pipeline projections the composition root supplies", () => {
+    describe("when the first pipeline registers", () => {
+      it("routes their jobs through the same shared registry as every pipeline", () => {
+        const runtime = WorkerEventingRuntime.create({
+          eventStore: EventStoreMemory.createForTesting(),
+          queueFactory: () => new TestQueue(),
+          processStore: InMemoryProcessStore.createForTesting(),
+          executionTarget: "worker",
+          warnWhenProjectionsRunInline: false,
+          consumersEnabled: false,
+          configureGlobalProjections: (registry) => {
+            registry.registerMapProjection(meterProjection);
+            registry.registerMapSubscriber("orgBillableEventsMeter", meterDispatch);
+          },
+        });
+
+        runtime.eventSourcing.register(anyPipeline());
+
+        expect([...runtime.eventSourcing.globalJobRegistry.keys()]).toEqual(
+          expect.arrayContaining([
+            "global:handler:orgBillableEventsMeter",
+            "global:reactor:billingMeterDispatch",
+          ]),
+        );
+      });
+    });
+  });
+
+  describe("given a composition root that supplies none", () => {
+    describe("when the first pipeline registers", () => {
+      it("registers no global routing keys at all", () => {
+        const runtime = WorkerEventingRuntime.create({
+          eventStore: EventStoreMemory.createForTesting(),
+          queueFactory: () => new TestQueue(),
+          processStore: InMemoryProcessStore.createForTesting(),
+          executionTarget: "worker",
+          warnWhenProjectionsRunInline: false,
+          consumersEnabled: false,
+        });
+
+        runtime.eventSourcing.register(anyPipeline());
+
+        expect(
+          [...runtime.eventSourcing.globalJobRegistry.keys()].filter((key) =>
+            key.startsWith("global:"),
+          ),
+        ).toEqual([]);
+      });
+    });
   });
 });

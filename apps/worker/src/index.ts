@@ -1,6 +1,7 @@
 export { WorkerApplication } from "./app/worker.application";
 export {
   WorkerProductionComposition,
+  type WorkerGlobalProjectionsCompositionOptions,
   type WorkerInfrastructureCompositionOptions,
   type WorkerProductionCompositionOptions,
   type WorkerTraceCompositionOptions,

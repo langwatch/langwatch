@@ -2,6 +2,7 @@ import {
   EventSourcing,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
+  type EventSourcingOptions,
   type EventStore,
   type ExecutionTarget,
   type ProcessStore,
@@ -27,6 +28,19 @@ export interface WorkerEventingDependencies {
    */
   consumersEnabled?: false;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * Projections that span pipelines, configured before any of them exist.
+   *
+   * The Eventing runtime takes these at construction because a global
+   * projection's queues are registered against the shared job registry the
+   * moment the first pipeline is registered, not by an installer afterwards.
+   * The live registry configures the SaaS billable-events meter and its
+   * dispatch subscriber exactly here, and their routing keys (`global:*`) sit
+   * in the same registry as every pipeline's. A consumer that claimed
+   * `event-sourcing/jobs` without them would reject and redeliver every
+   * billable span, evaluation, experiment and simulation event forever.
+   */
+  configureGlobalProjections?: EventSourcingOptions["configureGlobalProjections"];
 }
 
 /** Durable Eventing ports supplied by the Worker process composition root. */
@@ -34,6 +48,8 @@ export interface WorkerEventingProductionOptions {
   persistence: EventingServerRuntimeOptions;
   /** Production-only diagnostic for projections without a shared queue. */
   warnWhenProjectionsRunInline: boolean;
+  /** Cross-pipeline projections, registered before the first pipeline. */
+  configureGlobalProjections?: EventSourcingOptions["configureGlobalProjections"];
 }
 
 /**
@@ -62,6 +78,9 @@ export class WorkerEventingRuntime {
       executionTarget: "worker",
       consumersEnabled: false,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
+      ...(options.configureGlobalProjections
+        ? { configureGlobalProjections: options.configureGlobalProjections }
+        : {}),
     });
   }
 
@@ -85,6 +104,7 @@ export class WorkerEventingRuntime {
       processStore: this.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,
       warnWhenProjectionsRunInline: dependencies.warnWhenProjectionsRunInline,
+      configureGlobalProjections: dependencies.configureGlobalProjections,
     });
   }
 

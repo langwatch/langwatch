@@ -5,6 +5,7 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
+  createBlobMaintenancePipeline,
   createEventingRetentionConfiguration,
   EventingClickHouseEventStore,
   EventingServerRuntime,
@@ -168,6 +169,29 @@ class Credentials {
   }
 }
 
+/** A real registration, so the projection registry initializes its queues. */
+function blobMaintenanceDefinition() {
+  return createBlobMaintenancePipeline({
+    cleanup: {
+      sweep: async () => ({
+        queues: [],
+        totals: {
+          scanned: 0,
+          truncated: false,
+          leased: 0,
+          repaired: 0,
+          reclaimed: 0,
+          bookkeeping: 0,
+          pending: 0,
+        },
+        dryRun: false,
+        durationMs: 0,
+      }),
+      deleteDispatchedBefore: async () => 0,
+    },
+  });
+}
+
 describe("WorkerProductionComposition", () => {
   it("composes one canonical durable Eventing graph with consumers disabled", () => {
     const assignments = new TraceAssignments();
@@ -205,6 +229,51 @@ describe("WorkerProductionComposition", () => {
     } finally {
       create.mockRestore();
     }
+  });
+
+  it("carries the composition root's cross-pipeline projections into that graph", () => {
+    // A global projection joins the shared job registry when the first
+    // pipeline registers, not through an installer, so the only place it can
+    // be supplied is the Eventing runtime's construction. Without this seam a
+    // consumer of `event-sourcing/jobs` has no route for the SaaS billable
+    // meter's jobs and rejects every one of them for redelivery.
+    const composition = WorkerProductionComposition.create({
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      eventing: {
+        database: createProcessPersistenceDatabase(),
+        resolveClickHouseClient: async () => ({
+          insert: async () => undefined,
+          query: async () => ({ json: async () => [] }),
+        }),
+        groupQueue: { redis: {} as never },
+        retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+      },
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      trace: { installer: new TraceInstaller(new TraceAssignments()) },
+      topic: {
+        database: {} as never,
+        redis: null,
+        execution: {} as never,
+        metrics: {} as never,
+      },
+      globalProjections: {
+        configure: (registry) => {
+          registry.registerMapProjection({
+            name: "orgBillableEventsMeter",
+            eventTypes: ["lw.obs.trace.span_received"],
+            map: (event) => ({ eventId: event.id }),
+            store: { append: async () => void 0 },
+          });
+        },
+      },
+    });
+
+    composition.eventing.eventSourcing.register(blobMaintenanceDefinition());
+
+    expect([...composition.eventing.eventSourcing.globalJobRegistry.keys()]).toContain(
+      "global:handler:orgBillableEventsMeter",
+    );
   });
 
   it("installs Topic's producer graph and boot seeds without claiming the shared Eventing queue", async () => {

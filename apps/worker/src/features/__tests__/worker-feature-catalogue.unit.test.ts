@@ -12,6 +12,14 @@
  * This suite is what makes it true. It compares the catalogue against the
  * installer names the feature sources actually declare, so adding an installer
  * without declaring it fails here rather than passing silently.
+ *
+ * It also holds `job-registry.json` to the same standard. That file names
+ * every routing key on the shared `event-sourcing/jobs` queue, in mount order,
+ * against the feature that owns it — the checklist the packaged consumer must
+ * satisfy before it may claim the queue. Its keys are compared against the
+ * live legacy registry by `worker-pipeline-parity` in `platform/app`, which is
+ * the only place both graphs can be built; what belongs here is the half that
+ * needs no other package: that the two declarations name the same features.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -22,6 +30,13 @@ const featuresRoot = resolve(import.meta.dirname, "..");
 const catalogue = JSON.parse(readFileSync(join(featuresRoot, "catalogue.json"), "utf8")) as {
   version: number;
   features: string[];
+};
+
+const jobRegistry = JSON.parse(readFileSync(join(featuresRoot, "job-registry.json"), "utf8")) as {
+  version: number;
+  queue: string;
+  pipelines: { name: string; feature: string; jobs: string[] }[];
+  globalProjections: { pipeline: string; jobs: string[] };
 };
 
 /**
@@ -64,6 +79,33 @@ describe("worker feature catalogue", () => {
       // composition and is pinned by its own suite. Repeating it here would
       // be a second copy free to drift from the one the worker executes.
       expect(catalogue.features).toEqual([...catalogue.features].sort());
+    });
+  });
+});
+
+describe("worker job registry", () => {
+  describe("given the routing keys the shared queue carries", () => {
+    it("attributes every pipeline to a declared feature", () => {
+      const owners = [...new Set(jobRegistry.pipelines.map((pipeline) => pipeline.feature))];
+
+      expect(owners.sort()).toEqual([...catalogue.features].sort());
+    });
+
+    it("names the one queue every pipeline shares", () => {
+      // One queue is the whole reason parity has to be exact: a job whose
+      // routing key no handler claims is rejected for redelivery, not dropped.
+      expect(jobRegistry.queue).toBe("event-sourcing/jobs");
+    });
+
+    it("names each pipeline once, and each of its jobs once", () => {
+      const names = jobRegistry.pipelines.map((pipeline) => pipeline.name);
+
+      expect(names).toHaveLength(new Set(names).size);
+      for (const pipeline of jobRegistry.pipelines) {
+        expect(pipeline.jobs, `${pipeline.name} lists a job twice`).toHaveLength(
+          new Set(pipeline.jobs).size,
+        );
+      }
     });
   });
 });

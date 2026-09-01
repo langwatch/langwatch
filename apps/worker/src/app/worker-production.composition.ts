@@ -106,7 +106,10 @@ import {
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
 import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
-import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime";
+import {
+  WorkerEventingRuntime,
+  type WorkerEventingProductionOptions,
+} from "../platform/eventing/worker-eventing.runtime";
 import {
   WorkerInfrastructureAdapter,
   type WorkerInfrastructureAdapterOptions,
@@ -246,6 +249,19 @@ export type WorkerAuthzCompositionOptions = {
   installer: AuthzWorkerCapability;
 };
 
+/**
+ * Cross-pipeline projections the Eventing runtime takes at construction.
+ *
+ * A global projection is not an installer: its queues join the shared job
+ * registry as soon as the first pipeline registers, so it has to be configured
+ * before any feature mounts. The live registry uses this seam for the SaaS
+ * billable-events meter and the reporting subscriber that follows it, whose
+ * `global:*` routing keys share `event-sourcing/jobs` with every pipeline.
+ */
+export type WorkerGlobalProjectionsCompositionOptions = {
+  configure: NonNullable<WorkerEventingProductionOptions["configureGlobalProjections"]>;
+};
+
 /** Resolved technical inputs for the Worker-owned transport foundation. */
 export type WorkerInfrastructureCompositionOptions = Omit<
   WorkerInfrastructureAdapterOptions,
@@ -282,6 +298,7 @@ type WorkerProductionCompositionBaseOptions = {
   billingReporting?: WorkerBillingReportingCompositionOptions;
   authz?: WorkerAuthzCompositionOptions;
   identity?: WorkerIdentityCompositionOptions;
+  globalProjections?: WorkerGlobalProjectionsCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 };
@@ -322,6 +339,9 @@ export class WorkerProductionComposition {
     const eventing = WorkerEventingRuntime.createProduction({
       persistence: eventingOptions,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
+      ...(options.globalProjections
+        ? { configureGlobalProjections: options.globalProjections.configure }
+        : {}),
     });
     const automation = options.automation
       ? AutomationWorkerFeatureInstaller.create({
