@@ -857,7 +857,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 | Name           | Description                                                                                                        | Value  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
-| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views) when the application starts. Supported at any replica count via keeper-backed replicated access storage (requires clickhouse-serverless image newer than 0.3.0). The feature flag still gates the endpoint. | `true` |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views). Who provisions it depends on who owns the server: with `clickhouse.chartManaged: true` (default), the `clickhouse-serverless` subchart renders these objects as config at pod boot; with an external ClickHouse, the application self-provisions the same objects via SQL DDL at startup (see [BYO ClickHouse prerequisites](#langwatchql-lwql--byo-clickhouse-prerequisites) and [ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)). The feature flag still gates the endpoint. | `true` |
 
 ### Redis
 

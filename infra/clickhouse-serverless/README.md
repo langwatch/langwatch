@@ -21,7 +21,7 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `BACKUP_ENABLED` | `false` | Enable S3 disk for native `BACKUP`/`RESTORE` SQL |
 | `S3_ENDPOINT` | — | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA) |
-| `CH_REPLICATED` | `false` | Enable ReplicatedMergeTree with keeper-backed replicated access storage for LangWatchQL (requires keeper + data node env vars) |
+| `CH_REPLICATED` | `false` | Enable ReplicatedMergeTree with Keeper-backed data replication (requires keeper + data node env vars). Keeper replicates table data only — LangWatchQL access objects (users, profiles, row policies) are rendered as config at pod start, never stored in Keeper; see [ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md) |
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
