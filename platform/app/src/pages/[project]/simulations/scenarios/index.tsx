@@ -173,18 +173,18 @@ function ScenarioLibraryPage() {
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
           <Spacer />
+          <ReturnToNewSimulationsBanner target="scenarios" />
           <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}
             onToggle={handleLabelToggle}
+            triggerSize="header"
           />
           <PageLayout.HeaderButton onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario
           </PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>
-
-      <ReturnToNewSimulationsBanner target="scenarios" />
 
       <PageLayout.Container padding={0}>
         {isLoading && (
