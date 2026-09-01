@@ -88,8 +88,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       filtered view over the existing log-records UI
 
   @bdd @ui @ui-contract @drill-down @uniformity
-  Scenario: The user cannot tell from the events feed which row will
-            route to which destination
+  Scenario: The user cannot tell from the events feed which row routes where
     When the admin scrolls the events feed
     Then every row shows the same columns (timestamp, source, actor,
       action, target, cost, tokens, severity)
@@ -158,8 +157,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @composer @critical
-  Scenario: The IngestionSource composer does NOT show a Project
-            selection field
+  Scenario: The IngestionSource composer does NOT show a Project selection field
     When the admin opens the "Create ingestion source" composer at
       "/governance/inventory/new"
     Then the composer asks for: name, source type, per-platform config
@@ -187,8 +185,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       same helper text), set by the receiver layer, not by users
 
   @bdd @ui @ui-contract @namespaces
-  Scenario: The events feed displays langwatch.origin.* and
-            langwatch.governance.* as system-derived (read-only)
+  Scenario: The events feed displays governance attributes as system-derived and read-only
     When the events feed renders an event row's expanded attributes
     Then attributes in the langwatch.origin.* and langwatch.governance.*
       namespaces are visually grouped under a "System metadata"
@@ -241,8 +238,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @anomaly-rules
-  Scenario: The anomaly rule composer's scope picker still works against
-            IngestionSource IDs after the cutover
+  Scenario: The anomaly rule scope picker still works against IngestionSource IDs after the cutover
     Given Sergey's anomaly subscriber has rebased on governance_kpis fold
     When the admin opens the AnomalyRule composer at
       "/governance/anomaly-rules/new"
@@ -285,8 +281,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @trace-viewer-embed
-  Scenario: The per-source detail page embeds the existing trace
-            viewer (does NOT build a bespoke event renderer)
+  Scenario: The per-source detail page embeds the existing trace viewer, not a bespoke renderer
     When the admin navigates to a per-source detail page with events
     Then the events feed reuses the existing
       platform/app/src/components/messages/MessagesList component
@@ -316,8 +311,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @regression
-  Scenario: Lane-B test suite asserts every Project consumer filters
-            kind=internal_governance
+  Scenario: The Lane-B suite asserts every Project consumer filters out internal governance projects
     When the test suite runs
       platform/app/src/server/__tests__/projectFilter.invariant.integration.test.ts
     Then it enumerates every component / API / hook / repository
