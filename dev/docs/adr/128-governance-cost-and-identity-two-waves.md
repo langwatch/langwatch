@@ -675,25 +675,13 @@ knowingly disagree with the provider's own console).
 
 ### §16. Idle seats split across the waves (FR3)
 
-- **Wave 1, the aggregate**: "you pay for N seats, M were active" per
-  provider. It is **two reads against two tables**, because seat money is
-  never a rollup row (§5) — naming them here so the implementer does not
-  have to guess:
-  - **M (active)** — `countDistinct(RawActorId)` over
-    `governance_cost_rollup_1d` for the period, dedup-safe like every
-    other read of it. Raw actor id is a rollup dimension from day one
-    (§4, §9), which is exactly why §9's stamping is wave 1.
-  - **N (paid for)** — the roster count-events (§6), read from
-    `governance_seat_count_1d`, their own sibling projection output. They
-    are not rollup rows and the thin service does **not** read the event
-    log at request time, for the same reason the money numbers don't:
-    summed reads come from a projection, always.
-  The thin service multiplies **N** by the dated price list at read (§6),
-  renders "price missing" rather than a silent zero when a license type
-  has no price row, and needs no identity for either half.
-- **Wave 2, the names**: listing *which* seats are idle requires the
-  roster ↔ usage-actor join (§11). Idle default: no activity for 30 days,
-  adjustable per org; last-activity date always shown.
+- **Wave 1, the aggregate**: "you pay for N seats, M are assigned" per
+  provider — both numbers straight from the provider's SKU/roster counts
+  (bought vs assigned). No identity needed, no usage join.
+- **Wave 2, the names and the activity**: an *active*-seat count (distinct
+  raw actor ids on usage rows) and listing *which* seats are idle both
+  require the roster ↔ usage-actor join (§11). Idle default: no activity
+  for 30 days, adjustable per org; last-activity date always shown.
 - FR3 is **partially** met in wave 1, met in wave 2 — the ADR says so
   rather than rounding up.
 
