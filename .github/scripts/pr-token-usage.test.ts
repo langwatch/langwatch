@@ -273,6 +273,27 @@ describe("given a rollup with no sessions", () => {
   });
 });
 
+describe("given a pull request that has merged", () => {
+  describe("when its comment is refreshed one last time", () => {
+    /** @scenario "The last refresh says the number is settled" */
+    it("stamps the comment as final at the merge commit", () => {
+      const body = buildCommentBody({
+        usage: usage(),
+        shortSha: "9f8e7d6",
+        updatedAtIso: "2026-09-01T09:00:00.000Z",
+        final: true,
+      });
+      assert.match(body, /Final, at the merge of `9f8e7d6` · 2026-09-01 09:00 UTC/);
+      assert.ok(!body.includes("Updated for"));
+    });
+
+    it("keeps the ordinary stamp while the pull request is open", () => {
+      assert.match(build(usage()), /Updated for `abc1234`/);
+      assert.ok(!build(usage()).includes("Final, at the merge"));
+    });
+  });
+});
+
 describe("given a comment listing that spans more pages than a fixed cap", () => {
   describe("when the next page is read from the Link header", () => {
     /** @scenario "The whole comment listing is searched for the marker" */

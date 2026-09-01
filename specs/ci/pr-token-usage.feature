@@ -116,6 +116,58 @@ Feature: PR token usage comment
     Then a note states how many of the total tokens the model rows cover
     And a rollup whose model rows match the totals carries no such note
 
+  Rule: A merged pull request is refreshed one last time
+
+    The per-pull-request workflow refreshes on every push, so the last comment
+    describes the world as it was at the last commit. Review agents keep
+    reading the diff after that, and a pull request approved as it stands
+    never gets another push. A merge is the moment the total stops moving.
+
+    Scenario: The comment is refreshed when the pull request merges
+      Given a pull request carries a usage comment
+      And no further commit is pushed to it
+      When the pull request is merged
+      Then its comment is refreshed a final time
+      And the tokens spent reviewing it after its last commit are included
+
+    @unit
+    Scenario: The last refresh says the number is settled
+      Given a pull request that has merged
+      When its comment is refreshed one last time
+      Then the comment states that the total is final at the merge commit
+      And a comment on an open pull request keeps the ordinary stamp
+
+    @unit
+    Scenario: A merged pull request gets one last refresh
+      Given a push to the default branch that merged a pull request
+      When the pull requests for the pushed commit are read
+      Then the pull request that merged into the pushed branch is named
+
+    @unit
+    Scenario: Only the pull requests that merged are refreshed
+      Given a commit associated with pull requests that did not merge it
+      When the pull requests for the pushed commit are read
+      Then open pull requests are passed over
+      And pull requests merged into another branch are passed over
+
+    @unit
+    Scenario: A batch merge refreshes every pull request it carried
+      Given a push to the default branch that merged more than one pull request
+      When the pull requests for the pushed commit are read
+      Then every merged pull request is named exactly once
+
+    @unit
+    Scenario: A merged fork pull request is still not commented on
+      Given a merged pull request whose head branch is in another repository
+      When the pull requests for the pushed commit are read
+      Then it is reported as a fork rather than refreshed
+
+    @unit
+    Scenario: A push that merged nothing changes nothing
+      Given a direct push to the default branch
+      When the pull requests for the pushed commit are read
+      Then no pull request is named and no comment is touched
+
   @unit
   Scenario: An unmapped pull request reads as no usage
     Given the LangWatch API answers that the pull request is not mapped
