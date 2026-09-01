@@ -99,173 +99,181 @@ function archiveProjectsNamed(name: string): void {
 }
 
 describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
-  it.skipIf(isCI || !hasOrganizationLogin())(
-    "agent uses CLI to list and create projects",
-    async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-projects-"),
-      );
-      const projectName = `CLI Test Project ${Date.now()}`;
+  // One organization login serves both cases; each case then drives the
+  // CLI for one resource.
+  describe("given the CLI is logged in to an organization", () => {
+    describe("when the agent lists and creates projects", () => {
+      it.skipIf(isCI || !hasOrganizationLogin())(
+        "agent uses CLI to list and create projects",
+        async () => {
+          const tempFolder = fs.mkdtempSync(
+            path.join(os.tmpdir(), "langwatch-cli-projects-"),
+          );
+          const projectName = `CLI Test Project ${Date.now()}`;
 
-      fs.writeFileSync(
-        path.join(tempFolder, ".env"),
-        process.env.LANGWATCH_ENDPOINT
-          ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n`
-          : "",
-      );
-      setupLocalCli(tempFolder);
+          fs.writeFileSync(
+            path.join(tempFolder, ".env"),
+            process.env.LANGWATCH_ENDPOINT
+              ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n`
+              : "",
+          );
+          setupLocalCli(tempFolder);
 
-      // No project key here on purpose: `projects` reaches the organization,
-      // refuses a project key, and reads the credential of `langwatch login`.
-      fs.writeFileSync(
-        path.join(tempFolder, "CLAUDE.md"),
-        `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
-DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
+          // No project key here on purpose: `projects` reaches the organization,
+          // refuses a project key, and reads the credential of `langwatch login`.
+          fs.writeFileSync(
+            path.join(tempFolder, "CLAUDE.md"),
+            `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
+    DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-\`projects\` manages the projects of the whole organization, so it uses the
-credential of \`langwatch login\`. Do not set LANGWATCH_API_KEY: a project key
-is refused on these commands.
+    \`projects\` manages the projects of the whole organization, so it uses the
+    credential of \`langwatch login\`. Do not set LANGWATCH_API_KEY: a project key
+    is refused on these commands.
 
-First, set up the environment:
-\`\`\`bash
-export PATH="./bin:$PATH"
-${process.env.LANGWATCH_ENDPOINT ? `export $(grep LANGWATCH_ENDPOINT .env)` : ""}
-\`\`\`
+    First, set up the environment:
+    \`\`\`bash
+    export PATH="./bin:$PATH"
+    ${process.env.LANGWATCH_ENDPOINT ? `export $(grep LANGWATCH_ENDPOINT .env)` : ""}
+    \`\`\`
 
-Then run CLI commands directly:
-- \`langwatch projects list\`
-- \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`
-`,
-      );
+    Then run CLI commands directly:
+    - \`langwatch projects list\`
+    - \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`
+    `,
+          );
 
-      try {
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "CLI projects lifecycle",
-        description:
-          "Developer wants to list and create projects using the LangWatch CLI (not MCP).",
-        agents: [
-          createClaudeCodeAgent({
-            workingDirectory: tempFolder,
-            omitEnvKeys: ["LANGWATCH_API_KEY"],
-          }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent ran `langwatch projects list` via the Bash tool",
-              "Agent ran `langwatch projects create` with --name, --language, --framework, and --new-team-name flags",
-              "Agent received a service API key in the create output",
+          try {
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "CLI projects lifecycle",
+            description:
+              "Developer wants to list and create projects using the LangWatch CLI (not MCP).",
+            agents: [
+              createClaudeCodeAgent({
+                workingDirectory: tempFolder,
+                omitEnvKeys: ["LANGWATCH_API_KEY"],
+              }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent ran `langwatch projects list` via the Bash tool",
+                  "Agent ran `langwatch projects create` with --name, --language, --framework, and --new-team-name flags",
+                  "Agent received a service API key in the create output",
+                ],
+              }),
             ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. \`export PATH="./bin:$PATH"\`\n2. \`langwatch projects list\`\n3. \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.`,
-          ),
-          scenario.agent(),
-          (state) => {
-            toolCallFix(state);
+            script: [
+              scenario.user(
+                `Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. \`export PATH="./bin:$PATH"\`\n2. \`langwatch projects list\`\n3. \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.`,
+              ),
+              scenario.agent(),
+              (state) => {
+                toolCallFix(state);
 
-            const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
-              .join("\n");
+                const allText = state.messages
+                  .map((m) =>
+                    typeof m.content === "string"
+                      ? m.content
+                      : JSON.stringify(m.content),
+                  )
+                  .join("\n");
 
-            expect(allText).toMatch(/langwatch\s+projects/);
-          },
-          scenario.judge(),
-        ],
-      });
-
-      expect(result.success).toBe(true);
-      } finally {
-        archiveProjectsNamed(projectName);
-      }
-    },
-    900_000,
-  );
-
-  it.skipIf(isCI || !hasOrganizationLogin())(
-    "agent uses CLI to list and create API keys",
-    async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-api-keys-"),
-      );
-
-      fs.writeFileSync(
-        path.join(tempFolder, ".env"),
-        process.env.LANGWATCH_ENDPOINT
-          ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n`
-          : "",
-      );
-      setupLocalCli(tempFolder);
-
-      // No project key here on purpose: `api-keys` reaches the organization,
-      // refuses a project key, and reads the credential of `langwatch login`.
-      fs.writeFileSync(
-        path.join(tempFolder, "CLAUDE.md"),
-        `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
-DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
-
-\`api-keys\` manages the keys of the whole organization, so it uses the
-credential of \`langwatch login\`. Do not set LANGWATCH_API_KEY: a project key
-is refused on these commands.
-
-First: \`export PATH="./bin:$PATH"\`
-${process.env.LANGWATCH_ENDPOINT ? `And: \`export $(grep LANGWATCH_ENDPOINT .env)\`` : ""}
-Then: \`langwatch api-keys list\`
-Then: \`langwatch api-keys create --name "CI Deploy Key"\`
-`,
-      );
-
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "CLI API keys lifecycle",
-        description:
-          "Developer wants to list and create API keys using the LangWatch CLI (not MCP).",
-        agents: [
-          createClaudeCodeAgent({
-            workingDirectory: tempFolder,
-            omitEnvKeys: ["LANGWATCH_API_KEY"],
-          }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent ran `langwatch api-keys list` via the Bash tool",
-              "Agent ran `langwatch api-keys create` with a --name flag",
-              "Agent reported what the create command answered, either the token it returned or the permission the credential lacks, and did not invent a key",
+                expect(allText).toMatch(/langwatch\s+projects/);
+              },
+              scenario.judge(),
             ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH"`\n2. `langwatch api-keys list`\n3. `langwatch api-keys create --name "CI Deploy Key"`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.',
-          ),
-          scenario.agent(),
-          (state) => {
-            toolCallFix(state);
+          });
 
-            const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
-              .join("\n");
+          expect(result.success).toBe(true);
+          } finally {
+            archiveProjectsNamed(projectName);
+          }
+        },
+        900_000,
+      );
+    });
 
-            expect(allText).toMatch(/langwatch\s+api-keys/);
-          },
-          scenario.judge(),
-        ],
-      });
+    describe("when the agent lists and creates API keys", () => {
+      it.skipIf(isCI || !hasOrganizationLogin())(
+        "agent uses CLI to list and create API keys",
+        async () => {
+          const tempFolder = fs.mkdtempSync(
+            path.join(os.tmpdir(), "langwatch-cli-api-keys-"),
+          );
 
-      expect(result.success).toBe(true);
-    },
-    900_000,
-  );
+          fs.writeFileSync(
+            path.join(tempFolder, ".env"),
+            process.env.LANGWATCH_ENDPOINT
+              ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n`
+              : "",
+          );
+          setupLocalCli(tempFolder);
+
+          // No project key here on purpose: `api-keys` reaches the organization,
+          // refuses a project key, and reads the credential of `langwatch login`.
+          fs.writeFileSync(
+            path.join(tempFolder, "CLAUDE.md"),
+            `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
+    DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
+
+    \`api-keys\` manages the keys of the whole organization, so it uses the
+    credential of \`langwatch login\`. Do not set LANGWATCH_API_KEY: a project key
+    is refused on these commands.
+
+    First: \`export PATH="./bin:$PATH"\`
+    ${process.env.LANGWATCH_ENDPOINT ? `And: \`export $(grep LANGWATCH_ENDPOINT .env)\`` : ""}
+    Then: \`langwatch api-keys list\`
+    Then: \`langwatch api-keys create --name "CI Deploy Key"\`
+    `,
+          );
+
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "CLI API keys lifecycle",
+            description:
+              "Developer wants to list and create API keys using the LangWatch CLI (not MCP).",
+            agents: [
+              createClaudeCodeAgent({
+                workingDirectory: tempFolder,
+                omitEnvKeys: ["LANGWATCH_API_KEY"],
+              }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent ran `langwatch api-keys list` via the Bash tool",
+                  "Agent ran `langwatch api-keys create` with a --name flag",
+                  "Agent reported what the create command answered, either the token it returned or the permission the credential lacks, and did not invent a key",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH"`\n2. `langwatch api-keys list`\n3. `langwatch api-keys create --name "CI Deploy Key"`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.',
+              ),
+              scenario.agent(),
+              (state) => {
+                toolCallFix(state);
+
+                const allText = state.messages
+                  .map((m) =>
+                    typeof m.content === "string"
+                      ? m.content
+                      : JSON.stringify(m.content),
+                  )
+                  .join("\n");
+
+                expect(allText).toMatch(/langwatch\s+api-keys/);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success).toBe(true);
+        },
+        900_000,
+      );
+    });
+  });
 });

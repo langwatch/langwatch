@@ -9,6 +9,7 @@ import {
 } from "./helpers/claude-code-adapter";
 import {
 	executedCommandTranscript,
+	executedCommands,
 	experimentWasCreatedOrAdvanced,
 	experimentsJudgeModel,
 	findFilesCreatedSince,
@@ -66,9 +67,17 @@ describe("Experiments Skill for a Python OpenAI bot", () => {
 							(state) => {
 								const transcript = executedCommandTranscript(state);
 								expect(transcript).toMatch(/python|uv run|poetry run/);
-								expect(transcript).toMatch(
-									/langwatch experiment list[\s\S]*--format json/,
-								);
+								// Both tokens in ONE command: over the joined transcript
+								// this matched `experiment list` in one command and
+								// `--format json` in a later, unrelated one.
+								expect(
+									executedCommands(state).some(
+										(command) =>
+											/langwatch experiment list/.test(command) &&
+											/--format json/.test(command),
+									),
+									"Expected a single `langwatch experiment list --format json` command",
+								).toBe(true);
 								toolCallFix(state);
 								assertSkillWasRead(state, "experiments");
 

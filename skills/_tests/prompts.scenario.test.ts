@@ -415,10 +415,15 @@ describe("Prompts Skill", () => {
               "utf8"
             );
 
-            // The fetch passes a tag, and the file names the tag it deploys.
-            // A named constant, PROMPT_TAG = "production", is the shape most
-            // runs write, so the tag value need not sit at the call itself.
-            const passesATag = /tag\s*=[^=]|{\s*tag:/.test(mainPy);
+            // The tag has to travel INTO the fetch call. A bare `tag = ...`
+            // anywhere in the file used to satisfy this, so a file that
+            // defined PROMPT_TAG = "production" and then fetched the prompt
+            // without it passed while doing the opposite of what is asked.
+            // The value itself may still be a constant, which is the shape
+            // most runs write, so only the argument has to sit at the call.
+            const passesATag =
+              /prompts\s*\.\s*get\s*\([^)]*\btag\s*=/.test(mainPy) ||
+              /prompts\s*\.\s*get\s*\([^)]*\{[^}]*\btag\s*:/.test(mainPy);
             const namesADeploymentTag = /["'](production|staging)["']/.test(mainPy);
 
             expect(

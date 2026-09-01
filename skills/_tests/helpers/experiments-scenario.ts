@@ -108,6 +108,20 @@ export function executedCommandTranscript(state: {
 	return bashCommands(state as Parameters<typeof bashCommands>[0]).join("\n");
 }
 
+/**
+ * The Bash commands the agent ran, one entry each.
+ *
+ * Use this rather than the joined transcript whenever a check needs two
+ * tokens to belong to the SAME command: the joined form lets `a[\s\S]*b`
+ * match `a` in one command and `b` in another, which passes for a command
+ * the agent never ran.
+ */
+export function executedCommands(state: {
+	messages: Array<{ content: unknown }>;
+}): string[] {
+	return bashCommands(state as Parameters<typeof bashCommands>[0]);
+}
+
 export async function withExperimentWorkDir<T>({
 	prefix,
 	fixtureSubpath,

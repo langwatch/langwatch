@@ -150,7 +150,11 @@ async function waitForAgentOnline({
 		if (row) return row;
 		await sleep(3_000);
 	}
-	killAgentTree(agent, "SIGTERM");
+	// The caller never receives the handle on this path, so it can never call
+	// stop() itself. SIGTERM on its own would leave a fixture that ignores it
+	// online and registered while the tests after this one run, so the stop
+	// escalates to SIGKILL here the same way a normal teardown does.
+	await stopAgentProcess(agent);
 	throw new Error(
 		`the connected agent "${name}" did not come online within ${timeoutMs}ms:\n${agent.output()}`,
 	);
