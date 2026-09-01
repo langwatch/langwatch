@@ -1308,10 +1308,10 @@ builds the pipeline):
 | Shape | Count | Capabilities |
 | ----- | ----- | ------------ |
 | Real (worker builds from raw deps) | 2 | eventing-maintenance, topic |
-| Extracted (this programme) | 1 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it) |
+| Extracted (this programme) | 2 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it); scenario deferred-metrics rider (`396a3d742e` — the job description lives beside its delay constant in `@langwatch/scenario-server`, the worker installer binds it through its own consumer-side interface, and a package test pins name/dedup-id/span literals against platform's frozen twin, which may only change together) |
 | Hybrid (package installer, platform-built option bundle) | 2 | trace, governance-ingestion |
 | Synthesized wrapper (platform builds, worker receives) | 19 | automation, langy-maintenance, github, evaluation, coding-agent, governance-events, gateway-spend, metric, log, suite, scenario, experiment, langy-conversation, billing-reporting, authz, identity, sso-connection, scim-sync, join-request |
-| Riders (platform production code inside the mapper) | 2 | scenario `deferredComputeRunMetricsJob` (extraction in flight — moves to `@langwatch/scenario-server` with a drift guard, since both graphs register one queue job and two spellings would strand a key); SaaS `globalProjections` (billing meter projection + dispatch subscriber) |
+| Riders (platform production code inside the mapper) | 1 | SaaS `globalProjections` (billing meter projection + dispatch subscriber — extraction in flight to `packages/enterprise/features/billing/server`, twin-drift pins on the `global:*` keys and dedup shape) |
 
 Transitional seam flagged in `e3ebed7963`: the worker composition's top-level
 `database` option defaults to the topic feature's PrismaClient — the one typed
