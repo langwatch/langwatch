@@ -67,7 +67,7 @@ interface TranscriptTable {
 
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const CREDENTIALS = {
-  tenantId: "3807ec24-0000-4000-8000-000000000001",
+  tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
 };
@@ -83,7 +83,7 @@ const CONFIG = {
   readSeats: false,
 };
 
-const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 
 /**
  * Evaluate one OData `$filter` against one row.
@@ -239,13 +239,13 @@ function serveTranscriptPage(
 function transcriptRow(overrides: Record<string, unknown> = {}) {
   return {
     conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
-    name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+    name: "cccccccc-0000-4000-8000-000000000003_agent-one",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
     // `metadata.BotId` is deliberately not `BOT_ID`. On a real row those two
     // differ, and only the lookup column joins to the agent — a fixture that
     // made them equal would let a mix-up pass.
-    metadata: JSON.stringify({ BotId: "dacfd251-bot", BatchId: 0 }),
+    metadata: JSON.stringify({ BotId: "agent-one", BatchId: 0 }),
     content: JSON.stringify({ activities: [] }),
     _bot_conversationtranscriptid_value: BOT_ID,
     ...overrides,
@@ -548,7 +548,7 @@ describe("given a run against an environment holding one conversation", () => {
     // the conversation instead of leaving it unnamed.
     queueSignInAndBots([
       botRow(),
-      botRow({ botid: "dacfd251-bot", name: "wrong-agent" }),
+      botRow({ botid: "agent-one", name: "wrong-agent" }),
     ]);
     responseQueue.push({
       status: 200,
@@ -574,7 +574,7 @@ describe("given a run against an environment holding one conversation", () => {
     expect(result.events[0]!.extra).toMatchObject({
       botName: "engineering-agent",
     });
-    // Its metadata still says `dacfd251-bot`, and an agent by that id is
+    // Its metadata still says `agent-one`, and an agent by that id is
     // sitting in the list — so a name here at all would be the bug.
     expect(result.events[1]!.extra?.botName).toBeUndefined();
     expect(result.events[1]!.target).toBe("");

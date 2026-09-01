@@ -29,11 +29,11 @@ interface FetchCall {
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000000";
 const CREDENTIALS = {
-  tenantId: "3807ec24-0000-4000-8000-000000000001",
+  tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
 };
-const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 const TRANSCRIPT_ID = "11111111-1111-4111-8111-111111111111";
 
 const GRAPH_HOST = "graph.microsoft.com";
@@ -101,10 +101,10 @@ function subscribedSkusReply() {
 function transcriptRow() {
   return {
     conversationtranscriptid: TRANSCRIPT_ID,
-    name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+    name: "cccccccc-0000-4000-8000-000000000003_agent-one",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
-    metadata: JSON.stringify({ BotId: "dacfd251-bot", BatchId: 0 }),
+    metadata: JSON.stringify({ BotId: "agent-one", BatchId: 0 }),
     content: JSON.stringify({ activities: [] }),
     _bot_conversationtranscriptid_value: BOT_ID,
   };
