@@ -314,6 +314,66 @@ describe("GovernanceCostService.summary", () => {
 
         expect(result.billed.amountUsd).toBe(-42.5);
       });
+
+      it("nets charges against refunds and still reports the negative", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning([
+            laneRow({
+              costSource: "pulled",
+              day: "2026-08-01",
+              amountNanoUsd: 12.25 * NANO,
+            }),
+            laneRow({
+              costSource: "pulled",
+              day: "2026-08-02",
+              amountNanoUsd: -30.75 * NANO,
+            }),
+          ]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-03T12:00:00.000Z"),
+        });
+
+        expect(result.billed.amountUsd).toBe(-18.5);
+      });
+    });
+  });
+
+  describe("given a lane whose nano-dollar sum runs past the float-safe range", () => {
+    describe("when requesting the summary", () => {
+      it("reports every digit rather than the nearest float", async () => {
+        // 2^53 nano-USD plus four single nano charges. Accumulated as floats
+        // the four are swallowed whole, because each one lands exactly halfway
+        // between two representable values and rounds back to where it
+        // started. The lane is worth just over nine million dollars, which a
+        // real organization can spend in a thirty-day window.
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning([
+            laneRow({
+              costSource: "pulled",
+              day: "2026-08-01",
+              amountNanoUsd: 9_007_199_254_740_992,
+            }),
+            ...["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"].map(
+              (day) => laneRow({ costSource: "pulled", day, amountNanoUsd: 1 }),
+            ),
+          ]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-06T12:00:00.000Z"),
+        });
+
+        expect(result.billed.amountUsd).toBe(9_007_199.254_740_996);
+        expect(result.billed.amountUsd).not.toBe(9_007_199.254_740_993);
+      });
     });
   });
   describe("given the tenant's licence list has been read", () => {
