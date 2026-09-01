@@ -167,6 +167,13 @@ export type UiCapabilityResolution = {
   documentTitle: UiDocumentTitlePort;
   /** The default only router context can build. */
   navigation: UiNavigationPort;
+  /**
+   * The default only a live host can build: the reader, the scope and what
+   * they may do, all read from the deployment this page came from. Absent for
+   * a composition that declared no session source, and the refusal below is
+   * then the honest answer.
+   */
+  session?: UiSessionPort;
 };
 
 /**
@@ -177,12 +184,13 @@ export function resolveUiCapabilities({
   install,
   documentTitle,
   navigation,
+  session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
     documentTitle: install.documentTitle ?? documentTitle,
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     navigation: install.navigation ?? navigation,
-    session: install.session ?? UNAVAILABLE_UI_SESSION,
+    session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
   };
 }
 

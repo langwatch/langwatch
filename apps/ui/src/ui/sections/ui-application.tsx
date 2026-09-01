@@ -23,6 +23,7 @@ import type {
 } from "../../behavior/ui-feature-transport";
 import type { UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import { createUiRouter, type UiRouter } from "../../behavior/ui-router";
+import type { UiSessionSource } from "../../behavior/ui-session";
 import { uiRouteTable } from "../../model/ui-route-table";
 import { createUiFeatureShell } from "./ui-feature-shell";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers";
@@ -54,6 +55,13 @@ export type UiFeatureInstall = {
   capabilities?: UiCapabilityInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
+  /**
+   * The live session this application reads for itself — pass
+   * `useBrowserUiSession` to serve the reader, the scope and the permissions
+   * from the deployment. Absent means the session port refuses by name, which
+   * is what a composition with no host to ask should do.
+   */
+  session?: UiSessionSource;
 };
 
 export type UiApplicationInstall = {
@@ -95,6 +103,7 @@ export function createUiApplication({
           apis: features.apis ?? [],
           capabilities: features.capabilities ?? {},
           ...(features.transport ? { transport: features.transport } : {}),
+          ...(features.session ? { session: features.session } : {}),
         }),
         pageErrorFallback: pages.errorFallback,
       }),

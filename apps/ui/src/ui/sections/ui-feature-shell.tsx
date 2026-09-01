@@ -10,6 +10,12 @@
  * It renders inside the root layout's error boundary, so a transport or
  * capability fault shows the page error fallback rather than blanking the
  * application.
+ *
+ * The capabilities resolve INNERMOST, below the QueryClient and every feature
+ * Provider. A live session is four reads and a subscription to the address
+ * bar, so the port that answers `hasPermission` can only be built where those
+ * reads are legal — and a composition that installs no session source pays for
+ * none of it and keeps the refusing default.
  */
 
 import { QueryClient, QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
@@ -18,7 +24,9 @@ import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
   UiCapabilityContextProvider,
+  UNAVAILABLE_UI_SESSION,
   type UiCapabilityInstall,
+  type UiSessionPort,
 } from "../../behavior/ui-capabilities";
 import {
   createUiFeatureApiClient,
@@ -26,6 +34,7 @@ import {
   type UiFeatureApiTransport,
 } from "../../behavior/ui-feature-transport";
 import { useRouterUiNavigation } from "../../behavior/ui-router-navigation";
+import type { UiSessionSource } from "../../behavior/ui-session";
 import type { UiProviderShell } from "./ui-outer-providers";
 
 export type UiFeatureShellInstall = {
@@ -35,13 +44,50 @@ export type UiFeatureShellInstall = {
   capabilities: UiCapabilityInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
+  /**
+   * The live session this application reads for itself, when it has one to
+   * read. `useBrowserUiSession` is the one this package ships.
+   */
+  session?: UiSessionSource;
 };
+
+/** The session of a composition that declared none. Refuses by name. */
+const useUnavailableUiSession: UiSessionSource = () => UNAVAILABLE_UI_SESSION;
 
 export function createUiFeatureShell({
   apis,
   capabilities,
   transport,
+  session,
 }: UiFeatureShellInstall): UiProviderShell {
+  // Chosen once per shell, never per render, so the hook it calls is the same
+  // hook on every pass.
+  const useSessionCapability = session ?? useUnavailableUiSession;
+
+  function UiCapabilities({
+    transport: sessionTransport,
+    children,
+  }: {
+    transport: UiFeatureApiTransport;
+    children: ReactNode;
+  }) {
+    const navigation = useRouterUiNavigation();
+    const [documentTitle] = useState(() => BrowserUiDocumentTitle.create());
+    const sessionPort: UiSessionPort = useSessionCapability({ transport: sessionTransport });
+    const resolved = useMemo(
+      () =>
+        resolveUiCapabilities({
+          install: capabilities,
+          documentTitle,
+          navigation,
+          session: sessionPort,
+        }),
+      [documentTitle, navigation, sessionPort],
+    );
+
+    return <UiCapabilityContextProvider value={resolved}>{children}</UiCapabilityContextProvider>;
+  }
+
   return function UiFeatureShell({ children }: { children: ReactNode }) {
     // The host's QueryClient when this renders inside one, which is what makes
     // a feature's cache and the host's the same cache. Read through the
@@ -53,13 +99,6 @@ export function createUiFeatureShell({
     const [ownTransport] = useState(() => transport ?? createUiFeatureApiClient());
     const queryClient = hostQueryClient ?? ownQueryClient;
 
-    const navigation = useRouterUiNavigation();
-    const [documentTitle] = useState(() => BrowserUiDocumentTitle.create());
-    const resolved = useMemo(
-      () => resolveUiCapabilities({ install: capabilities, documentTitle, navigation }),
-      [documentTitle, navigation],
-    );
-
     // Innermost first, so the list reads in mount order at the call site.
     const mounted = apis.reduceRight<ReactNode>(
       (inner, { Provider }) => (
@@ -67,7 +106,7 @@ export function createUiFeatureShell({
           {inner}
         </Provider>
       ),
-      <UiCapabilityContextProvider value={resolved}>{children}</UiCapabilityContextProvider>,
+      <UiCapabilities transport={ownTransport}>{children}</UiCapabilities>,
     );
 
     // Always mounted, host client or own: a Provider that appears only in one

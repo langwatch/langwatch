@@ -52,6 +52,71 @@ export {
 } from "./behavior/ui-feature-transport";
 export { createRouterUiNavigation, useRouterUiNavigation } from "./behavior/ui-router-navigation";
 export {
+  organizationRoleOf,
+  projectSlugAddressedBy,
+  resolveUiScope,
+  selectAmbientTeam,
+  uiScopeSelectionWrites,
+  userBelongsToTeam,
+  userCanOpenTeam,
+  type UiScopeResolutionInput,
+  type UiScopeSelectionWrite,
+} from "./behavior/ui-scope-resolution";
+export {
+  isUiPublicRoute,
+  UI_PUBLIC_ROUTES,
+  useUiRouteReading,
+  type UiRouteReading,
+} from "./behavior/ui-scope-route";
+export {
+  broadcastUiScopeWrite,
+  readUiScopeMemory,
+  UI_LAST_VISITED_HOME_KIND_KEY,
+  UI_SELECTED_ORGANIZATION_ID_KEY,
+  UI_SELECTED_PROJECT_SLUG_KEY,
+  UI_SELECTED_TEAM_ID_KEY,
+  useUiScopeMemory,
+  writeUiScopeSelection,
+  type UiScopeMemory,
+} from "./behavior/ui-scope-storage";
+export {
+  BrowserUiSession,
+  readUiDemoProjectSlug,
+  UiFeatureFlagRequests,
+  useBrowserUiSession,
+  type BrowserUiSessionState,
+  type UiSessionSource,
+} from "./behavior/ui-session";
+export {
+  readUiActor,
+  toUiActor,
+  uiAuthClient,
+  UI_SESSION_PATH,
+  UI_SESSION_QUERY_KEY,
+  type UiAuthClient,
+} from "./behavior/ui-session-client";
+export {
+  UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
+  UI_FEATURE_FLAG_PROCEDURE,
+  UI_ORGANIZATIONS_PROCEDURE,
+  UI_SHARED_TRACE_PROCEDURE,
+  useUiEffectivePermissions,
+  useUiFeatureFlags,
+  useUiOrganizations,
+  useUiSharedProject,
+  type UiSharedProject,
+} from "./behavior/ui-session-queries";
+export {
+  UI_ORGANIZATION_ADMIN_ROLE,
+  UI_RESERVED_PROJECT_SLUGS,
+  type UiResolvedScope,
+  type UiScopeOrganization,
+  type UiScopeProject,
+  type UiScopeRoute,
+  type UiScopeSelection,
+  type UiScopeTeam,
+} from "./model/ui-scope";
+export {
   resolveUiPageLoader,
   uiRoutePageKeys,
   type UiPageLoader,

@@ -38,6 +38,25 @@ class RecordingFeedback extends UiFeedbackPort {
   }
 }
 
+/** A live session that must never be reached when an install outranks it. */
+class UnusableSession extends UiSessionPort {
+  currentUser(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  activeScope(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  hasPermission(): never {
+    throw new Error("the installed session should have answered");
+  }
+
+  isFeatureEnabled(): never {
+    throw new Error("the installed session should have answered");
+  }
+}
+
 class StubSession extends UiSessionPort {
   currentUser() {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
@@ -98,6 +117,34 @@ describe("given the capability ports a screen asks instead of reaching for the b
       expect(() => capabilities.session.isFeatureEnabled("some_flag")).toThrow(
         UiCapabilityUnavailableError,
       );
+    });
+  });
+
+  describe("when the application composed a live session of its own", () => {
+    it("answers with it, so a mounted composition stops refusing", () => {
+      const session = new StubSession();
+
+      const capabilities = resolveUiCapabilities({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        session,
+      });
+
+      expect(capabilities.session).toBe(session);
+    });
+
+    it("still lets an installed session win over it", () => {
+      const installed = new StubSession();
+
+      const capabilities = resolveUiCapabilities({
+        install: { session: installed },
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        session: new UnusableSession(),
+      });
+
+      expect(capabilities.session).toBe(installed);
     });
   });
 
