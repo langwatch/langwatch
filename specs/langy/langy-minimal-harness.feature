@@ -40,6 +40,34 @@ Feature: Langy minimal harness
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
 
+  # Asked how many of something there are, the agent had no documented way to
+  # ask. The prompt told it to count first and never said with what, so it
+  # guessed: a filter the output did not answer, a flag the command did not
+  # take, then a Python one-liner whose traceback reached the user. The prompt
+  # names the two flags instead.
+  @unit
+  Scenario: The prompt says how to count
+    When the prompt asset is checked
+    Then the rule about counting a whole population names the flags that count
+
+  # The prompt used to name the worker's own endpoint as an EXAMPLE of an
+  # address never to give the user, and the manager filled that placeholder in
+  # per worker at spawn. So the one paragraph forbidding internal addresses
+  # arrived carrying a real one, in the reply the user reads. The rule stays,
+  # the example goes, and so does the substitution that delivered it.
+  @unit
+  Scenario: The system prompt names no address the user cannot reach
+    When the prompt asset is checked
+    Then it names no host that only the worker can reach
+    And it names no environment variable standing in for one
+
+  @unit
+  Scenario: The prompt reaches the worker exactly as it was written
+    When a worker is provisioned
+    Then the prompt file in its home matches the shipped prompt byte for byte
+    And no per-worker value is put into it, so no run can put an address back
+      into the paragraph that forbids them
+
   @unit
   Scenario: Every skill the prompt routes to is one the worker has
     Given the skills named in the prompt's routing table

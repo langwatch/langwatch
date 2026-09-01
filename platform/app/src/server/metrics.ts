@@ -493,10 +493,15 @@ const esFoldRefoldTotal = new Counter({
  * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
  * applied on top instead (the events are never lost; only the replay is skipped).
  * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ * `incomplete` — the history read did not account for the state's applied
+ * events even after retries (replica read lag), so the replay was abandoned
+ * and the batch applied on top of the loaded state instead. Counted in
+ * addition to `performed` (the attempt); a sustained rate means the event
+ * log replica lags further than the re-fold retries wait.
  */
 export const incrementEsFoldRefoldTotal = (
   projectionName: string,
-  outcome: "performed" | "declined" | "unavailable",
+  outcome: "performed" | "declined" | "unavailable" | "incomplete",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
 register.removeSingleMetric("es_fold_refold_on_miss_total");
@@ -1068,7 +1073,10 @@ export const incrementEsProcessIntentsSuppressed = ({
 // --- Topic clustering domain metrics (ADR-051/ADR-054) ---
 // Run-page outcomes as the domain sees them, not just generic es_* counters:
 // `failed_final` is the alertable one (retries exhausted, run_failed
-// recorded); `failed_retryable` is expected noise under provider hiccups.
+// recorded); `failed_retryable` is expected noise under provider hiccups;
+// `failed_customer` is a run the customer's own configuration stopped —
+// recorded with its remediation, never retried, and deliberately outside
+// the alertable series (ADR-054 §4).
 register.removeSingleMetric("topic_clustering_page_total");
 const topicClusteringPageTotal = new Counter({
   name: "topic_clustering_page_total",
@@ -1079,7 +1087,12 @@ const topicClusteringPageTotal = new Counter({
 export const incrementTopicClusteringPageTotal = ({
   outcome,
 }: {
-  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+  outcome:
+    | "completed"
+    | "skipped"
+    | "failed_retryable"
+    | "failed_final"
+    | "failed_customer";
 }) => topicClusteringPageTotal.labels(outcome).inc();
 
 register.removeSingleMetric("topic_clustering_page_duration_milliseconds");

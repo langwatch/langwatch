@@ -29,6 +29,29 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
   # Authorize screen defaults
   # ─────────────────────────────────────────────────────────────────────
 
+  Rule: the code is confirmed before anything else is shown
+
+    @integration
+    Scenario: the screen asks for the code check first
+      Given the user opened the authorize screen for the device code
+      Then the screen shows only the code, the confirmation question and the
+        confirm action
+      And the organization picker, the access selection and the approve
+        action are not shown yet
+
+    @integration
+    Scenario: confirming the code reveals the access selection
+      When the user confirms the code matches the one in their terminal
+      Then the code section goes away
+      And the organization picker, the access selection and the approve
+        action are shown
+
+    @integration
+    Scenario: a new device code starts the confirmation over
+      Given the user confirmed one device code
+      When the screen is opened for a different device code
+      Then the confirmation is asked again before anything else is shown
+
   Rule: the authorize screen preselects the widest scope the user holds
 
     @integration
@@ -116,6 +139,13 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       And its permissionMode is "restricted" with the selected permission list
       And the response still carries the personal project and its API key,
         so older CLI versions keep working unchanged
+
+    @integration
+    Scenario: the exchange reports the permissions the key was minted with
+      Given the user approved the device code with the default selection
+      When the CLI polls the exchange endpoint
+      Then `cli_api_key_scope` carries the permission slugs of the minted key
+      And `langwatch whoami` can print them beside the key's reach
 
     @integration
     Scenario: an approval that is never exchanged mints nothing

@@ -28,6 +28,7 @@ import {
   ALL_PERMISSIONS,
   AuthzEngine,
   type AuthzDecision,
+  type AuthzDenialReason,
   type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzScopeRef,
@@ -183,7 +184,11 @@ export class AuthzService {
     principal: AuthzPrincipalRef;
     permission: AuthzPermission;
     ceiling?: boolean;
-  }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
+  }): Promise<{
+    allowed: boolean;
+    organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDenialReason;
+  }> {
     const scope = await this.resolveScope({ projectId, teamId, organizationId });
     if (!scope) return { allowed: false, organizationRole: null };
 
@@ -207,7 +212,11 @@ export class AuthzService {
       demoProjectId: this.demoProjectId(),
     });
     recordDenial(decision);
-    return { allowed: decision.allowed, organizationRole: grants.organizationRole };
+    return {
+      allowed: decision.allowed,
+      organizationRole: grants.organizationRole,
+      denialReason: decision.denialReason,
+    };
   }
 
   /**
@@ -227,6 +236,7 @@ export class AuthzService {
     allowed: boolean;
     matchedPermission?: AuthzPermission;
     organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDenialReason;
   }> {
     const scope = await this.collector.resolveScopeRef({ projectId });
     if (!scope) return { allowed: false, organizationRole: null };
@@ -262,6 +272,12 @@ export class AuthzService {
       allowed: matched !== undefined,
       ...(matched ? { matchedPermission: matched } : {}),
       organizationRole: grants.organizationRole,
+      // No single decision to read a reason off - every candidate permission
+      // was refused. The one reason worth naming is the one that refused them
+      // all for the same cause, and the snapshot already carries it.
+      ...(matched === undefined && grants.membershipDisabled
+        ? { denialReason: "membership-disabled" as const }
+        : {}),
     };
   }
 
@@ -289,9 +305,52 @@ export class AuthzService {
     projects: Map<string, boolean>;
     organizationRole: OrganizationRoleOrNull;
   }> {
+    const { byPermission, organizationRole } =
+      await this.canBatchPermissionsByIds({
+        principal,
+        permissions: [permission],
+        organizationId,
+        teams,
+        projects,
+      });
+    const decision = byPermission.get(permission) ?? {
+      teams: new Map<string, boolean>(),
+      projects: new Map<string, boolean>(),
+    };
+    return { ...decision, organizationRole };
+  }
+
+  /**
+   * MANY permissions across many scopes in one organization — and still ONE
+   * collection. `canBatchByIds` above is this with a single permission; this
+   * exists because the api-key project ceiling asks two permissions of every
+   * project, and two single-permission batches would collect the same
+   * snapshot twice. Deciding is pure, so permissions × scopes costs no
+   * further queries; each project's scope is resolved once, not once per
+   * permission, and only when the caller does not already know its team.
+   */
+  async canBatchPermissionsByIds({
+    principal,
+    permissions,
+    organizationId,
+    teams,
+    projects,
+  }: {
+    principal: AuthzPrincipalRef;
+    permissions: readonly AuthzPermission[];
+    organizationId: string;
+    teams: ReadonlyArray<{ teamId: string }>;
+    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+  }): Promise<{
+    byPermission: Map<
+      AuthzPermission,
+      { teams: Map<string, boolean>; projects: Map<string, boolean> }
+    >;
+    organizationRole: OrganizationRoleOrNull;
+  }> {
     // The api-key owner ceiling, off the same snapshot as the key's grants —
-    // see `canAnyByIds`. Null for a user principal, so a no-op for the callers
-    // this has today.
+    // see `canAnyByIds`. Null for a user or service-key principal, and
+    // `decideWithCeiling` with a null ceiling is a plain decide.
     const pass = this.collector.beginPass();
     const [grants, ownerGrants] = await Promise.all([
       this.collector.collectGrants({
@@ -302,7 +361,10 @@ export class AuthzService {
       this.ownerGrantsFor({ principal, organizationId, reader: pass }),
     ]);
     const demoProjectId = this.demoProjectId();
-    const allowedAt = (scope: AuthzScopeRef | null): boolean =>
+    const allowedAt = (
+      permission: AuthzPermission,
+      scope: AuthzScopeRef | null,
+    ): boolean =>
       scope
         ? this.engine.decideWithCeiling({
             keyGrants: grants,
@@ -313,25 +375,44 @@ export class AuthzService {
           }).allowed
         : false;
 
-    const resolvedProjects = await Promise.all(
-      projects.map(async ({ projectId, teamId }): Promise<[string, boolean]> => [
-        projectId,
-        allowedAt(
+    const projectScopes = await Promise.all(
+      projects.map(
+        async ({
+          projectId,
+          teamId,
+        }): Promise<[string, AuthzScopeRef | null]> => [
+          projectId,
           teamId
             ? { type: "project", id: projectId, teamId, organizationId }
             : await this.collector.resolveScopeRef({ projectId }),
-        ),
-      ]),
+        ],
+      ),
     );
 
     return {
-      teams: new Map(
-        teams.map(({ teamId }) => [
-          teamId,
-          allowedAt({ type: "team", id: teamId, organizationId }),
+      byPermission: new Map(
+        permissions.map((permission) => [
+          permission,
+          {
+            teams: new Map(
+              teams.map(({ teamId }) => [
+                teamId,
+                allowedAt(permission, {
+                  type: "team",
+                  id: teamId,
+                  organizationId,
+                }),
+              ]),
+            ),
+            projects: new Map(
+              projectScopes.map(([projectId, scope]) => [
+                projectId,
+                allowedAt(permission, scope),
+              ]),
+            ),
+          },
         ]),
       ),
-      projects: new Map(resolvedProjects),
       organizationRole: grants.organizationRole,
     };
   }

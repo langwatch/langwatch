@@ -75,6 +75,7 @@ import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
+import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
@@ -84,6 +85,13 @@ import {
 } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import { ConnectGateway } from "./server/connected-agents/connect.gateway";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
+import {
+  closeConnectedAgentRuntime,
+  getConnectedAgentRuntime,
+} from "./server/connected-agents/runtime";
+import { prisma } from "./server/db";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -94,9 +102,11 @@ import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
@@ -367,12 +377,23 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     server = createServer(handler);
   }
 
+  // One upgrade listener, routed by path: the tRPC transport and the
+  // connected agent gateway share the HTTP server, and an unknown path is
+  // answered 404 instead of hanging.
+  const upgradeRouter = createUpgradeRouter(
+    server as ReturnType<typeof createServer>,
+  );
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(
-    server as ReturnType<typeof createServer>,
-  );
+  const wsHandle = setupTRPCWebSocket(upgradeRouter);
+  // Connected agents (ADR-128): the SDK's outbound socket lands here.
+  const connectGateway = new ConnectGateway({
+    runtime: getConnectedAgentRuntime(),
+    prisma,
+    replicaCount: env.LANGWATCH_APP_REPLICAS,
+  });
+  connectGateway.mount(upgradeRouter);
 
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
@@ -428,7 +449,9 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // rather than a literal here: this handler used to force-exit after 5s,
   // which is inside the GroupQueue's own drain budget, so under the `all`
   // role (this process hosting the worker stack) a drain could never finish
-  // however long the queue was told it had.
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
+
   installShutdownHandlers((signal) => ({
     signal,
     logger,
@@ -443,25 +466,20 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
           await wsHandle.close();
         },
       },
+      createHttpServerClosePhase({
+        server,
+        closeSessions: () => mcpHandler.closeAllSessions(),
+        logger,
+      }),
+      // Connected agent sockets close after the HTTP drain, with 1012 so the
+      // SDKs reconnect at once to the next pod. A call in flight outlives any
+      // drain budget, so this phase comes after the drain, not inside it.
       {
-        name: "http-server",
+        name: "connected-agents",
         run: async () => {
-          // Stop accepting, then let requests already in flight finish.
-          // closeAllConnections() destroys active sockets, so calling it
-          // outright turned every rolling deploy into a burst of 502s for
-          // whatever was mid-request. Idle connections go immediately; the
-          // rest get the phase's budget and are only destroyed if they
-          // outlast it.
-          const closed = new Promise<void>((resolve) =>
-            server.close(() => resolve()),
-          );
-          if ("closeIdleConnections" in server) server.closeIdleConnections();
-          await mcpHandler.closeAllSessions();
-          try {
-            await closed;
-          } finally {
-            if ("closeAllConnections" in server) server.closeAllConnections();
-          }
+          await connectGateway.close();
+          await closeLongPollTransport();
+          await closeConnectedAgentRuntime();
         },
       },
       // Drain in-process workers (if any) before closing the shared App below,

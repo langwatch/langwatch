@@ -1,4 +1,5 @@
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
+import type React from "react";
 import { useState } from "react";
 import {
   LuBookOpen,
@@ -48,6 +49,14 @@ interface SurfaceSetup {
 }
 
 export const SETUP_SURFACES = {
+  connectedAgents: {
+    skill: "connect-agent",
+    trigger: "Connect my agent to LangWatch from code",
+    langyPrompt:
+      "Connect my agent to LangWatch from code. Connect to my repository, add the connect_agent decorator (Python) or the connectAgent wrapper (TypeScript) to the function that runs my agent, and open a pull request with the change.",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/connect-your-agent",
+    docsLabel: "connect your agent guide",
+  },
   traces: {
     skill: "tracing",
     trigger: "Instrument my code with LangWatch",
@@ -85,16 +94,16 @@ export const SETUP_SURFACES = {
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
-    docsLabel: "simulations documentation",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
+    docsLabel: "agent testing documentation",
   },
   simulationRuns: {
     skill: "scenarios",
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
-    docsLabel: "simulations documentation",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
+    docsLabel: "agent testing documentation",
   },
   prompts: {
     skill: "prompts",
@@ -171,23 +180,45 @@ export function SetupWithAgentButton({
 }
 
 /**
- * The one agent-actions menu shell: trigger button, the Langy entry (shown
- * only when the viewer can ask Langy), the copy-a-prompt entry with its
- * confirmation toast, and the docs link. `SetupWithAgentButton` and the /me
- * `ConnectYourAgentButton` are both thin configurations of this, so the two
- * controls can never drift apart in anatomy or behavior.
+ * The one agent-actions menu shell: a trigger, the copy-a-prompt entry with
+ * its confirmation toast, the Langy entry (shown only when the viewer can
+ * ask Langy), and the docs link. `SetupWithAgentButton`, the home
+ * `OnboardAgentPill` and the /me `ConnectYourAgentButton` are all thin
+ * configurations of this, so the controls can never drift apart in anatomy
+ * or behavior.
  */
 export function AgentActionsMenu({
   triggerLabel,
+  trigger,
   size = "sm",
   langy,
   copy,
   docs,
 }: {
-  triggerLabel: string;
+  /** Labels the default outline button. Ignored when `trigger` is given. */
+  triggerLabel?: string;
+  /**
+   * A trigger of the surface's own, in place of the default button.
+   * One element, because `Menu.Trigger asChild` clones it with the
+   * handlers and the ref: a string or a list has nowhere to put them.
+   */
+  trigger?: React.ReactElement;
   /** Match the sibling buttons of the surface this sits in. */
   size?: "sm" | "md";
-  langy: { prompt: string; label: string; hint: string };
+  /**
+   * Null where the surface already knows Langy is out of reach. Otherwise
+   * the entry still needs `useCanAskLangy` to agree.
+   */
+  langy: {
+    prompt: string;
+    label: string;
+    hint: string;
+    /**
+     * Takes the prompt instead of the Langy store, for a surface that
+     * animates its own composer on the way in.
+     */
+    onAsk?: (prompt: string) => void;
+  } | null;
   copy: {
     /** What the reader gets while the skill is still on its way. */
     prompt: string;
@@ -201,7 +232,13 @@ export function AgentActionsMenu({
     /** The endpoint that token belongs to, on a self-hosted deployment. */
     endpoint?: string;
   };
-  docs: { href: string; label: string; hint: string };
+  docs: {
+    href: string;
+    label: string;
+    hint: string;
+    /** Overrides the book glyph where the surface reads better with another. */
+    icon?: typeof LuBookOpen;
+  };
 }) {
   const canAsk = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
@@ -240,11 +277,13 @@ export function AgentActionsMenu({
         {/* The same outline/size the primary actions on these pages wear
             (PageLayout.HeaderButton), so the control reads as one of the
             page's own buttons rather than a themed import. */}
-        <Button variant="outline" size={size} aria-haspopup="menu">
-          <LuSparkles size={14} />
-          {triggerLabel}
-          <LuChevronDown size={14} />
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" size={size} aria-haspopup="menu">
+            <LuSparkles size={14} />
+            {triggerLabel}
+            <LuChevronDown size={14} />
+          </Button>
+        )}
       </Menu.Trigger>
       <Menu.Content minWidth="300px" padding={1}>
         <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
@@ -254,11 +293,11 @@ export function AgentActionsMenu({
             hint={copy.hint}
           />
         </Menu.Item>
-        {canAsk ? (
+        {langy && canAsk ? (
           <Menu.Item
             value="ask-langy"
             paddingY={2}
-            onClick={() => askLangy(langy.prompt)}
+            onClick={() => (langy.onAsk ?? askLangy)(langy.prompt)}
           >
             <AgentMenuOption
               icon={LuSparkles}
@@ -271,7 +310,7 @@ export function AgentActionsMenu({
         <Menu.Item value="docs" paddingY={2} asChild>
           <chakra.a href={docs.href} target="_blank" rel="noreferrer">
             <AgentMenuOption
-              icon={LuBookOpen}
+              icon={docs.icon ?? LuBookOpen}
               label={docs.label}
               hint={docs.hint}
             />

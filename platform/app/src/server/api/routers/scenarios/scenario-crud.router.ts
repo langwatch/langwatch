@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
@@ -19,14 +20,16 @@ const createScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).default([]),
   // Optional per-scenario model overrides; null clears back to the project
   // default (scenarios.user_simulator / scenarios.judge).
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // The test suite this scenario is filed in; absent or null files it into Default.
+  testSuiteId: z.string().nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -35,11 +38,17 @@ const updateScenarioSchema = projectSchema.extend({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // Absent = keep the current test suite; null = unfile; a test suite id = move.
+  testSuiteId: z.string().nullish(),
+  // The version the editor loaded. When sent, a save against any other
+  // version is refused with scenario_stale_version instead of overwriting
+  // the newer save. Absent = save over whatever is there.
+  expectedVersion: z.number().int().min(1).optional(),
 });
 
 /**
@@ -53,10 +62,13 @@ export const scenarioCrudRouter = createTRPCRouter({
       logger.info({ projectId: input.projectId }, "Creating scenario");
 
       const service = ScenarioService.create(ctx.prisma);
-      const result = await service.create({
-        ...input,
-        lastUpdatedById: ctx.session.user.id,
-      });
+      const result = await service.create(
+        {
+          ...input,
+          lastUpdatedById: ctx.session.user.id,
+        },
+        { actor: { userId: ctx.session.user.id, label: "user" } },
+      );
 
       trackServerEvent({
         userId: ctx.session.user.id,
@@ -134,15 +146,30 @@ export const scenarioCrudRouter = createTRPCRouter({
         "Updating scenario",
       );
 
-      const { id, projectId, ...data } = input;
+      const { id, projectId, expectedVersion, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
-      const result = await service.update(id, projectId, {
-        ...data,
-        lastUpdatedById: ctx.session.user.id,
-      });
+      try {
+        const result = await service.update({
+          id,
+          projectId,
+          data: {
+            ...data,
+            lastUpdatedById: ctx.session.user.id,
+          },
+          options: {
+            actor: { userId: ctx.session.user.id, label: "user" },
+            expectedVersion,
+          },
+        });
 
-      logger.info({ projectId, scenarioId: id }, "Scenario updated");
-      return result;
+        logger.info({ projectId, scenarioId: id }, "Scenario updated");
+        return result;
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   archive: protectedProcedure
@@ -168,6 +195,64 @@ export const scenarioCrudRouter = createTRPCRouter({
             code: "NOT_FOUND",
             message: error.message,
           });
+        }
+        throw error;
+      }
+    }),
+
+  moveToTestSuite: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioId: z.string(),
+        // A test suite id files the scenario there; null unfiles it.
+        testSuiteId: z.string().nullable(),
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      logger.info(
+        {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          testSuiteId: input.testSuiteId,
+        },
+        "Moving scenario to test suite",
+      );
+
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        return await service.moveToTestSuite({
+          scenarioId: input.scenarioId,
+          projectId: input.projectId,
+          testSuiteId: input.testSuiteId,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
+    }),
+
+  duplicate: protectedProcedure
+    .input(projectSchema.extend({ scenarioId: z.string() }))
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      logger.info(
+        { projectId: input.projectId, scenarioId: input.scenarioId },
+        "Duplicating scenario",
+      );
+
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        return await service.duplicate({
+          scenarioId: input.scenarioId,
+          projectId: input.projectId,
+          lastUpdatedById: ctx.session.user.id,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
         }
         throw error;
       }

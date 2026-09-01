@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { PRODUCTS, type ProductId } from "./products";
 
 /**
@@ -23,6 +24,7 @@ export function useReachableProducts({
   isLoading: boolean;
 } {
   const {
+    project,
     organization,
     hasPermission,
     isLoading: isOrganizationLoading,
@@ -33,10 +35,12 @@ export function useReachableProducts({
 
   const isQueryEnabled = enabled && !!organization?.id;
   const gatewayFlag = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     enabled: isQueryEnabled,
   });
   const governanceFlag = useFeatureFlag("release_ui_ai_governance_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     enabled: isQueryEnabled,
   });

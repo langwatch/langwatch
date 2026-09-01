@@ -97,8 +97,8 @@ Feature: Moving an organization onto the grants projection
 
   # A restated fact dedupes at the event store, but the queue has already paid
   # to carry it. A grant is its own aggregate, so a held organization restaged
-  # one group per grant on every worker boot: one organization carries 428,720
-  # share links and converged on nothing while it repeated them.
+  # one group per grant on every worker boot. An organization holding a large
+  # share-link population converged on nothing while it repeated them.
   @unit
   Scenario: A pass states only the facts the heads do not carry
     Given an organization whose projection already holds some of its facts
@@ -123,6 +123,37 @@ Feature: Moving an organization onto the grants projection
     Given a grant the migration stated whose legacy row has since been deleted
     When the migration runs again
     Then that grant is revoked
+
+  @unit
+  Scenario: A custom role deleted before the migration finished stays deleted
+    Given a custom role the migration has already deleted
+    And the organization no longer has that role
+    When the migration runs again
+    Then the organization finalizes
+    And that role's deletion is not repeated
+
+  @unit
+  Scenario: A deleted custom role that exists again is reported, not quietly restored
+    Given a custom role the migration has already deleted
+    And the organization has that role again under the same id
+    When the migration runs again
+    Then the organization is held
+    And the report names that role as a disagreement
+    And the role is not restored automatically
+
+  @unit
+  Scenario: A view budget is raised on a re-run, never lowered
+    Given a share link whose usage row was seeded on an earlier pass
+    When the migration seeds the budgets again
+    Then a usage row below the legacy count is raised to it
+    And a usage row already at or above it is left exactly as it is
+    And a usage row that disagrees about which project it belongs to is untouched
+
+  @unit
+  Scenario: A link viewed between passes does not hold the organization
+    Given a share link that has been viewed since the last pass
+    When the migration runs
+    Then the organization is not held for that link
 
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is
@@ -178,6 +209,41 @@ Feature: Moving an organization onto the grants projection
     When the read path is inspected
     Then the organization's migration status is the only fork
     And no separate cutover record exists
+
+  # ═══ Who this migration reaches ═══════════════════════════════════════
+  #
+  # Every organization, on every installation. The per-organization cloud
+  # rollout is finished, and what enrollment would still decide is only
+  # whether an organization created SINCE ever migrates - which must not
+  # depend on an operator remembering it. So the migration declares itself
+  # automatically enrolled and the cohort admits every organization with no
+  # row and no operator action. The generic mechanism is
+  # specs/migration/system-migrations-runner.feature; what is authz-specific
+  # is that this migration is the one that has made the declaration.
+  #
+  # Self-hosted never had enrollment: a migration either runs for every
+  # organization or for none, and which it is comes from the migration's own
+  # release declaration. Releasing it is the prerequisite for ever removing
+  # the legacy authorization path, because that removal is only safe once
+  # every installation that might upgrade into it has already had a release
+  # that runs this migration.
+
+  @unit
+  Scenario: The migration is released for self-hosted installations
+    When the migration's release declaration is read
+    Then it runs automatically on a self-hosted installation
+    And every organization there migrates without anyone enrolling it
+
+  # A brand-new organization is created against the legacy authorization path
+  # exactly as before - creation never waits on the engine, which is the
+  # coupling "born on engine" was removed to avoid. It writes legacy rows
+  # imperatively (the scenario above), and the pass adopts them afterwards.
+  @unit
+  Scenario: The migration reaches every cloud organization without enrollment
+    Given a cloud installation
+    When the migration's cohort declaration is read
+    Then every organization is in its cohort
+    And an organization created after the rollout finished migrates on the next pass
 
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-

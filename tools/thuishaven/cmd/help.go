@@ -98,7 +98,14 @@ var envHelpText = `Environment variables.
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
-    PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
+    PORTLESS=0                   Bypass the portless proxy entirely — no proxy
+                                 install/start/trust, no hostname routing. Each
+                                 service is served plain HTTP on its own
+                                 loopback port instead (still at its usual
+                                 app.<slug>.langwatch.localhost hostname, which
+                                 resolves to loopback with no proxy needed).
+                                 The escape hatch for a machine where the
+                                 proxy's TLS handshake won't come up.
     HAVEN_AGENT=1                Plain, colorless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)
                                  — zero token waste when an AI agent drives haven.
@@ -108,16 +115,22 @@ var envHelpText = `Environment variables.
                                  one per ~4 GiB RAM, capped at CPU count).
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
-                                 runaway tsgo shouldn't sit on a slot forever.
+                                 runaway typecheck shouldn't sit on a slot
+                                 forever.
     CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
                                  typecheck", "pnpm lint") machine wide (0
-                                 disables). With haven installed those runs are
+                                 disables — from a person's shell; agent shells
+                                 carry CLAUDECODE and a gate-off there is
+                                 ignored). With haven installed those runs are
                                  delegated to "haven slot run", which gates on
                                  the same flock semaphore "haven typecheck"
                                  holds — one counter for everything that
                                  saturates the cores. Both set CHECK_SLOTS=0
-                                 for the run they spawn, so a run is never
-                                 counted twice and cannot queue behind itself.
+                                 with their pid in CHECK_QUEUE_HELD for the run
+                                 they spawn, so a run is never counted twice
+                                 and cannot queue behind itself; the marker
+                                 only convinces a descendant, and only when it
+                                 names one of those two wrappers.
                                  CHECK_QUEUE_IMPL=js forces the JavaScript
                                  queue in dev/scripts/check-queue.mjs.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:

@@ -38,6 +38,11 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 			const tempFolder = createSkillTestWorkDir("langwatch-cli-auth-");
 
 			// No .env, no CLAUDE.md, no .skills/: bare directory with only the CLI.
+			// The CLI also reads the user-global config of the machine, where a
+			// developer is normally logged in. Point it at a file of this run that
+			// never exists, so the agent meets the missing-key error the scenario
+			// is about rather than the personal project of whoever runs the test.
+			const cliConfigPath = path.join(tempFolder, "langwatch-cli-config.json");
 			const result = await scenario.run({
 				setId: SKILL_TESTS_SET_ID,
 				name: "CLI auth discovery from scratch",
@@ -48,6 +53,7 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 						workingDirectory: tempFolder,
 						cleanEnv: true,
 						omitEnvKeys: ["ANTHROPIC_API_KEY"],
+						extraEnv: { LANGWATCH_CLI_CONFIG: cliConfigPath },
 					}),
 					scenario.userSimulatorAgent({ model: judgeModel }),
 					scenario.judgeAgent({

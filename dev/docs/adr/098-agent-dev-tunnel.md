@@ -24,8 +24,16 @@ Quick tunnels need no account and no signup, which is the right friction level i
 
 The local loop becomes: `langwatch agent dev --port 8010`, edit code, rerun the suite, Ctrl-C. A killed process skips the restore and leaves a dead tunnel URL on the agent; the badge and the `agent_dev_tunnel_unreachable` copy make that visible, and the next `agent dev` run replaces it. A TTL cleanup was considered and dropped for v1.
 
+## Amendment: the relay is ADR-128, `agent dev` stays for HTTP agents
+
+The "authenticated outbound relay through our own infrastructure, auth via the existing API key" this ADR recorded as the intended successor transport is [ADR-128](128-connected-agents.md). A connected agent opens the relay itself from the customer's process, so a local agent is a target with no tunnel, no public URL and no URL rewrite on the agent row.
+
+`langwatch agent dev` is not replaced by it. The relay needs the SDK inside the agent's process, which a customer cannot always give: another language, or no access to the code. Those agents stay HTTP agents, and `agent dev` stays the local loop for them. It keeps its Cloudflare quick tunnel, its per-session secret proxy, its URL restore on exit and the `agent_dev_tunnel_unreachable` copy, all unchanged.
+
+What changes is the recommendation. Docs, skills and MCP descriptions offer the decorator first and `agent dev` under HTTP agents.
+
 ## References
 
-- Related ADRs: ADR-097 (scenario remote-trace judging)
+- Related ADRs: ADR-097 (scenario remote-trace judging), ADR-128 (connected agents)
 - Spec: `specs/agents/agent-dev-tunnel.feature`
 - Review draft: https://nexus.langwatch.ai/wiki/agent-dev-tunnel-adr

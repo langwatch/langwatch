@@ -142,7 +142,7 @@ How three projects resolve:
 | Project | Input | Output | Why |
 |---|---|---|---|
 | `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input. |
+| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; no rule sets input. |
 | Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
 
 All three projects also resolve **Essential** PII redaction and
@@ -174,7 +174,9 @@ Secrets redaction is **on by default for every project**.
 Coding-agent traces are full of live credentials, so the safe default
 is to scrub them. It runs natively in the ingestion pipeline and
 replaces each detected secret with a redaction placeholder, leaving
-the surrounding text intact.
+the surrounding text intact. How detection decides what is a
+credential is covered on
+[Secrets redaction](/coding-agents/secrets-redaction).
 
 The built-in catalog covers:
 
@@ -208,7 +210,7 @@ scope.</Warning>
 
 | Level | What it redacts | How it runs |
 |---|---|---|
-| **Disabled** | Nothing | No scanning at all |
+| **Disabled** | None | No scanning at all |
 | **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
 | **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
 

@@ -221,8 +221,18 @@ describe("/cli/auth first-trace watch", () => {
     mockRouter.query = {};
   });
 
+  // Step one of the screen: the code check gates everything below it.
+  const confirmCode = async () => {
+    const user = userEvent.setup();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeDefined(),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+  };
+
   const approveDeviceSession = async () => {
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
     );
@@ -283,6 +293,7 @@ describe("/cli/auth first-trace watch", () => {
     renderPage();
 
     const user = userEvent.setup();
+    await confirmCode();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Send API key" }),

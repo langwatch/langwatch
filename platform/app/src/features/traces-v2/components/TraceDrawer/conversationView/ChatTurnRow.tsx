@@ -58,7 +58,7 @@ import {
   TurnEditTraceAction,
   TurnSessionCheckbox,
 } from "./TurnAnnotations";
-import { TurnSteps } from "./TurnSteps";
+import { TurnSteps, turnHasGenieSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
@@ -345,19 +345,22 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         either side of this show none of it — so the steps sit where they
         happened. Collapsed by default; the spans are only fetched on open.
       */}
-      {isTerminalOrigin({
+      {((isTerminalOrigin({
         serviceName: turn.serviceName,
         origin: turn.origin,
       }) &&
-        // TurnSteps parses Claude Code's span names only — for any other
+        // TurnSteps parses Claude Code's span names — for any other coding
         // agent the strip would announce steps and then find none.
-        (turn.serviceName ?? "").toLowerCase().includes("claude") && (
-          <TurnSteps
-            traceId={turn.traceId}
-            occurredAtMs={turn.timestamp}
-            spanCount={turn.spanCount}
-          />
-        )}
+        (turn.serviceName ?? "").toLowerCase().includes("claude")) ||
+        // Routed Genie turns carry no coding-agent service name; the trace
+        // name is their signal, and only multi-span turns have a SQL step.
+        turnHasGenieSteps(turn)) && (
+        <TurnSteps
+          traceId={turn.traceId}
+          occurredAtMs={turn.timestamp}
+          spanCount={turn.spanCount}
+        />
+      )}
 
       {assistantText ? (
         <TurnMessage

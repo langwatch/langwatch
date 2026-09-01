@@ -97,6 +97,18 @@ Feature: Langy can run a conversation on the pi harness
     Then it reads its own events, not the abandoned turn's
     And the abandoned turn's events are released instead of waiting forever
 
+  # The relay carries ephemeral frames the durable log can survive without, so
+  # a broken push must degrade the live view, never end the turn: ending it
+  # releases the worker mid tool call and the idle reaper kills it while an
+  # LLM call is still in flight.
+  @unit
+  Scenario: A broken relay push never fails the turn
+    Given the relay stream to the control plane breaks mid-turn
+    When the next frame push fails
+    Then the sink reopens the stream and retries the frame once
+    And repeated reopen failures drop frames under a cooldown instead of erroring
+    And the turn keeps running to its real terminal
+
   @unit
   Scenario: A command to a worker that stopped reading gives up instead of blocking
     Given a worker has stopped reading the commands the manager sends it
@@ -133,6 +145,23 @@ Feature: Langy can run a conversation on the pi harness
     When a fresh worker is provisioned for the conversation
     Then every session file is owned by the fresh worker's identity
 
+  # The stash parent is shared by every conversation and stays owned by the
+  # manager. A sandboxed worker runs under its own per-conversation identity
+  # and must pass through the stash to reach its own store. A stash without
+  # that traversal permission killed every pi worker at boot in production:
+  # the wrapper died on a permission error before its ready handshake, every
+  # first message failed with worker_spawn_failed, and the panel hung on
+  # "Thinking" and then "Reconnecting to the agent". The local runner (one
+  # identity for manager and worker) can never see this, which is why it
+  # shipped: the traversal bit is the sandbox-only contract this pins.
+  @unit
+  Scenario: A sandboxed worker can enter the shared session stash
+    Given workers run under per-conversation identities
+    When a worker's session store is provisioned
+    Then the shared stash directory lets a worker pass through it
+    And the stash stays unlistable, so sibling conversation ids stay hidden
+    And a stash created earlier with a stricter mode is repaired on provision
+
   # Conversation content must not sit on the manager's disk indefinitely
   # after the user moved on; a day covers every cache tier the store serves.
   @unit
@@ -145,12 +174,16 @@ Feature: Langy can run a conversation on the pi harness
   # Provider prompt caching is what makes a long conversation affordable, and
   # the default cache tier expires faster than the pauses between a user's
   # messages. The worker asks for the long tier: anthropic's hour-long
-  # cache_control, the Responses lane's day-long retention.
+  # cache_control, the Responses lane's day-long retention. The codex lane is
+  # the exception: the ChatGPT backend rejects the retention parameter with a
+  # 400 (the API-key endpoint accepts it), and in production that 400 killed
+  # every codex turn on its first LLM call. So the codex lane never asks.
   @unit
   Scenario: The worker asks the provider for long cache retention
     Given a pi worker provisioned for an anthropic or openai model
     When its config and environment are assembled
     Then the model allows long cache retention and the environment selects it
+    But a codex model never asks for it, because its backend refuses the request
 
   @unit
   Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn
@@ -179,3 +212,15 @@ Feature: Langy can run a conversation on the pi harness
     Then the span carries the cache-read and cache-write token counts
     And the hour-long share of the writes when the provider states it
     And the counts use the same attribute names the gateway's own span uses
+
+  # The gateway drops request options a provider cannot take and names them
+  # on the response (X-LangWatch-Params-Dropped). Two production outages were
+  # invisible until a live probe because nothing on the langy side recorded
+  # what the gateway removed: the next field pi starts sending should show up
+  # as a drop record on the first turn, not as a dead card in production.
+  @unit
+  Scenario: An option the gateway dropped from a model call is visible on the turn's telemetry
+    Given a pi worker's mediated LLM call whose response names dropped options
+    When the relay retells the call as a gen_ai span
+    Then the span records which options the gateway dropped
+    And the relay logs the drop once per distinct set, not once per call

@@ -20,6 +20,7 @@ import {
   CircleX,
   Copy,
   KeyRound,
+  Pencil,
   RotateCw,
   Trash2,
 } from "lucide-react";
@@ -52,13 +53,16 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-
+import type { SourceType } from "../components/ingestionSourceCatalog";
+import { needsIngestSecret } from "../components/ingestionSourceCatalog";
 import { SourceEventsTable } from "../components/SourceEventsTable";
 import {
   type SourceEventsPager,
   useSourceEventsPager,
 } from "../components/useSourceEventsPager";
 import type { PageRequest } from "../logic/eventsPager";
+import { useDestinationContext } from "./ingestionSourceForms";
+import { SourceEditDrawer } from "./inventory";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -114,6 +118,7 @@ function SourceDetailHeader({
   isArchiving,
   onRotate,
   onArchive,
+  onEdit,
 }: {
   source: Source;
   canManage: boolean;
@@ -121,6 +126,7 @@ function SourceDetailHeader({
   isArchiving: boolean;
   onRotate: () => void;
   onArchive: () => void;
+  onEdit: () => void;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -130,7 +136,7 @@ function SourceDetailHeader({
       <VStack align="start" gap={1}>
         <HStack gap={2}>
           <Link
-            href="/governance/ingestion-sources"
+            href="/governance/inventory?tab=sources"
             color="blue.600"
             fontSize="xs"
           >
@@ -161,19 +167,31 @@ function SourceDetailHeader({
         )}
       </VStack>
       <Spacer />
-      {/* Rotating a secret and archiving are both
+      {/* Editing, rotating a secret and archiving are all
           `ingestionSources:manage`. */}
       {canManage && (
         <>
           <Button
             size="sm"
             variant="outline"
-            onClick={onRotate}
-            loading={isRotating}
-            title="Mint a new ingestSecret (24h grace on the old one)"
+            onClick={onEdit}
+            title="Edit this source's configuration"
           >
-            <RotateCw size={14} /> Rotate secret
+            <Pencil size={14} /> Edit
           </Button>
+          {needsIngestSecret({
+            sourceType: source.sourceType as SourceType,
+          }) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRotate}
+              loading={isRotating}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -335,21 +353,38 @@ function SourceDetailShell({
 }
 
 /**
- * The two writes this page offers. Both are `ingestionSources:manage`; a
+ * The three writes this page offers. All are `ingestionSources:manage`; a
  * rotate reveals the new secret once, an archive sends the admin back to the
- * list.
+ * list, and an edit reopens the same drawer the source list uses.
  */
 function useSourceDetailMutations({
   orgId,
   sourceId,
   onSecretRevealed,
+  onEdited,
 }: {
   orgId: string;
   sourceId: string | undefined;
   onSecretRevealed: (details: { secret: string; sourceName: string }) => void;
+  onEdited: () => void;
 }) {
   const router = useRouter();
   const utils = api.useUtils();
+  const update = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void utils.ingestionSources.get.invalidate({
+        organizationId: orgId,
+        id: sourceId,
+      });
+      toaster.create({ title: "Source updated", type: "success" });
+      onEdited();
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the source",
+      }),
+  });
   const rotate = api.ingestionSources.rotateSecret.useMutation({
     onSuccess: (data) => {
       void utils.ingestionSources.get.invalidate({
@@ -367,7 +402,7 @@ function useSourceDetailMutations({
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/governance/ingestion-sources");
+      void router.push("/governance/inventory?tab=sources");
     },
     onError: (e) =>
       showErrorToast({
@@ -375,12 +410,12 @@ function useSourceDetailMutations({
         fallbackTitle: "Couldn't archive the source",
       }),
   });
-  return { rotate, archive };
+  return { rotate, archive, update };
 }
 
 /**
  * Everything the page needs: the source it addresses, what the viewer may do,
- * the three queries behind it and the two mutations that act on it. State and
+ * the three queries behind it and the three mutations that act on it. State and
  * callbacks only, the component owns the markup.
  */
 function useIngestionSourceDetailPage() {
@@ -390,6 +425,9 @@ function useIngestionSourceDetailPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  // Same derivation the inventory page uses, so the drawer offers the same
+  // destinations whichever surface opened it.
+  const destinationCtx = useDestinationContext(organization);
   const canRead = hasAnyPermission("ingestionSources:view");
   const canReadActivity = hasAnyPermission("activityMonitor:view");
 
@@ -428,16 +466,23 @@ function useIngestionSourceDetailPage() {
     sourceName: string;
   } | null>(null);
 
-  const { rotate: rotateMutation, archive: archiveMutation } =
-    useSourceDetailMutations({
-      orgId,
-      sourceId,
-      onSecretRevealed: setSecretReveal,
-    });
+  const [isEditing, setIsEditing] = useState(false);
+
+  const {
+    rotate: rotateMutation,
+    archive: archiveMutation,
+    update: updateMutation,
+  } = useSourceDetailMutations({
+    orgId,
+    sourceId,
+    onSecretRevealed: setSecretReveal,
+    onEdited: () => setIsEditing(false),
+  });
 
   return {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage: hasAnyPermission("ingestionSources:manage"),
     canReadActivity,
@@ -448,6 +493,9 @@ function useIngestionSourceDetailPage() {
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   };
 }
 
@@ -455,6 +503,7 @@ function IngestionSourceDetailPage() {
   const {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage,
     canReadActivity,
@@ -465,6 +514,9 @@ function IngestionSourceDetailPage() {
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   } = useIngestionSourceDetailPage();
 
   if (!sourceId) {
@@ -504,6 +556,68 @@ function IngestionSourceDetailPage() {
   }
 
   return (
+    <LoadedSourceDetail
+      pageTitle={pageTitle}
+      source={source}
+      orgId={orgId}
+      destinationCtx={destinationCtx}
+      canManage={canManage}
+      canReadActivity={canReadActivity}
+      healthQuery={healthQuery}
+      eventsPager={eventsPager}
+      secretReveal={secretReveal}
+      setSecretReveal={setSecretReveal}
+      rotateMutation={rotateMutation}
+      archiveMutation={archiveMutation}
+      updateMutation={updateMutation}
+      isEditing={isEditing}
+      setIsEditing={setIsEditing}
+    />
+  );
+}
+
+/**
+ * The page once the source has actually loaded. Split from the function above
+ * so that one reads as the scene chooser it is — not found, denied, errored,
+ * loading, loaded — without the whole loaded layout inlined at the bottom of
+ * the same chain.
+ */
+function LoadedSourceDetail({
+  pageTitle,
+  source,
+  orgId,
+  destinationCtx,
+  canManage,
+  canReadActivity,
+  healthQuery,
+  eventsPager,
+  secretReveal,
+  setSecretReveal,
+  rotateMutation,
+  archiveMutation,
+  updateMutation,
+  isEditing,
+  setIsEditing,
+}: {
+  pageTitle: string;
+  source: Source;
+  orgId: string;
+} & Pick<
+  ReturnType<typeof useIngestionSourceDetailPage>,
+  | "destinationCtx"
+  | "canManage"
+  | "canReadActivity"
+  | "healthQuery"
+  | "eventsPager"
+  | "secretReveal"
+  | "setSecretReveal"
+  | "rotateMutation"
+  | "archiveMutation"
+  | "updateMutation"
+  | "isEditing"
+  | "setIsEditing"
+>) {
+  return (
     <SourceDetailShell pageTitle={pageTitle}>
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <SourceDetailHeader
@@ -517,6 +631,18 @@ function IngestionSourceDetailPage() {
           onArchive={() =>
             archiveMutation.mutate({ organizationId: orgId, id: source.id })
           }
+          onEdit={() => setIsEditing(true)}
+        />
+
+        {/* The same drawer the source list opens, so the two surfaces cannot
+            drift into offering different edits of the same row. */}
+        <SourceEditDrawer
+          organizationId={orgId}
+          destinationCtx={destinationCtx}
+          source={isEditing ? source : null}
+          onClose={() => setIsEditing(false)}
+          onSubmit={(input) => updateMutation.mutate(input)}
+          isPending={updateMutation.isPending}
         />
 
         <SourceActivityPanels
@@ -729,7 +855,7 @@ function SecretRevealModal({
     sourceType === "otel_generic" ||
     sourceType === "claude_cowork" ||
     sourceType === "claude_code";
-  const usesWebhookUrl = sourceType === "workato";
+  const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
   // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1

@@ -1,13 +1,18 @@
-Feature: tsgo can never take the machine down
-  A whole-tree tsgo run peaks around ten gigabytes, the check queue bounds how
+Feature: The TypeScript compiler can never take the machine down
+  A whole-tree typecheck peaks around ten gigabytes, the check queue bounds how
   many run at once but not how big each gets, and language-server instances
   accumulate one per worktree, exempt from every admission control by design.
   Gating spawn paths is whack-a-mole — every new package, editor or daemon
-  that spawns tsgo reopens the hole. So the guarantee moves to where every
-  process is visible: the haven daemon watches tsgo itself, caps it softly at
-  spawn where haven owns the spawn, and reclaims it forcibly when the machine
-  is at stake. See dev/docs/adr/095-haven-tsgo-governor.md.
+  that spawns the compiler reopens the hole. So the guarantee moves to where
+  every process is visible: the haven daemon watches the compiler itself, caps
+  it softly at spawn where haven owns the spawn, and reclaims it forcibly when
+  the machine is at stake. See dev/docs/adr/095-haven-tsgo-governor.md.
 
+  # The compiler is one binary under two names: @typescript/native-preview
+  # published it as `tsgo`, typescript@7 renamed it to `tsc`, and a local build
+  # of the TypeScript repo still produces `tsgo`. Both are governed as ONE
+  # class against ONE budget — the knobs keep their HAVEN_TSGO_ names.
+  #
   # Behavior lives in tools/thuishaven: `domain/tsgowatch.go` decides what to
   # reclaim, `app/daemon.go` samples and enforces on the monitor tick, and
   # `dev/scripts/check-queue.mjs` sets the soft memory cap on the runs it
@@ -16,28 +21,28 @@ Feature: tsgo can never take the machine down
 
   @unit
   Scenario: A runaway whole-tree run is stopped at the hard ceiling
-    Given a whole-tree tsgo run whose memory exceeds the per-run ceiling
+    Given a whole-tree compiler run whose memory exceeds the per-run ceiling
     When the daemon takes its next sample
     Then that run is stopped
     And the reason, size and age are logged
 
   @unit
   Scenario: A run under every ceiling is left alone
-    Given a whole-tree tsgo run within the per-run ceiling
-    And the combined tsgo footprint is within the machine budget
+    Given a whole-tree compiler run within the per-run ceiling
+    And the combined compiler footprint is within the machine budget
     When the daemon takes its next sample
     Then nothing is stopped
 
   @unit
   Scenario: Over the machine budget, idle language servers go first
-    Given the combined tsgo footprint exceeds the machine budget
+    Given the combined compiler footprint exceeds the machine budget
     And an idle language server and two whole-tree runs are live
     When the daemon takes its next sample
     Then the idle language server is reclaimed before any run
 
   @unit
   Scenario: Over the machine budget, the youngest run goes before the oldest
-    Given the combined tsgo footprint exceeds the machine budget
+    Given the combined compiler footprint exceeds the machine budget
     And no idle language server is left to reclaim
     When the daemon takes its next sample
     Then the youngest whole-tree run is stopped first
@@ -57,10 +62,24 @@ Feature: tsgo can never take the machine down
     Then it is evicted
 
   @unit
-  Scenario: The governor only ever touches tsgo
+  Scenario: The governor only ever touches the TypeScript compiler
     Given processes of every other kind on the machine
     When the daemon takes its next sample
     Then none of them is ever a candidate
+
+  # TypeScript 7 renamed the native binary from `tsgo` to `tsc`, which silently
+  # emptied a governor that selected on the old name: the machine's largest
+  # transient memory consumer was neither capped nor observed. One name is not
+  # two classes — two classes would weigh each half of the machine's compilers
+  # against the whole budget and reclaim neither.
+  @unit
+  Scenario: The compiler is governed under both of its names
+    Given a run of the compiler installed as "tsc" and one installed as "tsgo"
+    And they exceed the machine budget only when counted together
+    When the daemon takes its next sample
+    Then both are watched as one class
+    And the youngest of the two is reclaimed
+    And a language server keeps its own ceiling and idle period under either name
 
   @unit
   Scenario: Coding agents, dev servers and test workers are observed, never touched
@@ -80,11 +99,11 @@ Feature: tsgo can never take the machine down
   Scenario: The operator can disable the governor
     Given the per-run ceiling is disabled via the environment
     When the daemon takes its next sample
-    Then no tsgo process is considered at all
+    Then no compiler process is considered at all
 
   @unit
   Scenario: Queued whole-tree runs get a soft memory cap at spawn
-    Given the check queue spawns a whole-tree tsgo run
+    Given the check queue spawns a whole-tree compiler run
     Then the Go runtime memory limit is set from the machine's memory
     But an operator's explicit limit is never overridden
 

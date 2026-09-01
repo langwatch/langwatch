@@ -78,7 +78,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     And below the cards a tile prompts "Connect a provider, enable a
       RoutingPolicy, or set up an IngestionSource to start collecting data"
     And the prompt links to /settings/model-providers,
-      /gateway/routing-policies, /governance/ingestion-sources
+      /gateway/routing-policies, /governance/inventory?tab=sources
 
   # ---------------------------------------------------------------------------
   # Per-user breakdown
@@ -146,7 +146,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
       | status       | "healthy" / "degraded" / "stale" / "down"  |
       | last event   | relative timestamp                         |
     And clicking a chip navigates to that source's detail page at
-      "/governance/ingestion-sources/<sourceId>" (link wiring
+      "/governance/inventory/<sourceId>" (link wiring
       follows in a sibling slice)
 
   @bdd @ui @admin-oversight @ingestion-health @empty
@@ -155,7 +155,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     When the dashboard renders
     Then the strip reads "No ingestion sources configured." with a CTA
       "+ Add your first source" linking to
-      "/governance/ingestion-sources"
+      "/governance/inventory?tab=sources"
 
   # ---------------------------------------------------------------------------
   # Mocked-data caveat (for v0; real-data wire-up follows D2)

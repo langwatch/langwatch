@@ -10,6 +10,10 @@ interface SectionCase {
   screenshot: string;
 }
 
+// AI Gateway and AI Governance list their sections in the product sidebar
+// of the navigation shell now, so their in-page section-nav rail stands
+// down to avoid the duplicate. Automations still lists page-local
+// destinations, so its rail keeps rendering in every mode.
 const sections: SectionCase[] = [
   {
     name: "Automations",
@@ -17,20 +21,6 @@ const sections: SectionCase[] = [
     sectionLabel: "Automations",
     pageHeading: "Overview",
     screenshot: "automations-shared-layout.png",
-  },
-  {
-    name: "AI Gateway",
-    path: () => "/gateway/virtual-keys",
-    sectionLabel: "AI Gateway",
-    pageHeading: "Virtual Keys",
-    screenshot: "gateway-shared-layout.png",
-  },
-  {
-    name: "AI Governance",
-    path: () => "/governance",
-    sectionLabel: "AI Governance",
-    pageHeading: "AI Governance",
-    screenshot: "governance-shared-layout.png",
   },
 ];
 
@@ -90,40 +80,12 @@ test("complex product areas share one local navigation layout", async ({
   }
 
   expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual([
-    220, 220, 220,
+    220,
   ]);
-  expect(
-    new Set(measurements.map(({ containerWidth }) => containerWidth)).size,
-  ).toBe(1);
-  expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(
-    1,
-  );
   for (const { borderColor } of measurements) {
     expect(borderColor).not.toBe("rgb(0, 0, 0)");
     expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
   }
-
-  const governanceNavigation = page.getByRole("navigation", {
-    name: "AI Governance navigation",
-  });
-  await governanceNavigation
-    .getByRole("link", { name: "Catalog", exact: true })
-    .click();
-  await expect(page).toHaveURL("/governance/ingestion-sources");
-
-  // The URL flips synchronously on pushState, but the router only commits the
-  // new location once the lazily-loaded route resolves; until then the nav
-  // still renders the previous page's active state. Poll instead of sampling
-  // once so the assertion waits for that commit like every other matcher here.
-  await expect(async () => {
-    const overviewBackground = await governanceNavigation
-      .getByRole("link", { name: "Overview", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    const activeBackground = await governanceNavigation
-      .getByRole("link", { name: "Catalog", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(overviewBackground).not.toBe(activeBackground);
-  }).toPass({ timeout: 15_000 });
 
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();

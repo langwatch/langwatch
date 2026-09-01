@@ -189,14 +189,24 @@
                 "experiment run",
                 "experiment status",
                 "experiment list-runs",
-                "experiment results"
+                "experiment results",
+                "experiment create",
+                "experiment get-state",
+                "experiment set-state",
+                "experiment versions",
+                "experiment restore"
               ],
               "hints": {
                 "experiment list": "langwatch experiment list --limit 20 -o json",
                 "experiment run": "langwatch experiment run <slug> --wait",
                 "experiment status": "langwatch experiment status <slug> -o json",
                 "experiment list-runs": "langwatch experiment list-runs <slug> -o json",
-                "experiment results": "langwatch experiment results <slug> --filter failed -o json"
+                "experiment results": "langwatch experiment results <slug> --filter failed -o json",
+                "experiment create": "langwatch experiment create --name \"Checkout quality\" -o json",
+                "experiment get-state": "langwatch experiment get-state <slug> -o json",
+                "experiment set-state": "langwatch experiment set-state <slug> --file state.json --expected-version 4 --message \"Added a target\"",
+                "experiment versions": "langwatch experiment versions <slug> -o json",
+                "experiment restore": "langwatch experiment restore <slug> 3"
               },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
@@ -285,7 +295,7 @@
       "name": "Agent Simulations",
       "description": "Test agents with simulation-based testing using user simulators and judge evaluation",
       "surfaces": {
-        "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+        "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
       },
       "children": [
         {
@@ -305,14 +315,19 @@
                 "scenario create",
                 "scenario update",
                 "scenario run",
-                "scenario delete"
+                "scenario delete",
+                "scenario version list",
+                "scenario version get"
               ],
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\"",
-                "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --wait",
-                "scenario delete": "langwatch scenario delete <id>"
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Billing\"",
+                "scenario update": "langwatch scenario update <id> --test-suite \"Billing\"",
+                "scenario run": "langwatch scenario run <id> --target http:<agent-id> --note \"after the timeout fix\"",
+                "scenario delete": "langwatch scenario delete <id>",
+                "scenario version list": "langwatch scenario version list <id> -o json",
+                "scenario version get": "langwatch scenario version get <id> 2 -o json"
               },
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
@@ -330,7 +345,7 @@
               "docs": "https://langwatch.ai/scenario/basics/no-code-scenario.md"
             },
             "api": "/api/scenarios",
-            "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
           },
           "sync": null,
           "plannedSync": "bidirectional",
@@ -371,10 +386,10 @@
                 "platform_get_simulation_run"
               ],
               "skill": null,
-              "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+              "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
             },
             "api": "/api/simulation-runs",
-            "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
           },
           "sync": null,
           "produces": [
@@ -385,56 +400,107 @@
           ]
         },
         {
-          "id": "agent-simulations.suites",
-          "name": "Suites (Run Plans)",
-          "description": "Bundle scenarios with targets for batch execution and repeated testing",
+          "id": "agent-simulations.test-suites",
+          "name": "Test Suites",
+          "description": "Groups of scenarios: a name and the scenarios filed in it",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.suites",
-                "typescript": "langwatch.suites"
+                "python": "langwatch.test_suites",
+                "typescript": "client.testSuites"
               },
               "cli": [
-                "suite list",
-                "suite get",
-                "suite create",
-                "suite update",
-                "suite duplicate",
-                "suite run",
-                "suite delete"
+                "test-suite list",
+                "test-suite create",
+                "test-suite get",
+                "test-suite rename",
+                "test-suite archive",
+                "test-suite run"
               ],
               "hints": {
-                "suite list": "langwatch suite list -o json",
-                "suite get": "langwatch suite get <id> -o json",
-                "suite create": "langwatch suite create \"regression\" --scenarios id1,id2 --targets http:agent_abc123",
-                "suite run": "langwatch suite run <id> --wait"
+                "test-suite list": "langwatch test-suite list -o json",
+                "test-suite create": "langwatch test-suite create \"Refunds\"",
+                "test-suite get": "langwatch test-suite get <id-or-name> -o json",
+                "test-suite rename": "langwatch test-suite rename <id-or-name> \"Refunds and credits\"",
+                "test-suite archive": "langwatch test-suite archive <id-or-name>",
+                "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
               },
               "skill": null,
               "docs": null
             },
             "platform": {
-              "ui": "/simulations/run-plans",
+              "ui": "/agent-testing",
               "mcp": [
-                "platform_list_suites",
-                "platform_get_suite",
-                "platform_create_suite",
-                "platform_update_suite",
-                "platform_run_suite",
-                "platform_archive_suite"
+                "platform_list_test_suites",
+                "platform_create_test_suite",
+                "platform_get_test_suite",
+                "platform_rename_test_suite",
+                "platform_archive_test_suite",
+                "platform_run_test_suite"
               ],
               "skill": null,
               "docs": null
             },
-            "api": "/api/suites",
+            "api": "/api/v1/test-suites",
             "docs": null
           },
           "sync": null,
           "produces": [
-            "suites",
+            "test-suites"
+          ],
+          "consumes": [
+            "scenarios",
+            "agents"
+          ]
+        },
+        {
+          "id": "agent-simulations.run-plans",
+          "name": "Run Plans",
+          "description": "Named configurations that run scenarios against targets and keep their run history",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": "langwatch.run_plans",
+                "typescript": "client.runPlans"
+              },
+              "cli": [
+                "run-plan run",
+                "run-plan list",
+                "run-plan get",
+                "run-plan archive"
+              ],
+              "hints": {
+                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --name \"nightly regression\" --wait",
+                "run-plan list": "langwatch run-plan list -o json",
+                "run-plan get": "langwatch run-plan get <id> -o json",
+                "run-plan archive": "langwatch run-plan archive <id>"
+              },
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/agent-testing/results",
+              "mcp": [
+                "platform_run_plan",
+                "platform_list_run_plans",
+                "platform_get_run_plan",
+                "platform_rerun_run_plan",
+                "platform_archive_run_plan"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/run-plans",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "run-plans",
             "simulation-runs"
           ],
           "consumes": [
             "scenarios",
+            "test-suites",
             "agents"
           ]
         }
@@ -473,6 +539,7 @@
                 "prompt tag rename",
                 "prompt tag assign",
                 "prompt tag delete",
+                "prompt get",
                 "prompt versions",
                 "prompt restore"
               ],
@@ -544,24 +611,25 @@
         {
           "id": "library.agents",
           "name": "Agents",
-          "description": "Agent definitions used in simulations and experiments",
+          "description": "Agent definitions used in simulations and experiments. A connected agent registers itself from code: connect_agent in Python, connectAgent from langwatch/agent in TypeScript",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.agents",
-                "typescript": "langwatch.agents"
+                "python": "langwatch.agents, langwatch.connect_agent",
+                "typescript": "langwatch.agents, connectAgent (langwatch/agent)"
               },
               "cli": [
                 "agent list",
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent test",
                 "agent dev",
                 "agent update",
                 "agent delete"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
             "platform": {
               "ui": "/agents",
@@ -571,13 +639,14 @@
                 "platform_create_agent",
                 "platform_update_agent",
                 "platform_run_agent",
+                "platform_test_agent",
                 "platform_delete_agent"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
-            "api": "/api/agents",
-            "docs": null
+            "api": "/api/v1/agents",
+            "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
           },
           "sync": null,
           "produces": [
@@ -770,9 +839,23 @@
             "graph get",
             "graph create",
             "graph update",
-            "graph delete"
+            "graph delete",
+            "chart schema",
+            "chart list",
+            "chart get",
+            "chart create",
+            "chart update",
+            "chart delete",
+            "chart run",
+            "chart place",
+            "chart unplace"
           ],
-          "skill": null,
+          "hints": {
+            "chart create": "langwatch chart create --name \"Traces per day\" --sql-file query.sql --param since=2026-01-01 --spec-file spec.json",
+            "chart run": "langwatch chart run <chart-id> --start 2026-08-01T00:00:00Z --end 2026-08-08T00:00:00Z --granularity 3600",
+            "chart place": "langwatch chart place <chart-id> --dashboard-id <dashboard-id>"
+          },
+          "skill": "lwql-charts",
           "docs": null
         },
         "platform": {
@@ -1044,7 +1127,7 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Catalog (ingestion)",
+          "name": "Inventory (ingestion)",
           "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
@@ -1056,13 +1139,14 @@
                 "ingest list",
                 "ingest tail",
                 "ingest health",
-                "ingest codex"
+                "ingest codex",
+                "ingest context"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/governance/ingestion-sources",
+              "ui": "/governance/inventory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1494,6 +1578,35 @@
           "sync": null,
           "produces": [
             "secrets"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.agent-cache",
+          "name": "Agent Cache",
+          "description": "A per-project store an agent keeps its own run state in, encrypted at rest, where each entry expires by itself",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": "langwatch.cache",
+                "typescript": null
+              },
+              "cli": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/api-reference/agent-cache/overview.md"
+            },
+            "api": "/api/agent-cache",
+            "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
+          },
+          "sync": null,
+          "produces": [
+            "agent-cache"
           ],
           "consumes": []
         },

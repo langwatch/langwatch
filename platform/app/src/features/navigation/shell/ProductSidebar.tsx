@@ -27,6 +27,7 @@ import {
 import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
+import { useVisibleSectionNavItems } from "../useVisibleSectionNavItems";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
@@ -116,7 +117,7 @@ function SidebarBottomBlock({
           showLabel={showExpanded}
         />
       )}
-      <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
+      <SupportMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
@@ -224,9 +225,10 @@ function SectionItemsNav({
   showExpanded: boolean;
 }) {
   const pathname = usePathname();
+  const visibleItems = useVisibleSectionNavItems(items);
   return (
     <>
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <SideMenuLink
           key={item.href}
           icon={item.icon}
@@ -255,12 +257,7 @@ function ProductSidebarBody({
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
   if (surface === "me") {
-    return (
-      <PersonalSidebarLinks
-        showExpanded={showExpanded}
-        shouldIncludeGovernSection={false}
-      />
-    );
+    return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
   if (surface === "gateway") {
     return (
@@ -272,13 +269,7 @@ function ProductSidebarBody({
       <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
     );
   }
-  return (
-    <MainMenuSections
-      showExpanded={showExpanded}
-      shouldIncludeGovernSection={false}
-      shouldIncludeOpsSection={false}
-    />
-  );
+  return <MainMenuSections showExpanded={showExpanded} />;
 }
 
 /**

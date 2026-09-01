@@ -10,8 +10,11 @@ organization, `aggregateId = organizationId` — is replaced by
 each their own aggregate. The organization is the tenant of every event and the
 aggregate of nothing; there is no cutover flag (ADR-110 deletes it and the
 `AuthzCutoverProjection` table), and rollout state moves off the authorization
-aggregates entirely onto `SystemMigrationTenantState`. Everything else here
-stands.
+aggregates entirely onto `SystemMigrationTenantState`. The widening cohort
+this ADR plans is also finished: the migration now declares itself enrolled
+automatically, so every cloud organization is in its cohort with no operator
+action, and an organization created since is adopted by the next pass rather
+than waiting to be enrolled. Everything else here stands.
 
 ## Decision, in one paragraph
 
@@ -957,9 +960,9 @@ follows it, and we accept that order as **best-effort FIFO**: it is the
 order ClickHouse accepted the events, which is the only order the system
 has. **No fold ever runs inline — not in normal operation and not during an
 outage.** If Redis is down, ADR-007's "Redis-loss circuit breaker" amendment
-(which names this pipeline, and expects the identity pipeline to join it
-later — identity programme D02) guarantees exactly three things, and inline
-processing is deliberately not among them:
+(which names this pipeline; the identity pipeline was expected to join it
+later, but that deliverable was withdrawn on 2026-08-24) guarantees exactly
+three things, and inline processing is deliberately not among them:
 
 - **Appends still land.** The event store is ClickHouse and the append is
   waited, so the fact is durable whether or not a queue job could be staged.
@@ -1162,6 +1165,56 @@ deliberately out of scope.
   old tables continuing as derived compat views until contract. The cost is
   deliberate: this is the last rewrite of this flow, and correct beats
   expedient everywhere the two diverge.
+
+## Amendment 2026-08-24: a disabled membership is not a membership
+
+The membership gate reads `OrganizationUser`, and that row has carried a
+`disabledAt` column since seat reconciliation shipped: an admin over their
+licensed seats disables people to get back within them, and the row survives
+with its role, department and history so re-enabling restores everything
+(`specs/licensing/seat-reconciliation.feature`).
+
+Nothing on the authorization path read that column. The organization switcher
+filtered it, `getOrganizationWithMembers` filtered it, and the member list
+filtered it, so the organization vanished from a disabled person's UI — while
+`findOrganizationRole`, every binding fence, the API-key ceiling and the
+virtual-key membership set all read the row as if it were live. A disabled
+member kept every permission they had, reachable by direct URL, tRPC call or
+REST call. The legacy resolver had the same hole, so this is not a regression
+the engine introduced; it is one it inherited and now closes.
+
+**Decided.** Membership means ACTIVE membership, everywhere authorization asks:
+
+- The read port returns the row as a fact — `{ role, disabled }` — and the
+  collector applies the policy, setting `isOrgMember` false and
+  `organizationRole` null for a disabled row. Filtering in SQL would have made
+  a disabled membership indistinguishable from an absent one, and the denial
+  could then only have claimed the person was never here.
+- Binding reads keep filtering in SQL (`disabledAt: null` on the membership
+  fence), because those queries return grants and have no fact to hand back.
+- Denials say `membership-disabled`, not `no-membership`. We know the cause
+  and the person can act on it — an admin can return their seat — which is the
+  ADR-045 test for a named error rather than a generic one.
+- Disabling and re-enabling bump the organization's authz epoch. Disabling is
+  a plain column write, so nothing else retires the snapshots §12 caches, and
+  an admin's revocation must not wait out a cache.
+
+**Inventory reads are deliberately untouched.** The legacy-import migration
+still imports a disabled member's grants (they are preserved for re-enable),
+and the listing repositories still list them (an admin has to see somebody to
+re-enable them). Only reads that answer "may this principal act?" changed.
+
+**Consequence worth stating plainly:** the §9 owner ceiling means a disabled
+member's personal API keys stop working, because `effective(key) =
+grants(key) ∩ grants(owner)`. That is the point — a person cut off from an
+organization must not keep a live credential to it — but it reaches past their
+own session, so any automation running on their key stops with them. Service
+keys, which have no owner, are unaffected.
+
+**Write-side membership reads were left alone on purpose.**
+`assertUsersInOrganization` and `group.isUserInOrganization` still let a
+disabled user be *granted* access. That is inert: the grant confers nothing
+while the seat is off, and it is waiting for them when it comes back on.
 
 ## References
 

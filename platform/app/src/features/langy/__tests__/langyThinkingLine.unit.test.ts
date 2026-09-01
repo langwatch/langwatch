@@ -327,4 +327,88 @@ describe("langyThinkingLine", () => {
       expect(LANGY_THINKING_VERBS).toContain("Blaming the NS");
     });
   });
+
+  /**
+   * The page Langy is driving holds a better truth than the turn does. While
+   * it applies an action or streams a run's cells, it knows which column and
+   * how far along, and the turn knows only that the agent is blocked on a
+   * poll. Filming the optimization loop is what made the gap plain: minutes of
+   * "Cooking…" over a page that was busy the whole time.
+   */
+  describe("given the open page reports what it is doing", () => {
+    const RUN = "Running Version A — 12 of 20 rows";
+
+    /** @scenario "A run streaming into the page names the column and the progress" */
+    it("says it, and never a whimsical verb over it", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 3_000,
+        pageActivity: RUN,
+      });
+      expect(line?.text).toBe(RUN);
+      expect(line?.tone).toBe("working");
+      expect(line?.allowWhimsy).toBe(false);
+    });
+
+    /** @scenario "Page activity wins over the command the agent is blocked on" */
+    it("outranks the tool the agent is blocked on", () => {
+      const messages = [
+        user,
+        assistant([
+          {
+            type: "tool-bash",
+            state: "input-available",
+            input: {
+              command: "sleep 45; langwatch experiment status NSFVA4mN",
+            },
+          },
+        ]),
+      ];
+      const withoutPage = langyThinkingLine({ messages, elapsedMs: 3_000 });
+      expect(withoutPage?.text).not.toBe(RUN);
+
+      const line = langyThinkingLine({
+        messages,
+        elapsedMs: 3_000,
+        pageActivity: RUN,
+      });
+      expect(line?.text).toBe(RUN);
+    });
+
+    /** @scenario "Page activity survives the turn falling quiet between steps" */
+    it("outranks the between-steps thinking line", () => {
+      const messages = [
+        user,
+        assistant([{ type: "tool-bash", state: "output-available" }]),
+      ];
+      expect(langyThinkingLine({ messages, elapsedMs: 3_000 })?.text).toBe(
+        "Thinking…",
+      );
+      expect(
+        langyThinkingLine({ messages, elapsedMs: 3_000, pageActivity: RUN })
+          ?.text,
+      ).toBe(RUN);
+    });
+
+    /** @scenario "A finished run releases the line" */
+    it("goes back to the turn's own signals once the page falls silent", () => {
+      const messages = [user, assistant([])];
+      const line = langyThinkingLine({
+        messages,
+        elapsedMs: 3_000,
+        pageActivity: null,
+      });
+      expect(line?.text).toBe("Preparing Langy's workspace…");
+    });
+
+    /** @scenario "A page with nothing to report leaves the line to the turn" */
+    it("ignores an empty report rather than rendering a blank line", () => {
+      const line = langyThinkingLine({
+        messages: [user, assistant([])],
+        elapsedMs: 3_000,
+        pageActivity: "   ",
+      });
+      expect(line?.text).toBe("Preparing Langy's workspace…");
+    });
+  });
 });

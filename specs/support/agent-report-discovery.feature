@@ -23,9 +23,9 @@ Feature: Agent Report Discovery Across Access Points
     Then a small "For agents" note says issues found while following the page can be reported with "npx langwatch report"
 
   @unit
-  Scenario: The docs footer note for agents reads in full
-    When a reader reaches the footer of a docs page on a desktop screen
-    Then the note for agents reads in full instead of being clipped mid-word
+  Scenario: The attribution footer carries the report line on every page
+    When a reader reaches the bottom of any docs page
+    Then a line above the Powered by note tells an AI agent to report issues with "npx langwatch report"
     And following it lands on the support documentation
 
   @unit

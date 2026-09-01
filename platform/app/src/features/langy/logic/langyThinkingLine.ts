@@ -241,10 +241,21 @@ export function langyThinkingLine({
   elapsedMs,
   hasLiveReasoning = false,
   workerReady = false,
+  pageActivity = null,
 }: {
   messages: ThinkingMessage[];
   /** Time since the turn was sent. */
   elapsedMs: number;
+  /**
+   * What the page Langy is driving is doing right now, in the page's own
+   * words, or null when it is doing nothing. The page reports the work it is
+   * actually carrying out — the column it is running and how many rows are
+   * back — so this is the most specific true line available, and it outranks
+   * everything the turn can infer. While the agent waits for a run it is
+   * blocked on a status poll, and naming the poll describes its bookkeeping
+   * where naming the run describes the reader's own work.
+   */
+  pageActivity?: string | null;
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts (they are live-edge only), so without this
@@ -263,6 +274,14 @@ export function langyThinkingLine({
   workerReady?: boolean;
 }): LangyThinkingLine | null {
   const last = currentTurnAssistant(messages);
+
+  // 0. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
+  //    true and more specific than anything below: the column being run and
+  //    the rows already back, rather than the poll the agent is blocked on.
+  const reported = pageActivity?.trim();
+  if (reported) {
+    return { text: reported, tone: "working", allowWhimsy: false };
+  }
 
   // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
   //    with its command in the input. Say the true thing.

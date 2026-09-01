@@ -12,15 +12,21 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AgentService } from "~/server/agents/agent.service";
 import { prisma } from "~/server/db";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
-import { loadExecutionData, workflowLoadKey } from "../dataLoader";
+import {
+  loadExecutionData,
+  promptLoadKey,
+  workflowLoadKey,
+} from "../dataLoader";
 
 describe("loadExecutionData", () => {
   let projectId: string;
   let authorId: string;
   const cleanupAgentIds: string[] = [];
   const cleanupWorkflowIds: string[] = [];
+  const cleanupPromptIds: string[] = [];
 
   beforeAll(async () => {
     const project = await getTestProject("data-loader");
@@ -37,6 +43,11 @@ describe("loadExecutionData", () => {
         { workflowId: { in: cleanupWorkflowIds }, projectId },
       ],
       ["workflow", { id: { in: cleanupWorkflowIds }, projectId }],
+      [
+        "llmPromptConfigVersion",
+        { configId: { in: cleanupPromptIds }, projectId },
+      ],
+      ["llmPromptConfig", { id: { in: cleanupPromptIds }, projectId }],
     ]);
   });
 
@@ -97,12 +108,16 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       if ("error" in result) {
         throw new Error(`loadExecutionData failed: ${result.error}`);
@@ -146,17 +161,128 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       expect("error" in result).toBe(true);
       if ("error" in result) {
         expect(result.error).toContain("no committed version");
       }
+    });
+  });
+
+  describe("given a target naming an agent this project does not have", () => {
+    describe("when the execution data is loaded", () => {
+      /** @scenario A run stops when a target's agent was deleted */
+      it("fails and names the missing agent", async () => {
+        const missingAgentId = `test_agent_${nanoid(8)}`;
+
+        const result = await loadExecutionData({
+          projectId,
+          dataset: {
+            type: "inline",
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [{ type: "agent", dbAgentId: missingAgentId }],
+          evaluators: [],
+        });
+
+        expect("error" in result).toBe(true);
+        if ("error" in result) {
+          expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
+          expect(result.status).toBe(404);
+        }
+      });
+    });
+  });
+
+  describe("given two targets pinned to different versions of one prompt", () => {
+    describe("when the execution data is loaded", () => {
+      /** @scenario "Two columns pinned to different versions of one prompt each run their own version" */
+      it("loads both versions instead of letting the last one win", async () => {
+        const promptService = new PromptService(prisma);
+        const created = await promptService.createPrompt({
+          projectId,
+          handle: `two-versions-${nanoid(8)}`,
+          prompt: "version one",
+          model: "openai/gpt-5-mini",
+        });
+        cleanupPromptIds.push(created.id);
+
+        const second = await promptService.updatePrompt({
+          idOrHandle: created.id,
+          projectId,
+          data: { commitMessage: "second", prompt: "version two" },
+        });
+        expect(second.version).toBe(2);
+
+        const result = await loadExecutionData({
+          projectId,
+          dataset: {
+            type: "inline",
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [
+            { type: "prompt", promptId: created.id, promptVersionNumber: 1 },
+            { type: "prompt", promptId: created.id, promptVersionNumber: 2 },
+          ],
+          evaluators: [],
+        });
+
+        if ("error" in result) {
+          throw new Error(`loadExecutionData failed: ${result.error}`);
+        }
+
+        const first = result.loadedPrompts.get(
+          promptLoadKey({ promptId: created.id, promptVersionNumber: 1 }),
+        );
+        const latest = result.loadedPrompts.get(
+          promptLoadKey({ promptId: created.id, promptVersionNumber: 2 }),
+        );
+
+        expect(first?.version).toBe(1);
+        expect(first?.prompt).toBe("version one");
+        expect(latest?.version).toBe(2);
+        expect(latest?.prompt).toBe("version two");
+      });
+    });
+  });
+
+  describe("given an evaluator config naming an evaluator this project does not have", () => {
+    describe("when the execution data is loaded", () => {
+      /** @scenario A run stops when an evaluator was deleted */
+      it("fails and names the missing evaluator", async () => {
+        const missingEvaluatorId = `test_eval_${nanoid(8)}`;
+
+        const result = await loadExecutionData({
+          projectId,
+          dataset: {
+            type: "inline",
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [],
+          evaluators: [{ dbEvaluatorId: missingEvaluatorId }],
+        });
+
+        expect("error" in result).toBe(true);
+        if ("error" in result) {
+          expect(result.error).toBe(
+            `Evaluator "${missingEvaluatorId}" not found`,
+          );
+          expect(result.status).toBe(404);
+        }
+      });
     });
   });
 });

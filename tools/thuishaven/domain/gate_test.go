@@ -35,6 +35,42 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 			}
 		})
 	})
+
+	// TypeScript 7 renamed the compiler binary to `tsc`, so the route around
+	// the package scripts is spelled differently now and costs exactly as
+	// much as it did.
+	t.Run("given the compiler invoked directly under either name", func(t *testing.T) {
+		t.Run("each is heavy", func(t *testing.T) {
+			for _, cmd := range []string{
+				"./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.json",
+				"pnpm exec tsc --noEmit -p tsconfig.json",
+				"pnpm exec tsgo --noEmit -p tsconfig.tsgo.json",
+				"cd platform/app && tsc -p tsconfig.tsgo.tests.json",
+			} {
+				if _, heavy := ClassifyCommand(cmd); !heavy {
+					t.Fatalf("%q should be gated", cmd)
+				}
+			}
+		})
+
+		// "tsc" is three letters and a substring of "tsconfig.json", so it is
+		// matched as the binary a word invokes rather than as text anywhere in
+		// the line. Reading a project file as a compiler run is the over-match
+		// that has a developer wondering why `cat` was queued.
+		t.Run("but naming the config file is not running the compiler", func(t *testing.T) {
+			for _, cmd := range []string{
+				"cat platform/app/tsconfig.json",
+				"grep -n strict platform/app/tsconfig.json",
+				"git diff tsconfig.json",
+				"/x/bin/mytsc --noEmit",
+				"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsc.real --noEmit -p tsconfig.json",
+			} {
+				if _, heavy := ClassifyCommand(cmd); heavy {
+					t.Fatalf("%q must not be gated", cmd)
+				}
+			}
+		})
+	})
 }
 
 // @scenario "An integration run is never narrowed"
@@ -74,6 +110,22 @@ func TestClassifyCommandSeparatesIntegrationFromUnit(t *testing.T) {
 }
 
 // @scenario "A caller's own worker count is respected but still admitted"
+// One compiler is one population: a `tsc` run has to file its duration where
+// its `tsgo` predecessor filed, or the estimate that decides whether a run is
+// narrowed has no prior observation and treats it as long.
+func TestDurationKeyBucketsBothCompilerNamesTogether(t *testing.T) {
+	t.Run("given the compiler invoked under each of its names", func(t *testing.T) {
+		tsc := DurationKey("./node_modules/.bin/tsc --noEmit -p tsconfig.json")
+		tsgo := DurationKey("./node_modules/.bin/tsgo --noEmit -p tsconfig.json")
+
+		t.Run("both land in one bucket", func(t *testing.T) {
+			if tsc != TypeScriptCompilerClass || tsgo != TypeScriptCompilerClass {
+				t.Fatalf("tsc = %q, tsgo = %q, want both %q", tsc, tsgo, TypeScriptCompilerClass)
+			}
+		})
+	})
+}
+
 func TestCallerSetWorkersIsDetected(t *testing.T) {
 	t.Run("given a command that already chose its width", func(t *testing.T) {
 		t.Run("the gate notices, and will not override it", func(t *testing.T) {

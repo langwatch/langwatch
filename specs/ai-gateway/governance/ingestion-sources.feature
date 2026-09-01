@@ -18,7 +18,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the admin has ingestionSources:manage permission
 
   Scenario: Admin lands on the IngestionSources index
-    When the admin navigates to "/governance/ingestion-sources"
+    When the admin navigates to "/governance/inventory?tab=sources"
     Then a list shows every configured source with: name, source type,
       last event timestamp, status
     And each row links to a per-source detail page with health metrics
@@ -133,12 +133,213 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       And a cron that can never run shows a plain-language message next
         to the input, and the create button refuses until it is fixed
 
+  Rule: A conversation source names the project its conversations land in
+
+    Some sources pull conversations, not counts. Those conversations can
+    be read in the trace explorer, but only once an admin says which
+    project they land in — the source ships with no destination and
+    routes nothing until then.
+
+    The choice carries three consequences the admin cannot discover any
+    other way, so the drawer states all three where the choice is made:
+    the destination project's own redaction policy governs what is
+    stored; only conversations from the last 31 days arrive, so a thread
+    that started earlier shows only its recent turns; and a destination
+    that is later archived or deleted stops receiving conversations
+    instead of failing the source or landing them elsewhere.
+
+    Sources that pull counts rather than conversations are offered no
+    destination at all — a control that changed nothing would be worse
+    than its absence.
+
+    @integration
+    Scenario: The composer of a conversation source offers a destination
+      When the admin picks "Databricks AI/BI Genie" from the Add source menu
+      Then the composer offers a picker for the project its conversations
+        land in, listing only projects of this organization
+      And the picker starts empty, because where another team's
+        conversations become readable is never a default
+
+    @integration
+    Scenario: The destination states its three consequences where it is picked
+      Given the admin is composing a "Databricks AI/BI Genie" source
+      When they pick a destination project
+      Then the drawer says the destination project's data-privacy policy
+        governs what is stored
+      And it says conversations from the last 31 days arrive, and that a
+        conversation that started earlier shows only its recent turns
+      And it says a destination that is archived or deleted stops
+        receiving conversations
+
+    @integration
+    Scenario: A source created without a destination routes nothing
+      When the admin creates a "Databricks AI/BI Genie" source without
+        picking a destination
+      Then the source is created
+      And the drawer said, before saving, that its conversations would
+        not be readable in the explorer until a destination is set
+
+    @integration
+    Scenario: The edit drawer changes a destination and says history stays
+      Given a "Databricks AI/BI Genie" source already lands in "Analytics"
+      When the admin opens the source for editing
+      Then the destination picker shows "Analytics"
+      And the drawer says conversations already routed stay where they are
+      When they change it to "Support" and save
+      Then the update carries "Support" as the destination
+
+    @integration
+    Scenario: A source that pulls counts is offered no destination
+      When the admin composes an "Anthropic Admin API (usage & cost)" source,
+        which pulls usage totals rather than conversations
+      Then no destination picker appears in the drawer
+      And the same is true when editing it
+
+    @integration
+    Scenario: An archived destination is named as archived, not as absent
+      Given a "Databricks AI/BI Genie" source lands in a project that has
+        since been archived
+      When the admin opens the source for editing
+      Then the drawer says that destination is archived and that
+        conversations are no longer being routed there
+      And it still offers the picker, so the admin can repoint the source
+        rather than being told routing stopped and given no way to restart it
+      And the picker being empty does not read as "never configured",
+        because the archived destination is named right above it
+      When they pick "Support" as the replacement destination
+      Then the picker shows "Support"
+      And the archived warning is gone, because it described the destination
+        they have just replaced rather than the one now on screen
+
+    @integration
+    Scenario: A destination the admin cannot see is not called archived
+      Given a "Databricks AI/BI Genie" source lands in a live project that
+        belongs to a team this admin is not on
+      When the admin opens the source for editing
+      Then the drawer does not say that destination is archived, so nobody
+        is sent to restore a project that was never gone
+
+    @unit
+    Scenario: The picker cannot offer a project of another organization
+      When the admin opens the destination picker
+      Then it lists only live projects of this organization
+      And a destination outside it, reaching the API by any other route,
+        is refused at write time with the destination named as the reason
+
+  Rule: A source routes only the events it recognises as its own conversations
+
+    The destination picker is offered only to sources that carry
+    conversations, but the destination itself is an ordinary stored
+    setting, and nothing at the moment it is written checks what kind of
+    source it was written on. So the run cannot treat the picker as the
+    only way a destination arrives. It decides for itself, per source,
+    which of that source's events are conversations, and routes nothing
+    else.
+
+    This is what keeps a source that pulls counts from turning billing
+    rows into readable conversations if a destination reaches it by some
+    other route. Such a source has no conversation events at all, so the
+    honest outcome is that nothing is routed — not that its totals are
+    rendered as though someone had said them.
+
+    Each source also names the agent that answered, and states which
+    source the conversation came from. Both travel with the conversation
+    rather than being assumed, because a second source reusing the first
+    one's labels would file its conversations under a product the
+    customer does not have.
+
+    The agent name is an identity, not a model anyone is billed for, and
+    a source may only name an agent from the set the platform knows. It
+    cannot supply the name of a real model, because a name that matched
+    a price would put a charge on a conversation nobody was charged for.
+
+    @unit
+    Scenario: A counts-pulling source with a destination still routes nothing
+      Given an "Anthropic Admin API (usage & cost)" source has a
+        destination project stored on it, which its own drawer never
+        offered and nothing on the way in refused
+      When a run pulls its usage and cost totals
+      Then nothing is routed to that project, because none of those
+        totals is a conversation
+
+    @unit
+    Scenario: A run routes only the events belonging to its own source
+      Given a "Databricks AI/BI Genie" source lands in "Analytics"
+      When a run hands over both its questions and events belonging to
+        another kind of source
+      Then only the Genie questions reach "Analytics"
+
+    The shape a source routes by — which of its events are conversations,
+    the agent that answered, where they came from, and the name of the batch
+    they arrive in — is supplied per source rather than being Genie's
+    constants. Genie is the only source that supplies one today, so no other
+    source routes anything in production; what the scenario below fixes is
+    that the shape is the source's own and is never inherited, which is what
+    a second source will rely on when it arrives.
+
+    Not everything is per-source yet: the individual conversation spans still
+    carry Genie's own names and labels whatever the source. That is invisible
+    while Genie is the only source routing, and it is what the second source
+    has to finish before its conversations can be told apart from Genie's.
+
+    @unit
+    Scenario: The conversation shape travels with the source, not with Genie
+      Given a second source that supplies its own conversation shape: which
+        of its events are conversations, the agent that answered, and where
+        they came from
+      When a batch is routed by that shape
+      Then each conversation names that source as where it came from, and
+        that source's agent as what answered — neither of them Genie's
+      And a Genie question handed to that shape is not one of its
+        conversations, so nothing is routed for it
+
+    @unit
+    Scenario: A source cannot name a real model as its agent
+      When a source is set up to route conversations
+      Then the agent it names must be one the platform already knows
+      And a real model's name cannot be used as an agent name, so no
+        routed conversation can be given a price by naming one
+
   @unit
   Scenario: The configured-source list groups under the same two headings
     Given configured sources of push, pull, and s3 modes exist
     When the admin views the list
     Then push-mode sources appear under "Real-time streams"
     And pull-mode and s3-mode sources appear together under "Synced on a schedule"
+
+  # ---------------------------------------------------------------------------
+  # Source list — table layout, icons, and protocol column — #7617
+  # ---------------------------------------------------------------------------
+
+  @integration @source-list
+  Scenario: Each source row shows the vendor icon next to the name
+    Given configured sources of different types exist
+    When the admin views the source list
+    Then each row displays the SourceTypeIconGlyph for its source type
+    And the icon sits to the left of the source name
+
+  @integration @source-list
+  Scenario: Each source row shows its delivery protocol
+    Given configured sources of push, pull, and s3 modes exist
+    When the admin views the source list
+    Then push sources show the protocol label "OTel push"
+    And pull sources show the protocol label "API pull"
+    And s3 sources show the protocol label "S3 pull"
+
+  @integration @source-list @pull-source
+  Scenario: The rotate-secret button is hidden for non-push sources on the list
+    Given a pull-mode source exists
+    And a push-mode source exists
+    When the admin views the source list
+    Then the push source row shows a "Rotate secret" action
+    And the pull source row does not show a "Rotate secret" action
+
+  @integration @source-detail @pull-source
+  Scenario: The rotate-secret button is hidden for non-push sources on the detail page
+    Given a pull-mode source exists
+    When the admin opens that source's detail page
+    Then the page does not show a "Rotate secret" action
+    And the Edit and Archive actions remain available
 
   Scenario Outline: Admin adds a source by type
     When the admin clicks "Add source"

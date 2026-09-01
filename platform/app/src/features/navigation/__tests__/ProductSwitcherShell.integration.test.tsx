@@ -379,6 +379,7 @@ beforeEach(() => {
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -583,6 +584,31 @@ describe("the product-switcher top bar", () => {
       });
       await user.keyboard("{ArrowDown}{Enter}");
 
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
+    });
+
+    /** @scenario Typing highlights the top result */
+    it("highlights the first result as I type, with no arrow key", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+      const field = screen.getByPlaceholderText("Search projects");
+
+      searchFor("billing");
+      // Highlighted by the typing itself, before any arrow key. The field
+      // names the highlighted option, which is the machine's own state
+      // rather than a class the list happens to carry.
+      await waitFor(() => {
+        const [first] = screen.getAllByRole("option");
+        expect(first).toHaveAttribute("data-highlighted");
+        expect(field).toHaveAttribute("aria-activedescendant", first?.id);
+      });
+
+      // Enter alone opens it, which is the point of the highlight.
+      await user.keyboard("{Enter}");
       await waitFor(() => {
         expect(pushMock).toHaveBeenCalledWith(
           expect.stringContaining("billing-sync"),

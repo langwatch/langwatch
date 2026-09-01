@@ -126,7 +126,7 @@ void (async () => {
   );
   await shoot(page, "C1-governance-birdeye", true);
 
-  await tryGoto(page, "C2-toolcatalog", "/governance/tool-catalog");
+  await tryGoto(page, "C2-toolcatalog", "/governance/inventory?tab=catalog");
   await shoot(page, "C2-tool-catalog-list", true);
 
   // Click "+ New" or first tile to open drawer
@@ -159,7 +159,7 @@ void (async () => {
     await page.waitForTimeout(500);
   }
 
-  await tryGoto(page, "C4-ingestion", "/governance/ingestion-sources");
+  await tryGoto(page, "C4-ingestion", "/governance/inventory?tab=sources");
   await shoot(page, "C4-ingestion-sources-list", true);
 
   await tryGoto(page, "C5-routing", "/gateway/routing-policies");
