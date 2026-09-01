@@ -310,6 +310,31 @@ describe("collectMalformedJsdocAnnotations", () => {
     ]);
   });
 
+  it("reports a titleless scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * @scenario",
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
+      expect.objectContaining({
+        title: "",
+        ref: expect.objectContaining({ line: 2 }),
+        reason: expect.stringContaining(
+          "put it on its own annotation line directly above the test",
+        ),
+      }),
+    ]);
+  });
+
   it("ignores JSDoc examples inside template strings", () => {
     const tests = join(root, "tests");
     mkdirSync(tests);

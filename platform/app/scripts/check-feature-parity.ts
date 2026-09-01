@@ -837,7 +837,7 @@ const ANNOTATION_RE =
   /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 const JSDOC_ANNOTATION_LINE_RE =
-  /^[ \t]*\*[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?))[ \t]*(?:\r)?$/;
+  /^[ \t]*\*[ \t]*@scenario(?:[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?)))?[ \t]*(?:\r)?$/;
 
 function collectJsdocBlocks({
   src,
