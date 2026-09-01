@@ -32,11 +32,30 @@
 --
 -- `CREATE INDEX CONCURRENTLY` is the usual answer but cannot run inside a
 -- transaction, which the Prisma migration runner requires, so it is not
--- available here. Instead the build is fenced with a short `lock_timeout`:
--- if the lock is not free almost immediately, or the build cannot start
--- promptly, the statement aborts, the transaction rolls back and the deploy
--- fails loudly rather than queueing writes behind a held lock. Nothing is
--- half-applied — an index either exists or it does not.
+-- available here. Instead the build is fenced from both ends:
+--
+--   * `lock_timeout` bounds how long the statement waits *to acquire* the
+--     lock, so a build never queues behind an in-flight writer;
+--   * `statement_timeout` bounds how long it may *hold* it, so a slow build
+--     cannot block "Grant" writes for an open-ended stretch either. Without
+--     it, the lock could be taken within the lock timeout and then held for
+--     the whole build.
+--
+-- Either bound expiring aborts the statement, rolls the transaction back —
+-- releasing the lock — and fails the deploy loudly. Nothing is half-applied:
+-- an index either exists or it does not. Both are `SET LOCAL`, so they last
+-- only for this migration's transaction and leave the session's own settings
+-- untouched.
+--
+-- The 30s build bound is sized off the sibling index migrations: the
+-- comparable "DatasetRecord" build measured ~2.8s over 2.58M rows, and
+-- "Grant" is far smaller, so 30s is roughly an order of magnitude of
+-- headroom over the expected build while still bounding a pathological one.
+--
+-- IRREVERSIBLE: Prisma migration history is forward-only — there is no `down`
+-- step it can run. This change is schema-only (one index, no row data), and
+-- the manual rollback is at the bottom of this file. To roll back, uncomment
+-- and run manually.
 --
 -- ROLLBACK / RETRY: a timeout is not a data problem. Re-run the migration;
 -- it takes the lock when the table is quiet. If it keeps timing out under
@@ -52,7 +71,9 @@
 --    WHERE indexrelid = '"Grant_organizationId_roleKey_live_idx"'::regclass;
 -- If it is false, `DROP INDEX` and retry.
 
+-- Wait at most 3s to acquire the lock, and hold it at most 30s while building.
 SET LOCAL lock_timeout = '3s';
+SET LOCAL statement_timeout = '30s';
 
 -- CreateIndex
 CREATE INDEX "Grant_organizationId_roleKey_live_idx"
