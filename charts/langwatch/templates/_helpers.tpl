@@ -641,6 +641,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
+{{/* Validate LWQL ClickHouse secret wiring.
+
+     When ClickHouse is chart-managed and LWQL is on, the clickhouse-serverless
+     subchart mounts the LWQL passwords from clickhouse.lwql.existingSecret,
+     which defaults to the app Secret — the Secret this chart writes
+     LWQL_CLICKHOUSE_PASSWORD / LWQL_POSTGRES_READER_PASSWORD into. Subchart
+     values are literal YAML, so that default is a static string while the app
+     Secret's name resolves dynamically. An operator who renames the app Secret
+     (secrets.existingSecret / autogen.secretNames.app) and leaves this at its
+     stock default sends the ClickHouse pod at a Secret that does not carry the
+     keys. The lwql-secrets volume is optional:true, so the miss is SILENT: the
+     pod boots, config.go skips the absent files, the langwatch_lwql user is
+     never created, and no error surfaces anywhere. Refuse instead, and name the
+     value that fixes it. Pointing lwql at a genuinely different Secret stays
+     legitimate (external-secrets, terraform); only the untouched default paired
+     with a renamed app Secret is treated as an oversight. */}}
+{{- $ch := .Values.clickhouse | default dict }}
+{{- $chLwql := $ch.lwql | default dict }}
+{{- if and .Values.lwql.enabled $ch.chartManaged $chLwql.enabled }}
+  {{- $appSecretName := include "langwatch.appSecretName" . }}
+  {{- if and (ne $appSecretName "langwatch-app-secrets") (eq ($chLwql.existingSecret | default "") "langwatch-app-secrets") }}
+    {{- $errors = append $errors (printf "clickhouse.lwql.existingSecret is still the default %q but the app Secret is named %q. The ClickHouse pod mounts the LWQL passwords from that Secret, and because the volume is optional a wrong name is silent: the langwatch_lwql user is never created and no error surfaces. Set clickhouse.lwql.existingSecret to %q, or to whichever Secret holds LWQL_CLICKHOUSE_PASSWORD / LWQL_POSTGRES_READER_PASSWORD." "langwatch-app-secrets" $appSecretName $appSecretName) }}
+  {{- end }}
+{{- end }}
+
 {{/* Output errors and warnings */}}
 {{- if $errors }}
 {{- fail (printf "Secret validation failed:\n%s" (join "\n" $errors)) }}

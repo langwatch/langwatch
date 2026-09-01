@@ -66,6 +66,46 @@ assert_not_contains() {
   fi
 }
 
+# Assert a projected-Secret volume actually resolves: extract the secretName and
+# the first item key the named volume references, then prove the Secret of that
+# name in the SAME render carries that key under data. This is the check env-var
+# assertions cannot make — an optional:true volume silently drops an unresolved
+# key, so "the env var is wired" is not "the mount resolves".
+assert_secret_key_resolves() {
+  local label="$1" haystack="$2" volume="$3"
+  local sname skey pair
+  # Anchor to the VOLUME definition, not the volumeMount of the same name: the
+  # `- name: <volume>` we want is the one followed by `secret:` (the mount is
+  # followed by mountPath). Reset on every list item so the mount block cannot
+  # bleed into the unrelated `secrets` volume's secretName that follows it.
+  # Emit "secretName firstItemKey" (the subchart lists key before path).
+  pair=$(awk -v v="$volume" '
+      $1=="-" && $2=="name:" && $3==v {inblk=1; sawsec=0; sname=""; next}
+      $1=="-" && $2=="name:" {inblk=0}
+      inblk && $1=="secret:" {sawsec=1}
+      inblk && sawsec && $1=="secretName:" {sname=$2; next}
+      inblk && sname!="" && $1=="-" && $2=="key:" {print sname, $3; exit}
+    ' <<< "$haystack")
+  sname="${pair%% *}"; skey="${pair##* }"
+  if [[ -z "$sname" || -z "$skey" || "$sname" == "$skey" ]]; then
+    fail "$label: could not locate secretName/key for volume '$volume' in render"
+    return
+  fi
+  # Walk the multi-doc render: within the Secret whose metadata.name == sname,
+  # look for a data key == skey. metadata precedes data in helm output, so name
+  # is set before the data line is seen.
+  if awk -v want="$sname" -v key="${skey}:" '
+      /^---/ {kind=""; name=""}
+      /^kind: / {kind=$2}
+      kind=="Secret" && /^  name: / {name=$2}
+      kind=="Secret" && name==want && $1==key {print "yes"; exit}
+    ' <<< "$haystack" | grep -q yes; then
+    pass "$label (Secret '$sname' carries key '$skey')"
+  else
+    fail "$label: volume '$volume' references Secret '$sname' key '$skey', but no such key in the rendered Secret"
+  fi
+}
+
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"
@@ -1000,11 +1040,13 @@ test_infra_overlays() {
   assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
 
   # Design C: with app-side provisioning DDL off for chart-managed ClickHouse,
-  # the provisioner MOVES to the subchart — it does not vanish. Two ends of that
-  # contract are assertable from the parent chart here (the vendored
-  # clickhouse-serverless tarball predates the LWQL templates, so the subchart's
-  # rendered config itself is covered by the subchart's own Go render tests, not
-  # this parent-chart harness):
+  # the provisioner MOVES to the subchart — it does not vanish. Three ends of
+  # that contract are assertable from the parent chart here. The vendored
+  # clickhouse-serverless-0.3.0 tarball DOES render the LWQL volume/env (checked
+  # in #3 below); only the XML config CONTENT (langwatch_lwql user, grants, row
+  # policies, lwql_postgres named collection) is written inside the container at
+  # boot by ch-config rather than by helm, so that content stays covered by the
+  # subchart's own Go render tests, not this parent-chart harness.
   #
   #   1. The subchart is switched ON by default. Helm cannot derive
   #      clickhouse.lwql.enabled from lwql.enabled, so the parent values set it,
@@ -1019,6 +1061,16 @@ test_infra_overlays() {
   #      every query even though the identity exists.
   assert_contains "chart-managed: app still wired with LWQL query password" \
     "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
+  #   3. The provisioning password actually REACHES the ClickHouse pod. The
+  #      clickhouse-serverless lwql-secrets volume mounts ONE Secret by name and
+  #      projects a key from it into /mnt/secrets/lwql, and the volume is
+  #      optional:true — so a Secret/key name that does not resolve is silently
+  #      skipped, config.go skips the absent file, and the langwatch_lwql user is
+  #      never created with no error anywhere. Env-var wiring (#2) does not prove
+  #      the mount resolves. Extract the secretName + key the volume references
+  #      and assert the RESOLVED Secret in the SAME render carries that key.
+  assert_secret_key_resolves "chart-managed: lwql-secrets volume key exists in rendered Secret" \
+    "$ch_single" "lwql-secrets"
 
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then

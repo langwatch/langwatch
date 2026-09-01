@@ -1853,6 +1853,22 @@ clickhouse:
   lwql:
     ## @param clickhouse.lwql.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
     enabled: true
+    # The clickhouse-serverless pod mounts the LWQL passwords from ONE Secret,
+    # projecting two keys to the files ch-config reads. Point it at THIS chart's
+    # app Secret, which is where the LWQL passwords are materialised
+    # (langwatch.templates.app.secrets — generated when autogen.enabled, supplied
+    # by the operator otherwise). Static default matches the app Secret's own
+    # static default name, exactly like gateway.secrets.existingSecretName and
+    # langyagent.secrets.existingSecretName; the chart's secret validation
+    # (langwatch.validateSecrets) fails the render if the app Secret is renamed
+    # while this is left at default.
+    ## @param clickhouse.lwql.existingSecret [string, default: langwatch-app-secrets] Secret the ClickHouse pod mounts the LWQL passwords from. Defaults to this chart's app Secret. If you rename the app Secret (secrets.existingSecret / autogen.secretNames.app), set this to the same name.
+    existingSecret: langwatch-app-secrets
+    ## @param clickhouse.lwql.passwordSecretKey [string, default: LWQL_CLICKHOUSE_PASSWORD] Key holding the langwatch_lwql user password. Matches the key the app Secret writes.
+    passwordSecretKey: LWQL_CLICKHOUSE_PASSWORD
+    postgres:
+      ## @param clickhouse.lwql.postgres.passwordSecretKey [string, default: LWQL_POSTGRES_READER_PASSWORD] Key holding the lwql_postgres reader password. Matches the key the app Secret writes; only mounted when clickhouse.lwql.postgres.host is set.
+      passwordSecretKey: LWQL_POSTGRES_READER_PASSWORD
 
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
