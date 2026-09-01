@@ -432,7 +432,10 @@ describe("the seat licence read inside the Dataverse source", () => {
         {
           status: 200,
           body: {
-            value: [...subscribedSkusReply().value, { skuPartNumber: "BROKEN" }],
+            value: [
+              ...subscribedSkusReply().value,
+              { skuPartNumber: "BROKEN" },
+            ],
           },
         },
       ];
