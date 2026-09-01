@@ -107,7 +107,7 @@ export function NewSimulationsCallout({
   };
 
   return (
-    <Box paddingX={3} paddingTop={2} paddingBottom={1}>
+    <Box paddingTop={2} paddingBottom={1}>
       <Link
         href={href}
         onClick={handleClick}
@@ -117,7 +117,7 @@ export function NewSimulationsCallout({
         _hover={{ textDecoration: "none" }}
       >
         <Box
-          colorPalette="blue"
+          colorPalette="teal"
           position="relative"
           borderRadius="lg"
           padding={3}
@@ -151,6 +151,7 @@ export function NewSimulationsCallout({
                 color="colorPalette.fg"
                 lineHeight={1.25}
                 letterSpacing="-0.005em"
+                paddingRight="18px"
               >
                 Welcome to the new simulations screen
               </Text>

@@ -247,10 +247,10 @@ Feature: The test suites rail
     And the runs sidebar reloads for the shorter period
     And the address names the new period
 
-  # --- The voice agents note ---
+  # --- The new-simulations announcement ---
 
   @integration
-  Scenario: The rail keeps the voice agents note
+  Scenario: The rail carries the new-simulations announcement
     Given the Agent Testing page is open
     When the rail is read
-    Then the voice agents note is shown, as it is on the v1 page
+    Then the announcement offering the way back to the previous screens is shown

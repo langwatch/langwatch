@@ -10,7 +10,7 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type {
   Period,
@@ -90,7 +90,11 @@ export function SuiteRail(props: SuiteRailProps) {
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
 
-      {!collapsed && <NewSimulationsCallout target="scenarios" />}
+      {!collapsed && (
+        <Box paddingX={3}>
+          <NewSimulationsCallout target="scenarios" />
+        </Box>
+      )}
 
       <SuiteRailFooter {...props} />
 
