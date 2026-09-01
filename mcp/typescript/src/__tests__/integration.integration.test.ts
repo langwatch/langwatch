@@ -63,17 +63,13 @@ const CANNED_PROMPT_DETAIL = {
   id: "p1",
   handle: "greeting-bot",
   name: "Greeting Bot",
-  latestVersionNumber: 3,
-  versions: [
-    {
-      version: 3,
-      commitMessage: "Updated tone",
-      model: "openai/gpt-4o",
-      messages: [{ role: "system", content: "You are a friendly bot." }],
-    },
-    { version: 2, commitMessage: "Added greeting" },
-    { version: 1, commitMessage: "Initial version" },
-  ],
+  version: 3,
+  versionId: "ver_p1v3",
+  commitMessage: "Updated tone",
+  model: "openai/gpt-4o",
+  messages: [{ role: "system", content: "You are a friendly bot." }],
+  parameters: {},
+  tags: [{ name: "latest", versionId: "ver_p1v3" }],
 };
 
 const CANNED_PROMPT_CREATED = {
