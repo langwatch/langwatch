@@ -27,7 +27,7 @@ const AXIS_TICK = { fontSize: 11, fill: "#64748b" } as const;
 const GRID_STROKE = "#e2e8f0";
 
 /** Compact above a thousand, exact below it. Money is read, not audited, here. */
-export function fmtMoney(value: number): string {
+function fmtMoney(value: number): string {
   if (value === 0) return "$0";
   if (Math.abs(value) >= 1000) return numeral(value).format("$0.[0]a");
   return numeral(value).format("$0,0.[00]");
