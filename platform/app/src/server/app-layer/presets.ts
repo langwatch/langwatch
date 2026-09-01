@@ -2909,7 +2909,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     storedObjects: storedObjectsService,
     userAvatarObjects,
     storedObjectOwners: StoredObjectOwnerLookupRuntime.create({
-      instanceDirectory: AppStoredObjectOwnerInstanceDirectory.create(),
+      instanceDirectory: AppStoredObjectOwnerInstanceDirectory.create({
+        listInstances: getAllClickHouseInstances,
+      }),
       telemetry: AppStoredObjectOwnerLookupTracingAdapter.create(),
     }).resolver,
     opsExplain: {

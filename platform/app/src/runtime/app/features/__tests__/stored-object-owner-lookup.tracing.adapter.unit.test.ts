@@ -9,10 +9,6 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({ withActiveSpan }),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getAllClickHouseInstances,
-}));
-
 import { AppStoredObjectOwnerInstanceDirectory } from "../stored-object-owner-instance-directory.adapter";
 import { AppStoredObjectOwnerLookupTracingAdapter } from "../stored-object-owner-lookup.tracing.adapter";
 
@@ -22,13 +18,15 @@ describe("AppStoredObjectOwnerLookupTracingAdapter", () => {
     withActiveSpan.mockReset();
   });
 
-  it("lists every process-composed ClickHouse instance through the named directory", async () => {
+  it("lists every ClickHouse instance the composition root injects", async () => {
     const instances = [{ target: "shared", client: { query: vi.fn() } }];
     getAllClickHouseInstances.mockResolvedValue(instances);
 
-    await expect(AppStoredObjectOwnerInstanceDirectory.create().listInstances()).resolves.toEqual(
-      instances,
-    );
+    await expect(
+      AppStoredObjectOwnerInstanceDirectory.create({
+        listInstances: getAllClickHouseInstances,
+      }).listInstances(),
+    ).resolves.toEqual(instances);
     expect(getAllClickHouseInstances).toHaveBeenCalledOnce();
   });
 

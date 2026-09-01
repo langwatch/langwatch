@@ -135,16 +135,11 @@ describe("given Zod schemas are the single source of truth", () => {
   describe("when an evaluator entry field declares a default value", () => {
     /** @scenario Evaluator entry fields with a default are classified optional */
     it("lists defaulted entry fields as optional, not required", () => {
-      // exact_match's `output`/`expected_output` carry defaults in the
-      // evaluation service, so they are omittable — the catalog must reflect
-      // that contract instead of forcing them to be mapped.
-      const exactMatch = AVAILABLE_EVALUATORS["langevals/exact_match"];
-      expect(exactMatch.requiredFields).toEqual([]);
-      expect(exactMatch.optionalFields).toEqual(["output", "expected_output"]);
-
-      const answerMatch = AVAILABLE_EVALUATORS["langevals/llm_answer_match"];
-      expect(answerMatch.requiredFields).toEqual([]);
-      expect(answerMatch.optionalFields).toEqual(["input", "output", "expected_output"]);
+      // llm_boolean's entry fields all carry a default in the evaluation
+      // service, so they are omittable and the catalog says so.
+      const llmBoolean = AVAILABLE_EVALUATORS["langevals/llm_boolean"];
+      expect(llmBoolean.requiredFields).toEqual([]);
+      expect(llmBoolean.optionalFields).toEqual(["input", "output", "contexts"]);
 
       // The classification only relaxes fields the service marks optional — it
       // does not blanket-empty every catalog entry; evaluators with genuinely

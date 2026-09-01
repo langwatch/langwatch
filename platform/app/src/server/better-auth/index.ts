@@ -37,7 +37,6 @@ import {
 import { fireActivityTrackingNurturing } from "../app-layer/billing/nurturing/activityTracking";
 import { ensureUserSyncedToCio } from "../app-layer/billing/nurturing/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
-import type { SignUpVerificationService } from "../app-layer/identity/signup-verification.service";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -47,7 +46,7 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
-import { passkeySignUpRegistration } from "./passkey-signup";
+import { passkeySignUpRegistration, type SignUpVerificationPort } from "./passkey-signup";
 import { runSignInRouterShadow } from "./signInRouterShadow";
 
 const logger = createLogger("langwatch:better-auth");
@@ -657,7 +656,7 @@ export const createAuth = ({
   mailer: EmailDeliveryPort;
   passkeyHandleSecret: string;
   redis: RedisConnection | null;
-  signUpVerification: SignUpVerificationService;
+  signUpVerification: SignUpVerificationPort;
   users: UserService;
 }) => {
   const secondaryStorage = createSecondaryStorage(redis);

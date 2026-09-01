@@ -4,8 +4,20 @@ import { createLogger } from "@langwatch/observability";
 import type { UserService } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
 import { trackServerEvent } from "~/server/posthog";
+
+/**
+ * What passkey sign-up needs from sign-up's address confirmation.
+ *
+ * Named here rather than imported from `app-layer/identity` because the
+ * composition root owns the identity services and their wiring: better-auth
+ * reaches identity only through the runtime, and a consumer that names the one
+ * method it calls needs nothing else
+ * (`src/server/__tests__/identity-package-boundaries.unit.test.ts`).
+ */
+export interface SignUpVerificationPort {
+  requestVerification(input: { email: string }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:better-auth:passkey-signup");
 
@@ -164,7 +176,7 @@ function createAfterVerification({
   verification,
 }: {
   users: UserService;
-  verification: SignUpVerificationService;
+  verification: SignUpVerificationPort;
 }) {
   return async function afterVerification({
     context,
@@ -217,7 +229,7 @@ function createAfterVerification({
 export function passkeySignUpRegistration(options: {
   handleSecret: string;
   users: UserService;
-  verification: SignUpVerificationService;
+  verification: SignUpVerificationPort;
 }) {
   return {
     requireSession: false,

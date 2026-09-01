@@ -284,7 +284,9 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
       // The role that actually grants data access, and the trap of granting
       // the control-plane role instead.
       expect(doc).toContain("Storage Blob Data Contributor");
-      expect(doc).toMatch(/Contributor.*does \*not\* grant data access/);
+      // Emphasis delimiter left open: oxfmt normalises `*not*` to `_not_`,
+      // and the sentence, not its formatting, is what is promised.
+      expect(doc).toMatch(/Contributor.*does [*_]not[*_] grant data access/);
 
       // Shared-key config is unnecessary in token modes, and federated
       // Kubernetes identity is AKS-only.
@@ -355,9 +357,11 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
 
       // The read code path must use row.storage_uri (the URI written at
       // ingest), not re-derive a URI from env. Grep for "registry.get(...row.storage_uri..."
-      // proximity — both names appearing close together.
+      // proximity — both names appearing close together. The registry is
+      // reached per project (`registryFor(projectId).get`) since the owner
+      // lookup was consolidated, so the accessor call is part of the name.
       const readPathMatch = service.match(
-        /registry\.get[\s\S]{0,200}row\.storage_uri|row\.storage_uri[\s\S]{0,200}registry\.get/,
+        /registry(?:For\([^)]*\))?\.get[\s\S]{0,200}row\.storage_uri|row\.storage_uri[\s\S]{0,200}registry(?:For\([^)]*\))?\.get/,
       );
       expect(readPathMatch).not.toBeNull();
 
