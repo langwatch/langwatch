@@ -57,6 +57,27 @@ Feature: Pulled provider usage becomes visible, attributed cost
     Then the reported cost reflects the corrected figure
     And the earlier figure is not added on top
 
+  # --- Money the provider reports as a credit ---
+
+  @unit
+  Scenario: A refunded day is recorded as the credit the provider reported
+    Given a provider reports a day's cost as a credit rather than a charge
+    When the source pulls that day
+    Then the recorded amount is the credit, with its sign intact
+    # Clamping it to zero does not make the books safer, it makes them wrong in
+    # the customer's disfavour: the charge that the credit reverses is already
+    # recorded, so dropping the credit leaves them looking like they spent
+    # money the provider has since given back.
+
+  @unit
+  Scenario: Widening money to allow credits does not admit values that are not money
+    When a provider sends a cost that is not a number at all
+    Then the record is recorded at zero rather than carrying the unusable value
+    # A guard on the same boundary the scenario above loosens, not new
+    # behaviour: allowing a minus sign must not be done by removing the check
+    # that the value is a number, which is the cheapest way to make the
+    # scenario above pass and the one that lets "banana" through as money.
+
   @unit
   Scenario: An exact provider cost is marked exact
     When a provider reports an exact cost for a usage record
@@ -71,3 +92,28 @@ Feature: Pulled provider usage becomes visible, attributed cost
   Scenario: Pulled and gateway cost for the same usage are not merged
     Given the same usage is both pulled and seen by the gateway
     Then the two costs are reported separately, not summed into one total
+
+  # --- Currency travels with the money ---
+
+  @unit
+  Scenario: A record from a provider that bills in another currency says which
+    When a source pulls a record priced in a currency other than dollars
+    Then the record carries that currency alongside the amount
+    And no exchange rate is applied anywhere on the way in
+
+  @unit
+  Scenario: A record whose provider states no currency is treated as dollars
+    When a source pulls a record that names no currency
+    Then the record is treated as dollars
+    # Every source shipped before this existed reported dollars, so this is
+    # what they already meant. It is a default, not a guess about a provider
+    # that told us something else.
+
+  @unit
+  Scenario: Records already on the durable log still read after the change
+    Given a usage record written before money carried a currency
+    When it is read back
+    Then it still parses
+    And it reads as dollars with no biller conversion
+    # The event log is append-only history. A shape change that cannot read
+    # what is already on it is a rebuild, not a migration.

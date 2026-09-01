@@ -125,7 +125,7 @@ describe("the Anthropic Admin puller", () => {
       });
       expect(record?.costBasis).toBe("computed");
       expect(record?.costStatus).toBe("estimate");
-      expect(record?.costNanoUsd).toBeGreaterThan(0);
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
       expect(record?.tokensInput).toBe(120_000);
       expect(record?.tokensCacheRead).toBe(4_000);
       // Both TTL variants of the nested `cache_creation` object count as
@@ -272,7 +272,7 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.rateVersion).toBeNull();
       // The documented worked example: `amount` is denominated in cents, so
       // "41280.000000" is $412.80 — not $41,280. Stored verbatim it was 100x.
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
     /** @scenario "A provider amount in minor units becomes the correct dollar amount" */
@@ -305,7 +305,7 @@ describe("the Anthropic Admin puller", () => {
 
       // $12.34, not $1,234. The 100x bug class (#6977) is a provider's minor
       // units stored as if they were the major ones.
-      expect(record?.costNanoUsd).toBe(12_340_000_000);
+      expect(record?.costNanoMinor).toBe(12_340_000_000);
     });
 
     it("shifts the decimal point without passing through a float", async () => {
@@ -338,7 +338,7 @@ describe("the Anthropic Admin puller", () => {
       });
       // 1234.567890123 cents = $12.34567890123; every digit nano-USD can hold
       // survives, the sub-nano tail rounds half away from zero.
-      expect(record?.costNanoUsd).toBe(12_345_678_901);
+      expect(record?.costNanoMinor).toBe(12_345_678_901);
     });
 
     it("survives an exponent-form amount from the schema's number branch", async () => {
@@ -372,7 +372,7 @@ describe("the Anthropic Admin puller", () => {
         observedAt: OBSERVED_AT,
       });
       // 1e-7 cents = 1e-9 USD = exactly one nano-USD.
-      expect(record?.costNanoUsd).toBe(1);
+      expect(record?.costNanoMinor).toBe(1);
     });
 
     it("drops a non-USD row rather than inventing a rate, and keeps the rest", async () => {
@@ -409,7 +409,7 @@ describe("the Anthropic Admin puller", () => {
         governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
     it("drops a malformed amount row rather than aborting the pull", async () => {
@@ -452,7 +452,7 @@ describe("the Anthropic Admin puller", () => {
         governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
     it("asks for the daily bucket the cost report actually supports", async () => {
@@ -542,7 +542,7 @@ describe("the Anthropic Admin puller", () => {
 
       // 999.5 cents = $9.995.
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).toBe(9_995_000_000);
+      expect(after?.costNanoMinor).toBe(9_995_000_000);
     });
   });
 
@@ -768,7 +768,7 @@ describe("the Anthropic Admin puller", () => {
         governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
       // And the rewind runs once: the freshly minted cursor carries the
       // current query identity.
       expect(JSON.parse(result.cursor ?? "{}").query).toContain("cost:");

@@ -64,6 +64,26 @@ const pulledUsageHintSchema = z
      * us a string should have every one of them survive to the ledger.
      */
     costUsd: z.string().optional(),
+    /**
+     * Which currency `costUsd` is in, ISO 4217. Absent means dollars, which is
+     * what every adapter written before this reported.
+     *
+     * Deliberately NOT a dimension. `dimensions` is the restatement identity,
+     * and a provider that re-denominated a period would mint a fresh key and
+     * add its correction on top of the figure it corrects rather than
+     * replacing it. Currency belongs with the money, not with the coordinates.
+     */
+    currency: z.string().length(3).optional(),
+    /**
+     * The BILLER's own conversion of `costUsd` into dollars, as the exact
+     * decimal string it published. Azure returns this beside the native
+     * amount at its own invoice-grade rate.
+     *
+     * Only ever the biller's number. Absent stays absent — nothing downstream
+     * fills it from a rate of our own. Also not a dimension, for the same
+     * reason as `currency`.
+     */
+    costUsdBiller: z.string().optional(),
     /** Falls back to the event's `target`, which is where models already sit. */
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
@@ -181,6 +201,8 @@ export function buildPulledUsageRecord({
           // The string when the adapter kept one, so no digit is lost to the
           // float `cost_usd` had to be to fit the canonical event shape.
           costUsd: hint.costUsd ?? event.cost_usd,
+          currencyCode: hint.currency,
+          costUsdBiller: hint.costUsdBiller,
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
         })
@@ -212,6 +234,8 @@ export function buildPulledUsageRecord({
     projectId: governanceProjectId,
     model,
     ...quantities,
+    costNanoMinor: priced.costNanoMinor,
+    currencyCode: priced.currencyCode,
     costNanoUsd: priced.costNanoUsd,
     rateVersion: priced.rateVersion,
     costBasis: priced.costBasis,

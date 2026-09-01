@@ -1,11 +1,17 @@
 @governance @cost
 Feature: One cost screen, three honest lanes
-  Wave 1 shows what the provider billed, what the gateway metered, and a
-  seat lane — side by side, each labeled for what it is, never summed
-  into one figure. Seat DATA is out of this wave: seat licence ingestion
-  and the dated price list ship in a separate PR (owner: Sergio). Until
-  that lands, the seat lane renders as an honest empty state — labeled,
-  visibly awaiting data, never a fabricated zero. LangWatch's own
+  The screen shows what the provider billed, what the gateway metered,
+  and the seats a tenant holds — side by side, each labeled for what it
+  is, never summed into one figure. The seat lane shows COUNTS, not
+  money: how many seats are bought and how many somebody is sitting in.
+  What those seats cost is already on the invoice the billed lane
+  reports, so a price on the seat lane would put the same spend on the
+  screen twice; the dated price list stays out. Until a licence list has
+  been read, the seat lane renders as an honest empty state — labeled,
+  visibly awaiting data, never a fabricated zero. A licence read that
+  fails says that instead: "not read yet" and "could not be read" are
+  different sentences, and only the seat lane degrades on one, while the
+  money lanes carry on. LangWatch's own
   subscription seats are a different product concept and must never be
   shown in this lane. The screen is visible only to organization members
   with the governance cost permission, and stays behind release flags
@@ -30,19 +36,12 @@ Feature: One cost screen, three honest lanes
     # covered by the rollup spec, not this component test.
 
   @integration
-  Scenario: The seat lane is an honest hole until seat data ships
-    # Seat ingestion and pricing arrive in a separate PR. The lane still
-    # renders so the screen's shape is complete, but it must say it has
-    # no data — a silent zero here would be a lie about money.
-    # LangWatch subscription seats (Subscription.maxMembers) are NOT this
-    # lane's data and must not be wired in as a stand-in.
-    # The Given is stated at the seam the test controls — the cost read's
-    # response — because no seat ingestion exists yet anywhere, so "not
-    # ingested" would be a constant no test could distinguish from its
-    # absence. A mock CAN return a seat amount, so this state and its
-    # opposite are both constructible today; the seats PR flips it with a
-    # data-present scenario instead of deleting this one.
-    Given the cost read returns no seat amount for this organization
+  Scenario: The seat lane is an honest hole until a licence list is read
+    # The lane still renders so the screen's shape is complete, but it
+    # must say it has no data — a silent zero here would be a lie about
+    # money. LangWatch subscription seats (Subscription.maxMembers) are
+    # NOT this lane's data and must not be wired in as a stand-in.
+    Given the cost read returns no seat counts for this organization
     When a permitted viewer opens the cost screen
     Then the seat lane is present and labeled
     And the seat lane states that seat data is not yet available
@@ -51,8 +50,78 @@ Feature: One cost screen, three honest lanes
     # money value" has no generic DOM check and each author would invent a
     # different one. It catches "$0.00", "0", "0,00 €" and zeros hiding in
     # accessible names (the assertion must read those too). Consequence:
-    # the lane's copy must stay digit-free — no "(0 sources)", no dates,
-    # no "wave 2" — or the test breaks, and that break is the point.
+    # the WAITING copy must stay digit-free — no "(0 sources)", no dates —
+    # or the test breaks, and that break is the point. It binds the
+    # waiting state only; the reported state below is all counts.
+
+  @integration
+  Scenario: The seat lane shows how many seats are bought and how many are assigned
+    # Bought minus assigned is the whole money conversation — seats paid
+    # for that nobody sits in — and neither number alone can say it, so
+    # both are shown together on the pool they belong to.
+    Given the tenant's licence list reports a pool with seats bought and some assigned
+    When a permitted viewer opens the cost screen
+    Then the seat lane names the pool and shows both counts
+    And the seat lane shows no currency figure
+    # The currency assertion is the point of the lane, not decoration:
+    # the invoice the billed lane already shows is what the seats cost.
+    # A price derived here from a unit count would be the same spend
+    # reported twice, on one screen, under two labels.
+
+  @unit
+  Scenario: Only pools somebody is paying to seat people in reach the screen
+    # Learned from a live tenant: the naive count said 27 unused seats
+    # when the true answer was 2. A company-wide pool can never be
+    # assigned to anyone and so reports zero assigned forever; a free
+    # pool arrives with ten thousand units because the number caps how
+    # far it may spread, not what anyone bought. Each is a loud,
+    # plausible, wrong finding that buries the real one.
+    Given a licence list holding a paid agent pool beside company-wide, free, suspended and non-agent pools
+    When the cost summary is read
+    Then only the paid agent pool appears on the seat lane
+    # The uncounted pools are not lost — the licence read keeps every
+    # pool it saw with the facts that classify it, so a later question
+    # can still ask about them.
+
+  @unit
+  Scenario: A licence list with nothing countable in it reads as awaiting
+    Given a licence list whose only pool is free
+    When the cost summary is read
+    Then the seat lane says it is awaiting data
+    # Rather than reporting an empty list of pools. "We have read no
+    # licences for you" and "your licences hold no seats" are different
+    # sentences, and a screen that showed a count of zero pools would be
+    # making a claim about a list nobody could count.
+
+  @unit
+  Scenario: A seat read that fails degrades only the seat lane
+    # Three different sentences, and the lane could only say two of them:
+    # "we have read no licences for you", "your licences hold no seats",
+    # and "we tried to read them and could not". The third used to fail
+    # the whole summary, so a licence read that broke took the billed and
+    # gateway lanes down with it — honest, and out of proportion to what
+    # actually broke.
+    Given the licence read fails while the cost lanes answer normally
+    When the cost summary is read
+    Then the seat lane says the read failed
+    And the billed and gateway lanes still carry their own figures
+    And the failure is logged, because a lane that quietly says "could
+      not be read" forever is a lane nobody is fixing
+    # Only the seat read degrades. A cost rollup that fails still fails
+    # the whole summary — the screen is about money, and a money lane
+    # that swallowed its own failure is the defect this feature exists
+    # to prevent.
+
+  @integration
+  Scenario: A failed seat read reads differently from one not yet taken
+    Given the cost read reports that seat data could not be read
+    When a permitted viewer opens the cost screen
+    Then the seat lane says seat data could not be read
+    And it does not say seat data is not yet available
+    And the seat lane renders no digit characters
+    And the billed and gateway lanes render their amounts as usual
+    # Same digit-free rule as the waiting state, for the same reason: any
+    # number in this lane is a number about money nobody measured.
 
   @integration
   Scenario: Viewing requires the organization-scoped governance cost permission
@@ -184,3 +253,47 @@ Feature: One cost screen, three honest lanes
     Given a billed day whose total is negative
     When a permitted viewer opens the cost screen
     Then the billed lane shows the negative amount as reported
+
+  Rule: The seat lane reads the newest report of each pool, and nobody else's
+
+    A licence count is a standing fact, not a running total. Each read of a
+    tenant's licences writes another report of the same pools, so the store
+    must hand back the newest report of each pool and nothing else — summing a
+    pool's reports would multiply the tenant's seats by however many times the
+    list happened to be read. These scenarios run against a real ClickHouse
+    because that is the only place the answer is decided.
+
+    @integration
+    Scenario: A pool that was read on several days reports its newest day only
+      Given a licence pool recorded on an earlier day and again on a later day
+      When the tenant's seat reports are read
+      Then the pool appears once, dated the later day
+      And its counts are the ones the later day reported
+      # The earlier day is still on the record and can still be asked about.
+      # What it must never do is arrive beside the later one as a second pool.
+
+    @integration
+    Scenario: A day read twice answers the same before and after a compaction
+      Given a day recorded once and then recorded again with different counts
+      When the tenant's seat reports are read before and after the store compacts
+      Then both reads report the counts the second recording carried
+      # The two recordings share one identity, so the store collapses them when
+      # it compacts. A read that let the compaction decide the winner would
+      # answer differently depending on when it happened to run, and nothing
+      # about a licence count is supposed to depend on that.
+
+    @integration
+    Scenario: A read carries no pool belonging to another tenant or another kind of record
+      Given another tenant holding a pool of the same name
+      And this tenant holding records that are not licence reports
+      When the tenant's seat reports are read
+      Then only this tenants licence pools are returned
+
+    @integration
+    Scenario: A pool whose recorded payload cannot be read costs only that pool
+      Given a tenant whose licence list holds one unreadable pool beside readable ones
+      When the tenant's seat reports are read
+      Then the readable pools are returned with their counts
+      And the unreadable pool is absent rather than reported as zero seats
+      # Zero is a number a summary would faithfully honour. Absent is the
+      # honest answer for a pool nobody could read.

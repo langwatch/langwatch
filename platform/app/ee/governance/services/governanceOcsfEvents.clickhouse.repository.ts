@@ -18,6 +18,7 @@ import { createLogger } from "@langwatch/observability";
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { SEAT_REPORT_ACTION } from "./pullers/microsoftGraphSeats";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
@@ -153,6 +154,101 @@ interface OcsfExportCHRow {
   RawOcsfJson: string;
 }
 
+/**
+ * One licence pool, as its newest seat report describes it.
+ *
+ * Counts, never money. A seat event states how many units the tenant holds and
+ * how many a person is sitting in; what those seats cost is on the invoice the
+ * cost lanes already read, and a figure invented from a unit count here would
+ * be added to it.
+ *
+ * The four facts travel independently rather than as one label, exactly as the
+ * licence read records them — a pool can be free AND company-wide AND
+ * suspended at once, and a single label would have to choose which to say.
+ * Which pools count as seats is the caller's decision, not the table's.
+ */
+export interface GovernanceSeatReportRow {
+  sourceId: string;
+  skuPartNumber: string;
+  /** `YYYY-MM-DD`, the day the count belongs to. */
+  day: string;
+  seatsBought: number;
+  seatsAssigned: number;
+  perPerson: boolean;
+  live: boolean;
+  free: boolean;
+  seatStem: boolean;
+}
+
+interface SeatReportCHRow {
+  SourceId: string;
+  SkuPartNumber: string;
+  Day: string;
+  LatestRawOcsfJson: string;
+}
+
+/** The `metadata.extension` bag a pull event's payload carries, if readable. */
+function readOcsfExtension(
+  rawOcsfJson: string,
+): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(rawOcsfJson) as {
+      metadata?: { extension?: Record<string, unknown> };
+    };
+    return parsed.metadata?.extension ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A count off the payload, or null when the payload holds no number there.
+ *
+ * `Number("")` and `Number(null)` are both 0, and a 0 here would say the
+ * tenant bought no seats — a confident wrong answer where the honest one is
+ * that this pool could not be read.
+ */
+function seatCount(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
+}
+
+/**
+ * One seat report row into the typed row, or null when it cannot be read.
+ *
+ * The counts ride inside the OCSF document rather than in a column, so a pool
+ * whose payload is unreadable is stepped over here. Dropping it costs the
+ * screen one pool; passing it through as zeros would report seats nobody
+ * bought, and one bad pool must never cost the tenant the rest of its list.
+ *
+ * A missing classifying fact reads as false, which leaves the pool uncounted.
+ * That is the conservative direction: an unclassifiable pool shown as seats is
+ * the loud wrong finding the licence read exists to avoid.
+ */
+function decodeSeatReport(
+  row: SeatReportCHRow,
+): GovernanceSeatReportRow | null {
+  const extension = readOcsfExtension(String(row.LatestRawOcsfJson ?? ""));
+  if (!extension) return null;
+
+  const seatsBought = seatCount(extension.seatsBought);
+  const seatsAssigned = seatCount(extension.seatsAssigned);
+  if (seatsBought === null || seatsAssigned === null) return null;
+
+  return {
+    sourceId: String(row.SourceId ?? ""),
+    skuPartNumber: String(row.SkuPartNumber ?? ""),
+    day: String(row.Day ?? ""),
+    seatsBought,
+    seatsAssigned,
+    perPerson: extension.perPerson === true,
+    live: extension.live === true,
+    free: extension.free === true,
+    seatStem: extension.seatStem === true,
+  };
+}
+
 export class GovernanceOcsfEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -283,5 +379,53 @@ export class GovernanceOcsfEventsClickHouseRepository {
       anomalyAlertId: r.AnomalyAlertId,
       rawOcsfJson: r.RawOcsfJson,
     }));
+  }
+
+  /**
+   * The newest seat report each licence pool carries.
+   *
+   * One row per pool rather than per day: a licence count is a standing fact,
+   * and what the screen asks is what the tenant holds now. So the newest
+   * report of a pool REPLACES the older ones instead of adding to them —
+   * summing a pool's days would multiply the tenant's seats by however many
+   * times the licence list happened to be read.
+   *
+   * `argMax` over `(EventTime, LastUpdatedAt)` rather than `EventTime` alone,
+   * because both are in play: EventTime picks the newest DAY, and a re-read of
+   * that same day writes a second version of the same row, which only
+   * LastUpdatedAt separates. Ordering on the day alone would leave that tie to
+   * whichever version the merge had not collapsed yet, so the same query would
+   * answer differently before and after a merge.
+   *
+   * TenantId leads the predicate — nothing else here is unique across tenants
+   * — and `ActionName` narrows to seat reports, so no conversation reaches the
+   * decode.
+   */
+  async findLatestSeatReports(input: {
+    tenantId: string;
+  }): Promise<GovernanceSeatReportRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          SourceId,
+          TargetName                                      AS SkuPartNumber,
+          toDate(max(EventTime))                          AS Day,
+          argMax(RawOcsfJson, (EventTime, LastUpdatedAt)) AS LatestRawOcsfJson
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND ActionName = {actionName:String}
+        GROUP BY SourceId, TargetName
+        ORDER BY SourceId, TargetName
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        actionName: SEAT_REPORT_ACTION,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as SeatReportCHRow[];
+    return rows.flatMap((row) => decodeSeatReport(row) ?? []);
   }
 }

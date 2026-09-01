@@ -32,6 +32,17 @@ Feature: A broken puller is visible, a flaky one is not
     And the consecutive-failure count starts over
 
   @unit
+  Scenario: A run that partly succeeded does not reset the failure count
+    Given the source has two consecutive failed runs
+    When a run completes but reports errors alongside its progress
+    Then the consecutive-failure count is neither reset nor increased
+    And the last-successful-run time is not updated
+    # A run that delivered something but also hit errors — unreadable rows it
+    # stepped over, a next-page link it refused to follow — is not the clean
+    # run that proves the source works. Counting it as one stamped a fresh
+    # success over exactly the signals that were meant to be loud.
+
+  @unit
   Scenario: A run that finds nothing new still counts as a success
     Given the provider reports no new usage for the period
     When the run completes without error

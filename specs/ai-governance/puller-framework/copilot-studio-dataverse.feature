@@ -41,13 +41,17 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # seeing 96% dropped should see it is deliberate, not a parsing failure.
 
   @integration
-  Scenario: The puller never reaches beyond the customer's environment
+  Scenario: The conversation read never reaches beyond the environment
     Given the puller is configured and running
+    And the source is not reading seat licences
     When a full pull completes
     Then every request went to the customer's Power Platform environment
     And no request went to Microsoft's directory service
-    # The customer therefore consents to Dataverse access only. No directory
-    # permission is requested, and none is needed.
+    # Reading conversations needs Dataverse access and nothing else. The one
+    # request that leaves the environment is the seat licence read, which is
+    # separately consented on the tenant and can be switched off — see
+    # specs/governance/pulled-seats.feature. A customer who declines the
+    # directory permission still gets every conversation.
 
   @unit
   Scenario: A next page cannot move the token to another tenant
@@ -260,6 +264,344 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     And no credential reaches the redirect target
     # This holds for every polling source, not only this one.
 
+  # --- What the environment costs, read from the Azure bill ---
+  #
+  # The transcript table says what was said and never what it cost. The bill
+  # for the whole environment lives in Azure Cost Management, on the
+  # subscription the environment runs in, and it is billed per day per meter
+  # category rather than per conversation. So this is the environment's daily
+  # bill carried alongside its conversations, not a price on any one of them.
+  #
+  # It is bundled into this source deliberately: it is the same customer, the
+  # same credential and the same environment, and a second source to configure
+  # would be a second thing to get wrong for one number.
+  #
+  # That bundling has a known cost, and the scenarios immediately below are it.
+  # The bill belongs to the subscription while the source belongs to one
+  # environment, and two environments can share a subscription, so the source is
+  # the wrong thing to hang the bill on. Until the bill is its own connection,
+  # a subscription may be named by one source only.
+
+  @unit
+  Scenario: A subscription another source already reads is refused at save time
+    Given a source that already reads the bill of an Azure subscription
+    When an admin saves another source naming that same subscription
+    Then the source is refused before it is stored
+    And the refusal names the source that already reads it
+    # Everything below the read files the figure against the source that read
+    # it, so two readers record the same bill twice and the organisation's
+    # total reports double what Azure charged. Both entries are individually
+    # correct, so no check downstream can tell the difference — which is why
+    # this has to be refused on the write.
+
+  @unit
+  Scenario: The same subscription in different letter case is still refused
+    Given a source that already reads the bill of an Azure subscription
+    When an admin saves another source naming that subscription in capitals
+    Then the source is refused before it is stored
+    # Azure prints the identifier in lower case and accepts either spelling, so
+    # the two name one subscription and one bill.
+
+  @unit
+  Scenario: A source keeping the subscription it already reads is saved
+    Given a source that already reads the bill of an Azure subscription
+    When an admin edits that same source and keeps the subscription
+    Then the source is saved
+    # Otherwise a rename would collide the source with itself.
+
+  @unit
+  Scenario: A source naming no subscription is left alone
+    Given an admin saving a source that names no Azure subscription
+    When they save the source
+    Then the source is saved
+    # A source with the field left empty claims nothing, and every such source
+    # would otherwise collide with every other one.
+
+  @unit
+  Scenario: The daily bill is read as the currency the customer is billed in
+    Given the subscription is billed in a currency other than dollars
+    When the cost read runs
+    Then each day is recorded in the billed currency
+    And the dollar figure recorded is the one Microsoft itself published
+
+  @unit
+  Scenario: The day a bill arrives packed as digits is read as a calendar day
+    Given Microsoft reports the day as a packed number rather than a date
+    When the cost read runs
+    Then each amount is filed under the calendar day those digits name
+
+  @unit
+  Scenario: A cost read that fails never costs the run its conversations
+    Given the environment's conversations were read successfully
+    When the cost read fails for any reason
+    Then the conversations are still delivered
+    And the run does not report an error
+    And the run is not treated as having made no progress
+    # This is the sharpest edge in the whole feature. The worker discards a
+    # run that reports errors without moving its cursor — including the
+    # transcripts it already read. A cost read that threw would therefore
+    # throw away the conversations, which are the reason the source exists.
+
+  @unit
+  Scenario: Being asked to slow down leaves the window unpriced rather than priced at nothing
+    Given Microsoft answers the cost read by asking us to retry later
+    When the cost read runs
+    Then no day in that window carries a cost figure
+    And the run does not move its record of how far cost has been priced
+    # Being throttled is normal operation here, not a fault: the very first
+    # real call against a live subscription was throttled. Recording zero for
+    # a day we were merely told to ask about later would be a confident wrong
+    # number that nothing later corrects.
+
+  @unit
+  Scenario: The very first cost read ever being throttled leaves nothing behind
+    Given the source has never successfully read cost
+    When its first cost read is throttled
+    Then the run records no cost at all
+    And it still delivers its conversations
+    # This is not the hypothetical case: it is what happened on the first real
+    # request against a live subscription. A hold written assuming there is
+    # already a priced-through point to hold at has no defined behaviour here.
+
+  @unit
+  Scenario: The bill is not asked about on every run
+    Given a source whose bill was asked about a few minutes ago
+    When the next run starts
+    Then it makes no cost request
+    And it attaches no cost figure to any day
+    And the conversations are delivered as before
+    # Azure publishes this bill once a day and refuses a caller that asks too
+    # often. A source running every five minutes would ask 288 times a day
+    # about a figure that moves once, and be throttled into never reading it
+    # at all — which is exactly what a live subscription did.
+
+  @unit
+  Scenario: A source that has never asked about the bill asks on its first run
+    Given a source that names an Azure subscription
+    And a source that has never asked about cost
+    When its first run starts
+    Then it asks about the bill on that run
+    # Someone who adds a source sees a figure on the first pull rather than
+    # hours later.
+    #
+    # The subscription is named for the same reason as above: a source without
+    # one never reaches the gate, so "it asks" is false for it no matter how
+    # long it has been.
+
+  @unit
+  Scenario: A throttled window is asked about again once the wait has passed
+    Given a source that names an Azure subscription
+    And a window being held because an earlier read was throttled
+    When a run starts once the bill is due to be asked about again
+    Then it asks about the bill on that run
+    And the window it asks about reaches back to the day after the last one it priced
+    # A throttled read must not be the end of the matter. What separates this
+    # from the run that skips is only elapsed time, and that is the whole
+    # claim: the hold is a reason to wait, never a reason to stop.
+    #
+    # The subscription is named because a source without one returns before
+    # the gate is ever consulted and asks nothing at all, however overdue it
+    # is. Without that Given this scenario is simply false for such a source.
+    #
+    # The second Then is what makes the hold observable. A held source still
+    # carries the last day it managed to price, and the ask reaches back to
+    # the day after it — so a window held since July asks about two months
+    # rather than the trailing week a healthy source sends. Drop the hold and
+    # that span collapses, which is what makes this an assertion rather than a
+    # restatement.
+    #
+    # Not every unpriced day survives, though. A source that has never priced
+    # anything has no mark to resume from, so its window is the trailing week
+    # and the oldest day drops out at each midnight. That gap is real, is
+    # tracked separately, and is not what this scenario claims.
+
+  @unit
+  Scenario: A run that skips the bill neither holds the window nor abandons it
+    Given a window being held because an earlier read was throttled
+    When a run skips the cost read because the bill is not due yet
+    Then the instant that window was first held at is unchanged
+    And the source does not give up on the window on that run
+    # A skip attempted nothing, so it must record nothing: it must not start a
+    # hold on a source that has none, must not move the instant an existing
+    # hold is anchored at, and must not be the run that abandons a window it
+    # never asked about.
+
+  @unit
+  Scenario: A window held across several failed reads keeps the instant it was first held at
+    Given a window already being held after a failed read
+    When a later due read fails as well
+    Then the window is still anchored at the instant it was first held at
+    # Re-anchoring on each failure would push the give-up cap permanently out
+    # of reach, and a window that can never be answered would pin the source
+    # to one instant forever.
+
+  @unit
+  Scenario: A successful read records that the bill was asked about even when no figure changed
+    Given a day that was already priced by an earlier run
+    When a later run reads the bill again and finds the same figure
+    Then the source still records that it asked on this run
+    # The record of asking is what the gate reads. A run that asked but did
+    # not write that down leaves the source due again minutes later, which is
+    # the every-five-minutes loop this whole section exists to stop.
+
+  @unit
+  Scenario: A record of asking that lies in the future does not stop the bill being read
+    Given a stored position whose record of the last ask is in the future
+    When the puller runs
+    Then the bill is asked about on that run
+    # A clock that moved backwards, or a position rewound by hand to re-sweep
+    # a period, must not jam the gate shut until real time catches up.
+
+  @unit
+  Scenario: A position carrying no record of when the bill was last asked about reads it at once
+    Given a stored position written before the timing of the cost read was recorded
+    When the puller runs
+    Then the bill is asked about on that run
+    # Positions are read back on every scheduled run. A source configured
+    # before this existed must start asking again, not sit waiting on a time
+    # it never recorded.
+
+  @unit
+  Scenario: A window held for too long is given up rather than held forever
+    Given a window that has been held unpriced for longer than the cap
+    When the next run that is due to ask about the bill starts
+    Then the source moves past that window
+    And it keeps reading conversations and later days
+    # Holding is right for a bill that is merely late. A window that can never
+    # be answered would otherwise pin the source to one instant permanently.
+
+  @unit
+  Scenario: A source that names no subscription reads no cost at all
+    Given the source names no Azure subscription
+    When the puller runs
+    Then no cost request is made
+    And the conversations are delivered as before
+    # The cost read is opt-in. A customer who only wants transcripts must not
+    # have a second permission grant forced on them to get them.
+
+  @unit
+  Scenario: The first cost read asks about a window that covers the settling days
+    Given a source that has never read cost before
+    When its first cost read runs
+    Then it asks about a window ending today
+    And that window reaches back far enough to cover days still settling
+    # Today's figures are partial by construction — the captured probe shows
+    # today's load balancer at 0.375 against 0.60 on every finished day. A
+    # read that only ever asked about new days would record every day at its
+    # partial figure and never correct one.
+
+  @unit
+  Scenario: A day already recorded is re-read and its figure replaced, not added to
+    Given a day was recorded while it was still running
+    When the same day is read again after it finished
+    Then both reads describe the same day under the same identity
+    And the finished figure replaces the partial one rather than adding to it
+    # The replacement itself is the summarizing step's job and already works.
+    # What is new and easy to get wrong is here: the two reads must produce
+    # the SAME identity for the same day and meter, or the correction lands
+    # beside the figure it was meant to correct and the day doubles.
+
+  @unit
+  Scenario: A re-read day the bill has not landed for emits no figure at all
+    Given a day inside the re-read window that Microsoft returns no row for
+    When the cost read runs
+    Then the run attaches no cost to that day
+    # Not "records a zero that is later replaced": a zero emitted for a day
+    # already recorded at a real figure is a correction downward to nothing,
+    # and the summarizing step would honour it. The absence has to survive as
+    # an absence all the way out of the puller.
+
+  @unit
+  Scenario: A cost reply spread over several pages is read whole
+    Given Microsoft answers the cost read with more rows than one page holds
+    When the cost read runs
+    Then the days on every page are recorded
+    # The captured probe fits in one page and still carries the field that
+    # offers a second. A reader that stops at the first page under-reports
+    # the bill and does so silently.
+
+  @unit
+  Scenario: A next page cannot move the Azure token to another host
+    Given the puller is reading the bill from Azure Resource Manager
+    When a response offers a next page somewhere that is not Resource Manager
+    Then the puller holds the window rather than following it
+    # The link arrives inside a reply and would be followed carrying the
+    # bearer, so where it points is decided by parsing it, not by comparing
+    # text. A name that merely begins with Resource Manager's is not Resource
+    # Manager, and neither is its real name reached on another port or behind
+    # credentials smuggled in front of the host.
+
+  @unit
+  Scenario: A cursor written before cost existed is still read
+    Given a source whose stored position was written before cost was ever read
+    When the puller runs
+    Then the position is read as it always was
+    And the source starts reading cost from scratch rather than failing
+    # Positions are persisted and read back on every scheduled run. A shape
+    # change the old value cannot survive stalls every already-configured
+    # source at once.
+
+  # --- One source, several reads: they do not hold each other hostage ---
+  # The source reads conversations from the environment, the bill from Azure,
+  # and seat licences from the tenant — three reads under three separate
+  # sign-ins. A customer whose environment address is wrong is still being
+  # billed, so the reads that CAN succeed must land while the one that cannot
+  # keeps failing loudly. This replaces the earlier rule that a conversation
+  # failure discarded the cost read along with it.
+
+  @unit
+  Scenario: The bill is still recorded when the environment cannot be reached
+    Given a source that reads conversations and the provider's bill
+    And the conversation read cannot sign in to the environment
+    When the source runs
+    Then the day's bill is delivered and its priced-through mark advances
+    And the run still reports the conversation failure
+    And the conversation position does not move
+    # The bill and the licences are read before the environment sign-in is
+    # attempted, and the conversation failure no longer abandons the run's
+    # result. The advanced cost mark is what lets the framework keep the
+    # delivered figures while still counting the failure.
+
+  @unit
+  Scenario: A conversation failure with no new bill still fails the run
+    Given the bill is already priced through today
+    And the bill is not due to be asked about again yet
+    And the seat licences are already reported through today
+    And the conversation read cannot sign in to the environment
+    When the source runs
+    Then the run fails and the same window is retried
+    # The second and third Givens are both load-bearing, and each fails this
+    # scenario on its own. A run that is due to ask about the bill records
+    # that it asked, and that record counts as the position moving even when
+    # the figure is unchanged — so on those few runs a day this scenario does
+    # not apply and the failure is reported the ordinary way. The vast
+    # majority of runs ask nothing, and those are the ones that need the
+    # position to stay still.
+    #
+    # The third Given is the same story a day later: one minute after UTC
+    # midnight the seat mark rolls to the new day, that roll counts as
+    # movement, and this same dead environment does not fail its run. Reported
+    # through today is therefore a real precondition, not scene-setting. It is
+    # also the one Given the bound test cannot show, because that test file
+    # reads no licences at all — the seat lane's own tests carry it.
+    #
+    # The cost and seat marks only move once a day. If their daily advance
+    # stood in for conversation progress on every run, a dead environment
+    # would look like steady progress. Failing the runs in between is what
+    # keeps the failure visible. The cost restatements those failed runs
+    # produced are discarded with them; the amendment lands at the next
+    # day-roll, at most a day late.
+
+  @unit
+  Scenario: The conversation window is retried without losing the priced bill
+    Given a run that priced the bill and then failed to read conversations
+    When the next run succeeds
+    Then the conversation window resumes from where the failed run started
+    And the bill's priced-through mark stays on that same day
+    # The trailing week is still re-read and restated in place on every run —
+    # that is how late-settling days get corrected. What holds still within a
+    # day is the mark, not the reading.
+
   # --- Retiring the source that never worked ---
 
   @integration
@@ -276,7 +618,10 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
 
   # --- Not in scope, so nobody goes looking for it ---
 
-  # No money figures of any kind. No charts. No conversation history older
-  # than thirty days — Microsoft deletes it on a schedule before then.
-  # Attribution shows the raw account identifier until the identity work
-  # lands separately.
+  # No price on any individual conversation. The bill above is the whole
+  # environment's daily cost per meter category, which is the only granularity
+  # Azure publishes it at — nothing here divides it across conversations, and
+  # a share worked out from a daily total would be invention rather than
+  # measurement. No charts. No conversation history older than thirty days —
+  # Microsoft deletes it on a schedule before then. Attribution shows the raw
+  # account identifier until the identity work lands separately.
