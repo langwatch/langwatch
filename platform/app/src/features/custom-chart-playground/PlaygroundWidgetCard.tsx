@@ -1,13 +1,19 @@
 /**
  * One persisted playground widget: a sortable card wrapping a sandboxed chart
  * frame, its Chart | Code toggle, its size/edit/delete menu, and the per-widget
- * executor that runs the widget's stored SQL on the frame's behalf.
+ * executor that runs the widget's declared queries on the frame's behalf.
  *
- * The frame never holds the SQL or the projectId — the parent does. Each
+ * The frame never holds SQL or the projectId — the parent does. Each
  * `lw:query` from the frame is served here, against this widget's own
- * statement, through the same abortable LangWatchQL executor the workbench
- * uses. Re-keying the frame on `srcdocHtml`+`sql` is what makes a Save re-run
- * the chart: an identity change forces a fresh frame that reads the new values.
+ * `queries`, through the same abortable LangWatchQL executor the workbench
+ * uses. Re-keying the frame on the widget's `code`+`queries` is what makes a
+ * Save re-run the chart: an identity change forces a fresh frame that reads
+ * the new values.
+ *
+ * Until a widget can name which of its `queries` a given `LW.query` call
+ * means (the bridge message is still `LW.query(overrides)`, no name), the
+ * executor runs `queries[0]` — the query the Code panel and the drawer both
+ * edit today.
  */
 
 import { Box, Button, Card, HStack, IconButton, Text } from "@chakra-ui/react";
@@ -22,6 +28,7 @@ import { SegmentedControl } from "~/components/ui/segmented-control";
 import { createLangWatchQLExecute } from "~/features/analytics-query/logic/lwqlExecute";
 import { explainAnyError, readHandledError } from "~/features/errors";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
 import { api } from "~/utils/api";
 
 import type { ChartFrameParams } from "./bridge/bridgeProtocol";
@@ -34,8 +41,8 @@ import { SandboxedChartFrame } from "./SandboxedChartFrame";
 export interface PlaygroundWidget {
   id: string;
   name: string;
-  srcdocHtml: string;
-  sql: string;
+  code: string;
+  queries: PlaygroundQuery[];
   gridColumn: number;
   gridRow: number;
   colSpan: number;
@@ -124,9 +131,9 @@ interface WidgetCodePanelProps {
 }
 
 /**
- * The card's Code side: the widget's author HTML, editable in place, with the
- * same Save the drawer uses. The SQL stays in the drawer — a card is too narrow
- * to edit two documents, and the HTML is what a chart is iterated on.
+ * The card's Code side: the widget's React/TSX file, editable in place, with
+ * the same Save the drawer uses. Queries stay in the drawer — a card is too
+ * narrow to edit two documents, and the file is what a chart is iterated on.
  */
 function WidgetCodePanel({
   value,
@@ -147,14 +154,14 @@ function WidgetCodePanel({
         overflow="hidden"
       >
         <PlaygroundCodeEditor
-          language="html"
+          language="typescript"
           value={value}
           onChange={onChange}
         />
       </Box>
       <HStack justify="space-between" minWidth={0} gap={2}>
         <Text fontSize="11px" color="fg.muted" truncate>
-          Chart HTML
+          widget.tsx
         </Text>
         <HStack gap={2}>
           <Button
@@ -188,7 +195,7 @@ interface PlaygroundWidgetCardProps {
   onSizeChange: (size: SizeOption) => void;
   onEdit: () => void;
   onSave: (
-    input: { id: string; srcdocHtml: string; sql: string },
+    input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
   isDeleting: boolean;
@@ -215,18 +222,20 @@ export function PlaygroundWidgetCard({
     transition,
     isDragging,
   } = useSortable({ id: widget.id });
-  const { executeQuery, params } = useWidgetExecutor(projectId, widget.sql);
+  // queries[0]: the executor doesn't yet resolve `LW.query` calls by name.
+  const primarySql = widget.queries[0]?.sql ?? "";
+  const { executeQuery, params } = useWidgetExecutor(projectId, primarySql);
 
   const [view, setView] = useState<WidgetView>("chart");
-  const [draftHtml, setDraftHtml] = useState(widget.srcdocHtml);
+  const [draftCode, setDraftCode] = useState(widget.code);
 
-  // Reseed the draft whenever the persisted HTML changes underneath it: a save
-  // from this card, a save from the drawer, or a refetch.
+  // Reseed the draft whenever the persisted code changes underneath it: a
+  // save from this card, a save from the drawer, or a refetch.
   useEffect(() => {
-    setDraftHtml(widget.srcdocHtml);
-  }, [widget.srcdocHtml]);
+    setDraftCode(widget.code);
+  }, [widget.code]);
 
-  const isDirty = draftHtml !== widget.srcdocHtml;
+  const isDirty = draftCode !== widget.code;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -294,8 +303,8 @@ export function PlaygroundWidgetCard({
             // query, which is what the toggle should look like anyway.
             <Box flex={1} minHeight={0}>
               <SandboxedChartFrame
-                key={`${widget.srcdocHtml}\u0000${widget.sql}`}
-                html={widget.srcdocHtml}
+                key={`${widget.code}\u0000${primarySql}`}
+                code={widget.code}
                 executeQuery={executeQuery}
                 params={params}
                 theme={colorMode === "dark" ? "dark" : "light"}
@@ -305,14 +314,14 @@ export function PlaygroundWidgetCard({
             </Box>
           ) : (
             <WidgetCodePanel
-              value={draftHtml}
-              onChange={setDraftHtml}
+              value={draftCode}
+              onChange={setDraftCode}
               isDirty={isDirty}
               isSaving={isSaving}
-              onCancel={() => setDraftHtml(widget.srcdocHtml)}
+              onCancel={() => setDraftCode(widget.code)}
               onSave={() =>
                 onSave(
-                  { id: widget.id, srcdocHtml: draftHtml, sql: widget.sql },
+                  { id: widget.id, code: draftCode, queries: widget.queries },
                   { onSuccess: () => setView("chart") },
                 )
               }

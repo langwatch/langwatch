@@ -17,6 +17,7 @@ import {
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
+import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
 import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import {
@@ -32,7 +33,7 @@ interface PlaygroundWidgetGridProps {
   onWidgetSizeChange: (id: string, size: SizeOption) => void;
   onWidgetEdit: (id: string) => void;
   onWidgetSave: (
-    input: { id: string; srcdocHtml: string; sql: string },
+    input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
   onWidgetsReorder: (layouts: GridLayout[]) => void;

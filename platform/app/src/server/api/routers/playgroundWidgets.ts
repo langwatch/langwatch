@@ -5,11 +5,14 @@
  * {@link PLAYGROUND_SRCDOC_CHART_KIND}. Every read and write filters by that
  * kind alongside `projectId`, so a playground widget is never read, updated or
  * deleted through the builder or workbench paths — and neither of those ever
- * sees a playground row. The `graph` column holds `{ srcdocHtml, sql }`.
+ * sees a playground row. The `graph` column holds a
+ * {@link PlaygroundWidgetDefinition} — see that module for the shape and why
+ * it is versioned.
  *
  * Deliberately independent of `graphs.ts`: the playground stores a sandboxed
- * author document plus a raw statement, not a builder payload or a validated
- * workbench definition, so it borrows the grid columns and nothing else.
+ * author file plus the named queries it runs, not a builder payload or a
+ * validated workbench definition, so it borrows the grid columns and nothing
+ * else.
  */
 
 import { nanoid } from "nanoid";
@@ -17,6 +20,11 @@ import { z } from "zod";
 
 import type { Prisma } from "~/generated/prisma/client";
 import { PLAYGROUND_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import {
+  PLAYGROUND_WIDGET_DEFINITION_VERSION,
+  type PlaygroundWidgetDefinition,
+  playgroundQuerySchema,
+} from "~/server/analytics/playgroundWidgetDefinition";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -27,9 +35,13 @@ const layoutSchema = z.object({
   rowSpan: z.number().min(1).max(2),
 });
 
-const graphOf = (srcdocHtml: string, sql: string): Prisma.InputJsonValue => ({
-  srcdocHtml,
-  sql,
+const graphOf = (input: {
+  code: string;
+  queries: PlaygroundWidgetDefinition["queries"];
+}): Prisma.InputJsonValue => ({
+  version: PLAYGROUND_WIDGET_DEFINITION_VERSION,
+  code: input.code,
+  queries: input.queries,
 });
 
 export const playgroundWidgetsRouter = createTRPCRouter({
@@ -52,8 +64,8 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         projectId: z.string(),
         dashboardId: z.string().optional(),
         name: z.string(),
-        srcdocHtml: z.string(),
-        sql: z.string(),
+        code: z.string(),
+        queries: z.array(playgroundQuerySchema),
       }),
     )
     .permission("analytics:create")
@@ -74,7 +86,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
           projectId: input.projectId,
           name: input.name,
           kind: PLAYGROUND_SRCDOC_CHART_KIND,
-          graph: graphOf(input.srcdocHtml, input.sql),
+          graph: graphOf({ code: input.code, queries: input.queries }),
           ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
           gridColumn: 0,
           gridRow: last ? last.gridRow + 1 : 0,
@@ -90,8 +102,8 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         projectId: z.string(),
         id: z.string(),
         name: z.string().optional(),
-        srcdocHtml: z.string(),
-        sql: z.string(),
+        code: z.string(),
+        queries: z.array(playgroundQuerySchema),
       }),
     )
     .permission("analytics:update")
@@ -103,7 +115,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
           kind: PLAYGROUND_SRCDOC_CHART_KIND,
         },
         data: {
-          graph: graphOf(input.srcdocHtml, input.sql),
+          graph: graphOf({ code: input.code, queries: input.queries }),
           ...(input.name === undefined ? {} : { name: input.name }),
         },
       });

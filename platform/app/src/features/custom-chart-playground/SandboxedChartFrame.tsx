@@ -25,8 +25,8 @@ import { createFrameBridge } from "./bridge/frameBridge";
 import { buildSrcdoc } from "./buildSrcdoc";
 
 export interface SandboxedChartFrameProps {
-  /** The author HTML. The frame re-mounts whenever this identity changes. */
-  html: string;
+  /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
+  code: string;
   executeQuery: ChartFrameExecuteQuery;
   /** Initial params; later changes are pushed as `lw:params-change`. */
   params: ChartFrameParams;
@@ -41,7 +41,7 @@ export interface SandboxedChartFrameProps {
 }
 
 export function SandboxedChartFrame({
-  html,
+  code,
   executeQuery,
   params,
   theme,
@@ -53,7 +53,7 @@ export function SandboxedChartFrame({
   const [tornDown, setTornDown] = useState(false);
   const [height, setHeight] = useState(240);
 
-  const srcdoc = useMemo(() => buildSrcdoc(html), [html]);
+  const srcdoc = useMemo(() => buildSrcdoc(code), [code]);
 
   // Callbacks live in refs so the bridge effect does not restart per render.
   const executeQueryRef = useRef(executeQuery);

@@ -2,10 +2,10 @@
  * The custom-chart-playground surface: persisted, sizable widgets, each a
  * sandboxed chart frame wired to the real LangWatchQL endpoint.
  *
- * "+ New widget" persists a blank widget immediately (starter HTML + SQL).
+ * "+ New widget" persists a blank widget immediately (starter code + query).
  * Widgets live in the same 2-column grid the reports dashboard uses — drag to
- * reorder, pick a size preset, delete, flip a card to Code to edit its HTML
- * in place, or edit both the HTML and the SQL in a drawer. The
+ * reorder, pick a size preset, delete, flip a card to Code to edit its file
+ * in place, or edit both the file and its queries in a drawer. The
  * frame's bridge tears itself down 1.5s after its last heartbeat, so widgets
  * stay mounted while the page is up; a Save re-keys only the touched frame.
  */
@@ -16,15 +16,23 @@ import { useState } from "react";
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { sizeOptions } from "~/components/analytics/reports/GraphCardMenu";
 import { toaster } from "~/components/ui/toaster";
+import { playgroundWidgetDefinitionSchema } from "~/server/analytics/playgroundWidgetDefinition";
 import { api } from "~/utils/api";
 import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import type { PlaygroundWidget } from "./PlaygroundWidgetCard";
 import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
 import { PlaygroundWidgetGrid } from "./PlaygroundWidgetGrid";
-import { STARTER_WIDGET_CODE, STARTER_WIDGET_SQL } from "./presets";
+import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "./presets";
 
-/** Parses a stored `CustomGraph.graph` into the widget the grid renders. */
+/**
+ * Parses a stored `CustomGraph.graph` into the widget the grid renders.
+ *
+ * A row this build itself never wrote — an old shape, a hand-edited one, a
+ * future version — fails `safeParse` and degrades to an empty file with no
+ * queries rather than crashing the grid. Dev-only prototype surface: no
+ * toast, no recovery flow, just a widget the author can overwrite.
+ */
 function toWidget(row: {
   id: string;
   name: string;
@@ -34,12 +42,13 @@ function toWidget(row: {
   colSpan: number;
   rowSpan: number;
 }): PlaygroundWidget {
-  const graph = (row.graph ?? {}) as { srcdocHtml?: string; sql?: string };
+  const parsed = playgroundWidgetDefinitionSchema.safeParse(row.graph);
+  const definition = parsed.success ? parsed.data : { code: "", queries: [] };
   return {
     id: row.id,
     name: row.name,
-    srcdocHtml: graph.srcdocHtml ?? "",
-    sql: graph.sql ?? "",
+    code: definition.code,
+    queries: definition.queries,
     gridColumn: row.gridColumn,
     gridRow: row.gridRow,
     colSpan: row.colSpan,
@@ -91,8 +100,8 @@ export function CustomChartPlayground({
         projectId,
         ...(dashboardId ? { dashboardId } : {}),
         name: "New widget",
-        srcdocHtml: STARTER_WIDGET_CODE,
-        sql: STARTER_WIDGET_SQL,
+        code: STARTER_WIDGET_CODE,
+        queries: STARTER_WIDGET_QUERIES,
       },
       {
         onSuccess: () => void widgetsQuery.refetch(),
@@ -160,7 +169,7 @@ export function CustomChartPlayground({
   // are the same mutation and the same refetch. `onSuccess` lets the caller
   // close itself only once the write landed.
   const handleSave = (
-    input: { id: string; srcdocHtml: string; sql: string },
+    input: { id: string; code: string; queries: PlaygroundWidget["queries"] },
     options?: { onSuccess?: () => void },
   ) => {
     updateWidget.mutate(

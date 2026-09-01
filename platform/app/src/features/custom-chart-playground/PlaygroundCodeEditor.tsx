@@ -33,7 +33,8 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
 };
 
 interface PlaygroundCodeEditorProps {
-  language: "html" | "sql";
+  /** Monaco's "typescript" language id highlights JSX/TSX too. */
+  language: "typescript" | "sql";
   value: string;
   onChange: (value: string) => void;
 }
