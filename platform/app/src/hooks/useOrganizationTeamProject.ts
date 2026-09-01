@@ -682,7 +682,26 @@ export const useOrganizationTeamProject = (
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {
-      // If user has custom role, ONLY use custom role permissions (no fallback)
+      // An org admin keeps admin access whatever team role they hold — both
+      // server paths answer this way (an ORGANIZATION-scoped ADMIN binding
+      // grants everything: checkPermissionFromBindings in rbac.ts, and the
+      // engine's bindingGrants), and the no-team-membership branch above
+      // already mirrors it. EXTERNAL users are never ADMIN, so their
+      // restriction below is unaffected.
+      //
+      // What the hook actually reads is the membership row's role, standing
+      // in for that binding — the same trust the branch above already
+      // places in it. The two are written together but not atomically, so
+      // they can diverge (binding deleted or edited on its own, or a crash
+      // between the membership and grant writes on invite acceptance).
+      // In that state this shows admin controls the server then refuses —
+      // a stale-UI failure, not an access grant.
+      if (organizationRole === OrganizationUserRole.ADMIN) {
+        return true;
+      }
+
+      // Otherwise ONLY the custom role's permissions apply (no fallback to
+      // the built-in team role it replaced)
       const rawPermissions = teamMember.assignedRole.permissions as
         | string[]
         | null
