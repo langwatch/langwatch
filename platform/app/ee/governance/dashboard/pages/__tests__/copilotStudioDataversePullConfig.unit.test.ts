@@ -41,7 +41,7 @@ function composer(parserConfig: Record<string, string>): ComposerState {
 
 const REQUIRED = {
   environmentUrl: "https://org12345.crm.dynamics.com",
-  credentialsTenantId: "3807ec24-0000-4000-8000-000000000001",
+  credentialsTenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   credentialsClientId: "app-client-id",
   credentialsClientSecret: "app-client-secret",
 };
