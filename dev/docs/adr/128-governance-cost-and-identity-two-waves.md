@@ -401,12 +401,24 @@ config — the reason this waits for wave 2). The rule then reads:
 - **Cross-currency guard (§3):** the split/variance arithmetic requires
   the bill and its mapped gateway rows to share a currency code. When
   they differ (e.g. bill in EUR, gateway metering in USD) and no
-  biller-provided USD conversion exists (`BillerUsdNano = 0`), the
-  mapping is **ineligible** — both lanes render separately, each in its
-  own currency, until a biller conversion or a dated rate table (§3 b)
-  is available. Where a biller conversion *does* exist the split uses
-  the converted amount column and the variance is computed in that
-  currency; the original invoice currency is still shown alongside.
+  biller-provided USD conversion exists, the mapping is **ineligible** —
+  both lanes render separately, each in its own currency, until a biller
+  conversion or a dated rate table (§3 b) is available. Where a biller
+  conversion *does* exist the split uses the converted amount and the
+  variance is computed in that currency; the original invoice currency
+  is still shown alongside.
+
+  "No conversion held" is **NULL, never 0**. The USD column is
+  `Nullable(Int64)` defaulting to NULL (migration 00087), because zero is
+  a legal cost — free-tier and zero-rated rows really do cost nothing —
+  so a 0 sentinel cannot tell "we hold no USD figure" apart from "this
+  cost nothing", and a reader charting it would draw the unpriced rows as
+  real zero-cost usage. Eligibility is therefore decided by
+  `countIf(isNull(AmountNanoUsd)) = 0` over the mapped rows, not by
+  comparing against 0. Sums stay honest without any guard clause: SQL
+  aggregates skip NULL, so an unpriced row is absent from the total
+  rather than dragging it toward zero, and the same count is what tells
+  the screen to render "—" instead of a figure.
 
 The mapping lives with the source config (small admin list, audited,
 read at query time like every overlap rule). The exclusion filter stays
