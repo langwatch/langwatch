@@ -161,7 +161,11 @@ export class FoldProjectionExecutor {
    *   per-page memory small while amortising the per-query round-trip. Injected
    *   only so tests can force multi-page runs.
    */
-  constructor(private readonly refoldPageSize = 1000) {}
+  constructor(
+    private readonly refoldPageSize = 1000,
+    /** Backoff between re-reads of an incomplete re-fold history. */
+    private readonly refoldHistoryRetryDelaysMs: readonly number[] = [50, 150],
+  ) {}
 
   /**
    * Loads state along with the ids of the events already folded into it.
@@ -477,14 +481,19 @@ export class FoldProjectionExecutor {
       canRefold(projection, context)
     ) {
       // CanRefold returns false without an eventLoader.
-      state = await this.refoldWithDelivered({
+      const refolded = await this.refoldWithDelivered({
         projection,
         delivered: [event],
         context,
         occurredAtMs: eventOccurredAt,
+        loadedAppliedIds: appliedEventIds,
+        stateFrontierOccurredAtMs: prevLastOccurred,
         logFields: { eventType: event.type, eventOccurredAt, prevLastOccurred },
         message: "Out-of-order event detected, re-folding from scratch",
       });
+      // An incomplete history read returns null: the loaded state stays the
+      // base and the event stays applied on top, out of order but not lost.
+      if (refolded !== null) state = refolded;
     }
 
     await projection.store.store(
@@ -631,15 +640,19 @@ export class FoldProjectionExecutor {
       earliestOccurredAt < prevLastOccurred;
 
     let state = loadedState;
+    let refolded: State | null = null;
     if (isOutOfOrder && canRefold(projection, context)) {
       // CanRefold returns false without an eventLoader.
       // `ordered`, not `fresh`: the replay discards the loaded state, so a
       // redelivered event the history read misses has to be folded in too.
-      state = await this.refoldWithDelivered({
+      refolded = await this.refoldWithDelivered({
         projection,
         delivered: ordered,
         context,
         occurredAtMs: earliestOccurredAt,
+        loadedAppliedIds: appliedEventIds,
+        stateFrontierOccurredAtMs:
+          typeof prevLastOccurred === "number" ? prevLastOccurred : 0,
         logFields: {
           batchSize: ordered.length,
           earliestOccurredAt,
@@ -647,7 +660,13 @@ export class FoldProjectionExecutor {
         },
         message: "Out-of-order batch detected, re-folding from scratch",
       });
+    }
+    if (refolded !== null) {
+      state = refolded;
     } else {
+      // No replay, or the history read was incomplete (null): the loaded
+      // state stays the base and the batch is applied on top, out of order
+      // but with nothing already folded thrown away.
       for (const event of fresh) {
         state = projection.apply(state, event);
       }
@@ -685,15 +704,28 @@ export class FoldProjectionExecutor {
    * run's `finished` event lost that race to the `agent_instance_recorded`
    * event stamped 63 ms after it, and the run read IN_PROGRESS forever.
    *
-   * Only the events in hand are merged: a history read that also misses an
-   * earlier, already-folded event still replays without it, which the applied
-   * set cannot repair. The warn line is what makes that lag visible.
+   * The same lag can also hide an event ALREADY folded into the loaded
+   * state, and a replay from that read would silently drop it. Two fences
+   * catch an incomplete read before it can replace the state:
+   *
+   * - every applied id the state was loaded with must be in the read or in
+   *   the delivery (the applied set is exactly the most recent commit, the
+   *   events most exposed to read lag);
+   * - the read plus the delivery must reach the state's occurred-at
+   *   checkpoint (a state at checkpoint T absorbed an event at T, so a
+   *   complete read returns one).
+   *
+   * A read that fails a fence is re-read on a short backoff; if it still
+   * fails, this returns null and the caller keeps the loaded state, applying
+   * the delivery on top, out of order but with nothing thrown away.
    */
   private async refoldWithDelivered<State, E extends Event>({
     projection,
     delivered,
     context,
     occurredAtMs,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
     logFields,
     message,
   }: {
@@ -701,15 +733,59 @@ export class FoldProjectionExecutor {
     delivered: readonly E[];
     context: ProjectionStoreContext;
     occurredAtMs: number;
+    /** Event ids the loaded state was committed with (the previous batch). */
+    loadedAppliedIds: readonly string[];
+    /** The loaded state's occurred-at high-water mark, 0 when unknown. */
+    stateFrontierOccurredAtMs: number;
     logFields: Record<string, unknown>;
     message: string;
-  }): Promise<State> {
-    // Callers guard eventLoader is set (canRefold).
-    const history = await projection.eventLoader!({
-      tenantId: context.tenantId,
-      aggregateId: context.aggregateId,
-      occurredAtMs,
+  }): Promise<State | null> {
+    const loadHistory = () =>
+      // Callers guard eventLoader is set (canRefold).
+      projection.eventLoader!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        occurredAtMs,
+      });
+
+    let history = await loadHistory();
+    let gap = this.historyReadGap({
+      history,
+      delivered,
+      loadedAppliedIds,
+      stateFrontierOccurredAtMs,
     });
+    for (const delayMs of this.refoldHistoryRetryDelaysMs) {
+      if (!gap) break;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      history = await loadHistory();
+      gap = this.historyReadGap({
+        history,
+        delivered,
+        loadedAppliedIds,
+        stateFrontierOccurredAtMs,
+      });
+    }
+    if (gap) {
+      incrementEsFoldRefoldTotal(projection.name, "incomplete");
+      logger.error(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          tenantId: context.tenantId,
+          ...logFields,
+          refoldEventCount: history.length,
+          missingAppliedIds: gap.missingAppliedIds.slice(
+            0,
+            MAX_LOGGED_EVENT_IDS,
+          ),
+          frontierMissing: gap.frontierMissing,
+          stateFrontierOccurredAtMs,
+        },
+        "Re-fold history read stayed incomplete after retries; keeping the loaded state and applying the delivery on top",
+      );
+      return null;
+    }
 
     const seen = new Set(history.map((e) => e.id));
     const missing = delivered.filter((e) => !seen.has(e.id));
@@ -747,6 +823,44 @@ export class FoldProjectionExecutor {
       state = projection.apply(state, e);
     }
     return state;
+  }
+
+  /**
+   * What a history read is missing before it may replace the loaded state:
+   * applied ids of the previous commit that neither the read nor the delivery
+   * accounts for, and the state's occurred-at checkpoint when nothing in
+   * either reaches it. Null when the read is complete enough to replay.
+   */
+  private historyReadGap<E extends Event>({
+    history,
+    delivered,
+    loadedAppliedIds,
+    stateFrontierOccurredAtMs,
+  }: {
+    history: readonly Event[];
+    delivered: readonly E[];
+    loadedAppliedIds: readonly string[];
+    stateFrontierOccurredAtMs: number;
+  }): { missingAppliedIds: string[]; frontierMissing: boolean } | null {
+    const accounted = new Set<string>(history.map((e) => e.id));
+    for (const e of delivered) accounted.add(e.id);
+    const missingAppliedIds = loadedAppliedIds.filter(
+      (id) => !accounted.has(id),
+    );
+
+    let maxOccurredAt = 0;
+    for (const e of history) {
+      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    }
+    for (const e of delivered) {
+      maxOccurredAt = Math.max(maxOccurredAt, e.occurredAt ?? 0);
+    }
+    const frontierMissing =
+      stateFrontierOccurredAtMs > 0 &&
+      maxOccurredAt < stateFrontierOccurredAtMs;
+
+    if (missingAppliedIds.length === 0 && !frontierMissing) return null;
+    return { missingAppliedIds, frontierMissing };
   }
 
   /**
