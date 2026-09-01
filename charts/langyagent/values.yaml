@@ -149,6 +149,14 @@ scratchSizeLimit: 1Gi
 # real cross-tenant credential and data exposure and nothing here makes it
 # small.
 #
+# One further cost, smaller but real: the per-uid runner execs each worker
+# through prlimit, capping its processes, open files and file size. Those caps
+# go with the identity. RLIMIT_NPROC in particular is accounted PER UID, so it
+# cannot simply be reapplied here — one cap would be shared by every worker in
+# the pod and the first busy conversation would starve the rest. Under `none` a
+# runaway worker is bounded by the pod's own cgroup limits and the /workspace
+# sizeLimit rather than per-worker.
+#
 # Who can reasonably take it: a single-tenant install whose users are all
 # colleagues in one organization. Who cannot: anyone serving mutually
 # untrusted users from one install.
@@ -180,7 +188,7 @@ acceptWorkerIsolationDisabled: false
 ## Admission "restricted" — or any policy engine requiring runAsNonRoot —
 ## admits no pod that can do the above at all, so on those clusters the choice
 ## is between sibling isolation and having an assistant. `workerIsolation`
-## below is where an operator makes it, deliberately and on the record
+## above is where an operator makes it, deliberately and on the record
 ## (ADR-130).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
@@ -225,10 +233,12 @@ containerSecurityContext:
     #
     # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
     # dropping loopback-TCP from non-root UIDs to the worker's internal port
-    # range. That rule (services/langyagent/iptables.go) is deleted in this
-    # change — dead under gVisor (no netfilter) and superseded by the
-    # per-worker OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′) — so NET_ADMIN is
-    # dropped here too. Nothing else in the manager touches the network stack.
+    # range. That rule (services/langyagent/iptables.go) is deleted — dead under
+    # gVisor (no netfilter), and the hole it guarded is now closed structurally
+    # rather than by any control: workers are driven over the stdio pipes they
+    # were spawned with and open no listener at all (ADR-131), so there is no
+    # loopback port for a sibling to reach. NET_ADMIN is dropped with it.
+    # Nothing else in the manager touches the network stack.
     #
     # Any addition beyond this needs to be justified in the
     # SecurityContext header above.
@@ -247,7 +257,7 @@ containerSecurityContext:
 # never appears at all. The controls that bound the attack that actually
 # happens (per-worker UID isolation and a NetworkPolicy with egress off) are
 # on by default. Note UID isolation is not free everywhere — see
-# `workerIsolation` below for the cluster class where it costs the install.
+# `workerIsolation` above for the cluster class where it costs the install.
 #
 # HARDENING, once, on purpose:
 #   runtimeClassName: "gvisor"          # or your Kata class on AKS
@@ -315,9 +325,9 @@ networkPolicy:
   # The collector's POD port for the rule above (NetworkPolicy egress ports
   # match the destination pod port). 4318 is OTLP/HTTP's default.
   otelCollectorPort: 4318
-  # External HTTPS egress for workers — needed for `git clone`,
-  # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
-  # and package installs. Default false: this pod runs LLM-
+  # External HTTPS egress for workers — needed for `git clone`, `gh` API
+  # calls, and the npm/pip installs the LLM-driven tools shell out to.
+  # Default false: this pod runs LLM-
   # driven arbitrary shell with the user's API key + GitHub user-to-server
   # token in env, so default-on egress IS the most dangerous posture (a
   # prompt-injection can curl creds to attacker-controlled IPs). Private

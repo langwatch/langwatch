@@ -61034,7 +61034,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     What the sandbox can and cannot reach, and where the boundaries sit.
   </Card>
   <Card title="Self-hosting Langy" icon="server" href="/self-hosting/langy/overview">
-    Ships enabled in the Helm chart, sandboxed with gVisor by default.
+    Ships enabled in the Helm chart; pin a sandboxed runtime to harden the pod-to-host boundary.
   </Card>
 </CardGroup>
 
@@ -62705,7 +62705,7 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 ## Langy (optional)
 
-Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+Langy, the automated AI engineer, runs as a separate agent pod, deployed by default and removable with `langyagent.chartManaged: false`. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
 See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
@@ -65383,7 +65383,7 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+On a pod pinned to gVisor — the hardened posture, not the default — the user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table there. The L7 adapter below is what makes egress control work identically whichever runtime the pod lands on, which is why it is the mechanism rather than a gVisor workaround.
 
 That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
 
@@ -65497,7 +65497,8 @@ The `langyagent` pod is a single Go "manager" process that spawns one [worker](/
 | Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
+| Sandbox | No RuntimeClass by default (`runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`); pin one to harden |
+| Worker isolation | Each worker gets its own uid by default, which costs the pod root; `workerIsolation: none` trades it for a pod a restricted cluster admits |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -65505,7 +65506,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one [worker](/
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly). On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works. EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime — recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.** To harden, pin a class and set `acceptUnsandboxedRuntime: false` — GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group. Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -65547,7 +65548,7 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
     The NetworkPolicy, the FQDN floor, and the cooperative-vs-mandatory egress limit.
   </Card>
   <Card title="The sandbox" icon="shield-halved" href="/langy/security/sandbox">
-    What the gVisor sandbox can and cannot reach, and where the boundaries sit.
+    What a worker can and cannot reach, which walls are configurable, and where the boundaries sit.
   </Card>
   <Card title="Platform self-hosting" icon="server" href="/self-hosting/overview">
     Deploy the rest of the LangWatch stack that Langy runs alongside.

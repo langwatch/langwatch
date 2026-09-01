@@ -1,10 +1,19 @@
 // Package workerpool is the driven adapter that owns worker lifecycle for the
-// langyagent manager. It is the re-home of the ADR-033 isolation model:
-// per-worker UID, 0700 chown-before-secrets home, per-worker
-// OPENCODE_SERVER_PASSWORD, the authProxy bearer→Basic swap, the sensitive-env
-// denylist, Setpgid process-group kill, the orphan reaper, and the fail-closed
-// worker auth guard all live here, unchanged in behavior and wrapped in
+// langyagent manager. It holds what survives of the ADR-033 isolation model:
+// the per-worker UID, the 0700 chown-before-secrets home, the sensitive-env
+// denylist, the Setpgid process-group kill and the orphan reaper, wrapped in
 // herr + OpenTelemetry.
+//
+// Three mechanisms ADR-033 put here are GONE, and looking for them is a waste
+// of an afternoon: the per-worker OPENCODE_SERVER_PASSWORD, the authProxy
+// bearer-to-Basic swap and the fail-closed control-server auth guard. All three
+// defended a loopback HTTP control port that the removed harness opened.
+// Workers are now driven over the anonymous stdio pipes they are spawned with
+// (ADR-131), so there is no port to defend and nothing replaced them.
+//
+// The per-worker UID itself is no longer unconditional either: ADR-130 made it
+// an operator's choice, and under "none" the pool skips reservation entirely
+// because the runner cannot apply it.
 package workerpool
 
 import (

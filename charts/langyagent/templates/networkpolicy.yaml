@@ -11,10 +11,12 @@
 #   - DNS (kube-system:53).
 #   - Control plane (langwatch-app) — the per-session MCP server calls the
 #     LangWatch API at LANGWATCH_ENDPOINT.
-#   - AI gateway (langwatch-gateway) — OpenCode's LLM traffic goes out via
+#   - AI gateway (langwatch-gateway) — worker LLM traffic goes out via
 #     OPENAI_BASE_URL pointed at the gateway, not direct to providers.
-#   - 443 to anywhere (optional, default OFF) — the tools OpenCode shells out
-#     to (git, gh, npm) need it, and so does opencode's own update/telemetry.
+#   - 443 to anywhere (optional, default OFF) — the tools a worker shells out
+#     to (git, gh, npm) need it. Nothing else does: the worker binary ships in
+#     the image and phones home to nobody, so this rule exists ONLY for those
+#     tools and can be tightened to their hosts.
 #     Turn it on with networkPolicy.allowExternalHttps=true; private ranges and
 #     the cloud metadata service stay carved out either way.
 apiVersion: networking.k8s.io/v1
@@ -76,7 +78,7 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.networkPolicy.controlPlanePort }}
-    # AI gateway — OpenCode LLM traffic (OPENAI_BASE_URL).
+    # AI gateway — worker LLM traffic (OPENAI_BASE_URL).
     - to:
         {{- with .Values.networkPolicy.egressToGateway }}
         {{- toYaml . | nindent 8 }}
@@ -110,7 +112,7 @@ spec:
           port: {{ $.Values.networkPolicy.otelCollectorPort }}
     {{- end }}
     {{- if .Values.networkPolicy.allowExternalHttps }}
-    # External HTTPS (OpenCode update/telemetry, git/gh/npm over :443). This is
+    # External HTTPS (git/gh/npm over :443). This is
     # the pod's ONLY route to the public internet, and the most dangerous rule
     # in the policy — it is off by default (allowExternalHttps=false).
     #
@@ -121,7 +123,7 @@ spec:
     # `egress.cilium.enabled`.
     #
     # The ipBlock `except` lists (networkPolicy.privateExcept / privateExceptV6)
-    # deny the private + link-local + CGNAT ranges so a compromised OpenCode
+    # deny the private + link-local + CGNAT ranges so a compromised worker
     # subprocess (RCE via prompt injection, supply chain) cannot use this
     # public-egress rule to reach internal services on :443 — the kube
     # apiserver, sidecars on the same node, neighbour pods (INCLUDING the

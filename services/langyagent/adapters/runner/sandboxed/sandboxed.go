@@ -27,6 +27,10 @@ var _ app.Runner = Runner{}
 // root selects it unless LANGY_WORKER_ISOLATION names "none" (ADR-130).
 func New() Runner { return Runner{} }
 
+// AppliesIdentity is true: this runner is the one that actually setuids the
+// child into the uid it is handed and chowns its files to it.
+func (Runner) AppliesIdentity() bool { return true }
+
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "sandboxed" }
 

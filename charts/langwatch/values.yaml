@@ -2131,7 +2131,7 @@ gateway:
     authExistingSecretName: ""
     authSecretKey: token
 
-## The Langy agent is the OpenCode "manager" pod that backs the in-product
+## The Langy agent is the "manager" pod that backs the in-product
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
@@ -2144,15 +2144,34 @@ gateway:
 ## provider for the project as you would for any other LangWatch feature.
 ##
 ## ISOLATION. The agent runs shell written by a language model, and the workers
-## hold the requesting user's credentials, so the controls that bound that are
-## on by DEFAULT and cost nothing: each conversation's worker runs under its own
-## UID with its own credentials, workers cannot read each other's, the per-worker
-## opencode password separates them, and the NetworkPolicy denies egress to the
-## internet unless you turn it on.
+## hold the requesting user's credentials. Four controls bound that. Two hold
+## everywhere and cannot be configured away: a worker opens no listener (the
+## manager drives it over the stdio pipes it spawned it with, so a sibling has
+## nothing to dial at any identity), and no credential is written to disk (the
+## worker config carries variable NAMES, never values). A third is the
+## NetworkPolicy, which denies egress to the internet unless you turn it on.
 ##
-## Those are the controls that stop the attack that actually happens: a worker
-## reached by prompt injection through ingested data, using its own legitimate
-## access to exfiltrate. They work identically on every cluster.
+## The fourth is per-worker Unix identity, on by DEFAULT, and it is the one that
+## does NOT work identically on every cluster — the claim this block used to
+## make. Giving each worker its own uid needs root plus five capabilities, and a
+## cluster enforcing Pod Security Admission "restricted" admits no such pod at
+## all. There the choice is between sibling identity and having an assistant:
+##
+##   langyagent:
+##     workerIsolation: none              # per-uid (default) | none
+##     acceptWorkerIsolationDisabled: true
+##
+## renders the pod non-root with no capabilities, which "restricted" admits. It
+## costs real isolation — one worker can then read another's live credentials
+## from /proc/<pid>/environ and another conversation's content from its session
+## directory — so the render refuses it without the acknowledgement and the pod
+## says so at boot. Take it for a single-tenant install whose users are
+## colleagues; do not take it if you serve mutually untrusted users. See ADR-130
+## and https://docs.langwatch.ai/self-hosting/langy/setup#hardening-clusters-that-refuse-root
+##
+## Together these bound the attack that actually happens: a worker reached by
+## prompt injection through ingested data, using its own legitimate access to
+## exfiltrate.
 ##
 ## A sandboxed RuntimeClass (gvisor, Kata) is the rung ABOVE that: it protects
 ## the node kernel from a worker that escapes its container, which needs a kernel
@@ -2183,6 +2202,10 @@ langyagent:
 
   ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
   acceptUnsandboxedRuntime: true
+  ## @param langyagent.workerIsolation [string, default: per-uid] Per-worker identity posture (ADR-130). "per-uid" gives each conversation's worker its own uid, which costs the pod root plus five capabilities. "none" runs every worker as the pod's own user, which is what makes the pod admissible under Pod Security Admission "restricted" — at the cost of one worker being able to read another's live credentials and conversation content. Any other value is refused at render time. Forcing the default posture non-root instead is refused too, because it renders a pod that is admitted and then fails every worker spawn.
+  workerIsolation: per-uid
+  ## @param langyagent.acceptWorkerIsolationDisabled [default: false] Accept running every worker under one shared identity. Required for workerIsolation "none"; the render fails without it, so the weaker posture is never reached by leaving a field blank or by an override that replaced more than it named.
+  acceptWorkerIsolationDisabled: false
 
   ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
   enableForAllUsers: true

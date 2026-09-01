@@ -88,7 +88,9 @@ func TestLoadConfig_RefusesAnUnknownWorkerIsolation(t *testing.T) {
 // not an escape hatch, so it must not depend on ENVIRONMENT the way the flag it
 // replaced did.
 //
-// @scenario "An operator can accept the reduced isolation and render a non-root pod"
+// Not bound to "An operator can accept the reduced isolation and render a
+// non-root pod": that scenario's Thens are about a RENDERED pod spec, which
+// this test never produces. The chart e2e suite owns that binding.
 func TestLoadConfig_AcceptsBothWorkerIsolationPostures(t *testing.T) {
 	for _, posture := range []string{WorkerIsolationPerUID, WorkerIsolationNone} {
 		clearLangyEnv(t)

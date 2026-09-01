@@ -13,14 +13,14 @@
  */
 export const goErrorCodes = {
   /**
-   * ErrAgentError — marks a turn the agent itself reported as failed (an
-   * opencode `error`/`session.error`/`message.error` event — e.g. its LLM call
-   * was rejected). The worker is alive and answered deterministically, so the
-   * control plane must fail the turn immediately with this code instead of the
-   * generic worker-stopped path. When the LLM proxy captured the gateway's
-   * herr for the failed call, it rides as a REASON on this herr — the full
-   * typed cause chain crosses every wire (herr ⇄ the control plane's
-   * DomainError are the same model).
+   * ErrAgentError — marks a turn the agent itself reported as failed (an error
+   * event on the worker's own stream — e.g. its LLM call was rejected). The
+   * worker is alive and answered deterministically, so the control plane must
+   * fail the turn immediately with this code instead of the generic
+   * worker-stopped path. When the LLM proxy captured the gateway's herr for
+   * the failed call, it rides as a REASON on this herr — the full typed cause
+   * chain crosses every wire (herr ⇄ the control plane's DomainError are the
+   * same model).
    *
    * @source services/langyagent/domain/errors.go
    */
@@ -96,8 +96,8 @@ export const goErrorCodes = {
   config_invalid: { service: "config" },
   /**
    * ErrConversationBusy — signals a second concurrent turn for a conversation
-   * whose single-stream opencode session is already answering. The control
-   * plane shows a "still answering — wait" notice. Maps to 409.
+   * whose single-stream agent session is already answering. The control plane
+   * shows a "still answering — wait" notice. Maps to 409.
    *
    * @source services/langyagent/domain/errors.go
    */
@@ -293,18 +293,15 @@ export const goErrorCodes = {
    */
   not_found: { service: "nlpgo", httpStatus: 404 },
   /**
-   * ErrOpenCodeAuthNotEnforced — is the fail-closed guard verdict (ADR-033 Fix
-   * A′): opencode answered an unauthenticated control request with something
-   * other than 401, so the per-worker password is not gating the control API.
-   * The worker must not serve traffic in that state.
+   * ErrSessionNotFound — signals the worker's agent session vanished mid-turn:
+   * it can never serve another one. The orchestrator recycles the worker and
+   * surfaces a typed "session-not-found" event, so the user retries onto a
+   * fresh worker rather than hitting the dead one again.
    *
-   * @source services/langyagent/domain/errors.go
-   */
-  opencode_auth_not_enforced: { service: "langyagent", httpStatus: 500 },
-  /**
-   * ErrSessionNotFound — signals the worker's opencode internal session
-   * vanished mid-turn. The orchestrator recycles the worker and surfaces a
-   * typed "session-not-found" event.
+   * The code string keeps the removed harness's name. It is WIRE FORMAT — the
+   * control plane's presentation registry is keyed by it — so renaming it is a
+   * breaking change to buy a tidier constant, exactly the trade
+   * OPENCODE_AGENT_URL declines elsewhere in ADR-131.
    *
    * @source services/langyagent/domain/errors.go
    */
@@ -513,8 +510,8 @@ export const goErrorCodes = {
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
   /**
-   * ErrWorkerNotReady — signals a freshly spawned worker's opencode did not
-   * become ready within LANGY_READINESS_TIMEOUT_MS.
+   * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
+   * within LANGY_READINESS_TIMEOUT_MS.
    *
    * @source services/langyagent/domain/errors.go
    */

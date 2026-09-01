@@ -57,7 +57,10 @@ func TestChownLchown_NoOp(t *testing.T) {
 // the child, and no filesystem ownership change. Both are what make the pod
 // runnable without root.
 //
-// @scenario "The manager does not reserve worker identities it cannot enforce"
+// Deliberately NOT bound to "The manager does not reserve worker identities it
+// cannot enforce". That scenario is about the POOL declining to reserve, and
+// this test passes whether or not the pool reserves — it never touches one. The
+// binding lives on TestPool_ReservesNoIdentityWhenTheRunnerCannotApplyOne.
 func TestRunner_AppliesNoIdentity(t *testing.T) {
 	attr := (Runner{}).SysProcAttr(4321)
 	if attr == nil {

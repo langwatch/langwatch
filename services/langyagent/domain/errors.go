@@ -19,9 +19,8 @@ import (
 // in-band path finalized on a handoff terminal.
 var ErrTurnHandedOff = errors.New("langyagent: turn handed off (ADR-048)")
 
-// ErrAgentError marks a turn the agent itself reported as failed (an opencode
-// `error`/`session.error`/`message.error` event — e.g. its LLM call was
-// rejected). The worker is alive and answered deterministically, so the
+// ErrAgentError marks a turn the agent itself reported as failed (an error
+// event on the worker's own stream — e.g. its LLM call was rejected). The worker is alive and answered deterministically, so the
 // control plane must fail the turn immediately with this code instead of the
 // generic worker-stopped path. When the LLM proxy captured the gateway's herr
 // for the failed call, it rides as a REASON on this herr — the full typed
@@ -45,7 +44,7 @@ const (
 	ErrInvalidConversationID = herr.Code("invalid_conversation_id")
 
 	// ErrConversationBusy signals a second concurrent turn for a conversation
-	// whose single-stream opencode session is already answering. The control
+	// whose single-stream agent session is already answering. The control
 	// plane shows a "still answering — wait" notice. Maps to 409.
 	ErrConversationBusy = herr.Code("conversation_busy")
 

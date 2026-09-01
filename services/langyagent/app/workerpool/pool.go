@@ -180,9 +180,9 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	// into /workspace by the entrypoint. Read the template once (a spawn writes it
 	// through unchanged) and materialize the skills tree
 	// onto disk under WorkspaceRoot/skills so each worker's agent can discover it;
-	// setupWorkerHome symlinks each worker home at that path. Both are fatal on
-	// failure — a manager that can't provide the system prompt or skills must not
-	// accept traffic and silently spawn crippled workers.
+	// the worker's generated config points `skillsDir` at that path. Both are
+	// fatal on failure — a manager that can't provide the system prompt or skills
+	// must not accept traffic and silently spawn crippled workers.
 	agentsTemplate, err := assets.AgentsTemplate()
 	if err != nil {
 		return nil, fmt.Errorf("load embedded AGENTS.md: %w", err)
@@ -611,8 +611,8 @@ func (p *Pool) KillSessionVanished(conversationID string) {
 // CancelTurn asks the conversation's live worker to abort the named in-flight
 // turn (the token-burn half of the user's Stop, ADR-078). A registry LOOKUP
 // only, never Acquire: Acquire can spawn, and a cancel for a conversation
-// with no worker must find nothing, not boot one. Every miss (no worker, a
-// different turn in flight, an agent that cannot abort) is a silent no-op: the
+// with no worker must find nothing, not boot one. Every miss (no worker, or a
+// different turn in flight) is a silent no-op: the
 // durable stopped terminal is already recorded upstream, so there is nothing
 // to report and nothing to retry.
 func (p *Pool) CancelTurn(conversationID, turnID string) {
@@ -623,6 +623,15 @@ func (p *Pool) CancelTurn(conversationID, turnID string) {
 		return
 	}
 	w.AbortTurn(p.baseCtx, turnID)
+}
+
+// appliesIdentity reports whether this pool's runner actually puts a worker
+// under the uid it is handed. A nil runner fails CLOSED exactly as New's
+// defaulting does (it substitutes the sandboxed runner): reserve the identity
+// rather than silently skip it, so a hand-built Pool cannot arrive at the
+// weaker behavior by omission.
+func (p *Pool) appliesIdentity() bool {
+	return p.runner == nil || p.runner.AppliesIdentity()
 }
 
 // reserveUIDLocked finds a free UID for conversationID. Must be called with
@@ -683,19 +692,32 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 
 	// Allocate a UID under the registry lock so two concurrent spawns can't both
 	// observe the same slot as free.
-	p.mu.Lock()
-	uid, err := p.reserveUIDLocked(conversationID)
-	p.mu.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if !success {
-			p.mu.Lock()
-			p.releaseUIDLocked(uid, conversationID)
-			p.mu.Unlock()
+	//
+	// Only when the runner will actually apply it (ADR-130 §4). Under shared
+	// identity every Chown is a no-op and SysProcAttr ignores the argument, so a
+	// reservation here would put a number in the logs and the registry that
+	// describes no running process, and could fail a spawn closed with
+	// "the assistant is at capacity" over a resource nothing is enforcing.
+	// uid stays 0, which every consumer already treats as "no identity applied":
+	// the runner's Chown/SysProcAttr discard it and egress carries it unread.
+	var uid uint32
+	appliesIdentity := p.appliesIdentity()
+	if appliesIdentity {
+		p.mu.Lock()
+		reserved, err := p.reserveUIDLocked(conversationID)
+		p.mu.Unlock()
+		if err != nil {
+			return nil, err
 		}
-	}()
+		uid = reserved
+		defer func() {
+			if !success {
+				p.mu.Lock()
+				p.releaseUIDLocked(uid, conversationID)
+				p.mu.Unlock()
+			}
+		}()
+	}
 
 	// Egress seam (ADR-076 / ADR-047): the enforcing guard stands up THIS
 	// worker's outbound forward proxy here and returns its loopback port (which
@@ -735,7 +757,8 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	// here is operational or hostile, not a bad id: fail the spawn closed.
 	// One span for the whole worker-home layout: create the home under the
 	// containment root, then Provision writes the agent config + AGENTS.md and
-	// symlinks the materialized skills tree. Ends when the home is fully staged (or
+	// points the worker's config at the materialized skills tree. Ends when the
+	// home is fully staged (or
 	// on the first failure), so the trace separates "laying out the home" from the
 	// readiness wait that follows.
 	_, provSpan := p.telemetry.StartPhase(ctx, "langy.worker.provision")
@@ -906,12 +929,18 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		p.onWorkerExit(conversationID, cmd, uid)
 	})
 
-	log.Info("worker ready",
+	// Log the uid only when one was actually applied. Under shared identity the
+	// worker runs as the manager's own user, and a `uid=0` field would read as a
+	// worker running as root — the opposite of what that posture does.
+	readyFields := []zap.Field{
 		zap.String("conversation", conversationID),
 		zap.String("session", sessionID),
 		zap.Bool("resumedSession", resumedSession),
-		zap.Uint32("uid", uid),
-	)
+	}
+	if appliesIdentity {
+		readyFields = append(readyFields, zap.Uint32("uid", uid))
+	}
+	log.Info("worker ready", readyFields...)
 
 	return &Worker{
 		conversationID: conversationID,

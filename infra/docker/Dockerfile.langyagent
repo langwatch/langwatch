@@ -1,4 +1,4 @@
-# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI the
+# Langy agent pod image — the Langy "manager" plus the LangWatch CLI the
 # per-session workers shell out to.
 #
 # Built by the `langyagent` matrix entry in
@@ -207,9 +207,9 @@ RUN set -eux; \
 # -----------------------------------------------------------------------------
 # Stage 2: runtime image.
 # -----------------------------------------------------------------------------
-# Keep the runtime on glibc: the pinned OpenCode release and the Bun-compiled
-# LangWatch CLI are glibc binaries. Debian slim removes Ubuntu's userland
-# overhead without introducing Alpine/musl compatibility surprises.
+# Keep the runtime on glibc: the Bun-compiled LangWatch CLI is a glibc binary.
+# Debian slim removes Ubuntu's userland overhead without introducing
+# Alpine/musl compatibility surprises.
 FROM debian:bookworm-slim
 
 # Pin the CLI version the agent was validated against. Bump it in lockstep with

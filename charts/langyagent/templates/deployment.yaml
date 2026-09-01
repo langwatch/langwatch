@@ -32,11 +32,34 @@
        value exists to keep it from being reached by accident, by a blank field
        or by an override that replaced more than it named. */ -}}
 {{- $isolation := .Values.workerIsolation | default "per-uid" }}
+{{- $podSCVals := .Values.podSecurityContext | default dict }}
+{{- $ctrSCVals := .Values.containerSecurityContext | default dict }}
 {{- if not (has $isolation (list "per-uid" "none")) }}
 {{- fail (printf "langyagent.workerIsolation must be \"per-uid\" or \"none\", got %q. Unset means \"per-uid\", the isolated default." $isolation) }}
 {{- end }}
-{{- if and .Values.chartManaged (eq $isolation "none") (not .Values.acceptWorkerIsolationDisabled) }}
+{{- if and (eq $isolation "none") (not .Values.acceptWorkerIsolationDisabled) }}
 {{- fail "langyagent.workerIsolation=none removes per-worker identity isolation: every conversation's worker runs as the same user, so one worker can read another's live credentials from /proc/<pid>/environ and another conversation's content from its session directory. This is how the agent runs on a cluster that refuses root, and on such a cluster the alternative is no assistant at all — but it is a trade to make deliberately. Set langyagent.acceptWorkerIsolationDisabled=true to accept it. To run without the assistant entirely, set langyagent.chartManaged=false." }}
+{{- end }}
+{{- /* The accident this whole feature exists to prevent, refused by name.
+
+       Forcing the DEFAULT posture non-root is the natural first attempt on a
+       policy-locked cluster, and it is the exact thing the customer in ADR-130
+       did. It does not work, and until this guard it did not say so: Helm
+       merges the capability map rather than replacing it, so the rendered pod
+       still requests all five capabilities; the kernel then clears them on the
+       UID transition. The pod is admitted, both probes go green, and every
+       conversation dies at the first chown in provisioning — which reads as a
+       Langy bug rather than a policy outcome.
+
+       Prose in a values file is not a guard (ADR-047's own lesson, quoted in
+       ADR-130). So this is a render-time refusal that names the supported
+       answer. */ -}}
+{{- if eq $isolation "per-uid" }}
+{{- $forcedNonRoot := or (eq (toString (dig "runAsNonRoot" false $podSCVals)) "true") (eq (toString (dig "runAsNonRoot" false $ctrSCVals)) "true") }}
+{{- $forcedUser := or (and (hasKey $podSCVals "runAsUser") (ne (toString $podSCVals.runAsUser) "0")) (and (hasKey $ctrSCVals "runAsUser") (ne (toString $ctrSCVals.runAsUser) "0")) }}
+{{- if or $forcedNonRoot $forcedUser }}
+{{- fail "langyagent.workerIsolation=per-uid cannot run non-root. Giving each conversation's worker its own uid needs CAP_SETUID/SETGID/CHOWN, which only a root-effective-uid process holds in a container, so a non-root securityContext here renders a pod that is admitted and then fails every worker spawn at its first chown. Note that Helm MERGES the capability map, so your own drop:[ALL] does not remove the chart's add: list either. The supported way to run on a cluster that refuses root is langyagent.workerIsolation=none with langyagent.acceptWorkerIsolationDisabled=true, which renders this pod as a non-root, zero-capability, seccomp-RuntimeDefault spec that Pod Security Admission \"restricted\" admits — at the cost of per-worker identity isolation (see ADR-130). To run without the assistant entirely, set langyagent.chartManaged=false." }}
+{{- end }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -44,7 +67,7 @@ metadata:
   name: {{ include "langyagent.fullname" . }}
   labels: {{- include "langyagent.labels" . | nindent 4 }}
 spec:
-  # Single replica on purpose. The manager keeps per-conversation OpenCode
+  # Single replica on purpose. The manager keeps per-conversation
   # workers in memory keyed by conversationId; a second replica would
   # cold-start a fresh worker whenever a follow-up turn lands on the other
   # pod. Scale vertically (resources / LANGY_MAX_WORKERS), not horizontally,
@@ -87,11 +110,20 @@ spec:
              value only on the pod — which is how a customer's install
              first failed (specs/security/helm-strict-admission.feature). */ -}}
       {{- if eq $isolation "none" }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        seccompProfile:
-          type: RuntimeDefault
+      {{- /* The operator's IDENTITY fields layer over the hardened floor; the
+             security fields do not. Hardcoding uid 1000 outright looked safer
+             and locks out the largest family of clusters that refuse root:
+             OpenShift's restricted-v2 SCC assigns each project a uid range via
+             openshift.io/sa.scc.uid-range, which never contains 1000, so the
+             pod is refused at admission and setting runAsUser did nothing
+             because this branch discarded it. fsGroup is safe to honour here
+             precisely because there are no per-worker uids left to group-share
+             — it is omitted under per-uid for the opposite reason. */ -}}
+      {{- $podIdent := dict }}
+      {{- range $k := list "runAsUser" "runAsGroup" "fsGroup" "supplementalGroups" "seLinuxOptions" }}
+      {{- if and (hasKey $podSCVals $k) (not (and (eq $k "runAsUser") (eq (toString (index $podSCVals $k)) "0"))) }}{{- $_ := set $podIdent $k (index $podSCVals $k) }}{{- end }}
+      {{- end }}
+      securityContext: {{- toYaml (merge $podIdent (dict "runAsNonRoot" true "runAsUser" 1000 "seccompProfile" (dict "type" "RuntimeDefault"))) | nindent 8 }}
       {{- else }}
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- end }}
@@ -103,15 +135,17 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if eq $isolation "none" }}
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              drop: ["ALL"]
+          {{- /* Same split as the pod level: identity is the operator's,
+                 everything that makes this spec admissible is not. capabilities
+                 in particular must NOT merge — a merge is exactly how an
+                 operator's drop:[ALL] ends up alongside the chart's add: list
+                 (ADR-130), so the add list has to be unreachable here rather
+                 than merely absent from the defaults. */ -}}
+          {{- $ctrIdent := dict }}
+          {{- range $k := list "runAsUser" "runAsGroup" "seLinuxOptions" }}
+          {{- if and (hasKey $ctrSCVals $k) (not (and (eq $k "runAsUser") (eq (toString (index $ctrSCVals $k)) "0"))) }}{{- $_ := set $ctrIdent $k (index $ctrSCVals $k) }}{{- end }}
+          {{- end }}
+          securityContext: {{- toYaml (merge $ctrIdent (dict "runAsNonRoot" true "runAsUser" 1000 "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "seccompProfile" (dict "type" "RuntimeDefault") "capabilities" (dict "drop" (list "ALL")))) | nindent 12 }}
           {{- else }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           {{- end }}

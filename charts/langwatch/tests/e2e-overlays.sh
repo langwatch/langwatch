@@ -963,6 +963,8 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 
 # @scenario "An operator on a non-root cluster can choose the assistant anyway"
+# @scenario "An operator can accept the reduced isolation and render a non-root pod"
+# @scenario "The default install keeps per-worker identity isolation"
 test_langy_isolation_postures() {
   sep; info "Suite: Langy worker isolation postures"
 
@@ -1027,14 +1029,65 @@ test_langy_isolation_postures() {
   fi
 
   # An unrecognized posture fails closed rather than defaulting. A typo must
-  # never silently select either wall.
+  # never silently select either wall. Grep the reason as well as the exit code:
+  # a bare exit-code check reports this property verified when the template
+  # broke for some entirely unrelated reason.
   out=$(tmpl_only "$tpl" --set autogen.enabled=true \
     --set langyagent.workerIsolation=per-user 2>&1) && rc=0 || rc=$?
   if [[ "$rc" -eq 0 ]]; then
     fail "langy: expected helm to refuse an unrecognized workerIsolation"
+  elif ! grep -qF 'must be "per-uid" or "none"' <<< "$out"; then
+    fail "langy: refused an unrecognized workerIsolation, but not for that reason"
   else
     pass "langy: an unrecognized workerIsolation is refused, not defaulted"
   fi
+
+  # 4. The accident. Forcing the DEFAULT posture non-root is what the customer
+  #    in ADR-130 actually did: Helm merges the capability map so the pod still
+  #    requests all five, the kernel clears them on the uid transition, and the
+  #    pod is admitted and then dies at the first chown. The render must refuse
+  #    it and name the supported answer, because a values-file comment saying
+  #    "don't do this" is not a guard.
+  local forced
+  for forced in podSecurityContext containerSecurityContext; do
+    out=$(tmpl_only "$tpl" --set autogen.enabled=true \
+      "--set" "langyagent.${forced}.runAsUser=1000" 2>&1) && rc=0 || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+      fail "langy per-uid: a forced non-root ${forced} must be refused, not rendered"
+    elif ! grep -qF "workerIsolation=none" <<< "$out"; then
+      fail "langy per-uid: the refusal must name workerIsolation=none as the answer"
+    else
+      pass "langy per-uid: a forced non-root ${forced} is refused by name"
+    fi
+  done
+
+  # 5. Under `none` the operator's uid must be HONOURED, not discarded.
+  #    OpenShift's restricted-v2 SCC assigns each project a uid range that never
+  #    contains 1000, so a hardcoded 1000 locks out the largest family of
+  #    clusters this posture exists to serve — and it failed silently, because
+  #    the branch dropped the override rather than refusing it.
+  local openshift
+  openshift=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true \
+    --set langyagent.podSecurityContext.runAsUser=1000700000 \
+    --set langyagent.containerSecurityContext.runAsUser=1000700000)
+  # The positive assertion is the whole test: if the branch discarded the
+  # override (the bug), this value is absent and the pod renders uid 1000. A
+  # matching negative check is not possible with a substring match — "1000" is a
+  # prefix of "1000700000" — and a wrong one here would fail on a correct render.
+  assert_contains "langy none: honours an operator-assigned uid" "$openshift" "runAsUser: 1000700000"
+  # ...while the security floor stays non-negotiable at that uid.
+  assert_contains "langy none: keeps drop ALL at an operator uid" "$openshift" "- ALL"
+  assert_contains "langy none: keeps seccomp at an operator uid" "$openshift" "RuntimeDefault"
+  # A capability the operator adds back must not reach the render: a merge here
+  # is precisely the failure mode ADR-130 was written from.
+  local refill
+  refill=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true \
+    --set 'langyagent.containerSecurityContext.capabilities.add[0]=SETUID')
+  assert_not_contains "langy none: an operator cannot refill capabilities" "$refill" "SETUID"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
