@@ -343,15 +343,19 @@ a consumer.
 
 ### §5. One `cost_source` column carries channel and provider
 
-Values: `gateway`, `pulled_anthropic`, `pulled_openai`, `pulled_azure`, …
-one per pulled provider. Filtering this column is how "show separately"
-and "show combined" are the same table.
+Values: `gateway` and `pulled` — the two lanes wave 1 ships
+(`GOVERNANCE_COST_SOURCE`). Which provider a pulled row came from is the
+`Provider` column, not a suffix on this one. Filtering this column is how
+"show separately" and "show combined" are the same table. A new value is
+added when a lane actually ships, never reserved ahead of one.
 
 - **`seat` is never a value** — seat money is computed at read, never
   stored as rows (§6).
-- **`trace` is reserved now, excluded in v1** — the column value exists
-  (columns-from-day-one) but the service filters it out and its
-  projection only turns on after the exclusion filter (§7) exists.
+- **`trace` is not a value** — trace cost stays a separate system
+  (per-request `Float64` in `trace_summaries`), and no pipeline carrying
+  trace cost registers this fold, so no row can carry a trace source. If
+  the trace lane ever merges in, that is a new value added with it, after
+  the exclusion filter (§7) exists.
 
 ### §6. Seat counts are durable events; seat money never is
 
@@ -731,7 +735,7 @@ then.
 | Name | Value | Purpose |
 |---|---|---|
 | Nano scale | 1 unit = 10⁻⁹ of one currency unit; $1 = 1,000,000,000 units | exact integer money math; matches `CostNanoUSD`/`AmountNanoUSD` |
-| `cost_source` values | `gateway`, `pulled_anthropic`, `pulled_openai`, `pulled_azure`, `trace` (reserved, excluded v1) | channel + provider in one filterable column; `seat` never appears |
+| `cost_source` values | `gateway`, `pulled` (`GOVERNANCE_COST_SOURCE`) | which lane the money came from, in one filterable column; the provider is the `Provider` column; `seat` and `trace` never appear |
 | Rollup table | `governance_cost_rollup_1d` | the one summed table charts read |
 | Rollup grain | 1 day (`toDate`) | matches bill grain; volume is thousands/day |
 | Idle-seat default | 30 days without activity, per-org adjustable | FR3 wave-2 listing |
