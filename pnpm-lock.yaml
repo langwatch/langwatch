@@ -457,6 +457,9 @@ importers:
       '@langwatch/data-retention-web':
         specifier: workspace:*
         version: link:../../packages/features/data-retention/web
+      '@langwatch/dataset-web':
+        specifier: workspace:*
+        version: link:../../packages/features/dataset/web
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
@@ -587,6 +590,9 @@ importers:
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../packages/group-queue
+      '@langwatch/langy-server':
+        specifier: workspace:*
+        version: link:../../packages/features/langy/server
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../../packages/features/log/contract

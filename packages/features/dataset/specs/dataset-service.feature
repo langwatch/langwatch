@@ -69,3 +69,61 @@ Feature: Shared Dataset service
     When a caller reads or writes its records
     Then the transport refuses it as a client precondition failure
     And it does not report a server fault
+
+  Rule: The Datasets pages are served from the browser application
+
+    # Both pages moved out of platform/app with the family. What the application
+    # keeps is everything a feature-web package may not own: which grant each
+    # address is behind, the transport, where a dataset may be replicated to,
+    # and the reader's membership.
+
+    @unit
+    Scenario: The datasets page is behind the grant its platform page asked for
+      Given a reader holds a grant the datasets page does not ask for
+      When they open the datasets address
+      Then the page does not render
+      And the refusal names the grant they are missing
+      # datasets:view, carried over one for one from the platform page's
+      # permission guard. Widening it here would admit a reader the platform
+      # page refused.
+
+    @unit
+    Scenario: One dataset's editor opens for anyone who can reach the project
+      Given a reader holds no dataset grant at all
+      When they open one dataset's address
+      Then the editor renders
+      # The platform page carried no permission guard: it read a grant only to
+      # decide whether to offer the experiment hand-off. Adding one here would
+      # break every deep link into a dataset that works today.
+
+    @unit
+    Scenario: Replication targets are the teams the reader may create datasets in
+      Given the reader belongs to a team whose role does not allow creating datasets
+      When the replication picker is offered
+      Then that team's projects are not listed
+      And a team the reader holds no membership on contributes no projects at all
+
+    @unit
+    Scenario: The lite membership role is answered by the application, not inferred
+      Given the reader holds the lite membership role
+      When the datasets list renders a row's actions
+      Then editing and deleting are not offered
+      And replicating to another project still is
+
+    @integration
+    Scenario: The editor waits for the dataset's status before it reads any records
+      Given the dataset read has not settled yet
+      When the editor page renders
+      Then the record grid is not mounted
+      And the reader is told the dataset will appear once it is ready
+      # An unsettled status reads as null, and null means "born before the
+      # column", so mounting on it would read records from a dataset that may
+      # still be processing.
+
+    @integration
+    Scenario: A dataset that failed to prepare names the reason and offers a retry
+      Given a dataset whose preparation failed
+      When the editor page renders
+      Then the reader is shown why it failed
+      And they are offered a retry
+      And the record grid is not mounted

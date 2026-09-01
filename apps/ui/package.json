@@ -69,6 +69,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/data-privacy-web": "workspace:*",
     "@langwatch/data-retention-web": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-web": "workspace:*",
     "@langwatch/gateway-web": "workspace:*",

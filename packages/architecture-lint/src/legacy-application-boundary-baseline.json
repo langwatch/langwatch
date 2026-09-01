@@ -181,10 +181,6 @@
       "platform/app/src/components/datasets/AddRowsFromCSVModal.tsx": [
         "../../server/datasets/types"
       ],
-      "platform/app/src/components/datasets/bulkUpload/BulkUploadDrawer.tsx": [
-        "~/server/datasets/types"
-      ],
-      "platform/app/src/components/datasets/CopyDatasetDialog.tsx": ["../../server/api/rbac"],
       "platform/app/src/components/datasets/DatasetMappingPreview.tsx": [
         "../../server/datasets/types",
         "../../server/tracer/tracesMapping"
@@ -766,11 +762,6 @@
       ],
       "platform/app/src/pages/[project]/analytics/evaluations.tsx": [
         "../../../server/evaluations/getEvaluator"
-      ],
-      "platform/app/src/pages/[project]/datasets.tsx": [
-        "../../server/api/root",
-        "../../server/datasets/record-count",
-        "../../server/datasets/types"
       ],
       "platform/app/src/pages/[project]/evaluations.tsx": [
         "../../server/experiments/workbenchState"

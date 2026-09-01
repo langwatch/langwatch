@@ -8,31 +8,24 @@ export {
   finalizeDirectUpload,
   retryDatasetNormalize,
   type DirectUploadHandle,
-} from "./upload/direct-upload";
-export { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "./upload/column-type-select";
-export {
-  parseHeaderColumns,
-  HEADER_PARSE_MAX_BYTES,
-} from "./upload/parse-header-columns";
+} from "./behavior/direct-upload";
+export { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "./ui/elements/column-type-select";
+export { parseHeaderColumns, HEADER_PARSE_MAX_BYTES } from "./model/parse-header-columns";
 export {
   RESERVED_COLUMN_NAMES,
   isReservedColumnName,
   getSafeColumnName,
-} from "./upload/reserved-columns";
-export {
-  baseNameFromFilename,
-  bumpName,
-  batchDedupeNames,
-} from "./upload/batch-name-dedup";
-export { reorderColumnsBySourceHeader } from "./upload/column-reorder";
-export { invalidColumnNameKeys } from "./upload/column-validation";
+} from "./model/reserved-columns";
+export { baseNameFromFilename, bumpName, batchDedupeNames } from "./model/batch-name-dedup";
+export { reorderColumnsBySourceHeader } from "./model/column-reorder";
+export { invalidColumnNameKeys } from "./model/column-validation";
 export {
   runWithConcurrency,
   uploadSingleFile,
   MAX_NAME_CONFLICT_RETRIES,
   type UploadSingleFileDeps,
   type UploadSingleFileResult,
-} from "./upload/bulk-upload-orchestrator";
+} from "./behavior/bulk-upload-orchestrator";
 export {
   useBulkUpload,
   BULK_UPLOAD_CONCURRENCY,
@@ -41,13 +34,13 @@ export {
   type BulkFileStatus,
   type BulkUploadCounts,
   type BulkUploadTransport,
-} from "./upload/use-bulk-upload";
+} from "./behavior/use-bulk-upload";
 export {
   DROPZONE_DOTTED_STYLE,
   RAINBOW_TEXT_CSS,
   dropzoneSurfaceProps,
   DropzonePrompt,
-} from "./dropzone/dataset-dropzone-styles";
+} from "./ui/elements/dataset-dropzone-styles";
 export {
   DatasetTableProvider,
   useDatasetTable,
@@ -56,18 +49,15 @@ export {
   type DatasetTableContextValue,
   type DatasetTableRowData,
   type RowHeightMode,
-} from "./editor/dataset-table-context";
+} from "./model/dataset-table-context";
 export {
   DatasetPreviewTable,
   type DatasetPreviewRow,
   type DatasetPreviewTableProps,
-} from "./editor/dataset-preview-table";
-export { EditableCell, JSON_LIKE_TYPES } from "./editor/editable-cell";
-export {
-  TableCell,
-  type ColumnType as DatasetTableColumnType,
-} from "./editor/table-cell";
-export { VirtualizedTableBody } from "./editor/virtualized-table-body";
+} from "./ui/blocks/dataset-preview-table";
+export { EditableCell, JSON_LIKE_TYPES } from "./ui/elements/editable-cell";
+export { TableCell, type ColumnType as DatasetTableColumnType } from "./ui/elements/table-cell";
+export { VirtualizedTableBody } from "./ui/blocks/virtualized-table-body";
 export {
   createDatasetEditorStore,
   rekeyEditorRecords,
@@ -76,20 +66,17 @@ export {
   type DatasetEditorStore,
   type EditorColumn,
   type EditorRecord,
-} from "./editor/use-dataset-editor-store";
-export type { PendingSavedChanges } from "./editor/pending-saved-changes";
-export { formatRecordCount, truncatedReadTooltip } from "./editor/dataset-editor-copy";
-export { datasetValueToString } from "./editor/dataset-value-to-string";
-export { datasetTableCss } from "./editor/dataset-table-styles";
+} from "./behavior/use-dataset-editor-store";
+export type { PendingSavedChanges } from "./model/pending-saved-changes";
+export { formatRecordCount, truncatedReadTooltip } from "./model/dataset-editor-copy";
+export { datasetValueToString } from "./model/dataset-value-to-string";
+export { datasetTableCss } from "./model/dataset-table-styles";
 export {
   buildNavigableColumns,
   useTableKeyboardNavigation,
-} from "./editor/use-table-keyboard-navigation";
-export {
-  DatasetPickerList,
-  type DatasetPickerSelection,
-} from "./picker/dataset-picker-list";
-export { convertDatasetRecordsToColumnTypes } from "./records/convert-record-values";
-export { SlugAlert } from "./slug/slug-alert";
-export { SlugChangeWarningAlert } from "./slug/slug-change-warning-alert";
-export { SlugConflictAlert } from "./slug/slug-conflict-alert";
+} from "./behavior/use-table-keyboard-navigation";
+export { DatasetPickerList, type DatasetPickerSelection } from "./ui/blocks/dataset-picker-list";
+export { convertDatasetRecordsToColumnTypes } from "./model/convert-record-values";
+export { SlugAlert } from "./ui/elements/slug-alert";
+export { SlugChangeWarningAlert } from "./ui/elements/slug-change-warning-alert";
+export { SlugConflictAlert } from "./ui/elements/slug-conflict-alert";

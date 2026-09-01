@@ -20,6 +20,7 @@ import { agentApiBinding, agentPageLoaders } from "./agent";
 import { automationsApiBinding, automationsPageLoaders } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
 import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
+import { datasetApiBinding, datasetPageLoaders } from "./dataset";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { opsApiBinding, opsPageLoaders } from "./ops";
@@ -31,6 +32,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...automationsPageLoaders,
     ...dataPrivacyPageLoaders,
     ...dataRetentionPageLoaders,
+    ...datasetPageLoaders,
     ...gatewayPageLoaders,
     ...governancePageLoaders,
     ...opsPageLoaders,
@@ -41,6 +43,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     automationsApiBinding,
     dataPrivacyApiBinding,
     dataRetentionApiBinding,
+    datasetApiBinding,
     gatewayApiBinding,
     governanceApiBinding,
     opsApiBinding,

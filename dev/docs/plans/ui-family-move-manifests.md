@@ -577,11 +577,19 @@ Known costs, all reported rather than suppressed:
   unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
   filed under governance for routingPolicies and took them; me deleted the two
   `[project]` page-shell rows its keys took; automations deleted 27, the whole
-  `features/automations/` inventory plus the page), `components/drawerRegistry.ts`
-  (automations deleted three entries; gateway and me one each),
+  `features/automations/` inventory plus the page; datasets deleted six — its two
+  pages under both the `dataset` and the `project` feature, plus the bulk upload
+  drawer and the replicate dialog), `components/drawerRegistry.ts`
+  (automations deleted three entries; gateway and me one each; datasets touched
+  none — its overlays were never registry entries),
   `apps/ui/src/features/installed-ui-features.ts`
   (+ `tests/installed-ui-features.unit.test.ts`), `pnpm-lock.yaml` —
   coordinator split-stages; one family commit at a time.
+- `pnpm-lock.yaml` again, from the other direction: datasets HAND-EDITED it to
+  add three dependencies rather than running `pnpm install`, because the file
+  already carried another lane's uncommitted additions and a real install would
+  have rewritten all of them. `pnpm install --frozen-lockfile --filter "<pkg>..."`
+  validates the edit without writing, and creates the links.
 - `apps/ui/src/behavior/ui-scope-resolution.ts` — me widened one union member
   (`lastVisitedHomeKind` now takes `"personal"` as well as `"project"`) so a
   `/me` page can leave the marker `MyLayout` used to write.
@@ -927,6 +935,158 @@ dev-only `LANGWATCH_DEFAULT_RETENTION_DAYS` override is server-side and stays.
   pages that were still framed. Whoever moves a family should grep the tests that
   read `platform/app/src/<their keys>` BEFORE deleting anything.
 
+### datasets — MOVED. 2 keys, 10 platform files, 0 insertions, 2,743 deletions
+
+Moved eighth, and the first family whose PAGE was cheap and whose CLOSURE was
+not. The two page files are 599 lines between them; what the survey's "6+6" did
+not count is that the detail page renders `DatasetEditorTable`, a 937-line
+spreadsheet with four non-Datasets callers (the workflow dataset node, the prompt
+demonstrations modal, the upload drawer and the add-record drawer). Deletes-only
+forbids repointing those, so the editor and everything under it travelled as
+NARROWED family-local copies while the platform originals stayed for their other
+consumers.
+
+**Relayout first.** `@langwatch/dataset-web` was flat by topic (`editor/`,
+`upload/`, `slug/`, `picker/`, `dropzone/`, `records/`) and is now the two-scope
+layout — 12 modules to `model`, 5 to `behavior`, 9 to `ui/elements`, 3 to
+`ui/blocks`, and the new sections and screens on top. Every move was a pure `mv`
+plus an import rewrite; the suite was 79 tests before and 79 after, which is what
+made it safe to do in one step. **The React context went to `model`, not
+`behavior`**, and that is the load-bearing call: `ui/elements` may import `model`
+and may NOT import `behavior`, and six element modules read `useDatasetTable()`.
+A context is a portable value, so `model` is also where it belongs.
+
+**The root export STAYS.** ~20 `platform/app` files import
+`@langwatch/dataset-web` — the upload drawer, the workbench, the studio's dataset
+modal, the prompt demonstrations — and deletes-only forbids repointing any of
+them. It costs exactly one finding (`ui-web-public-entry`), the same one ops-web
+and user-web carry, and it is the reason the relayout had to keep `src/index.ts`
+serving every name it served before.
+
+#### The contract DTO, and the bug it uncovered
+
+The survey's "one AppRouter type → contract DTO" is
+`inferRouterOutputs<AppRouter>["dataset"]["getAll"][number]` in the list page.
+It resolves to `DatasetSummary`, which `@langwatch/dataset-contract` already
+publishes and `listDatasets` already returns, so this was a REAL move rather than
+a restatement: the screen names the contract type and the inference is gone.
+
+Following it through found a live defect. `datasetDisplayRecordCount` read the
+postgres-layout count off `_count.datasetRecords`, and the repository's `list`
+projects that number onto `recordCount` and drops `_count` — so **the datasets
+list has been rendering 0 entries for every postgres-layout dataset** since the
+router moved into the package. Both platform tests that covered it built `_count`
+fixtures the wire never produces, which is why nothing caught it. The contract
+function now reads `_count.datasetRecords ?? recordCount`, one line in a package
+the ruling allows repointing, with its own unit test; the moved screen test
+builds a real `DatasetSummary`. Recorded rather than smuggled: this is a
+behaviour change the move made, and it is the only one.
+
+`platform/app/src/runtime/app/internal-api/__tests__/dataset.getAll.integration.test.ts`
+still asserts `found._count.datasetRecords`, which the composed router cannot
+return. It is a datastore-lane test this family did not touch and could not run;
+whoever owns dataset counts should look at it.
+
+#### What the deps cost, and how to add one without an install
+
+Four third-party libraries the platform files used are not dataset-web's:
+`react-feather` (→ `lucide-react`, which the Design System already uses),
+`motion` (→ the confirm-columns section mounts and unmounts outright; the
+animation is the one recorded visual loss), `react-papaparse` (→ a native input
+over `papaparse`, which the package already had) and `react-hook-form` +
+`@hookform/resolvers` (→ plain state; the resolver's three rules are now one
+`describeProblems` function a test asserts on). Only `@dnd-kit/core`,
+`@dnd-kit/utilities` and `@langwatch/platform-api-client` were added.
+
+**The lockfile is hand-editable and the edit is verifiable.** CI installs with
+`--frozen-lockfile`, and `pnpm install` rewrites the whole file, which is not
+safe while another lane's additions sit uncommitted in it. Copy the exact
+peer-suffixed `version:` string from another importer, insert the lines in
+alphabetical order, then run
+`pnpm install --frozen-lockfile --filter "<pkg>..."`: frozen mode never writes,
+so it validates the edit AND creates the `node_modules` links, and "Lockfile is
+up to date" is the proof.
+
+#### Overlays, and why this family touched no drawer entry
+
+The re-ranking said "touches NO drawer entries" and it was right, but not for the
+reason it looks like. `addOrEditDataset` IS a registered drawer — the list page
+simply never used the registry, it imported the component and drove it with
+`useDisclosure`. So all four overlays (add-or-edit, bulk upload, replicate,
+delete) are the screen's own state, the registry entry stays untouched for the
+workbench and the studio, and there is **no chrome gap to record** — the first
+family since the gateway with none.
+
+`useDeleteDatasetConfirmation` RETURNED A COMPONENT, which the house rules
+forbid. It died in the move: the dataset being deleted is the screen's own state
+and `DeleteDatasetDialog` is just a dialog.
+
+#### The eighth family's own additions, for whoever moves the ninth
+
+- **A SIXTH host port of the same shape.** The signal has now fired and been
+  deferred six times. Two questions this one asks that none before it did:
+  `isLiteMember()`, because the `EXTERNAL` membership role is a column rather
+  than a grant and `hasPermission` cannot answer it (`apps/ui`'s
+  `useUiOrganizationFacts` already reads it for the settings menu); and
+  `isReportedGlobally()`, which is a RECORDED GAP answered `false`.
+- **A recorded gap should stay ON the port, answered honestly.** The datasets
+  page asked `isHandledByGlobalHandler` before toasting, so a refusal the
+  application already showed as a modal was not also toasted. That answer is a
+  `WeakSet` four interceptors on `platform/app`'s MutationCache write to, and
+  that cache does not wrap the client `apps/ui` builds. Guessing a code list
+  would have been a fabrication; the adapter returns `false` with the reason
+  written down, and the unit test pins it so the day those interceptors move to
+  the transport, the test is what says so.
+- **A toast ACTION is how an undo travels without widening the feedback port.**
+  `UiSuccessNotice` carries a title and a description and no action. The undoable
+  delete needed a button, and widening a shared capability is a change a page
+  move does not own — so the package's own `DatasetSuccessNotice` carries an
+  optional `undo`, and the frontend feature renders it on the Design System
+  toaster's `action` trigger. Everything without an undo still goes through the
+  capability, so the code-keyed copy still decides the words.
+- **A replication picker can FILTER rather than grey.** The Agents family lists a
+  project the reader may not create in and disables the row; the datasets dialog
+  is a plain select with nowhere to put the explanation, so it leaves the row out
+  — which is what the platform dialog did. Both read the same
+  `@langwatch/authz-contract` rules; neither needed `~/server/api/rbac`. That
+  import is now off the gate list for a picker twice over.
+- **Two keys can carry two different policies, and asserting only one is how you
+  miss it.** The list page was `withPermissionGuard("datasets:view")`; the detail
+  page was wrapped in NO guard and read `hasPermission` only to decide whether to
+  offer the experiment hand-off. A ninth family should check each key's page
+  separately rather than assuming a family has one grant — inventing a guard for
+  the detail page would have broken every deep link into a dataset.
+- **Narrowing a copy is the cheapest part of taking one.** `DatasetEditorTable`
+  lost its in-memory mode, its imperative controller and six embedding flags; the
+  add-or-edit drawer lost the workbench's column-visibility props, the upload
+  step's locked-columns prop and the record re-mapping branch that reached
+  `@langwatch/workflow-web`. That last one is why this family's closure carries
+  no web-to-web import: the branch is unreachable from either screen.
+
+Known costs, all reported rather than suppressed:
+
+- THREE new architecture-lint findings, 790 to 793: `ui-web-public-entry` for the
+  root export (20 platform importers, un-repointable), `ui-screen-closure` for
+  `behavior/dataset-api.ts`'s `@langwatch/platform-api-client` (the line every
+  family carries), and `ui-screen-closure` for `behavior/direct-upload.ts` using
+  `fetch` directly. The last is real: the presigned upload and the normalize
+  retry are HTTP calls to non-tRPC endpoints, and `direct-upload.ts` is also
+  imported by `platform/app`'s upload drawer through the root export, so putting
+  it behind a host port would break a caller deletes-only forbids touching. It
+  closes when that drawer moves.
+- **`SetupWithAgentButton` is gone from the empty state.** It is 367 lines of
+  `platform/app` chrome reaching Langy, and `apps/ui` may not import
+  `@langwatch/langy-web`. The same loss the me, automations and agents families
+  took for the Langy context chip — which this family also loses, from the
+  dataset rows.
+- The bulk upload drawer's confirm-columns section no longer animates open.
+- `NoDataInfoBlock`, `SelectionActionBar`, `HorizontalFormControl`,
+  `ExternalImage`, `CopyButton` and the type-to-confirm delete dialog all became
+  family-local copies. Every one has non-Datasets callers in `platform/app`;
+  three of them (`NoDataInfoBlock`, `ExternalImage`, `SelectionActionBar`) are
+  promotion candidates for the Design System and were left alone rather than
+  promoted inside a page move.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -941,7 +1101,7 @@ closures are computed net of that.
 |---|---|---|---|---|
 | 1 | agents | 1 | ~2+0 | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies. |
 | 2 | settings S5 data governance | 4 | 5+5 | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one. |
-| 3 | datasets | 2 | 6+6 | relayout dataset-web; one AppRouter type → contract DTO; touches NO drawer entries |
+| 3 | datasets | 2 | 6+6 | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move. |
 | 4 | settings S4 model config | 2 | 7+6 | create model-provider-web; 2 one-line platform breaks |
 | 5 | prompts | 1 | 44+14 | "model out first" is now just NINE family-local copies (5 optimization_studio consumers die with workflows); ~70 prompt fragment lines retire; prompt-web governed, 57% adapter ratio |
 | 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
