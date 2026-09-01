@@ -50,6 +50,65 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Then reading the summary returns only the restated amount
     And the reader can see the day was revised and what it was before
 
+  @unit
+  Scenario: A pulled event in another currency is summarized under that currency
+    Given a pulled usage event whose provider billed in a currency other than dollars
+    When that event is summarized
+    Then the summary row names the currency the event carried
+    And it is not filed under dollars
+    # Driven through the real summarizing step from a real event, not by
+    # building the row by hand: the currency has to survive the trip from the
+    # event, and a hand-built row proves only that the row has a field.
+
+  @unit
+  Scenario: A non-dollar day reports no dollar figure unless the biller gave one
+    Given a pulled usage event in a currency other than dollars
+    And the provider published no dollar equivalent for it
+    When that event is summarized
+    Then the row's dollar figure is absent rather than zero
+    And the row still carries the full amount in the currency it was billed in
+    # Absent and zero are different facts. Zero charts as free usage and would
+    # quietly erase real spend from a dollar total; absent says we hold money
+    # here that no dollar column can honestly state.
+
+  @unit
+  Scenario: The biller's own dollar conversion is what the dollar figure reports
+    Given a pulled usage event carrying both its own currency and the biller's dollar equivalent
+    When that event is summarized
+    Then the row keeps the provider's own amount and currency
+    And the row's dollar figure is the one the provider published
+    And that figure is not derived from the original amount by any rate
+    # We never invent a rate. The only dollar figure we will state is one the
+    # biller itself stands behind, and it is a separate number carried from
+    # ingest rather than anything this step calculates.
+
+  @unit
+  Scenario: A day in two currencies keeps a separate running total for each
+    Given one day holding events in two different currencies
+    When they are summarized
+    Then each currency has its own total
+    And no total mixes the two
+
+  @unit
+  Scenario: A credit summarizes against the charge it reverses
+    Given a day holding one charge and a later credit of the same size in the same currency
+    And the two are separate items rather than a revision of one
+    When they are summarized
+    Then the day's total for that currency reads as zero
+    # Two items, not a restatement: a restatement replaces and would read as
+    # zero even if credits were being dropped, which is the failure this is
+    # meant to catch.
+
+  @unit
+  Scenario: The watchdog compares the amount in the currency it was billed in
+    Given a summary row in a currency other than dollars that disagrees with its events
+    When the comparator runs
+    Then the drift is counted
+    # Comparing the dollar column makes the watchdog blind exactly where that
+    # column is empty by design — every non-dollar row, where both sides read
+    # as absent and agree with each other while the real amounts differ. The
+    # comparison has to be on the billed amount, which every row has.
+
   @integration
   Scenario: Rebuilding the summary from history reproduces it exactly
     Given a populated summary

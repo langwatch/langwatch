@@ -35,7 +35,7 @@ const ORIGIN = {
 };
 
 const CONVERSATION_START = "2026-08-25T19:14:34Z";
-const NAME = "b957a08c-0000-4000-8000-000000000001_dacfd251-bot";
+const NAME = "cccccccc-0000-4000-8000-000000000003_agent-one";
 
 /** A per-conversation channel id. GUID-shaped, and never a person. */
 const CHANNEL_ID = "3237db76-f6f8-03f7-72fc-c309292eefdc";
@@ -120,7 +120,7 @@ function transcriptRow({
     conversationstarttime: start,
     conversationtranscriptid: transcriptId,
     metadata: JSON.stringify({
-      BotId: "dacfd251-bot",
+      BotId: "agent-one",
       BotName: "engineering-agent",
       ...(batchId === null ? {} : { BatchId: batchId }),
     }),

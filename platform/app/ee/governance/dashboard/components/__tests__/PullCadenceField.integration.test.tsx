@@ -10,7 +10,7 @@
  * back through `onChange` as a cron string.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -58,13 +58,37 @@ describe("given the Cadence section of the composer", () => {
     });
 
     /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
-    it("prefills from the source's recommended schedule and says so in plain words", () => {
+    it("prefills from the source's recommended schedule", () => {
       renderField({ sourceType: "anthropic_admin", initialValue: "" });
       const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
       expect(frequency.value).toBe("hourly");
+    });
+
+    /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
+    it("does not restate the picked schedule underneath the picker", () => {
+      renderField({ sourceType: "anthropic_admin", initialValue: "" });
+
+      // The select already reads "Every hour". A sentence under it saying the
+      // same thing is a second copy of the answer the admin is looking at,
+      // and a pair of them per field is what made this drawer grey text.
+      expect(screen.queryByTestId("cadence-summary")).toBeNull();
       expect(
-        screen.getByText("Checks for new activity every hour, on the hour"),
-      ).toBeTruthy();
+        screen.queryByText(/Leave as-is to use the recommended schedule/),
+      ).toBeNull();
+    });
+
+    /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
+    it("puts the explanation behind an (i) beside the Cadence heading", async () => {
+      renderField({ sourceType: "anthropic_admin", initialValue: "" });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId("cadence-field-info"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/How often we check this source for new activity/),
+        ).toBeTruthy();
+      });
     });
 
     it("renders nothing for a source that has no pull schedule", () => {
@@ -75,7 +99,7 @@ describe("given the Cadence section of the composer", () => {
 
   describe("when the admin picks a different cadence", () => {
     /** @scenario "Picking a cadence saves exactly that schedule" */
-    it("emits the matching cron and updates the summary sentence", async () => {
+    it("emits the matching cron, with the select itself as the only feedback", async () => {
       const onChangeSpy = vi.fn();
       renderField({
         sourceType: "databricks_genie",
@@ -83,11 +107,11 @@ describe("given the Cadence section of the composer", () => {
         onChangeSpy,
       });
       const user = userEvent.setup();
-      await user.selectOptions(screen.getByLabelText("Frequency"), "hourly");
+      const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
+      await user.selectOptions(frequency, "hourly");
       expect(onChangeSpy).toHaveBeenLastCalledWith("0 * * * *");
-      expect(
-        screen.getByText("Checks for new activity every hour, on the hour"),
-      ).toBeTruthy();
+      expect(frequency.value).toBe("hourly");
+      expect(screen.queryByTestId("cadence-summary")).toBeNull();
     });
 
     /** @scenario "Leaving the cadence untouched keeps the recommended schedule" */
@@ -131,6 +155,28 @@ describe("given the Cadence section of the composer", () => {
       await user.clear(input);
       await user.type(input, "0 9 30 2 *");
       expect(screen.getByText(/never comes around/i)).toBeTruthy();
+    });
+  });
+
+  describe("when cron editing is on", () => {
+    /** @scenario "Cron editing is still there for schedules the picker cannot say" */
+    it("keeps the plain-words reading of the typed cron", async () => {
+      renderField({ sourceType: "databricks_genie", initialValue: "" });
+      const user = userEvent.setup();
+      await user.click(screen.getByLabelText("Edit as a cron expression"));
+
+      const input = screen.getByLabelText<HTMLInputElement>("Cron expression");
+      await user.clear(input);
+      await user.type(input, "0 * * * *");
+
+      // Unlike the select, a cron box shows five fields and no meaning, so
+      // this sentence is the only thing that says what the typed value does.
+      // That is why it survives here and not in the picker.
+      await waitFor(() => {
+        expect(screen.getByTestId("cadence-summary").textContent).toContain(
+          "every hour, on the hour",
+        );
+      });
     });
   });
 
