@@ -259,6 +259,23 @@ Feature: Dataset editor
       # announced once in a toast that dismisses; what is left on screen has to
       # go on being true after it does.
 
+  Rule: Each dataset is opened unsearched
+
+    A search belongs to the dataset it was typed against. The editor is not torn
+    down when the user moves between datasets — the same grid stays on screen
+    and the dataset under it changes — so a search left in the box would narrow
+    the next dataset by a word nobody typed against it, at a page it may not
+    have, with the previous dataset's size still shown as the total. Rows would
+    be missing and nothing on screen would say why.
+
+    @integration
+    Scenario: Opening another dataset starts it unsearched
+      Given I have searched one dataset
+      When I open a different dataset without leaving the editor
+      Then the search box is empty and the whole dataset is shown
+      And I am on its first page
+      And the record count reports that dataset's own size
+
   Rule: Search is offered for saved datasets only
 
     Search narrows a dataset by asking the server for the matching rows. A

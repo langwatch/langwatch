@@ -207,17 +207,62 @@ export function DatasetEditorTable({
   // would leave a selection pointing at rows the user never picked. A draft is
   // also entirely on screen already, so there is nothing to search for.
   const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch] = useDebounce(searchInput, 300);
-  const activeSearch = datasetId
-    ? debouncedSearch.trim() || undefined
-    : undefined;
+  // The term is debounced TOGETHER with the dataset it was typed against. A
+  // bare-string debounce leaves the previous dataset's term in the debounced
+  // value for 300ms after the user moves to another dataset without leaving the
+  // editor — long enough to fetch the new dataset narrowed by a word that was
+  // never typed against it. Pairing them lets the term be discarded the instant
+  // it stops belonging to what is on screen, without waiting for the debounce.
+  const searchScope = useMemo(
+    () => ({ datasetId, text: searchInput }),
+    [datasetId, searchInput],
+  );
+  const [debouncedSearch] = useDebounce(searchScope, 300);
+  const activeSearch =
+    datasetId && debouncedSearch.datasetId === datasetId
+      ? debouncedSearch.text.trim() || undefined
+      : undefined;
   const isSearching = !!activeSearch;
+
+  // Where the user was before the search started, so clearing it puts them back
+  // rather than on page 1 — see `onSearchChange` below, which maintains it.
+  const pageBeforeSearch = useRef<number | undefined>(undefined);
+  // The dataset's own total, remembered from its last unsearched read — see the
+  // count derivation below, which maintains it.
+  const unsearchedRecordCount = useRef<number | undefined>(undefined);
+
+  // Search term, page and the remembered dataset total each describe ONE
+  // dataset. The editor stays mounted when the user moves between datasets
+  // client-side — the route param changes underneath it — so unless they are
+  // dropped here they carry over: the new dataset opens narrowed by a word
+  // typed against the old one, at a page it may not have, with the old one's
+  // size on the count chip and nothing on screen explaining any of it.
+  //
+  // Reset during render, not in an effect: an effect runs after the render that
+  // has already put the stale page into the query key, so the request for it
+  // goes out regardless. `setData` clears the row selection when the new
+  // dataset's rows land, so there is nothing to clear here.
+  const [openDatasetId, setOpenDatasetId] = useState(datasetId);
+  const datasetChanged = openDatasetId !== datasetId;
+  if (datasetChanged) {
+    setOpenDatasetId(datasetId);
+    setSearchInput("");
+    setPage(1);
+    pageBeforeSearch.current = undefined;
+    unsearchedRecordCount.current = undefined;
+  }
+  // The state reset above only lands on the re-render React schedules; the
+  // query below reads its arguments from THIS render, which still holds the
+  // previous dataset's page. Derive what to ask for so the new dataset is never
+  // requested at a page that belonged to another one. (`activeSearch` needs no
+  // equivalent — it is already gated on the term belonging to this dataset.)
+  const requestedPage = datasetChanged ? 1 : page;
 
   const databaseDataset = api.datasetRecord.listPaginated.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: datasetId ?? "",
-      page,
+      page: requestedPage,
       limit: pageSize,
       search: activeSearch,
     },
@@ -267,14 +312,6 @@ export function DatasetEditorTable({
   // otherwise the header could only say how many rows matched, which reads as
   // the dataset having shrunk. The editor always loads unsearched first (the
   // box starts empty), so this is populated before any search can run.
-  const unsearchedRecordCount = useRef<number | undefined>(undefined);
-  if (!isSearching && serverRecordCount != null) {
-    unsearchedRecordCount.current = serverRecordCount;
-  }
-
-  const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const isLastPage = currentPage >= pageCount;
   // While `keepPreviousData` serves the prior key's result during a key change,
   // `isPlaceholderData` is true. Skip hydrating from it: a `datasetId` switch
   // would otherwise populate the grid with the OLD dataset's rows under the NEW
@@ -282,6 +319,17 @@ export function DatasetEditorTable({
   // same-dataset page switch this just holds the current page until the next one
   // lands.
   const holdingPreviousData = databaseDataset.isPlaceholderData;
+  // Only ever remembered from a SETTLED read of the dataset being shown. Held
+  // over from a placeholder, the number belongs to whichever dataset was open
+  // before, and a later search would report "3 of 679" about a dataset with 3
+  // rows in it — a total the user has no way to recognise as the wrong one.
+  if (!isSearching && !holdingPreviousData && serverRecordCount != null) {
+    unsearchedRecordCount.current = serverRecordCount;
+  }
+
+  const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const isLastPage = currentPage >= pageCount;
   // Snap a now-out-of-range page back into range — e.g. the last page's rows
   // were all deleted under us (the post-delete refetch shrinks the count) or a
   // navigation refetch returned a smaller dataset. Acts ONLY on an authoritative
@@ -410,7 +458,6 @@ export function DatasetEditorTable({
   // LAST page, so returning a multi-page dataset to page 1 would withdraw them
   // for the rest of the session — a search would silently cost the user their
   // place and their way of adding a row.
-  const pageBeforeSearch = useRef<number | undefined>(undefined);
   // The bookkeeping is done HERE, in the event handler, and not inside a
   // `setPage` updater: React replays updaters in StrictMode to surface impurity,
   // and an updater that writes this ref reads it back as `undefined` on the

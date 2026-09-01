@@ -152,6 +152,59 @@ const singlePageRecords = [
   { id: "c", entry: { input: "password reset", expected_output: "answer" } },
 ];
 
+/**
+ * Serves a different set of records per `datasetId`, so a switch between
+ * datasets on a still-mounted editor can be observed.
+ */
+const serveDatasetsById = (
+  byId: Record<string, { id: string; entry: Record<string, string> }[]>,
+  { pageSize = 50 }: { pageSize?: number } = {},
+) => {
+  const requests: { datasetId?: string; page?: number; search?: string }[] = [];
+  const cache = new Map<string, unknown>();
+
+  listPaginatedQuery.mockImplementation(
+    (input: { datasetId?: string; page?: number; search?: string }) => {
+      const datasetId = input?.datasetId ?? "";
+      const page = input?.page ?? 1;
+      const search = input?.search?.trim().toLowerCase();
+      const key = `${datasetId}::${page}::${search ?? ""}`;
+      requests.push({ datasetId, page, search: input?.search });
+
+      const cached = cache.get(key);
+      if (cached) return cached;
+
+      const records = byId[datasetId] ?? [];
+      const matching = search
+        ? records.filter((r) =>
+            Object.values(r.entry).some((v) =>
+              v.toLowerCase().includes(search),
+            ),
+          )
+        : records;
+      const result = {
+        data: {
+          id: datasetId,
+          name: datasetId,
+          columnTypes,
+          count: matching.length,
+          totalPages: Math.ceil(matching.length / pageSize),
+          page,
+          datasetRecords: matching.slice(
+            (page - 1) * pageSize,
+            page * pageSize,
+          ),
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      cache.set(key, result);
+      return result;
+    },
+  );
+  return requests;
+};
+
 const typeSearch = async (
   user: ReturnType<typeof userEvent.setup>,
   text: string,
@@ -542,6 +595,91 @@ describe("given the server refuses the search", () => {
       /\bof\b|matching/,
     );
     expect(screen.queryByText("question 0")).not.toBeInTheDocument();
+  });
+});
+
+describe("given I open another dataset without leaving the editor", () => {
+  /** @scenario Opening another dataset starts it unsearched */
+  it("drops the previous dataset's search rather than applying it to the new one", async () => {
+    // The editor stays mounted across a client-side move between datasets, so
+    // every piece of search state is carried over unless it is reset. Carried
+    // over, the new dataset is fetched already narrowed by a word the user
+    // typed against a different dataset — rows are missing and nothing on
+    // screen says why.
+    const user = userEvent.setup();
+    const requests = serveDatasetsById({
+      "ds-a": manyRecords,
+      "ds-b": singlePageRecords,
+    });
+    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+      wrapper: Wrapper,
+    });
+
+    await typeSearch(user, "escalation");
+    await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
+
+    rerender(<DatasetEditorTable datasetId="ds-b" />);
+
+    await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
+    expect(requests.filter((r) => r.datasetId === "ds-b" && r.search)).toEqual(
+      [],
+    );
+    expect(screen.getByTestId("dataset-row-search")).toHaveValue("");
+  });
+
+  /** @scenario Opening another dataset starts it unsearched */
+  it("does not report the new dataset's size as the previous one's", async () => {
+    // `unsearchedRecordCount` is remembered so a search can say "3 of 679". Kept
+    // across a dataset switch it says "3 of 679" about a dataset that holds 3
+    // rows in total — a number the user has no way to recognise as stale.
+    const user = userEvent.setup();
+    serveDatasetsById({ "ds-a": manyRecords, "ds-b": singlePageRecords });
+    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+      wrapper: Wrapper,
+    });
+
+    await typeSearch(user, "escalation");
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+        "1 of 120",
+      ),
+    );
+
+    rerender(<DatasetEditorTable datasetId="ds-b" />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+        "3 records",
+      ),
+    );
+    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+      "120",
+    );
+  });
+
+  /** @scenario Opening another dataset starts it unsearched */
+  it("starts the new dataset at its first page", async () => {
+    // Page is per-dataset too: page 3 of a 120-row dataset is past the end of a
+    // 3-row one, and the clamp only corrects it after a request for a page that
+    // does not exist has already gone out.
+    const user = userEvent.setup();
+    const requests = serveDatasetsById({
+      "ds-a": manyRecords,
+      "ds-b": singlePageRecords,
+    });
+    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+      wrapper: Wrapper,
+    });
+
+    await user.click(await screen.findByTestId("pagination-next"));
+    await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
+
+    rerender(<DatasetEditorTable datasetId="ds-b" />);
+
+    await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
+    expect(
+      requests.filter((r) => r.datasetId === "ds-b" && (r.page ?? 1) > 1),
+    ).toEqual([]);
   });
 });
 
