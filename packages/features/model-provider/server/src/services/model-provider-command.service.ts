@@ -15,6 +15,7 @@ import {
   type ModelProvider,
   type ModelProviderApiKeyValidation,
   type ModelProviderApiKeyValidationInput,
+  type ModelProviderCredentialVerdict,
   type ModelProviderDeleteInput,
   type ModelProviderTestConnectionInput,
   type ModelProviderWriteInput,
@@ -137,7 +138,7 @@ export class ModelProviderCommandService {
 
   async testConnection(
     input: ModelProviderTestConnectionInput,
-  ): Promise<{ connected: boolean }> {
+  ): Promise<ModelProviderCredentialVerdict> {
     const parsed = modelProviderTestConnectionInputSchema.parse(input);
     const organizationId = await this.options.scopes.tryResolveAnchor({
       projectId: parsed.projectId,

@@ -13,11 +13,8 @@ vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { RedirectRefusedError } from "../../../utils/ssrfProtection";
-import {
-  ProviderUnreachableError,
-  type ValidationResult,
-  validateProviderApiKey,
-} from "../providerValidation";
+import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
+import { ProviderUnreachableError, validateProviderApiKey } from "../providerValidation";
 
 /**
  * The code a refusal carries, or `undefined` when the key was accepted.
@@ -26,11 +23,11 @@ import {
  * sentence a customer reads is the registry's and is free to be reworded
  * without any of these tests being about it.
  */
-const codeOf = (result: ValidationResult): string | undefined =>
+const codeOf = (result: ModelProviderCredentialVerdict): string | undefined =>
   result.valid ? undefined : result.domainError.code;
 
 /** Everything a refusal puts on the wire, for the tests that assert absence. */
-const wireOf = (result: ValidationResult): string =>
+const wireOf = (result: ModelProviderCredentialVerdict): string =>
   result.valid ? "" : JSON.stringify(result.domainError);
 
 describe("validateProviderApiKey", () => {

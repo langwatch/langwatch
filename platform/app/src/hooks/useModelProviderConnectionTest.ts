@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { describeError, explainSerializedError } from "../features/errors";
 import type {
-  UncheckedReason,
-  ValidationResult,
-} from "../server/modelProviders/providerValidation";
+  ModelProviderCredentialVerdict,
+  ModelProviderUncheckedReason,
+} from "@langwatch/model-provider-contract";
 import { api } from "../utils/api";
 
 /**
@@ -22,16 +22,18 @@ import { api } from "../utils/api";
  */
 
 /**
- * The wire shape of a verdict — the server's own type, not a copy of it.
+ * The wire shape of a verdict — the contract's own type, not a copy of it.
  *
- * `import type` and not a value import: the module that owns this type reaches
- * the provider repository, and through it Prisma and the encryption helpers, so
- * importing anything from it by value would pull both into the browser bundle.
- * Types are erased, so this costs nothing at runtime and buys the one thing a
- * redeclaration cannot — a rename or a new `outcome` on the server becomes a
- * type error here instead of a sentence that quietly stops being true.
+ * The feature's contract package is where the union lives, so the packaged
+ * transport that returns it and this hook that reads it are checked against one
+ * declaration. That is the guard that failed the last time: the extraction
+ * collapsed the procedure's output to `{ connected: boolean }`, and because the
+ * hook named a type of its own, the two were free to disagree — every provider
+ * fell past all three branches and rendered as untestable.
+ *
+ * A redeclaration here would buy nothing and cost exactly that.
  */
-type ConnectionTestResult = ValidationResult;
+type ConnectionTestResult = ModelProviderCredentialVerdict;
 
 export type ConnectionTestState =
   | { status: "testing" }
@@ -48,7 +50,7 @@ export type ConnectionTestState =
  * is whether they still have something to do. Only the cases they can act on
  * get a next step.
  */
-const uncheckedMessage = (reason: UncheckedReason): string => {
+const uncheckedMessage = (reason: ModelProviderUncheckedReason): string => {
   if (reason === "no_credential" || reason === "credential_masked") {
     // Not "nothing is stored": a credential written before the encryption
     // secret was rotated is unreadable rather than absent, and the two are
@@ -65,46 +67,34 @@ const uncheckedMessage = (reason: UncheckedReason): string => {
  *
  * A pure function rather than three branches inside the hook: the mapping is
  * the part worth reading on its own, and keeping it out here is what lets the
- * exhaustiveness check below be the only place a new outcome has to be
- * handled.
+ * compiler own exhaustiveness.
+ *
+ * A `switch` over the discriminant with no `default` and no trailing return is
+ * that ownership. TypeScript proves the three cases cover the union, so there
+ * is no unreachable branch left to describe an unclassified verdict as "can't
+ * be tested automatically" — and a fourth outcome added to the contract makes
+ * this a compile error, because the function would then be able to fall through
+ * and return `undefined`.
  */
 function toState(result: ConnectionTestResult): ConnectionTestState {
-  if (result.outcome === "verified") {
-    return { status: "works" };
+  switch (result.outcome) {
+    case "verified":
+      return { status: "works" };
+    case "refused": {
+      // The refusal is a serialized handled error riding on the payload, so it
+      // is read with `explainSerializedError` rather than `describeError`. Both
+      // land in the same code-keyed registry; only the transport differs. The
+      // provider's own sentence never appears in either — a rejected-credential
+      // body is where the credential itself tends to turn up.
+      const { title, description } = explainSerializedError(result.domainError);
+      return {
+        status: "refused",
+        message: description ? `${title}. ${description}` : title,
+      };
+    }
+    case "unchecked":
+      return { status: "unchecked", message: uncheckedMessage(result.reason) };
   }
-
-  if (result.outcome === "refused") {
-    // The refusal is a serialized handled error riding on the payload, so it
-    // is read with `explainSerializedError` rather than `describeError`. Both
-    // land in the same code-keyed registry; only the transport differs. The
-    // provider's own sentence never appears in either — a rejected-credential
-    // body is where the credential itself tends to turn up.
-    const { title, description } = explainSerializedError(result.domainError);
-    return {
-      status: "refused",
-      message: description ? `${title}. ${description}` : title,
-    };
-  }
-
-  if (result.outcome === "unchecked") {
-    return { status: "unchecked", message: uncheckedMessage(result.reason) };
-  }
-
-  // A fourth outcome would otherwise fall into the branch above and be
-  // described as "can't be tested automatically" — a confident sentence about
-  // a verdict nobody has classified. This turns that into a compile error at
-  // the moment the server grows one.
-  //
-  // The discriminator only, never the payload: this message reaches
-  // `describeError` in the caller's catch, which can render a plain Error's
-  // text to the customer, and nothing promises a future outcome's fields are
-  // free of credential material.
-  const unhandled: never = result;
-  throw new Error(
-    `Unhandled connection test outcome: ${String(
-      (unhandled as { outcome?: unknown }).outcome,
-    )}`,
-  );
 }
 
 export function useModelProviderConnectionTest({

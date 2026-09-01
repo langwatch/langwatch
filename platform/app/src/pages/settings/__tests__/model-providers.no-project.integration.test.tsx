@@ -347,7 +347,7 @@ describe("given the Model Providers settings page", () => {
 
       /** @scenario "Testing a saved provider uses the credential already stored" */
       it("sends the row id when the connection test is picked", async () => {
-        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified", valid: true });
         renderPage();
 
         fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
@@ -364,7 +364,7 @@ describe("given the Model Providers settings page", () => {
 
       /** @scenario "A working credential says so" */
       it("shows the verdict on the row it belongs to", async () => {
-        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified", valid: true });
         renderPage();
 
         fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
@@ -376,6 +376,7 @@ describe("given the Model Providers settings page", () => {
       it("never renders a provider it could not check as working", async () => {
         mockTestConnection.mockResolvedValueOnce({
           outcome: "unchecked",
+          valid: true,
           reason: "provider_not_probeable",
         });
         renderPage();

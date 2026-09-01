@@ -13,6 +13,7 @@ import {
 import type {
   CodexTokenKeys,
   ModelProviderApiKeyValidation,
+  ModelProviderCredentialVerdict,
   ModelProviderService,
   ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
@@ -103,6 +104,21 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
       z.record(z.string(), z.string()).parse(customKeys),
     );
     return { valid: result.valid, message: result.valid ? undefined : result.outcome };
+  }
+
+  /**
+   * The stored-credential probe, handed back whole.
+   *
+   * `validateApiKey` above narrows the same verdict to what the save path
+   * needs, because a save is a yes-or-no decision. A reader is not: this
+   * returns the probe's own answer so "we could not check this" survives the
+   * trip to the browser instead of arriving as a pass.
+   */
+  testConnection(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<ModelProviderCredentialVerdict> {
+    return validateProviderApiKey(provider, z.record(z.string(), z.string()).parse(customKeys));
   }
 
   tryGetExecutionValue(input: {

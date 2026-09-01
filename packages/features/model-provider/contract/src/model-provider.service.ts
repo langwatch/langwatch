@@ -16,6 +16,7 @@ import type {
   ModelProvider,
   ModelProviderApiKeyValidation,
   ModelProviderApiKeyValidationInput,
+  ModelProviderCredentialVerdict,
   ModelProviderDeleteInput,
   ModelProviderExecutionParameters,
   ModelProviderExecutionPrepareInput,
@@ -63,7 +64,17 @@ export abstract class ModelProviderService {
   abstract validateApiKey(
     input: ModelProviderApiKeyValidationInput,
   ): Promise<ModelProviderApiKeyValidation>;
-  abstract testConnection(input: ModelProviderTestConnectionInput): Promise<{ connected: boolean }>;
+  /**
+   * Probes a credential that is already stored.
+   *
+   * Returns the three-verdict union, not a boolean. Collapsing it here is what
+   * broke Test Connection once already: "we could not check this" became
+   * indistinguishable from "this works", and the browser had no shape left to
+   * tell them apart.
+   */
+  abstract testConnection(
+    input: ModelProviderTestConnectionInput,
+  ): Promise<ModelProviderCredentialVerdict>;
   abstract getCodexStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus>;
   abstract refreshCodexForGateway(
     input: ModelProviderCodexGatewayRefreshInput,

@@ -42,6 +42,7 @@ import {
   type ModelProvider,
   type ModelProviderCodexStatus,
   type ModelProviderCodexStatusInput,
+  type ModelProviderCredentialVerdict,
   type ModelProviderDeleteInput,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
@@ -128,7 +129,7 @@ export class ModelProviderApp {
   testConnection(
     input: Omit<ModelProviderTestConnectionInput, "actorId">,
     by: ModelProviderCaller,
-  ): Promise<{ connected: boolean }> {
+  ): Promise<ModelProviderCredentialVerdict> {
     return this.dependencies.modelProviders.testConnection({ ...input, actorId: by.id });
   }
 

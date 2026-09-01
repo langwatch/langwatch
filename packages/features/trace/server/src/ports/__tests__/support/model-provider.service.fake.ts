@@ -1,6 +1,7 @@
 import {
   ModelProviderService,
   type ModelCostEstimateInput,
+  type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 
 export class TestModelProviderService extends ModelProviderService {
@@ -55,8 +56,12 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Trace tests.");
   }
 
-  testConnection(): Promise<{ connected: boolean }> {
-    return Promise.resolve({ connected: false });
+  testConnection(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
   }
 
   getCodexStatus(): Promise<never> {

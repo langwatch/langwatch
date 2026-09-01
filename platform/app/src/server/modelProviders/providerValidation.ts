@@ -2,7 +2,9 @@ import { HandledError, type SerializedHandledError } from "@langwatch/handled-er
 import { createLogger } from "@langwatch/observability";
 import {
   tryGetModelProviderDefinition,
+  type ModelProviderCredentialVerdict,
   type ModelProviderService,
+  type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
 import {
   providerApiRoots,
@@ -21,58 +23,23 @@ import { RedirectRefusedError, ssrfSafeFetch } from "../../utils/ssrfProtection"
 type ProbeResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
 
 /**
- * The answer to "does this credential work".
+ * The verdict this module produces, and the reasons a check never ran.
  *
- * A refusal travels as a serialized `HandledError`, not as a sentence. It is
- * still a RETURN value rather than a throw — asking a provider and being told
- * no is a successful question, and ADR-045 reserves throwing for the absence
- * of an answer — but the words the customer reads come from the code-keyed
- * registry in `features/errors`, the same as every other failure in the app.
- *
- * The shape follows `target_result.domainError`: a handled error carried on a
- * payload rather than off a transport envelope, read back with
- * `explainSerializedError`.
+ * Declared in `@langwatch/model-provider-contract` rather than here: the same
+ * three answers travel out through the packaged transport to the browser, and a
+ * shape restated on either side is a shape that drifts. This module is the one
+ * that decides which of them a credential gets.
  */
-export type ValidationResult =
-  | { outcome: "verified"; valid: true }
-  | { outcome: "refused"; valid: false; domainError: SerializedHandledError }
-  | { outcome: "unchecked"; valid: true; reason: UncheckedReason };
 
-/**
- * Why a check never reached the provider.
- *
- * These used to be indistinguishable from a pass, which was safe for exactly
- * as long as the answer stayed inside the save path: a skip should not block
- * a save, so `valid: true` was the right thing to return. Put the same value
- * in front of a customer and it becomes a claim we cannot support — six of
- * the sixteen registered providers reach one of these paths, so a control
- * that read `valid` alone would report more than a third of the list as
- * working without having sent a packet.
- *
- * `valid` still says what the save path needs. `outcome` says what a reader
- * needs. Neither has to lie for the other.
- */
-export type UncheckedReason =
-  /** Complex or non-probeable auth — AWS, gcloud, subscription-key services. */
-  | "provider_not_probeable"
-  /** The stored key came back as the masked placeholder, not a credential. */
-  | "credential_masked"
-  /** Nothing is stored and no environment variable supplies one. */
-  | "no_credential"
-  /** No endpoint is known or configured, so there is nowhere to ask. */
-  | "no_endpoint"
-  /** Not a provider in the registry. */
-  | "unknown_provider";
+const verified = (): ModelProviderCredentialVerdict => ({ outcome: "verified", valid: true });
 
-const verified = (): ValidationResult => ({ outcome: "verified", valid: true });
-
-const refused = (domainError: SerializedHandledError): ValidationResult => ({
+const refused = (domainError: SerializedHandledError): ModelProviderCredentialVerdict => ({
   outcome: "refused",
   valid: false,
   domainError,
 });
 
-const unchecked = (reason: UncheckedReason): ValidationResult => ({
+const unchecked = (reason: ModelProviderUncheckedReason): ModelProviderCredentialVerdict => ({
   outcome: "unchecked",
   valid: true,
   reason,
@@ -946,7 +913,7 @@ async function runProbeChain({
 }: {
   candidates: ProbeRequest[];
   context: ProbeContext;
-}): Promise<ValidationResult> {
+}): Promise<ModelProviderCredentialVerdict> {
   const failures: RankedFailure[] = [];
 
   // One deadline for the walk, not one per shape — see PROBE_BUDGET_MS. The
@@ -1012,7 +979,7 @@ export async function validateKeyWithCustomUrl({
   provider: string;
   customBaseUrl: string | undefined;
   modelProviders: ModelProviderService;
-}): Promise<ValidationResult> {
+}): Promise<ModelProviderCredentialVerdict> {
   const providerDef = tryGetModelProviderDefinition(provider);
   if (!providerDef) {
     return unchecked("unknown_provider");
@@ -1150,7 +1117,7 @@ function whyNotCheckable({
    * fields are.
    */
   hasAgentPlatformDoor: boolean;
-}): UncheckedReason | null {
+}): ModelProviderUncheckedReason | null {
   // The stored value came back as the mask, not a credential — the customer is
   // editing a provider without touching its key.
   if (apiKey === MASKED_KEY_PLACEHOLDER) {
@@ -1183,7 +1150,7 @@ function whyNotCheckable({
 export async function validateProviderApiKey(
   provider: string,
   customKeys: Record<string, string>,
-): Promise<ValidationResult> {
+): Promise<ModelProviderCredentialVerdict> {
   // Get provider definition from registry
   const providerDef = tryGetModelProviderDefinition(provider);
   if (!providerDef) {

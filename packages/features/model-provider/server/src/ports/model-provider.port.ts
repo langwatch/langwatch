@@ -21,6 +21,7 @@ import {
   type ModelDefaultScope,
   type ModelProvider,
   type ModelProviderApiKeyValidation,
+  type ModelProviderCredentialVerdict,
   type CodexTokenKeys,
   type ModelProviderSummary,
   type ModelDefaultFeature,
@@ -148,13 +149,20 @@ export abstract class ModelProviderCatalog {
     provider: string,
     customKeys: Record<string, unknown>,
   ): Promise<ModelProviderApiKeyValidation>;
-  async testConnection(
+  /**
+   * Probes a stored credential and reports which of the three verdicts it is.
+   *
+   * Abstract rather than derived from `validateApiKey`, which is the shape
+   * this port used to carry: that default read `valid` off the save-time
+   * verdict and returned `{ connected }`, so "we could not check this" — the
+   * answer six of the sixteen registered providers give — arrived at the
+   * browser as a pass. A catalog has to answer the question it was asked, and
+   * the compiler now says so.
+   */
+  abstract testConnection(
     provider: string,
     customKeys: Record<string, unknown>,
-  ): Promise<{ connected: boolean }> {
-    const result = await this.validateApiKey(provider, customKeys);
-    return { connected: result.valid };
-  }
+  ): Promise<ModelProviderCredentialVerdict>;
   metadata(provider: string): {
     models: string[];
     embeddingsModels: string[];

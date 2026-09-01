@@ -17,6 +17,7 @@ import {
   type ModelDefaultSnapshotInput,
   type ModelProvider,
   type ModelProviderApiKeyValidation,
+  type ModelProviderCredentialVerdict,
   type ModelProviderApiKeyValidationInput,
   type ModelProviderCodexGatewayRefresh,
   type ModelProviderCodexStatus,
@@ -221,7 +222,7 @@ export class ModelProviderService extends ModelProviderServiceContract {
     return this.commands.validateApiKey(input);
   }
 
-  testConnection(input: ModelProviderTestConnectionInput): Promise<{ connected: boolean }> {
+  testConnection(input: ModelProviderTestConnectionInput): Promise<ModelProviderCredentialVerdict> {
     return this.commands.testConnection(input);
   }
 

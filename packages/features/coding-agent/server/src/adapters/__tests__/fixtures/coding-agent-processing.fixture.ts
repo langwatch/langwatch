@@ -3,6 +3,7 @@ import type { GithubService } from "@langwatch/github-contract";
 import {
   ModelProviderService,
   type ModelCostEstimateInput,
+  type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import Redis from "ioredis";
@@ -125,8 +126,12 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Coding Agent tests.");
   }
 
-  testConnection(): Promise<{ connected: boolean }> {
-    return Promise.resolve({ connected: false });
+  testConnection(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
   }
 
   getCodexStatus(): Promise<never> {

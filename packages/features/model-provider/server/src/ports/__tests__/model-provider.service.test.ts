@@ -4,6 +4,7 @@ import {
   type ModelDefaultConfig,
   type ModelProvider,
   type ModelProviderApiKeyValidation,
+  type ModelProviderCredentialVerdict,
   type CodexTokenKeys,
   CODEX_DEFAULT_MODEL,
   DEFAULT_AZURE_API_VERSION,
@@ -650,9 +651,9 @@ class Catalog extends ModelProviderCatalog {
   testConnection(
     provider: string,
     customKeys: Record<string, unknown>,
-  ): Promise<{ connected: boolean }> {
+  ): Promise<ModelProviderCredentialVerdict> {
     this.connectionChecks.push({ provider, customKeys });
-    return Promise.resolve({ connected: true });
+    return Promise.resolve({ outcome: "verified", valid: true });
   }
   tryGetExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
@@ -1198,7 +1199,7 @@ describe("ModelProviderService", () => {
         organizationId: "org_1",
         actorId: "user_1",
       }),
-    ).resolves.toEqual({ connected: true });
+    ).resolves.toEqual({ outcome: "verified", valid: true });
     expect(limiter.calls).toBe(1);
 
     authorization.canWriteResult = false;
