@@ -33,7 +33,9 @@ function rollupReturning(rows: LaneRow[]) {
 }
 
 /** One (day, lane) row, priced in dollars and complete, unless said otherwise. */
-function laneRow(overrides: Partial<LaneRow> & { costSource: string }): LaneRow {
+function laneRow(
+  overrides: Partial<LaneRow> & { costSource: string },
+): LaneRow {
   return {
     day: "2026-08-01",
     amountNanoUsd: 0,
