@@ -1,6 +1,8 @@
 import { generateApiSpecs } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import type { SecretService } from "@langwatch/secret-contract";
 import { SecretReservedNameError } from "@langwatch/secret-contract";
+import { SecretApp } from "@langwatch/secret-server";
 import type { MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,15 +52,21 @@ const secret = {
   updatedBy: { name: "Alex" },
 };
 
+const secretService = {
+  create,
+  delete: vi.fn(),
+  get: vi.fn(),
+  getValues: vi.fn(),
+  list: vi.fn(),
+  update: vi.fn(),
+};
+
+// `App.secrets` is the feature's APPLICATION, not its service — that is what
+// the door is handed and what stamps `actorId` on a write. The assertions
+// below name the service's arguments, so the real application has to sit
+// between them, composed over stubbed stores the way the process composes it.
 const langwatchApp = {
-  secrets: {
-    create,
-    delete: vi.fn(),
-    get: vi.fn(),
-    getValues: vi.fn(),
-    list: vi.fn(),
-    update: vi.fn(),
-  },
+  secrets: SecretApp.create({ secrets: secretService as unknown as SecretService }),
 };
 
 vi.mock("~/app/api/middleware/app-context", () => {
@@ -118,9 +126,9 @@ describe("Secret modern REST composition", () => {
     authenticatedProjectId = "project-1";
     contractState.invalidOutput = false;
     create.mockResolvedValue(secret);
-    langwatchApp.secrets.list.mockResolvedValue([secret]);
-    langwatchApp.secrets.get.mockResolvedValue(secret);
-    langwatchApp.secrets.update.mockResolvedValue(secret);
+    secretService.list.mockResolvedValue([secret]);
+    secretService.get.mockResolvedValue(secret);
+    secretService.update.mockResolvedValue(secret);
   });
 
   /** @scenario "Every transport uses one service" */
@@ -244,17 +252,17 @@ describe("Secret modern REST composition", () => {
     expect(get.status).toBe(200);
     expect(update.status).toBe(200);
     expect(remove.status).toBe(200);
-    expect(langwatchApp.secrets.get).toHaveBeenCalledWith({
+    expect(secretService.get).toHaveBeenCalledWith({
       id: "secret-1",
       projectId: "project-1",
     });
-    expect(langwatchApp.secrets.update).toHaveBeenCalledWith({
+    expect(secretService.update).toHaveBeenCalledWith({
       actorId: "user-1",
       id: "secret-1",
       projectId: "project-1",
       value: "replacement-secret-value",
     });
-    expect(langwatchApp.secrets.delete).toHaveBeenCalledWith({
+    expect(secretService.delete).toHaveBeenCalledWith({
       id: "secret-1",
       projectId: "project-1",
     });

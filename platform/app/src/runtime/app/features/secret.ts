@@ -26,6 +26,11 @@ function buildSecretRestApp(
   const rest = createProjectRestApiService({
     name: "secret",
     basePath: options.basePath ?? "/api/v1/secret",
+    // The door calls `context.app.list(...)` and the rest of `SecretApp`'s own
+    // operations, so it is handed the feature's application rather than the
+    // process App that holds it. `apps/api` composes the same door the same
+    // way (`api-secret-rest.feature.ts`).
+    application: (app) => app.secrets,
     staticVersioning: {
       selector: restVersionSelector,
       ...(options.pathVersion ? { pathVersion: options.pathVersion } : {}),

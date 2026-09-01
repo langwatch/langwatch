@@ -19,13 +19,9 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
   resolveApiKeyPermission: (...args: unknown[]) => resolveApiKeyPermission(...args),
 }));
 
-// The middleware resolves its service from the App on the request context.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appCredentialPermissionsMock } =
-    await import("~/test-utils/appCredentialPermissionsMock");
-  return appCredentialPermissionsMock();
-});
-
+import type { App } from "~/server/app-layer/app";
+import { credentialBackedPermissions } from "~/test-utils/appCredentialPermissionsMock";
+import { appContextMiddlewareFor } from "../app-context";
 import { requireOrgPermission, requireOrgPermissionOrThrow } from "../org-auth";
 
 type TestEnv = {
@@ -47,6 +43,11 @@ function buildApp(middleware: MiddlewareHandler) {
     caught.push(error);
     return c.json({ caught: true }, 500);
   });
+  // The middleware reads the authorization engine off the App its transport
+  // root installed on the request, so the test is a transport root: it mounts
+  // an App carrying the credential-backed engine rather than replacing the
+  // module the process composes one from.
+  app.use(appContextMiddlewareFor({ permissions: credentialBackedPermissions() } as App));
   app.use(async (c, next) => {
     c.set("organization", { id: "org_1" });
     c.set("apiKeyId", "key_1");
@@ -104,9 +105,7 @@ describe("requireOrgPermissionOrThrow", () => {
   describe("when the credential lacks the permission", () => {
     it("throws insufficient_permissions naming the permission in meta", async () => {
       resolveApiKeyPermission.mockResolvedValue(false);
-      const { app, caught } = buildApp(
-        requireOrgPermissionOrThrow("organization:manage"),
-      );
+      const { app, caught } = buildApp(requireOrgPermissionOrThrow("organization:manage"));
 
       await app.request("/probe");
 
@@ -124,9 +123,7 @@ describe("requireOrgPermissionOrThrow", () => {
   describe("when the credential holds the permission", () => {
     it("passes through with the same organization-scope check", async () => {
       resolveApiKeyPermission.mockResolvedValue(true);
-      const { app, caught } = buildApp(
-        requireOrgPermissionOrThrow("organization:manage"),
-      );
+      const { app, caught } = buildApp(requireOrgPermissionOrThrow("organization:manage"));
 
       const res = await app.request("/probe");
 

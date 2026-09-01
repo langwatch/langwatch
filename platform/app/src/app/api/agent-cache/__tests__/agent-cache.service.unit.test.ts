@@ -9,6 +9,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCacheRepository } from "../agent-cache.repository";
 import { AgentCacheService } from "../agent-cache.service";
 
+// A process configures its logger before anything creates one, and a test is a
+// process too. Unconfigured, the package's development default builds a
+// pino-pretty transport on a worker thread: the warning below IS emitted, but
+// it reaches fd 1 from another thread, so nothing this thread does to
+// `process.stdout.write` can observe it. `environment: "test"` drops the
+// transport and pino writes to `process.stdout` directly. The level is named
+// because the test default is `error`, and the line under assertion is a
+// warning. Hoisted so it lands before the service module's own
+// module-scope `createLogger`.
+await vi.hoisted(async () => {
+  const { configureLogger } = await import("@langwatch/observability");
+  configureLogger({ environment: "test", level: "warn" });
+});
+
 vi.mock("~/utils/encryption", () => ({
   encrypt: (value: string) => `sealed:${value}`,
   decrypt: (value: string) => {
@@ -47,10 +61,9 @@ describe("AgentCacheService", () => {
     describe("when the caller reads it", () => {
       /** @scenario "An entry the platform can no longer read answers as a miss" */
       it("answers as a miss rather than as a failure", async () => {
-        vi.spyOn(
-          AgentCacheRepository.prototype,
-          "findByName",
-        ).mockResolvedValue("written-with-a-key-that-is-gone");
+        vi.spyOn(AgentCacheRepository.prototype, "findByName").mockResolvedValue(
+          "written-with-a-key-that-is-gone",
+        );
 
         await expect(
           service.getByName({ projectId: "project_1", name: "ACME_SESSION" }),
@@ -59,10 +72,9 @@ describe("AgentCacheService", () => {
 
       /** @scenario "An entry the platform can no longer read answers as a miss" */
       it("keeps the stored value out of the log line", async () => {
-        vi.spyOn(
-          AgentCacheRepository.prototype,
-          "findByName",
-        ).mockResolvedValue("a-secret-nobody-may-log");
+        vi.spyOn(AgentCacheRepository.prototype, "findByName").mockResolvedValue(
+          "a-secret-nobody-may-log",
+        );
         // The logger writes to stdout, so that is where the assertion has to
         // look: a spy on `console` would pass without reading a line.
         const written: string[] = [];

@@ -1,4 +1,6 @@
+import type { SecretService } from "@langwatch/secret-contract";
 import { SecretDuplicateError, SecretNotFoundError } from "@langwatch/secret-contract";
+import { SecretApp } from "@langwatch/secret-server";
 import { generateSpecs } from "hono-openapi";
 import type { MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,8 +20,21 @@ const secret = {
   updatedBy: { name: "Alex" },
 };
 
+const secretService = {
+  create,
+  delete: vi.fn(),
+  get,
+  getValues: vi.fn(),
+  list,
+  update: vi.fn(),
+};
+
+// The App carries the feature's APPLICATION, not its service. `SecretApp` is
+// what stamps `actorId` on a write, so the assertions below — that the service
+// saw the caller's id — only mean anything with the real application composed
+// over a stubbed service, the way the process composes it.
 const langwatchApp = {
-  secrets: { create, delete: vi.fn(), get, getValues: vi.fn(), list, update: vi.fn() },
+  secrets: SecretApp.create({ secrets: secretService as unknown as SecretService }),
 };
 
 vi.mock("~/app/api/middleware/app-context", () => {
@@ -56,7 +71,7 @@ import { appRestSecurity } from "~/server/api/security";
 
 const { hono: app } = createSecretLegacyRestApp({
   security: appRestSecurity,
-  secrets: () => langwatchApp.secrets as never,
+  secrets: () => langwatchApp.secrets,
 });
 
 describe("Secret legacy API compatibility", () => {
@@ -66,8 +81,8 @@ describe("Secret legacy API compatibility", () => {
     create.mockResolvedValue(secret);
     get.mockResolvedValue(secret);
     list.mockResolvedValue([secret]);
-    langwatchApp.secrets.update.mockResolvedValue(secret);
-    langwatchApp.secrets.delete.mockResolvedValue(undefined);
+    secretService.update.mockResolvedValue(secret);
+    secretService.delete.mockResolvedValue(undefined);
   });
 
   /** @scenario "Legacy REST remains a thin compatibility transport" */

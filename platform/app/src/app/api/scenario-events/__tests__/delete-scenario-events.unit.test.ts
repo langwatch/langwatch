@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { SimulationService } from "@langwatch/scenario-contract";
 
-vi.mock("@langwatch/observability", () => ({
+// Partial: the subject now arrives through `@langwatch/platform-api`, whose
+// tRPC spine calls `createWarnThrottle` at module scope. A whole-module
+// replacement takes that export away and the file fails to collect before a
+// single case runs. Only the logger is stubbed.
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

@@ -38,7 +38,13 @@ import {
 } from "../../server/stored-objects/__tests__/azurite-test-support";
 import { migrateDatasetContentToObjectStorage } from "../backfillDatasetContentToS3";
 
-const datasetStorageResolver = new AppDatasetStorageResolver();
+// The resolver owns an S3 client manager as well as the Azure one, and it
+// refuses to construct without a process-owned AWS builder. Nothing below
+// reaches the S3 arm — the env points every destination at Azurite — so the
+// builder is a stub rather than a real transport graph.
+const datasetStorageResolver = new AppDatasetStorageResolver({
+  buildS3ClientConfig: () => ({}),
+});
 
 const CONTAINER = "datasets";
 

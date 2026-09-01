@@ -47,10 +47,18 @@ class CredentialBackedTestAuthzService {
   }
 }
 
-export function appCredentialPermissionsMock(prisma?: unknown) {
-  const permissions = new CredentialBackedTestAuthzService(
+/**
+ * The authorization engine on its own, for a suite that installs an App on the
+ * request context rather than replacing the singleton module.
+ */
+export function credentialBackedPermissions(prisma?: unknown): AuthzService {
+  return new CredentialBackedTestAuthzService(
     (prisma ?? {}) as PrismaClient,
   ) as unknown as AuthzService;
+}
+
+export function appCredentialPermissionsMock(prisma?: unknown) {
+  const permissions = credentialBackedPermissions(prisma);
   return {
     getApp: () => ({ permissions }),
     tryGetApp: () => null,

@@ -56,10 +56,17 @@ export function createProjectApiService(options: { name: string; basePath: strin
  * It deliberately shares the auth, input-target, API-key ceiling and route
  * policy seams with the canonical project API. A feature only declares its
  * REST schemas and maps a validated request to its composed service.
+ *
+ * `application` is what a door is handed as `context.app`. A REST family serves
+ * exactly one feature, and its handlers call that feature's application
+ * directly, so the family names it here and the process App stays the thing it
+ * is selected from. Without this the whole `App` reached every handler and a
+ * door's own operations were looked up on an object that has none of them.
  */
-export function createProjectRestApiService(options: {
+export function createProjectRestApiService<TApplication>(options: {
   name: string;
   basePath?: string;
+  application: (app: App) => TApplication;
   staticVersioning?: StaticRestVersioning;
   maxInputBytes: number;
   rateLimitOptOut: string;
@@ -67,13 +74,14 @@ export function createProjectRestApiService(options: {
 }) {
   const basePath = options.basePath ?? `/api/v1/${options.name}`;
   const family = familyFromBasePath(basePath);
-  return createRestService<App>({
+  const application = options.application;
+  return createRestService<TApplication>({
     name: options.name,
     basePath,
     staticVersioning: options.staticVersioning,
     maxInputBytes: options.maxInputBytes,
     middleware: [appContextMiddleware],
-    app: appFromContext,
+    app: (context) => application(appFromContext(context)),
     actor: resolveRequestActor,
     authorize: authorizeRequestPermission,
     projectIdInput: true,

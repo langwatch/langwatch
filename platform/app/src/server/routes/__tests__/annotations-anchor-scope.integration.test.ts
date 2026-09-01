@@ -32,10 +32,14 @@ describe("Annotations REST API", () => {
   const bindings = {
     langwatchApp: {
       annotations,
+      // Credential resolution is authentication plumbing, so the route asks the
+      // api-key service the App hands out through `ApiKeyApp.apiKeyService`.
       apiKeys: {
-        tryResolveToken: async ({ token }: { token: string }) =>
-          token === project.apiKey ? { type: "legacy", project } : null,
-        markUsed: () => void 0,
+        apiKeyService: {
+          tryResolveToken: async ({ token }: { token: string }) =>
+            token === project.apiKey ? { type: "legacy", project } : null,
+          markUsed: () => void 0,
+        },
       },
     },
   };

@@ -54,7 +54,9 @@ vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   const { prisma: dbForPermissions } = await import("~/server/db");
   const fakeApp = () => ({
-    apiKeys: { tryResolveToken: mockResolve, markUsed: vi.fn() },
+    // Credential resolution is authentication plumbing, so the route asks the
+    // api-key service the App hands out through `ApiKeyApp.apiKeyService`.
+    apiKeys: { apiKeyService: { tryResolveToken: mockResolve, markUsed: vi.fn() } },
     permissions: appPermissionsService(dbForPermissions),
     evaluations: { reportEvaluation: mockReportEvaluation },
     modelProviders: testModelProviders,

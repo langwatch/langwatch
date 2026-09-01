@@ -32,8 +32,7 @@ const apiKeyCeilingDenialResponse = vi.fn();
 vi.mock("~/server/api-key/auth-middleware", () => ({
   extractCredentials: (...args: unknown[]) => extractCredentials(...args),
   enforceApiKeyCeiling: (...args: unknown[]) => enforceApiKeyCeiling(...args),
-  apiKeyCeilingDenialResponse: (...args: unknown[]) =>
-    apiKeyCeilingDenialResponse(...args),
+  apiKeyCeilingDenialResponse: (...args: unknown[]) => apiKeyCeilingDenialResponse(...args),
 }));
 
 const tryResolveToken = vi.fn();
@@ -41,9 +40,14 @@ const markUsed = vi.fn();
 const tryGetProject = vi.fn();
 
 const processApp = {
+  // Credential resolution and the last-used stamp are authentication plumbing,
+  // so the gate asks the api-key service the App hands out through
+  // `ApiKeyApp.apiKeyService` rather than the application itself.
   apiKeys: {
-    tryResolveToken,
-    markUsed,
+    apiKeyService: {
+      tryResolveToken,
+      markUsed,
+    },
   },
   projects: {
     tryGetById: tryGetProject,
