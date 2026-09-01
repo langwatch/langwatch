@@ -722,6 +722,7 @@ const LEGACY_PARTIAL: string[] = [
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-panel-layout.feature",
+  "specs/langy/langy-projection-independent-reactions.feature",
   "specs/langy/langy-prompt-optimization-entrypoints.feature",
   "specs/langy/langy-session-key.feature",
   "specs/licensing/oss-experimentation-uncapped.feature",
@@ -1754,11 +1755,13 @@ function analyzeParity(): ParityAnalysis {
     .map((b) => ({ title: b.title, ref: b.ref }));
 
   const legacySet = new Set(LEGACY_UNBOUND);
+  const allReports: Report[] = [];
   const enforced: Report[] = [];
   const legacy: LegacyReport[] = [];
 
   for (const f of allFeatures) {
     const report = buildReport(f, bindingsByTitle);
+    allReports.push(report);
     if (legacySet.has(f)) {
       legacy.push(toLegacyReport(report));
     } else {
@@ -1774,9 +1777,11 @@ function analyzeParity(): ParityAnalysis {
 
   // Partial floor, same shape: a file that enforces some scenarios and leaves
   // others untagged is a failure unless it was already in that state when the
-  // floor was introduced.
+  // floor was introduced. Runs against ALL reports (not just enforced) so that
+  // legacy-unbound files cannot silently gain untagged scenarios — the same
+  // hidden-scenario hole this floor exists to close.
   const partialSet = new Set(LEGACY_PARTIAL);
-  const partial = enforced.filter(isPartiallyTagged).map(toPartialReport);
+  const partial = allReports.filter(isPartiallyTagged).map(toPartialReport);
   const partialFeatures = new Set(partial.map((r) => r.feature));
 
   return {
