@@ -200,7 +200,13 @@ function stubVerticalLayout(): () => void {
 }
 
 /** One keystroke, delivered where dnd-kit's keyboard sensor listens for it. */
-function press(element: HTMLElement, code: string): void {
+function press({
+  element,
+  code,
+}: {
+  element: HTMLElement;
+  code: string;
+}): void {
   fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
 }
 
@@ -234,14 +240,14 @@ describe("given a flag with more than one targeting rule", () => {
         // Keys are dispatched at the handle rather than typed at whatever
         // holds focus: the dialog's focus trap moves focus around between
         // tests, and what is under test is the sensor, not the trap.
-        press(firstGrip, "Space");
+        press({ element: firstGrip, code: "Space" });
         await waitFor(() => expect(announcement()).not.toBe(""));
         const pickedUp = announcement();
 
-        press(firstGrip, "ArrowDown");
+        press({ element: firstGrip, code: "ArrowDown" });
         await waitFor(() => expect(announcement()).not.toBe(pickedUp));
 
-        press(firstGrip, "Space");
+        press({ element: firstGrip, code: "Space" });
         await waitFor(() =>
           expect(ruleFieldLabels()).toEqual(["Project id", "Organization id"]),
         );

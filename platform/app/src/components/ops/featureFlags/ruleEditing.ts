@@ -72,7 +72,7 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "ORGANIZATION" as const,
         target: rule.match.organizationId,
-        otherConditions: without(rule.match, "organizationId"),
+        otherConditions: without({ match: rule.match, key: "organizationId" }),
       };
     }
     if (rule.match.projectId) {
@@ -80,7 +80,7 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "PROJECT" as const,
         target: rule.match.projectId,
-        otherConditions: without(rule.match, "projectId"),
+        otherConditions: without({ match: rule.match, key: "projectId" }),
       };
     }
     if (rule.match.organizationCreatedAfter) {
@@ -88,7 +88,10 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "NEW_USERS" as const,
         target: toDateInputValue(rule.match.organizationCreatedAfter),
-        otherConditions: without(rule.match, "organizationCreatedAfter"),
+        otherConditions: without({
+          match: rule.match,
+          key: "organizationCreatedAfter",
+        }),
       };
     }
     return {
@@ -127,10 +130,13 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
 }
 
 /** The rule's other conditions: its match without the one the scope owns. */
-function without(
-  match: FeatureFlagRuleMatch,
-  key: keyof FeatureFlagRuleMatch,
-): FeatureFlagRuleMatch {
+function without({
+  match,
+  key,
+}: {
+  match: FeatureFlagRuleMatch;
+  key: keyof FeatureFlagRuleMatch;
+}): FeatureFlagRuleMatch {
   const { [key]: _owned, ...rest } = match;
   return rest;
 }

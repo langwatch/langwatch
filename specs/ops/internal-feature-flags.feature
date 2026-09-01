@@ -425,6 +425,14 @@ Feature: Internal feature flag system for system-level kill switches
       Then it does not offer June, because every organization created since
            June was created since January and the earlier rule answers first
 
+    @unit
+    Scenario: a new-users range a later rule closes is reported as a range
+      Given a rule turns a flag off for organizations created since June
+      And a later rule turns it on for organizations created since January
+      When the note is written
+      Then it names both ends, because naming January alone would claim
+           organizations the June rule switches back off
+
   Rule: The rules dialog offers New users as a scope of its own
 
     @integration

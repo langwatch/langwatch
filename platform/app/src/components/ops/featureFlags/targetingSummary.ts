@@ -6,27 +6,39 @@ import type { FeatureFlagRules } from "~/server/featureFlag";
  *
  * The walk honors first-match-wins throughout, because every shortcut around
  * it makes the page contradict the resolver: a disabled rule shadows every
- * later rule for the same target, a rule below a catch-all can never fire,
- * and — since an age rule is an inclusive lower bound rather than an exact
- * value — a disabled "new users since January" shadows an enabled "new users
- * since June" as well.
+ * later rule for the same target, and a rule below a catch-all can never
+ * fire.
+ *
+ * Age rules need more than a shadow check. Each is an inclusive lower bound,
+ * so two of them carve the timeline into ranges rather than naming two
+ * independent groups: a rule disabling "since June" placed above one enabling
+ * "since January" leaves the flag on for January through May and off from
+ * June, and a summary that reports the January rule's date on its own claims
+ * a population the resolver switches off.
  *
  * @see specs/ops/internal-feature-flags.feature
  */
+
+/** Organizations created from `from` on, and — when set — before `until`. */
+export interface AgeRange {
+  from: string;
+  until: string | null;
+}
 
 export interface TargetingSummary {
   enabledForEveryone: boolean;
   enabledOrganizationCount: number;
   enabledProjectCount: number;
-  /** The date of the first "new users" rule that enables the flag. */
-  enabledNewUsersSince: string | null;
+  /** The first stretch of creation dates a rule switches the flag on for. */
+  enabledNewUsers: AgeRange | null;
   /**
-   * Targets an earlier rule switches off. Only readable alongside
-   * `enabledForEveryone`, where the catch-all would otherwise claim the
-   * whole fleet on behalf of organizations a rule above it excludes.
+   * Targets an earlier rule switches off. Only read alongside
+   * `enabledForEveryone`, where the catch-all would otherwise claim the whole
+   * fleet on behalf of organizations a rule above it excludes.
    */
   excludedOrganizationCount: number;
   excludedProjectCount: number;
+  excludedNewUsers: AgeRange[];
 }
 
 type TargetKey = "organizationId" | "projectId";
@@ -41,6 +53,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
     rules: reachable,
     key: "projectId",
   });
+  const ages = ageRanges(reachable);
 
   return {
     enabledForEveryone: catchAllEnabled === true,
@@ -49,12 +62,15 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
       enabled: true,
     }),
     enabledProjectCount: count({ decisions: projects, enabled: true }),
-    enabledNewUsersSince: firstUnshadowedEnabledDate(reachable),
+    enabledNewUsers: bare(ages.find((range) => range.enabled)),
     excludedOrganizationCount: count({
       decisions: organizations,
       enabled: false,
     }),
     excludedProjectCount: count({ decisions: projects, enabled: false }),
+    excludedNewUsers: ages
+      .filter((range) => !range.enabled)
+      .flatMap((range) => bare(range) ?? []),
   };
 }
 
@@ -71,6 +87,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
         noun: "organization",
       }),
       pluralize({ count: summary.excludedProjectCount, noun: "project" }),
+      ...summary.excludedNewUsers.map(describeRange),
     ]);
     return exceptions
       ? `Enabled for everyone via rule, except ${exceptions}`
@@ -82,9 +99,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
       noun: "organization",
     }),
     pluralize({ count: summary.enabledProjectCount, noun: "project" }),
-    summary.enabledNewUsersSince
-      ? `organizations created on or after ${formatDate(summary.enabledNewUsersSince)}`
-      : null,
+    summary.enabledNewUsers ? describeRange(summary.enabledNewUsers) : null,
   ]);
   return targets ? `Enabled for ${targets}` : null;
 }
@@ -128,47 +143,66 @@ function firstDecisionPerTarget({
   return decisions;
 }
 
-/**
- * The date of the first age rule that switches the flag on for anybody.
- *
- * An age rule is a lower bound, not an equality, so an organization matching
- * a later rule matches every earlier rule naming an earlier-or-equal date
- * too. A disabled "since January" therefore answers for every organization a
- * subsequent "since June" would have covered, and the June rule enables
- * nobody — the case a per-date walk reports backwards.
- *
- * Only rules whose sole condition is the date take part. One that also names
- * an organization speaks for that organization alone, so it neither claims
- * the new-users population nor shadows a rule that does.
- */
-function firstUnshadowedEnabledDate(rules: FeatureFlagRules): string | null {
-  const dated = rules.flatMap((rule) => {
-    const date = rule.match.organizationCreatedAfter;
-    if (!date || Object.keys(rule.match).length > 1) return [];
-    return [{ date, enabled: rule.enabled }];
-  });
-  const shadows = (earlier: { date: string; enabled: boolean }, date: string) =>
-    !earlier.enabled && startsOnOrBefore(earlier.date, date);
-
-  return (
-    dated.find(
-      (rule, index) =>
-        rule.enabled &&
-        !dated.slice(0, index).some((earlier) => shadows(earlier, rule.date)),
-    )?.date ?? null
-  );
+interface DecidedRange extends AgeRange {
+  enabled: boolean;
 }
 
 /**
- * Whether every organization the later date covers is already covered by the
- * earlier one. An unparseable boundary matches nobody in the resolver, so it
- * covers nothing here either and shadows no rule.
+ * The creation dates the age rules decide, in order, as ranges.
+ *
+ * Every age condition is `created >= date`, so the verdict can only change at
+ * a date some rule names: between two consecutive dates the same rule wins
+ * for every organization. Resolving one organization per boundary therefore
+ * describes the whole timeline exactly, and adjacent boundaries that agree
+ * are merged so a run of rules reads as the one range it is.
+ *
+ * Only rules whose sole condition is the date take part. One that also names
+ * an organization speaks for that organization alone, so it neither claims
+ * the new-users population nor excludes any of it.
  */
-function startsOnOrBefore(earlier: string, later: string): boolean {
-  const from = Date.parse(earlier);
-  const to = Date.parse(later);
-  if (Number.isNaN(from) || Number.isNaN(to)) return false;
-  return from <= to;
+function ageRanges(rules: FeatureFlagRules): DecidedRange[] {
+  const dated = rules.flatMap((rule) => {
+    const date = rule.match.organizationCreatedAfter;
+    // An unreadable date matches nobody in the resolver, so it decides
+    // nothing here either and does not get to bound a range.
+    if (!date || Object.keys(rule.match).length > 1 || !readable(date)) {
+      return [];
+    }
+    return [{ date, enabled: rule.enabled }];
+  });
+  const boundaries = [...new Set(dated.map((rule) => rule.date))].sort(
+    (a, b) => Date.parse(a) - Date.parse(b),
+  );
+
+  const ranges: DecidedRange[] = [];
+  boundaries.forEach((from, index) => {
+    const decided = dated.find(
+      (rule) => Date.parse(rule.date) <= Date.parse(from),
+    );
+    if (!decided) return;
+    const until = boundaries[index + 1] ?? null;
+    const previous = ranges[ranges.length - 1];
+    if (previous?.enabled === decided.enabled && previous.until === from) {
+      previous.until = until;
+      return;
+    }
+    ranges.push({ from, until, enabled: decided.enabled });
+  });
+  return ranges;
+}
+
+/** A range without the verdict that produced it, which is not the caller's. */
+function bare(range: DecidedRange | undefined): AgeRange | null {
+  return range ? { from: range.from, until: range.until } : null;
+}
+
+function readable(date: string): boolean {
+  return !Number.isNaN(Date.parse(date));
+}
+
+function describeRange({ from, until }: AgeRange): string {
+  const opening = `organizations created on or after ${formatDate(from)}`;
+  return until ? `${opening} and before ${formatDate(until)}` : opening;
 }
 
 function count({
@@ -179,8 +213,9 @@ function count({
   enabled: boolean;
 }): number {
   let total = 0;
-  for (const decision of decisions.values())
+  for (const decision of decisions.values()) {
     if (decision === enabled) total += 1;
+  }
   return total;
 }
 

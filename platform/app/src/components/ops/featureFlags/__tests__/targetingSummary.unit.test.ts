@@ -75,7 +75,10 @@ describe("given a new-users rule", () => {
     // project, so a "matches everyone" test written as "no organization and
     // no project" reads it as a catch-all and reports the whole fleet.
     expect(summary.enabledForEveryone).toBe(false);
-    expect(summary.enabledNewUsersSince).toBe("2026-06-01");
+    expect(summary.enabledNewUsers).toEqual({
+      from: "2026-06-01",
+      until: null,
+    });
     expect(targetingLabel(summary)).toBe(
       "Enabled for organizations created on or after Jun 1, 2026",
     );
@@ -171,13 +174,18 @@ describe("given an age rule sits below a disabled age rule with an earlier date"
   });
 
   describe("when the disabled rule names a later date", () => {
-    it("still offers the earlier one, whose population it does not cover", () => {
+    /** @scenario "a new-users range a later rule closes is reported as a range" */
+    it("bounds the range at it, rather than reading as open-ended", () => {
+      // The flag is on from January and off again from June, so naming
+      // January alone would claim every organization created since.
       expect(
         labelFor([
           { match: { organizationCreatedAfter: "2026-06-01" }, enabled: false },
           { match: { organizationCreatedAfter: "2026-01-01" }, enabled: true },
         ]),
-      ).toContain("Jan 1, 2026");
+      ).toBe(
+        "Enabled for organizations created on or after Jan 1, 2026 and before Jun 1, 2026",
+      );
     });
   });
 
@@ -196,5 +204,55 @@ describe("given an age rule sits below a disabled age rule with an earlier date"
         ]),
       ).toContain("Jun 1, 2026");
     });
+  });
+});
+
+describe("given an age rule excludes part of the fleet above a catch-all", () => {
+  describe("when the note is written", () => {
+    /** @scenario "a catch-all note admits the targets a rule above it excludes" */
+    it("names the excluded dates, not just excluded ids", () => {
+      expect(
+        labelFor([
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: false },
+          { match: {}, enabled: true },
+        ]),
+      ).toBe(
+        "Enabled for everyone via rule, except organizations created on or after Jun 1, 2026",
+      );
+    });
+
+    it("lists an excluded organization and an excluded date together", () => {
+      expect(
+        labelFor([
+          { match: { organizationId: "organization_a" }, enabled: false },
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: false },
+          { match: {}, enabled: true },
+        ]),
+      ).toBe(
+        "Enabled for everyone via rule, except 1 organization, organizations created on or after Jun 1, 2026",
+      );
+    });
+  });
+});
+
+describe("given consecutive age rules that agree", () => {
+  it("reads as the one range they are", () => {
+    expect(
+      labelFor([
+        { match: { organizationCreatedAfter: "2026-01-01" }, enabled: true },
+        { match: { organizationCreatedAfter: "2026-06-01" }, enabled: true },
+      ]),
+    ).toBe("Enabled for organizations created on or after Jan 1, 2026");
+  });
+});
+
+describe("given an age rule whose date cannot be read", () => {
+  it("bounds nothing, because it matches nobody in the resolver either", () => {
+    expect(
+      labelFor([
+        { match: { organizationCreatedAfter: "whenever" }, enabled: false },
+        { match: { organizationCreatedAfter: "2026-01-01" }, enabled: true },
+      ]),
+    ).toBe("Enabled for organizations created on or after Jan 1, 2026");
   });
 });
