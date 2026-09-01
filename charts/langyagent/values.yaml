@@ -39,7 +39,7 @@ manager:
   port: 8080
   maxWorkers: 20
   workerIdleMs: 600000        # 10 min — idle workers are reaped
-  # How long to wait for a freshly-spawned worker to report ready before
+  # How long to wait for a freshly-spawned worker's ready handshake before
   # aborting the spawn. Under gVisor (runsc), process/syscall startup is
   # materially slower than runc: a cold worker boot on the dev gVisor node
   # measured ~28s (2026-07-07), so the previous 15s default aborted the FIRST
@@ -123,15 +123,60 @@ workspaceVolume:
 ## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
 scratchSizeLimit: 1Gi
 
+# Per-worker identity isolation (ADR-130).
+#
+#   per-uid  (default) each conversation's worker runs under its own uid, so
+#            the kernel refuses one worker reading another's process
+#            environment or session directory. Costs root + five capabilities.
+#   none     every worker runs as the pod's own user. The pod then needs no
+#            root and no capabilities at all, which is what makes it
+#            admissible under Pod Security Admission "restricted" and the
+#            common Gatekeeper / Kyverno rules — with no exemption, no
+#            RuntimeClass and no separate namespace.
+#
+# What `none` actually costs, stated precisely because the honest version is
+# narrower than it sounds. Workers keep NO credentials on disk — the worker
+# config carries environment variable names, never values — and they have no
+# listener, so the sibling-reaches-sibling attack is impossible at either
+# setting. What a shared identity opens is two things: one conversation's
+# worker can read another's live credentials from /proc/<pid>/environ, and can
+# read another's conversation content from its session directory. That is a
+# real cross-tenant credential and data exposure and nothing here makes it
+# small.
+#
+# Who can reasonably take it: a single-tenant install whose users are all
+# colleagues in one organization. Who cannot: anyone serving mutually
+# untrusted users from one install.
+#
+# This is the same shape as acceptUnsandboxedRuntime below, one rung down. It
+# exists because on a cluster that refuses root the alternative is not a
+# better-isolated assistant, it is no assistant: the pod is refused at
+# admission and the deployment never runs.
+workerIsolation: per-uid
+
+# Accept running workers without per-worker identity isolation. Required to
+# render with `workerIsolation: none`; the render fails otherwise (see
+# deployment.yaml), so nobody arrives at the weaker posture by leaving a field
+# blank or by an override that replaced more than it named.
+acceptWorkerIsolationDisabled: false
+
 ## SecurityContext.
 ##
-## Why the manager runs as ROOT here (counter-intuitive but load-bearing):
-## per-worker UID isolation requires `child_process.spawn({uid, gid})` —
-## that syscall path needs CAP_SETUID + CAP_SETGID + CAP_CHOWN, which only
-## a root-effective-uid process holds inside a container. With the manager
-## as UID 1000, every worker subprocess inherited UID 1000 too, so worker
-## A could read worker B's home under `/workspace/sessions/<worker-B>/` and
-## steal its project API key + GitHub token (PR #4913 review).
+## Why the manager runs as ROOT by default (counter-intuitive but
+## load-bearing): per-worker UID isolation requires spawning each worker under
+## its own uid, and that syscall path needs CAP_SETUID + CAP_SETGID +
+## CAP_CHOWN, which only a root-effective-uid process holds inside a container.
+## With the manager as UID 1000 every worker inherits UID 1000 too, and one
+## conversation's worker can then read another's live credentials out of
+## /proc/<pid>/environ and its conversation content out of the session
+## directory (PR #4913 review).
+##
+## This is a DEFAULT, not an invariant. A cluster enforcing Pod Security
+## Admission "restricted" — or any policy engine requiring runAsNonRoot —
+## admits no pod that can do the above at all, so on those clusters the choice
+## is between sibling isolation and having an assistant. `workerIsolation`
+## below is where an operator makes it, deliberately and on the record
+## (ADR-130).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
 ##   - Drop ALL caps and add back ONLY what's strictly required: the five
@@ -139,8 +184,8 @@ scratchSizeLimit: 1Gi
 ##     FOWNER lets root chmod a per-worker dir it has already chowned away
 ##     to the worker UID). NET_ADMIN was dropped alongside the iptables
 ##     lockdown it existed for — the worker→worker exfil hole it guarded is
-##     now closed because a worker has no listener at all (ADR-033 Fix A′),
-##     which needs no netfilter. No SYS_*.
+##     now closed structurally: workers are driven over stdio pipes and have
+##     no listener a sibling could dial (ADR-131). No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
 ##   - readOnlyRootFilesystem stays on so a worker can't pivot through
@@ -174,7 +219,7 @@ containerSecurityContext:
     # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
     #
     # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
-    # dropping loopback-TCP from non-root UIDs to a worker's internal port
+    # dropping loopback-TCP from non-root UIDs to the worker's internal port
     # range. That rule (services/langyagent/iptables.go) is deleted in this
     # change — dead under gVisor (no netfilter) and superseded by workers
     # that bind no listener at all (ADR-033 Fix A′) — so NET_ADMIN is
@@ -195,8 +240,9 @@ containerSecurityContext:
 # default that misbehaves on their nodes reads as "Langy is broken", and when
 # the RuntimeClass is simply absent the pod is rejected at admission, so it
 # never appears at all. The controls that bound the attack that actually
-# happens (per-worker UID isolation, workers with no listener, and a
-# NetworkPolicy with egress off) are on by default and work everywhere.
+# happens (per-worker UID isolation and a NetworkPolicy with egress off) are
+# on by default. Note UID isolation is not free everywhere — see
+# `workerIsolation` below for the cluster class where it costs the install.
 #
 # HARDENING, once, on purpose:
 #   runtimeClassName: "gvisor"          # or your Kata class on AKS
@@ -215,8 +261,9 @@ runtimeClassName: ""
 # What you give up: the pod->host escape surface reverts to standard cgroups +
 # namespaces, so a worker that breaks out of the container faces only the node
 # kernel. What you keep: per-worker UID isolation still separates one
-# conversation's credentials from another's inside the pod, and the
-# NetworkPolicy still bounds where workers can reach.
+# conversation's credentials from another's inside the pod, the workers have no
+# listener for a sibling to reach at all, and the NetworkPolicy still bounds
+# where they can egress.
 #
 # The judgement call this leaves the operator: a single-tenant install whose
 # users are all colleagues carries a much smaller worker-versus-worker risk
@@ -238,7 +285,7 @@ networkPolicy:
   # NetworkPolicy egress uses a podSelector + ports[].port, which Kubernetes
   # matches against the destination POD port (post-DNAT), not the Service
   # port. The earlier value 80 was the Service port: traffic to the gateway
-  # at 5563 was dropped, so a worker couldn't reach the gateway and Langy
+  # at 5563 was dropped, so the worker couldn't reach the gateway and Langy
   # was dead-on-arrival the moment an operator enabled `chartManaged: true`.
   egressToControlPlane: []
   gatewayPort: 5563
