@@ -82,27 +82,40 @@ export interface PromptSummary {
   version?: number;
 }
 
+export interface PromptTag {
+  name: string;
+  versionId: string;
+}
+
+export type PromptFieldList = Array<{ identifier: string; type: string }>;
+
+/**
+ * A single versioned prompt payload. `GET /api/prompts/:id` returns the
+ * requested version's data flattened to the top level (merged with the base
+ * prompt data), and `GET /api/prompts/:id/versions` returns an array of
+ * entries in this same shape — there is no nested `versions` array on the
+ * detail response.
+ */
 export interface PromptVersion {
   versionId?: string;
   version?: number;
-  commitMessage?: string;
+  commitMessage?: string | null;
   model?: string;
+  /** Legacy single-text prompt body. */
+  prompt?: string;
   messages?: Array<{ role: string; content: string }>;
   temperature?: number;
   maxTokens?: number;
-  responseFormat?: Record<string, unknown>;
-  parameters?: Array<{ identifier: string; type: string }>;
-  inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
-  tags?: string[];
+  responseFormat?: Record<string, unknown> | null;
+  /** Runtime parameters: an object map of name -> JSON value, not an array. */
+  parameters?: Record<string, unknown>;
+  inputs?: PromptFieldList;
+  outputs?: PromptFieldList;
+  /** All tags on the prompt; each names the version it currently points to. */
+  tags?: PromptTag[];
 }
 
-export interface PromptDetailResponse extends PromptSummary {
-  versions?: PromptVersion[];
-  model?: string;
-  messages?: Array<{ role: string; content: string }>;
-  prompt?: Array<{ role: string; content: string }>;
-}
+export interface PromptDetailResponse extends PromptSummary, PromptVersion {}
 
 export interface PromptMutationResponse {
   id?: string;
@@ -390,6 +403,16 @@ export async function getPrompt(
     "GET",
     `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
   ) as Promise<PromptDetailResponse>;
+}
+
+/** Lists all versions of a prompt (versioned data only). */
+export async function getPromptVersions(
+  idOrHandle: string
+): Promise<PromptVersion[]> {
+  return makeRequest(
+    "GET",
+    `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`
+  ) as Promise<PromptVersion[]>;
 }
 
 /** Creates a new prompt. */

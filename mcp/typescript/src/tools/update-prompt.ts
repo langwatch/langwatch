@@ -1,7 +1,9 @@
 import {
   getPrompt as apiGetPrompt,
+  getPromptVersions as apiGetPromptVersions,
   updatePrompt as apiUpdatePrompt,
-  type PromptVersion,
+  type PromptDetailResponse,
+  type PromptTag,
 } from "../langwatch-api.js";
 
 /**
@@ -9,10 +11,14 @@ import {
  *
  * Updates an existing prompt via the PUT endpoint. Every update with a
  * commitMessage creates a new version automatically. The mutation response
- * does not carry the tags the server actually applied to that version, so
- * this re-fetches the prompt via getPrompt and derives the reported
- * versionId and deployment state from the matching version's own tags
- * (matched by commitMessage) — never from the request's tags directly.
+ * does not carry the tags the server actually applied, so this re-fetches
+ * the prompt via getPrompt: the GET response is the prompt's latest version
+ * flattened to the top level (version, versionId, commitMessage) plus a
+ * `tags` array of { name, versionId } naming which version each tag points
+ * to. The new version is identified by matching the request's commitMessage
+ * against that top level (falling back to the versions listing), and
+ * deployment state is derived from the tags that point at it — never from
+ * the request's tags directly.
  */
 export async function handleUpdatePrompt(params: {
   idOrHandle: string;
@@ -39,19 +45,44 @@ export async function handleUpdatePrompt(params: {
   return renderUpdateSuccess({ idOrHandle, params, updated });
 }
 
-function findVersionByCommitMessage({
-  versions,
-  commitMessage,
-}: {
-  versions: PromptVersion[];
-  commitMessage: string;
-}): PromptVersion | undefined {
-  return versions.find((v) => v.commitMessage === commitMessage);
+interface IdentifiedVersion {
+  version?: number;
+  versionId?: string;
 }
 
-/** A version's own deployment tags, excluding the built-in "latest" tag. */
-function deploymentTagsOf(version: PromptVersion | undefined): string[] {
-  return (version?.tags ?? []).filter((tag) => tag !== "latest");
+/**
+ * Finds the version created by this update. The GET detail response IS the
+ * latest version, so a top-level commitMessage match identifies it directly;
+ * otherwise (e.g. a concurrent update landed after ours) the versions
+ * listing is consulted, best-effort.
+ */
+async function identifyNewVersion({
+  idOrHandle,
+  prompt,
+  commitMessage,
+}: {
+  idOrHandle: string;
+  prompt: PromptDetailResponse;
+  commitMessage: string;
+}): Promise<IdentifiedVersion | undefined> {
+  if (prompt.commitMessage === commitMessage) {
+    return { version: prompt.version, versionId: prompt.versionId };
+  }
+  try {
+    const versions = await apiGetPromptVersions(idOrHandle);
+    const match = (Array.isArray(versions) ? versions : []).find(
+      (v) => v.commitMessage === commitMessage
+    );
+    if (match) return { version: match.version, versionId: match.versionId };
+  } catch {
+    // Identification failure is reported by the caller.
+  }
+  return undefined;
+}
+
+/** The prompt's deployment tags, excluding the built-in "latest" tag. */
+function deploymentTagsOf(prompt: PromptDetailResponse): PromptTag[] {
+  return (prompt.tags ?? []).filter((tag) => tag?.name !== "latest");
 }
 
 async function renderUpdateSuccess({
@@ -82,9 +113,10 @@ async function renderUpdateSuccess({
     );
     return lines.join("\n");
   }
-  const versions = prompt.versions ?? [];
-  const newVersion = findVersionByCommitMessage({
-    versions,
+
+  const newVersion = await identifyNewVersion({
+    idOrHandle,
+    prompt,
     commitMessage: params.commitMessage,
   });
 
@@ -108,20 +140,27 @@ async function renderUpdateSuccess({
   }
 
   if (newVersion) {
-    const newTags = deploymentTagsOf(newVersion);
+    const allDeployments = deploymentTagsOf(prompt);
+    const newTags = allDeployments
+      .filter(
+        (tag) =>
+          newVersion.versionId != null &&
+          tag.versionId === newVersion.versionId
+      )
+      .map((tag) => tag.name);
     if (newTags.length > 0) {
       lines.push(`**Deployed to**: ${newTags.join(", ")}`);
     } else {
       lines.push(`**Deployment**: not deployed`);
 
-      // Other versions' deployment tags are untouched by this update —
+      // Tags pointing at other versions are untouched by this update —
       // surface them on their own line so no line pairs a version number
       // with a deployment tag name.
       const otherTags = Array.from(
         new Set(
-          versions
-            .filter((v) => v !== newVersion)
-            .flatMap((v) => deploymentTagsOf(v))
+          allDeployments
+            .filter((tag) => tag.versionId !== newVersion.versionId)
+            .map((tag) => tag.name)
         )
       );
       if (otherTags.length > 0) {
@@ -154,9 +193,10 @@ async function renderTagFailure({
     // without claiming whether a version was created.
     return `Prompt update failed: could not assign tag(s) ${failedTags} to "${idOrHandle}". Whether a new version was created could not be confirmed (confirmation read failed) — run platform_get_prompt before retrying.`;
   }
-  const versions = prompt.versions ?? [];
-  const matched = findVersionByCommitMessage({
-    versions,
+
+  const matched = await identifyNewVersion({
+    idOrHandle,
+    prompt,
     commitMessage: params.commitMessage,
   });
 

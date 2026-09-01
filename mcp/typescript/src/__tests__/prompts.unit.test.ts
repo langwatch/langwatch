@@ -1,83 +1,69 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleGetPrompt } from "../tools/get-prompt.js";
 import { handleUpdatePrompt } from "../tools/update-prompt.js";
-import { getPrompt, updatePrompt } from "../langwatch-api.js";
+import {
+  getPrompt,
+  getPromptVersions,
+  updatePrompt,
+  type PromptDetailResponse,
+  type PromptVersion,
+} from "../langwatch-api.js";
 
 // Partial mock (spread over the real module) rather than a full replacement:
 // Scenario 11 dynamically imports create-mcp-server.js, which re-exports other
 // langwatch-api.js members (e.g. LangWatchApiError) at tool-registration time.
-// Only getPrompt needs to be a fake for these tests.
+// Only the prompt read/write functions need to be fakes for these tests.
 vi.mock("../langwatch-api.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../langwatch-api.js")>();
-  return { ...actual, getPrompt: vi.fn(), updatePrompt: vi.fn() };
+  return {
+    ...actual,
+    getPrompt: vi.fn(),
+    getPromptVersions: vi.fn(),
+    updatePrompt: vi.fn(),
+  };
 });
 
 const mockGetPrompt = vi.mocked(getPrompt);
+const mockGetPromptVersions = vi.mocked(getPromptVersions);
 const mockUpdatePrompt = vi.mocked(updatePrompt);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The versions listing is only a fallback; default to "no versions found"
+  // so tests exercising the top-level commitMessage match stay honest.
+  mockGetPromptVersions.mockResolvedValue([]);
 });
 
 /**
- * Widened local fixture types. The real `PromptVersion`/`PromptDetailResponse`
- * in ../langwatch-api.ts are currently too narrow (missing parameters, inputs,
- * outputs, tags, versionId, temperature, maxTokens, responseFormat) — that is
- * exactly the bug under test. A later task widens the real types; until then,
- * fixtures here are typed independently of them.
- *
- * NOTE: the shape of `parameters`/`inputs`/`outputs` entries below
- * (`{ identifier, type }`) is a best-effort assumption, not verified against
- * the live API contract (out of this task's read scope) — confirm before
- * relying on the exact field names in the fix.
+ * Fixtures below mirror the real `GET /api/prompts/:id` contract
+ * (apiResponsePromptWithVersionDataSchema in
+ * platform/app/src/app/api/prompts/[[...route]]/schemas/outputs.ts):
+ * the returned version's data is flattened to the top level, `parameters`
+ * is an object map (runtimeParametersSchema, defaulting to {}), `tags` is
+ * an array of { name, versionId } objects, and there is NO nested
+ * `versions` array — version history lives behind GET /:id/versions.
  */
-interface FixturePromptVersion {
-  version?: number;
-  versionId?: string;
-  commitMessage?: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  responseFormat?: Record<string, unknown>;
-  parameters?: Array<{ identifier: string; type: string }>;
-  inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
-  messages?: Array<{ role: string; content: string }>;
-  tags?: string[];
-}
-
-interface FixturePrompt {
-  id?: string;
-  handle?: string;
-  name?: string;
-  latestVersionNumber?: number;
-  versions?: FixturePromptVersion[];
-}
 
 describe("handleGetPrompt()", () => {
   describe("when the returned version has every renderable field set", () => {
     /** @scenario "Rendering every field that changes how the prompt is called" */
     it("renders headings and readable text for parameters, inputs, outputs, model, temperature, maxTokens, and responseFormat", async () => {
-      const richVersion: FixturePromptVersion = {
+      const fixture: PromptDetailResponse = {
+        id: "prompt_1",
+        handle: "my-prompt",
         version: 3,
         versionId: "ver_rich001",
         model: "gpt-5-mini",
         temperature: 0.7,
         maxTokens: 512,
         responseFormat: { type: "json_schema", name: "answer_schema" },
-        parameters: [{ identifier: "temperature", type: "float" }],
+        parameters: { reasoning_effort: "low" },
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "answer", type: "str" }],
         messages: [{ role: "user", content: "{{question}}" }],
         tags: [],
       };
-      const fixture: FixturePrompt = {
-        id: "prompt_1",
-        handle: "my-prompt",
-        latestVersionNumber: 3,
-        versions: [richVersion],
-      };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -88,6 +74,7 @@ describe("handleGetPrompt()", () => {
       expect(result).toMatch(/temperature/i);
       expect(result).toMatch(/max ?tokens/i);
       expect(result).toMatch(/response ?format/i);
+      expect(result).toContain("reasoning_effort");
       expect(result).toContain("question");
       expect(result).toContain("str");
       expect(result).toContain("answer");
@@ -98,18 +85,17 @@ describe("handleGetPrompt()", () => {
   describe("when the returned version has none of those fields set", () => {
     /** @scenario "Omitting headings for fields absent from the API response" */
     it("renders no heading for parameters, inputs, outputs, model, temperature, maxTokens, or responseFormat", async () => {
-      const bareVersion: FixturePromptVersion = {
+      const fixture: PromptDetailResponse = {
+        id: "prompt_1",
+        handle: "my-prompt",
         version: 1,
         versionId: "ver_bare001",
         commitMessage: "Initial version",
+        // The API defaults parameters to {} — an empty map, not an array.
+        parameters: {},
+        tags: [],
       };
-      const fixture: FixturePrompt = {
-        id: "prompt_1",
-        handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [bareVersion],
-      };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -120,34 +106,31 @@ describe("handleGetPrompt()", () => {
       expect(result).not.toMatch(/#+\s*max ?tokens/i);
       expect(result).not.toMatch(/#+\s*response ?format/i);
       expect(result).not.toContain("[object Object]");
+      expect(result).not.toContain("**Parameters**");
     });
   });
 
   describe("when a pinned older version has every renderable field set", () => {
     /** @scenario "Rendering the pinned version's fields when version pins an older one" */
     it("renders the pinned version's fields, not the latest version's", async () => {
-      const olderVersion: FixturePromptVersion = {
+      // Pinning version=2 makes the API return that version's data at the
+      // top level.
+      const fixture: PromptDetailResponse = {
+        id: "prompt_1",
+        handle: "my-prompt",
         version: 2,
         versionId: "ver_older002",
         model: "gpt-5-mini",
         temperature: 0.5,
         maxTokens: 256,
         responseFormat: { type: "json_schema", name: "answer_schema" },
-        parameters: [{ identifier: "temperature", type: "float" }],
+        parameters: { seed: 42 },
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "answer", type: "str" }],
         messages: [{ role: "user", content: "{{question}}" }],
         tags: [],
       };
-      // latestVersionNumber (5) is intentionally higher than the pinned
-      // version (2) to make "older" unambiguous in this fixture.
-      const fixture: FixturePrompt = {
-        id: "prompt_1",
-        handle: "my-prompt",
-        latestVersionNumber: 5,
-        versions: [olderVersion],
-      };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt", version: 2 });
 
@@ -171,18 +154,18 @@ describe("handleGetPrompt()", () => {
   describe("when the returned version is tagged with multiple deployment tags", () => {
     /** @scenario "Listing tags currently assigned to the returned version" */
     it("lists production and staging as deployments of the returned version", async () => {
-      const version: FixturePromptVersion = {
-        version: 1,
-        versionId: "ver_tags001",
-        tags: ["production", "staging"],
-      };
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [version],
+        version: 1,
+        versionId: "ver_tags001",
+        tags: [
+          { name: "production", versionId: "ver_tags001" },
+          { name: "staging", versionId: "ver_tags001" },
+          { name: "latest", versionId: "ver_tags001" },
+        ],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -191,62 +174,50 @@ describe("handleGetPrompt()", () => {
     });
   });
 
-  describe("when the returned version has no tags but an older version is tagged production", () => {
+  describe("when the returned version has no tags of its own but production points at an older version", () => {
     /** @scenario "Never implying a tag is undeployed everywhere when it is only absent from this version" */
-    it("states production is not assigned to the returned version, without claiming it is undeployed", async () => {
-      const returnedVersion: FixturePromptVersion = {
-        version: 2,
-        versionId: "ver_v2",
-        tags: [],
-      };
-      const olderTaggedVersion: FixturePromptVersion = {
-        version: 1,
-        versionId: "ver_v1",
-        tags: ["production"],
-      };
-      const fixture: FixturePrompt = {
+    it("lists production against the version it points to, without claiming it is undeployed", async () => {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 2,
-        versions: [returnedVersion, olderTaggedVersion],
+        version: 2,
+        versionId: "ver_v2",
+        tags: [
+          { name: "latest", versionId: "ver_v2" },
+          { name: "production", versionId: "ver_v1" },
+        ],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
-      // The tag is listed against the history version that carries it, and
-      // is absent from the returned version's Deployments section.
-      const [beforeHistory, historySection] = result.split("## Version History");
-      expect(historySection).toBeDefined();
-      expect(historySection).toMatch(/production/i);
-      const deploymentsSection =
-        beforeHistory?.split("## Deployments")[1] ?? "";
-      expect(deploymentsSection).not.toMatch(/production/i);
-      expect(result).not.toMatch(/production["']?\s+is\s+(?:not\s+)?undeployed/i);
-      expect(result).not.toMatch(/production["']?[^.\n]*not\s+deployed\s+anywhere/i);
+      const deploymentsSection = result.split("## Deployments")[1] ?? "";
+      expect(deploymentsSection).toContain("production");
+      expect(deploymentsSection).toContain("ver_v1");
+      // The tag points at another version, so it must not be marked as
+      // assigned to the returned one.
+      expect(deploymentsSection).not.toMatch(/production.*\(this version\)/);
+      expect(result).not.toMatch(/undeployed/i);
+      expect(result).not.toMatch(/not\s+deployed\s+anywhere/i);
     });
   });
 
   describe("when the returned version is tagged only with the built-in latest tag", () => {
     /** @scenario "Rendering an empty deployments section when the version carries only the built-in latest tag" */
     it("renders an empty deployments section with no claim the prompt is undeployed", async () => {
-      const version: FixturePromptVersion = {
-        version: 1,
-        versionId: "ver_v1",
-        tags: ["latest"],
-      };
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [version],
+        version: 1,
+        versionId: "ver_v1",
+        tags: [{ name: "latest", versionId: "ver_v1" }],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
-      // Fails against current code: no "Deployments" section is ever rendered.
       expect(result).toMatch(/deployments?/i);
+      expect(result).not.toContain("- latest");
       expect(result).not.toMatch(/not deployed anywhere/i);
     });
   });
@@ -254,18 +225,14 @@ describe("handleGetPrompt()", () => {
   describe("when the returned version is tagged with a custom tag", () => {
     /** @scenario "Listing a custom tag as a deployment" */
     it("lists canary as a deployment of the returned version", async () => {
-      const version: FixturePromptVersion = {
-        version: 1,
-        versionId: "ver_v1",
-        tags: ["canary"],
-      };
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [version],
+        version: 1,
+        versionId: "ver_v1",
+        tags: [{ name: "canary", versionId: "ver_v1" }],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -276,17 +243,14 @@ describe("handleGetPrompt()", () => {
   describe("when a prompt version exists", () => {
     /** @scenario "Including the returned version's versionId" */
     it("includes the returned version's versionId", async () => {
-      const version: FixturePromptVersion = {
-        version: 1,
-        versionId: "ver_xyz789",
-      };
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [version],
+        version: 1,
+        versionId: "ver_xyz789",
+        tags: [],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -294,24 +258,49 @@ describe("handleGetPrompt()", () => {
     });
   });
 
+  describe("when the API returns unexpected shapes for parameters and tags", () => {
+    /** @scenario "Rendering every field that changes how the prompt is called" */
+    it("does not crash on an array parameters shape or string tags", async () => {
+      // Defensive: the pre-fix code crashed with "fields is not iterable"
+      // on the real object-map parameters; the fix must survive both the
+      // real shape and the legacy/assumed ones.
+      const fixture = {
+        id: "prompt_1",
+        handle: "my-prompt",
+        version: 1,
+        versionId: "ver_v1",
+        parameters: [{ identifier: "temperature", type: "float" }],
+        tags: ["production", "latest"],
+      } as unknown as PromptDetailResponse;
+      mockGetPrompt.mockResolvedValue(fixture);
+
+      const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
+
+      expect(result).toContain("temperature");
+      expect(result).toContain("production");
+      expect(result).not.toContain("[object Object]");
+    });
+  });
+
   describe("when called with format json", () => {
     /** @scenario "Requesting the unabridged API payload via format json" */
     it("returns a response that parses as the full platform_get_prompt API payload", async () => {
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [{ version: 1, versionId: "ver_v1", model: "gpt-5-mini" }],
+        version: 1,
+        versionId: "ver_v1",
+        model: "gpt-5-mini",
+        parameters: {},
+        tags: [],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({
         idOrHandle: "my-prompt",
         format: "json",
-      } as any);
+      });
 
-      // Fails against current code: the response is markdown, not JSON, so
-      // JSON.parse throws (an uncaught throw fails the test).
       const parsed = JSON.parse(result);
       expect(parsed).toEqual(fixture);
     });
@@ -320,13 +309,15 @@ describe("handleGetPrompt()", () => {
   describe("when called without a format argument", () => {
     /** @scenario "Defaulting to the digest format when format is omitted" */
     it("returns the rendered digest, not the raw API payload", async () => {
-      const fixture: FixturePrompt = {
+      const fixture: PromptDetailResponse = {
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 1,
-        versions: [{ version: 1, versionId: "ver_v1", model: "gpt-5-mini" }],
+        version: 1,
+        versionId: "ver_v1",
+        model: "gpt-5-mini",
+        tags: [],
       };
-      mockGetPrompt.mockResolvedValue(fixture as any);
+      mockGetPrompt.mockResolvedValue(fixture);
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
@@ -356,7 +347,6 @@ describe("MCP server platform_get_prompt tool registration", () => {
       expect(tool).toBeDefined();
 
       const shapeKeys = Object.keys(tool?.inputSchema?.shape ?? {});
-      // Fails against current code: no "format" key is registered at all.
       expect(shapeKeys).toContain("format");
       expect(tool?.description ?? "").toMatch(/format/i);
     });
@@ -364,15 +354,17 @@ describe("MCP server platform_get_prompt tool registration", () => {
 });
 
 /**
- * Write-path spec (issue #5666 AC5-9). These tests define the contract the
- * fix must implement: after updatePrompt succeeds, the tool re-fetches the
- * prompt via getPrompt to derive authoritative state (the mutation response
- * alone does not carry applied tags), finds the new version by matching the
- * request's commitMessage, and reports versionId and deployment state from
- * that version's tags (the built-in "latest" tag is never a deployment).
- * On updatePrompt failure with tags requested, the tool re-fetches and
- * matches by commitMessage to detect the committed-but-untagged version
- * (the platform commits the version before assigning tags).
+ * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool
+ * re-fetches the prompt via getPrompt to derive authoritative state (the
+ * mutation response alone does not carry applied tags). The GET response is
+ * the prompt's latest version flattened to the top level, so the new version
+ * is identified by matching the request's commitMessage against the
+ * top-level commitMessage (falling back to GET /:id/versions), and
+ * deployment state comes from the tags whose versionId points at it (the
+ * built-in "latest" tag is never a deployment). On updatePrompt failure with
+ * tags requested, the tool re-fetches and matches the same way to detect the
+ * committed-but-untagged version (the platform commits the version before
+ * assigning tags).
  */
 
 /** No single output line may pair a version number with a deployment tag name. */
@@ -386,29 +378,24 @@ function expectNoLineMixesVersionAndTag(result: string, tags: string[]) {
 }
 
 describe("handleUpdatePrompt()", () => {
-  const { getPrompt: mockedGetPrompt } = { getPrompt: mockGetPrompt };
-
   describe("when the server applies different tags than the request asked for", () => {
     /** @scenario "Deriving tag and deployment state from the server response, not the request" */
     it("reflects the tags the server applied, not the request's tags", async () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 4,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 4,
-        versions: [
-          {
-            version: 4,
-            versionId: "ver_new004",
-            commitMessage: "Update greeting",
-            tags: ["staging", "latest"],
-          },
+        version: 4,
+        versionId: "ver_new004",
+        commitMessage: "Update greeting",
+        tags: [
+          { name: "staging", versionId: "ver_new004" },
+          { name: "latest", versionId: "ver_new004" },
         ],
-      } as any);
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -429,27 +416,19 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 6,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 6,
-        versions: [
-          {
-            version: 6,
-            versionId: "ver_new006",
-            commitMessage: "Tweak wording",
-            tags: ["latest"],
-          },
-          {
-            version: 5,
-            versionId: "ver_old005",
-            commitMessage: "Prior stable",
-            tags: ["production", "staging"],
-          },
+        version: 6,
+        versionId: "ver_new006",
+        commitMessage: "Tweak wording",
+        tags: [
+          { name: "latest", versionId: "ver_new006" },
+          { name: "production", versionId: "ver_old005" },
+          { name: "staging", versionId: "ver_old005" },
         ],
-      } as any);
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -470,21 +449,18 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 7,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 7,
-        versions: [
-          {
-            version: 7,
-            versionId: "ver_new007",
-            commitMessage: "Ship it",
-            tags: ["production", "latest"],
-          },
+        version: 7,
+        versionId: "ver_new007",
+        commitMessage: "Ship it",
+        tags: [
+          { name: "production", versionId: "ver_new007" },
+          { name: "latest", versionId: "ver_new007" },
         ],
-      } as any);
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -504,21 +480,18 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 2,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 2,
-        versions: [
-          {
-            version: 2,
-            versionId: "ver_new002",
-            commitMessage: "First canary",
-            tags: ["canary", "latest"],
-          },
+        version: 2,
+        versionId: "ver_new002",
+        commitMessage: "First canary",
+        tags: [
+          { name: "canary", versionId: "ver_new002" },
+          { name: "latest", versionId: "ver_new002" },
         ],
-      } as any);
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -537,21 +510,15 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 3,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 3,
-        versions: [
-          {
-            version: 3,
-            versionId: "ver_new003",
-            commitMessage: "Plain update",
-            tags: ["latest"],
-          },
-        ],
-      } as any);
+        version: 3,
+        versionId: "ver_new003",
+        commitMessage: "Plain update",
+        tags: [{ name: "latest", versionId: "ver_new003" }],
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -569,21 +536,15 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 9,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 9,
-        versions: [
-          {
-            version: 9,
-            versionId: "ver_new009",
-            commitMessage: "Add disclaimer",
-            tags: ["latest"],
-          },
-        ],
-      } as any);
+        version: 9,
+        versionId: "ver_new009",
+        commitMessage: "Add disclaimer",
+        tags: [{ name: "latest", versionId: "ver_new009" }],
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -594,27 +555,57 @@ describe("handleUpdatePrompt()", () => {
     });
   });
 
+  describe("when the re-fetched top level does not match but the versions listing does", () => {
+    /** @scenario "Including the new version's versionId" */
+    it("identifies the new version via the versions listing fallback", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+      });
+      // A concurrent update landed after ours: the top level shows a newer
+      // commit, but GET /:id/versions still lists ours.
+      mockGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        version: 13,
+        versionId: "ver_racer013",
+        commitMessage: "Someone else's commit",
+        tags: [{ name: "latest", versionId: "ver_racer013" }],
+      });
+      const listedVersions: PromptVersion[] = [
+        { version: 13, versionId: "ver_racer013", commitMessage: "Someone else's commit" },
+        { version: 12, versionId: "ver_mine012", commitMessage: "Add disclaimer" },
+      ];
+      mockGetPromptVersions.mockResolvedValue(listedVersions);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Add disclaimer",
+      });
+
+      expect(result).toContain("ver_mine012");
+      expect(result).not.toMatch(/could not be identified/i);
+    });
+  });
+
   describe("when the new version cannot be identified after a successful update", () => {
     /** @scenario "Signalling when the new version cannot be identified after a successful update" */
     it("states that version and deployment details are unavailable instead of silently omitting them", async () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 10,
-      } as any);
-      mockedGetPrompt.mockResolvedValue({
+      });
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 10,
-        versions: [
-          {
-            version: 9,
-            versionId: "ver_stale009",
-            commitMessage: "Some earlier commit",
-            tags: ["latest"],
-          },
-        ],
-      } as any);
+        version: 9,
+        versionId: "ver_stale009",
+        commitMessage: "Some earlier commit",
+        tags: [{ name: "latest", versionId: "ver_stale009" }],
+      });
+      mockGetPromptVersions.mockResolvedValue([
+        { version: 9, versionId: "ver_stale009", commitMessage: "Some earlier commit" },
+      ]);
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -637,19 +628,14 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}")
       );
-      mockedGetPrompt.mockResolvedValue({
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 8,
-        versions: [
-          {
-            version: 8,
-            versionId: "ver_orphan8",
-            commitMessage: "Risky change",
-            tags: ["latest"],
-          },
-        ],
-      } as any);
+        version: 8,
+        versionId: "ver_orphan8",
+        commitMessage: "Risky change",
+        tags: [{ name: "latest", versionId: "ver_orphan8" }],
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -671,19 +657,17 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}")
       );
-      mockedGetPrompt.mockResolvedValue({
+      mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 8,
-        versions: [
-          {
-            version: 8,
-            versionId: "ver_other08",
-            commitMessage: "Unrelated commit",
-            tags: ["latest"],
-          },
-        ],
-      } as any);
+        version: 8,
+        versionId: "ver_other08",
+        commitMessage: "Unrelated commit",
+        tags: [{ name: "latest", versionId: "ver_other08" }],
+      });
+      mockGetPromptVersions.mockResolvedValue([
+        { version: 8, versionId: "ver_other08", commitMessage: "Unrelated commit" },
+      ]);
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -703,9 +687,8 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "prompt_1",
         handle: "my-prompt",
-        latestVersionNumber: 11,
-      } as any);
-      mockedGetPrompt.mockRejectedValue(
+      });
+      mockGetPrompt.mockRejectedValue(
         new LangWatchApiError("boom", 500, "{}")
       );
 
@@ -731,7 +714,7 @@ describe("handleUpdatePrompt()", () => {
       mockUpdatePrompt.mockRejectedValue(
         new LangWatchApiError("Tag assignment rejected", 422, "{}")
       );
-      mockedGetPrompt.mockRejectedValue(
+      mockGetPrompt.mockRejectedValue(
         new LangWatchApiError("boom", 500, "{}")
       );
 

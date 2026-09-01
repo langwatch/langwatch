@@ -6,6 +6,7 @@ vi.mock("../langwatch-api.js", () => ({
   getAnalyticsTimeseries: vi.fn(),
   listPrompts: vi.fn(),
   getPrompt: vi.fn(),
+  getPromptVersions: vi.fn(),
   createPrompt: vi.fn(),
   updatePrompt: vi.fn(),
   assignPromptTag: vi.fn(),
@@ -570,22 +571,14 @@ describe("handleGetPrompt()", () => {
         id: "p1",
         handle: "greeting",
         name: "Greeting Prompt",
-        latestVersionNumber: 2,
-        versions: [
-          {
-            version: 2,
-            model: "openai/gpt-4o",
-            messages: [
-              { role: "system", content: "You are a greeter." },
-              { role: "user", content: "Hello!" },
-            ],
-            commitMessage: "Updated greeting",
-          },
-          {
-            version: 1,
-            commitMessage: "Initial version",
-          },
+        version: 2,
+        versionId: "ver_002",
+        model: "openai/gpt-4o",
+        messages: [
+          { role: "system", content: "You are a greeter." },
+          { role: "user", content: "Hello!" },
         ],
+        commitMessage: "Updated greeting",
       });
 
       const result = await handleGetPrompt({ idOrHandle: "greeting" });
@@ -593,7 +586,7 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("# Prompt: Greeting Prompt");
       expect(result).toContain("**Handle**: greeting");
       expect(result).toContain("**ID**: p1");
-      expect(result).toContain("**Latest Version**: v2");
+      expect(result).toContain("**Version**: v2");
       expect(result).toContain("**Model**: openai/gpt-4o");
       expect(result).not.toContain("**Provider**");
     });
@@ -601,13 +594,9 @@ describe("handleGetPrompt()", () => {
     it("formats messages", async () => {
       mockGetPrompt.mockResolvedValue({
         name: "Test",
-        versions: [
-          {
-            messages: [
-              { role: "system", content: "You are helpful." },
-              { role: "user", content: "Hi there" },
-            ],
-          },
+        messages: [
+          { role: "system", content: "You are helpful." },
+          { role: "user", content: "Hi there" },
         ],
       });
 
@@ -618,41 +607,6 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("### user\nHi there");
     });
 
-    it("formats version history", async () => {
-      mockGetPrompt.mockResolvedValue({
-        name: "Test",
-        versions: [
-          { version: 3, commitMessage: "Third update" },
-          { version: 2, commitMessage: "Second update" },
-          { version: 1, commitMessage: "Initial" },
-        ],
-      });
-
-      const result = await handleGetPrompt({ idOrHandle: "test" });
-
-      expect(result).toContain("## Version History");
-      expect(result).toContain("- **v3**: Third update");
-      expect(result).toContain("- **v2**: Second update");
-      expect(result).toContain("- **v1**: Initial");
-    });
-  });
-
-  describe("when prompt has more than 10 versions", () => {
-    it("truncates version history with a count", async () => {
-      const versions = Array.from({ length: 12 }, (_, i) => ({
-        version: 12 - i,
-        commitMessage: `Version ${12 - i}`,
-      }));
-
-      mockGetPrompt.mockResolvedValue({
-        name: "Test",
-        versions,
-      });
-
-      const result = await handleGetPrompt({ idOrHandle: "test" });
-
-      expect(result).toContain("... and 2 more versions");
-    });
   });
 
   describe("when prompt has no versions", () => {
@@ -763,10 +717,9 @@ describe("handleUpdatePrompt()", () => {
       mockGetPrompt.mockResolvedValue({
         id: "p1",
         handle: "greeting",
-        latestVersionNumber: 2,
-        versions: [
-          { version: 2, versionId: "ver_002", commitMessage: "Update system prompt" },
-        ],
+        version: 2,
+        versionId: "ver_002",
+        commitMessage: "Update system prompt",
       });
 
       const result = await handleUpdatePrompt({
@@ -835,9 +788,12 @@ describe("handleUpdatePrompt() with tags", () => {
       mockGetPrompt.mockResolvedValue({
         id: "p1",
         handle: "test",
-        latestVersionNumber: 2,
-        versions: [
-          { version: 2, versionId: "ver_002", commitMessage: "add tags", tags: ["staging", "latest"] },
+        version: 2,
+        versionId: "ver_002",
+        commitMessage: "add tags",
+        tags: [
+          { name: "staging", versionId: "ver_002" },
+          { name: "latest", versionId: "ver_002" },
         ],
       });
 
