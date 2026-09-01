@@ -21,10 +21,22 @@ import {
 
 import { getHexColorForString } from "~/utils/rotatingColors";
 
+import {
+  CHART_TOOLTIP_CONTENT,
+  CHART_TOOLTIP_CURSOR,
+  CHART_TOOLTIP_LABEL,
+} from "../chartTheme";
+
 import type { DailyBucket, RankRow } from "./sampleSeries";
 
-const AXIS_TICK = { fontSize: 11, fill: "#64748b" } as const;
-const GRID_STROKE = "#e2e8f0";
+// Chakra tokens rather than fixed greys: a light grid stroke reads as bright
+// white dashes across a dark panel, and the axis labels drift out of step with
+// every other label on the page.
+const AXIS_TICK = {
+  fontSize: 11,
+  fill: "var(--chakra-colors-fg-muted)",
+} as const;
+const GRID_STROKE = "var(--chakra-colors-border)";
 
 /** Compact above a thousand, exact below it. Money is read, not audited, here. */
 function fmtMoney(value: number): string {
@@ -168,7 +180,8 @@ export function CostDonut({ rows }: { rows: RankRow[] }) {
             </Pie>
             <Tooltip
               formatter={(value) => fmtMoney(Number(value))}
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={CHART_TOOLTIP_CONTENT}
+              labelStyle={CHART_TOOLTIP_LABEL}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -290,7 +303,9 @@ export function CostStackedBars({
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
             labelFormatter={(label) => formatDayTick(label as string)}
-            contentStyle={{ fontSize: 12 }}
+            contentStyle={CHART_TOOLTIP_CONTENT}
+            labelStyle={CHART_TOOLTIP_LABEL}
+            cursor={CHART_TOOLTIP_CURSOR}
           />
           {showLegend && ChartLegend({ keys })}
           {keys.map((k) => (
@@ -355,7 +370,8 @@ export function CostForecastArea({
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
             labelFormatter={(label) => formatDayTick(label as string)}
-            contentStyle={{ fontSize: 12 }}
+            contentStyle={CHART_TOOLTIP_CONTENT}
+            labelStyle={CHART_TOOLTIP_LABEL}
           />
           {ChartLegend({ keys })}
           {projectedFromDay && lastDay && (
@@ -439,7 +455,8 @@ export function CostLine({
           <Tooltip
             formatter={(value) => format(Number(value))}
             labelFormatter={(label) => formatDayTick(label as string)}
-            contentStyle={{ fontSize: 12 }}
+            contentStyle={CHART_TOOLTIP_CONTENT}
+            labelStyle={CHART_TOOLTIP_LABEL}
           />
           <Area
             type="monotone"

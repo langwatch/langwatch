@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { CHART_TOOLTIP_CONTENT, CHART_TOOLTIP_LABEL } from "./chartTheme";
 import { formatLaneUsd } from "./costLaneFormat";
 
 /** The two lanes' colors. Fixed, so a lane keeps its color between renders. */
@@ -55,7 +56,8 @@ function LaneAreas({ series }: { series: readonly GovernanceCostDayDto[] }) {
           formatter={(value) =>
             formatLaneUsd(value === null ? null : Number(value))
           }
-          contentStyle={{ fontSize: 12 }}
+          contentStyle={CHART_TOOLTIP_CONTENT}
+          labelStyle={CHART_TOOLTIP_LABEL}
         />
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
         <Area
