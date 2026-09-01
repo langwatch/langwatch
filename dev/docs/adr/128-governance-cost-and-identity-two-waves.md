@@ -133,7 +133,7 @@ before the relying code ships:
 Numbered; each states why and what it rejects. §1–§8 are the money
 design — wave 1 ships the lanes **independent**; §2's interconnection
 and §7's mapping ship in **wave 2** (ruled by Sergio 2026-08-29) —
-§9–§17 identity and wave 2, §18–§20 cross-cutting.
+§9–§17 identity and wave 2, §18–§22 cross-cutting.
 
 ### §1. One ADR, two waves, cost before identity
 
@@ -404,8 +404,16 @@ removes the filter from the wave-1 critical path.)
 
 **Wave 2 — coverage is an explicit admin mapping, not an assumption.**
 When an admin connects a provider bill (an `IngestionSource`), they say
-which gateway keys that bill pays for (a schema addition on the source
-config — the reason this waits for wave 2). The rule then reads:
+which gateway keys that bill pays for. **The mapping is a dated join
+table** (`IngestionSourceKeyCoverage`, Schema) — the schema addition that
+is the reason this waits for wave 2. Dated, because coverage is read at
+query time: re-pointing a key from Bill 1 to Bill 2 in June must leave May
+filed under Bill 1, and an un-dated column would silently re-file every
+past month the next time a chart is drawn — history edited by a
+present-tense edit, which hard constraint 2 forbids. A separate table,
+because one-home then becomes a **database** guarantee: a partial unique
+index refuses a second bill claiming an already-covered key, rather than
+letting the last admin to hit Save win. The rule then reads:
 
 - A gateway row whose key is **mapped** to a source: the bill replaces
   its number in the combined total; the row still splits the bill (§2).
@@ -435,10 +443,13 @@ config — the reason this waits for wave 2). The rule then reads:
   rather than dragging it toward zero, and the same count is what tells
   the screen to render "—" instead of a figure.
 
-The mapping lives with the source config (small admin list, audited,
-read at query time like every overlap rule). The exclusion filter stays
-a **blocking prerequisite of the wave-2 combined view** — the first
-screen that merges lanes cannot ship before it. Rejected: provider-wide
+The mapping is edited beside the source config (small admin list,
+audited, read at query time like every overlap rule). The exclusion filter
+stays a **blocking prerequisite of the wave-2 combined view** — the first
+screen that merges lanes cannot ship before it. Rejected: a list column of
+key ids on `IngestionSource` — un-dated, rewritten wholesale on every
+edit, and with no way for the database itself to hold the one-home rule.
+Rejected: provider-wide
 coverage — one connected bill silently claiming *all* that provider's
 gateway traffic. Zero-config, and correct for a single-account org, but
 an org with a second, unconnected account of the same provider would
@@ -586,6 +597,35 @@ the app layer — the pattern the whole codebase uses. Rejects: ClickHouse
 residence (admin-curated rows are what it is worst at); a Postgres → CH
 sync (infrastructure for a problem app-layer joins don't have yet).
 
+**All three are keyed by `organizationId`, never by the hidden governance
+project.** The rollup's `TenantId` is that project's id (§8), and unlike the
+organization it is not durable: `resolveGovProjectId` resolves only
+un-archived projects (`archivedAt: null`,
+`ee/governance/services/govProject.ts`), and the re-mint path in
+`governanceProject.service.ts` can hand back an archived row — so one
+archive/re-mint cycle would orphan every identity and erasure row keyed to
+it, and a delete job walking that key could miss an erased person's rows
+entirely. That is the one failure this design cannot have. The organization
+id outlives all of it; reads translate org → `TenantId` through the same
+`resolveGovProjectId` call every cost read already makes
+(`governanceCost.service.ts:241`), so the join costs nothing new. Rejects:
+keying identity and erasure on the hidden project id (cheaper join, at the
+price of rows that can be orphaned by an operation nobody connects to
+governance).
+
+**What blanks a match on erasure is a listener, not a call site.** Step 1 of
+§9's erasure sequence is driven by a governance-side subscriber to the
+existing identity-pipeline event `lw.identity.user_erased` — emitted by
+`EraseUserCommand`
+(`src/server/event-sourcing/pipelines/identity/commands/eraseUser.command.ts`;
+the facts are built in `eraseUser` in
+`packages/identity-server/src/guards.ts`). Subscribing means every erasure
+path, the ones that exist today and the ones added later, is covered without
+anyone remembering that governance keeps its own rows. Rejects: appending a
+step to the erasure service's side-effect sequence — a second erasure entry
+point would silently skip governance, and nothing would surface the gap
+until an audit went looking.
+
 ### §12. Proof connects itself; guesses wait for a human; conflicts always stop the machine
 
 The match policy for `IdentityMatch`:
@@ -601,7 +641,14 @@ The match policy for `IdentityMatch`:
   notes only; no script artifact backs it.)
 - **Anything weaker only suggests** — "m.silva" resembling "Maria Silva"
   creates a suggestion an admin confirms. Nothing ever merges two people
-  automatically.
+  automatically. **Suggestions are computed at read and never stored**: the
+  review screen recomputes the current maybes on load from the evidence as
+  it stands, and confirming one writes an `IdentityMatch` row directly. A
+  suggestion table would give a lifecycle — staleness, invalidation,
+  cleanup — to rows whose evidence can stop being true between one page
+  load and the next; the same resolve-at-read argument §9 makes for people
+  and departments applies to the guesses about them. Accepted cost: no
+  dismiss-forever, so a maybe an admin ignores comes back next time.
 - **Conflict rule (the two-m.silvas safeguard):** if evidence points at
   two candidates, or new evidence contradicts an existing link (a
   provider id already linked to someone else), automatic linking
@@ -610,7 +657,10 @@ The match policy for `IdentityMatch`:
   shared mailboxes, and addresses re-issued to new hires. Re-issued
   emails are survivable *because links are dated*: the leaver's link
   closes at offboarding, the new hire gets a new link, and January's
-  spend stays with January's person.
+  spend stays with January's person. **The suspension itself is stored** —
+  the one exception to the rule above, because a halt on automatic linking
+  is worthless if a restart clears it (`DiscoveredPerson.suspendedAt` /
+  `suspendedReason`, Schema).
 - A collision-review screen is future work (Open questions), flagged per
   the framing ruling.
 
@@ -669,6 +719,19 @@ shape), never as mutated rows. Rejects: silent recompute
 (unreconcilable exports); freeze-after-N-days (our screen would
 knowingly disagree with the provider's own console).
 
+**Provisional is a second marker, and it means the opposite thing.** A
+figure whose day still sits inside the provider's settling window renders
+as **provisional** — "this can still move" — as distinct from *revised*,
+which says a restatement already happened. No source supplies finality:
+Anthropic revises cost for up to 30 days (#6978), and FOCUS's
+`ChargeClass="Correction"` describes only periods that have already
+closed, so nothing on the wire tells us a day is settled. The flag is
+therefore **derived** from a per-source settling window
+(`SETTLING_WINDOW_DAYS`, Constants — 30 days by default, overridable per
+source as providers differ), computed at read like every other overlap
+rule. The reason it earns a marker at all: a governance number that
+silently restates is worse than one that admitted up front it might.
+
 ### §16. Idle seats split across the waves (FR3)
 
 - **Wave 1, the aggregate**: "you pay for N seats, M are assigned" per
@@ -677,7 +740,19 @@ knowingly disagree with the provider's own console).
 - **Wave 2, the names and the activity**: an *active*-seat count (distinct
   raw actor ids on usage rows) and listing *which* seats are idle both
   require the roster ↔ usage-actor join (§11). Idle default: no activity
-  for 30 days, adjustable per org; last-activity date always shown.
+  for 30 days, adjustable per org; last-activity date always shown. The
+  roster side of that join comes from **extending the seat pull to
+  per-user assignment facts** — "the provider reported that this person
+  holds a seat of type X on day D" — appended as durable events on the
+  same spine as §6's counts, which today carry only a number. That
+  extension is what makes a never-active seat holder visible at all: by
+  definition they appear in zero usage rows, so no usage-side derivation
+  can ever name them, and they are precisely the person this feature
+  exists to find. Stated plainly, it widens what the pull stores to names
+  and email addresses — the same class of personal data §9 already carries
+  on usage rows, under the same erasure path (§9, §11). Rejects: keeping
+  the pull counts-only, which would quietly demote this bullet's promise
+  from *which* seats are idle to *how many*.
 - FR3 is **partially** met in wave 1, met in wave 2 — the ADR says so
   rather than rounding up.
 
@@ -920,6 +995,33 @@ to change, in a branch already four deep in a stack.
 *Rejects:* a shared lane type spanning seats and spend now. Revisit at
 the third lane.
 
+### §22. New surfaces speak FOCUS; the shipped internal names stay
+
+Every **new** wave-2 surface a customer can see — DTO fields, export
+columns, any header on a downloadable file — uses the FinOps FOCUS
+standard's name where the standard has one, and an `x_`-prefixed extension
+where it does not. FOCUS through 1.4 has no columns for identity, team,
+cost center, or AI/token dimensions, so most of what this ADR adds is
+necessarily an extension; naming them the standard's way now means a
+customer's FOCUS tooling ingests our export without a translation table,
+and the ones FOCUS *does* define (§3's `BilledCost`, `BillingCurrency`,
+`ChargePeriodStart/End`, `ProviderName`) already line up.
+`IdentityMatch.evidenceKind` (§11) stays mappable onto the pull-mode
+architecture map's `x_PersonResolutionMethod` vocabulary — the values are
+chosen so the mapping is a lookup, never a re-derivation.
+
+**The shipped rollup's internal column names do not change.** Renaming a
+live table buys nothing: no customer reads a ClickHouse column name, the
+export layer is where the standard is actually observed, and a rename
+costs a migration plus every query that references it. The boundary is
+therefore where the name becomes visible, not where the data is stored.
+
+Source: the pull-mode architecture map (`_pull-mode-architecture-map.md`,
+§8.3). Rejects: retrofitting FOCUS names onto the live rollup (churn with
+no reader); ignoring FOCUS entirely (the first export surface would then
+need a rename layer, and rename layers are where column meanings quietly
+drift apart).
+
 ## Constants
 
 | Name | Value | Purpose |
@@ -937,6 +1039,7 @@ the third lane.
 | One-app choice (§21.1 form default, v3.7) | `azureBillingUsesSameApp: boolean`, written by the create form's builder beside a claimed subscription, default `true` | the only durable record of whether the billing pair is a copy of the bot's or a second app; nothing reads it at run time — the edit path (#7777) will |
 | Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
 | Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
+| `SETTLING_WINDOW_DAYS` | 30 days, overridable per ingestion source | §15: days inside the window render *provisional*; no provider feed supplies finality |
 
 ## Invariants
 
@@ -1063,6 +1166,10 @@ model DiscoveredPerson {
   kind           String            // person | service_account (deterministic, §10)
   firstSeenAt    DateTime
   lastSeenAt     DateTime
+  suspendedAt    DateTime?         // §12 conflict rule: automatic linking stopped for this identity
+  suspendedReason String?          // what tripped it, for the human who reviews
+  // Suspension is stored (suggestions are not, §12) — a halt on auto-linking
+  // that a restart clears is not a halt.
   @@unique([organizationId, provider, rawActorId])
 }
 
@@ -1082,7 +1189,8 @@ model IdentityMatch {
   id                 String    @id @default(nanoid())
   organizationId     String
   discoveredPersonId String    // the provider-side identity
-  userId             String?   // platform user; nullable — GDPR erasure blanks it, row and dates remain
+  userId             String?   // platform user; nullable — blanked by the §11 listener on
+                               // lw.identity.user_erased; the row and its dates remain
   evidenceKind       String    // directory_id | verified_email | human_confirmed
   validFrom          DateTime
   validTo            DateTime? // open link = null; offboarding/correction closes, never rewrites
@@ -1115,6 +1223,21 @@ model SeatPrice {
   // EXCLUDE USING gist (
   //   "organizationId" WITH =, "provider" WITH =, "licenseType" WITH =,
   //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
+}
+
+model IngestionSourceKeyCoverage {
+  id                String    @id @default(nanoid())
+  organizationId    String
+  ingestionSourceId String              // the connected bill
+  virtualKeyId      String              // the gateway key that bill pays for
+  validFrom         DateTime
+  validTo           DateTime?           // open coverage = null; re-pointing closes, never rewrites
+  // One OPEN bill per key — the §7 one-home rule, enforced in the database:
+  // partial unique index (raw SQL in the migration:
+  //   UNIQUE ("virtualKeyId") WHERE "validTo" IS NULL).
+  // Overlap guard: same btree_gist exclusion pattern as IdentityMatch —
+  // EXCLUDE USING gist ("virtualKeyId" WITH =,
+  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&).
 }
 ```
 
@@ -1224,9 +1347,43 @@ money tables, only the identity tables and read paths.
 | Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
-| Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
+
+- **v3.8 (2026-09-01, captain: Sergio Esteban).** Wave-2 lock completed; the
+  two #7740 forks plus four gaps found in the lock-completeness pass, all
+  ratified:
+  - **Identity and erasure key on `organizationId`** (§11, Schema): the
+    rollup's `TenantId` is the hidden governance project's id, and that id
+    is not durable — the resolver filters archived projects and the re-mint
+    path can return an archived row, so keying on it could orphan the very
+    rows an erasure job must find. Reads translate org → tenant through the
+    `resolveGovProjectId` call every cost read already makes.
+  - **Key-to-bill mapping is a dated join table** (§7, Schema, Open
+    questions): `IngestionSourceKeyCoverage`, with a partial unique index
+    holding one-home in the database. Dates keep a June re-point from
+    re-filing May; a list column on the source is rejected. Resolves the
+    open question of that name.
+  - **Erasure blanks matches through a listener** (§11, Schema): a
+    governance subscriber to the existing `lw.identity.user_erased` event,
+    not a step appended to the erasure service — so a future second erasure
+    path cannot silently skip governance rows.
+  - **Suggestions compute at read; suspension is stored** (§12, Schema): no
+    suggestion table and its lifecycle, at the accepted cost of no
+    dismiss-forever; `DiscoveredPerson.suspendedAt`/`suspendedReason`
+    persist the conflict halt, which a restart must not clear.
+  - **Idle-seat names come from per-user seat-assignment facts** (§16): the
+    seat pull extends from counts to "this person holds a seat of type X on
+    day D", appended on §6's spine — the only way to name a holder who
+    appears in zero usage rows, and a stated expansion of stored personal
+    data to the class §9 already carries.
+  - **New surfaces speak FOCUS** (§22 new, §15, Constants): FOCUS names on
+    new customer-visible surfaces and `x_` extensions where the standard has
+    none, with the live rollup's internal names left alone; plus a
+    *provisional* marker, distinct from *revised*, derived from a
+    `SETTLING_WINDOW_DAYS` window because no provider feed states finality.
+  - *Numbered v3.8 rather than v3.3 on rebase: wave 1 shipped v3.3–v3.7 to
+    `main` in parallel with this branch.*
 
 - **v3.7 (2026-09-03, captain: Sergio Esteban).** The create form's
   default flipped to one app registration for both reads (issue #7775).
