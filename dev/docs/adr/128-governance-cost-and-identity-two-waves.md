@@ -455,13 +455,23 @@ after her March transfer, and every re-org would trigger a rewrite job).
 Old rows are facts; the lens moves, the facts don't.
 
 **Erasure.** When a provider-supplied raw actor id contains personal data
-(e.g. an email address), GDPR erasure blanks the `IdentityMatch.userId`
-link (§11) **and** pseudonymises the `rawActorId` / `displayText` on the
-corresponding `DiscoveredPerson` row. The spend events themselves keep
-only the `discoveredPersonId` foreign key, which is already opaque.
-Retention policy (§7) covers the events; the identity tables carry their
-own `validTo` lifecycle. Provider-opaque identifiers (UUIDs, numeric ids)
-need no action because they are not personal data on their own.
+(e.g. an email address), GDPR erasure:
+
+1. blanks `IdentityMatch.userId` (§11),
+2. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
+   row (hash-replace, preserving the row for spend attribution),
+3. issues an `ALTER TABLE … UPDATE` on the ClickHouse rollup to replace
+   the matching `RawActorId` value with the same pseudonym — `RawActorId`
+   is part of the ORDER BY / dedup key, so the pseudonym must be
+   deterministic (e.g. `SHA-256(secret ‖ original)` truncated to the same
+   length) to avoid splitting or collapsing rollup rows.
+
+Retention policy (§7) covers event expiry; the identity tables carry
+their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
+numeric ids) are not personal data in isolation but **are** personal data
+when stored alongside identity context — evaluate per provider whether
+the identifier is reversible to a person outside our system before
+exempting it from erasure.
 
 ### §10. Five actor kinds, all first-class: people, agents, API keys, seats, service accounts
 
