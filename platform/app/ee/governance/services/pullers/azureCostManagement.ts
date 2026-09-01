@@ -123,6 +123,52 @@ export function azureCostReadIsDue({
 export const AZURE_COST_API_VERSION = "2025-03-01";
 
 /**
+ * The one host Azure Resource Manager is served from.
+ *
+ * Written once because three things depend on it agreeing with itself: the
+ * audience the token is minted for, the address the first page is asked of,
+ * and the check that decides whether a next-page link may be followed. Two
+ * copies drifting apart would show up as the guard refusing the very link the
+ * request's own host served, which reads like a permissions problem and is not
+ * one.
+ */
+export const AZURE_MANAGEMENT_HOST = "management.azure.com";
+
+/**
+ * Whether a link is Azure Resource Manager itself and nowhere else.
+ *
+ * The next-page link arrives inside a reply and is followed carrying the ARM
+ * bearer token, so where it points is decided by parsing rather than by
+ * comparing text. Written the same way, and for the same reason, as
+ * `isDataverseEnvironmentOrigin` guards the other host this source sends a
+ * token to.
+ *
+ * `hostname` rather than `host`: it excludes the port, which is compared
+ * separately, and it is already lowercased and punycoded by the parser, so a
+ * link differing from ARM's own only in letter case is still ARM. Anything
+ * that will not parse is not a URL and is refused with everything else.
+ *
+ * The port, user and password comparisons are not decoration. A link can name
+ * the host ARM answers to and still reach somewhere else on it, or carry
+ * credentials in front of a host that does match, which a request would then
+ * send along with the bearer. Each of those shapes is held out by its own test
+ * through the page walk, so none of the four comparisons can be dropped
+ * without a test saying so.
+ */
+export function isAzureResourceManagerUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.port !== "") return false;
+  return url.hostname === AZURE_MANAGEMENT_HOST;
+}
+
+/**
  * One day's bill for one meter category, as it will be recorded.
  *
  * `costMinor` is the amount in the currency the subscription is BILLED in, and

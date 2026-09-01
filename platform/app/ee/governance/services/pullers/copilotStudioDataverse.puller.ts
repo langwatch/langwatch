@@ -44,10 +44,12 @@ import { z } from "zod";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AZURE_COST_API_VERSION,
+  AZURE_MANAGEMENT_HOST,
   azureCostEvents,
   azureCostReadIsDue,
   azureCostReadWindow,
   azureCostRequestBody,
+  isAzureResourceManagerUrl,
   nextAzureCostCursor,
   readAzureCostRows,
 } from "./azureCostManagement";
@@ -382,7 +384,7 @@ function environmentScope(environmentUrl: string): string {
  * a token minted for one is refused by the other. So a source that reads cost
  * signs in twice per run, once per audience.
  */
-export const AZURE_MANAGEMENT_SCOPE = "https://management.azure.com/.default";
+export const AZURE_MANAGEMENT_SCOPE = `https://${AZURE_MANAGEMENT_HOST}/.default`;
 
 async function resolveEnvironmentToken(params: {
   credentials: Record<string, string> | undefined;
@@ -794,39 +796,6 @@ function hostOf(value: string): string {
   }
 }
 
-/** The one host Azure Resource Manager is served from. */
-const AZURE_MANAGEMENT_HOST = "management.azure.com";
-
-/**
- * Whether a link is Azure Resource Manager itself and nowhere else.
- *
- * `hostname` rather than `host`: it excludes the port, which is compared
- * separately, and it is already lowercased and punycoded by the parser, so a
- * link differing from ARM's own only in letter case is still ARM. Anything
- * that will not parse is not a URL and is refused with everything else.
- *
- * The port, user and password comparisons are not decoration. A link can name
- * the host ARM answers to and still reach somewhere else on it, or carry
- * credentials in front of a host that does match, which a request would then
- * send along with the bearer. Each of those shapes is held out by its own test
- * through the page walk, so none of the four comparisons can be dropped
- * without a test saying so.
- */
-function isAzureResourceManagerUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname === AZURE_MANAGEMENT_HOST &&
-      url.port === "" &&
-      url.username === "" &&
-      url.password === ""
-    );
-  } catch {
-    return false;
-  }
-}
-
 export class CopilotStudioDataversePuller
   implements PullerAdapter<CopilotStudioDataverseConfig>
 {
@@ -1071,7 +1040,7 @@ export class CopilotStudioDataversePuller
     const days: ReturnType<typeof readAzureCostRows>["days"] = [];
 
     let url: string | null =
-      `https://management.azure.com/subscriptions/${encodeURIComponent(subscriptionId)}` +
+      `https://${AZURE_MANAGEMENT_HOST}/subscriptions/${encodeURIComponent(subscriptionId)}` +
       `/providers/Microsoft.CostManagement/query?api-version=${AZURE_COST_API_VERSION}`;
     let pageCount = 0;
 
