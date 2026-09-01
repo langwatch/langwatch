@@ -58,12 +58,15 @@ export const listSimulationRunsCommand = async (options: {
   try {
     const fetchPage = async (
       cursor?: string,
+      limitOverride?: number,
     ): Promise<SimulationRunListPage> => {
       const params = new URLSearchParams();
       if (options.scenarioSetId)
         params.set("scenarioSetId", options.scenarioSetId);
       if (options.batchRunId) params.set("batchRunId", options.batchRunId);
-      if (options.limit) params.set("limit", options.limit);
+      const limit =
+        limitOverride === undefined ? options.limit : String(limitOverride);
+      if (limit) params.set("limit", limit);
       if (cursor) params.set("cursor", cursor);
 
       const response = await fetch(
@@ -123,7 +126,13 @@ export const listSimulationRunsCommand = async (options: {
         scanStoppedEarly = true;
         break;
       }
-      page = await fetchPage(page.nextCursor);
+      // The last page is cut to what is left of the ceiling, so the scan
+      // stops AT it rather than up to one page past it. The cut only ever
+      // makes the page smaller than the one already in use: the API refuses
+      // a limit above its own ceiling, and a smaller one it always takes.
+      const remaining = FILTER_SCAN_RUN_CEILING - scanned;
+      const pageLimit = remaining < page.runs.length ? remaining : undefined;
+      page = await fetchPage(page.nextCursor, pageLimit);
       runs = page.runs.filter(matchesFilters);
       scanned += page.runs.length;
     }

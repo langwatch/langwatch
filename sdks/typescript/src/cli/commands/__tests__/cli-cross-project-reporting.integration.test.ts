@@ -120,6 +120,9 @@ describe("given a login that minted a user-scoped CLI key", () => {
 
       const result = await run({ args: ["whoami"] });
 
+      // The exit code first: an absence assertion on stdout also holds when
+      // the command failed and printed nothing at all.
+      expect(result.exitCode).toBe(0);
       expect(result.stdout).not.toContain("Permissions:");
     });
 
