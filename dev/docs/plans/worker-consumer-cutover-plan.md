@@ -148,6 +148,14 @@ Preparatory commits, each behaviour-neutral and landable independently:
   `createLegacyWorkerPorts` for transport, drains packaged then App).
 - **P5 — the pre-switch test suite** (below).
 
+P1 and P2 landed as `5e8a84ba4d` and `25885235b8`. A P1 finding widens
+P3/P4's scope: two consumer knobs are not yet wired to the new option —
+`apps/worker/src/platform/config/worker.config.ts` still binds
+`WORKER_EVENTING_CONSUMERS_ENABLED` through the fail-closed producer-only
+schema, and `worker.process.ts:64` logs `mode: "producer-only"`
+unconditionally. The switch must reconcile both or the boot log will state
+the opposite of what the process does.
+
 The one atomic switch commit: `workers.ts` selects
 `PackagedWorkerExecutableComposition` by default with
 `LANGWATCH_WORKER_COMPOSITION=legacy` as the escape hatch, plus the ledger
@@ -191,5 +199,5 @@ loses no work.
 | Unroutable boot window | consumer live from first registered queue | Identical to today's legacy boot; redelivery absorbs it |
 | Double side effects | topic boot seeds, governance arming on both instances | Seed gate moves with the consumer (P3); passive App `ProcessRuntime` never loops; tests 3 and 6 |
 | Deferred double-resolve | a synthesized capability with a real connect | No-op connects by contract; test 5 |
-| Replay/retention drift | packaged es lacked `replayMarkerChecker` | P1 plumbs it; test 2 asserts it |
+| Replay/retention drift | packaged es lacked `replayMarkerChecker` | P1 plumbs it (`5e8a84ba4d`); test 2 asserts it. **Amended by a P1 finding:** the plumb covers pipeline projections only — `ProjectionRegistry.initialize()` builds the global router with `{ executionTarget }` alone (`packages/eventing/src/projections/projectionRegistry.ts:147-151`), so `global:*` handlers fold during replay whatever the checker says. Pre-existing in `@langwatch/eventing`, identical under the legacy consumer, but decide before the switch whether the global router should take the checker |
 | SaaS global-projection mismatch | consumer without `global:*` handlers rejects billable jobs forever | Both sides derive from the one `config.isSaas`; `job-registry.json`'s `globalProjections` block keeps the guard honest |
