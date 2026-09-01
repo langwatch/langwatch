@@ -283,7 +283,8 @@ export class LangWatchQLService {
    * Exposed as its own step because a second caller needs the verdict and not
    * the rows: saving a workbench chart stores SQL that will be executed later,
    * by whoever opens it, and must refuse at write what the query endpoint would
-   * refuse at run (`server/analytics/saved-workbench-charts`). That caller
+   * refuse at run (`runtime/app/features/dashboard-saved-workbench-chart-policy.adapter.ts`,
+   * the Dashboard feature's `SavedWorkbenchChartPolicy`). That caller
    * asking this rather than re-deriving the policy is what keeps one refusal
    * decision in the codebase — and {@link execute} calling it too is what stops
    * the two drifting apart.

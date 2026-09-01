@@ -152,6 +152,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     await connection?.closeOnce();
   });
 
+  /** @scenario "Placing a chart onto a dashboard already holding builder charts does not overlap them" */
   it("places a saved chart after an existing builder without moving the builder", async () => {
     const dashboards = service();
     const dashboard = await createDashboard();
@@ -180,6 +181,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     await expect(graphRow(placed.id)).resolves.toEqual({ gridRow: 5, kind: "workbench_sql" });
   });
 
+  /** @scenario "Placing a saved workbench chart does not let a builder chart land on top of it" */
   it("places a builder after an existing saved chart without moving the saved chart", async () => {
     const dashboards = service();
     const dashboard = await createDashboard();

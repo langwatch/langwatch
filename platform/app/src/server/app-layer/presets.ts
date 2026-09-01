@@ -202,8 +202,7 @@ import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
 import { AppDashboardGraphVisibilityPolicy } from "~/runtime/app/features/dashboard-graph-visibility-policy.adapter";
 import { PostgresScimAdapter } from "@langwatch/enterprise-scim-server";
 import { ScimSyncGuards } from "@langwatch/identity-server";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+import { AppSavedWorkbenchChartPolicy } from "~/runtime/app/features/dashboard-saved-workbench-chart-policy.adapter";
 import {
   createLangWatchQLService,
   DEFAULT_LWQL_DATABASE,
@@ -1593,19 +1592,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const dashboardService = PostgresDashboardAdapter.create({
     database: prisma,
     ids: { generate: () => nanoid() },
-    // The compatibility transports validate with caller protections before
-    // this service is reached. The process policy is the same Analytics
-    // validator for internal callers, using the API-key/full-project view.
-    savedWorkbenchChartPolicy: {
-      validate: async ({ projectId, definition }) => {
-        validateSavedWorkbenchChartDefinition({
-          projectId,
-          protections: await getProtectionsForProject(prisma, { projectId }),
-          definition,
-          lwql: langWatchQL,
-        });
-      },
-    },
+    // Both governors — the LangWatchQL validator over the SQL, the Vega-Lite
+    // policy over the specification — measured against the protections the
+    // WRITE arrived with, which every door resolves for its own caller.
+    savedWorkbenchChartPolicy: AppSavedWorkbenchChartPolicy.create({ langWatchQL }),
     graphVisibility: AppDashboardGraphVisibilityPolicy.create({ featureFlags, projects }),
     langWatchQL,
   }).build();
@@ -3658,16 +3648,9 @@ export function createTestApp(
     dashboard: PostgresDashboardAdapter.create({
       database: testPrisma,
       ids: { generate: () => nanoid() },
-      savedWorkbenchChartPolicy: {
-        validate: async ({ projectId, definition }) => {
-          validateSavedWorkbenchChartDefinition({
-            projectId,
-            protections: await getProtectionsForProject(testPrisma, { projectId }),
-            definition,
-            lwql: testLangWatchQL,
-          });
-        },
-      },
+      savedWorkbenchChartPolicy: AppSavedWorkbenchChartPolicy.create({
+        langWatchQL: testLangWatchQL,
+      }),
       graphVisibility: AppDashboardGraphVisibilityPolicy.create({
         featureFlags: testFeatureFlags,
         projects: testProjects,

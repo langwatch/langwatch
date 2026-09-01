@@ -195,9 +195,14 @@ export class DashboardService extends DashboardServiceContract {
     dashboardId?: string;
     layout?: Partial<GraphLayout>;
   }): Promise<Graph> {
+    // `layout` is this method's grouping, not a field of the create input:
+    // the schema is strict and flattens the grid onto the row, so spreading
+    // `input` whole would offer it the `layout` key it refuses. Both
+    // transports always pass one, so leaving it in rejected every create.
+    const { layout: requestedLayout, ...withoutLayout } = input;
     const parsed = graphCreateInputSchema.parse({
-      ...input,
-      ...input.layout,
+      ...withoutLayout,
+      ...requestedLayout,
     });
 
     if (parsed.dashboardId !== undefined) {

@@ -181,6 +181,7 @@ describe("DashboardService", () => {
     });
   });
 
+  /** @scenario "A dashboard is created after the project's current dashboards" */
   it("creates dashboards after the project's current last order", async () => {
     const { service, repository } = serviceWith();
     await service.create({ projectId: "project_1", name: "Quality" });
@@ -189,6 +190,7 @@ describe("DashboardService", () => {
     );
   });
 
+  /** @scenario "A dashboard from another project cannot be renamed" */
   it("does not permit a dashboard from another project to be renamed", async () => {
     const repository = new FakeDashboardRepository();
     repository.tryFindDashboard.mockResolvedValue(null);
@@ -213,6 +215,7 @@ describe("DashboardService", () => {
     expect(repository.updateDashboardOrder).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A graph is placed after every chart in the shared grid" */
   it("places a builder graph after a workbench chart already occupying the dashboard grid", async () => {
     const { service, repository } = serviceWith();
     repository.tryFindLastGraphGridRow.mockResolvedValue(5);
@@ -227,6 +230,7 @@ describe("DashboardService", () => {
     );
   });
 
+  /** @scenario "Saved chart governance is called before persistence" */
   it("passes saved-chart definitions through the policy before persistence", async () => {
     const repository = new FakeDashboardRepository();
     repository.createSavedWorkbenchChart.mockResolvedValue(savedChart);

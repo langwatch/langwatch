@@ -191,9 +191,9 @@ import {
   lwqlTimeWindowSchema,
 } from "~/server/analytics/lwql/timeWindowSchema";
 import {
+  AppSavedWorkbenchChartPolicy,
   mapDashboardSavedWorkbenchChartError,
-  validateSavedWorkbenchChartDefinition,
-} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+} from "~/runtime/app/features/dashboard-saved-workbench-chart-policy.adapter";
 import { availableFilters } from "~/server/filters/registry";
 import { resolveLangWatchQLCaller } from "./ports/lwqlCaller";
 import { enforceWorkbenchEnabled } from "./ports/workbenchAccessMiddleware";
@@ -1233,11 +1233,10 @@ const appTrpcFeatures = createAppTrpcFeatures({
         // which is the one place they are known: a member who cannot read costs
         // must not be able to save a chart that selects them.
         admitDefinition: (ctx: TRPCContext, input) =>
-          validateSavedWorkbenchChartDefinition({
+          AppSavedWorkbenchChartPolicy.create({ langWatchQL: ctx.app.langWatchQL }).admit({
             projectId: input.projectId,
             protections: input.protections,
             definition: input.definition,
-            lwql: ctx.app.langWatchQL,
           }),
         mapError: mapDashboardSavedWorkbenchChartError,
       },

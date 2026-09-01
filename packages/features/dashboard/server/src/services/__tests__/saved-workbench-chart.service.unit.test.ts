@@ -231,6 +231,7 @@ describe("SavedWorkbenchChartService", () => {
     });
 
     describe("when the definition carries a query, parameters and a specification", () => {
+      /** @scenario "A saved definition carries the query, its parameter values and its specification" */
       it("stores them together rather than only the query", async () => {
         const { service, repository } = build();
         const spec = { mark: "bar" };
@@ -339,6 +340,49 @@ describe("SavedWorkbenchChartService", () => {
       });
     });
 
+    describe("when the definition changes and the caller's protections come with it", () => {
+      /** @scenario "Editing a saved chart runs exactly the governors that creating it ran" */
+      it("asks the policy about the new definition, exactly as a create does", async () => {
+        const repository = new FakeRepository({ chart: record(), updated: record() });
+        const { service, policy } = build({ repository });
+        const edited = definition({ sql: "SELECT cost FROM traces" });
+
+        await service.update({
+          projectId: "project-1",
+          chartId: "chart-1",
+          definitionUpdate: { protections: PROTECTIONS, definition: edited },
+        });
+
+        expect(policy.seen).toEqual([
+          { projectId: "project-1", protections: PROTECTIONS, definition: edited },
+        ]);
+      });
+
+      /** @scenario "Editing a saved chart runs exactly the governors that creating it ran" */
+      it("does not write the row when the policy refuses the edit", async () => {
+        const repository = new FakeRepository({ chart: record(), updated: record() });
+        const { service } = build({
+          repository,
+          policy: new RecordingPolicy(new Error("refused by the chart policy")),
+        });
+
+        await expect(
+          service.update({
+            projectId: "project-1",
+            chartId: "chart-1",
+            definitionUpdate: {
+              protections: PROTECTIONS,
+              definition: definition({ sql: "SELECT CapturedInput FROM traces" }),
+            },
+          }),
+        ).rejects.toThrow("refused by the chart policy");
+
+        expect(repository.calls.some((c) => c.method === "tryUpdateSavedWorkbenchChart")).toBe(
+          false,
+        );
+      });
+    });
+
     describe("when only the name changes", () => {
       it("leaves the policy alone, since no SQL was touched", async () => {
         const repository = new FakeRepository({ chart: record(), updated: record() });
@@ -403,6 +447,7 @@ describe("SavedWorkbenchChartService", () => {
     });
 
     describe("when no row is given and the dashboard already has graphs", () => {
+      /** @scenario "Placing a chart requires a dashboard id and accepts an optional grid position" */
       it("places it on the row after the last one", async () => {
         const repository = new FakeRepository({
           dashboard: { id: "dashboard-1" },
@@ -443,6 +488,7 @@ describe("SavedWorkbenchChartService", () => {
     });
 
     describe("when a row is given", () => {
+      /** @scenario "Placing a chart requires a dashboard id and accepts an optional grid position" */
       it("uses it and does not ask where the last graph sits", async () => {
         const repository = new FakeRepository({
           dashboard: { id: "dashboard-1" },
@@ -461,6 +507,68 @@ describe("SavedWorkbenchChartService", () => {
         const call = repository.calls.find((c) => c.method === "tryPlaceSavedWorkbenchChart");
         expect((call?.input as { gridRow: number }).gridRow).toBe(2);
       });
+    });
+  });
+
+  describe("given a placement with no dashboard on it", () => {
+    /** @scenario "Placing a chart requires a dashboard id and accepts an optional grid position" */
+    it("refuses before anything is looked up", async () => {
+      const repository = new FakeRepository({ dashboard: { id: "dashboard-1" } });
+      const { service } = build({ repository });
+
+      await expect(
+        service.place({
+          projectId: "project-1",
+          chartId: "chart-1",
+          dashboardId: "",
+        }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartValidationError);
+
+      expect(repository.calls).toEqual([]);
+    });
+  });
+
+  describe("given a chart id this project does not hold", () => {
+    /** @scenario "Placing a chart that does not exist in this project is refused" */
+    it("refuses the placement as not found, even onto a dashboard that is the project's", async () => {
+      const repository = new FakeRepository({
+        dashboard: { id: "dashboard-1" },
+        placed: null,
+      });
+      const { service } = build({ repository });
+
+      await expect(
+        service.place({
+          projectId: "project-1",
+          chartId: "another-projects-chart",
+          dashboardId: "dashboard-1",
+        }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+    });
+
+    /** @scenario "Another project's saved chart is not runnable" */
+    it("refuses to run it, and executes nothing", async () => {
+      const repository = new FakeRepository({ chart: null });
+      const executed: unknown[] = [];
+      const { service } = build({
+        repository,
+        langWatchQL: {
+          execute: async (input: unknown) => {
+            executed.push(input);
+            return { rows: [] } as never;
+          },
+        } as Partial<LangWatchQLService>,
+      });
+
+      await expect(
+        service.run({
+          projectId: "project-1",
+          chartId: "another-projects-chart",
+          execution: { projectId: "project-1" } as never,
+        }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+
+      expect(executed).toEqual([]);
     });
   });
 
