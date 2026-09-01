@@ -1,7 +1,7 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuSparkles } from "react-icons/lu";
+import { LuSparkles } from "react-icons/lu";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import {
   clearLegacySimulationsPreference,
@@ -122,10 +122,9 @@ function BannerWithFlag({
         <Text fontSize="sm" color="colorPalette.fg">
           You are on the previous simulations screens.
         </Text>
-        <HStack gap={1} color="colorPalette.fg" fontSize="sm" fontWeight="600">
-          <Text>Go to the new version</Text>
-          <Icon as={LuArrowRight} boxSize={3.5} />
-        </HStack>
+        <Text color="colorPalette.fg" fontSize="sm" fontWeight="600">
+          Go to the new version
+        </Text>
       </HStack>
     </Link>
   );
