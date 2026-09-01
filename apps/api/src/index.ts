@@ -15,6 +15,7 @@ export {
   composeApiDatabase,
   composeApiLifecycleProcess,
   composeApiSecretEncryption,
+  LoggedApiAgentsAbsence,
   LoggedApiAuthzAbsence,
   LoggedApiDatabaseAbsence,
   LoggedApiEventingAbsence,
@@ -26,6 +27,11 @@ export {
   type ApiOwnedRestFeaturePorts,
   type ApiProductionCompositionOptions,
 } from "./app/api-production.composition";
+export {
+  ApiAgentsAbsenceReportPort,
+  ApiAgentsComposition,
+  type ApiAgentsCompositionOptions,
+} from "./app/api-agents.composition";
 export {
   ApiAuthzAbsenceReportPort,
   ApiAuthzComposition,

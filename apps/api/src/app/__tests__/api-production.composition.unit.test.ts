@@ -16,18 +16,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
   let rest: Hono | undefined;
+  let agents: unknown;
   let secrets: unknown;
   let metrics: unknown;
-  const create = vi.fn((options: { rest?: Hono; secrets?: unknown; metrics?: unknown }) => {
-    rest = options.rest;
-    secrets = options.secrets;
-    metrics = options.metrics;
-    return process;
-  });
+  const create = vi.fn(
+    (options: { rest?: Hono; agents?: unknown; secrets?: unknown; metrics?: unknown }) => {
+      rest = options.rest;
+      agents = options.agents;
+      secrets = options.secrets;
+      metrics = options.metrics;
+      return process;
+    },
+  );
   return {
     create,
     process,
     rest: () => rest,
+    agents: () => agents,
     secrets: () => secrets,
     metrics: () => metrics,
   };
@@ -125,6 +130,7 @@ vi.mock("../../platform/infrastructure/api-database.infrastructure", async (impo
 
 import { ApiMetricsPort } from "../../api-process.lifecycle";
 import { ApiProcessGraphPort } from "../../api.process";
+import { ApiAgentsComposition } from "../api-agents.composition";
 import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
@@ -738,6 +744,53 @@ describe("ApiProductionComposition", () => {
     });
   });
 
+  describe("given the agent service this process can now compose itself", () => {
+    beforeEach(() => {
+      databaseMocks.configured.value = false;
+      processMocks.create.mockClear();
+    });
+
+    describe("when a host supplied one", () => {
+      /** @scenario "An injected agent service is the one the process serves" */
+      it("serves the host's service and composes none of its own", async () => {
+        databaseMocks.configured.value = true;
+        const injected = new Proxy(AgentService.prototype, {});
+        const compose = vi.spyOn(ApiAgentsComposition, "tryCompose");
+
+        await composeWithout(
+          { DATABASE_URL: "postgresql://localhost/langwatch" },
+          { agents: injected },
+        );
+
+        expect(processMocks.agents()).toBe(injected);
+        expect(compose).not.toHaveBeenCalled();
+        compose.mockRestore();
+      });
+    });
+
+    describe("when the deployment configured a database", () => {
+      /** @scenario "The API process composes its own agent service" */
+      it("composes its own service over the guarded client, with no host supplying one", async () => {
+        databaseMocks.configured.value = true;
+
+        await composeSelfComposedAgents({ DATABASE_URL: "postgresql://localhost/langwatch" });
+
+        const composed = processMocks.agents() as AgentService;
+        expect(composed).toBeInstanceOf(AgentService);
+        await expect(composed.getAll({ projectId: "project-1" })).resolves.toEqual([]);
+      });
+    });
+
+    describe("when the deployment configured no database", () => {
+      /** @scenario "A process with no database composes no agent service" */
+      it("composes no agent service, so the process mounts no agents surface", async () => {
+        await composeSelfComposedAgents({});
+
+        expect(processMocks.agents()).toBeUndefined();
+      });
+    });
+  });
+
   describe("given the metrics transport this process can now compose itself", () => {
     describe("when a host supplied one", () => {
       /** @scenario "An injected metrics transport answers every scrape" */
@@ -794,12 +847,16 @@ class TestMetrics extends ApiMetricsPort {
 }
 
 function productionComposition(
-  overrides: { secrets?: SecretService; metrics?: ApiMetricsPort } = {
+  overrides: {
+    agents?: AgentService;
+    secrets?: SecretService;
+    metrics?: ApiMetricsPort;
+  } = {
     secrets: secretService().service,
   },
 ): ApiProductionComposition {
   return ApiProductionComposition.create({
-    agents: new Proxy(AgentService.prototype, {}),
+    agents: overrides.agents ?? new Proxy(AgentService.prototype, {}),
     ...(overrides.secrets ? { secrets: overrides.secrets } : {}),
     ...(overrides.metrics ? { metrics: overrides.metrics } : {}),
     apiKeys: apiKeyService(resolvedKey).service,
@@ -811,9 +868,29 @@ function productionComposition(
 
 async function composeWithout(
   source: Readonly<Record<string, unknown>>,
-  overrides: { metrics?: ApiMetricsPort } = {},
+  overrides: { agents?: AgentService; metrics?: ApiMetricsPort } = {},
 ): Promise<ApiProductionComposition> {
   const composition = productionComposition(overrides);
+  await composition.compose({
+    config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
+    graph: new TestGraph(),
+    observability: { serviceName: "langwatch-api-test" },
+    resources: new ResourceScope(),
+  });
+  return composition;
+}
+
+/** Composes with no host-supplied agent service, so the process resolves its own. */
+async function composeSelfComposedAgents(
+  source: Readonly<Record<string, unknown>>,
+): Promise<ApiProductionComposition> {
+  const composition = ApiProductionComposition.create({
+    secrets: secretService().service,
+    apiKeys: apiKeyService(resolvedKey).service,
+    authz: authzService(true).service,
+    organizations: organizationService(),
+    auth: new TestAuthComposition(),
+  });
   await composition.compose({
     config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
     graph: new TestGraph(),

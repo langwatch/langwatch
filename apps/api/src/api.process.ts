@@ -36,7 +36,8 @@ export abstract class ApiProcessGraphPort {
  */
 export class ApiProcess {
   static create(options: {
-    agents: AgentService;
+    /** Absent for a process that composed no agent service; see ApiApplication. */
+    agents?: AgentService;
     /** Absent for a process that composed no secret service; see ApiApplication. */
     secrets?: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;

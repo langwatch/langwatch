@@ -50,12 +50,9 @@ describe("ApiStandaloneComposition", () => {
     });
 
     it("names every adapter it is still waiting on rather than leaving the gap implicit", () => {
-      expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
+      expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toEqual([
         "IdentityEmailService and the Better Auth browser-session transport",
-      );
-      expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
-        "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
-      );
+      ]);
     });
 
     it("stops naming the instance administrator credential and the rate limiter it now owns", () => {
@@ -92,6 +89,13 @@ describe("ApiStandaloneComposition", () => {
       expect(named).not.toMatch(
         /ApiKeyBindingIdPort|ApiKeyDiagnosticsPort|organization identity ports/i,
       );
+    });
+
+    /** @scenario "The unavailable-adapter list no longer names the agent ports" */
+    it("stops naming the agent ports, now that packaged adapters fill them", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(/AgentsWorkflowPort|AgentsAuditLogPort|agent audit history/i);
     });
 
     it("stops naming the stored-secret key, now that it reads and uses its own", () => {

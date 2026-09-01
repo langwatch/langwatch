@@ -1,11 +1,17 @@
 export {
+  PostgresAgentAdapter,
+  type PostgresAgentAdapterOptions,
+} from "./adapters/postgres.agent.adapter";
+export {
   PrismaAgentAdapter,
   type PrismaAgentAdapterOptions,
 } from "./adapters/prisma.agent.adapter";
+export { UnavailableLinkedWorkflowCopyAdapter } from "./adapters/unavailable.linked-workflow-copy.adapter";
 export { AgentApp, type AgentAppDependencies } from "./app/agent.app";
 export { AgentService } from "./services/agent.service";
 export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.api";
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
+export { LinkedWorkflowCopyPort } from "./ports/linked-workflow-copy.port";
 export {
   HttpProxyTrpcApi,
   type HttpProxyResult,

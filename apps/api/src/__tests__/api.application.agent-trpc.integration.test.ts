@@ -158,6 +158,17 @@ describe("ApiApplication Agent tRPC composition", () => {
     ]);
   });
 
+  /** @scenario "A process with no database composes no agent service" */
+  it("mounts no agents surface at all for a process that composed no agent service", () => {
+    const application = ApiApplication.create({ secrets: new TestSecretService() });
+
+    const names = Object.keys(application.trpc._def.procedures).filter((path) =>
+      path.startsWith("agents."),
+    );
+
+    expect(names).toEqual([]);
+  });
+
   it("refuses a copy command whose project inputs cross tenant boundaries", async () => {
     const agents = new TestAgentService();
     const copy = vi.spyOn(agents, "copy");

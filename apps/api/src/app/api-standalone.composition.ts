@@ -24,14 +24,25 @@ import {
 } from "./api-production.composition";
 
 /**
- * The already-composed product services an API host hands over.
+ * The product services an API host hands over.
  *
- * The API package cannot build these itself: every one of them needs at least
- * one port whose only implementation still lives with the legacy application
- * (see API_UNAVAILABLE_PRODUCT_ADAPTERS).
+ * One of them is still mandatory, and it is the one whose ports have no
+ * packaged implementation at all (see API_UNAVAILABLE_PRODUCT_ADAPTERS). The
+ * rest are optional: a host supplies them to override what this process would
+ * compose for itself, and leaving one out is a supported shape rather than a
+ * gap.
  */
 export type ApiProductAdapters = Readonly<{
-  agents: AgentService;
+  /**
+   * A host's already-composed agent service, when it has one.
+   *
+   * Optional since this process can build its own over its guarded client
+   * ({@link ApiProductionComposition.resolveAgents}), with the one gap that
+   * composition names: it holds no Workflow application, so copying a workflow
+   * agent refuses rather than writing an agent pointing at another project's
+   * graph.
+   */
+  agents?: AgentService;
   /**
    * The one product service on this list the API package CAN build.
    *
@@ -85,9 +96,10 @@ export type ApiProductAdapters = Readonly<{
  * to be on it and are not any more: {@link ApiProductionComposition} builds
  * both from its own validated configuration and its own Redis
  * ({@link ApiProductionComposition.restFeaturePorts}), so no host supplies
- * them. What still keeps the two families that READ them off this process is
- * named by the entries that remain — the organization identity ports and the
- * stored-object application — not by the credential or the counter.
+ * them. What still keeps the two families that READ them off this process —
+ * the organization provisioning port, the stored-object application — is that
+ * no package implements either yet, which is why neither is an entry here:
+ * this list names what a HOST supplies, not every port that has no home.
  *
  * The query guards left the list for a narrower reason, and the difference
  * matters. The multitenancy, organization and mass-delete guards now live in
@@ -160,11 +172,31 @@ export type ApiProductAdapters = Readonly<{
  * because the packaged adapter declares both ports optional and this process
  * holds neither system.
  *
- * The two entries that remain still name ports whose only implementation is
+ * The agent entry closed next, and it closed the way the others did — by the
+ * ports getting a packaged implementation — with one difference worth being
+ * exact about. `AgentsWorkflowPort` and `AgentsAuditLogPort` were on this list
+ * because they had exactly one implementation anywhere and it was the legacy
+ * application's, not because either needed the application. Read one operation
+ * at a time, almost none of it did: the fields a linked Studio graph declares,
+ * the workflow's name, archiving it, deleting it after a failed copy, and the
+ * `agents.` audit entries that make up an agent's history are all reads and
+ * writes over this process's own client. `PostgresAgentAdapter` is all of them
+ * ({@link ApiProductionComposition.resolveAgents}).
+ *
+ * ONE operation genuinely did need it, and this process declares that gap the
+ * way the project deletion above declares its two. Copying a WORKFLOW agent
+ * copies the Studio graph it points at, which is the Workflow lifecycle's own
+ * copy — a dataset copier, a DSL rewrite and the version rules behind them —
+ * and this process composes no Workflow application. So it composes no
+ * workflow-copy port, and the agent service it builds refuses that one
+ * operation by name and announces the gap at boot. It cannot skip it: an agent
+ * copied without its graph is an agent pointing at the source project's
+ * workflow, which reads to every caller as a copy that succeeded.
+ *
+ * The one entry that remains still names ports whose only implementation is
  * the legacy application's.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
-  "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
   "IdentityEmailService and the Better Auth browser-session transport",
 ] as const;
 

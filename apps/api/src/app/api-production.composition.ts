@@ -44,6 +44,7 @@ import {
   ApiEventingAbsenceReportPort,
   ApiEventingInfrastructure,
 } from "../platform/infrastructure/api-eventing.infrastructure";
+import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
 import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
 import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
 import {
@@ -85,7 +86,14 @@ export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminK
 
 /** What a host hands the production composition, and what it may leave out. */
 export type ApiProductionCompositionOptions = {
-  agents: AgentService;
+  /**
+   * A host's already-composed agent service, when it has one.
+   *
+   * Optional since this process can build its own: see
+   * {@link ApiProductionComposition.resolveAgents} for which wins and what an
+   * unresolvable agent service means for the door that serves it.
+   */
+  agents?: AgentService;
   /**
    * A host's already-composed secret service, when it has one.
    *
@@ -151,6 +159,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedEventing: ApiEventingInfrastructure | undefined;
   private composedAuthz: ApiAuthzComposition | undefined;
   private composedTenancy: ApiTenancyComposition | undefined;
+  private composedAgents: ApiAgentsComposition | undefined;
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -201,8 +210,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authorization: AuthzApiAuthorizationAdapter.create(authz),
       audit: this.options.audit,
     });
+    const agents = this.resolveAgents(options);
     const process = ApiProcess.create({
-      agents: this.options.agents,
+      agents,
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
       rest: this.composeRest(authz, tenancy),
@@ -272,9 +282,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * They are exposed rather than mounted because the two families that read
    * them still need services this package cannot construct — the organization
    * provisioning port behind `/api/organizations`, the stored-object
-   * application behind `/api/files` — which is what the remaining entries of
-   * `API_UNAVAILABLE_PRODUCT_ADAPTERS` name. The host that mounts those
-   * families spreads these in instead of binding its own.
+   * application behind `/api/files`. Neither is on
+   * `API_UNAVAILABLE_PRODUCT_ADAPTERS`, which names the adapters a HOST must
+   * supply; these are ports no package implements yet at all. The host that
+   * mounts those families spreads these in instead of binding its own.
    */
   restFeaturePorts(): ApiOwnedRestFeaturePorts | undefined {
     return this.composedFeaturePorts;
@@ -288,11 +299,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * below the composition root constructs a client, so this accessor is the
    * only place a typed `PrismaClient` enters the process.
    *
-   * It is exposed rather than consumed because a client is not a service: the
-   * packaged `Postgres*Adapter`s that would take it still need ports this
-   * package cannot construct, which is what the remaining entries of
-   * `API_UNAVAILABLE_PRODUCT_ADAPTERS` name. What has changed is that the
-   * guard is no longer one of them.
+   * It is exposed as well as consumed. This process now builds the secret,
+   * AuthZ, organization, project, API-key and agent services over it, and a
+   * host that mounts families this package does not — the organization
+   * provisioning door, the stored-object application — composes their packaged
+   * adapters over the SAME client rather than opening a second pool with a
+   * second guard.
    */
   database(): PrismaConnection | undefined {
     return this.composedDatabase?.connection;
@@ -333,6 +345,41 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       encryption,
       reservedNames: RESERVED_PROJECT_SECRET_NAMES,
     }).build();
+  }
+
+  /**
+   * The agent service this process serves, and where it came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. An injected service wins. A host that already owns the product graph
+   *     has one composed service per process, and a test that binds a double
+   *     is asking for that double rather than for Postgres.
+   *  2. Otherwise the process composes its own, over the guarded client
+   *     {@link composeApiDatabase} opened. The two ports that used to make
+   *     this impossible — the linked-workflow reads and the agent audit
+   *     history — are packaged adapters now, and both are Postgres
+   *     ({@link ApiAgentsComposition}).
+   *  3. With neither — no host service, and no database — there is no agent
+   *     service, and the tRPC router that would call one is not mounted. The
+   *     same rule the secret door follows: absent beats a door that answers
+   *     every call with a 500.
+   *
+   * One capability the composed service does not have is announced rather than
+   * discovered: this process holds no Workflow application, so copying a
+   * workflow agent refuses by name instead of writing an agent that points at
+   * the source project's graph.
+   */
+  private resolveAgents(options: ApiRuntimeCompositionOptions): AgentService | undefined {
+    if (this.options.agents) return this.options.agents;
+
+    const logger = createLogger(options.config.serviceName);
+    this.composedAgents = ApiAgentsComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      processName: options.config.serviceName,
+      report: LoggedApiAgentsAbsence.create(logger),
+    });
+    return this.composedAgents?.agents;
   }
 
   /**
@@ -713,6 +760,40 @@ export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
     this.logger.warn(
       { reason },
       "API composed no AuthZ service and no host supplied one: it mounts no product transports, because every route it would mount is authorized",
+    );
+  }
+}
+
+/**
+ * Names what the agent service is missing once, at boot, rather than leaving it
+ * to be inferred.
+ *
+ * Two different facts, so two different lines. No client means no agent service
+ * and no agents door at all. A composed service with no workflow-copy
+ * capability is a door that serves every operation but one, and a deployment
+ * should read that in its own logs rather than on the first copy of a workflow
+ * agent.
+ */
+export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
+  static create(logger: Pick<Logger, "info" | "warn">): LoggedApiAgentsAbsence {
+    return new LoggedApiAgentsAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info" | "warn">) {
+    super();
+  }
+
+  absent(reason: "no-database"): void {
+    this.logger.warn(
+      { reason },
+      "API composed no agent service and no host supplied one: it mounts no agents surface, because every operation on it reads the agent rows",
+    );
+  }
+
+  withoutWorkflowCopies(): void {
+    this.logger.info(
+      { reason: "no-workflow-application" },
+      "API composed its agent service without a workflow-copy capability: every agent operation is served except copying a workflow agent, which needs the Studio graph this process does not compose",
     );
   }
 }
