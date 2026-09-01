@@ -184,7 +184,10 @@ describe("given the LangWatchQL access-management config", () => {
         "named_collection_control",
         "<named_collection_control>1</named_collection_control>",
       ],
-      ["show_named_collections", "<show_named_collections>1</show_named_collections>"],
+      [
+        "show_named_collections",
+        "<show_named_collections>1</show_named_collections>",
+      ],
     ])("grants %s", (_label, expected) => {
       expect(xml).toContain(expected);
     });
