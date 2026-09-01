@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./surfaces/impersonation": {
+      "types": "./src/surfaces/impersonation/index.ts",
+      "default": "./src/surfaces/impersonation/index.ts"
     }
   },
   "scripts": {
