@@ -15,8 +15,8 @@ import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import { normalizeToSnakeCase } from "~/optimization_studio/utils/normalizeToSnakeCase";
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
+import { normalizeToSnakeCase } from "~/optimization_studio/utils/normalizeToSnakeCase";
 import {
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
