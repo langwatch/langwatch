@@ -1060,6 +1060,46 @@ function composerAdvancedExtras({
   );
 }
 
+/**
+ * What the closed Advanced group owes the outside: one line saying where this
+ * source's conversations will go.
+ *
+ * The destination picker sits inside the group, so an admin who never opens it
+ * never reads what it says about leaving the destination unset — and a source
+ * created that way routes its conversations nowhere. The default is fine; the
+ * silence about it is not, so the outcome is stated where the admin is
+ * already looking.
+ *
+ * Only for types that route conversations. On a source that produces none,
+ * a line about where conversations land describes a decision its adapter
+ * never makes.
+ */
+function ComposerDestinationHint({
+  composer,
+  destinationCtx,
+}: {
+  composer: ComposerState;
+  destinationCtx: DestinationContext;
+}) {
+  if (!routesConversations(composer.sourceType)) return null;
+  // Named from the same list the picker offers, so the line and the control
+  // cannot disagree about which project was chosen.
+  const chosen = destinationCtx.availableProjects.find(
+    (project) => project.id === composer.traceProjectId,
+  );
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      data-testid="composer-destination-hint"
+    >
+      {composer.traceProjectId
+        ? `Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`
+        : "Conversations will not land anywhere until you pick a destination project under Advanced. Audit events are recorded either way."}
+    </Text>
+  );
+}
+
 export function SourceComposerDrawer({
   isOpen,
   organizationId,
@@ -1150,6 +1190,11 @@ export function SourceComposerDrawer({
                 setComposer({ ...composer, parserConfig })
               }
               advancedExtras={advancedExtras}
+            />
+
+            <ComposerDestinationHint
+              composer={composer}
+              destinationCtx={destinationCtx}
             />
 
             <OttlEditor
