@@ -945,7 +945,7 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
-# @scenario "Self-provisioning is enabled for chart-managed ClickHouse at any replica count"
+# @scenario "App self-provisioning is exclusive to external ClickHouse under Design C"
 # @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
@@ -958,6 +958,9 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-external.yaml")
   assert_not_contains "ext-ch: no CH StatefulSet" "$ch_ext" "clickhouse-serverless/templates"
   assert_contains "ext-ch: CLICKHOUSE_URL env" "$ch_ext" "name: CLICKHOUSE_URL"
+  # Design C: the chart cannot render config into a server it does not run, so
+  # the app self-provisions the LWQL access model for external ClickHouse.
+  assert_contains "ext-ch: LWQL_SELF_PROVISION on for external CH" "$ch_ext" "name: LWQL_SELF_PROVISION"
 
   # postgres-external: DATABASE_URL from secret
   local pg_ext
@@ -984,15 +987,17 @@ test_infra_overlays() {
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
 
-  # LWQL self-provisioning: enabled at replicas=3 via keeper-backed access storage
-  assert_contains "repl-ch: LWQL_SELF_PROVISION enabled at replicas=3" "$ch_repl" "name: LWQL_SELF_PROVISION"
+  # Design C: chart-managed ClickHouse renders the LWQL access model as config
+  # in the subchart, so the app must NOT self-provision it — LWQL_SELF_PROVISION
+  # is absent at replicas=3.
+  assert_not_contains "repl-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_repl" "name: LWQL_SELF_PROVISION"
 
-  # LWQL self-provisioning: also enabled at replicas=1
+  # ...and also absent at replicas=1 (chart-managed at any replica count).
   local ch_single
   ch_single=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_contains "single-ch: LWQL_SELF_PROVISION enabled at replicas=1" "$ch_single" "name: LWQL_SELF_PROVISION"
+  assert_not_contains "single-ch: LWQL_SELF_PROVISION off for chart-managed CH" "$ch_single" "name: LWQL_SELF_PROVISION"
 
   # Mode transition: app Deployment env differs between replicas=1 and replicas=3
   if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then

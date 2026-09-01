@@ -319,27 +319,29 @@ message.
 ──────────────────────────────────────────────────────────────────────
 8. LangWatchQL (LWQL) — governed analytics SQL
 ──────────────────────────────────────────────────────────────────────
-{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
-The app self-provisions the LangWatchQL backend on every boot: a
-restricted ClickHouse identity, settings profile, row policies, a
-read-only PostgreSQL role, and the analytics views. The
-`release_lwql_workbench` feature flag still gates the HTTP endpoint —
-until it is on for a project, queries are refused with
-`lwql_not_enabled` while the backend objects sit ready.
+{{- if .Values.lwql.enabled }}
+The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with `lwql_not_enabled`
+while the backend objects sit ready.
 
-{{- if not .Values.clickhouse.chartManaged }}
-Your ClickHouse is external: self-provisioning needs its admin user to
-be allowed access-management DDL (`access_management`,
-`named_collection_control`) and the server to declare the `custom_`
-settings prefix. The `langwatch/clickhouse-serverless` image ships
-both; on other servers, add them or set lwql.enabled=false. If the
-server refuses the DDL the app logs it and LangWatchQL stays
-unavailable — nothing else breaks.
+{{- if .Values.clickhouse.chartManaged }}
+Whoever owns the ClickHouse server owns the access model. Your ClickHouse is
+chart-managed, so the ClickHouse pods render the LangWatchQL restricted
+identity, its settings profile, grants, tenant row filters and the
+`lwql_postgres` bridge as config at boot — set `clickhouse.lwql.enabled=true`
+on the clickhouse-serverless subchart and supply the two LWQL passwords in its
+Secret. The application does NOT issue that DDL (one owner per entity name), and
+still creates the views, engine tables and key-map rows it must.
 {{- else }}
-For chart-managed ClickHouse, LangWatchQL access entities are stored in
-ClickHouse Keeper and shared by all replicas. Changing the replica count
-across the 1↔N boundary rolls the application automatically (its environment
-changes), requiring no operator action.
+Your ClickHouse is external, so the chart cannot render config into it: the app
+self-provisions the LangWatchQL backend on every boot — a restricted identity,
+settings profile, row policies, a read-only PostgreSQL role and the analytics
+views. This needs the admin user allowed access-management DDL
+(`access_management`, `named_collection_control`) and the server to declare the
+`custom_` settings prefix. The `langwatch/clickhouse-serverless` image ships
+both; on other servers, add them or set lwql.enabled=false. If the server
+refuses the DDL the app logs it and LangWatchQL stays unavailable — nothing
+else breaks.
 {{- end }}
 {{- else }}
 Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned

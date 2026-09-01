@@ -850,16 +850,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
 
-{{/* LangWatchQL self-provisioning (issue #6635). The app derives the
-     restricted connection from CLICKHOUSE_URL/DATABASE_URL and converges the
-     whole access model at boot; the chart contributes only the mode switch and
-     the two stable passwords. `optional: true` is deliberate: an operator
-     Secret without these keys means LangWatchQL simply stays unprovisioned
-     (fail-closed refusals) instead of the pod dying in
-     CreateContainerConfigError — a default-on feature must degrade, not brick
-     an upgrade. For chart-managed ClickHouse, access entities and named
-     collections are stored in keeper and replicated across all nodes,
-     enabling self-provisioning at any replica count. */}}
+{{/* LangWatchQL self-provisioning (issue #6635; ownership model from
+     langwatch-saas#1168, Design C). Rendered ONLY for external ClickHouse —
+     for chart-managed ClickHouse the clickhouse-serverless subchart renders the
+     access model as config and this block is absent, keeping exactly one owner
+     per entity name. On the external path the app derives the restricted
+     connection from CLICKHOUSE_URL/DATABASE_URL and converges the whole access
+     model at boot; the chart contributes the mode switch and the two stable
+     passwords. `optional: true` is deliberate: an operator Secret without these
+     keys means LangWatchQL simply stays unprovisioned (fail-closed refusals)
+     instead of the pod dying in CreateContainerConfigError — a default-on
+     feature must degrade, not brick an upgrade. */}}
 {{- if (include "langwatch.lwql.selfProvisionActive" .) }}
 {{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
 - name: LWQL_SELF_PROVISION
@@ -1245,16 +1246,25 @@ true
 {{- end -}}
 
 {{/*
-  Whether LangWatchQL self-provisioning is wired into the pods (issue #6635).
-  Enabled whenever lwql.enabled is true. For chart-managed clustered ClickHouse
-  (replicas > 1), access entities and named collections are stored in ClickHouse
-  Keeper and replicated across all nodes; topology-safe self-provisioning is
-  therefore supported at any replica count. External ClickHouse is wired
-  regardless — the chart cannot see its topology, and the app degrades to a
-  logged, fail-closed refusal if the server rejects access-management DDL.
+  Whether the APPLICATION self-provisions the LangWatchQL backend via SQL DDL
+  (issue #6635; ownership model from langwatch-saas#1168, Design C).
+
+  One rule: whoever owns the ClickHouse server owns the access model. For
+  chart-managed ClickHouse the clickhouse-serverless subchart renders the LWQL
+  user, profile, grants, row filters and the lwql_postgres named collection as
+  config at pod boot, so the app must NOT also issue that DDL — a second owner
+  of the same entity names wedges access entities (495 on every repair statement)
+  or blocks server boot (named-collection collision). App self-provisioning is
+  therefore the EXTERNAL/BYO ClickHouse path only: the chart cannot render config
+  into a server it does not run, so the app issues the DDL and degrades to a
+  logged, fail-closed refusal if the server rejects it.
+
+  This is genuinely mutually exclusive with the subchart's config rendering, not
+  merely default-off: it is gated on `not clickhouse.chartManaged`, the same
+  switch that decides whether the subchart exists at all.
 */}}
 {{- define "langwatch.lwql.selfProvisionActive" -}}
-{{- if .Values.lwql.enabled -}}
+{{- if and .Values.lwql.enabled (not .Values.clickhouse.chartManaged) -}}
 true
 {{- end -}}
 {{- end -}}
