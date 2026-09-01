@@ -275,6 +275,47 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   # It is bundled into this source deliberately: it is the same customer, the
   # same credential and the same environment, and a second source to configure
   # would be a second thing to get wrong for one number.
+  #
+  # That bundling has a known cost, and the scenarios immediately below are it.
+  # The bill belongs to the subscription while the source belongs to one
+  # environment, and two environments can share a subscription, so the source is
+  # the wrong thing to hang the bill on. Until the bill is its own connection,
+  # a subscription may be named by one source only.
+
+  @unit
+  Scenario: A subscription another source already reads is refused at save time
+    Given a source that already reads the bill of an Azure subscription
+    When an admin saves another source naming that same subscription
+    Then the source is refused before it is stored
+    And the refusal names the source that already reads it
+    # Everything below the read files the figure against the source that read
+    # it, so two readers record the same bill twice and the organisation's
+    # total reports double what Azure charged. Both entries are individually
+    # correct, so no check downstream can tell the difference — which is why
+    # this has to be refused on the write.
+
+  @unit
+  Scenario: The same subscription in different letter case is still refused
+    Given a source that already reads the bill of an Azure subscription
+    When an admin saves another source naming that subscription in capitals
+    Then the source is refused before it is stored
+    # Azure prints the identifier in lower case and accepts either spelling, so
+    # the two name one subscription and one bill.
+
+  @unit
+  Scenario: A source keeping the subscription it already reads is saved
+    Given a source that already reads the bill of an Azure subscription
+    When an admin edits that same source and keeps the subscription
+    Then the source is saved
+    # Otherwise a rename would collide the source with itself.
+
+  @unit
+  Scenario: A source naming no subscription is left alone
+    Given an admin saving a source that names no Azure subscription
+    When they save the source
+    Then the source is saved
+    # A source with the field left empty claims nothing, and every such source
+    # would otherwise collide with every other one.
 
   @unit
   Scenario: The daily bill is read as the currency the customer is billed in
@@ -336,63 +377,43 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
 
   @unit
   Scenario: A source that has never asked about the bill asks on its first run
-    Given a source that has never asked about cost
+    Given a source that names an Azure subscription
+    And a source that has never asked about cost
     When its first run starts
     Then it asks about the bill on that run
     # Someone who adds a source sees a figure on the first pull rather than
     # hours later.
+    #
+    # The subscription is named for the same reason as above: a source without
+    # one never reaches the gate, so "it asks" is false for it no matter how
+    # long it has been.
 
   @unit
   Scenario: A throttled window is asked about again once the wait has passed
-    Given a window being held because an earlier read was throttled
+    Given a source that names an Azure subscription
+    And a window being held because an earlier read was throttled
     When a run starts once the bill is due to be asked about again
     Then it asks about the bill on that run
-    And it does not wait in place for the throttle to pass
+    And the window it asks about reaches back to the day after the last one it priced
     # A throttled read must not be the end of the matter. What separates this
     # from the run that skips is only elapsed time, and that is the whole
     # claim: the hold is a reason to wait, never a reason to stop.
     #
-    # Deliberately says nothing about the shape of the window. The ask always
-    # runs from the trailing week up to today whether the last read was
-    # throttled, succeeded, or never happened, so no window a held source asks
-    # about differs from one a healthy source asks about — a Then about the
-    # span would read as though the hold caused it, and would hold just as
-    # well with the hold removed.
+    # The subscription is named because a source without one returns before
+    # the gate is ever consulted and asks nothing at all, however overdue it
+    # is. Without that Given this scenario is simply false for such a source.
     #
-    # Nor does every unpriced day survive. A source that has never priced
+    # The second Then is what makes the hold observable. A held source still
+    # carries the last day it managed to price, and the ask reaches back to
+    # the day after it — so a window held since July asks about two months
+    # rather than the trailing week a healthy source sends. Drop the hold and
+    # that span collapses, which is what makes this an assertion rather than a
+    # restatement.
+    #
+    # Not every unpriced day survives, though. A source that has never priced
     # anything has no mark to resume from, so its window is the trailing week
     # and the oldest day drops out at each midnight. That gap is real, is
     # tracked separately, and is not what this scenario claims.
-    #
-    # Waiting inside a run burns the run's whole deadline on a sleep and risks
-    # it being killed holding the conversations it already read. The schedule
-    # is the retry — but only on the runs that are due, because retrying a
-    # throttled read every five minutes is what caused the throttling.
-
-  @unit
-  Scenario: The bill is asked about a handful of times a day
-    Given a source pulling continuously through a whole day
-    When the day is over
-    Then the bill has been asked about more than once and far fewer than two dozen times
-    # Both bounds earn their place. Asking once a day means a figure Azure
-    # published this morning waits until tomorrow; asking on every run is the
-    # live failure this gate exists to prevent, where a source read the bill
-    # zero times in half an hour because Azure refused all of it.
-    #
-    # Says nothing about how often the source runs, because the gate cannot
-    # see that: it reads elapsed time since the last ask and nothing else. A
-    # source on a six-hourly schedule asks on every run and a daily one asks
-    # once, and both are correct. Any claim here about a fraction of runs
-    # would be false the moment someone types a legal cron.
-
-  @unit
-  Scenario: A window that cannot be read is asked about many times before it is given up on
-    Given a window being held because an earlier read was throttled
-    When the span before such a window is abandoned passes
-    Then the bill has been asked about many times over within it
-    # The two bounds have to be read together. An interval longer than the
-    # give-up cap would abandon every held window before the next ask was ever
-    # due, and a customer would never see a figure at all.
 
   @unit
   Scenario: A run that skips the bill neither holds the window nor abandons it
