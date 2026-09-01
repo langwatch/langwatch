@@ -634,7 +634,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Langy Overview](https://langwatch.ai/docs/langy/overview.md): Langy is the automated AI engineer inside LangWatch that reads your traces and evals, writes Scenario tests, and opens PRs for the CI to run the evals and validate improvements.
 - [Getting started with Langy](https://langwatch.ai/docs/langy/getting-started.md): Langy setup: enabling the agent, picking a model or signing in with Codex, and reviewing the first pull request it opens.
-- [How Langy works](https://langwatch.ai/docs/langy/how-langy-works.md): Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests.
+- [How Langy works](https://langwatch.ai/docs/langy/how-langy-works.md): Each Langy conversation is one isolated worker process: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests.
 
 ## Using Langy
 
@@ -652,7 +652,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Security & Control
 
-- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
+- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker process, walled off from its siblings by Unix identity and from the host by a sandboxed container runtime, with an L7 egress adapter on the way out. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 - [Langy Data Flow and Privacy](https://langwatch.ai/docs/langy/security/data-flow-and-privacy.md): Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it.
 - [What Langy Can Do in Your GitHub](https://langwatch.ai/docs/langy/security/github-access.md): Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
 
@@ -713,7 +713,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Langy
 
-- [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+- [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the two isolation postures you choose between.
 - [Langy Assistant](https://langwatch.ai/docs/self-hosting/langy/setup.md): Run LangWatch's in-product AI assistant on your own cluster
 - [Register the GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 - [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.

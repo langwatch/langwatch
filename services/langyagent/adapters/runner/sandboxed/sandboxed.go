@@ -23,15 +23,15 @@ type Runner struct{}
 // compile-time proof Runner satisfies the app port.
 var _ app.Runner = Runner{}
 
-// New returns the sandboxed runner. It is the secure default; the composition
-// root selects it whenever LANGY_UNSAFE_DEV_DISABLE_ISOLATION is not armed.
+// New returns the sandboxed runner. It is the default posture; the composition
+// root selects it unless LANGY_WORKER_ISOLATION names "none" (ADR-130).
 func New() Runner { return Runner{} }
 
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "sandboxed" }
 
-// CommandContext applies per-worker process/file limits before execing
-// OpenCode. RLIMIT_NPROC is accounted per UID, which matches this runner's
+// CommandContext applies per-worker process/file limits before execing the
+// worker. RLIMIT_NPROC is accounted per UID, which matches this runner's
 // per-conversation identity boundary. Memory remains a pod-level cgroup limit;
 // Bun's large virtual address reservation makes RLIMIT_AS unsuitable.
 func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
@@ -63,7 +63,7 @@ func (Runner) Lchown(path string, uid uint32) error {
 // Credential. The explicit empty Groups forces setgroups([]) on exec — without
 // it the child would inherit the (root) manager's supplementary groups; combined
 // with the unique per-conv UID the worker then belongs to exactly one identity at
-// the kernel level. Setpgid puts opencode in its own process group so a SIGTERM
+// the kernel level. Setpgid puts the worker in its own process group so a SIGTERM
 // to the manager doesn't tear the worker down before we gracefully reap it.
 func (Runner) SysProcAttr(uid uint32) *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{

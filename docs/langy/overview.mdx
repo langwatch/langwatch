@@ -26,7 +26,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     Enable Langy, pick a model or sign in with Codex, and review the first pull request.
   </Card>
   <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
-    The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.
+    The mechanism: one isolated worker per conversation, whose only interface to LangWatch is the `langwatch` CLI.
   </Card>
   <Card title="Ask Langy" icon="comments" href="/langy/chat">
     The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.

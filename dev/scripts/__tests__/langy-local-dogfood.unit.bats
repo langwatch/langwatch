@@ -47,7 +47,7 @@ write_full_env() {
   cat >"$ENV_FILE" <<EOF
 OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="test-secret"
-LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+LANGY_WORKER_ISOLATION=none
 SESSIONS_ROOT="$TEST_DIR/sessions"
 LANGY_WORKSPACE_ROOT="$TEST_DIR/workspace"
 FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled
@@ -78,7 +78,7 @@ run_doctor() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"LANGY_INTERNAL_SECRET missing"* ]]
   [[ "$output" == *"OPENCODE_AGENT_URL missing"* ]]
-  [[ "$output" == *'LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true'* ]]
+  [[ "$output" == *'LANGY_WORKER_ISOLATION=none'* ]]
   [[ "$output" == *"LANGY_INTERNAL_SECRET=\""* ]]
 }
 

@@ -8,21 +8,21 @@ import (
 )
 
 func TestCommandContext_ExecutesBinaryDirectly(t *testing.T) {
-	cmd := Runner{}.CommandContext(context.Background(), "/tmp/opencode", "serve")
-	if cmd.Path != "/tmp/opencode" {
+	cmd := Runner{}.CommandContext(context.Background(), "/tmp/langy-worker", "serve")
+	if cmd.Path != "/tmp/langy-worker" {
 		t.Fatalf("command path = %q, want direct binary", cmd.Path)
 	}
-	if want := []string{"/tmp/opencode", "serve"}; !reflect.DeepEqual(cmd.Args, want) {
+	if want := []string{"/tmp/langy-worker", "serve"}; !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("command args = %#v, want %#v", cmd.Args, want)
 	}
 }
 
-// SysProcAttr must omit the setuid Credential (opencode runs as the manager's own
-// user) but keep Setpgid so the manager can group-signal it on shutdown.
+// SysProcAttr must omit the setuid Credential (the worker runs as the manager's
+// own user) but keep Setpgid so the manager can group-signal it on shutdown.
 func TestSysProcAttr_NoCredentialButProcessGroup(t *testing.T) {
 	attr := Runner{}.SysProcAttr(2345)
 	if attr.Credential != nil {
-		t.Errorf("Credential = %+v, want nil (opencode runs as the manager's own user)", attr.Credential)
+		t.Errorf("Credential = %+v, want nil (the worker runs as the manager's own user)", attr.Credential)
 	}
 	if !attr.Setpgid {
 		t.Errorf("Setpgid = false, want true even with isolation disabled")

@@ -19,8 +19,8 @@ func TestOverlayLangyIsolationNeverLeaks(t *testing.T) {
 	// never on the shared overlay the control plane reads.
 	for _, tier := range []LangyTier{LangyTierSandboxed, LangyTierContainerUnsafe, LangyTierHostUnsafe} {
 		t.Run("given the "+tier.String()+" tier", func(t *testing.T) {
-			if keyPresent(langyStack(tier).OverlayEnv(), "LANGY_UNSAFE_DEV_DISABLE_ISOLATION") {
-				t.Fatal("LANGY_UNSAFE_DEV_DISABLE_ISOLATION must never be in the overlay")
+			if keyPresent(langyStack(tier).OverlayEnv(), "LANGY_WORKER_ISOLATION") {
+				t.Fatal("LANGY_WORKER_ISOLATION must never be in the overlay")
 			}
 		})
 	}

@@ -1,6 +1,6 @@
 ---
 title: How Langy is Isolated
-description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
+description: Langy runs each conversation as an isolated worker process, walled off from its siblings by Unix identity and from the host by a sandboxed container runtime, with an L7 egress adapter on the way out. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 sidebarTitle: Sandbox and isolation
 keywords:
   - ai agent sandbox
@@ -9,44 +9,83 @@ keywords:
   - ai agent security
 ---
 
-Each conversation runs as a separate `opencode` worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
+Each conversation runs as a separate worker process inside a single agent pod. The worker runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`), so there are two boundaries that matter: the one between a worker and the host, and the one between a worker and the conversation next to it. They are set independently, and on a self-hosted install you choose both.
 
-On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
+## The pod-to-host boundary
 
-Running unsandboxed takes an explicit pair, `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`; the chart's render-time `fail` guard refuses the first value alone. You then lose the pod-to-host boundary and keep only the in-pod walls below.
+gVisor is a user-space kernel that sits between the worker and the host kernel, giving a container that runs arbitrary shell a much smaller escape surface than a normal one. Any sandboxed RuntimeClass does the same job — a Kata class on AKS, GKE Sandbox on GKE.
+
+On LangWatch Cloud the pod always runs under gVisor.
+
+**Self-hosted, it is off by default.** The chart ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, so the agent installs and runs on any cluster and hardening is a deliberate later step. Most self-managed clusters cannot offer a sandboxed runtime, and refusing them outright made the assistant hosted-only in practice.
+
+To pin one:
+
+```yaml
+langyagent:
+  runtimeClassName: "gvisor"
+  acceptUnsandboxedRuntime: false
+```
+
+Blanking the class afterwards while `acceptUnsandboxedRuntime` stays `false` is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox. Pinning a class the cluster does not define creates no pod at all — Kubernetes refuses it at admission, and the reason lands on the Deployment rather than on a pod you can see.
+
+## The worker-to-worker boundary
+
+Two conversations in one pod belong to two different people, and a prompt-injected worker's most valuable neighbour is the worker beside it. Three things separate them, and only one of them is configurable.
+
+**The control channel cannot be reached at any identity.** A worker is driven over the anonymous stdio pipes it was spawned with. There is no listener, no port and no path, so there is nothing for a sibling to dial: holding the file descriptor *is* the authorization. This is structural — no password, proxy or policy is doing the work, and no setting turns it off.
+
+**No credential is written to disk.** A worker's config file carries environment variable *names*, never values. Every live credential reaches the worker through its process environment, so there is no credential file for a sibling to read.
+
+**Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
+
+Holding that wall costs the container root plus five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`) — a UID handoff needs them, and only a root-effective-uid process holds them inside a container. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+
+### On a cluster that refuses root
+
+Pod Security Admission `restricted`, and the common Gatekeeper / Kyverno rules, require `runAsNonRoot: true`. Such a cluster admits no pod that can do the above at all, so the choice there is between per-worker identity and having an assistant:
+
+```yaml
+langyagent:
+  workerIsolation: none
+  acceptWorkerIsolationDisabled: true
+```
+
+The pod then renders as UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault` — a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
+
+What it costs is narrower than it sounds and still real. The first two walls above do not move: the control channel stays unreachable, and there is still no credential file. What a shared identity opens is that one conversation's worker can read another's **live credentials** from `/proc/<pid>/environ`, and another conversation's **content** from its session directory. That is a genuine cross-tenant credential and data exposure.
+
+Take it for a single-tenant install whose users are all colleagues in one organization. Do not take it if you serve mutually untrusted users from one install. One further consequence is easy to miss: a pod that cannot hold capabilities can never run the per-worker network namespace described under "hard egress" below, so this setting also forecloses that upgrade path for as long as it is selected.
+
+The pod logs a warning at boot naming exactly what is exposed, so the posture shows up in the first support bundle rather than being reconstructed from a values file after an incident.
 
 ## Isolation layers
 
-Langy is isolated at several layers, from the pod boundary down to the walls between two conversations sharing one pod. Weakest to strongest:
-
 | Boundary | Mechanism | Enforced by |
 |---|---|---|
-| Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
-| Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
-| Worker to worker (control port) | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode |
+| Pod to host | A sandboxed RuntimeClass such as gVisor (`runsc`). Off by default self-hosted; opt in with `runtimeClassName` and a render-time guard against losing it | Kubernetes + chart |
+| Worker to worker (control channel) | Anonymous stdio pipes. The worker opens no listener, so a sibling has nothing to dial at any identity | Process construction (not configurable) |
+| Worker to worker (credentials at rest) | None are written. The worker config holds variable names; values live only in the process environment | Process construction (not configurable) |
+| Worker to worker (process env and session files) | A distinct Unix UID per conversation, `0700` home, `/proc/<pid>/environ` readable only by the owning UID. Traded away by `workerIsolation: none` | Linux file permissions (DAC) |
 | Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
 | Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
-| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
+| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace | Cilium / netns (planned, see below) |
 | Control plane to agent | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster | Go |
-
-The manager process runs as root in the container, because assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
-
-To keep the blast radius small, the container drops all capabilities and adds back only five: `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, and `SETGID`. It also sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`.
-
-It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary, and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ## Why egress is enforced at L7, not with iptables
 
 gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
 
-That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-076) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
 
 The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
 
 <Warning>
 **Isolation limits (state these to a regulated buyer).**
 
-Today the per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers still share one gVisor sandbox and one network namespace (ADR-053, Proposed). The file and control-port walls above stop one worker from reading another worker's secrets or driving another worker's control server, but they do not give each conversation its own kernel or its own network stack.
+Per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers share one sandbox and one network namespace. The identity wall stops one worker reading another's process environment or session files; it does not give each conversation its own kernel or its own network stack.
+
+With `workerIsolation: none` that wall is **gone entirely** — one conversation's worker can read another's live credentials and conversation content. The control-channel and no-credential-file properties above survive it, but nothing else between siblings does.
 
 The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
 

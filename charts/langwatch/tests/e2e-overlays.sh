@@ -689,9 +689,12 @@ EXEMPT_WORKLOADS=(
   # Upstream subchart we do not control: no readOnlyRootFilesystem, no seccomp,
   # no limits on the config-reload sidecar.
   "charts/prometheus/templates/deploy.yaml:prometheus.chartManaged"
-  # Root by design: the manager needs CHOWN/DAC_OVERRIDE/FOWNER/SETUID/SETGID
-  # to hand each worker a distinct UID. Forcing it non-root re-opens
-  # cross-worker credential theft (ADR-033).
+  # Root in its DEFAULT posture only: the manager needs
+  # CHOWN/DAC_OVERRIDE/FOWNER/SETUID/SETGID to hand each worker a distinct UID
+  # (ADR-033). It is no longer exempt by necessity — ADR-130 added
+  # `workerIsolation: none`, which renders this same workload fully hardened.
+  # test_langy_isolation_postures below asserts that, so the exemption here
+  # covers the default and nothing more.
   "charts/langyagent/templates/deployment.yaml:langyagent.chartManaged"
   # Runs kubectl against Secrets, so it needs its token and a writable root for
   # kubectl's discovery cache. Only renders on the operator-owned-Secret path.
@@ -940,6 +943,98 @@ YAML
   metrics_off=$(tmpl --set autogen.enabled=true -f "$metrics_base" -f "${OVERLAYS}/strict-admission.yaml")
   assert_contains "strict-admission: metrics render produced a manifest" "$metrics_off" "kind: Deployment"
   assert_not_contains "strict-admission: app metrics scrape off" "$metrics_off" "prometheus.io/scrape"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Langy worker isolation postures (ADR-130)
+#
+# The agent is the one workload exempt from the hardened posture, and the
+# exemption is conditional: it holds for the DEFAULT per-uid posture, which
+# needs root and five capabilities to hand each worker its own identity, and
+# stops holding under `workerIsolation: none`. That second posture exists
+# because a cluster enforcing PSA "restricted" admits no pod that can do the
+# first, so this suite's job is to prove the claim the docs make on the
+# operator's behalf: `none` really does render a spec such a cluster accepts.
+#
+# Three postures, three assertions. The middle one is the load-bearing test —
+# it reuses assert_workload_hardened, so the agent is held to the identical
+# bar as every workload LangWatch authors, read off container objects rather
+# than grepped out of the text.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# @scenario "An operator on a non-root cluster can choose the assistant anyway"
+test_langy_isolation_postures() {
+  sep; info "Suite: Langy worker isolation postures"
+
+  local tpl="charts/langyagent/templates/deployment.yaml"
+
+  # 1. Default (per-uid). Root plus exactly the five capabilities the UID
+  #    handoff needs, and no more. Asserting the adds by name is what catches a
+  #    sixth arriving quietly; asserting root is what pins WHY it is exempt.
+  local per_uid
+  per_uid=$(tmpl_only "$tpl" --set autogen.enabled=true)
+  assert_contains "langy per-uid: manager runs as root" "$per_uid" "runAsUser: 0"
+  # The posture reaches the manager through the ConfigMap, not the pod spec, so
+  # it is asserted against that template. Rendering the deployment and grepping
+  # for the value would pass vacuously — it is never in there.
+  assert_contains "langy per-uid: posture reaches the manager" \
+    "$(tmpl_only "charts/langyagent/templates/configmap.yaml" --set autogen.enabled=true)" \
+    'LANGY_WORKER_ISOLATION: "per-uid"'
+  local cap
+  for cap in CHOWN DAC_OVERRIDE FOWNER SETUID SETGID; do
+    assert_contains "langy per-uid: keeps CAP_${cap}" "$per_uid" "- ${cap}"
+  done
+  assert_not_contains "langy per-uid: no SYS_ADMIN" "$per_uid" "- SYS_ADMIN"
+
+  # 2. `none` + the acknowledgement. The whole point: a spec PSA "restricted"
+  #    admits. Held to the same bar as every hardened workload — non-root at
+  #    BOTH levels, drop ALL, RuntimeDefault seccomp, read-only root, no
+  #    privilege escalation, requests and limits.
+  assert_workload_hardened "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true
+
+  # The capability list must be EMPTY, not merely dropped-then-re-added. Helm
+  # merges maps rather than replacing them, which is precisely how an operator
+  # setting `drop: [ALL]` in their own values still ends up requesting all five
+  # — the failure ADR-130 was written from. Assert the adds are gone by name.
+  local hardened
+  hardened=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true)
+  for cap in CHOWN DAC_OVERRIDE FOWNER SETUID SETGID; do
+    assert_not_contains "langy none: drops CAP_${cap}" "$hardened" "- ${cap}"
+  done
+  assert_contains "langy none: runs as uid 1000" "$hardened" "runAsUser: 1000"
+  assert_contains "langy none: posture reaches the manager" \
+    "$(tmpl_only "charts/langyagent/templates/configmap.yaml" --set autogen.enabled=true \
+        --set langyagent.workerIsolation=none \
+        --set langyagent.acceptWorkerIsolationDisabled=true)" \
+    'LANGY_WORKER_ISOLATION: "none"'
+
+  # 3. `none` WITHOUT the acknowledgement is refused at render time, and for
+  #    the stated reason. A bare exit-code check would go green on any
+  #    unrelated template error.
+  local out rc
+  out=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none 2>&1) && rc=0 || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    fail "langy none: expected helm to refuse without acceptWorkerIsolationDisabled"
+  elif ! grep -qF "acceptWorkerIsolationDisabled" <<< "$out"; then
+    fail "langy none: refused, but not for the expected reason"
+  else
+    pass "langy none: refused without the operator acknowledgement"
+  fi
+
+  # An unrecognized posture fails closed rather than defaulting. A typo must
+  # never silently select either wall.
+  out=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=per-user 2>&1) && rc=0 || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    fail "langy: expected helm to refuse an unrecognized workerIsolation"
+  else
+    pass "langy: an unrecognized workerIsolation is refused, not defaulted"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1350,6 +1445,7 @@ main() {
   test_component_toggles
   test_langy_disabled
   test_pod_security
+  test_langy_isolation_postures
   test_infra_overlays
   test_overlay_stacking
   test_workers_probes

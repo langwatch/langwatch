@@ -144,13 +144,13 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
 			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleHostMS)),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
-			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
-			// The pi harness spawns this worktree's own built wrapper binary
+			"LANGY_WORKER_ISOLATION=none",
+			// The manager spawns this worktree's own built wrapper binary
 			// (`pnpm --filter @langwatch/langyworker build:binary`). Without an
 			// explicit path the manager falls back to bare `langy-worker` on
-			// PATH, which no dev machine has: every pi spawn then fails with
-			// exec-not-found while opencode keeps working, which reads as a
-			// harness bug instead of a setup gap.
+			// PATH, which no dev machine has: every spawn then fails with
+			// exec-not-found, which reads as an agent bug instead of a setup
+			// gap.
 			"LANGY_PI_WORKER_BINARY_PATH="+piWorkerPath,
 		),
 	}
@@ -163,10 +163,10 @@ type langyContainerOpts struct {
 	Port   int    // the manager's HTTP port, published to host loopback and set as PORT
 	Secret string // the shared control-plane ↔ manager bearer secret
 	Image  string // the image tag (defaults to langyImage when empty)
-	// DisableUIDSandbox sets LANGY_UNSAFE_DEV_DISABLE_ISOLATION inside the container
-	// — true only for the container-unsafe tier. The sandboxed tier leaves it unset
+	// DisableUIDSandbox sets LANGY_WORKER_ISOLATION=none inside the container —
+	// true only for the container-unsafe tier. The sandboxed tier leaves it unset
 	// so the worker uses the ADR-033 per-worker UID sandbox (the container runs as
-	// root, so setuid+chown work), exactly as production does.
+	// root, so setuid+chown work), exactly as a per-uid production install does.
 	DisableUIDSandbox bool
 	// ObservabilityOTLPPort, when non-zero, dual-exports the worker's own operational
 	// telemetry (traces + logs + metrics) to the shared LGTM collector — the same
@@ -228,7 +228,7 @@ func langyContainerShell(o langyContainerOpts) string {
 		"-e", fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 	}
 	if o.DisableUIDSandbox {
-		run = append(run, "-e", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true")
+		run = append(run, "-e", "LANGY_WORKER_ISOLATION=none")
 	}
 	// Dual-export the worker's telemetry to the shared LGTM collector, exactly as
 	// the host-run Go services do — but at host.docker.internal, since 127.0.0.1

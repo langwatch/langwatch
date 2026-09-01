@@ -32,20 +32,34 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 ## How Langy is isolated
 
 Langy's workers run shell written by a language model, and each one holds the
-credentials of the person who asked. Two controls bound that, both on by
-default on every cluster:
+credentials of the person who asked. Four controls bound that. Two hold
+everywhere and cannot be configured away:
 
-- **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and its own opencode password. Workers cannot read
-  each other's keys or reach each other's control ports.
+- **No control channel to reach.** The manager drives each worker over the stdio
+  pipes it spawned it with. A worker opens no port, so there is nothing for a
+  sibling to dial at any identity.
+- **No credentials at rest.** A worker's config file carries environment
+  variable *names*, never values. There is no credential file to steal.
+
+The third is on by default and is the one a hardened cluster may force you to
+give up:
+
+- **Per-worker identity.** Each conversation's worker runs under its own UID,
+  with a `0700` home, so a sibling cannot read its process environment or its
+  session files. Holding this costs the pod root plus five capabilities — see
+  [Clusters that refuse root](#hardening-clusters-that-refuse-root) if yours
+  will not admit that.
+
+The fourth is on by default and needs no configuration:
+
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
   the gateway, and nothing else. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
-Those are the controls that bound the realistic attack: a worker reached by
-prompt injection through data it was asked to look at, using its own legitimate
-access to exfiltrate. They need no configuration and behave the same everywhere.
+Together these bound the realistic attack: a worker reached by prompt injection
+through data it was asked to look at, using its own legitimate access to
+exfiltrate.
 
 The rung above them is a **sandboxed runtime**, which protects the node's kernel
 from a worker that escapes its container. That needs a kernel exploit on top of
@@ -237,6 +251,62 @@ pod reaches Ready on its own. Confirm the sandbox is real:
 ```bash
 kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
 # Linux version 4.19.0-gvisor ...
+```
+
+## Hardening: clusters that refuse root
+
+Pod Security Admission `restricted`, and the common Gatekeeper or Kyverno
+policies, require `runAsNonRoot: true` and `capabilities.drop: [ALL]`. The
+default agent pod cannot satisfy that: handing each worker its own UID needs
+`CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN`, and only a root-effective-uid
+process holds them inside a container.
+
+Setting `runAsUser` and `drop: [ALL]` in your own values does **not** produce a
+working pod, and the way it fails is worth knowing before you try it. Helm
+merges maps rather than replacing them, so your `drop: ["ALL"]` merges with the
+chart's `add: [...]` and the rendered pod still requests all five capabilities.
+The kernel then clears them anyway on the UID transition. The pod is admitted,
+reports healthy, and dies at the first worker spawn — which reads like a Langy
+bug rather than a policy outcome.
+
+The supported way is to say what you are giving up:
+
+```yaml
+langyagent:
+  workerIsolation: none
+  acceptWorkerIsolationDisabled: true
+```
+
+The pod then renders as UID 1000 with `runAsNonRoot: true`,
+`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault` —
+a spec that PSA `restricted` admits with no exemption, no RuntimeClass and no
+separate namespace. Omitting the acknowledgement fails the render with a message
+naming the trade, so nobody reaches this posture by leaving a field blank.
+
+<Warning>
+**What `workerIsolation: none` costs.** The first two controls above survive it:
+workers still have no control channel to reach and no credentials at rest. What
+a shared identity opens is that one conversation's worker can read another's
+**live credentials** from `/proc/<pid>/environ`, and another conversation's
+**content** from its session directory. That is a real cross-tenant credential
+and data exposure.
+
+Take it for a single-tenant install whose users are all colleagues in one
+organization — the case this setting exists for, where the alternative is no
+assistant at all. Do not take it if you serve mutually untrusted users from one
+install.
+
+It also forecloses one future upgrade: the per-worker network namespace that
+would make egress enforcement mandatory rather than cooperative needs
+`CAP_SYS_ADMIN`, which this pod can never hold. If you expect to need
+bypass-proof egress, stay on `per-uid` and seek a policy exemption instead.
+</Warning>
+
+The pod logs a warning at boot naming exactly what is exposed, so the posture is
+visible in your logs rather than only in a values file:
+
+```bash
+kubectl -n langwatch logs deploy/langwatch-langyagent | grep worker_isolation
 ```
 
 ## Letting Langy reach the internet

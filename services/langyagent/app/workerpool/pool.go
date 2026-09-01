@@ -1069,8 +1069,8 @@ func (p *Pool) kill(conversationID, reason string) {
 		zap.String("reason", reason),
 	)
 	if w.cmd != nil && w.cmd.Process != nil {
-		// Signal the WHOLE process group, not just opencode's leader pid.
-		// spawnOpenCode sets Setpgid: true, so opencode + every child it shelled
+		// Signal the WHOLE process group, not just the worker's leader pid.
+		// The runner sets Setpgid: true, so the worker + every child it shelled
 		// out to (`gh`, `git`, `npm`, `gh auth git-credential fill`) share one
 		// pgid == leader pid. Without `-pgid`, a kill against the leader leaves
 		// the children reparented to PID 1 (the manager) holding the user's
@@ -1080,7 +1080,7 @@ func (p *Pool) kill(conversationID, reason string) {
 		pid := w.cmd.Process.Pid
 		_ = syscall.Kill(-pid, syscall.SIGINT)
 		// Best-effort hard kill if SIGINT didn't take. Negative pid sends to the
-		// whole group; opencode's `defer` cleanup gets SIGINT first for a chance
+		// whole group; the worker's own cleanup gets SIGINT first for a chance
 		// to flush, then SIGKILL nukes the tree.
 		clog.Go(p.baseCtx, "worker-hard-kill", func() {
 			time.Sleep(2 * time.Second)

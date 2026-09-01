@@ -50,12 +50,14 @@ missing_env=()
 for key in OPENCODE_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
   if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
 done
-# The isolation flag must literally be true: set-but-false still spawns the
-# gVisor runner, which cannot exist on a dev laptop.
-case "$(env_value LANGY_UNSAFE_DEV_DISABLE_ISOLATION)" in
-  true|1) ok "LANGY_UNSAFE_DEV_DISABLE_ISOLATION" ;;
-  "") bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION missing"; missing_env+=(LANGY_UNSAFE_DEV_DISABLE_ISOLATION) ;;
-  *) bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION must be true for a local (no gVisor) agent" ;;
+# The isolation posture must be "none". Unset means per-uid (ADR-130's default),
+# which needs root plus CAP_SETUID/SETGID/CHOWN to hand each worker its own
+# identity — capabilities a laptop process does not hold. Every spawn then dies
+# at the first chown, so a missing value fails here rather than at first message.
+case "$(env_value LANGY_WORKER_ISOLATION)" in
+  none) ok "LANGY_WORKER_ISOLATION" ;;
+  "") bad "LANGY_WORKER_ISOLATION missing"; missing_env+=(LANGY_WORKER_ISOLATION) ;;
+  *) bad "LANGY_WORKER_ISOLATION must be none for a local agent (per-uid needs root)" ;;
 esac
 # The roots must be writable directories or the worker provision fails at
 # spawn with a distant chown/mkdir error.
@@ -74,10 +76,10 @@ if [[ ${#missing_env[@]} -gt 0 ]]; then
   else
     BLOCK=$(cat <<BLOCK
 
-# Langy local dev (agent runs without gVisor via the unsafe-dev runner)
+# Langy local dev (no sandboxed runtime, workers share this machine's identity)
 OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="${SECRET}"
-LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+LANGY_WORKER_ISOLATION=none
 SESSIONS_ROOT="\$HOME/.langwatch-langy/sessions"
 LANGY_WORKSPACE_ROOT="\$HOME/.langwatch-langy/workspace"
 BLOCK

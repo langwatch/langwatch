@@ -19,9 +19,9 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
-// progressInterval is the heartbeat cadence, mirroring adapters/opencode:
-// comfortably below the control plane's HEARTBEAT_GRACE (30s) so a live but
-// quiet turn is never mistaken for a dead one.
+// progressInterval is the heartbeat cadence: comfortably below the control
+// plane's HEARTBEAT_GRACE (30s) so a live but quiet turn is never mistaken for
+// a dead one.
 const progressInterval = 5 * time.Second
 
 // maxStartedInputs caps the recorded tool-start inputs one turn keeps for the

@@ -124,7 +124,7 @@ func (t *Telemetry) StartSpawn(ctx context.Context, conversationID string) (cont
 }
 
 // StartPhase opens a child span for one phase of a worker spawn — egress prep,
-// home/skills provision, opencode spawn, readiness wait. Deliberately generic: the
+// home/skills provision, worker spawn, readiness wait. Deliberately generic: the
 // phases share no attributes and the langy.* span name is the only thing that
 // varies, so the spawn waterfall stays one cheap helper instead of a near-identical
 // method per phase. Callers defer span.End() and set any per-phase attribute (e.g.

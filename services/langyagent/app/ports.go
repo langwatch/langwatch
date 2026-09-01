@@ -2,7 +2,7 @@
 // turn — acquire a worker, run the turn, map failures — through the consumer
 // interfaces declared here, so it stays testable without a real worker pool or
 // a real HTTP response. Driven adapters implement these ports: app/workerpool
-// backs WorkerPool/Worker, adapters/opencode backs CodingAgent (agent.go),
+// backs WorkerPool/Worker, adapters/pi backs CodingAgent (agent.go),
 // adapters/controlplane backs TurnFinalizer; the driving adapter (transport/rpc)
 // provides the ChatSink.
 package app

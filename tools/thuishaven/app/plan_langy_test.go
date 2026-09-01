@@ -38,7 +38,7 @@ func TestLangyContainerShell(t *testing.T) {
 			}
 		})
 		t.Run("does NOT disable the UID sandbox", func(t *testing.T) {
-			if strings.Contains(sh, "LANGY_UNSAFE_DEV_DISABLE_ISOLATION") {
+			if strings.Contains(sh, "LANGY_WORKER_ISOLATION") {
 				t.Fatalf("sandboxed tier must keep the UID sandbox on: %s", sh)
 			}
 		})
@@ -67,7 +67,7 @@ func TestLangyContainerShell(t *testing.T) {
 			Slug: "brave-otter", Port: 5000, Secret: "s", DisableUIDSandbox: true,
 		})
 		t.Run("disables the UID sandbox inside the container", func(t *testing.T) {
-			if !strings.Contains(sh, "'LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true'") {
+			if !strings.Contains(sh, "'LANGY_WORKER_ISOLATION=none'") {
 				t.Fatalf("container-unsafe tier must disable the UID sandbox: %s", sh)
 			}
 		})
