@@ -1,89 +1,63 @@
 /**
  * Composes the sandboxed frame's document.
  *
- * The init-race fix lives here: the author's HTML is embedded as an inert
- * `<template id="lw-author">` and the shim is the ONLY directly-executed
- * script. The shim activates the template only after `lw:init` has set
- * `LW.params`/`LW.theme` and wired the port, so author code may read them
- * synchronously at its first line.
+ * The frame loads React, ReactDOM, Recharts and Babel standalone from a CDN
+ * as plain UMD `<script>` tags — render-blocking, so by the time the shim and
+ * author runtime run, the globals they read (`window.React`, and so on) are
+ * already there. The widget's own source is embedded as a JS string constant
+ * rather than markup: it is a React/TSX file, not HTML, and the shim's
+ * `window.__lwActivateAuthor` hook (wired up by `bridge/authorRuntime.ts`)
+ * is what compiles and mounts it, only after `lw:init`.
  */
 
+import { buildAuthorRuntimeScript } from "./bridge/authorRuntime";
 import { buildShimScript } from "./bridge/shimSource";
 
-const TEMPLATE_OPEN = /<template\b/gi;
-const TEMPLATE_CLOSE = /<\/template/gi;
-const SCRIPT_OPEN = /<script\b/gi;
-const SCRIPT_CLOSE = /<\/script/gi;
-
-interface Token {
-  readonly index: number;
-  readonly length: number;
-  readonly kind:
-    | "template-open"
-    | "template-close"
-    | "script-open"
-    | "script-close";
-}
-
-function tokensOf(html: string): Token[] {
-  const tokens: Token[] = [];
-  for (const [regex, kind] of [
-    [TEMPLATE_OPEN, "template-open"],
-    [TEMPLATE_CLOSE, "template-close"],
-    [SCRIPT_OPEN, "script-open"],
-    [SCRIPT_CLOSE, "script-close"],
-  ] as const) {
-    regex.lastIndex = 0;
-    for (let match = regex.exec(html); match; match = regex.exec(html)) {
-      tokens.push({ index: match.index, length: match[0].length, kind });
-    }
-  }
-  return tokens.sort((a, b) => a.index - b.index);
-}
+/**
+ * Pinned versions so a CDN release never silently changes what a saved
+ * widget compiles against. React 18's UMD build is the one that added
+ * `ReactDOM.createRoot`, and Recharts' UMD reads `window.PropTypes` as a
+ * plain global rather than requiring it — hence prop-types loading first.
+ */
+const CDN_SCRIPTS = [
+  "https://unpkg.com/react@18/umd/react.production.min.js",
+  "https://unpkg.com/prop-types@15/prop-types.min.js",
+  "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
+  "https://unpkg.com/recharts@2/umd/Recharts.js",
+  "https://unpkg.com/@babel/standalone@7/babel.min.js",
+];
 
 /**
- * Neutralises only the `</template>` sequences that would prematurely close
- * the wrapper template.
- *
- * Balanced nested `<template>` pairs are legal inside a template and pass
- * through untouched, as does a literal `"</template>"` inside a `<script>`'s
- * raw text (the HTML parser only leaves script raw-text mode on `</script`,
- * so such a string cannot close the wrapper). Only an UNMATCHED close tag in
- * markup position is rewritten to its entity form — it would have been a
- * parse error anyway, so rendering it as text loses nothing.
+ * Embeds `source` as a JS string literal safe to inline inside a `<script>`
+ * element. `JSON.stringify` handles quoting and control characters; the one
+ * thing it does not know about is HTML: a literal `</script` inside the
+ * string would close the element early regardless of the JS syntax around
+ * it, since the HTML tokenizer never looks at JS semantics. That is the only
+ * sequence guarded here.
  */
-export function escapeAuthorHtml(html: string): string {
-  const replacements: { index: number; length: number }[] = [];
-  let templateDepth = 0;
-  let inScript = false;
-  for (const token of tokensOf(html)) {
-    if (inScript) {
-      // Script raw text: everything except the closing script tag is inert.
-      if (token.kind === "script-close") inScript = false;
-      continue;
-    }
-    if (token.kind === "script-open") inScript = true;
-    else if (token.kind === "template-open") templateDepth += 1;
-    else if (token.kind === "template-close") {
-      if (templateDepth > 0) templateDepth -= 1;
-      else replacements.push({ index: token.index, length: "</".length });
-    }
-  }
-  let out = html;
-  for (const { index } of replacements.reverse()) {
-    out = `${out.slice(0, index)}&lt;/${out.slice(index + 2)}`;
-  }
-  return out;
+function toInlineScriptLiteral(source: string): string {
+  return JSON.stringify(source).replace(/<\/script/gi, "<\\/script");
 }
 
-export function buildSrcdoc(authorHtml: string): string {
+export function buildSrcdoc(code: string): string {
   return [
     "<!doctype html>",
     '<html><head><meta charset="utf-8">',
-    "<style>body{margin:8px;font-family:system-ui,sans-serif;font-size:13px;}</style>",
+    "<style>",
+    "  body { margin: 8px; font-family: system-ui, sans-serif; font-size: 13px; }",
+    "  #lw-compile-error {",
+    "    display: none; white-space: pre-wrap; font-family: ui-monospace, monospace;",
+    "    font-size: 12px; color: #b91c1c; background: #fef2f2;",
+    "    border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin: 0;",
+    "  }",
+    "</style>",
+    ...CDN_SCRIPTS.map((src) => `<script src="${src}" crossorigin></script>`),
     "</head><body>",
+    '<div id="lw-root"></div>',
+    '<pre id="lw-compile-error"></pre>',
     `<script>${buildShimScript()}</script>`,
-    `<template id="lw-author">${escapeAuthorHtml(authorHtml)}</template>`,
+    `<script>window.__LW_AUTHOR_SOURCE__ = ${toInlineScriptLiteral(code)};</script>`,
+    `<script>${buildAuthorRuntimeScript()}</script>`,
     "</body></html>",
   ].join("\n");
 }

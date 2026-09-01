@@ -22,7 +22,7 @@ import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 import type { PlaygroundWidget } from "./PlaygroundWidgetCard";
 import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
 import { PlaygroundWidgetGrid } from "./PlaygroundWidgetGrid";
-import { STARTER_WIDGET_HTML, STARTER_WIDGET_SQL } from "./presets";
+import { STARTER_WIDGET_CODE, STARTER_WIDGET_SQL } from "./presets";
 
 /** Parses a stored `CustomGraph.graph` into the widget the grid renders. */
 function toWidget(row: {
@@ -91,7 +91,7 @@ export function CustomChartPlayground({
         projectId,
         ...(dashboardId ? { dashboardId } : {}),
         name: "New widget",
-        srcdocHtml: STARTER_WIDGET_HTML,
+        srcdocHtml: STARTER_WIDGET_CODE,
         sql: STARTER_WIDGET_SQL,
       },
       {

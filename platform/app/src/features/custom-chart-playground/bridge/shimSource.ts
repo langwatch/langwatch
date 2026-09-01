@@ -2,12 +2,19 @@
  * The frame-side shim, as a string of plain JavaScript.
  *
  * A string rather than a module because it executes inside a sandboxed
- * `srcdoc` iframe with no module graph of its own: `buildSrcdoc` inlines it
- * as the document's only directly-executed script. It installs the `LW`
- * global, forwards console output and uncaught errors to the parent, posts a
- * heartbeat, and — the init-race fix — activates the author's `<template>`
- * only AFTER `lw:init` has delivered the port, params and theme, so author
- * code can read `LW.params` synchronously at its first line.
+ * `srcdoc` iframe: `buildSrcdoc` inlines it as the document's first executed
+ * script, ahead of the CDN-loaded React/ReactDOM/Recharts/Babel globals and
+ * the author runtime that compiles and mounts the widget's file. It installs
+ * the `LW` global, forwards console output and uncaught errors to the
+ * parent, posts a heartbeat, and — the init-race fix — calls
+ * `window.__lwActivateAuthor` only AFTER `lw:init` has delivered the port,
+ * params and theme, so author code can read `LW.params` synchronously at its
+ * first line.
+ *
+ * The shim itself knows nothing about React, Babel or the module format —
+ * that lives in `bridge/authorRuntime.ts`, which is what defines the hook
+ * this file calls. Keeping the split means a future non-React chart kind
+ * reuses this shim unchanged.
  *
  * Protocol constants are interpolated from `bridgeProtocol.ts` so the two
  * sides cannot drift.
@@ -134,21 +141,19 @@ export function buildShimScript(): string {
     }
   }
 
-  function activateAuthorTemplate() {
-    var template = document.getElementById("lw-author");
-    if (!template || !template.content) return;
-    var fragment = template.content.cloneNode(true);
-    // Cloned scripts are inert by spec — re-create each one so it executes.
-    var inert = fragment.querySelectorAll("script");
-    Array.prototype.forEach.call(inert, function (oldScript) {
-      var fresh = document.createElement("script");
-      Array.prototype.forEach.call(oldScript.attributes, function (attribute) {
-        fresh.setAttribute(attribute.name, attribute.value);
-      });
-      fresh.textContent = oldScript.textContent;
-      oldScript.parentNode.replaceChild(fresh, oldScript);
-    });
-    document.body.appendChild(fragment);
+  // The activation hook itself is generic — the shim knows nothing about
+  // templates, React or Babel. buildSrcdoc defines window.__lwActivateAuthor
+  // before this script runs; whatever runtime it wires up (today: the
+  // author-runtime that compiles and mounts a React file) is what actually
+  // runs the author's code.
+  function activateAuthor() {
+    if (typeof window.__lwActivateAuthor === "function") {
+      try {
+        window.__lwActivateAuthor();
+      } catch (activationError) {
+        LW.error(activationError);
+      }
+    }
   }
 
   window.addEventListener("message", function (event) {
@@ -166,7 +171,7 @@ export function buildShimScript(): string {
       port.postMessage({ type: "lw:heartbeat" });
     }, ${CHART_FRAME_HEARTBEAT_INTERVAL_MS});
     resolveReady();
-    activateAuthorTemplate();
+    activateAuthor();
   });
 })();
 `;
