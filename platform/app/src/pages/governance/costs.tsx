@@ -350,11 +350,15 @@ function CostBreakdowns({
         </CostPanel>
       </SimpleGrid>
 
+      {/* One grid of nine, in the prototype's order. */}
       <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
+        {/* The placeholder series is agents whatever Group By says, so this
+            title does not follow it — a chart labelled by model showing agent
+            names would be worse than a fixed label. */}
         <CostPanel title="% cost by agent" sample>
           <CostDonut rows={sample.agents} />
         </CostPanel>
-        <CostPanel title={`Cost over time · by ${filters.groupBy}`}>
+        <CostPanel title={`Cost evolution by ${filters.groupBy}`}>
           <CostStackedBars
             buckets={aggregateBuckets(breakdowns.overTime, filters.interval)}
           />
@@ -362,9 +366,7 @@ function CostBreakdowns({
         <CostPanel title="Cost by department">
           <CostRankList rows={departmentRows} />
         </CostPanel>
-      </SimpleGrid>
 
-      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
         <CostPanel title="Cost by agent" sample>
           <CostRankList rows={sample.agents} />
         </CostPanel>
@@ -380,9 +382,7 @@ function CostBreakdowns({
             }))}
           />
         </CostPanel>
-      </SimpleGrid>
 
-      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
         <CostPanel title="Genie questions over time" sample>
           <CostStackedBars
             buckets={sample.genie}
