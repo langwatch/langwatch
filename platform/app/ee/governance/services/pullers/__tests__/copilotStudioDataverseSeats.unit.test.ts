@@ -573,13 +573,15 @@ describe("the seat licence read inside the Dataverse source", () => {
 
     /** @scenario "A conversation failure with no new bill still fails the run" */
     it("fails the run once both marks are already on today", async () => {
-      // The cost and seat marks only move on the day roll. If their daily
-      // advance stood in for conversation progress on every run, a dead
-      // environment would look like steady progress.
+      // The seat mark only moves on the day roll, and the bill is only asked
+      // about a few times a day. If either advance stood in for conversation
+      // progress on the runs between, a dead environment would look like
+      // steady progress.
       const previous = JSON.stringify({
         ...TRANSCRIPT_POSITION,
         costPricedThroughDay: today(),
         costHeldSinceMs: null,
+        costReadAtMs: Date.now() - 60_000,
         seatsReportedThroughDay: today(),
         seatsHeldSinceMs: null,
       });

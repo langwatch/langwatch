@@ -323,19 +323,127 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # already a priced-through point to hold at has no defined behaviour here.
 
   @unit
-  Scenario: A held window is asked about again on the next run
-    Given a run whose cost read was throttled
+  Scenario: The bill is not asked about on every run
+    Given a source whose bill was asked about a few minutes ago
     When the next run starts
-    Then it asks about the same window again
+    Then it makes no cost request
+    And it attaches no cost figure to any day
+    And the conversations are delivered as before
+    # Azure publishes this bill once a day and refuses a caller that asks too
+    # often. A source running every five minutes would ask 288 times a day
+    # about a figure that moves once, and be throttled into never reading it
+    # at all — which is exactly what a live subscription did.
+
+  @unit
+  Scenario: A source that has never asked about the bill asks on its first run
+    Given a source that has never asked about cost
+    When its first run starts
+    Then it asks about the bill on that run
+    # Someone who adds a source sees a figure on the first pull rather than
+    # hours later.
+
+  @unit
+  Scenario: A throttled window is asked about again once the wait has passed
+    Given a window being held because an earlier read was throttled
+    When a run starts once the bill is due to be asked about again
+    Then it asks about the bill on that run
     And it does not wait in place for the throttle to pass
-    # Waiting inside a run burns the run's whole deadline on a sleep and
-    # risks it being killed holding the conversations it already read. The
-    # schedule is the retry.
+    # A throttled read must not be the end of the matter. What separates this
+    # from the run that skips is only elapsed time, and that is the whole
+    # claim: the hold is a reason to wait, never a reason to stop.
+    #
+    # Deliberately says nothing about the shape of the window. The ask always
+    # runs from the trailing week up to today whether the last read was
+    # throttled, succeeded, or never happened, so no window a held source asks
+    # about differs from one a healthy source asks about — a Then about the
+    # span would read as though the hold caused it, and would hold just as
+    # well with the hold removed.
+    #
+    # Nor does every unpriced day survive. A source that has never priced
+    # anything has no mark to resume from, so its window is the trailing week
+    # and the oldest day drops out at each midnight. That gap is real, is
+    # tracked separately, and is not what this scenario claims.
+    #
+    # Waiting inside a run burns the run's whole deadline on a sleep and risks
+    # it being killed holding the conversations it already read. The schedule
+    # is the retry — but only on the runs that are due, because retrying a
+    # throttled read every five minutes is what caused the throttling.
+
+  @unit
+  Scenario: The bill is asked about a handful of times a day
+    Given a source pulling continuously through a whole day
+    When the day is over
+    Then the bill has been asked about more than once and far fewer than two dozen times
+    # Both bounds earn their place. Asking once a day means a figure Azure
+    # published this morning waits until tomorrow; asking on every run is the
+    # live failure this gate exists to prevent, where a source read the bill
+    # zero times in half an hour because Azure refused all of it.
+    #
+    # Says nothing about how often the source runs, because the gate cannot
+    # see that: it reads elapsed time since the last ask and nothing else. A
+    # source on a six-hourly schedule asks on every run and a daily one asks
+    # once, and both are correct. Any claim here about a fraction of runs
+    # would be false the moment someone types a legal cron.
+
+  @unit
+  Scenario: A window that cannot be read is asked about many times before it is given up on
+    Given a window being held because an earlier read was throttled
+    When the span before such a window is abandoned passes
+    Then the bill has been asked about many times over within it
+    # The two bounds have to be read together. An interval longer than the
+    # give-up cap would abandon every held window before the next ask was ever
+    # due, and a customer would never see a figure at all.
+
+  @unit
+  Scenario: A run that skips the bill neither holds the window nor abandons it
+    Given a window being held because an earlier read was throttled
+    When a run skips the cost read because the bill is not due yet
+    Then the instant that window was first held at is unchanged
+    And the source does not give up on the window on that run
+    # A skip attempted nothing, so it must record nothing: it must not start a
+    # hold on a source that has none, must not move the instant an existing
+    # hold is anchored at, and must not be the run that abandons a window it
+    # never asked about.
+
+  @unit
+  Scenario: A window held across several failed reads keeps the instant it was first held at
+    Given a window already being held after a failed read
+    When a later due read fails as well
+    Then the window is still anchored at the instant it was first held at
+    # Re-anchoring on each failure would push the give-up cap permanently out
+    # of reach, and a window that can never be answered would pin the source
+    # to one instant forever.
+
+  @unit
+  Scenario: A successful read records that the bill was asked about even when no figure changed
+    Given a day that was already priced by an earlier run
+    When a later run reads the bill again and finds the same figure
+    Then the source still records that it asked on this run
+    # The record of asking is what the gate reads. A run that asked but did
+    # not write that down leaves the source due again minutes later, which is
+    # the every-five-minutes loop this whole section exists to stop.
+
+  @unit
+  Scenario: A record of asking that lies in the future does not stop the bill being read
+    Given a stored position whose record of the last ask is in the future
+    When the puller runs
+    Then the bill is asked about on that run
+    # A clock that moved backwards, or a position rewound by hand to re-sweep
+    # a period, must not jam the gate shut until real time catches up.
+
+  @unit
+  Scenario: A position carrying no record of when the bill was last asked about reads it at once
+    Given a stored position written before the timing of the cost read was recorded
+    When the puller runs
+    Then the bill is asked about on that run
+    # Positions are read back on every scheduled run. A source configured
+    # before this existed must start asking again, not sit waiting on a time
+    # it never recorded.
 
   @unit
   Scenario: A window held for too long is given up rather than held forever
     Given a window that has been held unpriced for longer than the cap
-    When the next run starts
+    When the next run that is due to ask about the bill starts
     Then the source moves past that window
     And it keeps reading conversations and later days
     # Holding is right for a bill that is merely late. A window that can never
@@ -425,10 +533,26 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   @unit
   Scenario: A conversation failure with no new bill still fails the run
     Given the bill is already priced through today
+    And the bill is not due to be asked about again yet
     And the seat licences are already reported through today
     And the conversation read cannot sign in to the environment
     When the source runs
     Then the run fails and the same window is retried
+    # The second and third Givens are both load-bearing, and each fails this
+    # scenario on its own. A run that is due to ask about the bill records
+    # that it asked, and that record counts as the position moving even when
+    # the figure is unchanged — so on those few runs a day this scenario does
+    # not apply and the failure is reported the ordinary way. The vast
+    # majority of runs ask nothing, and those are the ones that need the
+    # position to stay still.
+    #
+    # The third Given is the same story a day later: one minute after UTC
+    # midnight the seat mark rolls to the new day, that roll counts as
+    # movement, and this same dead environment does not fail its run. Reported
+    # through today is therefore a real precondition, not scene-setting. It is
+    # also the one Given the bound test cannot show, because that test file
+    # reads no licences at all — the seat lane's own tests carry it.
+    #
     # The cost and seat marks only move once a day. If their daily advance
     # stood in for conversation progress on every run, a dead environment
     # would look like steady progress. Failing the runs in between is what

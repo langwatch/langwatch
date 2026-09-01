@@ -79,6 +79,46 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  */
 export const AZURE_COST_MAX_HOLD_MS = 7 * ONE_DAY_MS;
 
+/**
+ * How long a source waits between asking Cost Management anything at all.
+ *
+ * Not a tuning knob. Azure publishes this bill once a day and refuses a caller
+ * that asks too often, per subscription, with a quota that does not recover in
+ * minutes. A source on a five-minute schedule would ask 288 times a day about
+ * a figure that moves once — and a live subscription did exactly that, drawing
+ * a flat refusal on every attempt and reading the bill zero times in half an
+ * hour. The conversations kept arriving; the cost stayed blank forever.
+ *
+ * Six hours asks four times a day: enough that a bill published at any hour is
+ * picked up the same day, few enough to stay well inside the quota, and short
+ * enough that a window held by a refusal is retried dozens of times before the
+ * cap above abandons it. Raising this past that cap would abandon every held
+ * window before the next ask was ever due, which is why the two are tested
+ * against each other rather than separately.
+ */
+const AZURE_COST_READ_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Whether this run may ask about the bill at all.
+ *
+ * A run that has never asked always asks, so a source added just now shows a
+ * figure on its first pull rather than hours later. A record of asking that
+ * lies in the future — a clock that moved backwards, or a position rewound by
+ * hand to re-sweep a period — counts as due: waiting for real time to catch up
+ * would jam the source shut for a span nothing here can bound.
+ */
+export function azureCostReadIsDue({
+  nowMs,
+  readAtMs,
+}: {
+  nowMs: number;
+  readAtMs: number | null;
+}): boolean {
+  if (readAtMs === null) return true;
+  if (readAtMs > nowMs) return true;
+  return nowMs - readAtMs >= AZURE_COST_READ_INTERVAL_MS;
+}
+
 /** The Cost Management API version this request shape is written against. */
 export const AZURE_COST_API_VERSION = "2025-03-01";
 
@@ -426,6 +466,11 @@ export function azureCostEvents({
  * ever-widening span. Giving up costs those days their cost figure, which is
  * what they had before any of this existed. Not giving up costs the source its
  * ability to move at all, and the conversations matter more than the bill.
+ *
+ * Every outcome records the instant of the ask, because this is only reached
+ * when a run actually asked. That record is what `azureCostReadIsDue` reads,
+ * and a run that asked without writing it down would be due again on the very
+ * next run — the every-five-minutes loop the interval exists to stop.
  */
 export function nextAzureCostCursor({
   nowMs,
@@ -435,14 +480,26 @@ export function nextAzureCostCursor({
   nowMs: number;
   previous: { pricedThroughDay: string | null; heldSinceMs: number | null };
   outcome: "priced" | "held";
-}): { pricedThroughDay: string | null; heldSinceMs: number | null } {
+}): {
+  pricedThroughDay: string | null;
+  heldSinceMs: number | null;
+  readAtMs: number;
+} {
   if (outcome === "priced") {
-    return { pricedThroughDay: utcDay(nowMs), heldSinceMs: null };
+    return {
+      pricedThroughDay: utcDay(nowMs),
+      heldSinceMs: null,
+      readAtMs: nowMs,
+    };
   }
 
   const heldSinceMs = previous.heldSinceMs ?? nowMs;
   if (nowMs - heldSinceMs <= AZURE_COST_MAX_HOLD_MS) {
-    return { pricedThroughDay: previous.pricedThroughDay, heldSinceMs };
+    return {
+      pricedThroughDay: previous.pricedThroughDay,
+      heldSinceMs,
+      readAtMs: nowMs,
+    };
   }
 
   // Give up: mark the day BEFORE the trailing window's own start as priced, so
@@ -451,5 +508,6 @@ export function nextAzureCostCursor({
   return {
     pricedThroughDay: utcDay(trailingStartMs - ONE_DAY_MS),
     heldSinceMs: null,
+    readAtMs: nowMs,
   };
 }
