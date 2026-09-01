@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -81,7 +82,18 @@ function buildFixture(trackedPaths: string[]): string {
         name: "@langwatch/server",
         version: "3.16.0",
         bin: { "langwatch-server": "dist/cli.cjs" },
-        files: ["dist"],
+        files: ["dist", "src"],
+        // The real manifest's entry-point shape: a bare `main`, a string
+        // export and a conditions object, all relative to the package root
+        // the repository has rather than the one the artifact gets.
+        main: "dist/cli.cjs",
+        exports: {
+          ".": "./dist/cli.cjs",
+          "./task": {
+            types: "./src/task/task.executable.ts",
+            default: "./src/task/task.executable.ts",
+          },
+        },
       },
       null,
       2,
@@ -96,6 +108,8 @@ function buildFixture(trackedPaths: string[]): string {
         "platform/app/",
         "packages/api/",
         "dev/scripts/",
+        "apps/server/dist/",
+        "apps/server/src/",
         "apps/server/package.json",
       ],
       null,
@@ -106,7 +120,15 @@ function buildFixture(trackedPaths: string[]): string {
   writeFileSync(join(root, "README.md"), "fixture\n");
   writeFileSync(join(root, "LICENSE.md"), "fixture\n");
 
-  for (const relPath of trackedPaths) write({ root, relPath });
+  // What the manifest's entry points name, tracked so the completeness guard
+  // sees them too.
+  for (const relPath of [
+    "apps/server/dist/cli.cjs",
+    "apps/server/src/task/task.executable.ts",
+    ...trackedPaths,
+  ]) {
+    write({ root, relPath });
+  }
 
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["add", "-A"], { cwd: root });
@@ -140,6 +162,19 @@ function runCheck({ root, extraArgs = [] }: { root: string; extraArgs?: string[]
       output: `${failure.stdout ?? ""}${failure.stderr ?? ""}`,
     };
   }
+}
+
+/** Every path a manifest names as an entry point, at any condition depth. */
+function entryTargets(manifest: Record<string, unknown>): string[] {
+  const collect = (value: unknown): string[] => {
+    if (typeof value === "string") return [value];
+    if (Array.isArray(value)) return value.flatMap(collect);
+    if (value && typeof value === "object") {
+      return Object.values(value).flatMap(collect);
+    }
+    return [];
+  };
+  return [manifest.main, manifest.exports, manifest.bin].flatMap(collect);
 }
 
 /** Whether a repo-relative path survived into the staged tree. */
@@ -240,6 +275,46 @@ describe("npm pack staging filters", () => {
     for (const named of artifacts.filter((p) => !p.endsWith(".log"))) {
       expect(output).toContain(named);
     }
+  });
+
+  describe("the published manifest", () => {
+    /** @scenario Every entry point the published package advertises resolves inside it */
+    it("relocates every advertised entry point onto the staged layout", () => {
+      const root = buildFixture(["platform/app/src/server/config.ts"]);
+      const stageDir = join(root, "_stage");
+
+      const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
+      expect(code).toBe(0);
+
+      const published = JSON.parse(readFileSync(join(stageDir, "package.json"), "utf8")) as {
+        bin: Record<string, string>;
+        files: string[];
+        main: string;
+        exports: Record<string, unknown>;
+        scripts?: unknown;
+      };
+
+      expect(published.files).toEqual(["app"]);
+      expect(published.bin).toEqual({
+        "langwatch-server": "app/apps/server/dist/cli.cjs",
+      });
+      expect(published.main).toBe("./app/apps/server/dist/cli.cjs");
+      expect(published.exports).toEqual({
+        ".": "./app/apps/server/dist/cli.cjs",
+        "./task": {
+          types: "./app/apps/server/src/task/task.executable.ts",
+          default: "./app/apps/server/src/task/task.executable.ts",
+        },
+      });
+      expect(published.scripts).toBeUndefined();
+
+      // The whole point of the relocation: an entry point that names a path
+      // the package does not carry throws ERR_MODULE_NOT_FOUND for anyone
+      // importing the package by name, and nothing at publish time says so.
+      for (const target of entryTargets(published)) {
+        expect(existsSync(join(stageDir, target)), `${target} is not shipped`).toBe(true);
+      }
+    });
   });
 
   describe("--stage-to", () => {

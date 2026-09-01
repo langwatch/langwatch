@@ -18,6 +18,7 @@
   "LICENSE.md",
   "pnpm-workspace.yaml",
   "pnpm-lock.yaml",
+  "patches/",
   "apps/server/package.json",
   "plugins/langwatch/package.json",
   "services/langyworker/package.json",

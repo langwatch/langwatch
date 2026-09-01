@@ -71,6 +71,24 @@ function rootOverrideKeys(): string[] {
   return keys;
 }
 
+/**
+ * The patch files `patchedDependencies:` names, same line-scan approach.
+ */
+function patchedDependencyPaths(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "patchedDependencies:");
+  if (start === -1) return [];
+
+  const paths: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (!/^\s/.test(line)) break; // next top-level key
+    const target = /:\s*"?([^"\s]+)"?\s*$/.exec(line);
+    if (target?.[1]) paths.push(target[1]);
+  }
+  return paths;
+}
+
 /** Every package.json the repo tracks, excluding installed dependencies. */
 function trackedManifests(): string[] {
   return execFileSync(
@@ -313,6 +331,25 @@ describe("the repo is a single pnpm workspace", () => {
       expect(shipped).toBeInstanceOf(Array);
       expect(shipped).toContain("pnpm-workspace.yaml");
       expect(shipped).toContain("pnpm-lock.yaml");
+    });
+
+    /** @scenario The published package carries every input its install reads */
+    it("ships every patch the workspace applies", () => {
+      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
+      const patches = patchedDependencyPaths();
+
+      // A patch the package does not carry is not a weaker install, it is no
+      // install: pnpm stops the whole `--frozen-lockfile` run with ENOENT on
+      // the missing file, before anything is built and long before the first
+      // migration. The workspace definition ships, so the declaration always
+      // reaches the end user whether or not the file it names does.
+      expect(patches.length).toBeGreaterThan(0);
+      for (const patch of patches) {
+        const covered = shipped.some(
+          (f) => patch === f || patch.startsWith(f.endsWith("/") ? f : `${f}/`),
+        );
+        expect(covered, `no distribution entry ships ${patch}`).toBe(true);
+      }
     });
 
     /** @scenario Every project the lockfile mentions is resolvable */

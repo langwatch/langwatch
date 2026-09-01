@@ -296,13 +296,43 @@ done < <(node -p "require('./apps/server/distribution-files.json').join('\n')")
 # against it, so `--frozen-lockfile` fails without it.
 cp "$ROOT/package.json" "$APP/package.json"
 
-# The published manifest is owned by apps/server. Its entrypoint and file list
-# are adjusted only for the staged layout.
+# The published manifest is owned by apps/server. Its entrypoint, file list and
+# module map are adjusted only for the staged layout.
+#
+# `main` and `exports` name paths relative to the PACKAGE root, and staging
+# moves the package root one level above the workspace root: what apps/server
+# calls `dist/cli.cjs` sits at app/apps/server/dist/cli.cjs in the artifact.
+# Relocating `bin` and `files` while leaving those two alone published a
+# manifest advertising the REPOSITORY's paths, so every entry point resolved
+# to a file the tarball does not have — `@langwatch/server` and
+# `@langwatch/server/task` both threw ERR_MODULE_NOT_FOUND while the files
+# themselves shipped correctly one directory down. Nothing catches that at
+# publish time: `bin` is the only entry point npx reads, so the package
+# installs and boots with a module map that names nothing.
+#
+# Only this root manifest is rewritten. The workspace member staged at
+# app/apps/server keeps its own, so the application resolves
+# `@langwatch/server/task` through the pnpm link exactly as it does in the
+# repository.
 node -e '
   const fs = require("node:fs");
   const pkg = JSON.parse(fs.readFileSync("apps/server/package.json", "utf8"));
+  // Every entry-point target, at any condition depth. A non-string (an
+  // exports `null`, which blocks a subpath) is left as it is.
+  const relocate = (value) => {
+    if (typeof value === "string") {
+      return "./app/apps/server/" + value.replace(/^\.\//, "");
+    }
+    if (Array.isArray(value)) return value.map(relocate);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, relocate(v)]));
+    }
+    return value;
+  };
   pkg.bin = { "langwatch-server": "app/apps/server/dist/cli.cjs" };
   pkg.files = ["app"];
+  if (pkg.main !== undefined) pkg.main = relocate(pkg.main);
+  if (pkg.exports !== undefined) pkg.exports = relocate(pkg.exports);
   delete pkg.scripts;
   fs.writeFileSync(process.argv[1], JSON.stringify(pkg, null, 2) + "\n");
 ' "$STAGE/package.json"
