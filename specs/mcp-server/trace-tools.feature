@@ -1,3 +1,6 @@
+# See dev/docs/adr/132-a-trace-id-is-looked-up-never-searched.md for why a trace
+# id is not reachable through search, and why the shape check below only ever
+# adds advice instead of changing what the tool does.
 @integration
 Feature: MCP Trace Tools
   As a coding agent
@@ -45,3 +48,42 @@ Feature: MCP Trace Tools
   Scenario: Agent gets a trace that does not exist
     When the agent calls get_trace with traceId "nonexistent-trace"
     Then the response contains an error message "Trace not found"
+
+  # Implementation:
+  #   mcp/typescript/src/tools/search-traces.ts
+  #
+  # An empty result is the one moment the caller needs a redirect, and it was
+  # the one place the tip naming get_trace never printed. These four scenarios
+  # are @unimplemented until the bindings land alongside the change; the tag
+  # comes off in the same commit as the tests.
+
+  @unimplemented
+  Scenario: Agent pastes a trace id into the search query
+    Given a trace exists with id "trace_4bf92f3577b34da6a3ce929d0e0e4736"
+    When the agent calls search_traces with query "trace_4bf92f3577b34da6a3ce929d0e0e4736"
+    Then the response reports that no traces matched
+    And the response says the query looks like a trace id and names get_trace
+
+  @unimplemented
+  Scenario: A search that matches nothing says which window it searched
+    When the agent calls search_traces with a query that matches no trace
+    Then the response reports that no traces matched
+    And the response states the time window it searched
+    And the response names get_trace for looking up a known trace id
+
+  # The shape check recognises the OTel and trace_-prefixed forms only. A
+  # customer-assigned id is unrecognisable by construction — TraceId is a
+  # free-form String — so the unconditional guidance is what has to carry it.
+  @unimplemented
+  Scenario: A trace id in a format the shape check cannot recognise still gets guidance
+    Given the project's traces carry customer-assigned ids like "order-12345"
+    When the agent calls search_traces with query "order-12345"
+    Then the response reports that no traces matched
+    And the response names get_trace for looking up a known trace id
+
+  # The load-bearing guarantee of ADR-132: advice only, never routing.
+  @unimplemented
+  Scenario: An id-shaped query is still executed as a search
+    When the agent calls search_traces with query "trace_4bf92f3577b34da6a3ce929d0e0e4736"
+    Then the server receives a trace search request
+    And the server receives no single-trace lookup
