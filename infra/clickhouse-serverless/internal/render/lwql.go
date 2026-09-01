@@ -141,16 +141,22 @@ func renderLwql(input *config.Input, usersD, configD string) error {
 	// plaintext reader password (ClickHouse must dial PostgreSQL with the real
 	// value, so unlike every other rendered credential this one is NOT hashed —
 	// the first plaintext secret on the pod's config disk, by necessity).
-	if input.LwqlPgHost != "" && input.LwqlPgPassword != "" {
+	if input.LwqlPgHost != "" && input.LwqlPgPassword != "" && input.LwqlPgDatabase != "" {
 		// The SaaS render-config.sh hardcodes the reader role as lwql_ro; this
 		// path parameterizes it via CLICKHOUSE_LWQL_PG_USER (input.LwqlPgUser) so
 		// a BYO PostgreSQL can name the role whatever its own conventions require.
+		// An unset user still defaults to lwql_ro, matching the bash renderer's
+		// ${CLICKHOUSE_LWQL_PG_USER:-lwql_ro}.
+		pgUser := input.LwqlPgUser
+		if pgUser == "" {
+			pgUser = "lwql_ro"
+		}
 		serverConfig["named_collections"] = map[string]any{
 			"lwql_postgres": map[string]any{
 				"host":     input.LwqlPgHost,
 				"port":     input.LwqlPgPort,
 				"database": input.LwqlPgDatabase,
-				"user":     input.LwqlPgUser,
+				"user":     pgUser,
 				"password": input.LwqlPgPassword,
 			},
 		}

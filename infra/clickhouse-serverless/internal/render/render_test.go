@@ -643,3 +643,60 @@ func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgPassword(t *testing.T) {
 		t.Error("named_collections must be omitted when the PostgreSQL password is absent")
 	}
 }
+
+// The named collection needs a database to connect to as well; without one the
+// bridge collection is omitted, matching the bash renderer + terraform contract
+// which requires host, database, and password together.
+// @scenario "The lwql_postgres bridge is omitted without its PostgreSQL database"
+func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgDatabase(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlPgHost = "pg.internal"
+	input.LwqlPgPassword = "pg-secret"
+	// LwqlPgDatabase deliberately empty.
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "named_collections") {
+		t.Error("named_collections must be omitted when the PostgreSQL database is absent")
+	}
+}
+
+// With host, password and database all set but no explicit user, the rendered
+// named collection defaults to lwql_ro, matching the bash renderer's
+// ${CLICKHOUSE_LWQL_PG_USER:-lwql_ro}.
+// @scenario "The lwql_postgres bridge user defaults to lwql_ro when unset"
+func TestRenderAll_LwqlNamedCollectionDefaultsPgUser(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LwqlPassword = "lwql-secret"
+	input.LwqlPgHost = "pg.internal"
+	input.LwqlPgDatabase = "langwatch"
+	input.LwqlPgPassword = "pg-secret"
+	// LwqlPgUser deliberately empty.
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	server := string(serverData)
+	if !strings.Contains(server, "named_collections") {
+		t.Fatalf("named_collections must be rendered when host, database, and password are all set\n--- actual ---\n%s", server)
+	}
+	if !strings.Contains(server, "user: lwql_ro") {
+		t.Errorf("user must default to lwql_ro when unset\n--- actual ---\n%s", server)
+	}
+}
