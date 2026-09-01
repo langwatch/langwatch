@@ -76,6 +76,11 @@ const CONFIG = {
   adapter: "copilot_studio_dataverse" as const,
   environmentUrl: ENVIRONMENT_URL,
   botIds: [],
+  // Named rather than left to the schema's default, which is on: this file is
+  // about the conversation read, and a licence read would add two calls to
+  // every queued-response count here without testing anything the seats suite
+  // does not already. `copilotStudioDataverseSeats.unit.test.ts` owns that read.
+  readSeats: false,
 };
 
 const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
@@ -454,7 +459,7 @@ describe("given a response steering the next page somewhere else", () => {
 });
 
 describe("given a run against an environment holding one conversation", () => {
-  /** @scenario "The puller never reaches beyond the customer's environment" */
+  /** @scenario "The conversation read never reaches beyond the environment" */
   it("reaches only the sign-in and the environment, never the directory", async () => {
     const adapter = await newAdapter();
     queueSignInAndBots();

@@ -8,18 +8,29 @@ Feature: Seat licences are pulled beside usage
 
   Background:
     Given a Copilot Studio source whose credential can read the tenant's licences
-    And the source has opted into reading seat licences
+    And the source is reading seat licences
 
   @unit
-  Scenario: A source that has not opted in reads no licences at all
-    Given a source that has not opted into reading seat licences
+  Scenario: Licence reading is on unless an admin switches it off
+    Given a source created without touching the licence setting
+    When its configuration is read
+    Then the source reads seat licences
+    And the setting is offered as a switch that is already on
+    # Seats are the half of the money the conversations cannot show — a seat
+    # nobody sits in produces no usage at all — so a source that reads one and
+    # not the other answers "what is this costing us" wrong, and an admin
+    # would have had to know the setting existed to get the right answer.
+
+  @unit
+  Scenario: A source whose licence reading is switched off reads none at all
+    Given an admin switched the licence reading off
     When the source runs
     Then no licence request is made
     And the conversations are delivered as before
-    # Same rule as the cost read: licences need their own admin consent on the
-    # tenant, and a customer who only wants transcripts must not have another
-    # permission grant forced on them — nor a request that fails on every run
-    # because the consent was never given.
+    # The switch is what makes this a setting rather than a constant: the
+    # licence read needs its own admin consent on the tenant, and a customer
+    # who only wants transcripts must be able to decline it outright rather
+    # than leave a request that is refused on every run.
 
   @unit
   Scenario: A day already reported is not asked about again

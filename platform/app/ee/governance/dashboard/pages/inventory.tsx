@@ -67,7 +67,9 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Link } from "~/components/ui/link";
+import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -1645,8 +1647,21 @@ interface FieldDef {
    * that showing it beats describing it — the point is to move the domain out
    * of the hint and into the control, so a wrong value is unreachable rather
    * than merely rejected. `date` is for values the admin thinks of as a day.
+   * `switch` is for a setting with exactly two states and a right answer for
+   * almost everyone: a two-entry select asks the admin to read both lines to
+   * find out it was already decided for them.
    */
-  control?: "select" | "date";
+  control?: "select" | "date" | "switch";
+  /**
+   * Where a `control: "switch"` sits before anyone touches it.
+   *
+   * Declared on the field rather than assumed, because the form holds strings
+   * and an untouched field holds nothing at all — so "no value" has to name a
+   * state somewhere, and this is the one declaration the render and the
+   * builder both read. They cannot drift into showing one answer and saving
+   * another.
+   */
+  defaultOn?: boolean;
   /**
    * The choices, for `control: "select"`.
    *
@@ -1681,7 +1696,8 @@ export interface FieldOption {
 export type FieldControl =
   | { kind: "text"; hint?: string }
   | { kind: "date"; hint?: string }
-  | { kind: "select"; options: readonly FieldOption[]; hint?: string };
+  | { kind: "select"; options: readonly FieldOption[]; hint?: string }
+  | { kind: "switch"; defaultOn: boolean; hint?: string };
 
 export function fieldControl({
   field,
@@ -1692,10 +1708,37 @@ export function fieldControl({
 }): FieldControl {
   const hint = field.contextHint?.(values);
   if (field.control === "date") return { kind: "date", hint };
+  if (field.control === "switch") {
+    return { kind: "switch", defaultOn: field.defaultOn ?? false, hint };
+  }
   if (field.control === "select") {
     return { kind: "select", options: field.options?.(values) ?? [], hint };
   }
   return { kind: "text", hint };
+}
+
+/**
+ * Whether a switch field is on, given what the form holds for it.
+ *
+ * The switch writes "true" or "false" and nothing else, so anything else is a
+ * value no control produced — an unset field, a source created before the
+ * field existed, a hand-edited config — and says nothing about what the admin
+ * chose. The field's own declared default is the answer for all of them, which
+ * is what keeps an untouched form and the config it saves agreeing.
+ *
+ * Read by the render and by the builders, deliberately: a second answer to
+ * "is this on" is how a toggle ends up showing one state and saving the other.
+ */
+export function switchFieldIsOn({
+  value,
+  defaultOn,
+}: {
+  value: string | undefined;
+  defaultOn: boolean;
+}): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultOn;
 }
 
 /**
@@ -1708,8 +1751,9 @@ export function fieldControl({
  * whole save for a field the form no longer even offers. Clearing it is the
  * only outcome that matches what the admin is being shown.
  *
- * Deliberately narrow: text and date fields are never touched, because their
- * domains are not enumerable and "not in the list" means nothing there.
+ * Deliberately narrow: text, date and switch fields are never touched,
+ * because their domains are not enumerable and "not in the list" means nothing
+ * there — for a switch it would mean silently turning a deliberate off back on.
  */
 export function reconcileParserValues({
   sourceType,
@@ -1803,6 +1847,17 @@ function anthropicBucketWidthOptions(
     })),
   ];
 }
+
+/**
+ * Whether a Copilot Studio source reads the tenant's seat licences when nobody
+ * has said either way.
+ *
+ * One constant because two readers need the same answer: the switch renders
+ * from it, and `buildCopilotStudioDataversePullConfig` saves from it for a form
+ * that was never touched. Split them and the form shows one state while the
+ * save stores the other.
+ */
+const READ_SEATS_DEFAULT_ON = true;
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
@@ -1909,15 +1964,13 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "readSeats",
       label: "Also record licence counts",
       placeholder: "",
-      hint: "Records how many Copilot Studio licences the tenant has bought and how many are assigned, once a day. This needs a separate admin consent the other fields do not: the app registration must be granted the Organization.Read.All application permission on the tenant. Without it the read is refused and no counts are recorded. Only pool totals are read — never a list of users.",
-      control: "select",
-      // Off first, because a controlled <select> holding "" displays its first
-      // entry: a form nobody has touched must show the same answer the builder
-      // will produce for it.
-      options: () => [
-        { value: "no", label: "No — conversations and cost only" },
-        { value: "yes", label: "Yes — also record licence counts" },
-      ],
+      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      control: "switch",
+      defaultOn: READ_SEATS_DEFAULT_ON,
+      // Advanced because the default is already the answer for almost
+      // everyone: the collapsed group is where an admin goes to disagree, not
+      // where the setting hides.
+      advanced: true,
     },
   ],
   openai_compliance: [
@@ -2425,20 +2478,6 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 }
 
 /**
- * A yes/no select's value as the boolean an adapter schema expects.
- *
- * Only an explicit yes is on. An unset field, a source created before the
- * field existed, and anything unrecognised all mean off, because the two
- * mistakes are not symmetric: a value misread as on turns on a read the
- * customer never asked for, while one misread as off leaves a setting looking
- * ignored. "true" is accepted because `seedComposerParserConfig` turns a
- * stored boolean back into form state with `String(stored)`.
- */
-function parserFlagIsOn(value: string | undefined): boolean {
-  return value === "yes" || value === "true";
-}
-
-/**
  * The pullConfig for a Copilot Studio source reading Dataverse.
  *
  * All three credential fields travel in the `credentials` subtree — the only
@@ -2483,8 +2522,13 @@ export function buildCopilotStudioDataversePullConfig(
     // for a field the customer deliberately left blank.
     ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
     // A real boolean, because the adapter's schema is `z.boolean()` and would
-    // refuse the form's string on every run.
-    readSeats: parserFlagIsOn(p.readSeats),
+    // refuse the form's string on every run. The default comes from the field
+    // definition the switch renders from, so a form nobody touched saves the
+    // state it was showing.
+    readSeats: switchFieldIsOn({
+      value: p.readSeats,
+      defaultOn: READ_SEATS_DEFAULT_ON,
+    }),
     credentials: { tenantId, clientId, clientSecret },
   };
 }
@@ -2599,6 +2643,53 @@ export function parserFieldPresentation({
 }
 
 /**
+ * A two-state setting, rendered as a toggle.
+ *
+ * Its own component rather than another branch in `ParserFieldInput` because
+ * it is the only control whose displayed state is derived rather than held:
+ * the form stores a string that can be absent, and absent means the field's
+ * declared default. That derivation belongs beside the toggle that shows it.
+ */
+function ParserSwitchInput({
+  ariaLabel,
+  defaultOn,
+  fieldKey,
+  readOnly,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  defaultOn: boolean;
+  fieldKey: string;
+  readOnly: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const on = switchFieldIsOn({ value, defaultOn });
+
+  // Same reasoning as the select branch below: a switch has no readOnly
+  // either, and `disabled` would drop it out of the tab order where a keyboard
+  // or screen-reader user could not read what it holds. So a locked toggle is
+  // shown as its own state in a readOnly input instead.
+  if (readOnly) return <Input size="sm" value={on ? "On" : "Off"} readOnly />;
+
+  return (
+    <Switch
+      checked={on}
+      // Never blank: blank means the field's declared default, which is not
+      // always off, so writing it back would flip a deliberate choice.
+      onCheckedChange={({ checked }) => onChange(checked ? "true" : "false")}
+      // The field label beside this is a heading, not a bound <label>, so the
+      // accessible name has to come from the control itself.
+      inputProps={{
+        "aria-label": ariaLabel,
+        "data-testid": `parser-switch-${fieldKey}`,
+      }}
+    />
+  );
+}
+
+/**
  * The input itself, chosen by control kind.
  *
  * Split from `ParserConfigField` so the label, the required marker and the hint
@@ -2607,7 +2698,9 @@ export function parserFieldPresentation({
  * labelling another.
  */
 function ParserFieldInput({
+  ariaLabel,
   control,
+  fieldKey,
   isMultiline,
   isSecret,
   placeholder,
@@ -2615,7 +2708,14 @@ function ParserFieldInput({
   value,
   onChange,
 }: {
+  /**
+   * The field's label. Only the switch branch reads it: the label beside a
+   * field is a heading rather than a bound `<label>`, and every other control
+   * here is reachable by its own text or placeholder while a switch is not.
+   */
+  ariaLabel: string;
   control: FieldControl;
+  fieldKey: string;
   isMultiline: boolean;
   isSecret: boolean;
   placeholder: string;
@@ -2661,6 +2761,19 @@ function ParserFieldInput({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
+    );
+  }
+
+  if (control.kind === "switch") {
+    return (
+      <ParserSwitchInput
+        ariaLabel={ariaLabel}
+        defaultOn={control.defaultOn}
+        fieldKey={fieldKey}
+        readOnly={readOnly}
+        value={value}
+        onChange={onChange}
+      />
     );
   }
 
@@ -2714,16 +2827,29 @@ function ParserConfigField({
 
   return (
     <VStack align="stretch" gap={1}>
-      <Text fontSize="xs" fontWeight="medium">
-        {field.label}
-        {isRequired && (
-          <Text as="span" color="red.500" marginLeft={1}>
-            *
-          </Text>
+      {/* The explanation sits behind the (i), never under the input: a
+          paragraph per field turned this form into a wall of grey text an
+          admin scrolls past. See dev/docs/best_practices/copywriting.md. */}
+      <HStack gap={0} alignItems="center">
+        <Text fontSize="xs" fontWeight="medium">
+          {field.label}
+          {isRequired && (
+            <Text as="span" color="red.500" marginLeft={1}>
+              *
+            </Text>
+          )}
+        </Text>
+        {shownHint && (
+          <FieldInfoTooltip
+            description={shownHint}
+            testId={`parser-field-info-${field.key}`}
+          />
         )}
-      </Text>
+      </HStack>
       <ParserFieldInput
+        ariaLabel={field.label}
         control={control}
+        fieldKey={field.key}
         isMultiline={isMultiline}
         isSecret={isSecret}
         placeholder={placeholder}
@@ -2731,11 +2857,6 @@ function ParserConfigField({
         value={values[field.key] ?? ""}
         onChange={(next) => onChange({ ...values, [field.key]: next })}
       />
-      {shownHint && (
-        <Text fontSize="xs" color="fg.muted">
-          {shownHint}
-        </Text>
-      )}
     </VStack>
   );
 }

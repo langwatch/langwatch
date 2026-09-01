@@ -232,8 +232,8 @@ const conversationEvents = <T extends { action: string }>(events: T[]) =>
   );
 
 describe("the seat licence read inside the Dataverse source", () => {
-  describe("when the source has not opted into reading licences", () => {
-    /** @scenario "A source that has not opted in reads no licences at all" */
+  describe("when an admin has switched the licence reading off", () => {
+    /** @scenario "A source whose licence reading is switched off reads none at all" */
     it("asks Microsoft Graph nothing and still delivers the conversations", async () => {
       const result = await runPull({ readSeats: false });
 
@@ -243,7 +243,7 @@ describe("the seat licence read inside the Dataverse source", () => {
       expect(result.errorCount).toBe(0);
     });
 
-    /** @scenario "A source that has not opted in reads no licences at all" */
+    /** @scenario "A source whose licence reading is switched off reads none at all" */
     it("signs in for no audience it does not need", async () => {
       await runPull({ readSeats: false });
 
