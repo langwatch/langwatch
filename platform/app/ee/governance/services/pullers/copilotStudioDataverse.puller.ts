@@ -794,6 +794,35 @@ function hostOf(value: string): string {
   }
 }
 
+/** The one host Azure Resource Manager is served from. */
+const AZURE_MANAGEMENT_HOST = "management.azure.com";
+
+/**
+ * Whether a link is Azure Resource Manager itself and nowhere else.
+ *
+ * Exported for the tests that hold the spoofs out, so the shapes a reviewer
+ * worries about are named somewhere a reader can find them.
+ *
+ * `hostname` rather than `host`: it excludes the port, which is compared
+ * separately, and it is already lowercased and punycoded by the parser, so a
+ * link differing from ARM's own only in letter case is still ARM. Anything
+ * that will not parse is not a URL and is refused with everything else.
+ */
+export function isAzureResourceManagerUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === AZURE_MANAGEMENT_HOST &&
+      url.port === "" &&
+      url.username === "" &&
+      url.password === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 export class CopilotStudioDataversePuller
   implements PullerAdapter<CopilotStudioDataverseConfig>
 {
@@ -1154,6 +1183,14 @@ export class CopilotStudioDataversePuller
   /**
    * Accept the next-page link only if Azure Resource Manager itself served it.
    *
+   * The link arrives inside a reply and is followed carrying the ARM bearer
+   * token, so the host is decided by parsing rather than by comparing text.
+   * Text comparison can be correct and still be fragile: a prefix ending in a
+   * slash does pin the host, because a URL's authority ends at its first
+   * slash — but only for exactly as long as nobody tidies the slash away, and
+   * nothing about the string says it is load-bearing. Parsing states the rule
+   * it means and cannot be edited into a weaker one by accident.
+   *
    * A next page the run will not follow means the window was read in part, and
    * a partial window must never be reported as priced: the meters that live on
    * the pages behind it would keep their previous figures with nothing marking
@@ -1165,7 +1202,7 @@ export class CopilotStudioDataversePuller
   }): string | null {
     const { nextLink, subscriptionId } = params;
 
-    if (!nextLink.startsWith("https://management.azure.com/")) {
+    if (!isAzureResourceManagerUrl(nextLink)) {
       // The refused link carries the ARM token if followed. Logged like the
       // transcript walk's own refusal, because a silent stall here is
       // indistinguishable from a permissions problem.

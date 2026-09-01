@@ -1263,8 +1263,10 @@ describe("given an Azure bill that does not fit in one reply", () => {
   }
 
   function costCalls() {
+    // Lowercased before matching: a host is case-insensitive, and a link that
+    // shouts its host is still a call to Azure that these counts must see.
     return capturedCalls.filter((call) =>
-      call.url.includes("management.azure.com"),
+      call.url.toLowerCase().includes("management.azure.com"),
     );
   }
 
@@ -1309,6 +1311,52 @@ describe("given an Azure bill that does not fit in one reply", () => {
       // The refused link carries the token if followed.
       expect(costCalls()).toHaveLength(1);
       expect(errors.join(" ")).toContain("not-azure.example.com");
+    });
+  });
+
+  describe("when the next page is dressed up to look like Azure", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it.each([
+      // The host carries on past the name ARM answers to.
+      "https://management.azure.com.evil.example/next",
+      // The name sits in the user field; the real host is after the @.
+      "https://management.azure.com@evil.example/next",
+      // The same, hidden behind something that reads like a port.
+      "https://management.azure.com:443@evil.example/next",
+      // The dot before evil is percent-encoded rather than written.
+      "https://management.azure.com%2eevil.example/next",
+      // ARM's name, reached without TLS, where the token would go in clear.
+      "http://management.azure.com/next",
+      // Not a link at all.
+      "management.azure.com/next",
+    ])("holds the window rather than send the token to %s", async (link) => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 1.5, nextLink: link }),
+      });
+
+      expect(await readTheBill()).toBeNull();
+      // One call: the first page. The dressed-up link was never followed.
+      expect(costCalls()).toHaveLength(1);
+    });
+
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("still follows Azure's own link when it differs only in letter case", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://MANAGEMENT.AZURE.COM/next-page",
+        }),
+      });
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 2.5 }),
+      });
+
+      expect(await readTheBill()).not.toBeNull();
+      expect(costCalls()).toHaveLength(2);
     });
   });
 
