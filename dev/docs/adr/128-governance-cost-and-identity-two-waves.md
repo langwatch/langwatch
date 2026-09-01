@@ -469,11 +469,26 @@ Old rows are facts; the lens moves, the facts don't.
 1. blanks `IdentityMatch.userId` (§11),
 2. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
    row (hash-replace, preserving the row for spend attribution),
-3. issues an `ALTER TABLE … UPDATE` on the ClickHouse rollup to replace
-   the matching `RawActorId` value with the same pseudonym — `RawActorId`
-   is part of the ORDER BY / dedup key, so the pseudonym must be
-   deterministic (e.g. `SHA-256(secret ‖ original)` truncated to the same
-   length) to avoid splitting or collapsing rollup rows.
+3. rewrites the rollup rows carrying that id so they carry the pseudonym
+   instead. **Not with an `ALTER TABLE … UPDATE`:** `RawActorId` is in
+   the ORDER BY, and ClickHouse refuses a mutation on a sorting-key
+   column — the key *is* the row's identity, so a changed key is a
+   different row rather than an edited one, and the engine will not
+   pretend otherwise. Erasure goes through the rebuild path the rollup
+   already has (§4: "a rebuild is a replay"): record the mapping (step
+   4), `ALTER TABLE … DELETE` this organization's rows carrying the
+   original value, then replay the affected days, which re-derives them
+   with the mapping applied. The pseudonym is deterministic (e.g.
+   `SHA-256(secret ‖ original)`) so every replay lands on one stable key
+   rather than minting a new one per run.
+
+   Bounded by the replay horizon, and honestly: for days older than
+   `event_log` retention there is nothing left to replay from, so the
+   delete is the whole operation and that actor's spend on those days
+   leaves the rollup rather than reappearing pseudonymized. Totals for
+   those days drop by the erased amount. The alternative — leaving the
+   row and its personal data in place — is not one, so the erasure job
+   records which days it could not rebuild instead of failing silently.
 4. **Replay safety:** the fold / replay pipeline (§4) must apply the
    erasure mapping — a lookup from original `RawActorId` to its
    pseudonym — *before* writing the rollup row. Without this, a replay
@@ -483,9 +498,13 @@ Old rows are facts; the lens moves, the facts don't.
    pseudonym)`), joined during the fold's projection step. The key
    includes `organizationId` and `provider` because the same raw actor
    id string can appear under different providers or tenants — scoping
-   prevents cross-tenant collisions. Test: erase, replay, assert the
-   rollup contains only the pseudonymized key with the correct total;
-   add a collision test with the same `original` under two providers.
+   prevents cross-tenant collisions. Tests, against the ClickHouse
+   version we deploy rather than a mock: erase, replay, assert the
+   rollup contains only the pseudonymized key with the correct total; a
+   collision test with the same `original` under two providers; and one
+   that asserts the mutation route is closed — an `ALTER TABLE … UPDATE`
+   on `RawActorId` must be rejected, so nobody re-adds the step that
+   cannot work.
 
 Retention policy (§7) covers event expiry; the identity tables carry
 their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
@@ -717,6 +736,7 @@ then.
 | Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
 | Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
+| Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 3; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
 | One dollar, one home | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
 | Pulled rows never enforce | no budget resolver ever reaches `Scope="pulled"` rows | structural, ADR-088 Decision 3 (unchanged) |
 | Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
