@@ -15,7 +15,7 @@ Feature: The new-simulations callout offers the way back
   retirement, the dismissal and the recorded preference, so the way back to
   the previous screens stays reachable.
 
-  The previous screens carry the way forward: a banner under their header
+  The previous screens carry the way forward: a banner in their header row
   shows on the browser that recorded the preference, while the release flag
   is on, and a click clears the preference and the dismissal so the person
   reads the new screens again with the offer intact.
