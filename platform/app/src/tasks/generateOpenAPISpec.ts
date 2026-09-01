@@ -226,7 +226,7 @@ const specOnlyIdentity = {
   roles: specOnly<any>("Roles"),
   scim: specOnly<any>("SCIM"),
   organizationProvisioning: specOnly<any>("Organization provisioning"),
-  organizationsWithTeamLookup: specOnly<any>("Organizations"),
+  organizations: specOnly<any>("Organizations"),
   managementAudit: () => {
     throw new Error("Management audit is not available while generating the OpenAPI document");
   },
@@ -365,7 +365,7 @@ export default async function execute() {
     createMeRestApp({
       security: appRestSecurity,
       personalUsage: specOnlyServices.governance,
-      organizations: specOnlyIdentity.organizationsWithTeamLookup,
+      organizations: specOnlyIdentity.organizations,
       projects: specOnlyServices.projects,
     }).hono,
   );

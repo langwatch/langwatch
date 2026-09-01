@@ -129,6 +129,9 @@ class UnusedTeams extends TeamRepository {
   get(): Promise<OrganizationTeam> {
     throw new Error("not used by this test");
   }
+  tryGetOrganizationId(): Promise<string | null> {
+    throw new Error("not used by this test");
+  }
   list(): Promise<OrganizationTeamPage> {
     throw new Error("not used by this test");
   }
@@ -296,6 +299,9 @@ class MemoryTeams extends TeamRepository {
   get(): Promise<OrganizationTeam> {
     return Promise.resolve(this.team);
   }
+  tryGetOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
+    return Promise.resolve(teamId === this.team.id ? this.team.organizationId : null);
+  }
   list(): Promise<OrganizationTeamPage> {
     return Promise.resolve({
       data: [this.team],
@@ -351,6 +357,26 @@ class MemoryTeams extends TeamRepository {
 }
 
 describe("OrganizationService", () => {
+  it("answers the organization behind a team", async () => {
+    const service = createService(
+      new StubRepository("team"),
+      new RecordingGrants(),
+      new MemoryTeams(),
+    );
+
+    await expect(service.tryGetOrganizationIdByTeamId({ teamId: "team" })).resolves.toBe("org");
+  });
+
+  it("answers null for a team nothing owns, rather than refusing", async () => {
+    const service = createService(
+      new StubRepository("team"),
+      new RecordingGrants(),
+      new MemoryTeams(),
+    );
+
+    await expect(service.tryGetOrganizationIdByTeamId({ teamId: "gone" })).resolves.toBeNull();
+  });
+
   it("returns management settings through the canonical service", async () => {
     const repository = new StubRepository("team");
     repository.settings = {

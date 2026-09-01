@@ -51,6 +51,19 @@ export type UpdateOrganizationSettingsResult = z.infer<
   typeof updateOrganizationSettingsResultSchema
 >;
 
+/**
+ * Resolving the tenant behind one team.
+ *
+ * Answers `null` for a team that does not exist, and answers an ARCHIVED
+ * team's organization the same as a live one's: the callers are usage
+ * metering and the personal-workspace reads, which have to place a project
+ * under its tenant whether or not its team is still open for business.
+ */
+export const getOrganizationIdByTeamIdInputSchema = z
+  .object({ teamId: z.string().min(1) })
+  .strict();
+export type GetOrganizationIdByTeamIdInput = z.infer<typeof getOrganizationIdByTeamIdInputSchema>;
+
 export const getOrganizationMembersInputSchema = z
   .object({
     organizationId: organizationIdSchema,

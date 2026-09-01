@@ -17,6 +17,7 @@ import type {
 } from "./group";
 import type {
   ClaimOrganizationBillingCustomerInput,
+  GetOrganizationIdByTeamIdInput,
   GetOrganizationSettingsInput,
   GetOldestTeamInput,
   GetOrganizationBillingProfileInput,
@@ -69,6 +70,18 @@ export abstract class OrganizationService {
   }): Promise<boolean>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   abstract getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
+
+  /**
+   * The organization that owns one team, or null when no such team exists.
+   *
+   * Absence is an answer rather than a refusal: usage metering and the
+   * personal-workspace reads ask it about a team id they were handed by a
+   * project row, and a team that has since gone means "no tenant to meter",
+   * not "the lookup broke".
+   */
+  abstract tryGetOrganizationIdByTeamId(
+    input: GetOrganizationIdByTeamIdInput,
+  ): Promise<string | null>;
 
   /** Returns the billing-facing profile or throws OrganizationNotFoundError. */
   abstract getBillingProfile(

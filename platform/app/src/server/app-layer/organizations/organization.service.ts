@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import type { AuthService as AuthCapability } from "@langwatch/auth-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import {
   OrganizationService as OrganizationServiceContract,
@@ -13,6 +14,8 @@ import {
   type DeleteOrganizationGroupInput,
   type GetOldestTeamInput,
   type GetOrganizationSettingsInput,
+  type OrganizationSettings,
+  type UpdateOrganizationSettingsInput,
   type UpdateOrganizationSettingsResult,
   type GetOrganizationGroupInput,
   type GetOrganizationTeamInput,
@@ -66,7 +69,6 @@ import {
   findSharedTeamIds,
 } from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { decrypt } from "~/utils/encryption";
 import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
@@ -95,11 +97,9 @@ import type {
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationRepository,
-  OrganizationSettings,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
   UpdateMemberRoleResult,
-  UpdateOrganizationSettingsInput,
 } from "./repositories/organization.repository";
 
 /**
@@ -293,6 +293,15 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly canonical?: OrganizationServiceContract,
     private readonly licenseEnforcement?: LicenseEnforcementService,
     private readonly shares?: ShareService,
+    /**
+     * Session revocation, resolved on each call rather than held.
+     *
+     * Auth is composed after Organization — Auth needs User, and User needs
+     * Organization — so a value passed here would be the uninitialised half of
+     * that cycle. A thunk is read when a member is actually disabled, by which
+     * time the whole graph is built.
+     */
+    private readonly auth?: () => Pick<AuthCapability, "revokeAllBrowserSessions">,
   ) {
     super();
   }
@@ -494,8 +503,28 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.licenseEnforcement;
   }
 
-  async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
-    return this.repo.getOrganizationIdByTeamId(teamId);
+  /**
+   * Fails closed on purpose: a seat revoked without the session revoked leaves
+   * the person working until their token happens to expire, so a process that
+   * did not compose Auth must refuse the disable rather than half-perform it.
+   */
+  private getAuthService(): Pick<AuthCapability, "revokeAllBrowserSessions"> {
+    const auth = this.auth?.();
+    if (!auth) {
+      throw new Error("Auth service is not configured");
+    }
+    return auth;
+  }
+
+  /**
+   * The organization that owns one team, answered by the organization feature.
+   *
+   * Was a second copy of the same `Team.organizationId` read living on this
+   * process's repository; the contract now declares it, so metering and the
+   * personal-workspace doors ask one owner.
+   */
+  tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
+    return this.getCanonicalService().tryGetOrganizationIdByTeamId(input);
   }
 
   async getUserOrgRole(params: {
@@ -731,52 +760,42 @@ export class OrganizationService extends OrganizationServiceContract {
   /**
    * The organization profile as the management surface reads it back:
    * everything a settings write accepts except the S3 secret (write-only) and
-   * the SSO fields (staff-backoffice-only). S3 endpoint and access key id are
-   * decrypted here so callers never handle ciphertext.
+   * the SSO fields (staff-backoffice-only).
+   *
+   * The read, the field selection and the S3 credential decryption all belong
+   * to the organization feature, so this process holds no second copy of what
+   * "the settings" are. A missing organization arrives as the contract's
+   * `OrganizationNotFoundError` rather than the bare `Error` this used to
+   * raise, which is what lets a REST door answer a nameable refusal instead of
+   * an unknown 500.
    */
-  async getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings> {
-    const { organizationId } = input;
-    const settings = await this.repo.findSettingsById(organizationId);
-    if (!settings) {
-      // The organization is implied by an authenticated credential, so a
-      // miss is a platform inconsistency rather than a nameable caller error.
-      throw new Error(`Organization not found: ${organizationId}`);
-    }
-    return {
-      ...settings,
-      s3Endpoint: settings.s3Endpoint ? decrypt(settings.s3Endpoint) : null,
-      s3AccessKeyId: settings.s3AccessKeyId ? decrypt(settings.s3AccessKeyId) : null,
-    };
+  getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings> {
+    return this.getCanonicalService().getSettings(input);
   }
 
   /**
    * Partial settings update. Only the fields present are written, unlike
    * {@link update}, whose full-form semantics clear absent S3 credentials.
    *
-   * Owns the ADR-057 cascade: when this write turns trace sharing off, every
+   * The write itself belongs to the organization feature — including the
+   * before-and-after read that decides whether trace sharing was just switched
+   * off. What stays here is the ADR-057 cascade that decision triggers: every
    * existing trace share link across the organization's projects is revoked,
    * not just new ones blocked, so re-enabling later never resurrects old
-   * links. The transition is detected against the stored value before the
-   * write, mirroring the project-level kill switch.
+   * links. It stays because it crosses two features the organization does not
+   * own (every project, and every share link on it).
    *
-   * `traceShareRevocationRequired` reports that transition to callers that
-   * run the cascade themselves (the REST handler composes
-   * `revokeTraceSharesAfterOrganizationSettingsUpdate`). It is answered even
-   * though this service already revoked, so a caller that repeats the pass
-   * is idempotent rather than a second, divergent source of truth.
+   * `traceShareRevocationRequired` is passed straight back out, so a caller
+   * that repeats the pass itself (the REST handler composes
+   * `revokeTraceSharesAfterOrganizationSettingsUpdate`) is idempotent rather
+   * than a second, divergent source of truth.
    */
   async updateSettings(
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {
-    const wasSharingEnabled =
-      input.traceSharingEnabled === false
-        ? (await this.repo.findSettingsById(input.organizationId))
-            ?.traceSharingEnabled === true
-        : false;
+    const result = await this.getCanonicalService().updateSettings(input);
 
-    await this.repo.updateSettings(input);
-
-    if (input.traceSharingEnabled === false && wasSharingEnabled) {
+    if (result.traceShareRevocationRequired) {
       if (!this.shares) {
         throw new Error("Share service is required to disable trace sharing");
       }
@@ -800,7 +819,7 @@ export class OrganizationService extends OrganizationServiceContract {
       }
     }
 
-    return { traceShareRevocationRequired: wasSharingEnabled };
+    return result;
   }
 
   /**
@@ -925,6 +944,14 @@ export class OrganizationService extends OrganizationServiceContract {
     }
 
     await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+
+    if (disabled) {
+      // Revoking the seat has to revoke the live session too, or the person
+      // keeps working until their token happens to expire. Through the
+      // canonical Auth service: it clears the Better Auth session cache as
+      // well as the rows, which is the half a plain delete misses.
+      await this.getAuthService().revokeAllBrowserSessions({ userId });
+    }
 
     // Disabling is a plain column write, not a grant write, so nothing else
     // retires the authorization snapshots cached for this organization. An

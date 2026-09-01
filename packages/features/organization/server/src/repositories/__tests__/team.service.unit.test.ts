@@ -84,6 +84,9 @@ class MemoryTeams extends TeamRepository {
   getById(): Promise<OrganizationTeam> {
     return Promise.resolve(team);
   }
+  tryGetOrganizationId(): Promise<string | null> {
+    return Promise.resolve(team.organizationId);
+  }
   getBySlug(): Promise<OrganizationTeam> {
     return Promise.resolve(team);
   }

@@ -56,7 +56,6 @@ const createMockSubscriptionRepository = () => ({
 });
 
 const createMockOrganizationRepository = () => ({
-  getOrganizationIdByTeamId: vi.fn(),
   getProjectIds: vi.fn(),
   getFeature: vi.fn(),
   findWithAdmins: vi.fn(),

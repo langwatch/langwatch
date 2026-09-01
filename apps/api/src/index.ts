@@ -164,7 +164,7 @@ export {
 export { createGroupRestApp } from "@langwatch/organization-server";
 export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
-export { createMeRestApp, type MeRestTeamOrganizationLookup } from "@langwatch/user-server";
+export { createMeRestApp } from "@langwatch/user-server";
 export {
   createOrganizationsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,

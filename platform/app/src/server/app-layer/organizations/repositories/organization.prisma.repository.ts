@@ -28,7 +28,6 @@ import { getApp } from "~/server/app-layer/app";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { encrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
@@ -36,7 +35,6 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import { isCustomRole } from "../../../api/enterprise";
-import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import {
   CannotDemoteLastAdminError,
@@ -59,13 +57,11 @@ import type {
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationRepository,
-  OrganizationSettings,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
-  UpdateOrganizationSettingsInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
 
@@ -119,54 +115,6 @@ async function lockActiveAdmins({
     ORDER BY "userId"
     FOR UPDATE
   `;
-}
-
-/** A credential-bearing settings value encrypted at rest; cleared values store null. */
-function encryptedOrNull(value: string | null): string | null {
-  return value ? encrypt(value) : null;
-}
-
-/**
- * The profile fields of a partial settings write: only the fields present on
- * the input are written.
- */
-function profileSettingsData(
-  input: UpdateOrganizationSettingsInput,
-): Prisma.OrganizationUpdateInput {
-  return {
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.supportContact !== undefined
-      ? { supportContact: input.supportContact?.trim() || null }
-      : {}),
-    ...(input.presenceEnabled !== undefined
-      ? { presenceEnabled: input.presenceEnabled }
-      : {}),
-    ...(input.traceSharingEnabled !== undefined
-      ? { traceSharingEnabled: input.traceSharingEnabled }
-      : {}),
-    ...(input.primaryIntent !== undefined ? { primaryIntent: input.primaryIntent } : {}),
-  };
-}
-
-/**
- * The stored-objects (S3) fields of a partial settings write: only the fields
- * present on the input are written, and credential-bearing ones are encrypted.
- */
-function storageSettingsData(
-  input: UpdateOrganizationSettingsInput,
-): Prisma.OrganizationUpdateInput {
-  return {
-    ...(input.s3Endpoint !== undefined
-      ? { s3Endpoint: encryptedOrNull(input.s3Endpoint) }
-      : {}),
-    ...(input.s3AccessKeyId !== undefined
-      ? { s3AccessKeyId: encryptedOrNull(input.s3AccessKeyId) }
-      : {}),
-    ...(input.s3SecretAccessKey !== undefined
-      ? { s3SecretAccessKey: encryptedOrNull(input.s3SecretAccessKey) }
-      : {}),
-    ...(input.s3Bucket !== undefined ? { s3Bucket: input.s3Bucket || null } : {}),
-  };
 }
 
 /**
@@ -350,14 +298,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
   getClient(): PrismaClient {
     return this.prisma;
-  }
-
-  async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
-    const team = await this.prisma.team.findUnique({
-      where: { id: teamId },
-      select: { organizationId: true },
-    });
-    return team?.organizationId ?? null;
   }
 
   async getUserOrgRole({
@@ -959,36 +899,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findSettingsById(organizationId: string): Promise<OrganizationSettings | null> {
-    return this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        supportContact: true,
-        presenceEnabled: true,
-        traceSharingEnabled: true,
-        primaryIntent: true,
-        s3Endpoint: true,
-        s3AccessKeyId: true,
-        s3Bucket: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  }
-
-  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: input.organizationId },
-      data: {
-        ...profileSettingsData(input),
-        ...storageSettingsData(input),
-      },
-    });
-  }
-
   /**
    * Removes a membership, and the personal workspace that came with it.
    *
@@ -1245,12 +1155,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { disabledAt: disabled ? new Date() : null },
       });
     });
-
-    if (disabled) {
-      // Revoking the seat has to revoke the live session too, or the person
-      // keeps working until their token happens to expire.
-      await revokeAllSessionsForUser({ prisma: this.prisma, userId });
-    }
   }
 
   async updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult> {

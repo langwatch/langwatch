@@ -75,7 +75,7 @@ function createMockOrganizationService(): OrganizationService {
     findWithAdmins: vi.fn().mockResolvedValue(null),
     updateSentPlanLimitAlert: vi.fn().mockResolvedValue(undefined),
     findProjectsWithName: vi.fn().mockResolvedValue([]),
-    getOrganizationIdByTeamId: vi.fn().mockResolvedValue(null),
+    tryGetOrganizationIdByTeamId: vi.fn().mockResolvedValue(null),
     getProjectIds: vi.fn().mockResolvedValue([]),
     isFeatureEnabled: vi.fn().mockResolvedValue(false),
   } as unknown as OrganizationService;

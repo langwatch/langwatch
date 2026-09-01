@@ -198,47 +198,6 @@ export interface EnrichedAuditLog {
 }
 
 /**
- * Partial update for an organization's settings: only the fields present are
- * written. `undefined` leaves a column untouched; an explicit `null` (or empty
- * string, for the encrypted S3 credentials) clears it. Callers whose form
- * semantics are "absent means clear" (the organization settings form
- * round-trips every S3 field) make the clearing explicit with nulls.
- */
-export interface UpdateOrganizationSettingsInput {
-  organizationId: string;
-  name?: string;
-  supportContact?: string | null;
-  presenceEnabled?: boolean;
-  traceSharingEnabled?: boolean;
-  primaryIntent?: OrganizationIntent | null;
-  s3Endpoint?: string | null;
-  s3AccessKeyId?: string | null;
-  s3SecretAccessKey?: string | null;
-  s3Bucket?: string | null;
-}
-
-/**
- * The organization profile as the management surface reads and writes it.
- * Deliberately excludes `ssoDomain`/`ssoProvider` (staff-backoffice-only) and
- * `s3SecretAccessKey` (write-only: never read back). The S3 endpoint and
- * access key id are returned as stored (encrypted); the service decrypts.
- */
-export interface OrganizationSettings {
-  id: string;
-  name: string;
-  slug: string;
-  supportContact: string | null;
-  presenceEnabled: boolean;
-  traceSharingEnabled: boolean;
-  primaryIntent: OrganizationIntent | null;
-  s3Endpoint: string | null;
-  s3AccessKeyId: string | null;
-  s3Bucket: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/**
  * A membership row with the user it belongs to, as the members management
  * surface lists it. `disabledAt` is exposed rather than filtered so an admin
  * can see who is disabled in order to re-enable them.
@@ -334,7 +293,6 @@ export interface UpdateTeamMemberRoleInput {
 }
 
 export interface OrganizationRepository {
-  getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
   getUserOrgRole(params: {
     userId: string;
     organizationId: string;
@@ -436,12 +394,6 @@ export interface OrganizationRepository {
     userId: string;
   }): Promise<MemberTeamBinding[]>;
 
-  /** The organization profile the management surface reads back. */
-  findSettingsById(organizationId: string): Promise<OrganizationSettings | null>;
-
-  /** Partial settings update; see {@link UpdateOrganizationSettingsInput}. */
-  updateSettings(input: UpdateOrganizationSettingsInput): Promise<void>;
-
   deleteMember(input: DeleteMemberInput): Promise<void>;
 
   setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
@@ -470,10 +422,6 @@ export interface OrganizationRepository {
 
 export class NullOrganizationRepository implements OrganizationRepository {
   getClient(): PrismaClient | null {
-    return null;
-  }
-
-  async getOrganizationIdByTeamId(_teamId: string): Promise<string | null> {
     return null;
   }
 
@@ -632,12 +580,6 @@ export class NullOrganizationRepository implements OrganizationRepository {
   }): Promise<MemberTeamBinding[]> {
     return [];
   }
-
-  async findSettingsById(_organizationId: string): Promise<OrganizationSettings | null> {
-    return null;
-  }
-
-  async updateSettings(_input: UpdateOrganizationSettingsInput): Promise<void> {}
 
   async deleteMember(_input: DeleteMemberInput): Promise<void> {}
 

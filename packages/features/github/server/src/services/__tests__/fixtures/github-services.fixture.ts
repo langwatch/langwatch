@@ -28,6 +28,10 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
+  tryGetOrganizationIdByTeamId(): never {
+    return unsupported();
+  }
+
   getBillingProfile(): never {
     return unsupported();
   }

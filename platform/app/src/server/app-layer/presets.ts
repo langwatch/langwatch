@@ -1353,6 +1353,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       canonicalOrganizations,
       licenseEnforcement,
       share,
+      // A thunk, not the service: Auth is composed further down because it
+      // needs User, which needs this. Disabling a member reads it then.
+      () => auth,
     ),
     "OrganizationService",
   );
@@ -3218,6 +3221,7 @@ export function createTestApp(
       testCanonicalOrganizations,
       createLicenseEnforcementService(testPrisma),
       testShare,
+      () => testAuth,
     ),
     "OrganizationService",
   );

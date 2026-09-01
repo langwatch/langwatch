@@ -4,6 +4,7 @@ import { OrganizationUserRole, type PrismaClient, TeamUserRole } from "~/generat
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ShareService } from "@langwatch/share-contract";
 import type { LicenseEnforcementService } from "~/server/license-enforcement";
+import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 
@@ -35,7 +36,6 @@ vi.mock("../../app", () => ({
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getClient: vi.fn(),
-    getOrganizationIdByTeamId: vi.fn(),
     getUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
@@ -62,8 +62,6 @@ describe("OrganizationService", () => {
     findMembership: vi.fn(),
     findAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
-    findSettingsById: vi.fn(),
-    updateSettings: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
     updateMemberRole: vi.fn(),
@@ -77,6 +75,19 @@ describe("OrganizationService", () => {
   const mockShares = {
     revokeAllTraceShares: mockRevokeAllTraceShares,
   } as unknown as ShareService;
+  // Settings are the organization feature's, so the service under test reaches
+  // the canonical contract for them rather than its own repository.
+  const mockCanonicalGetSettings = vi.fn();
+  const mockCanonicalUpdateSettings = vi.fn();
+  const mockCanonicalTryGetOrganizationIdByTeamId = vi.fn();
+  // Disabling a seat revokes the live session through the canonical Auth
+  // service; the service resolves it lazily, so the double is a thunk too.
+  const mockRevokeAllBrowserSessions = vi.fn();
+  const mockCanonical = {
+    getSettings: mockCanonicalGetSettings,
+    updateSettings: mockCanonicalUpdateSettings,
+    tryGetOrganizationIdByTeamId: mockCanonicalTryGetOrganizationIdByTeamId,
+  } as unknown as OrganizationServiceContract;
 
   let service: OrganizationService;
 
@@ -85,32 +96,36 @@ describe("OrganizationService", () => {
     // The flows that compose raw-client helpers ask the repository for its
     // client; the double is Prisma-backed as far as they are concerned.
     vi.mocked(mockRepo.getClient!).mockReturnValue({} as unknown as PrismaClient);
+    mockCanonicalUpdateSettings.mockResolvedValue({ traceShareRevocationRequired: false });
     service = new OrganizationService(
       mockRepo,
       mockPrompts,
-      void 0,
+      mockCanonical,
       { checkLimit: mockCheckLimit } as unknown as LicenseEnforcementService,
       mockShares,
+      () => ({ revokeAllBrowserSessions: mockRevokeAllBrowserSessions }),
     );
   });
 
-  describe("getOrganizationIdByTeamId", () => {
-    describe("when team exists", () => {
-      it("returns the organizationId", async () => {
-        vi.mocked(mockRepo.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+  describe("tryGetOrganizationIdByTeamId", () => {
+    describe("when the team exists", () => {
+      it("returns the organization the feature answers with", async () => {
+        mockCanonicalTryGetOrganizationIdByTeamId.mockResolvedValue("org-123");
 
-        const result = await service.getOrganizationIdByTeamId("team-456");
+        const result = await service.tryGetOrganizationIdByTeamId({ teamId: "team-456" });
 
         expect(result).toBe("org-123");
-        expect(mockRepo.getOrganizationIdByTeamId).toHaveBeenCalledWith("team-456");
+        expect(mockCanonicalTryGetOrganizationIdByTeamId).toHaveBeenCalledWith({
+          teamId: "team-456",
+        });
       });
     });
 
-    describe("when team does not exist", () => {
-      it("returns null", async () => {
-        vi.mocked(mockRepo.getOrganizationIdByTeamId).mockResolvedValue(null);
+    describe("when the team does not exist", () => {
+      it("returns null rather than refusing", async () => {
+        mockCanonicalTryGetOrganizationIdByTeamId.mockResolvedValue(null);
 
-        const result = await service.getOrganizationIdByTeamId("nonexistent");
+        const result = await service.tryGetOrganizationIdByTeamId({ teamId: "nonexistent" });
 
         expect(result).toBeNull();
       });
@@ -322,6 +337,75 @@ describe("OrganizationService", () => {
       });
     });
 
+    describe("when the seat is taken away", () => {
+      const activeMember = {
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: "user-456", name: null, email: null },
+      };
+
+      /** @scenario "Disabling a member revokes their live browser sessions" */
+      it("revokes every browser session that member holds", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(activeMember);
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        // The membership write comes first: signing them out and then failing
+        // the write would lock out a member whose seat was never revoked.
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalled();
+        expect(mockRevokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-456" });
+      });
+
+      /** @scenario "Re-enabling a member revokes nothing" */
+      it("revokes nothing when the seat is given back", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          ...activeMember,
+          disabledAt: new Date("2026-08-01T00:00:00Z"),
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockRevokeAllBrowserSessions).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A process without a session owner refuses the disable" */
+      it("refuses the disable when no session owner was composed", async () => {
+        const withoutAuth = new OrganizationService(mockRepo, mockPrompts, mockCanonical, {
+          checkLimit: mockCheckLimit,
+        } as unknown as LicenseEnforcementService);
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(activeMember);
+
+        await expect(
+          withoutAuth.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: true,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toThrow("Auth service is not configured");
+      });
+    });
+
     describe("when disabling another member", () => {
       /** @scenario Disabling or re-enabling a membership takes effect on the next request */
       it("retires the organization's cached authorization answers", async () => {
@@ -526,79 +610,93 @@ describe("OrganizationService", () => {
     });
   });
 
+  describe("when reading organization settings", () => {
+    it("answers from the organization feature rather than a second copy", async () => {
+      const settings = {
+        id: "org-123",
+        name: "Org",
+        slug: "org",
+        supportContact: null,
+        presenceEnabled: true,
+        traceSharingEnabled: true,
+        primaryIntent: null,
+        s3Endpoint: "https://storage.example.com",
+        s3AccessKeyId: "access-key",
+        s3Bucket: "bucket",
+        createdAt: new Date(1),
+        updatedAt: new Date(2),
+      };
+      mockCanonicalGetSettings.mockResolvedValue(settings);
+
+      await expect(service.getSettings({ organizationId: "org-123" })).resolves.toBe(settings);
+
+      expect(mockCanonicalGetSettings).toHaveBeenCalledWith({ organizationId: "org-123" });
+    });
+  });
+
   describe("when updating organization settings", () => {
-    describe("when trace sharing is turned off", () => {
+    describe("when the write reports that trace sharing was turned off", () => {
       it("revokes every project's existing trace shares (ADR-057)", async () => {
-        vi.mocked(mockRepo.findSettingsById).mockResolvedValue({
-          id: "org-123",
-          name: "Org",
-          slug: "org",
-          supportContact: null,
-          presenceEnabled: true,
-          traceSharingEnabled: true,
-          primaryIntent: null,
-          s3Endpoint: null,
-          s3AccessKeyId: null,
-          s3Bucket: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+        mockCanonicalUpdateSettings.mockResolvedValue({
+          traceShareRevocationRequired: true,
         });
         vi.mocked(mockRepo.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
 
-        await service.updateSettings({
+        const result = await service.updateSettings({
           organizationId: "org-123",
           traceSharingEnabled: false,
         });
 
-        expect(mockRepo.updateSettings).toHaveBeenCalledWith({
+        expect(mockCanonicalUpdateSettings).toHaveBeenCalledWith({
           organizationId: "org-123",
           traceSharingEnabled: false,
         });
         expect(mockRevokeAllTraceShares).toHaveBeenCalledTimes(2);
         expect(mockRevokeAllTraceShares).toHaveBeenCalledWith("proj-1");
         expect(mockRevokeAllTraceShares).toHaveBeenCalledWith("proj-2");
+        // Reported onward, so a door that repeats the pass stays idempotent.
+        expect(result).toEqual({ traceShareRevocationRequired: true });
+      });
+
+      it("names every project whose share links survived the pass", async () => {
+        mockCanonicalUpdateSettings.mockResolvedValue({
+          traceShareRevocationRequired: true,
+        });
+        vi.mocked(mockRepo.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
+        mockRevokeAllTraceShares.mockImplementation((projectId: string) =>
+          projectId === "proj-2" ? Promise.reject(new Error("nope")) : Promise.resolve(),
+        );
+
+        await expect(
+          service.updateSettings({
+            organizationId: "org-123",
+            traceSharingEnabled: false,
+          }),
+        ).rejects.toThrow("proj-2");
+
+        // Settled, not `all`: the first rejection must not skip the rest.
+        expect(mockRevokeAllTraceShares).toHaveBeenCalledTimes(2);
       });
     });
 
-    describe("when trace sharing was already off", () => {
-      it("does not revoke anything again", async () => {
-        vi.mocked(mockRepo.findSettingsById).mockResolvedValue({
-          id: "org-123",
-          name: "Org",
-          slug: "org",
-          supportContact: null,
-          presenceEnabled: true,
-          traceSharingEnabled: false,
-          primaryIntent: null,
-          s3Endpoint: null,
-          s3AccessKeyId: null,
-          s3Bucket: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+    describe("when the write reports nothing to revoke", () => {
+      it("revokes nothing and never enumerates the projects", async () => {
+        mockCanonicalUpdateSettings.mockResolvedValue({
+          traceShareRevocationRequired: false,
         });
 
-        await service.updateSettings({
-          organizationId: "org-123",
-          traceSharingEnabled: false,
-        });
-
-        expect(mockRevokeAllTraceShares).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the update does not touch trace sharing", () => {
-      it("writes the partial update without reading the stored settings", async () => {
-        await service.updateSettings({
+        const result = await service.updateSettings({
           organizationId: "org-123",
           name: "Renamed Org",
         });
 
-        expect(mockRepo.updateSettings).toHaveBeenCalledWith({
+        expect(mockCanonicalUpdateSettings).toHaveBeenCalledWith({
           organizationId: "org-123",
           name: "Renamed Org",
         });
-        expect(mockRepo.findSettingsById).not.toHaveBeenCalled();
+        expect(mockRepo.getProjectIds).not.toHaveBeenCalled();
         expect(mockRevokeAllTraceShares).not.toHaveBeenCalled();
+        expect(result).toEqual({ traceShareRevocationRequired: false });
       });
     });
   });

@@ -49,6 +49,7 @@ import {
   getOrganizationTeamWithMembersInputSchema,
   getOldestTeamInputSchema,
   getOrganizationBillingProfileInputSchema,
+  getOrganizationIdByTeamIdInputSchema,
   getOrganizationMembersInputSchema,
   getOrganizationSettingsInputSchema,
   listMemberOrganizationGroupsInputSchema,
@@ -83,6 +84,7 @@ import {
   type GetOrganizationTeamWithMembersInput,
   type GetOldestTeamInput,
   type GetOrganizationBillingProfileInput,
+  type GetOrganizationIdByTeamIdInput,
   type GetOrganizationMembersInput,
   type ListMemberOrganizationGroupsInput,
   type ListOrganizationGroupsInput,
@@ -289,6 +291,10 @@ export class OrganizationService extends OrganizationServiceContract {
 
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
     return this.teams.getOrganizationMembers(getOrganizationMembersInputSchema.parse(input));
+  }
+
+  tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null> {
+    return this.teams.tryGetOrganizationId(getOrganizationIdByTeamIdInputSchema.parse(input));
   }
 
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {

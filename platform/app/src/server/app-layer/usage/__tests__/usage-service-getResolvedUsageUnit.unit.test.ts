@@ -41,7 +41,7 @@ const LICENSE_TRACES_PLAN: PlanInfo = {
 
 describe("UsageService.getResolvedUsageUnit", () => {
   const mockOrgService = {
-    getOrganizationIdByTeamId: vi.fn(),
+    tryGetOrganizationIdByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
   } as unknown as OrganizationService;
 

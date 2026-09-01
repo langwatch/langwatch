@@ -11,7 +11,7 @@
  *      (simulates what the /settings/authentication form does).
  *   4. Verify context A is STILL signed in (keepSessionId preserves
  *      the caller's session).
- *   5. Verify context B is signed OUT (revokeOtherSessionsForUser
+ *   5. Verify context B is signed OUT (revokeOtherBrowserSessions
  *      killed the other Session row).
  *   6. Verify the old password no longer works.
  *   7. Verify the new password does work.

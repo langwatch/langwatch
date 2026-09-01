@@ -47,6 +47,7 @@ export function createAnnotationTestOrganizations() {
     getOrganizationMembers: vi.fn(async ({ userIds }: { userIds: string[] }) => userIds),
     isMember: unavailable,
     getOldestTeamId: unavailable,
+    tryGetOrganizationIdByTeamId: unavailable,
     getBillingProfile: unavailable,
     claimBillingCustomerId: unavailable,
     ensurePersonalWorkspace: unavailable,

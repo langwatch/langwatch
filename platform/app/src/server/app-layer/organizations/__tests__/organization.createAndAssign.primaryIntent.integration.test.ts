@@ -1,7 +1,67 @@
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import {
+  GroupIdentityPort,
+  OrganizationSettingsSecretPort,
+  PersonalWorkspaceIdentityPort,
+  PostgresOrganizationAdapter,
+  TeamIdentityPort,
+  type PersonalWorkspaceResourceIds,
+} from "@langwatch/organization-server";
 import { prisma } from "~/server/db";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
+
+/**
+ * The settings write belongs to the organization feature, so the intent edits
+ * below drive ITS service against the same database rather than a second copy
+ * of the write in this process.
+ *
+ * The identity, authorization and grant collaborators the adapter composes are
+ * untouched by a settings write — it reads the organization row, writes the
+ * organization row, and speaks to nothing else — so they are inert here and a
+ * failure would name this write rather than one of them. Nothing needs a real
+ * cipher either: no S3 credential is written, so the secret port is identity.
+ */
+class PassthroughSettingsSecrets extends OrganizationSettingsSecretPort {
+  encrypt(value: string): string {
+    return value;
+  }
+
+  decrypt(value: string): string {
+    return value;
+  }
+}
+
+class UnusedIdentities extends PersonalWorkspaceIdentityPort {
+  create(): PersonalWorkspaceResourceIds {
+    throw new Error("A settings write creates no personal workspace");
+  }
+}
+
+class UnusedTeamIdentities extends TeamIdentityPort {
+  createTeam(): { teamId: string; slug: string } {
+    throw new Error("A settings write creates no team");
+  }
+
+  createBindingId(): string {
+    throw new Error("A settings write creates no binding");
+  }
+}
+
+class UnusedGroupIdentities extends GroupIdentityPort {
+  createGroupId(): string {
+    throw new Error("A settings write creates no group");
+  }
+
+  createBindingId(): string {
+    throw new Error("A settings write creates no binding");
+  }
+
+  slugify(): string {
+    throw new Error("A settings write slugs nothing");
+  }
+}
 
 /**
  * ADR-038 I4/I5: `createAndAssign` persists the declared primary intent on
@@ -18,6 +78,15 @@ import { PrismaOrganizationRepository } from "../repositories/organization.prism
  */
 describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () => {
   const repository = new PrismaOrganizationRepository(prisma);
+  const settings = PostgresOrganizationAdapter.create({
+    database: prisma,
+    identities: new UnusedIdentities(),
+    teamIdentities: new UnusedTeamIdentities(),
+    groupIdentities: new UnusedGroupIdentities(),
+    authz: {} as AuthzService,
+    grants: {} as AuthzGrantsService,
+    settingsSecrets: new PassthroughSettingsSecrets(),
+  }).build();
   const testNamespace = `intent-${nanoid(8)}`;
   const createdOrgIds: string[] = [];
   const createdUserIds: string[] = [];
@@ -105,13 +174,13 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
         )?.primaryIntent;
 
       // undefined leaves the current value untouched
-      await repository.updateSettings({
+      await settings.updateSettings({
         organizationId: orgId,
         name: "Renamed",
       });
       expect(await readIntent()).toBe("AGENT_GOVERNANCE");
 
-      await repository.updateSettings({
+      await settings.updateSettings({
         organizationId: orgId,
         name: "Renamed",
         primaryIntent: "LLM_OPS",
@@ -119,7 +188,7 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
       expect(await readIntent()).toBe("LLM_OPS");
 
       // null clears back to legacy behavior
-      await repository.updateSettings({
+      await settings.updateSettings({
         organizationId: orgId,
         name: "Renamed",
         primaryIntent: null,

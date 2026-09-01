@@ -156,6 +156,10 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
+  tryGetOrganizationIdByTeamId(): never {
+    throw new Error("not used by this test");
+  }
+
   async getOldestTeamId(): Promise<string> {
     if (!this.teamId) throw new OrganizationHasNoTeamError("org");
     return this.teamId;

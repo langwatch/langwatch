@@ -27,6 +27,7 @@ export class TestOrganizationService extends OrganizationService {
   getPersonalWorkspaceFeatures = unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
   getSettings = unsupported<OrganizationService["getSettings"]>();
   getTeam = unsupported<OrganizationService["getTeam"]>();
+  tryGetOrganizationIdByTeamId = unsupported<OrganizationService["tryGetOrganizationIdByTeamId"]>();
   getTeamById = unsupported<OrganizationService["getTeamById"]>();
   getTeamBySlugForMember = unsupported<OrganizationService["getTeamBySlugForMember"]>();
   getTeamWithMembers = unsupported<OrganizationService["getTeamWithMembers"]>();

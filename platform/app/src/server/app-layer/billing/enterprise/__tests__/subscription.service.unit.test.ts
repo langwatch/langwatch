@@ -74,7 +74,6 @@ const createMockItemCalculator = () => ({
 const createMockOrganizationRepository = (): {
   [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
 } => ({
-  getOrganizationIdByTeamId: vi.fn(),
   getUserOrgRole: vi.fn(),
   getUserOrgRoleByTeamId: vi.fn(),
   getProjectIds: vi.fn(),
@@ -101,8 +100,6 @@ const createMockOrganizationRepository = (): {
   findMembership: vi.fn(),
   findAllMembers: vi.fn(),
   findMemberTeamBindings: vi.fn(),
-  findSettingsById: vi.fn(),
-  updateSettings: vi.fn(),
   deleteMember: vi.fn(),
   setMemberDisabled: vi.fn(),
   updateMemberRole: vi.fn(),

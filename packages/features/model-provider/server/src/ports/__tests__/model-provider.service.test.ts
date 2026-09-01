@@ -465,6 +465,10 @@ class Organizations extends OrganizationService {
     return this.notUsed();
   }
 
+  tryGetOrganizationIdByTeamId() {
+    return this.notUsed();
+  }
+
   getBillingProfile() {
     return Promise.resolve({
       id: "org_1",

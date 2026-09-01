@@ -72,7 +72,6 @@ import { createRolesRestApp } from "@langwatch/role-server";
 import {
   createMeRestApp,
   createUserAvatarRestApp,
-  type MeRestTeamOrganizationLookup,
   type UserAvatarObjectReader,
 } from "@langwatch/user-server";
 import { createWorkflowsRestApp, type WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
@@ -145,17 +144,15 @@ export interface AppRestFeatureServices {
   /**
    * The organization capability, WIDER than the published contract.
    *
-   * Two families reach past it. `/api/me` resolves the organization behind a
-   * personal workspace from its team, and `/api/organizations` provisions an
-   * organization before any credential for it exists — neither is on
-   * `OrganizationService` today, so each family names what it calls and the
-   * intersection is what a process has to supply. Both belong on the contract;
-   * moving them there is a change to the organization package, not to this
-   * enumeration.
+   * One family still reaches past it: `/api/organizations` provisions an
+   * organization before any credential for it exists, which is not on
+   * `OrganizationService` today, so it names what it calls and the
+   * intersection is what a process has to supply. It belongs on the contract;
+   * moving it there is a change to the organization package, not to this
+   * enumeration. `/api/me`'s team-to-organization read used to sit here for
+   * the same reason and now does: it is `tryGetOrganizationIdByTeamId`.
    */
-  organizations: () => OrganizationService &
-    MeRestTeamOrganizationLookup &
-    OrganizationProvisioningPort;
+  organizations: () => OrganizationService & OrganizationProvisioningPort;
   /** Reading effective permissions and the bindings that confer them. */
   permissions: () => AuthzService;
   projects: () => ProjectService;

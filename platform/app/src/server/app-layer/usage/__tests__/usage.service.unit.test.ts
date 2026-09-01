@@ -99,7 +99,7 @@ vi.mock("~/env.mjs", () => ({
 
 describe("UsageService", () => {
   const mockOrgService: OrganizationService = {
-    getOrganizationIdByTeamId: vi.fn(),
+    tryGetOrganizationIdByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
   } as unknown as OrganizationService;
 
@@ -146,7 +146,7 @@ describe("UsageService", () => {
   describe("checkLimit", () => {
     describe("when team has no organization", () => {
       it("throws OrganizationNotFoundForTeamError", async () => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(null);
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue(null);
 
         await expect(service.checkLimit({ teamId: "team-123" })).rejects.toThrow(
           "Organization for team not found: team-123",
@@ -157,7 +157,7 @@ describe("UsageService", () => {
     describe("when the counting store cannot report usage", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue(USAGE_UNKNOWN);
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -198,7 +198,7 @@ describe("UsageService", () => {
     describe("when free-tier org exceeds limit on SaaS", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 50_000 },
@@ -224,7 +224,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = false;
         mockEnv.BASE_HOST = "https://my-langwatch.example.com";
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 50_000 },
@@ -249,7 +249,7 @@ describe("UsageService", () => {
     describe("when paid TIERED org exceeds limit on SaaS", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = true;
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 10_000 },
@@ -282,7 +282,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         mockEnv.IS_SAAS = false;
         mockEnv.BASE_HOST = "https://my-langwatch.example.com";
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 10_000 },
@@ -306,7 +306,7 @@ describe("UsageService", () => {
 
     describe("when count >= maxMessagesPerMonth", () => {
       beforeEach(() => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         // Free plan resolves to events counter
         mockEventUsageService.getCountByProjects.mockResolvedValue([
@@ -373,7 +373,7 @@ describe("UsageService", () => {
 
     describe("when count < maxMessagesPerMonth", () => {
       it("returns exceeded: false", async () => {
-        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.tryGetOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         // Free plan resolves to events counter
         mockEventUsageService.getCountByProjects.mockResolvedValue([

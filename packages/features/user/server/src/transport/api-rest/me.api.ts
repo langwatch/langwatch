@@ -109,19 +109,6 @@ export interface MePersonalUsageReader {
 }
 
 /**
- * Resolving the organization behind a personal workspace when the credential
- * did not name one.
- *
- * Not on the `OrganizationService` contract today, so it is named here rather
- * than assumed: the concrete service already answers it, and a process passing
- * anything else has to say so. It belongs on the contract — moving it there is
- * a change to the organization package, not to a transport move.
- */
-export interface MeRestTeamOrganizationLookup {
-  getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
-}
-
-/**
  * Hono app for /api/me — the personal-developer surface. Two reads:
  *
  *   GET /api/me/usage    — the same spend / usage / model-breakdown payload
@@ -150,7 +137,7 @@ export function createMeRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   personalUsage: () => MePersonalUsageReader;
-  organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
+  organizations: () => OrganizationService;
   projects: () => ProjectService;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const secured = options.security.createProjectApp({ basePath: "/api/me" });
@@ -165,7 +152,7 @@ function registerUsageRoute(
   secured: SecuredApp<{ Variables: AppRestProjectVariables }>,
   services: {
     personalUsage: () => MePersonalUsageReader;
-    organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
+    organizations: () => OrganizationService;
     projects: () => ProjectService;
   },
 ): void {
@@ -214,7 +201,7 @@ function registerUsageRoute(
       // ingestion source, in which case there is no ledger traffic.
       const organizationId =
         c.get("apiKeyOrganizationId") ??
-        (await services.organizations().getOrganizationIdByTeamId(project.teamId));
+        (await services.organizations().tryGetOrganizationIdByTeamId({ teamId: project.teamId }));
       const governanceProject = organizationId
         ? await services.projects().tryFindInternal({
             organizationId,

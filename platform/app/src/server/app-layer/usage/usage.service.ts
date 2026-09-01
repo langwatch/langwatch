@@ -64,7 +64,7 @@ export class UsageService {
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
     const organizationId =
-      await this.organizationService.getOrganizationIdByTeamId(teamId);
+      await this.organizationService.tryGetOrganizationIdByTeamId({ teamId });
     if (!organizationId) {
       throw new OrganizationNotFoundForTeamError(teamId);
     }
