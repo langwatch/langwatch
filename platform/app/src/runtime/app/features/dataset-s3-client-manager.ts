@@ -11,14 +11,10 @@ type ManagedClient = {
   superseded: boolean;
 };
 
-export type DatasetS3ClientConfigBuilder = AppAwsClientConfiguration["build"];
-
 export type AppDatasetS3ClientManagerOptions = {
   resolveTarget?: (projectId: string) => Promise<ResolvedS3ClientTarget>;
   /** Process-owned AWS transport graph composed from validated proxy policy. */
-  aws?: Pick<AppAwsClientConfiguration, "build">;
-  /** Compatibility seam for isolated tasks and unit tests. */
-  buildClientConfig?: DatasetS3ClientConfigBuilder;
+  aws: Pick<AppAwsClientConfiguration, "build">;
 };
 
 /**
@@ -27,17 +23,10 @@ export type AppDatasetS3ClientManagerOptions = {
  * destination/identity fingerprint remains unchanged.
  */
 export class AppDatasetS3ClientManager extends DatasetS3ClientResolver {
-  static create(options: AppDatasetS3ClientManagerOptions = {}): AppDatasetS3ClientManager {
-    const aws = options.aws;
-    const buildClientConfig = aws
-      ? (input: Parameters<DatasetS3ClientConfigBuilder>[0]) => aws.build(input)
-      : options.buildClientConfig;
-    if (!buildClientConfig) {
-      throw new Error("Dataset S3 clients require a process-owned AWS configuration.");
-    }
+  static create(options: AppDatasetS3ClientManagerOptions): AppDatasetS3ClientManager {
     return new AppDatasetS3ClientManager(
       options.resolveTarget ?? resolveS3ClientTarget,
-      buildClientConfig,
+      options.aws,
     );
   }
 
@@ -48,7 +37,7 @@ export class AppDatasetS3ClientManager extends DatasetS3ClientResolver {
 
   private constructor(
     private readonly resolveTarget: (projectId: string) => Promise<ResolvedS3ClientTarget>,
-    private readonly buildClientConfig: DatasetS3ClientConfigBuilder,
+    private readonly aws: Pick<AppAwsClientConfiguration, "build">,
   ) {
     super();
   }
@@ -119,7 +108,7 @@ export class AppDatasetS3ClientManager extends DatasetS3ClientResolver {
     current: ManagedClient | undefined,
   ): ManagedClient {
     const client = new S3Client({
-      ...this.buildClientConfig({
+      ...this.aws.build({
         ...(target.region !== undefined ? { region: target.region } : {}),
         targetHost: target.endpoint ?? "s3.amazonaws.com",
         ...(target.endpoint ? { endpoint: target.endpoint } : {}),

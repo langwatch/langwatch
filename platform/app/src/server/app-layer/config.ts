@@ -18,6 +18,10 @@ import {
   type TracePrivacyRuntimeConfig,
 } from "~/runtime/trace-privacy.config";
 import {
+  resolveAzureIdentityConfig,
+  type AzureIdentityConfig,
+} from "~/runtime/azure-identity.config";
+import {
   resolveScenarioChildParentEnvironment,
   type ScenarioChildParentEnvironment,
 } from "~/runtime/worker/scenario-child-parent.config";
@@ -161,6 +165,11 @@ export interface AppConfig {
   groupQueue: GroupQueueProcessConfig;
   /** Parsed once at boot and injected into outbound transport composition. */
   outboundProxy: OutboundProxyConfig;
+  /**
+   * The federated identity the process platform injected, parsed once here so
+   * Azure-backed storage receives it rather than reading `process.env` itself.
+   */
+  azureIdentity: AzureIdentityConfig;
   /** Private, immutable configuration for the process-owned outbound mailer. */
   mailer: MailerConfiguration;
   /** SDK policy for the process-owned Stripe client, composed only in SaaS mode. */
@@ -283,6 +292,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisDbIndex: env.REDIS_DB_INDEX,
     groupQueue,
     outboundProxy: parseOutboundProxyConfig(process.env),
+    azureIdentity: resolveAzureIdentityConfig(process.env),
     mailer: mail.mailer,
     nextauthSecret: mail.runtime.nextauthSecret,
     stripe: resolveStripeRuntimeConfig({ STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY }),

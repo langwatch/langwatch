@@ -12,10 +12,7 @@ vi.mock("~/env.mjs", () => ({
   env: mockEnv,
 }));
 
-import {
-  AzureBackendMisconfiguredError,
-  resolveAzureCredentials,
-} from "../azure-credentials";
+import { AzureBackendMisconfiguredError, resolveAzureCredentials } from "../azure-credentials";
 
 const ALLOW_INSECURE_ENV = "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS";
 
@@ -112,12 +109,7 @@ describe("resolveAzureCredentials", () => {
       // supported mode is actually reachable and returns its own
       // discriminated credential shape, proving there is no silent
       // default-case swallow.
-      const modes = [
-        "sharedKey",
-        "workloadIdentity",
-        "managedIdentity",
-        "azureCli",
-      ] as const;
+      const modes = ["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"] as const;
 
       for (const mode of modes) {
         resetEnv();
@@ -171,8 +163,7 @@ describe("resolveAzureCredentials", () => {
       mockEnv.AZURE_BLOB_CONTAINER = "cont";
       process.env.AZURE_CLIENT_ID = "client-id";
       process.env.AZURE_TENANT_ID = "tenant-id";
-      process.env.AZURE_FEDERATED_TOKEN_FILE =
-        "/var/run/secrets/azure/tokens/azure-identity-token";
+      process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/azure/tokens/azure-identity-token";
 
       const credentials = resolveAzureCredentials({ purpose: "read" });
 
@@ -203,6 +194,34 @@ describe("resolveAzureCredentials", () => {
       expect(message).toMatch(/azure\.workload\.identity\/client-id/);
       expect(message).toMatch(/webhook/i);
       expect(message).not.toMatch(/set (it|them|this) by hand/i);
+    });
+  });
+
+  describe("given the composition root parsed the platform-injected identity", () => {
+    it("accepts the parsed values in place of the process environment", () => {
+      setTokenModeEnv("workloadIdentity");
+      // The same pod, read two ways: the process parsed the webhook's values
+      // into typed configuration at boot, so the resolver must not insist on
+      // reading them off `process.env` a second time.
+
+      expect(
+        resolveAzureCredentials({
+          identity: {
+            tenantId: "tenant-id",
+            clientId: "client-id",
+            federatedTokenFile: "/var/run/secrets/azure/token",
+          },
+        }).mode,
+      ).toBe("workloadIdentity");
+      expect(() => resolveAzureCredentials()).toThrow(AzureBackendMisconfiguredError);
+    });
+
+    it("still refuses when the parsed identity is as empty as the environment", () => {
+      setTokenModeEnv("workloadIdentity");
+
+      expect(() => resolveAzureCredentials({ identity: {} })).toThrow(
+        AzureBackendMisconfiguredError,
+      );
     });
   });
 

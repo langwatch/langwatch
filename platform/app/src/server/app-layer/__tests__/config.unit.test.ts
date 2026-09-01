@@ -141,6 +141,71 @@ describe("Evaluation execution process configuration", () => {
   );
 });
 
+describe("Azure identity process configuration", () => {
+  const INJECTED = {
+    AZURE_TENANT_ID: "tenant-id",
+    AZURE_CLIENT_ID: "client-id",
+    AZURE_FEDERATED_TOKEN_FILE: "/var/run/secrets/azure/token",
+  } as const;
+
+  it("projects the platform-injected federated identity into the composed app configuration", () => {
+    const previous = Object.fromEntries(
+      Object.keys(INJECTED).map((key) => [key, process.env[key]]),
+    );
+    Object.assign(process.env, INJECTED);
+
+    try {
+      initializeEnvironmentConfig({
+        NODE_ENV: "test",
+        BUILD_TIME: "1",
+        SKIP_ENV_VALIDATION: "1",
+        BASE_HOST: "http://localhost:5560",
+      });
+
+      // The AKS workload-identity webhook writes these three, so the process
+      // parses them once here and hands them to Azure-backed storage rather
+      // than letting each construction site read them off `process.env`.
+      expect(createAppConfigFromEnv().azureIdentity).toEqual({
+        tenantId: "tenant-id",
+        clientId: "client-id",
+        federatedTokenFile: "/var/run/secrets/azure/token",
+      });
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it("leaves the identity empty on an install the webhook never mutated", () => {
+    const previous = Object.fromEntries(
+      Object.keys(INJECTED).map((key) => [key, process.env[key]]),
+    );
+    for (const key of Object.keys(INJECTED)) delete process.env[key];
+
+    try {
+      initializeEnvironmentConfig({
+        NODE_ENV: "test",
+        BUILD_TIME: "1",
+        SKIP_ENV_VALIDATION: "1",
+        BASE_HOST: "http://localhost:5560",
+      });
+
+      expect(createAppConfigFromEnv().azureIdentity).toEqual({
+        tenantId: undefined,
+        clientId: undefined,
+        federatedTokenFile: undefined,
+      });
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+});
+
 describe("Langevals process configuration", () => {
   it("keeps the configured internal endpoint and transport defaults together", () => {
     expect(

@@ -334,6 +334,7 @@ import { AppMailerRuntime } from "~/runtime/app/mailer.runtime";
 import { AppLangevalsRuntime } from "~/runtime/app/langevals.runtime";
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
 import { resolveAppMailerConfiguration } from "~/runtime/app/mailer.private-config";
+import { resolveAzureIdentityConfig } from "~/runtime/azure-identity.config";
 import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerLookupRuntime } from "@langwatch/stored-object-server";
@@ -1463,7 +1464,11 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     }).build(),
     "ScenarioService",
   );
-  const datasetRuntime = AppDatasetRuntime.create({ database: prisma });
+  const datasetRuntime = AppDatasetRuntime.create({
+    database: prisma,
+    aws,
+    azureIdentity: config.azureIdentity,
+  });
   const dataset = traced(datasetRuntime.build(), "DatasetService");
   const annotations = traced(
     PostgresAnnotationAdapter.create({
@@ -3106,6 +3111,7 @@ export function createTestApp(
       payloadCodec: "json",
     },
     outboundProxy: {},
+    azureIdentity: resolveAzureIdentityConfig({}),
     mailer: resolveAppMailerConfiguration({ BASE_HOST: "http://localhost:5560" }),
     stripe: resolveStripeRuntimeConfig({}),
     langevals: resolveLangevalsRuntimeConfig({}),
@@ -3262,13 +3268,8 @@ export function createTestApp(
   // below are built from.
   const testDataset = AppDatasetRuntime.create({
     database: testPrisma,
-    // Not optional in practice: `AppDatasetRuntime.create` builds its own
-    // storage resolver whenever one is not supplied, and that resolver
-    // refuses to exist without a process-owned AWS configuration. Omitting it
-    // threw "Dataset S3 clients require a process-owned AWS configuration"
-    // out of `createTestApp` itself — so a suite calling it at module scope
-    // could not even load, whatever it was actually testing.
     aws: testAws,
+    azureIdentity: config.azureIdentity,
   }).build();
   const testWorkflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
   const testWorkflows = AppWorkflowRuntime.create({

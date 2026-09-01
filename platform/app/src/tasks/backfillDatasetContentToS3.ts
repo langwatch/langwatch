@@ -4,6 +4,7 @@ import { AppDatasetStorageResolver } from "../runtime/app/features/dataset-stora
 import { AppAwsClientConfiguration } from "../runtime/app/aws-client.composition";
 import { prisma } from "../server/db";
 import { parseOutboundProxyConfig } from "../server/outboundProxy";
+import { resolveAzureIdentityConfig } from "../runtime/azure-identity.config";
 
 const logger = createLogger("langwatch:tasks:backfillDatasetContentToS3");
 
@@ -16,7 +17,8 @@ const createMigration = (storage: AppDatasetStorageResolver) =>
 function createTaskStorage(): { storage: AppDatasetStorageResolver; close(): Promise<void> } {
   const aws = AppAwsClientConfiguration.create(parseOutboundProxyConfig(process.env));
   const storage = new AppDatasetStorageResolver({
-    buildS3ClientConfig: (input) => aws.build(input),
+    aws,
+    azureIdentity: resolveAzureIdentityConfig(process.env),
   });
   return {
     storage,

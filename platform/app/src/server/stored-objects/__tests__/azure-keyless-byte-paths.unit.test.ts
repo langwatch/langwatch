@@ -44,12 +44,17 @@ import { resetAzureTokenCacheForTests } from "../azure-token-provider";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { maybeAzureDriver } from "../stored-objects-factory";
 
-// The resolver owns an S3 client manager as well as the Azure one, and it
-// refuses to construct without a process-owned AWS builder. Nothing below
-// reaches the S3 arm — every assertion is on the Azure destination — so the
-// builder is a stub rather than a real transport graph.
+// The resolver owns an S3 client manager as well as the Azure one, and both
+// arms take their collaborators injected. Nothing below reaches the S3 arm —
+// every assertion is on the Azure destination — so the injected AWS graph
+// refuses rather than pretending to be a transport graph, which is what makes
+// that claim a check instead of a comment.
 const datasetStorageResolver = new AppDatasetStorageResolver({
-  buildS3ClientConfig: () => ({}),
+  aws: {
+    build: () => {
+      throw new Error("Every assertion here is on the Azure arm; the S3 arm is never built.");
+    },
+  },
 });
 
 /** A keyless install: identity mode, and no account key anywhere. */

@@ -5,12 +5,37 @@ import {
   type DatasetNormalizeQueuePort,
   type DatasetUploadPort,
   type DatasetContentPort,
-  type DatasetStorageResolver,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
 import type { AzureIdentityConfig } from "~/runtime/azure-identity.config";
 import { AppDatasetStorageResolver } from "./dataset-storage";
+
+export type AppDatasetRuntimeOptions = {
+  database: PrismaClient;
+  experiments?: DatasetExperimentLookup;
+  storage?: DatasetUploadPort;
+  queue?: DatasetNormalizeQueuePort;
+  /** Object-backed dataset reads/mutations; selected by the composition root. */
+  content?: DatasetContentPort;
+  /**
+   * Process-owned AWS transport graph for the dataset object's S3 clients.
+   * Required rather than optional because the runtime always owns a storage
+   * resolver, and a resolver with no AWS graph can build no S3 client at all:
+   * while this was optional the composition root omitted it, which compiled
+   * and then threw out of `initializeDefaultApp` on every boot.
+   */
+  aws: Pick<AppAwsClientConfiguration, "build">;
+  /**
+   * Platform-injected federated identity, parsed once by the composition root.
+   * It reaches the Azure driver's credential resolution; the sibling
+   * destination and read-driver resolvers still read the same three variables
+   * off `process.env`, so this is ownership of one arm, not of the whole
+   * Azure path.
+   */
+  azureIdentity?: AzureIdentityConfig;
+  generateId?: () => string;
+};
 
 /**
  * Process-owned Dataset composition. The feature server owns the service and
@@ -19,53 +44,23 @@ import { AppDatasetStorageResolver } from "./dataset-storage";
  */
 export class AppDatasetRuntime {
   private readonly adapter: PostgresDatasetAdapter;
-  private readonly ownedStorageResolver: AppDatasetStorageResolver | undefined;
+  private readonly storageResolver: AppDatasetStorageResolver;
 
   private constructor(
-    options: {
-      database: PrismaClient;
-      experiments?: DatasetExperimentLookup;
-      storage?: DatasetUploadPort;
-      queue?: DatasetNormalizeQueuePort;
-      /** Object-backed dataset reads/mutations; selected by the composition root. */
-      content?: DatasetContentPort;
-      storageResolver?: DatasetStorageResolver;
-      aws?: Pick<AppAwsClientConfiguration, "build">;
-      azureIdentity?: AzureIdentityConfig;
-      generateId?: () => string;
-    },
-    ownedStorageResolver: AppDatasetStorageResolver | undefined,
+    options: AppDatasetRuntimeOptions,
+    storageResolver: AppDatasetStorageResolver,
   ) {
-    this.adapter = PostgresDatasetAdapter.create(options);
-    this.ownedStorageResolver = ownedStorageResolver;
+    this.adapter = PostgresDatasetAdapter.create({ ...options, storageResolver });
+    this.storageResolver = storageResolver;
   }
 
-  static create(options: {
-    database: PrismaClient;
-    experiments?: DatasetExperimentLookup;
-    storage?: DatasetUploadPort;
-    queue?: DatasetNormalizeQueuePort;
-    /** Object-backed dataset reads/mutations; selected by the composition root. */
-    content?: DatasetContentPort;
-    storageResolver?: DatasetStorageResolver;
-    /** Process-owned AWS transport graph for the dataset object's S3 clients. */
-    aws?: Pick<AppAwsClientConfiguration, "build">;
-    /** Parsed platform identity used by Azure-backed dataset storage. */
-    azureIdentity?: AzureIdentityConfig;
-    generateId?: () => string;
-  }): AppDatasetRuntime {
-    const ownedStorageResolver = options.storageResolver
-      ? undefined
-      : new AppDatasetStorageResolver({
-          aws: options.aws,
-          azureIdentity: options.azureIdentity,
-        });
+  static create(options: AppDatasetRuntimeOptions): AppDatasetRuntime {
     return new AppDatasetRuntime(
-      {
-        ...options,
-        storageResolver: options.storageResolver ?? ownedStorageResolver,
-      },
-      ownedStorageResolver,
+      options,
+      new AppDatasetStorageResolver({
+        aws: options.aws,
+        azureIdentity: options.azureIdentity,
+      }),
     );
   }
 
@@ -82,6 +77,6 @@ export class AppDatasetRuntime {
   }
 
   close(): Promise<void> {
-    return this.ownedStorageResolver?.close() ?? Promise.resolve();
+    return this.storageResolver.close();
   }
 }

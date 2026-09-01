@@ -38,12 +38,17 @@ import {
 } from "../../server/stored-objects/__tests__/azurite-test-support";
 import { migrateDatasetContentToObjectStorage } from "../backfillDatasetContentToS3";
 
-// The resolver owns an S3 client manager as well as the Azure one, and it
-// refuses to construct without a process-owned AWS builder. Nothing below
-// reaches the S3 arm — the env points every destination at Azurite — so the
-// builder is a stub rather than a real transport graph.
+// The resolver owns an S3 client manager as well as the Azure one, and both
+// arms take their collaborators injected. Nothing below reaches the S3 arm —
+// the env points every destination at Azurite — so the injected AWS graph
+// refuses rather than pretending to be a transport graph, which is what makes
+// that claim a check instead of a comment.
 const datasetStorageResolver = new AppDatasetStorageResolver({
-  buildS3ClientConfig: () => ({}),
+  aws: {
+    build: () => {
+      throw new Error("Every destination in this suite is Azurite; the S3 arm is never built.");
+    },
+  },
 });
 
 const CONTAINER = "datasets";
