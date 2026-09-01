@@ -51,14 +51,6 @@ const AddOrEditDatasetDrawer = lazyDefault({
   factory: () => import("./AddOrEditDatasetDrawer"),
   key: "AddOrEditDatasetDrawer",
 });
-const AutomationDrawer = lazyDefault({
-  factory: () => import("~/features/automations/AutomationDrawer"),
-  key: "AutomationDrawer",
-});
-const ViewAutomationDrawer = lazyDefault({
-  factory: () => import("~/features/automations/ViewAutomationDrawer"),
-  key: "ViewAutomationDrawer",
-});
 const AgentHistoryDrawer = lazyDefault({
   factory: () => import("~/runtime/ui/features/agent-ui-host.adapter"),
   key: "AgentHistoryDrawer",
@@ -262,8 +254,6 @@ export const drawers = {
   // nothing. It redirects to `traceV2Details` on the page it was opened on.
   traceDetails: LegacyTraceDrawerRedirect,
   traceV2Details: TraceV2DrawerNoop,
-  automation: AutomationDrawer,
-  viewAutomation: ViewAutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
@@ -272,13 +262,6 @@ export const drawers = {
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVDrawer,
   addOrEditDataset: AddOrEditDatasetDrawer,
-  // Serves URLs handed out before the authoring drawer replaced the filter-only
-  // one: the REST `platformUrl` field and the automation emails both used to
-  // name this drawer, and those links live in inboxes and in whatever callers
-  // stored the response. It points at the same drawer as `automation` so an old
-  // link opens the editor that can change a query condition, which the drawer
-  // it used to open could not do at all.
-  editAutomationFilter: AutomationDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   dashboardName: DashboardNameDrawer,

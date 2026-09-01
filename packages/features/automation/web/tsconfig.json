@@ -6,13 +6,19 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom"],
+    "lib": ["es2022", "dom", "dom.iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
+      "@langwatch/dataset-contract": ["../../dataset/contract/src/index.ts"],
+      "@langwatch/monitor-contract": ["../../monitor/contract/src/index.ts"],
+      "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
+    }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }

@@ -65,6 +65,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/automation-web": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-web": "workspace:*",

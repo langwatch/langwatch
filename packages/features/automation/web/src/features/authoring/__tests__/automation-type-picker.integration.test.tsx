@@ -7,10 +7,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  AutomationTypePicker,
-  type AutomationSource,
-} from "../ui/blocks/automation-type-picker";
+import { AutomationTypePicker, type AutomationSource } from "../ui/blocks/automation-type-picker";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -283,31 +283,126 @@ Known costs, all reported rather than suppressed:
   that file threw, and the same file rendered five pages without ever calling
   `cleanup`.
 
-### automations — 5 keys (all → ONE module), 25 prod files + ~16 tests
+### automations — MOVED. 5 keys (all → ONE screen), 23 prod files + 20 tests
 
-- Page `pages/[project]/automations.tsx` (965 L) + entire
-  `features/automations/` subtree (exclusive) + `components/automations/FilterDisplay`
-  (leaks to analytics `GraphFilterIndicator` — cheap copy).
-- STRUCTURAL GATE: its five routes are children of the platform-served
-  `features/langy/ProjectLangyLayout` layout key — either that layout also
-  serves from apps/ui or the loader-merge design must let an apps/ui page
-  be a child of a host-served layout route. Resolve before dispatch.
-- Hard blockers: `~/server/filters/types` + generated prisma client in the
-  closure (both banned — contract types first); `AutomationDrawer`/`ViewAutomationDrawer`
-  are registered in platform's drawerRegistry (copies, not deletions);
-  13 openDrawer call sites; `QueryFilterInput` reaches traces-v2 SearchBar.
-- Destination `@langwatch/automation-web` relaid out in `648ed49987`; the
-  near-duplicate premise was FALSE — platform's `features/automations/`
-  subtree holds no stale copies; every same-named platform file is a shim
-  or app adapter importing the package (draftReducer binds the package's
-  draft model to app provider clients; the slack registry is a documented
-  re-export). The family move is therefore adapters+page, cheaper than
-  surveyed. Four package modules have their only tests in platform
-  (report-schedule, daily-cap-advice, firing-rate,
-  liquid-json-substitution) — those tests move into the package with the
-  family.
-- The loader-parity unit test pins all five keys to one module via a
-  `sharing` table — those rows delete with the keys.
+Moved fourth, and it is the first family whose move BREAKS `platform/app`
+rather than only shrinking it. Everything else follows the gateway shape file
+for file: one host port (`model/automation-host.ts`), one hand-written
+procedure map (`behavior/automation-api.ts`), the router/session/feedback
+re-bindings, the same `withUiPageGuard` in front of the same loader registry,
+a `testing.tsx` harness and a package-owned `vitest.setup.ts`.
+
+Destination `@langwatch/automation-web`, extended rather than relaid out:
+`screens/automations` is the new public entry, the app adapters and the five
+delivery providers join `features/authoring`, and `liquid-editor`,
+`slack-templates` and `overview` gained the feature entries `authoring` now
+imports them through (declared in `features/authoring/feature.json`).
+
+What actually happened, against what was surveyed:
+
+- The near-duplicate premise was FALSE, as the survey already corrected: every
+  same-named platform file was a shim or an app adapter, so the move is
+  adapters + page and no stale copy had to be reconciled.
+- The four package modules whose only tests were in platform — report-schedule,
+  daily-cap-advice, firing-rate, liquid-json-substitution — came home with them.
+- The screen takes its TAB AS A PROP. `platform/app` matched the pathname to
+  decide which of the four tabs to show; the route table gives each address its
+  own page key, so `apps/ui` maps a key to a tab and the screen never reads the
+  address to learn what the router already knew. That is why the host port has
+  no `pathname` and why five keys point at one loader.
+- `FilterDisplay` came over as a package copy (analytics still renders the
+  platform one), and its triple-nested value flattening was lifted into a
+  helper rather than added to the `max-depth` debt register, which may only
+  shrink.
+
+The prisma and `~/server` blockers resolved without a contract change:
+`TriggerAction` came from `@langwatch/automation-contract` instead of the
+generated client, and the only `~/server/filters/types` import was a test's
+`FilterField` type, which left with the structured-filter editor below.
+
+WHAT PLATFORM/APP LOSES, AND IT IS NOT ONLY DELETIONS. `AutomationDrawer` and
+`ViewAutomationDrawer` are the family's own, so they moved, and the three
+drawer-registry entries that named them (`automation`, `viewAutomation` and the
+`editAutomationFilter` alias kept for links in inboxes) are deleted with them.
+Unlike the gateway's routing-policy drawer, these had SIX non-family callers,
+and deletes-only forbids repointing them: `traces-v2`'s Automate button, the
+command bar's "new automation" action, `FieldsFilters`' Add Automation button,
+`GraphCardHeader`'s bell (twice) and the custom-analytics page (twice). Those
+seven call sites now fail to typecheck — `Argument of type '"automation"' is
+not assignable` — and are LEFT BROKEN under the migration-is-not-gradual
+ruling. They close when those four surfaces move, or when a cross-feature
+overlay capability exists.
+
+Hazards, as they actually resolved:
+
+- **The trace-query autocomplete is a plain textarea.** `QueryFilterInput`
+  reached four ways into `features/traces-v2`'s SearchBar;
+  `@langwatch/trace-web` publishes the suggestion ENGINE
+  (`getSuggestionState`) and no surface that renders it, and copying another
+  feature's dropdown was ruled out. The query still edits, the example chips
+  still seed it and the live matched-trace count still follows it — but there
+  is no field/value completion and no syntax-help drawer. THE ONE FEATURE LOSS
+  of this move, and the same shape as the me family's recent-traces
+  placeholder. `ConditionBuilder` did NOT need the copy: it only ever called
+  the ranking helpers with an empty query, so it reads `FIELD_NAMES`,
+  `FIELD_VALUES` and `SEARCH_FIELDS` off `@langwatch/trace-contract` directly.
+- **Creating a dataset from inside the drawer is gone**, and with it the whole
+  sub-flow (`state/subFlow.ts`, its two tests and the drawer's keep-the-draft
+  branch). `openDrawer("addOrEditDataset")` is another feature's overlay; a
+  host-port action could write the address but nothing would open, because the
+  chrome layout route that mounts `CurrentDrawer` does not exist yet — the same
+  gap the me family recorded for `traceV2Details`. Picking an existing dataset
+  is untouched.
+- **The legacy structured-filter editor is read-only.**
+  `components/filters/FieldsFilters` imports `~/server/api/root`,
+  `~/server/filters/registry` and `~/server/analytics/utils`; a browser package
+  may name none of them. A legacy automation shows its stored conditions
+  through `FilterDisplay` and a Clear conditions button, which is the action the
+  copy already told the reader to take.
+- **The Langy context targets are gone from the rows.** `@langwatch/langy-web`
+  is ungoverned and every consumer compiles its source, which needs an `es2023`
+  library and a stylesheet declaration `apps/ui` would have had to adopt
+  globally. Same loss the me family took on its Langy menu entry.
+- `explainAnyError` did not travel: the attempt log takes the host's one-line
+  description instead of asking whether a code carried registered copy, which
+  is the property the log was after and needs no registry.
+- **The annotation-queue spoof guard has no server-side test.** The web
+  roundtrip case asserting the schema strips `createdByUserId` was deleted as
+  false — the schema deliberately declares the field; the real guarantee is
+  `automation.api.ts`'s unconditional session stamp, and the api-trpc transport
+  has no test harness yet to pin it.
+- The `@langwatch/automation-web` root `.` export was DELETED rather than kept:
+  the move left it with no importer anywhere, so governing the package cost no
+  `ui-web-public-entry` finding at all. (`@langwatch/gateway-web`'s is still
+  owed.)
+
+Known costs, all reported rather than suppressed:
+
+- 7 platform typecheck errors in 5 files, listed above. The whole-tree
+  `pnpm typecheck` is 12 errors against a 5-error baseline.
+- 2 new architecture-lint findings, both `ui-screen-closure`: the procedure
+  map's `@langwatch/platform-api-client` (the same one governance, gateway and
+  user-web carry) and `template-authoring.tsx`'s `popup.location.replace`,
+  which is a FALSE POSITIVE — it navigates the Block Kit Builder popup the
+  component itself opened, not the application.
+- 10 of 21 scenario bindings lost, all four scenarios from
+  `specs/automations/authoring-drawer.feature` that describe machinery this
+  move removes: "Creating a dataset from the automation is offered and works",
+  "Leaving the dataset drawer without creating keeps the dataset already
+  chosen", "An abandoned sub-flow does not seed the next automation" and "A
+  link issued before the drawer changed still opens the automation". The tests
+  that replaced them are DELIBERATELY UNTAGGED rather than bound to a scenario
+  they no longer prove.
+- ONE RED TEST INHERITED, not caused: `provider-roundtrip.unit.test.ts` asserts
+  that `annotationQueueActionParamsSchema` strips a client-supplied
+  `createdByUserId`. The schema declares the field
+  (`packages/features/automation/contract/src/providers/annotation-queue.ts:8`),
+  so it is kept, and the test failed in `platform/app`'s unit lane too. The
+  guarantee it names is real and lives in the router, which force-stamps the
+  field from the session
+  (`packages/features/automation/server/src/transport/api-trpc/automation.api.ts:1008`).
+  Left red rather than rewritten: which of the two should change is a security
+  question, not a page move's.
 
 ## Cross-family collisions (settle before dispatching pairs)
 
@@ -329,12 +424,38 @@ Known costs, all reported rather than suppressed:
 - `apps/ui/src/features/catalogue.json`, `legacy-page-loaders.ts` (+ its
   unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
   filed under governance for routingPolicies and took them; me deleted the two
-  `[project]` page-shell rows its keys took), `apps/ui/src/features/installed-ui-features.ts`
+  `[project]` page-shell rows its keys took; automations deleted 27, the whole
+  `features/automations/` inventory plus the page), `components/drawerRegistry.ts`
+  (automations deleted three entries; gateway and me one each),
+  `apps/ui/src/features/installed-ui-features.ts`
   (+ `tests/installed-ui-features.unit.test.ts`), `pnpm-lock.yaml` —
   coordinator split-stages; one family commit at a time.
 - `apps/ui/src/behavior/ui-scope-resolution.ts` — me widened one union member
   (`lastVisitedHomeKind` now takes `"personal"` as well as `"project"`) so a
   `/me` page can leave the marker `MyLayout` used to write.
+
+## The fourth family's own additions, for whoever moves the fifth
+
+- A FOURTH host port of the same shape (`AutomationHostPort`). The promotion
+  signal has now fired twice and been deferred twice, for the same reason both
+  times: it is a change to four packages a page move does not own.
+- The first family to be told which VIEW it is showing rather than reading the
+  address for it. Five page keys, one screen, one prop. Any family whose tabs
+  are separate URLs should copy this instead of matching a pathname, and it is
+  why this port has no `pathname` at all.
+- The first family to add PRIVATE FEATURE ENTRIES to its destination package.
+  `authoring` composes three sibling features, so each gained an `index.ts` and
+  `authoring/feature.json` names them. `ui-web-feature-deep-import` is what
+  catches the alternative, and it fired fourteen times before the entries
+  existed.
+- The first family whose move leaves `platform/app` RED. Six non-family
+  surfaces opened its drawers; the gateway's and the me family's had none.
+  Whoever moves a family whose overlays are shared should count the callers
+  BEFORE assuming the registry entry is a pure deletion.
+- A destination package needs a triple-slash reference for any ambient module
+  declaration its own source relies on (`?raw`, `*.css`). Workspace packages
+  resolve to each other's SOURCE, so a consumer compiles those imports with no
+  way to reach a `.d.ts` that only the owner's `include` covers.
 
 ## The third family's own additions, for whoever moves the fourth
 

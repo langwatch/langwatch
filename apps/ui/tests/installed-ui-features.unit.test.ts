@@ -11,6 +11,18 @@ import { describe, expect, it } from "vitest";
 import { UiFeedbackPort, UiSessionPort } from "../src/behavior/ui-capabilities";
 import { installedUiFeatures, mergeUiFeatureInstalls } from "../src/features/installed-ui-features";
 
+const AUTOMATION_PAGE_KEYS = [
+  // Five keys for ONE screen: the four tabs are four URLs of the same page, and
+  // `/activity` is a fifth address that has shown the overview since the
+  // History tab was folded into it. The feature maps each key to the tab it
+  // shows, which is why the screen never reads the pathname.
+  "pages/[project]/automations",
+  "pages/[project]/automations/automations",
+  "pages/[project]/automations/alerts",
+  "pages/[project]/automations/schedules",
+  "pages/[project]/automations/activity",
+];
+
 const GATEWAY_PAGE_KEYS = [
   "pages/gateway/virtual-keys",
   "pages/gateway/virtual-keys/[id]",
@@ -78,15 +90,21 @@ describe("given what apps/ui serves itself", () => {
   describe("when the standing declaration is read", () => {
     it("registers a loader for every page key the families it serves name", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
-        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS, ...PERSONAL_WORKSPACE_PAGE_KEYS].sort(),
+        [
+          ...AUTOMATION_PAGE_KEYS,
+          ...GATEWAY_PAGE_KEYS,
+          ...GOVERNANCE_PAGE_KEYS,
+          ...PERSONAL_WORKSPACE_PAGE_KEYS,
+        ].sort(),
       );
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Four rather than three: the personal workspace mounts two, because the
+      // Five rather than four: the personal workspace mounts two, because the
       // coding-agent tables its screens render call procedures of their own and
       // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
+        "@langwatch/automation-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
         "@langwatch/user-web",
@@ -135,9 +153,14 @@ describe("given what apps/ui serves itself", () => {
       const merged = mergeUiFeatureInstalls(installedUiFeatures);
 
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
-        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS, ...PERSONAL_WORKSPACE_PAGE_KEYS].sort(),
+        [
+          ...AUTOMATION_PAGE_KEYS,
+          ...GATEWAY_PAGE_KEYS,
+          ...GOVERNANCE_PAGE_KEYS,
+          ...PERSONAL_WORKSPACE_PAGE_KEYS,
+        ].sort(),
       );
-      expect(merged.apis).toHaveLength(4);
+      expect(merged.apis).toHaveLength(5);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

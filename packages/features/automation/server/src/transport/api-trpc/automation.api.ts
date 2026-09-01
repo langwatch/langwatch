@@ -1006,8 +1006,9 @@ export class AutomationTrpcApi {
           // the legacy create mutation — or an edit would silently strip it and
           // disable dispatch for the trigger.
           // Force createdByUserId to the session user — never trust the client
-          // (builder5015-002). The schema strips it from the wire; we stamp
-          // unconditionally on the annotation-queue branch below.
+          // (builder5015-002). The schema deliberately declares the field so it
+          // survives to dispatch; this unconditional stamp is the entire
+          // anti-spoof guarantee.
           const actionParams: Record<string, unknown> =
             input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
               ? {

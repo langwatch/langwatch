@@ -2,6 +2,7 @@
   "version": 0,
   "governedWebPackages": [
     "@langwatch/agent-web",
+    "@langwatch/automation-web",
     "@langwatch/enterprise-governance-web",
     "@langwatch/gateway-web",
     "@langwatch/prompt-web",
@@ -14,6 +15,14 @@
       "uses": {
         "screens": ["@langwatch/agent-web/screens/agent-management"],
         "surfaces": ["@langwatch/agent-web/surfaces/browser-port"]
+      }
+    },
+    {
+      "id": "automations",
+      "root": "automations",
+      "uses": {
+        "screens": ["@langwatch/automation-web/screens/automations"],
+        "surfaces": []
       }
     },
     {

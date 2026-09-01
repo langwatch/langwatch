@@ -1,3 +1,11 @@
+/// <reference path="../../model/liquid-raw.d.ts" />
+// The reference is load-bearing rather than decorative. `?raw` imports are a
+// Vite convention TypeScript has to be told about, and the declaration that
+// tells it lives beside this file — reachable from THIS package's `include`,
+// and from nobody else's. A consumer that compiles this source (workspace
+// packages resolve to each other's source, so `apps/ui` does) would otherwise
+// fail on twenty-one imports for want of a declaration it has no way to know
+// about. Triple-slash pulls it in wherever this module is compiled.
 import type { GatedBlockType } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 import digestCompactSource from "./digest-compact.liquid?raw";

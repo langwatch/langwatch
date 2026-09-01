@@ -105,7 +105,6 @@
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/automation-server": "workspace:*",
-    "@langwatch/automation-web": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",

@@ -12,24 +12,17 @@ import { describe, expect, it, vi } from "vitest";
 import { legacyPageLoaders } from "../legacy-page-loaders";
 
 /**
- * Four screens are each reached from more than one address. Every extra
- * address used to keep a file whose whole body re-exported the shared one; the
- * registry names the shared module directly instead, so what has to be pinned
- * is that each key still resolves the component its address always served.
- *
  * The shared modules are stubbed rather than imported: the assertion is about
  * which module and which export a key names, and evaluating four real screens
  * to learn that would drag their whole import graph in.
  */
 const screens = vi.hoisted(() => ({
-  automations: () => null,
   evaluations: () => null,
   experiments: () => null,
   wizard: () => null,
   edit: () => null,
 }));
 
-vi.mock("~/pages/[project]/automations", () => ({ default: screens.automations }));
 vi.mock("~/pages/[project]/evaluations", () => ({
   default: screens.evaluations,
   GuardedExperimentsPage: screens.experiments,
@@ -55,11 +48,6 @@ describe("given the browser route table and this application's page loaders", ()
 
 describe("given the addresses that share one screen", () => {
   const sharing: ReadonlyArray<[string, () => null]> = [
-    ["pages/[project]/automations", screens.automations],
-    ["pages/[project]/automations/automations", screens.automations],
-    ["pages/[project]/automations/alerts", screens.automations],
-    ["pages/[project]/automations/schedules", screens.automations],
-    ["pages/[project]/automations/activity", screens.automations],
     ["pages/[project]/evaluations", screens.evaluations],
     ["pages/[project]/experiments/index", screens.experiments],
     ["pages/[project]/evaluations/wizard", screens.wizard],

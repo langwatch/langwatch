@@ -71,14 +71,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/index": () => import("~/pages/[project]/index"),
   "runtime/ui/features/agent-ui-host.adapter": () =>
     import("~/runtime/ui/features/agent-ui-host.adapter"),
-  "pages/[project]/automations": () => import("~/pages/[project]/automations"),
-  // Four tabs of one screen. Each address kept a file whose whole body was
-  // `export { default } from "../automations"`; the key names the shared
-  // module directly instead.
-  "pages/[project]/automations/automations": () => import("~/pages/[project]/automations"),
-  "pages/[project]/automations/alerts": () => import("~/pages/[project]/automations"),
-  "pages/[project]/automations/schedules": () => import("~/pages/[project]/automations"),
-  "pages/[project]/automations/activity": () => import("~/pages/[project]/automations"),
   "pages/[project]/datasets": () => import("~/pages/[project]/datasets"),
   "pages/[project]/datasets/[id]": () => import("~/pages/[project]/datasets/[id]"),
   "pages/[project]/evaluators": () => import("~/pages/[project]/evaluators"),

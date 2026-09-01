@@ -1,4 +1,4 @@
 {
   "version": 0,
-  "dependencies": []
+  "dependencies": ["liquid-editor", "overview", "slack-templates"]
 }

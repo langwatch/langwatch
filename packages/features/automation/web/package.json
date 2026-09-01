@@ -2,37 +2,48 @@
   "name": "@langwatch/automation-web",
   "version": "0.1.0",
   "private": true,
+  "description": "The automations family a project opens on itself: its alerts, schedules and trace automations, and the drawer that authors them.",
   "files": [
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "./screens/automations": {
+      "types": "./src/screens/automations/index.ts",
+      "default": "./src/screens/automations/index.ts"
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
+    "date-fns": "^4.4.0",
     "liqe": "^3.8.7",
     "lucide-react": "^1.22.0",
+    "react-feather": "^2.0.10",
+    "react-icons": "^5.7.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@langwatch/authz-contract": "workspace:*",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",
     "monaco-editor": "^0.55.1",
     "react": "^19.2.7",
@@ -42,6 +53,8 @@
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",
-    "react": "^19.2.7"
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

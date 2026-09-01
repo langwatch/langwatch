@@ -445,6 +445,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract
+      '@langwatch/automation-web':
+        specifier: workspace:*
+        version: link:../../packages/features/automation/web
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -2602,21 +2605,45 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
       liqe:
         specifier: ^3.8.7
         version: 3.8.7
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
+      react-feather:
+        specifier: ^2.0.10
+        version: 2.0.10(react@19.2.8)
+      react-icons:
+        specifier: ^5.7.0
+        version: 5.7.0(react@19.2.8)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.18)(react@19.2.8)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       zustand:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -2624,6 +2651,12 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
@@ -2636,6 +2669,9 @@ importers:
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -6664,9 +6700,6 @@ importers:
       '@langwatch/automation-server':
         specifier: workspace:*
         version: link:../../packages/features/automation/server
-      '@langwatch/automation-web':
-        specifier: workspace:*
-        version: link:../../packages/features/automation/web
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../packages/aws-client

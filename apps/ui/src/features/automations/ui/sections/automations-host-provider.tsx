@@ -1,0 +1,137 @@
+/**
+ * What the automations screen and its two editors are mounted inside.
+ *
+ * Two things go around every `/:project/automations*` page: the tRPC Provider
+ * the package's own hooks run on, and the host port that answers for the scope,
+ * the permissions, the flags, this deployment's address, the query string and
+ * the feedback. Both are mounted here, once, so a screen module stays a screen
+ * module.
+ *
+ * The reads live here rather than in the adapter for a reason worth keeping:
+ * the adapter is a value object over what has already been read, so a test
+ * constructs one, while a hook cannot be constructed at all.
+ *
+ * `organization.getAll` is asked with the same input the application shell asks
+ * with, which under tRPC's path-plus-input cache key is the same entry: the
+ * graph is fetched once for the document however many halves of the product
+ * want it. This family reads the TEAM off it as well as the organization and
+ * project, because the Slack delivery provider stamps a message with the team
+ * the automation belongs to.
+ */
+
+import {
+  automationApi,
+  AutomationHostProvider,
+  type AutomationFailureNotice,
+} from "@langwatch/automation-web/screens/automations";
+import { useMemo, type ComponentType, type ReactNode } from "react";
+import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
+import { UiAutomationHost } from "../../behavior/automation-host.adapter";
+
+/**
+ * This application's own address, for the links a rendered preview prints.
+ *
+ * A composition whose HTML shell carries no configuration is a self-hosted one
+ * with no stated address rather than a broken one: the preview then prints the
+ * hosted application, which is the same fallback `platform/app` applied when
+ * the drawer rendered outside a browser.
+ */
+function readAppBaseUrl(): string {
+  try {
+    return readPublicAppConfig().appBaseUrl;
+  } catch {
+    return "https://app.langwatch.ai";
+  }
+}
+
+function AutomationsHost({ children }: { children: ReactNode }) {
+  const { session, navigation, route, feedback } = useUiCapabilities();
+  const scope = session.activeScope();
+
+  const organizations = automationApi.organization.getAll.useQuery({ isDemo: false });
+
+  /**
+   * The organization, team and project the address is about.
+   *
+   * Resolved from the one graph read rather than from three: the scope names an
+   * organization and a project, and the team is whichever one holds the
+   * project.
+   */
+  const placement = useMemo(() => {
+    const organization = (organizations.data ?? []).find(
+      (candidate) => candidate.id === scope.organizationId,
+    );
+    const team = organization?.teams.find((candidate) =>
+      candidate.projects.some((project) => project.id === scope.projectId),
+    );
+    const project = team?.projects.find((candidate) => candidate.id === scope.projectId);
+    return {
+      organization: organization
+        ? { id: organization.id, name: organization.name, slug: organization.slug }
+        : void 0,
+      team: team ? { id: team.id, name: team.name, slug: team.slug } : void 0,
+      project: project ? { id: project.id, name: project.name, slug: project.slug } : void 0,
+    };
+  }, [organizations.data, scope.organizationId, scope.projectId]);
+
+  const reading = route.reading();
+  const host = useMemo(
+    () =>
+      UiAutomationHost.create(
+        {
+          scope: {
+            organizationId: scope.organizationId,
+            teamId: placement.team?.id ?? null,
+            projectId: scope.projectId,
+          },
+          organization: placement.organization,
+          team: placement.team,
+          project: placement.project,
+          appBaseUrl: readAppBaseUrl(),
+          route: reading,
+        },
+        {
+          hasPermission: (permission) => session.hasPermission(permission),
+          featureFlag: (flag) => session.featureFlag(flag),
+          setQuery: (next, options) => route.setQuery(next, options),
+          navigate: (to) => navigation.navigate(to),
+          succeeded: (notice) => feedback.succeeded(notice),
+          failed: (failure) => feedback.failed(failure),
+          // The one line a surface too tight for a toast prints. Same copy the
+          // toast would have shown, so a failure never reads two different ways
+          // depending on where it surfaced.
+          describeFailure: (failure: AutomationFailureNotice) =>
+            failure.title ??
+            resolveUiFailureCopy({
+              error: failure.error,
+              fallbackTitle: failure.fallbackTitle,
+            }).title,
+        },
+      ),
+    [
+      scope.organizationId,
+      scope.projectId,
+      placement,
+      reading,
+      session,
+      route,
+      navigation,
+      feedback,
+    ],
+  );
+
+  return <AutomationHostProvider value={host}>{children}</AutomationHostProvider>;
+}
+
+/** Wraps the automations screen in the host its package asks for. */
+export function withAutomationsHost<P extends object>(Screen: ComponentType<P>): ComponentType<P> {
+  const Mounted = (props: P) => (
+    <AutomationsHost>
+      <Screen {...props} />
+    </AutomationsHost>
+  );
+  Mounted.displayName = `withAutomationsHost(${Screen.displayName ?? Screen.name ?? "Screen"})`;
+  return Mounted;
+}
