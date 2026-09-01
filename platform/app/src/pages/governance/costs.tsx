@@ -27,6 +27,14 @@ import {
 import { CostFilterBar } from "~/components/governance/costs/CostFilterBar";
 import { CostPanel } from "~/components/governance/costs/CostPanel";
 import {
+  CostSampleBanner,
+  CostSampleToggle,
+} from "~/components/governance/costs/CostSampleControls";
+import {
+  resolveRealDataState,
+  sampleModeActive,
+} from "~/components/governance/costs/costSampleMode";
+import {
   ALL_DEPARTMENTS,
   aggregateBuckets,
   aggregateLine,
@@ -69,6 +77,13 @@ import { api } from "~/utils/api";
  * seats, forecasts, token counts and Genie questions have no backing read yet
  * and are drawn from `sampleSeries`, each badged `sample`.
  *
+ * Those invented panels do not render unconditionally. They fill a screen with
+ * nothing measured on it, step aside once real figures arrive, and the reader
+ * can overrule either default from the toggle in the header — the same
+ * arrangement the trace explorer uses for its sample traces. See
+ * `costSampleMode.ts` for why an unanswered read is not treated as an empty
+ * one.
+ *
  * Spec: specs/governance/governance-cost-screen.feature (ADR-128)
  */
 
@@ -108,10 +123,32 @@ function CostsPage() {
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
 
+  // `null` until the reader picks a side, which is what lets the default below
+  // follow the data. Deliberately not persisted: the same rule the trace
+  // explorer applies to its sample traces — opting in is a decision about this
+  // sitting, not a preference that follows you back tomorrow.
+  const [sampleOptIn, setSampleOptIn] = useState<boolean | null>(null);
+  const showSample = sampleModeActive({
+    optIn: sampleOptIn,
+    realData: resolveRealDataState([
+      breakdowns.departmentRows,
+      breakdowns.userRows,
+      breakdowns.overTime,
+      breakdowns.modelOverTime,
+    ]),
+  });
+
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={5} width="full">
-        <Heading size="md">Costs</Heading>
+        <HStack justify="space-between" align="center">
+          <Heading size="md">Costs</Heading>
+          <CostSampleToggle
+            active={showSample}
+            onToggle={() => setSampleOptIn(!showSample)}
+          />
+        </HStack>
+        {showSample && <CostSampleBanner />}
         <CostFilterBar
           department={filters.department}
           departments={breakdowns.departments}
@@ -130,7 +167,11 @@ function CostsPage() {
           data={summary.data}
         />
 
-        <CostBreakdowns filters={filters} breakdowns={breakdowns} />
+        <CostBreakdowns
+          filters={filters}
+          breakdowns={breakdowns}
+          showSample={showSample}
+        />
       </VStack>
     </GovernanceLayout>
   );
@@ -330,9 +371,11 @@ function totalPerSeries(buckets: DailyBucket[]): RankRow[] {
 function CostBreakdowns({
   filters,
   breakdowns,
+  showSample,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
+  showSample: boolean;
 }) {
   const days = useMemo(
     () => recentDays(filters.windowDays),
@@ -368,26 +411,31 @@ function CostBreakdowns({
   return (
     <VStack align="stretch" gap={4}>
       <AdoptionRow breakdowns={breakdowns} />
-      <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
-        <CostPanel title="Consumption forecast · by agent" sample>
-          <CostForecastArea
-            buckets={sample.forecast.buckets}
-            projectedFromDay={sample.forecast.projectedFromDay}
-          />
-        </CostPanel>
-        <CostPanel title="Subscriptions · by department" sample>
-          <CostStackedBars buckets={sample.subscriptions} />
-        </CostPanel>
-      </SimpleGrid>
+      {showSample && (
+        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
+          <CostPanel title="Consumption forecast · by agent" sample>
+            <CostForecastArea
+              buckets={sample.forecast.buckets}
+              projectedFromDay={sample.forecast.projectedFromDay}
+            />
+          </CostPanel>
+          <CostPanel title="Subscriptions · by department" sample>
+            <CostStackedBars buckets={sample.subscriptions} />
+          </CostPanel>
+        </SimpleGrid>
+      )}
 
-      {/* One grid of nine, in the prototype's order. */}
+      {/* One grid, in the prototype's order. With samples off the four
+          measured panels close ranks and the grid reflows around them. */}
       <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
         {/* The placeholder series is agents whatever Group By says, so this
             title does not follow it — a chart labelled by model showing agent
             names would be worse than a fixed label. */}
-        <CostPanel title="% cost by agent" sample>
-          <CostDonut rows={sample.agents} />
-        </CostPanel>
+        {showSample && (
+          <CostPanel title="% cost by agent" sample>
+            <CostDonut rows={sample.agents} />
+          </CostPanel>
+        )}
         <CostPanel title={`Cost evolution by ${filters.groupBy}`}>
           <CostStackedBars
             buckets={
@@ -401,9 +449,11 @@ function CostBreakdowns({
           <CostRankList rows={departmentRows} />
         </CostPanel>
 
-        <CostPanel title="Cost by agent" sample>
-          <CostRankList rows={sample.agents} />
-        </CostPanel>
+        {showSample && (
+          <CostPanel title="Cost by agent" sample>
+            <CostRankList rows={sample.agents} />
+          </CostPanel>
+        )}
         <CostPanel title="Cost by model">
           <CostRankList
             rows={
@@ -417,19 +467,26 @@ function CostBreakdowns({
           <CostRankList rows={userRows} />
         </CostPanel>
 
-        <CostPanel title="Genie questions over time" sample>
-          <CostStackedBars
-            buckets={sample.genie}
-            format={fmtCount}
-            showLegend={false}
-          />
-        </CostPanel>
-        <CostPanel title="Tokens over time" sample>
-          <CostLine points={sample.tokens} />
-        </CostPanel>
-        <CostPanel title="Subscriptions vs consumption" sample>
-          <CostStackedBars buckets={sample.seatsVsUsage} showLegend={false} />
-        </CostPanel>
+        {showSample && (
+          <>
+            <CostPanel title="Genie questions over time" sample>
+              <CostStackedBars
+                buckets={sample.genie}
+                format={fmtCount}
+                showLegend={false}
+              />
+            </CostPanel>
+            <CostPanel title="Tokens over time" sample>
+              <CostLine points={sample.tokens} />
+            </CostPanel>
+            <CostPanel title="Subscriptions vs consumption" sample>
+              <CostStackedBars
+                buckets={sample.seatsVsUsage}
+                showLegend={false}
+              />
+            </CostPanel>
+          </>
+        )}
       </SimpleGrid>
     </VStack>
   );
