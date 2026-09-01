@@ -119,6 +119,18 @@ Feature: Seat licences are pulled beside usage
     # be a confident wrong number that a summary would faithfully honour.
 
   @unit
+  Scenario: A list whose every pool is unreadable holds the day
+    Given the provider answers the licence read
+    And no pool in the answer can be read
+    When the source runs
+    Then no seat count is recorded for the day
+    And the next run asks again
+    # A list nothing could be read from and a tenant that genuinely holds no
+    # licences arrive as the same empty list. Reporting the day publishes the
+    # second answer for the first, and a day already marked reported is never
+    # asked about again.
+
+  @unit
   Scenario: A day held for too long is given up rather than held forever
     Given a day whose licence read has kept failing for longer than the cap
     When the next run starts

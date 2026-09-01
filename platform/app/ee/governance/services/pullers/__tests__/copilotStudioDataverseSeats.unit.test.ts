@@ -402,6 +402,53 @@ describe("the seat licence read inside the Dataverse source", () => {
     });
   });
 
+  describe("when every pool in the list is one Graph cannot be read from", () => {
+    /** @scenario "A list whose every pool is unreadable holds the day" */
+    it("holds the day rather than reporting a tenant that holds nothing", async () => {
+      graphReplies = [
+        {
+          status: 200,
+          body: { value: [{ skuPartNumber: "VIRTUAL_AGENT_USL" }, {}] },
+        },
+      ];
+
+      const result = await runPull({
+        cursor: JSON.stringify(TRANSCRIPT_POSITION),
+      });
+      const cursor = JSON.parse(String(result.cursor));
+
+      // A list nothing could be read from arrives as the same empty list a
+      // tenant that genuinely holds no licences does, and a day marked
+      // reported is never asked about again.
+      expect(seatEvents(result.events)).toHaveLength(0);
+      expect(cursor).toHaveProperty("seatsReportedThroughDay", null);
+      expect(typeof cursor.seatsHeldSinceMs).toBe("number");
+      expect(result.errorCount).toBe(0);
+    });
+
+    /** @scenario "A list whose every pool is unreadable holds the day" */
+    it("keeps the pools it could read when only some of them fail", async () => {
+      graphReplies = [
+        {
+          status: 200,
+          body: {
+            value: [...subscribedSkusReply().value, { skuPartNumber: "BROKEN" }],
+          },
+        },
+      ];
+
+      const result = await runPull({
+        cursor: JSON.stringify(TRANSCRIPT_POSITION),
+      });
+      const cursor = JSON.parse(String(result.cursor));
+
+      // The hold above is for a list that yielded nothing at all. One bad pool
+      // must still not cost the tenant the rest of its list.
+      expect(seatEvents(result.events)).toHaveLength(2);
+      expect(cursor.seatsReportedThroughDay).toBe(today());
+    });
+  });
+
   describe("when a day has been held past the cap", () => {
     /** @scenario "A day held for too long is given up rather than held forever" */
     it("hands back a moved cursor so the giving-up is persisted", async () => {

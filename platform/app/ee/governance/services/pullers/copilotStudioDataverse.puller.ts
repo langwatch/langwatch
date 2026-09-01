@@ -1280,6 +1280,22 @@ export class CopilotStudioDataversePuller
       );
     }
 
+    if (read.skus.length === 0 && read.unreadableRows > 0) {
+      // Nothing survived the read. The same reasoning the malformed body gets
+      // above, one level down: a list that yielded no pool and a tenant that
+      // holds no licences arrive as the same empty list, and reporting the day
+      // publishes the second answer for the first — permanently, because a day
+      // already marked reported is never asked about again.
+      //
+      // Only when NOTHING was read. A list that yielded some pools is recorded
+      // as it stands, because one bad pool must not cost the tenant the rest.
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: no licence pool in Microsoft Graph's reply could be read; holding the day",
+      );
+      return null;
+    }
+
     return read;
   }
 
