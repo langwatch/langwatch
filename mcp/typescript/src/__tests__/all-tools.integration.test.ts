@@ -104,17 +104,13 @@ const CANNED_PROMPT_DETAIL = {
   id: "p1",
   handle: "greeting-bot",
   name: "Greeting Bot",
-  latestVersionNumber: 3,
-  versions: [
-    {
-      version: 3,
-      commitMessage: "Updated tone",
-      model: "openai/gpt-4o",
-      messages: [{ role: "system", content: "You are a friendly bot." }],
-    },
-    { version: 2, commitMessage: "Added greeting" },
-    { version: 1, commitMessage: "Initial version" },
-  ],
+  version: 3,
+  versionId: "ver_p1v3",
+  commitMessage: "Updated tone",
+  model: "openai/gpt-4o",
+  messages: [{ role: "system", content: "You are a friendly bot." }],
+  parameters: {},
+  tags: [{ name: "latest", versionId: "ver_p1v3" }],
 };
 
 const CANNED_PROMPT_CREATED = {
@@ -1087,7 +1083,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_get_prompt", () => {
     describe("when prompt exists", () => {
-      it("returns formatted prompt details with messages and versions", async () => {
+      it("returns formatted prompt details with messages and deployments", async () => {
         const { handleGetPrompt } = await import(
           "../tools/get-prompt.js"
         );
@@ -1099,7 +1095,7 @@ describe("All MCP tools integration", () => {
         expect(result).toContain("gpt-4o");
         expect(result).toContain("You are a friendly bot.");
         expect(result).toContain("v3");
-        expect(result).toContain("## Version History");
+        expect(result).toContain("## Deployments");
         expect(result).toContain("Updated tone");
       });
     });

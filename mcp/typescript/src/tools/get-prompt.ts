@@ -85,7 +85,7 @@ export async function handleGetPrompt(params: {
       }
     } else if (fields && typeof fields === "object") {
       for (const [key, value] of Object.entries(fields)) {
-          entries.push(`- **${key}**: ${JSON.stringify(value)}`);
+        entries.push(`- **${key}**: ${JSON.stringify(value)}`);
       }
     }
     if (entries.length === 0) return;
