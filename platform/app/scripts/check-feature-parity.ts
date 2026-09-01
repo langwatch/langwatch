@@ -693,6 +693,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/automations/authoring-drawer.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
+  // Reason: reached this branch from main already partially tagged, and its
+  // eight untagged scenarios describe the CI comment bot, which this branch
+  // does not own. Tagging them @unimplemented would claim the behaviour is
+  // unbuilt when it ships today; the honest statement is that it is untagged
+  // and unmeasured. For the CI owners to bind or park.
+  "specs/ci/pr-token-usage.feature",
   "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/cache-write-ttl-pricing.feature",
   "specs/coding-agent/terminal-view.feature",
@@ -736,6 +742,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/prompts/locked-input-variable.feature",
   "specs/queue-pausing/queue-pausing.feature",
   "specs/rbac/scoped-role-bindings.feature",
+  // Reason: same as specs/ci/pr-token-usage.feature — arrived from main
+  // already partially tagged. Its two untagged scenarios describe the skill
+  // testing harness, which this branch does not own.
+  "specs/skills/skills-testing.feature",
   "specs/suites/suite-model-selection.feature",
   "specs/topic-clustering/event-sourced-scheduling.feature",
   "specs/traces-v2/annotations.feature",
