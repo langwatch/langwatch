@@ -216,7 +216,6 @@ import { type EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
 import {
-  COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
   SimulationProcessingPipelineAdapter,
   FinishRunCommand,
@@ -266,6 +265,7 @@ import { TraceAnalyticsStore } from "@langwatch/trace-server";
 import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
+import { scenarioDeferredComputeRunMetricsJob } from "~/runtime/worker/scenario-deferred-metrics.job";
 import type { AppTracePrivacyRuntime } from "~/runtime/app/trace-privacy.runtime";
 import { createEvaluationTriggerSubscriber } from "~/runtime/app/trace-evaluation-trigger.adapter";
 
@@ -1523,26 +1523,20 @@ export class PipelineRegistry {
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
 
     // Resolve deferred retry job
-    const retryJobId = (payload: ComputeRunMetricsCommandData) =>
-      `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
+    const retryJob = scenarioDeferredComputeRunMetricsJob;
 
     const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
-      name: "deferredComputeRunMetrics",
+      name: retryJob.name,
       process: async (payload) => {
         await simCommands.computeRunMetrics(payload);
       },
-      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+      delay: retryJob.delayMs,
       deduplication: {
-        makeId: retryJobId,
+        makeId: (payload) => retryJob.makeJobId(payload),
         extend: false,
         replace: true,
       },
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.scenario_run_id": payload.scenarioRunId,
-        "deferred.trace_id": payload.traceId,
-        "deferred.retry_count": payload.retryCount,
-      }),
+      spanAttributes: (payload) => retryJob.spanAttributes(payload),
     });
 
     if (retryQueue) {
@@ -1551,7 +1545,7 @@ export class PipelineRegistry {
       // Fallback: event sourcing disabled, use in-memory setTimeout
       scheduleRetry.resolve(
         createInMemoryDeferredFallback({
-          delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
+          delayMs: retryJob.delayMs,
           process: (payload) => simCommands.computeRunMetrics(payload),
           logContext: (p) => ({
             tenantId: p.tenantId,
