@@ -96,7 +96,9 @@ function LaneAreas({ series }: { series: readonly GovernanceCostDayDto[] }) {
  *
  * A day where a lane holds no figure carries null, and recharts leaves a gap
  * rather than drawing down to the axis — the chart's version of the same rule
- * the panels follow.
+ * the panels follow. A day the read could only price part of carries null for
+ * the same reason: a point drawn at the priced part would sit lower than the
+ * day cost, and nothing about its position would say so.
  */
 export function CostLanesChart({
   series,
@@ -104,6 +106,14 @@ export function CostLanesChart({
   series: readonly GovernanceCostDayDto[];
 }) {
   if (series.length === 0) return <NoReportedDays />;
+
+  // Without this, a deliberate gap is indistinguishable from lost data, and
+  // the reader's most likely reading of a hole in a cost chart is that the
+  // product dropped something.
+  const hasWithheldDay = series.some(
+    (day) =>
+      day.billedCellsWithoutAmount > 0 || day.gatewayCellsWithoutAmount > 0,
+  );
 
   return (
     <VStack
@@ -119,6 +129,12 @@ export function CostLanesChart({
       <Box height="260px">
         <LaneAreas series={series} />
       </Box>
+      {hasWithheldDay ? (
+        <Text fontSize="xs" color="fg.subtle" data-testid="cost-lanes-chart-note">
+          Days with usage billed in a currency other than US dollars are left
+          blank rather than drawn at part of what they cost.
+        </Text>
+      ) : null}
     </VStack>
   );
 }

@@ -1,6 +1,6 @@
 import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 
-import { formatLaneUsd } from "./costLaneFormat";
+import { formatLaneUsd, laneWithheldTotalNote } from "./costLaneFormat";
 
 /**
  * One cost lane, labeled for what it measures.
@@ -9,20 +9,29 @@ import { formatLaneUsd } from "./costLaneFormat";
  * invoice and the gateway's own meter answer different questions and disagree
  * on purpose — so each panel states its own figure under its own label and the
  * screen offers no total.
+ *
+ * A lane the read could not total in full arrives with a null amount and a
+ * non-zero `cellsWithoutAmount`, and renders as an em dash with the note
+ * saying why. The panel never reconstructs a figure from the parts it can see:
+ * whether a total is offered is the read side's decision, made once, in
+ * `governanceCost.service.ts`.
  */
 export function CostLanePanel({
   label,
   description,
   amountUsd,
   cellsWithoutAmount,
+  currenciesWithoutUsdAmount,
   testId,
 }: {
   label: string;
   description: string;
   /** Null when no figure is held. Rendered as an em dash, never as zero. */
   amountUsd: number | null;
-  /** Cells summarized without a stated amount, if any. */
+  /** Cells summarized without a stated USD amount, if any. */
   cellsWithoutAmount: number;
+  /** Which currencies those cells were billed in. May be empty. */
+  currenciesWithoutUsdAmount: readonly string[];
   testId: string;
 }) {
   return (
@@ -50,9 +59,8 @@ export function CostLanePanel({
           {description}
         </Text>
         {cellsWithoutAmount > 0 ? (
-          <Text fontSize="xs" color="fg.subtle">
-            Some usage in this lane arrived without a stated amount and is not
-            included.
+          <Text fontSize="xs" color="fg.subtle" data-testid={`${testId}-note`}>
+            {laneWithheldTotalNote({ currenciesWithoutUsdAmount })}
           </Text>
         ) : null}
       </VStack>
