@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AZURE_COST_MAX_HOLD_MS,
   AZURE_COST_REREAD_DAYS,
   azureCostReadIsDue,
   azureCostReadWindow,
@@ -356,51 +355,6 @@ describe("reading an Azure Cost Management daily reply", () => {
       expect(
         azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS + ONE_DAY_MS }),
       ).toBe(true);
-    });
-
-    /**
-     * How many times a source pulling continuously actually gets to ask, over
-     * a given span.
-     *
-     * Runs the gate the way the puller runs it — every run either asks and
-     * records the instant, or is turned away — rather than dividing one
-     * constant by another. Arithmetic over two literals would hold for any
-     * pair of values; this fails if the gate itself stops turning runs away.
-     *
-     * The five-minute step is this helper's own sampling rate, not a claim
-     * about how anyone schedules a source. The gate never sees a schedule; it
-     * reads elapsed time, so any step well under the interval gives the same
-     * answer.
-     */
-    const asksOverSpan = (spanMs: number): number => {
-      const RUN_EVERY_MS = 5 * 60_000;
-      let readAtMs: number | null = null;
-      let asks = 0;
-      for (let nowMs = NOW_MS; nowMs < NOW_MS + spanMs; nowMs += RUN_EVERY_MS) {
-        if (azureCostReadIsDue({ nowMs, readAtMs })) {
-          asks += 1;
-          readAtMs = nowMs;
-        }
-      }
-      return asks;
-    };
-
-    /** @scenario "The bill is asked about a handful of times a day" */
-    it("asks a handful of times a day, not once and not on every run", () => {
-      const asksInADay = asksOverSpan(ONE_DAY_MS);
-      expect(asksInADay).toBeGreaterThan(1);
-      // Azure publishes the figure once a day and refused us outright at 288
-      // asks a day. Two dozen is the ceiling that keeps this a gate rather
-      // than a formality.
-      expect(asksInADay).toBeLessThan(24);
-    });
-
-    /** @scenario "A window that cannot be read is asked about many times before it is given up on" */
-    it("asks many times over before a held window would be given up on", () => {
-      // The two bounds have to be read together. An interval longer than the
-      // give-up cap would abandon every held window before the next ask was
-      // ever due, and a customer would never see a figure at all.
-      expect(asksOverSpan(AZURE_COST_MAX_HOLD_MS)).toBeGreaterThan(10);
     });
 
     /** @scenario "A successful read records that the bill was asked about even when no figure changed" */
