@@ -785,37 +785,60 @@ then.
 Sketches; exact DDL lands with the first migration PR.
 
 ```sql
--- ClickHouse: the one summed table (fed by fold projection, NOT an MV)
+-- ClickHouse: the one summed table (fed by fold projection, NOT an MV).
+-- As shipped in migration 00087 — read that file, not this block, when
+-- the two ever disagree.
 CREATE TABLE governance_cost_rollup_1d (
-    Day                Date,
-    OrganizationId     String,
-    IngestionSourceId  String,        -- '' for gateway rows
+    -- ---- the sort key: the fold's group key, exactly ----
+    TenantId           String,        -- the org's hidden governance project
+    Day                Date,          -- the provider's business day (UTC)
     CostSource         LowCardinality(String),  -- §5 values
-    Provider           LowCardinality(String),
-    Model              LowCardinality(String),  -- '' where the bill has no model grain
-    AgentId            String,        -- provider-native (space/bot/project), '' if none
-    RawActorId         String,        -- §9: exactly what the provider said
-    ActorKind          LowCardinality(String),  -- person|agent|api_key|service_account|unknown
-    CurrencyCode       LowCardinality(String),  -- §3: part of every group key
-    AmountNano         Int64,         -- billed or metered amount in nano-units
-    BilledAmountNano   Int64,         -- provider-billed portion (0 for pure gateway rows)
-    BillerUsdNano      Int64,         -- biller-provided USD conversion (Azure totalCostUSD), 0 if none
-    ExactOrEstimate    LowCardinality(String),  -- ADR-088 Decision 6, carried through
-    RevisedAt          Nullable(DateTime),      -- §15 marker (latest revision only)
-    PreviousAmountNano Nullable(Int64),         -- §15 "was $X" (immediately-prior amount)
-    Version            UInt64                   -- projection write version; reads argMax on this
-) ENGINE = ReplacingMergeTree(Version)   -- via the CLICKHOUSE_ENGINE_REPLACING_PREFIX
-                                         -- envsub in the real migration, never a bare literal
-ORDER BY (OrganizationId, Day, CostSource, IngestionSourceId,
-          Provider, Model, AgentId, CurrencyCode, RawActorId);
+    IngestionSourceId  String DEFAULT '',       -- '' for gateway rows
+    Provider           LowCardinality(String) DEFAULT '',
+    Model              LowCardinality(String) DEFAULT '',
+    AgentId            String DEFAULT '',       -- provider-native, '' if none
+    CurrencyCode       LowCardinality(String) DEFAULT 'USD',  -- §3
+    RawActorId         String DEFAULT '',       -- §9: what the provider said
+
+    -- ---- payload (not part of the row's identity) ----
+    OrganizationId     String DEFAULT '',       -- who the money belongs to
+    ExactOrEstimate    LowCardinality(String) DEFAULT '',  -- ADR-088 Dec. 6
+    AmountNanoUsd      Nullable(Int64) DEFAULT NULL,  -- NULL, never 0
+    AmountNanoMinor    Int64 DEFAULT 0,   -- provider's own figure, nano-minor
+    TokensInput        UInt64 DEFAULT 0,
+    TokensOutput       UInt64 DEFAULT 0,
+    TokensCacheRead    UInt64 DEFAULT 0,
+    TokensCacheWrite   UInt64 DEFAULT 0,
+    RequestCount       UInt64 DEFAULT 0,
+    RevisionCount      UInt32 DEFAULT 0,        -- §15 restatement history
+    PreviousAmountNanoUsd Nullable(Int64) DEFAULT NULL,  -- §15 "was $X"
+    PulledItemsJson    String DEFAULT '',       -- latest contribution per item
+    Version            LowCardinality(String) DEFAULT '',  -- schema snapshot
+    AppliedEventIds    Array(String) DEFAULT [],  -- redelivery dedup (00054)
+    CreatedAt          UInt64 DEFAULT 0,
+    LastEventOccurredAt UInt64 DEFAULT 0,
+    EventTimestamp     UInt64                   -- RMT replacement version
+) ENGINE = ReplacingMergeTree(EventTimestamp)   -- via the
+                                         -- CLICKHOUSE_ENGINE_REPLACING_PREFIX
+                                         -- envsub, never a bare literal
+PARTITION BY toYYYYMM(Day)
+ORDER BY (TenantId, Day, CostSource, IngestionSourceId,
+          Provider, Model, AgentId, CurrencyCode, RawActorId)
+TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE;
 -- The ORDER BY is the dedup key and MUST equal the full dimension tuple:
 -- any dimension omitted here is silently collapsed on background merge
 -- (distinct actors' or currencies' money deleted, not just hidden — the
 -- 00069 bug class). Low-cardinality columns lead so chart scans read a
 -- cheap prefix; RawActorId sits last so per-person cardinality never
--- widens the prefix. ActorKind stays out: it is determined by
--- (provider, RawActorId), never a distinguishing dimension.
--- ALL reads must be dedup-safe (argMax(col, Version) or IN-tuple,
+-- widens the prefix. ActorKind is not a column at all: it is determined
+-- by (provider, RawActorId), never a distinguishing dimension.
+-- `ExactOrEstimate` is deliberately OUTSIDE the key — a day moving from
+-- estimate to exact is a restatement that must REPLACE, and in the key
+-- both rows would survive and the day would read as double its cost.
+-- Retention is a fixed 13-month TTL, exempt from tenant retention
+-- (following gateway_spend, 00067): cost records must not be governed by
+-- a policy a customer can shrink to weeks.
+-- ALL reads must be dedup-safe (argMax(col, EventTimestamp) or IN-tuple,
 -- ADR-015:98) — dedup is eventual, plain SUM double-counts mid-merge.
 ```
 
