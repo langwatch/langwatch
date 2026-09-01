@@ -484,7 +484,7 @@ test_lwql() {
   local http_code
   http_code=$(kc exec "$app_pod" -- curl -s -o /dev/null -w '%{http_code}' \
     -X POST -H 'Content-Type: application/json' -d '{"sql":"SELECT 1"}' \
-    http://localhost:5560/api/v1/projects/e2e/analytics/query/clickhouse)
+    http://localhost:5560/api/v1/query)
   assert_eq "query endpoint refuses unauthenticated" "$http_code" "401"
 
   # Idempotence: for chart-managed ClickHouse the app owns none of the access
