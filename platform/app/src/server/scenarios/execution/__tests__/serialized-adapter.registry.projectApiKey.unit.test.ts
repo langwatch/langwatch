@@ -30,8 +30,28 @@ import type {
   WorkflowAgentData,
 } from "../types";
 
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The workflow and code adapters call undici's own fetch, so that export is
+// the interception point. Hoisted, because the vi.mock factory below is
+// hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return { ...actual, fetch: mockFetch };
+});
+
+// The global fetch must never be used with an npm-undici dispatcher: Node's
+// global fetch is bound to the undici bundled with Node, and rejects one with
+// "invalid onRequestStart method". Pointing the global at the same mock would
+// let a regression back to it pass this suite.
+vi.stubGlobal(
+  "fetch",
+  vi.fn(() => {
+    throw new Error(
+      "the adapter must call undici's fetch, not the global fetch",
+    );
+  }),
+);
 
 const defaultInput = {
   threadId: "thread_1",

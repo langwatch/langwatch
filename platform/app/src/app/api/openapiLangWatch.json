@@ -2579,10 +2579,6 @@
                           "minLength": 1,
                           "maxLength": 64
                         },
-                        "description": {
-                          "type": "string",
-                          "maxLength": 2000
-                        },
                         "parameters": {
                           "type": "object",
                           "additionalProperties": {},
@@ -4188,7 +4184,7 @@
             }
           }
         },
-        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
         "tags": [
           "Agents"
         ],
@@ -4507,7 +4503,7 @@
             }
           }
         },
-        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
         "tags": [
           "Agents"
         ],
@@ -7634,772 +7630,6 @@
         ]
       }
     },
-    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
-      "post": {
-        "operationId": "postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse",
-        "summary": "Run LangWatchQL analytics SQL",
-        "description": "Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.",
-        "tags": [
-          "Analytics / LangWatchQL"
-        ],
-        "responses": {
-          "200": {
-            "description": "The query ran, and the result is scoped to the caller's project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "columns": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "type": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "type"
-                        ]
-                      }
-                    },
-                    "rows": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": {}
-                      }
-                    },
-                    "statistics": {
-                      "type": "object",
-                      "properties": {
-                        "elapsedMs": {
-                          "type": "number"
-                        },
-                        "rowsRead": {
-                          "type": "number"
-                        },
-                        "bytesRead": {
-                          "type": "number"
-                        },
-                        "rowsReturned": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "elapsedMs",
-                        "rowsRead",
-                        "bytesRead",
-                        "rowsReturned"
-                      ]
-                    },
-                    "truncated": {
-                      "type": "boolean"
-                    },
-                    "followsTimeWindow": {
-                      "type": "boolean"
-                    },
-                    "followsGranularity": {
-                      "type": "boolean"
-                    },
-                    "granularitySeconds": {
-                      "type": "number"
-                    },
-                    "coarsenedFromSeconds": {
-                      "type": "number"
-                    },
-                    "diagnostics": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "code": {
-                            "type": "string",
-                            "enum": [
-                              "RESULT_TRUNCATED",
-                              "POSSIBLE_FANOUT",
-                              "UNBOUNDED_TIME_RANGE",
-                              "MISSING_TIME_BUCKETS",
-                              "INCOMPLETE_COMPARISON_PERIOD"
-                            ]
-                          },
-                          "message": {
-                            "type": "string"
-                          },
-                          "meta": {
-                            "type": "object",
-                            "additionalProperties": {}
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "message"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "columns",
-                    "rows",
-                    "statistics",
-                    "truncated",
-                    "followsTimeWindow",
-                    "followsGranularity",
-                    "diagnostics"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sql": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 50000
-                  },
-                  "parameters": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "timeWindow": {
-                    "type": "object",
-                    "properties": {
-                      "start": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      "end": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "start",
-                      "end"
-                    ]
-                  },
-                  "granularitySeconds": {
-                    "anyOf": [
-                      {
-                        "type": "number",
-                        "const": 1
-                      },
-                      {
-                        "type": "number",
-                        "const": 60
-                      },
-                      {
-                        "type": "number",
-                        "const": 3600
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "sql"
-                ]
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "projectId",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
-    "/api/v1/projects/{projectId}/analytics/schema": {
-      "get": {
-        "operationId": "getApiV1ProjectsByProjectIdAnalyticsSchema",
-        "summary": "Discover the LangWatchQL analytics schema",
-        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.",
-        "tags": [
-          "Analytics / LangWatchQL"
-        ],
-        "responses": {
-          "200": {
-            "description": "The LangWatchQL schema, scoped to the caller's permissions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "database": {
-                      "type": "string"
-                    },
-                    "datasets": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "grain": {
-                            "type": "string"
-                          },
-                          "joinKeys": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "timeColumn": {
-                            "type": "string"
-                          },
-                          "freshness": {
-                            "type": "string"
-                          },
-                          "columns": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "name": {
-                                  "type": "string"
-                                },
-                                "type": {
-                                  "type": "string"
-                                },
-                                "description": {
-                                  "type": "string"
-                                },
-                                "unit": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ],
-                                  "enum": [
-                                    "ms",
-                                    "USD",
-                                    "tokens",
-                                    "tokens/s",
-                                    null
-                                  ]
-                                },
-                                "gates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": [
-                                      "input",
-                                      "output",
-                                      "costs"
-                                    ]
-                                  }
-                                },
-                                "available": {
-                                  "type": "boolean"
-                                }
-                              },
-                              "required": [
-                                "name",
-                                "type",
-                                "description",
-                                "unit",
-                                "gates",
-                                "available"
-                              ]
-                            }
-                          },
-                          "exampleSql": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "description",
-                          "grain",
-                          "joinKeys",
-                          "timeColumn",
-                          "freshness",
-                          "columns",
-                          "exampleSql"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "database",
-                    "datasets"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "meta": {
-                          "type": "object",
-                          "additionalProperties": {}
-                        },
-                        "trace_id": {
-                          "type": "string"
-                        },
-                        "span_id": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "code",
-                        "message"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "projectId",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
     "/api/v1/projects/{projectId}/analytics/charts": {
       "get": {
         "operationId": "getApiV1ProjectsByProjectIdAnalyticsCharts",
@@ -10571,6 +9801,754 @@
         ]
       }
     },
+    "/api/v1/query": {
+      "post": {
+        "operationId": "postApiV1Query",
+        "summary": "Run a LangWatchQL query",
+        "description": "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nThe project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
+        "tags": [
+          "Query"
+        ],
+        "responses": {
+          "200": {
+            "description": "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "type"
+                        ]
+                      }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "statistics": {
+                      "type": "object",
+                      "properties": {
+                        "elapsedMs": {
+                          "type": "number"
+                        },
+                        "rowsRead": {
+                          "type": "number"
+                        },
+                        "bytesRead": {
+                          "type": "number"
+                        },
+                        "rowsReturned": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "elapsedMs",
+                        "rowsRead",
+                        "bytesRead",
+                        "rowsReturned"
+                      ]
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "followsTimeWindow": {
+                      "type": "boolean"
+                    },
+                    "followsGranularity": {
+                      "type": "boolean"
+                    },
+                    "granularitySeconds": {
+                      "type": "number"
+                    },
+                    "coarsenedFromSeconds": {
+                      "type": "number"
+                    },
+                    "diagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "RESULT_TRUNCATED",
+                              "POSSIBLE_FANOUT",
+                              "UNBOUNDED_TIME_RANGE",
+                              "MISSING_TIME_BUCKETS",
+                              "INCOMPLETE_COMPARISON_PERIOD"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "meta": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "columns",
+                    "rows",
+                    "statistics",
+                    "truncated",
+                    "followsTimeWindow",
+                    "followsGranularity",
+                    "diagnostics"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50000
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "timeWindow": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "description": "A value already parsed into a native Date. A JSON request body cannot produce this shape — send a string or a number instead."
+                          }
+                        ]
+                      },
+                      "end": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "description": "A value already parsed into a native Date. A JSON request body cannot produce this shape — send a string or a number instead."
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "granularitySeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 60
+                      },
+                      {
+                        "type": "number",
+                        "const": 3600
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "sql"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/query/schema": {
+      "get": {
+        "operationId": "getApiV1QuerySchema",
+        "summary": "Discover the queryable LangWatchQL schema",
+        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\nScoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.",
+        "tags": [
+          "Query"
+        ],
+        "responses": {
+          "200": {
+            "description": "The datasets and columns this key may query, with the permissions that unlock each one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "database": {
+                      "type": "string"
+                    },
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "grain": {
+                            "type": "string"
+                          },
+                          "joinKeys": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "timeColumn": {
+                            "type": "string"
+                          },
+                          "freshness": {
+                            "type": "string"
+                          },
+                          "columns": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "unit": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "enum": [
+                                    "ms",
+                                    "USD",
+                                    "tokens",
+                                    "tokens/s",
+                                    null
+                                  ]
+                                },
+                                "gates": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "input",
+                                      "output",
+                                      "costs"
+                                    ]
+                                  }
+                                },
+                                "available": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "type",
+                                "description",
+                                "unit",
+                                "gates",
+                                "available"
+                              ]
+                            }
+                          },
+                          "exampleSql": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "grain",
+                          "joinKeys",
+                          "timeColumn",
+                          "freshness",
+                          "columns",
+                          "exampleSql"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "database",
+                    "datasets"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/coding-agent/sessions/{sessionId}/events": {
       "get": {
         "operationId": "getApiCodingAgentSessionsBySessionIdEvents",
@@ -11564,7 +11542,7 @@
             }
           }
         },
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with your own organization API key and nothing else: no project id is sent anywhere. Rows appear only for projects you may view, and cost only for those you may price.",
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.",
         "summary": "Get pull request usage",
         "tags": [
           "Coding Agents"

@@ -37,6 +37,7 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
@@ -119,7 +120,8 @@ export function createApiRouter() {
   api.route("/", agentsApp); // /api/v1/agents, connect and call included
   api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/charts/* — saved workbench charts only; the raw-LWQL routes this app used to serve were removed (issue #7565)
+  api.route("/", queryApp); // /api/v1/query — LWQL query domain, REST; the only HTTP door for raw LangWatchQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", codingAgentV1App); // /api/v1/coding-agent/* — organization-key door

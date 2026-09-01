@@ -30,7 +30,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Connect your agent
 
-- [Connect Your Agent](https://langwatch.ai/docs/agent-testing/connect-your-agent.md): Decorate the function that runs your agent to connect it to LangWatch, so your team can run test suites from the platform against your actual agent.
+- [Connect Your Agent](https://langwatch.ai/docs/agent-testing/connect-your-agent.md): Add a small connect function beside your service startup that calls the agent you already have, so your team can run test suites from the platform against the real agent.
 - [Targets](https://langwatch.ai/docs/agent-testing/targets.md): A target is the agent, prompt, code agent or workflow a run sends the conversation to, together with the parameters it runs with.
 - [Environments and Personal Agents](https://langwatch.ai/docs/agent-testing/environments.md): One agent name, one row per environment. Your machine, staging and production are separate targets that a single run compares.
 - [Linking Your Traces](https://langwatch.ai/docs/agent-testing/linking-your-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
@@ -1012,6 +1012,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Overview](https://langwatch.ai/docs/api-reference/analytics/overview.md): Query analytics timeseries data with metrics, aggregations, and filters.
 - [Query analytics timeseries (legacy path)](https://langwatch.ai/docs/api-reference/analytics/query-analytics-timeseries-legacy-path.md)
 - [Create Timeseries](https://langwatch.ai/docs/api-reference/analytics/create-timeseries.md)
+
+## Query
+
+- [Overview](https://langwatch.ai/docs/api-reference/query/overview.md): Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.
+- [Discover the queryable LangWatchQL schema](https://langwatch.ai/docs/api-reference/query/discover-the-queryable-langwatchql-schema.md)
+- [Run a LangWatchQL query](https://langwatch.ai/docs/api-reference/query/run-a-langwatchql-query.md)
 
 ## Secrets
 

@@ -81,7 +81,13 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   environment?: string;
   /** A definition map, a Standard JSON Schema object, or a JSON Schema object. */
   parameters?: P;
-  /** Default true, except when CI is truthy. LANGWATCH_AGENT_CONNECT=0 always disables. */
+  /**
+   * Whether this process connects. Takes any boolean, so one expression can
+   * gate the deployments that connect. Without it the default is true, except
+   * when CI is truthy; a value given here replaces that rule rather than adding
+   * to it, so keep the CI half: `process.env.APP_ENV !== "production" && !process.env.CI`.
+   * LANGWATCH_AGENT_CONNECT=0 always disables.
+   */
   enabled?: boolean;
   /** Names this instance in the platform. Also LANGWATCH_AGENT_INSTANCE_LABEL. */
   instanceLabel?: string;

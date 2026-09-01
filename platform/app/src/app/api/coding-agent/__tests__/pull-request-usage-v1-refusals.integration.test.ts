@@ -3,9 +3,9 @@
  * @integration
  *
  * The refusals the v1 pull-request usage door answers with, each on its own
- * stable code: an organization service key (no user) and a legacy project key
- * are turned away before anything is read, and a key from another
- * organization learns nothing about a pull request mapped elsewhere.
+ * stable code: a legacy project key is turned away before anything is read,
+ * and a key from another organization learns nothing about a pull request
+ * mapped elsewhere.
  *
  * Every refusal is asserted on its code rather than its sentence. The code is
  * the contract a CLI or an agent branches on; the sentence beside it is copy
@@ -43,21 +43,6 @@ afterAll(async () => {
 });
 
 describe("Feature: Pull request usage v1 REST API refusals", () => {
-  describe("given an organization service key created for no user", () => {
-    describe("when the usage is read", () => {
-      /** @scenario "An organization key with no bound user cannot read pull request usage" */
-      it("refuses with the user-bound key required code", async () => {
-        const res = await app.request(USAGE_PATH, {
-          headers: bearer({ token: fixture.serviceToken }),
-        });
-
-        expect(res.status).toBe(400);
-        const body = await res.json();
-        expect(body.code).toBe("user_bound_key_required");
-      });
-    });
-  });
-
   describe("given a legacy project API key", () => {
     describe("when the usage is read", () => {
       /** @scenario "A legacy project key cannot reach the v1 usage read" */

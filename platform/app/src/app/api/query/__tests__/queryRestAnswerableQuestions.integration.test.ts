@@ -1,7 +1,7 @@
 /**
  * The questions the LangWatchQL analytics SQL API exists to answer, each asked
- * through the public endpoint against a seed whose answer is known before the
- * query runs.
+ * through the public `POST /api/v1/query` REST door against a seed whose
+ * answer is known before the query runs.
  *
  * ## What makes a case here evidence
  *
@@ -32,6 +32,8 @@
  *
  * @see specs/analytics/lwql-api.feature
  * @see ~/server/analytics/lwql — the service under test
+ * @see ./queryRestApi.integration.test.ts — the request/isolation proof for this door
+ * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -692,7 +694,7 @@ async function seedTenant({
 
 // ---------------------------------------------------------------------------
 
-describe("given the LangWatchQL analytics SQL API and a seed with known answers", () => {
+describe("given the /api/v1/query REST door and a seed with known answers", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -704,6 +706,9 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
   let database: string;
   let facts: string;
 
+  /** The door every question below is asked through. */
+  const runPath = "/api/v1/query";
+
   const shippedService = () =>
     new LangWatchQLService({
       executor: createLangWatchQLExecutor({
@@ -714,29 +719,31 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       database,
     });
 
-  /** Runs SQL through the real endpoint, asserting it answered. */
+  /** POSTs a well-formed query and asserts it answered. */
   const ask = async (sql: string) => {
-    const response = await app.request(
-      `/api/v1/projects/${asking.id}/analytics/query/clickhouse`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Auth-Token": asking.apiKey,
-        },
-        body: JSON.stringify({ sql }),
+    const response = await app.request(runPath, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": asking.apiKey,
       },
-    );
+      body: JSON.stringify({ sql }),
+    });
     const body = (await response.json()) as Record<string, any>;
-    expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
-    return body;
+    if (response.status !== 200) {
+      throw new Error(`query failed: ${JSON.stringify(body)}`);
+    }
+    if (body.error !== undefined) {
+      throw new Error(`the query answered an error: ${JSON.stringify(body)}`);
+    }
+    return body as Record<string, any>;
   };
 
-  const codes = (body: Record<string, any>): string[] =>
-    body.diagnostics.map((diagnostic: any) => diagnostic.code);
+  const codes = (result: Record<string, any>): string[] =>
+    result.diagnostics.map((diagnostic: any) => diagnostic.code);
 
-  const diagnostic = (body: Record<string, any>, code: string) =>
-    body.diagnostics.find((entry: any) => entry.code === code);
+  const diagnostic = (result: Record<string, any>, code: string) =>
+    result.diagnostics.find((entry: any) => entry.code === code);
 
   /**
    * Row count the second tenant holds in a window, read as the administrator.
@@ -861,7 +868,9 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         promptId,
       })) {
         const result = await postgres.asAdmin(statement);
-        expect(result.exitCode, result.stderr).toBe(0);
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr);
+        }
       }
     }
 
@@ -908,7 +917,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
   describe("when latency percentiles by model in time buckets are asked for", () => {
     /** @scenario "Latency percentiles by model in time buckets" */
     it("answers the seeded 50th, 95th and 99th percentile for each model", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT toStartOfDay(OccurredAt) AS bucket,
                 arrayJoin(Models) AS model,
                 quantileExact(0.5)(TotalDurationMs) AS p50,
@@ -928,7 +937,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // so the comparison reads them as numbers rather than pinning the
       // encoding.
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.model,
           Number(row.p50),
           Number(row.p95),
@@ -939,7 +948,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         [SECOND_MODEL, 300, 300, 300, 10],
         [PRIMARY_MODEL, 100, 200, 5000, 50],
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
@@ -947,7 +956,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
     /** @scenario "Error rate versus the previous equivalent period" */
     it("answers both rates from the asking tenant's traces only", async () => {
       const current = `OccurredAt >= toDateTime64('${at(DAY.errorRateCurrent)}', 3)`;
-      const body = await ask(
+      const result = await ask(
         `SELECT countIf(${current}) AS current_traces,
                 countIf(${current} AND ContainsErrorStatus) AS current_errors,
                 countIf(NOT (${current})) AS previous_traces,
@@ -958,14 +967,14 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          WHERE ${within("OccurredAt", DAY.errorRatePrevious, 2)}`,
       );
 
-      expect(body.rows).toHaveLength(1);
-      expect(body.rows[0]).toMatchObject({
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toMatchObject({
         current_error_rate: 0.5,
         previous_error_rate: 0.2,
       });
-      expect(Number(body.rows[0].current_traces)).toBe(10);
-      expect(Number(body.rows[0].previous_traces)).toBe(10);
-      expect(codes(body)).toEqual([]);
+      expect(Number(result.rows[0].current_traces)).toBe(10);
+      expect(Number(result.rows[0].previous_traces)).toBe(10);
+      expect(codes(result)).toEqual([]);
     });
   });
 
@@ -973,7 +982,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
     /** @scenario "Rolling windows over trace metrics" */
     it("answers a one-hour rolling error rate over quarter-hour buckets", async () => {
       const oneHour = "ROWS BETWEEN 3 PRECEDING AND CURRENT ROW";
-      const body = await ask(
+      const result = await ask(
         `SELECT bucket,
                 errors,
                 traces,
@@ -995,20 +1004,20 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
 
       // Seeded errors per bucket are 0, 1, 2, 3 out of five traces each, so the
       // rolling rate walks 0/5, 1/10, 3/15 and 6/20 as the window fills.
-      expect(body.rows.map((row: any) => row.rolling_error_rate)).toEqual([
+      expect(result.rows.map((row: any) => row.rolling_error_rate)).toEqual([
         0, 0.1, 0.2, 0.3,
       ]);
-      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
+      expect(result.rows.map((row: any) => Number(row.traces))).toEqual([
         5, 5, 5, 5,
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
   describe("when cost is aggregated by model and prompt version", () => {
     /** @scenario "Cost by project, model, and prompt version" */
     it("answers the seeded spend for each model and prompt version of the asking project", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT TenantId AS project,
                 arrayJoin(Models) AS model,
                 LastUsedPromptVersionNumber AS prompt_version,
@@ -1020,7 +1029,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.model,
           Number(row.prompt_version),
           row.spend,
@@ -1031,10 +1040,10 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         [PRIMARY_MODEL, 2, 0.4],
       ]);
       // The project dimension is the tenant itself, and it is the asking one.
-      expect(new Set(body.rows.map((row: any) => row.project))).toEqual(
+      expect(new Set(result.rows.map((row: any) => row.project))).toEqual(
         new Set([asking.id]),
       );
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
 
     /**
@@ -1045,7 +1054,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
      */
     /** @scenario "Cost attributed to dimension names rather than identifiers" */
     it("answers the same spend attributed to project, model, and prompt names", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT p.ProjectName AS project,
                 arrayJoin(t.Models) AS model,
                 pr.PromptName AS prompt,
@@ -1065,7 +1074,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // The identical numbers the identifier-shaped question above returns,
       // now carrying the names a report would print.
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.project,
           row.model,
           row.prompt,
@@ -1084,7 +1093,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // answer above is right. See the report accompanying this change for the
       // noise this raises on healthy dimension joins.
       expect(
-        codes(body).every((code: string) => code !== "RESULT_TRUNCATED"),
+        codes(result).every((code: string) => code !== "RESULT_TRUNCATED"),
       ).toBe(true);
     });
   });
@@ -1093,7 +1102,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
     /** @scenario "Token and cost outliers" */
     it("returns the one seeded trace that costs far more than the median", async () => {
       const window = within("OccurredAt", DAY.outliers);
-      const body = await ask(
+      const result = await ask(
         `SELECT TraceId,
                 round(TotalCost, 4) AS cost,
                 TotalPromptTokenCount AS prompt_tokens
@@ -1107,13 +1116,13 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY cost DESC`,
       );
 
-      expect(body.rows).toHaveLength(1);
-      expect(body.rows[0]).toMatchObject({
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toMatchObject({
         TraceId: `${asking.id}-outlier-extreme`,
         cost: 5,
       });
-      expect(Number(body.rows[0].prompt_tokens)).toBe(50_000);
-      expect(codes(body)).toEqual([]);
+      expect(Number(result.rows[0].prompt_tokens)).toBe(50_000);
+      expect(codes(result)).toEqual([]);
     });
   });
 
@@ -1123,7 +1132,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // The pass rate is written as a ratio of two counts rather than with an
       // If-suffixed average: an aggregate's If suffix refuses a nullable
       // condition, and an evaluation that produced no verdict has none.
-      const body = await ask(
+      const result = await ask(
         `SELECT arrayJoin(t.Models) AS model,
                 t.LastUsedPromptVersionNumber AS prompt_version,
                 count() AS evaluations,
@@ -1138,7 +1147,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.model,
           Number(row.evaluations),
           row.mean_score,
@@ -1154,8 +1163,8 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // The evaluation measures asserted above are the fine grain and are not
       // multiplied — which is exactly the judgement the diagnostic leaves to
       // the reader rather than making itself.
-      expect(codes(body)).toEqual(["POSSIBLE_FANOUT"]);
-      expect(diagnostic(body, "POSSIBLE_FANOUT").meta).toMatchObject({
+      expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
+      expect(diagnostic(result, "POSSIBLE_FANOUT").meta).toMatchObject({
         dataset: `${database}.traces`,
         multipliedBy: `${database}.evaluations`,
       });
@@ -1165,7 +1174,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
   describe("when traces containing one operation before another are asked for", () => {
     /** @scenario "Traces containing operation A then operation B" */
     it("returns only the trace whose retrieval preceded its generation", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT TraceId
          FROM ${database}.spans
          WHERE ${within("StartTime", DAY.spanOrder)}
@@ -1176,17 +1185,17 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY TraceId`,
       );
 
-      expect(body.rows.map((row: any) => row.TraceId)).toEqual([
+      expect(result.rows.map((row: any) => row.TraceId)).toEqual([
         `${asking.id}-order-ab`,
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
   describe("when the elapsed time between two events in a trace is asked for", () => {
     /** @scenario "Time between two events in a trace" */
     it("answers the seeded five seconds, and its negative for the reversed trace", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT TraceId,
                 dateDiff('second',
                   minIf(StartTime, SpanName = 'retrieve'),
@@ -1201,7 +1210,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.TraceId,
           Number(row.retrieval_to_generation_seconds),
         ]),
@@ -1209,14 +1218,14 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         [`${asking.id}-order-ab`, 5],
         [`${asking.id}-order-ba`, -5],
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
   describe("when the first failure and first retry per trace are asked for", () => {
     /** @scenario "First failure and first retry per trace" */
     it("names the earliest failing operation and the retry that followed it", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT TraceId,
                 argMinIf(SpanName, StartTime, ifNull(StatusCode, 0) = 2) AS first_failure,
                 minIf(StartTime, ifNull(StatusCode, 0) = 2) AS first_failure_at,
@@ -1229,7 +1238,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.TraceId,
           row.first_failure,
           row.first_failure_at,
@@ -1252,7 +1261,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
           at(DAY.retries, 12, 20),
         ],
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
@@ -1263,7 +1272,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
      */
     /** @scenario "Run comparisons across simulation batches" */
     it("answers the seeded success rate and mean duration for each batch", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT BatchRunId AS batch,
                 count() AS runs,
                 round(countIf(ifNull(Verdict, '') = 'success') / count(), 4) AS success_rate,
@@ -1275,7 +1284,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       );
 
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.batch,
           Number(row.runs),
           row.success_rate,
@@ -1285,14 +1294,14 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         ["batch-1", 2, 0.5, 1500],
         ["batch-2", 2, 1, 600],
       ]);
-      expect(codes(body)).toEqual([]);
+      expect(codes(result)).toEqual([]);
     });
   });
 
   describe("when human annotations are compared against evaluator verdicts", () => {
     /** @scenario "Annotation-versus-evaluation agreement" */
     it("answers how often the human thumbs matched the evaluator's pass", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT count() AS compared,
                 countIf(a.IsThumbsUp = e.Passed) AS agreed,
                 round(countIf(a.IsThumbsUp = e.Passed) / count(), 4) AS agreement_rate
@@ -1301,7 +1310,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          WHERE ${within("e.ScheduledAt", DAY.evaluations)}`,
       );
 
-      const [row] = body.rows;
+      const [row] = result.rows;
       expect(
         Number(row.compared),
         "no annotation joined an evaluation — the agreement rate below would be over nothing",
@@ -1330,17 +1339,17 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         "the other tenant has no annotations — the isolation claim below is vacuous",
       ).toBeGreaterThan(0);
 
-      const body = await ask(
+      const result = await ask(
         `SELECT DISTINCT TenantId FROM ${database}.annotations`,
       );
-      expect(body.rows.map((row: any) => row.TenantId)).toEqual([asking.id]);
+      expect(result.rows.map((row: any) => row.TenantId)).toEqual([asking.id]);
     });
   });
 
   describe("when a trace-grain aggregate is taken after joining spans", () => {
     /** @scenario "Fanout warning on a trace-to-span join" */
     it("carries a fanout diagnostic naming the repeated dataset, and the numbers show it was right", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT t.TraceId AS trace,
                 sum(t.TotalDurationMs) AS summed_trace_duration_ms,
                 count() AS joined_rows
@@ -1352,8 +1361,8 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY trace`,
       );
 
-      const fanout = diagnostic(body, "POSSIBLE_FANOUT");
-      expect(codes(body)).toEqual(["POSSIBLE_FANOUT"]);
+      const fanout = diagnostic(result, "POSSIBLE_FANOUT");
+      expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout.meta).toMatchObject({
         dataset: `${database}.traces`,
         multipliedBy: `${database}.spans`,
@@ -1366,7 +1375,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
       // The evidence the diagnostic is not crying wolf: every seeded trace is
       // 1000 ms, and the join multiplies that by its span count.
       expect(
-        body.rows.map((row: any) => [
+        result.rows.map((row: any) => [
           row.trace,
           Number(row.summed_trace_duration_ms),
           Number(row.joined_rows),
@@ -1382,7 +1391,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
   describe("when a time-bucketed answer has an empty bucket inside its range", () => {
     /** @scenario "Missing time buckets diagnostic fires" */
     it("says how many buckets are missing and where the gap is", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT toStartOfHour(OccurredAt) AS bucket, count() AS traces
          FROM ${database}.traces
          WHERE ${within("OccurredAt", DAY.missingBuckets)}
@@ -1390,11 +1399,11 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
          ORDER BY bucket`,
       );
 
-      expect(body.rows.map((row: any) => Number(row.traces))).toEqual([
+      expect(result.rows.map((row: any) => Number(row.traces))).toEqual([
         1, 1, 1,
       ]);
-      expect(codes(body)).toEqual(["MISSING_TIME_BUCKETS"]);
-      expect(diagnostic(body, "MISSING_TIME_BUCKETS").meta).toMatchObject({
+      expect(codes(result)).toEqual(["MISSING_TIME_BUCKETS"]);
+      expect(diagnostic(result, "MISSING_TIME_BUCKETS").meta).toMatchObject({
         timeColumn: "bucket",
         missingBucketCount: 1,
         gapsAfter: [`${DAY.missingBuckets}T01:00:00.000Z`],
@@ -1402,7 +1411,7 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
     });
 
     it("says nothing about the same shape over a range with no gap in it", async () => {
-      const body = await ask(
+      const result = await ask(
         `SELECT toStartOfFifteenMinutes(OccurredAt) AS bucket, count() AS traces
          FROM ${database}.traces
          WHERE ${within("OccurredAt", DAY.rolling)}
@@ -1412,8 +1421,8 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
 
       // Four contiguous buckets, so the rule has a series to find holes in and
       // finds none — the control is not passing for want of an axis.
-      expect(body.rows).toHaveLength(4);
-      expect(codes(body)).toEqual([]);
+      expect(result.rows).toHaveLength(4);
+      expect(codes(result)).toEqual([]);
     });
   });
 
@@ -1441,12 +1450,12 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
         }),
       );
       try {
-        const body = await ask(sql);
+        const result = await ask(sql);
 
-        expect(body.rows).toHaveLength(3);
-        expect(codes(body)).toEqual(["INCOMPLETE_COMPARISON_PERIOD"]);
+        expect(result.rows).toHaveLength(3);
+        expect(codes(result)).toEqual(["INCOMPLETE_COMPARISON_PERIOD"]);
         expect(
-          diagnostic(body, "INCOMPLETE_COMPARISON_PERIOD").meta,
+          diagnostic(result, "INCOMPLETE_COMPARISON_PERIOD").meta,
         ).toMatchObject({
           reason: "unfinished_newest_period",
           newestPeriodStart: `${DAY.unfinishedPeriod}T12:00:00.000Z`,
@@ -1464,11 +1473,13 @@ describe("given the LangWatchQL analytics SQL API and a seed with known answers"
   describe("when a dataset is read with no condition on its time column", () => {
     /** @scenario "An unbounded read is reported as covering the whole history" */
     it("answers, says the read covered the whole history, and stays quiet once it is bounded", async () => {
-      const body = await ask(`SELECT count() AS value FROM ${database}.traces`);
+      const result = await ask(
+        `SELECT count() AS value FROM ${database}.traces`,
+      );
 
-      expect(Number(body.rows[0].value)).toBeGreaterThan(0);
-      expect(codes(body)).toEqual(["UNBOUNDED_TIME_RANGE"]);
-      expect(diagnostic(body, "UNBOUNDED_TIME_RANGE").meta).toEqual({
+      expect(Number(result.rows[0].value)).toBeGreaterThan(0);
+      expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);
+      expect(diagnostic(result, "UNBOUNDED_TIME_RANGE").meta).toEqual({
         dataset: `${database}.traces`,
         timeColumn: "OccurredAt",
       });

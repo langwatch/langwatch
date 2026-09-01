@@ -10,12 +10,14 @@
  * this deployment's honest answer is `lwql_unavailable`, which proves the
  * refusal was about the bucket arithmetic and not about the door.
  *
- * The family publishes the canonical error envelope, so the refusal is read at
- * `body.error.code` with its structured detail at `body.error.meta` — by code,
- * never by message prose.
+ * The family publishes this API's canonical error envelope at the top level,
+ * like every other REST family, so the refusal is read at `body.error.code`
+ * with its structured detail at `body.error.meta` — by code, never by message
+ * prose.
  *
  * @see specs/analytics/lwql-workbench.feature
  * @see ~/server/analytics/lwql/resolveTimeWindow.ts — the budget contract
+ * @see ./queryRestApi.integration.test.ts — the door's request and isolation proofs
  */
 
 import { nanoid } from "nanoid";
@@ -44,23 +46,22 @@ const GRANULARITY_SQL =
 /** Seven days, in seconds — the window every request below reports over. */
 const WEEK_SECONDS = 7 * 24 * 3600;
 
-describe("given the LangWatchQL REST query endpoint and the granularity budget", () => {
+describe("given the /api/v1/query REST endpoint and the granularity budget", () => {
   const ns = nanoid(8);
 
   let organization: Organization;
   let team: Team;
   let project: Project;
 
-  const queryPath = (p: Project) =>
-    `/api/v1/projects/${p.id}/analytics/query/clickhouse`;
+  const runPath = "/api/v1/query";
 
-  const post = async (
+  const call = async (
     body: Record<string, unknown>,
   ): Promise<{
     status: number;
     body: Body;
   }> => {
-    const response = await app.request(queryPath(project), {
+    const response = await app.request(runPath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -122,8 +123,8 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
 
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
     /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
-    it("is refused with the named code and the bucket arithmetic in the envelope's meta", async () => {
-      const { status, body } = await post({
+    it("is refused with the named code and the bucket arithmetic in the error meta", async () => {
+      const { status, body } = await call({
         sql: GRANULARITY_SQL,
         timeWindow: {
           start: "2026-02-20T00:00:00.000Z",
@@ -144,7 +145,7 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
 
   describe("when the same statement is run at an hour, which fits the ceiling", () => {
     it("gets past the budget gate and reaches the next gate instead", async () => {
-      const { status, body } = await post({
+      const { status, body } = await call({
         sql: GRANULARITY_SQL,
         timeWindow: {
           start: "2026-02-20T00:00:00.000Z",

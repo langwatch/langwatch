@@ -178,7 +178,7 @@ export const CodeAgentDataSchema = z.object({
    *
    * It can only SHORTEN the run: the code executor clamps every per-node
    * request to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 60s when unset), so a value
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset), so a value
    * above that ceiling is silently ignored. Absent leaves the engine on the
    * operator default.
    */

@@ -3,11 +3,15 @@
  *
  * The pull-request usage rollup answers an ORGANIZATION-wide question — what
  * one pull request cost across every project the CALLER may read — so this
- * door authenticates at the organization: an `sk-lw` user-bound API key alone,
- * with no `X-Project-Id` header and no project named anywhere. The legacy
- * `/api/coding-agent/pull-request-usage` route answers the same question but
- * recovers the calling user through their personal workspace's project id,
- * an indirection the key itself already makes unnecessary.
+ * door authenticates at the organization: an `sk-lw` organization API key
+ * alone, with no `X-Project-Id` header and no project named anywhere. Both
+ * key kinds are served: a user-bound key reads with its key ceiling
+ * intersected with its holder's access, and an organization SERVICE key —
+ * created for no user, the credential a CI job holds — reads with its own
+ * bindings alone. The legacy `/api/coding-agent/pull-request-usage` route
+ * answers the same question but recovers a calling user through their
+ * personal workspace's project id, an indirection the key itself already
+ * makes unnecessary.
  *
  * Built on `@langwatch/api` with org-key authentication in throwing mode, the
  * way the management families are, but with no Enterprise plan gate: this read
@@ -30,6 +34,7 @@ import type { Context } from "hono";
 import type { z } from "zod";
 import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import type { Organization } from "~/generated/prisma/client";
+import { managementActor } from "~/server/api/management/audit";
 import {
   registerMountedRoute,
   type ServiceEndpointMeta,
@@ -41,7 +46,6 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 
-import { requireUserBoundCaller } from "../../shared/user-bound-key";
 import {
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
@@ -76,9 +80,10 @@ const callerScopedRead = {
         "authenticated by the organization-key middleware; the handler then " +
         "resolves the caller's per-project permission cut " +
         "(resolveCallerProjectScope) intersected with the key's own binding " +
-        "ceiling (hasApiKeyPermission), so rows appear only for projects " +
-        "BOTH the key and its holder may view, and cost only where both may " +
-        "price",
+        "ceiling (hasApiKeyPermission): rows appear only for projects both " +
+        "the key and its holder may view, and cost only where both may " +
+        "price. A service key owns no user, so its bindings alone are the " +
+        "cut",
       permissions: ["traces:view", "cost:view"],
       credential: "apiKey",
     }),
@@ -97,21 +102,20 @@ const pullRequestUsageHandler = async (
   { query }: { query: UsageQuery },
 ) => {
   const organization = c.get("organization") as Organization;
-  // The rollup answers with whatever the CALLER may read, so it needs a
-  // person: an organization service key created for no user is refused here.
-  const callerUserId = requireUserBoundCaller({
-    apiKeyUserId: (c.get("apiKeyUserId") as string | null) ?? null,
-  });
+  // Null for an organization service key, which acts as nobody: the
+  // credential a CI job holds, served with its own bindings as the scope.
+  const callerUserId = (c.get("apiKeyUserId") as string | null) ?? null;
 
   // The same permission cut the in-app surfaces resolve, names included —
   // intersected with the KEY's own binding ceiling: a deliberately narrowed
-  // key must read with its own scope, never its holder's full one.
+  // key must read with its own scope, never its holder's full one, and a
+  // service key's bindings are the whole of its scope.
   const scope = await resolveCallerProjectScope({
     userId: callerUserId,
     organizationId: organization.id,
     apiKeyCeiling: {
       apiKeyId: c.get("apiKeyId") as string,
-      check: (check) => getApp().permissions.hasApiKeyPermission(check),
+      cuts: (query) => getApp().permissions.apiKeyProjectCuts(query),
     },
   });
 
@@ -128,9 +132,10 @@ const pullRequestUsageHandler = async (
   // before the answer leaves, so a read is never served unrecorded. Never the
   // contributors themselves: how many projects fed the rollup says how wide
   // the read reached without copying the names into a second store that
-  // outlives it.
+  // outlives it. A service key acts as nobody, so it is recorded as
+  // `apikey:<id>` — the same stable actor string the management audits use.
   await auditLog({
-    userId: callerUserId,
+    userId: managementActor(c),
     organizationId: organization.id,
     action: "codingAgents.pullRequestUsage",
     targetKind: "pullRequest",
@@ -165,9 +170,12 @@ export const app = service
           "only. Cost is calculated from the tokens the agent reported and " +
           "LangWatch's model prices, so it estimates spend rather than " +
           "restating a provider invoice. " +
-          "Authenticate with your own organization API key and nothing else: " +
-          "no project id is sent anywhere. Rows appear only for projects you " +
-          "may view, and cost only for those you may price.",
+          "Authenticate with an organization API key and nothing else: no " +
+          "project id is sent anywhere. A key created for you reads with " +
+          "your own access; an organization service key, such as one a " +
+          "continuous integration job holds, reads with the access its " +
+          "bindings grant. Rows appear only for projects the key may view, " +
+          "and cost only for those it may price.",
         docs: {
           summary: "Get pull request usage",
           operationId: "getPullRequestUsage",
