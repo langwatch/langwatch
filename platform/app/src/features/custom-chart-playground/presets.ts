@@ -79,6 +79,12 @@ const RUNAWAY_HTML = `<div>Busy-looping for 3 seconds — the watchdog should te
   console.log("survived the loop (watchdog missed)");
 </script>`;
 
+/** The SQL a freshly-created playground widget starts with. */
+export const STARTER_WIDGET_SQL = BUCKETED_TRACES_SQL;
+
+/** The author HTML a freshly-created playground widget starts with. */
+export const STARTER_WIDGET_HTML = FULL_TOUR_HTML;
+
 export const CHART_PLAYGROUND_PRESETS: readonly ChartPlaygroundPreset[] = [
   { name: "Full tour", sql: BUCKETED_TRACES_SQL, html: FULL_TOUR_HTML },
   {

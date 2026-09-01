@@ -28,3 +28,12 @@ export const BUILDER_CHART_KIND = "builder";
 
 /** The kind a saved LangWatchQL workbench chart carries. */
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
+
+/**
+ * The kind a persisted custom-chart-playground widget carries. Its `graph`
+ * column holds `{ srcdocHtml, sql }`: the author HTML rendered in a sandboxed
+ * frame and the LangWatchQL statement the parent executes on the frame's
+ * behalf. Filtered on by the playground's own reads, so a playground widget is
+ * never interpreted as a builder or workbench definition.
+ */
+export const PLAYGROUND_SRCDOC_CHART_KIND = "playground_srcdoc";

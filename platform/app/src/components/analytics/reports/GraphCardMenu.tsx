@@ -51,6 +51,11 @@ interface GraphCardMenuProps {
   isWorkbenchChart?: boolean;
   /** The step this workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
+  /**
+   * When present, Edit runs this instead of navigating to a chart editor
+   * route — used by surfaces (e.g. the playground) that edit a card in place.
+   */
+  onEdit?: () => void;
   onSizeChange: (size: SizeOption) => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
@@ -65,6 +70,7 @@ export function GraphCardMenu({
   rowSpan,
   isWorkbenchChart = false,
   granularitySeconds,
+  onEdit,
   onSizeChange,
   onGranularityChange,
   onDelete,
@@ -96,10 +102,19 @@ export function GraphCardMenu({
         <Menu.Item
           value="edit"
           onClick={() => {
+            if (onEdit) {
+              onEdit();
+              return;
+            }
             void router.push(editUrl);
           }}
         >
-          <Edit /> {isWorkbenchChart ? "Open in workbench" : "Edit Graph"}
+          <Edit />{" "}
+          {onEdit
+            ? "Edit"
+            : isWorkbenchChart
+              ? "Open in workbench"
+              : "Edit Graph"}
         </Menu.Item>
 
         <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>

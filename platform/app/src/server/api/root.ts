@@ -62,6 +62,7 @@ import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
 import { pinnedTraceRouter } from "./routers/pinnedTrace";
 import { planRouter } from "./routers/plan";
+import { playgroundWidgetsRouter } from "./routers/playgroundWidgets";
 import { presenceRouter } from "./routers/presence";
 import { projectRouter } from "./routers/project";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
@@ -115,6 +116,7 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  playgroundWidgets: playgroundWidgetsRouter,
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,

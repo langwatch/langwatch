@@ -1,0 +1,179 @@
+/**
+ * Persistence for custom-chart-playground widgets.
+ *
+ * A thin, project-scoped CRUD router over `CustomGraph` rows of kind
+ * {@link PLAYGROUND_SRCDOC_CHART_KIND}. Every read and write filters by that
+ * kind alongside `projectId`, so a playground widget is never read, updated or
+ * deleted through the builder or workbench paths — and neither of those ever
+ * sees a playground row. The `graph` column holds `{ srcdocHtml, sql }`.
+ *
+ * Deliberately independent of `graphs.ts`: the playground stores a sandboxed
+ * author document plus a raw statement, not a builder payload or a validated
+ * workbench definition, so it borrows the grid columns and nothing else.
+ */
+
+import { nanoid } from "nanoid";
+import { z } from "zod";
+
+import type { Prisma } from "~/generated/prisma/client";
+import { PLAYGROUND_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const layoutSchema = z.object({
+  gridColumn: z.number().min(0).max(1),
+  gridRow: z.number().min(0),
+  colSpan: z.number().min(1).max(2),
+  rowSpan: z.number().min(1).max(2),
+});
+
+const graphOf = (srcdocHtml: string, sql: string): Prisma.InputJsonValue => ({
+  srcdocHtml,
+  sql,
+});
+
+export const playgroundWidgetsRouter = createTRPCRouter({
+  list: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("analytics:view")
+    .query(async ({ ctx, input }) => {
+      return await ctx.prisma.customGraph.findMany({
+        where: {
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+        orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+      });
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        dashboardId: z.string().optional(),
+        name: z.string(),
+        srcdocHtml: z.string(),
+        sql: z.string(),
+      }),
+    )
+    .permission("analytics:create")
+    .mutation(async ({ ctx, input }) => {
+      // Next free row: one below the lowest playground widget in the project.
+      const last = await ctx.prisma.customGraph.findFirst({
+        where: {
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+        orderBy: { gridRow: "desc" },
+        select: { gridRow: true },
+      });
+
+      return await ctx.prisma.customGraph.create({
+        data: {
+          id: nanoid(),
+          projectId: input.projectId,
+          name: input.name,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          graph: graphOf(input.srcdocHtml, input.sql),
+          ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
+          gridColumn: 0,
+          gridRow: last ? last.gridRow + 1 : 0,
+          colSpan: 1,
+          rowSpan: 1,
+        },
+      });
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        id: z.string(),
+        name: z.string().optional(),
+        srcdocHtml: z.string(),
+        sql: z.string(),
+      }),
+    )
+    .permission("analytics:update")
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.customGraph.updateMany({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+        data: {
+          graph: graphOf(input.srcdocHtml, input.sql),
+          ...(input.name === undefined ? {} : { name: input.name }),
+        },
+      });
+      return { success: true };
+    }),
+
+  updateLayout: protectedProcedure
+    .input(
+      z
+        .object({ projectId: z.string(), graphId: z.string() })
+        .merge(layoutSchema),
+    )
+    .permission("analytics:update")
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.customGraph.updateMany({
+        where: {
+          id: input.graphId,
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+        data: {
+          gridColumn: input.gridColumn,
+          gridRow: input.gridRow,
+          colSpan: input.colSpan,
+          rowSpan: input.rowSpan,
+        },
+      });
+      return { success: true };
+    }),
+
+  batchUpdateLayouts: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        layouts: z.array(z.object({ graphId: z.string() }).merge(layoutSchema)),
+      }),
+    )
+    .permission("analytics:update")
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.$transaction(
+        input.layouts.map((layout) =>
+          ctx.prisma.customGraph.updateMany({
+            where: {
+              id: layout.graphId,
+              projectId: input.projectId,
+              kind: PLAYGROUND_SRCDOC_CHART_KIND,
+            },
+            data: {
+              gridColumn: layout.gridColumn,
+              gridRow: layout.gridRow,
+              colSpan: layout.colSpan,
+              rowSpan: layout.rowSpan,
+            },
+          }),
+        ),
+      );
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ projectId: z.string(), id: z.string() }))
+    .permission("analytics:delete")
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.customGraph.deleteMany({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+      });
+      return { success: true };
+    }),
+});

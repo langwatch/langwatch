@@ -32,6 +32,12 @@ export interface SandboxedChartFrameProps {
   params: ChartFrameParams;
   theme: ChartFrameTheme;
   onLog: (entry: ChartFrameLogEntry) => void;
+  /**
+   * Upper bound on the frame's rendered height, in px. Defaults to the
+   * protocol ceiling. A widget passes its card's row-span height so a taller
+   * card gives the chart more room without lifting the bridge's own clamp.
+   */
+  maxHeight?: number;
 }
 
 export function SandboxedChartFrame({
@@ -40,6 +46,7 @@ export function SandboxedChartFrame({
   params,
   theme,
   onLog,
+  maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
@@ -131,7 +138,7 @@ export function SandboxedChartFrame({
           display: "block",
           height: `${Math.max(
             CHART_FRAME_MIN_HEIGHT_PX,
-            Math.min(CHART_FRAME_MAX_HEIGHT_PX, height),
+            Math.min(Math.min(CHART_FRAME_MAX_HEIGHT_PX, maxHeight), height),
           )}px`,
         }}
       />
