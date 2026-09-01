@@ -410,6 +410,35 @@ describe("given a saved dataset", () => {
     });
   });
 
+  describe("when I edit a matching row so it no longer matches", () => {
+    /** @scenario A row edited so it no longer matches is not pulled out from under me */
+    it("leaves the row on screen rather than removing it under the cursor", async () => {
+      // Deliberate, not an oversight. Re-running the search on every settled
+      // save would take the row out from under the person still working in it,
+      // and strand any further edit to the same row — its grid position now
+      // belongs to a different record, which is what `selectedRows` and
+      // `rowData` address rows by. The grid answers the search as it was run.
+      updateMutate.mockImplementation(
+        (_args: unknown, opts: { onSuccess: () => void }) => opts.onSuccess(),
+      );
+      const user = userEvent.setup();
+      const requests = serveDataset(singlePageRecords);
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+
+      await typeSearch(user, "escalation");
+      await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
+      await screen.findByText("needs escalation");
+
+      await user.dblClick(screen.getByTestId("cell-0-input_0"));
+      const editor = await screen.findByRole("textbox");
+      await user.clear(editor);
+      await user.type(editor, "resolved{Enter}");
+
+      await waitFor(() => expect(updateMutate).toHaveBeenCalled());
+      expect(screen.getByText("resolved")).toBeInTheDocument();
+    });
+  });
+
   describe("when I clear the search", () => {
     /** @scenario Clearing the search restores the whole dataset */
     it("restores the whole dataset and the ways to add a row", async () => {

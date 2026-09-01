@@ -276,6 +276,21 @@ Feature: Dataset editor
       And I am on its first page
       And the record count reports that dataset's own size
 
+  Rule: A row edited out of its matches stays on screen
+
+    Editing a matching row so that it no longer contains the searched text
+    leaves it in the grid until the next search. The alternative is to remove it
+    the moment the edit saves, which takes the row out from under the cursor of
+    the person who is still working in it — and strands any further edit to the
+    same row, whose position in the grid has just been taken by another. The
+    grid answers the search as it was run; running it again re-answers it.
+
+    @integration
+    Scenario: A row edited so it no longer matches is not pulled out from under me
+      Given I have searched for "escalation"
+      When I edit the matching row so it no longer contains "escalation"
+      Then the row is still there with what I typed in it
+
   Rule: Search is offered for saved datasets only
 
     Search narrows a dataset by asking the server for the matching rows. A
