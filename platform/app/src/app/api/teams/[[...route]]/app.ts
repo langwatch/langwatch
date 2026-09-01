@@ -294,21 +294,7 @@ secured
       });
       if (!team) throw new TeamNotFoundError(id);
 
-      const projects = await prisma.project.findMany({
-        where: {
-          teamId: id,
-          archivedAt: null,
-          kind: { not: "internal_governance" },
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      const projects = await service.listProjects({ teamId: id });
 
       return c.json({ data: projects });
     },
