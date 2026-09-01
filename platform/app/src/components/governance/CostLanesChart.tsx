@@ -11,7 +11,12 @@ import {
   YAxis,
 } from "recharts";
 
-import { CHART_TOOLTIP_CONTENT, CHART_TOOLTIP_LABEL } from "./chartTheme";
+import {
+  CHART_AXIS_TICK,
+  CHART_GRID_STROKE,
+  CHART_TOOLTIP_CONTENT,
+  CHART_TOOLTIP_LABEL,
+} from "./chartTheme";
 import { formatLaneUsd } from "./costLaneFormat";
 
 /** The two lanes' colors. Fixed, so a lane keeps its color between renders. */
@@ -45,10 +50,14 @@ function LaneAreas({ series }: { series: readonly GovernanceCostDayDto[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={[...series]}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="day" tick={{ fontSize: 11 }} minTickGap={24} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          vertical={false}
+          stroke={CHART_GRID_STROKE}
+        />
+        <XAxis dataKey="day" tick={CHART_AXIS_TICK} minTickGap={24} />
         <YAxis
-          tick={{ fontSize: 11 }}
+          tick={CHART_AXIS_TICK}
           width={70}
           tickFormatter={(value: number) => formatLaneUsd(value)}
         />

@@ -31,3 +31,18 @@ export const CHART_TOOLTIP_LABEL = {
 export const CHART_TOOLTIP_CURSOR = {
   fill: "var(--chakra-colors-bg-muted)",
 } as const;
+
+/**
+ * Axis labels. Recharts defaults tick text to a fixed `#666`, which is dim
+ * against a dark panel and out of step with every other label on the page.
+ */
+export const CHART_AXIS_TICK = {
+  fontSize: 11,
+  fill: "var(--chakra-colors-fg-muted)",
+} as const;
+
+/**
+ * Grid lines. Left unset, recharts draws them in `#ccc` — on a dark panel that
+ * reads as bright dashes across the data.
+ */
+export const CHART_GRID_STROKE = "var(--chakra-colors-border)";

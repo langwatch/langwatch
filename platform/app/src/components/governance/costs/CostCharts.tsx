@@ -22,6 +22,8 @@ import {
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 import {
+  CHART_AXIS_TICK,
+  CHART_GRID_STROKE,
   CHART_TOOLTIP_CONTENT,
   CHART_TOOLTIP_CURSOR,
   CHART_TOOLTIP_LABEL,
@@ -29,14 +31,8 @@ import {
 
 import type { DailyBucket, RankRow } from "./sampleSeries";
 
-// Chakra tokens rather than fixed greys: a light grid stroke reads as bright
-// white dashes across a dark panel, and the axis labels drift out of step with
-// every other label on the page.
-const AXIS_TICK = {
-  fontSize: 11,
-  fill: "var(--chakra-colors-fg-muted)",
-} as const;
-const GRID_STROKE = "var(--chakra-colors-border)";
+const AXIS_TICK = CHART_AXIS_TICK;
+const GRID_STROKE = CHART_GRID_STROKE;
 
 /** Compact above a thousand, exact below it. Money is read, not audited, here. */
 function fmtMoney(value: number): string {
