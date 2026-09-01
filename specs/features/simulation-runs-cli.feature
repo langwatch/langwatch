@@ -92,3 +92,32 @@ Feature: Simulation Run CLI Commands
     When I run "langwatch simulation-run list --format json"
     Then each run carries a "note" field and a "scenarioVersion" field
     And raw run metadata is not part of the output
+
+  # ============================================================================
+  # Status and name filters follow the cursor
+  # ============================================================================
+  # The listing pages by batch, so one page can hold no run that matches a
+  # status or name filter while later pages do. Filtering one page and
+  # reporting it empty reads as "no failed runs" when failed runs exist.
+
+  @unit
+  Scenario: A status filter follows the cursor instead of reporting an empty page
+    Given the first page of runs holds no failed run and more pages exist
+    And a later page holds a failed run
+    When I run "langwatch simulation-run list --status FAILED"
+    Then the CLI follows the cursor until a page holds a match
+    And I see the failed run
+
+  @unit
+  Scenario: An exhausted status filter says what it scanned
+    Given no run matches the status filter in any reachable page
+    When I run "langwatch simulation-run list --status FAILED"
+    Then the message names the filter and how many runs were scanned
+    And the message does not claim the project has no simulation runs
+
+  @unit
+  Scenario: A refused page size is reported as a validation error, not as a network error
+    When I run "langwatch simulation-run list --limit 200"
+    Then the failure carries the code "validation_error" at status 422
+    And the reasons name the limit field and its maximum
+    And no suggestion tells me to check my network
