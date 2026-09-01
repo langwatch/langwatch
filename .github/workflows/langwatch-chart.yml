@@ -194,6 +194,16 @@ jobs:
         if: "!cancelled()"
         run: ./tests/stored-objects-upgrade-ordering.sh
 
+      # Design C rests on one Secret name resolving identically on both sides:
+      # the app reads the langwatch_lwql password from exactly the Secret the
+      # ClickHouse pod mounts to create that identity. The two names come from
+      # two different helpers, only guaranteed equal by shared values — a
+      # divergence is invisible in the source and breaks every LWQL query. Also
+      # pins the chart's default autogen-off posture, which no preset exercises.
+      - name: "assert LWQL query Secret matches the ClickHouse-mounted Secret"
+        if: "!cancelled()"
+        run: ./tests/lwql-secret-parity.sh
+
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,
   # migration postures, validation failures). They normally run inside the
