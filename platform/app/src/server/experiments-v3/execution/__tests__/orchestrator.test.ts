@@ -835,7 +835,7 @@ describe("orchestrator", () => {
     // narrowed to a field by variantOutputPaths, or serialized.
     describe("given a variant whose output is structured", () => {
       const structuredState = (variantOutputPaths?: Record<string, string[]>) => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.targets.push({
           id: "comparison-target",
           type: "evaluator",
@@ -1262,12 +1262,10 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>(
-        [
-          ["prompt_A", { handle: "say-hi" } as never],
-          ["prompt_B", { handle: "be-formal" } as never],
-        ],
-      );
+      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>([
+        [promptLoadKey({ promptId: "prompt_A" }), { handle: "say-hi" } as never],
+        [promptLoadKey({ promptId: "prompt_B" }), { handle: "be-formal" } as never],
+      ]);
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,
         state,
@@ -1312,9 +1310,9 @@ describe("orchestrator", () => {
           includeMetrics: [],
         },
       });
-      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>(
-        [["prompt_X", { handle: "shared-handle" } as never]],
-      );
+      const loadedPrompts = new Map<string, { handle: string } & Record<string, unknown>>([
+        [promptLoadKey({ promptId: "prompt_X" }), { handle: "shared-handle" } as never],
+      ]);
 
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,

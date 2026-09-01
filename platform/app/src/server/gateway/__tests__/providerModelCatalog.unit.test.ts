@@ -7,7 +7,7 @@ describe("declaredModelsForProvider", () => {
     it("declares the customer's own model ids", () => {
       const declared = declaredModelsForProvider({
         provider: "custom",
-        customModels: [{ modelId: "stealth/ox-alpha", displayName: "Ox" }],
+        customModels: [{ modelId: "stealth/ox-alpha", displayName: "Ox", mode: "chat" }],
         customEmbeddingsModels: null,
       });
 

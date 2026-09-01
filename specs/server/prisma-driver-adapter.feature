@@ -51,8 +51,10 @@ Feature: Postgres access through the Prisma driver adapter
     Given a module that imports "~/server/db"
     When the module is imported
     Then no Prisma client (and no pg pool) is constructed
-    When a property of the exported client is first accessed
-    Then exactly one guarded client is constructed and reused thereafter
+    When a property of the exported client is accessed before composition
+    Then still nothing is constructed, and the access is refused
+    When the composition root supplies the one process connection
+    Then every access delegates to that client and constructs nothing of its own
 
   @unimplemented @unit
   Scenario: A composition root constructs and owns the Prisma client explicitly

@@ -44,7 +44,13 @@ import { resetAzureTokenCacheForTests } from "../azure-token-provider";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { maybeAzureDriver } from "../stored-objects-factory";
 
-const datasetStorageResolver = new AppDatasetStorageResolver();
+// The resolver owns an S3 client manager as well as the Azure one, and it
+// refuses to construct without a process-owned AWS builder. Nothing below
+// reaches the S3 arm — every assertion is on the Azure destination — so the
+// builder is a stub rather than a real transport graph.
+const datasetStorageResolver = new AppDatasetStorageResolver({
+  buildS3ClientConfig: () => ({}),
+});
 
 /** A keyless install: identity mode, and no account key anywhere. */
 function configureWorkloadIdentity() {

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../../license-enforcement/errors";
+import { TestMailer } from "../../mailer/__tests__/mailer.test-double";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {
   classifyInvitesByMemberType,
@@ -190,6 +191,10 @@ describe("InviteService", () => {
       mockPlanProvider,
       undefined,
       ledger as unknown as AuthzGrantsService,
+      // The service sends through an injected delivery port and returns
+      // "not sent" without one, so a suite that asserts on the invite mail
+      // has to supply it. `sendInviteEmail` itself is still mocked above.
+      new TestMailer(),
     );
   });
 

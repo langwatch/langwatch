@@ -210,7 +210,7 @@ export const generateCells = (
   } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
-  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
 
   // Handle evaluator-all-rows scope - run one evaluator across all rows with existing target outputs
   if (scope.type === "evaluator-all-rows") {
@@ -586,7 +586,7 @@ export const generateComparisonCells = ({
 }): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
-  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
   const rowsInScope = scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
 
   /**

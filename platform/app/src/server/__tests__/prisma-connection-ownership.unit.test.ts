@@ -34,6 +34,16 @@ describe("Prisma process ownership", () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * The whole of what `~/server/db` promises after ADR-111: it constructs
+   * nothing, ever. The module holds no value import of the generated client
+   * (only `import type`), so there is no constructor here to observe firing —
+   * the refusal below is the observable form of "nothing was built".
+   * `@langwatch/prisma-client`'s own `import-side-effects.test.ts` pins the
+   * other half: importing the package that DOES own construction builds no
+   * client, adapter or pool either.
+   */
+  /** @scenario Importing the db module does not construct a client */
   it("does not construct a connection before executable composition", () => {
     expect(() => prisma.project).toThrow(
       "Prisma connection has not been composed for this process",

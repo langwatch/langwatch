@@ -70,7 +70,27 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 }));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
-vi.mock("../../app", () => ({ tryGetApp: () => null }));
+// The authorization-engine migration reaches the cohort through the App
+// (`registeredMigrations` reads `tryGetApp()?.authzMigration`), so a process
+// answering null registers nothing and every assertion about a migration that
+// "declares itself automatic" would read false against an empty registry. The
+// declaration itself is pinned where it is written -
+// packages/features/authz/server/src/migrations/__tests__/legacy-import.authz-grant.migration.unit.test.ts
+// asserts `enrolledAutomatically` is true - so what this suite owns is only
+// what the COHORT does with such a declaration.
+vi.mock("../../app", () => ({
+  tryGetApp: () => ({
+    authzMigration: {
+      name: AUTHZ_ENGINE_MIGRATION_NAME,
+      title: "Authorization engine",
+      description: "Moves an organization onto the authorization engine.",
+      requiresOperatorConfirmation: true,
+      runsAutomaticallyOnSelfHosted: true,
+      enrolledAutomatically: true,
+      migrateTenant: async () => ({ status: "migrated" as const, report: {} }),
+    },
+  }),
+}));
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {

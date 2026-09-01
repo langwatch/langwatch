@@ -15,6 +15,7 @@
  * input, resolves no scope, and would never reach the authorization service —
  * `permissionsAsked` would come back empty while every guard stayed green.
  */
+import { EvaluatorApp } from "@langwatch/evaluator-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { permissionsAsked, monitors, evaluations, evaluators, prisma } = vi.hoisted(() => ({
@@ -63,6 +64,16 @@ vi.mock("~/server/app-layer/app", () => ({
     monitors,
     evaluations,
     evaluators,
+    // The evaluator procedures reach their work through the feature's
+    // application, not through the raw service. Composed for real over the
+    // stubbed service above: the second permission probe several of them make
+    // happens INSIDE the handler, after a call on this object, so an absent
+    // facet turns those rows into a green assertion about the declared check
+    // alone.
+    evaluatorApp: EvaluatorApp.create({
+      evaluators: evaluators as never,
+      modelProviders: {} as never,
+    }),
     permissions: {
       getDecision: async ({ permission }: { permission: string }) => {
         permissionsAsked.push(permission);
