@@ -27,11 +27,16 @@ resources:
 # Deployment environment reported to the manager as ENVIRONMENT (surfaced via the
 # ConfigMap). Empty (the default) inherits the umbrella's global.env, which itself
 # defaults to "production"; a standalone install with no global falls back to
-# "production" too. This value is SECURITY-LOAD-BEARING: the manager refuses to
-# honour LANGY_UNSAFE_DEV_DISABLE_ISOLATION (the local-dev per-worker UID-isolation
-# bypass) unless ENVIRONMENT is a local-like value, so a prod pod MUST report a
-# production environment for that refusal to fire. Only set this to a local-like
-# value ("local"/"dev"/"development"/"test") for a throwaway dev cluster.
+# "production" too.
+#
+# This was SECURITY-LOAD-BEARING until ADR-130 and is not any more, which is
+# worth stating rather than quietly deleting. The manager used to refuse the
+# per-worker-UID bypass unless ENVIRONMENT named a local-like environment, so a
+# prod pod had to report a production environment for that refusal to fire.
+# There is no such refusal now: `workerIsolation` below is where the posture is
+# chosen, gated by an acknowledgement in this file rather than by a value that
+# telemetry and log routing also read. Do not rely on this field to hold any
+# boundary — the manager reads it for labelling only.
 environment: ""
 
 # Manager tunables (read by services/langyagent/config.go). Surfaced via the ConfigMap.

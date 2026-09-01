@@ -32,25 +32,27 @@ export async function monobinarySupportsLangyagent(binary: string): Promise<bool
   }
 }
 
-// The manager only accepts running workers without per-worker isolation in a
-// local-like environment (services/langyagent/config.go enforces this on its
-// side too). Mirroring the check here means a .env edited to a production-like
-// ENVIRONMENT never even asks for the unsafe mode.
+// Which environments this installer will ask for shared-identity workers in.
+// The manager no longer refuses the posture outside a local-like ENVIRONMENT —
+// ADR-130 made it an operator's choice, acknowledged in a values file — so this
+// set is now the only thing standing between a .env edited to a production-like
+// ENVIRONMENT and a silently weaker install. It selects a posture rather than
+// mirroring a refusal, which is why it stays.
 const UNSAFE_ISOLATION_ENVIRONMENTS = new Set(["local", "development", "dev", "test"]);
 
 /**
- * The Langy assistant's manager, the process that owns one opencode worker
- * per conversation. Same `cmd/service` mono-binary as the gateway and the NLP
+ * The Langy assistant's manager, the process that owns one worker per
+ * conversation. Same `cmd/service` mono-binary as the gateway and the NLP
  * engine, dispatched as `langyagent`, so the assistant adds no download of its
- * own beyond the opencode runtime predep.
+ * own.
  *
  * Health: /health.
  *
  * WHAT IS DIFFERENT ABOUT A LAPTOP. In a cluster this pod runs under a
  * sandboxed container runtime, as root, handing every conversation's worker
  * its own UID, because there the workers belong to different people and a
- * prompt-injected one must not be able to read a colleague's credentials off
- * disk. Here there is one person, on their own machine, and each worker
+ * prompt-injected one must not be able to read a colleague's live credentials
+ * out of /proc. Here there is one person, on their own machine, and each worker
  * already runs as them with their own credentials. The UID handoff would need
  * root to perform, so demanding it would mean asking someone to run their
  * laptop install as root in order to isolate them from themselves. We run
@@ -92,17 +94,19 @@ export async function startLangyagent(
         PORT: String(ctx.ports.langyagent),
         SESSIONS_ROOT: sessionsRoot,
         LANGY_WORKSPACE_ROOT: workspaceRoot,
-        // Workers spawn as the user who ran the installer. Only asked for in
-        // a local-like ENVIRONMENT (the scaffolded .env's default); the
-        // manager refuses it anywhere else, and we do not ask.
-        ...(isLocalLike ? { LANGY_UNSAFE_DEV_DISABLE_ISOLATION: "true" } : {}),
-        // Each worker is an opencode process holding a real conversation; two
-        // at a time is as much as a laptop should be asked to hold, and idle
-        // ones are reaped quickly so a finished conversation stops costing
-        // memory. Production's ceilings are much higher and set in the chart.
+        // Workers spawn as the user who ran the installer, sharing one
+        // identity. A laptop install is single-tenant by construction, and the
+        // per-uid posture needs root plus five capabilities it does not have.
+        // Only asked for in a local-like ENVIRONMENT; elsewhere we leave the
+        // variable unset and the manager defaults to per-uid (ADR-130).
+        ...(isLocalLike ? { LANGY_WORKER_ISOLATION: "none" } : {}),
+        // Each worker is a process holding a real conversation; two at a time
+        // is as much as a laptop should be asked to hold, and idle ones are
+        // reaped quickly so a finished conversation stops costing memory.
+        // Production's ceilings are much higher and set in the chart.
         LANGY_MAX_WORKERS: envFromFile.LANGY_MAX_WORKERS ?? "2",
         LANGY_WORKER_IDLE_MS: envFromFile.LANGY_WORKER_IDLE_MS ?? "120000",
-        // opencode and the `langwatch` CLI both live in ~/.langwatch/bin; the
+        // The worker binary and the `langwatch` CLI both live in ~/.langwatch/bin; the
         // workers inherit exactly this PATH (the manager's allowlist passes it
         // through), which is how their tool calls resolve.
         PATH: [ctx.paths.bin, process.env.PATH ?? ""].filter(Boolean).join(delimiter),

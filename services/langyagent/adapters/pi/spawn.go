@@ -31,7 +31,7 @@ const (
 // the forward, regardless of the value sent.
 const mediatedLLMPlaceholderKey = "langy-mediated"
 
-// defaultModel is what a turn that names no model runs on.
+// defaultModel is the model for a turn naming none.
 const defaultModel = "openai/gpt-5-mini"
 
 // ProvisionInput is everything Provision needs to lay down a worker's home.
@@ -202,8 +202,8 @@ func provisionSessionDir(in ProvisionInput) error {
 }
 
 // Provision creates a per-worker home with the wrapper's config file, the
-// substituted AGENTS.md, and the pi session dir. Isolation ordering: every
-// directory is chown'd (via the runner) to the
+// substituted AGENTS.md, and the pi session dir. The isolation ordering is
+// load-bearing: every directory is chown'd (via the runner) to the
 // per-conversation UID and chmod'd 0700/0600 BEFORE per-worker material lands,
 // so a sibling worker (a different UID) can never open(2) this worker's files.
 // The config file itself carries no secret (env var NAMES only) but is owned

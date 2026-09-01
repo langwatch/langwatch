@@ -135,7 +135,7 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
   # refused unless acknowledged in their own values file, and announced by the
   # manager at startup. That is the opposite of quiet, which is why it does not
   # contradict the scenario above.
-  @e2e @unimplemented
+  @e2e
   Scenario: An operator on a non-root cluster can choose the assistant anyway
     Given a cluster that forbids running as root
     And an operator who has accepted the reduced isolation on the record

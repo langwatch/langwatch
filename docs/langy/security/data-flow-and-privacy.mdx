@@ -19,7 +19,7 @@ A Langy conversation sends data to at most three destinations. Two of them are y
 flowchart TD
     U[You, in the LangWatch UI] --> CP[LangWatch control plane]
     CP -->|LANGY_INTERNAL_SECRET bearer, ClusterIP| AG[Langy agent pod]
-    AG --> W[One gVisor-sandboxed worker per conversation]
+    AG --> W[One isolated worker per conversation]
 
     W -->|langwatch CLI, per-session caller-scoped key| API[LangWatch API]
     W -->|LLM traffic via per-project virtual key| GW[LangWatch AI Gateway]

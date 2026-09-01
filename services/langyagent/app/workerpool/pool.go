@@ -1073,7 +1073,7 @@ func (p *Pool) kill(conversationID, reason string) {
 	)
 	if w.cmd != nil && w.cmd.Process != nil {
 		// Signal the WHOLE process group, not just the worker's leader pid.
-		// The spawn sets Setpgid: true, so the worker + every child it shelled
+		// The runner sets Setpgid: true, so the worker + every child it shelled
 		// out to (`gh`, `git`, `npm`, `gh auth git-credential fill`) share one
 		// pgid == leader pid. Without `-pgid`, a kill against the leader leaves
 		// the children reparented to PID 1 (the manager) holding the user's

@@ -17,8 +17,8 @@ func TestCommandContext_ExecutesBinaryDirectly(t *testing.T) {
 	}
 }
 
-// SysProcAttr must omit the setuid Credential (the worker runs as the manager's own
-// user) but keep Setpgid so the manager can group-signal it on shutdown.
+// SysProcAttr must omit the setuid Credential (the worker runs as the manager's
+// own user) but keep Setpgid so the manager can group-signal it on shutdown.
 func TestSysProcAttr_NoCredentialButProcessGroup(t *testing.T) {
 	attr := Runner{}.SysProcAttr(2345)
 	if attr.Credential != nil {
