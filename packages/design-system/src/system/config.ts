@@ -1,7 +1,7 @@
 /**
  * Theme system definition for LangWatch.
  * This file only exports the Chakra UI `system` — the app shell (providers,
- * routing, NProgress) now lives in src/AppProviders.tsx and src/main.tsx.
+ * routing, NProgress) lives in `@langwatch/ui`'s `ui/sections`.
  */
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode";

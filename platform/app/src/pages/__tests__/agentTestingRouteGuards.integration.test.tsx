@@ -139,7 +139,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
-import { legacyRedirectRoutes } from "~/legacyRedirects";
+import { uiLegacyRedirectRoutes } from "@langwatch/ui";
 import AgentTestingRoute from "../[project]/agent-testing/[[...path]]";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -227,8 +227,8 @@ describe("the Agent Testing address", () => {
       }
 
       // And no legacy redirect sends a simulations address there either.
-      for (const route of legacyRedirectRoutes) {
-        expect(route.path ?? "").not.toContain("agent-testing");
+      for (const route of uiLegacyRedirectRoutes) {
+        expect(route.path).not.toContain("agent-testing");
       }
     });
   });

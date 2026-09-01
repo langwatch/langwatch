@@ -6,9 +6,9 @@
  *
  * In the new navigation modes the settings menu is the ONLY place the
  * ops pages are offered: the product sidebars carry no ops section any
- * more. So a page that lands in `routes.tsx` and not in `opsGroup()` or
- * `backofficeGroup()` has no entry anywhere, and nothing else would say
- * so. `routes.tsx` is a hand-maintained table, and the menu is a second
+ * more. So a page that lands in the route table and not in `opsGroup()`
+ * or `backofficeGroup()` has no entry anywhere, and nothing else would
+ * say so. The route table is hand-maintained, and the menu is a second
  * hand-maintained table, which is exactly the pair that drifts.
  *
  * "Reachable" is read from the menu data itself rather than from a list
@@ -16,12 +16,9 @@
  * covers: an entry claims its own address, everything under its prefix,
  * and the addresses it names in `alsoActiveAt`.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { uiRouteDescriptors, uiRouteTable } from "@langwatch/ui";
 import { describe, expect, it } from "vitest";
 import { backofficeGroup, opsGroup, type SettingsMenuGroup } from "../useSettingsMenu";
-
-const ROUTES_PATH = path.join(__dirname, "../../../routes.tsx");
 
 /**
  * Every `/ops` address the route table registers. Parameter segments are
@@ -29,8 +26,9 @@ const ROUTES_PATH = path.join(__dirname, "../../../routes.tsx");
  * that lists it rather than from the menu.
  */
 function registeredOpsRoutes(): string[] {
-  const source = readFileSync(ROUTES_PATH, "utf-8");
-  const paths = [...source.matchAll(/\bpath:\s*"([^"]+)"/g)].map((m) => m[1]!);
+  const paths = uiRouteDescriptors(uiRouteTable)
+    .map((descriptor) => descriptor.path)
+    .filter((declared): declared is string => declared !== void 0);
   return [
     ...new Set(
       paths
@@ -62,8 +60,8 @@ describe("given the internal ops pages the route table registers", () => {
   const addresses = registeredOpsRoutes();
   const menu = [opsGroup(), backofficeGroup()];
 
-  // Both readings are of hand-maintained tables, so a rename that stops
-  // one matching would otherwise leave a test passing on nothing at all.
+  // Both sides are hand-maintained tables, so a rename that empties one of
+  // them would otherwise leave a test passing on nothing at all.
   it("finds the ops routes and the menu entries", () => {
     expect(addresses.length).toBeGreaterThanOrEqual(10);
     expect(addresses).toContain("/ops");

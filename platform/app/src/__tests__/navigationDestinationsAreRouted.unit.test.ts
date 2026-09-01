@@ -3,7 +3,7 @@
  *
  * Spec: specs/navigation/destination-route-registration.feature
  *
- * `routes.tsx` is a hand-maintained table, not filesystem routing, so adding a
+ * The route table is hand-maintained, not filesystem routing, so adding a
  * page under `src/pages/` and linking to it are two edits — and the third,
  * registering the route, is the one nothing complains about. That is how the
  * Ops -> Migrations link shipped in #7079 pointing at a page nobody could open:
@@ -17,6 +17,9 @@
  *     `PageMenuLink` turns into an href via `projectScopedDestination`. Those
  *     are data, so they are imported rather than scanned.
  *
+ * The route table itself is data too, since it moved into `@langwatch/ui`: the
+ * patterns are read off the descriptors rather than regexed out of a file.
+ *
  * The first cut of this test checked only the literals while describing itself
  * as covering every link — so it shipped claiming 56 more destinations than it
  * actually looked at (#7113 review).
@@ -28,6 +31,7 @@
  * and hands back the route that would actually render, which is the only
  * answer worth asserting on.
  */
+import { uiRouteDescriptors, uiRouteTable } from "@langwatch/ui";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { matchRoutes } from "react-router";
@@ -35,7 +39,6 @@ import { describe, expect, it } from "vitest";
 import { projectRoutes } from "~/utils/routes";
 
 const MAIN_MENU_PATH = path.join(__dirname, "../components/MainMenu.tsx");
-const ROUTES_PATH = path.join(__dirname, "../routes.tsx");
 
 /** The pattern the router falls back to when nothing else claims a path. */
 const CATCH_ALL = "*";
@@ -53,13 +56,15 @@ function menuHrefLiterals(): string[] {
 }
 
 /**
- * Every `path: "..."` the route table declares, as a flat list. The real table
- * nests, but every path in it is absolute, so a flat list of the same strings
- * ranks identically — nesting only matters for joining relative segments.
+ * Every path the route table declares, as a flat list. The real table nests,
+ * but every path in it is absolute, so a flat list of the same strings ranks
+ * identically — nesting only matters for joining relative segments. A layout
+ * route declares no path of its own and contributes nothing here.
  */
 function routePatterns(): string[] {
-  const source = readFileSync(ROUTES_PATH, "utf-8");
-  return [...source.matchAll(/\bpath:\s*"([^"]+)"/g)].map((m) => m[1]!);
+  return uiRouteDescriptors(uiRouteTable)
+    .map((descriptor) => descriptor.path)
+    .filter((declared): declared is string => declared !== void 0);
 }
 
 /** `projectRoutes` writes Next-style `[param]`; the router speaks `:param`. */
@@ -114,8 +119,9 @@ const hrefLiterals = menuHrefLiterals();
 const declaredPaths = Object.values(projectRoutes).map((route) => route.path);
 
 describe("given the destinations the app can navigate to", () => {
-  // Two of the three inputs are regexes over source, so a rename that stops
-  // one matching would otherwise leave a test that passes by finding nothing.
+  // The menu links are still read as source literals, so a rename that stops
+  // that regex matching would otherwise leave a test that passes by finding
+  // nothing.
   it("finds the menu links, the declared routes, and the route table", () => {
     expect(hrefLiterals.length).toBeGreaterThanOrEqual(5);
     expect(declaredPaths.length).toBeGreaterThan(0);

@@ -1,3 +1,9 @@
+import {
+  uiRouteDescriptors,
+  uiRouteTable,
+  type UiPageRouteDescriptor,
+  type UiRouteDescriptor,
+} from "@langwatch/ui";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -9,7 +15,7 @@ import { describe, expect, it } from "vitest";
  * shipped: it named the layout as `withPermissionGuard`'s `layoutComponent`,
  * which frames only the refusal a reader without the permission sees.
  *
- * The list comes from the routes table rather than a directory listing, so a
+ * The list comes from the route table rather than a directory listing, so a
  * new settings page is covered the moment it is reachable, and the component
  * files that sit next to the pages are left out.
  *
@@ -17,33 +23,34 @@ import { describe, expect, it } from "vitest";
  */
 const SOURCE_ROOT = join(__dirname, "..", "..", "..");
 
-const routesSource = readFileSync(join(SOURCE_ROOT, "routes.tsx"), "utf-8");
-
 /**
- * Every `/settings` route in the table, as the module path it loads.
+ * Every `/settings` route in the table, as the page key it loads.
  *
- * The table is cut into one chunk per route first, so a route can only be
- * paired with the module named inside its own entry, and one that names none
- * throws rather than borrowing the next route's.
+ * A retired `/settings` address that forwards elsewhere renders no page and
+ * frames nothing, so it is not one of these. A `/settings` route that names
+ * a page outside `pages/settings` throws rather than being skipped quietly.
  */
 function registeredSettingsPageModules(): string[] {
-  return routesSource
-    .split(/path:\s*"/)
-    .slice(1)
-    .filter((entry) => entry.startsWith("/settings"))
-    .map((entry) => {
-      const address = entry.slice(0, entry.indexOf('"'));
-      const module = /import\("\.\/(pages\/settings[^"]*)"\)/.exec(entry);
-      if (!module) {
-        throw new Error(`The route ${address} names no page module`);
+  return uiRouteDescriptors(uiRouteTable)
+    .filter((descriptor: UiRouteDescriptor) => descriptor.path?.startsWith("/settings") === true)
+    .filter((descriptor): descriptor is UiPageRouteDescriptor => !("redirect" in descriptor))
+    .map((descriptor) => {
+      if (!descriptor.page.startsWith("pages/settings")) {
+        throw new Error(
+          `The route ${String(descriptor.path)} names ${descriptor.page}, which is not a settings page`,
+        );
       }
-      return module[1]!;
+      return descriptor.page;
     });
 }
 
-/** The same routes counted a second way, to hold the reading above to it. */
+/**
+ * The same routes counted a second way — over the serialised table rather
+ * than the walk above — so a walk that silently drops a branch disagrees with
+ * a flat read of the same data.
+ */
 function declaredSettingsRouteCount(): number {
-  return (routesSource.match(/path:\s*"\/settings/g) ?? []).length;
+  return (JSON.stringify(uiRouteTable).match(/"path":"\/settings[^"]*","page"/g) ?? []).length;
 }
 
 /** Where a route's module specifier lives on disk. */
@@ -62,8 +69,9 @@ describe("the pages under /settings", () => {
 
   describe("when the routes table is read", () => {
     it("finds every settings page, so the check below covers them all", () => {
-      // Both counts come from the table but are read differently, so a page
-      // the reading above drops is a page these two disagree about. The floor
+      // Both counts come from the table but are read differently — a
+      // structural walk and a flat read of the serialised data — so a page
+      // one of them drops is a page these two disagree about. The floor
       // catches the case where both readings break at once and the check
       // below would pass over an empty list.
       expect(declaredSettingsRouteCount()).toBeGreaterThan(20);

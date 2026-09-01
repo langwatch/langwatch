@@ -19,6 +19,38 @@ export {
   warmChunk,
 } from "./behavior/chunk-reload";
 export { lazyRoute, type LazyRouteModule } from "./behavior/lazy-route";
+export {
+  resolveUiPageLoader,
+  uiRoutePageKeys,
+  type UiPageLoader,
+  type UiPageLoaderRegistry,
+} from "./behavior/ui-page-loaders";
+export { createUiRouter, type UiRouter, type UiRouterOptions } from "./behavior/ui-router";
+export {
+  uiLegacyRedirectRoutes,
+  uiRouteDescriptors,
+  uiRouteTable,
+  type UiPageRouteDescriptor,
+  type UiRedirectDescriptor,
+  type UiRedirectRouteDescriptor,
+  type UiRouteDescriptor,
+} from "./model/ui-route-table";
+export {
+  createUiApplication,
+  type UiApplication,
+  type UiApplicationInstall,
+} from "./ui/sections/ui-application";
+export {
+  createUiInnerProvider,
+  type UiInnerProviderInstall,
+} from "./ui/sections/ui-inner-providers";
+export {
+  createUiOuterProvider,
+  type UiOuterProviderInstall,
+  type UiProviderShell,
+} from "./ui/sections/ui-outer-providers";
+export { createUiRouteObjects, type UiRouteObjectsOptions } from "./ui/sections/ui-route-objects";
+export { createUiRootLayout, type UiRootLayoutInstall } from "./ui/sections/ui-root-layout";
 export { RpcClientPort } from "./features/agent/behavior/rpc-client.port";
 export { TrpcAgentBrowserAdapter } from "./features/agent/behavior/trpc-agent-browser.adapter";
 export {

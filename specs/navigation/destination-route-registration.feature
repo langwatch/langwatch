@@ -1,5 +1,5 @@
-# Routing in the app is a hand-maintained table in platform/app/src/routes.tsx,
-# not filesystem-based. Adding a page and linking to it are two edits; the third
+# Routing in the app is a hand-maintained table in @langwatch/ui
+# (apps/ui/src/model/ui-route-table.ts), not filesystem-based. Adding a page and linking to it are two edits; the third
 # — registering the route — is the one nothing complains about.
 #
 # Sibling spec: project-scoped-destinations.feature covers whether a destination

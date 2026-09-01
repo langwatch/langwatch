@@ -2,19 +2,25 @@
  * @vitest-environment jsdom
  *
  * The gateway moved from /settings/gateway/* to /gateway/*. These tests run
- * the REAL redirect route objects that routes.tsx mounts (legacyRedirectRoutes)
- * plus the real /gateway index page, inside a memory router, so what is
- * asserted is the address the user ends on: sub-path, query and hash intact,
- * history entry replaced.
+ * the REAL redirect descriptors the packaged route table mounts
+ * (`uiLegacyRedirectRoutes`), materialised through the same function the
+ * application uses, plus the real /gateway index page, inside a memory router,
+ * so what is asserted is the address the user ends on: sub-path, query and
+ * hash intact, history entry replaced.
  *
  * Spec: specs/navigation/gateway-url-move.feature
  */
 
-import { UiPrefixRedirect } from "@langwatch/ui";
+import { createUiRouteObjects, uiLegacyRedirectRoutes, UiPrefixRedirect } from "@langwatch/ui";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
-import { legacyRedirectRoutes } from "../legacyRedirects";
+
+/** The redirect descriptors the application mounts, materialised the same way. */
+const legacyRedirectRoutes = createUiRouteObjects({
+  table: uiLegacyRedirectRoutes,
+  loaders: {},
+});
 
 // The global test-setup.ts stubs ~/utils/compat/next-router with an inert
 // router. The gateway index page redirects through the real compat layer,
@@ -51,8 +57,8 @@ function renderRouterAt(initialEntries: string[]) {
       element: <div>routing policies</div>,
     },
     {
-      // Mirrors the routes.tsx stanza: retargeted straight to People so the
-      // departments rename never adds a hop.
+      // Mirrors the route table's stanza: retargeted straight to People so
+      // the departments rename never adds a hop.
       path: "/governance/cost-centers",
       element: (
         <UiPrefixRedirect
