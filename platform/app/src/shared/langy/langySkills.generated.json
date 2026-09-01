@@ -118,6 +118,13 @@
 		"userPrompt": "Set up online evaluations for my agent"
 	},
 	{
+		"id": "playground-widgets",
+		"label": "Playground widgets",
+		"description": "Author a custom-chart-playground widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.",
+		"category": "recipe",
+		"userPrompt": "Build me a custom chart widget"
+	},
+	{
 		"id": "prompt-optimization",
 		"label": "Prompt optimization",
 		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
