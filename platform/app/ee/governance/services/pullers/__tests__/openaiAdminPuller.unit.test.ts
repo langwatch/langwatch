@@ -174,7 +174,7 @@ describe("given an OpenAI Admin cost source", () => {
       });
 
       // 0.0000001234 USD × 1e9 = 123.4 → 123 nanoUsd (truncated).
-      expect(record?.costNanoUsd).toBe(123);
+      expect(record?.costNanoMinor).toBe(123);
     });
 
     /** @scenario "Spend is called an estimate, not the invoice" */
@@ -314,7 +314,7 @@ describe("given an OpenAI Admin cost source", () => {
       });
 
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).not.toBe(before?.costNanoUsd);
+      expect(after?.costNanoMinor).not.toBe(before?.costNanoMinor);
     });
 
     /** @scenario "Re-reading an unchanged day records nothing new" */

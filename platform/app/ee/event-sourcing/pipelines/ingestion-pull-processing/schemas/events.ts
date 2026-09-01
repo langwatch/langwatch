@@ -79,6 +79,20 @@ export const ingestionPullRunCompletedEventDataSchema = sourceEnvelope.extend({
   scheduledFor: z.number(),
   nextCursor: z.string().nullable(),
   eventCount: z.number().int().nonnegative(),
+  /**
+   * Items this run could not read while still advancing its cursor past them —
+   * rows that failed to parse, a next-page link it refused to follow. Nonzero
+   * means partial success: a run that reported errors WITHOUT advancing fails
+   * outright and records `run_failed` instead, so it never reaches here.
+   *
+   * Optional rather than defaulted, and the difference is load-bearing here:
+   * the fold reads events straight off the log without re-parsing them
+   * (`AbstractFoldProjection.apply`), so a `.default(0)` would type the field
+   * as always-present while every completion written before this change has no
+   * such key. The reader owns the `?? 0`, and reading absence as a clean run is
+   * right for that history — those producers had no notion of partial success.
+   */
+  errorCount: z.number().int().nonnegative().optional(),
 });
 export type IngestionPullRunCompletedEventData = z.infer<
   typeof ingestionPullRunCompletedEventDataSchema

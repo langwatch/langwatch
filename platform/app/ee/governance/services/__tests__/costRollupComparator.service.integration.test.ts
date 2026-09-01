@@ -194,8 +194,8 @@ describe("CostRollupComparatorService", () => {
       // Both figures are carried out of the comparison, which is what the log
       // line renders: a counter alone cannot tell an operator which way the
       // drift went or by how much.
-      expect(comparison.mismatches[0]!.summarizedNanoUsd).toBe(9_999_000_000);
-      expect(comparison.mismatches[0]!.derivedNanoUsd).toBe(12_340_000_000);
+      expect(comparison.mismatches[0]!.summarizedNanoMinor).toBe(9_999_000_000);
+      expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(12_340_000_000);
     });
 
     it("leaves the drifted row exactly as it found it", async () => {
@@ -277,7 +277,7 @@ describe("CostRollupComparatorService", () => {
         costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
       });
       expect(nextDay.mismatches).toHaveLength(1);
-      expect(nextDay.mismatches[0]!.derivedNanoUsd).toBe(7_340_000_000);
+      expect(nextDay.mismatches[0]!.derivedNanoMinor).toBe(7_340_000_000);
     });
   });
 
@@ -296,7 +296,7 @@ describe("CostRollupComparatorService", () => {
       });
 
       expect(comparison.mismatches).toHaveLength(1);
-      expect(comparison.mismatches[0]!.derivedNanoUsd).toBe(null);
+      expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(null);
       expect(await mismatchCount()).toBe(before + 1);
     });
   });

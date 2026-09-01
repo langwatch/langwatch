@@ -45,10 +45,20 @@ export const COST_SOURCE_EVENT_TYPES: Record<
 
 export interface CostRollupCellMismatch {
   cell: GovernanceCostRollupCell;
-  /** What the summary says, or null when the summary has no such cell. */
-  summarizedNanoUsd: number | null;
+  /**
+   * What the summary says, in the cell's own currency, or null when the
+   * summary has no such cell.
+   *
+   * The BILLED amount rather than the dollar one. On a non-dollar row the
+   * dollar column is empty by design, so comparing it makes both sides read as
+   * absent and agree with each other while the real amounts differ by any
+   * margin at all — the watchdog would be blind exactly where nothing else is
+   * watching. Every row has an amount in the currency it was billed in, and
+   * the currency is part of the cell, so like is compared with like.
+   */
+  summarizedNanoMinor: number | null;
   /** What the events add up to, or null when the events have no such cell. */
-  derivedNanoUsd: number | null;
+  derivedNanoMinor: number | null;
 }
 
 export interface CostRollupComparison {
@@ -99,19 +109,24 @@ export class CostRollupComparatorService {
     const summarizedByKey = new Map(
       summarized.map((row) => [
         governanceCostRollupKeyOfRow(row),
-        row.AmountNanoUsd,
+        row.AmountNanoMinor,
       ]),
     );
 
     const mismatches: CostRollupCellMismatch[] = [];
     for (const [key, state] of derived) {
-      const derivedAmount = governanceCostRollupTotals(state).amountNanoUsd;
-      const summarizedAmount = summarizedByKey.get(key) ?? null;
+      const derivedAmount = governanceCostRollupTotals(state).amountNanoMinor;
+      // `?? null` would read a summarized amount of 0 as absent. A cell whose
+      // events sum to zero and a cell that is missing from the summary are
+      // different faults, and only one of them is drift.
+      const summarizedAmount = summarizedByKey.has(key)
+        ? summarizedByKey.get(key)!
+        : null;
       if (summarizedAmount !== derivedAmount) {
         mismatches.push({
           cell: decodeGovernanceCostRollupKey(key),
-          summarizedNanoUsd: summarizedAmount,
-          derivedNanoUsd: derivedAmount,
+          summarizedNanoMinor: summarizedAmount,
+          derivedNanoMinor: derivedAmount,
         });
       }
       summarizedByKey.delete(key);
@@ -122,8 +137,8 @@ export class CostRollupComparatorService {
     for (const [key, summarizedAmount] of summarizedByKey) {
       mismatches.push({
         cell: decodeGovernanceCostRollupKey(key),
-        summarizedNanoUsd: summarizedAmount,
-        derivedNanoUsd: null,
+        summarizedNanoMinor: summarizedAmount,
+        derivedNanoMinor: null,
       });
     }
 
@@ -148,8 +163,11 @@ export class CostRollupComparatorService {
           provider: mismatch.cell.provider,
           model: mismatch.cell.model,
           raw_actor_id: mismatch.cell.rawActorId,
-          summarized_nano_usd: mismatch.summarizedNanoUsd,
-          derived_nano_usd: mismatch.derivedNanoUsd,
+          // The currency is on the line because the two amounts below are in
+          // it, and a figure without its denomination is not a figure.
+          currency_code: mismatch.cell.currencyCode,
+          summarized_nano_minor: mismatch.summarizedNanoMinor,
+          derived_nano_minor: mismatch.derivedNanoMinor,
         },
         "Governance cost rollup disagrees with the events it was derived from",
       );

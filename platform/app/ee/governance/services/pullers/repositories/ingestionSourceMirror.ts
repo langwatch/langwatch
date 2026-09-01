@@ -37,10 +37,11 @@ export function buildIngestionSourceMirror({
     pollerCursor: state.Cursor,
     errorCount: state.ConsecutiveErrors,
     // A run that reached the provider and found nothing new still succeeded,
-    // so this advances on every completion. `lastEventAt` below does not --
-    // it answers "when did data last arrive", which an empty run does not
-    // move. Conflating the two is what made a dead puller read as a quiet
-    // one (ADR-128).
+    // so this advances on every CLEAN completion -- the fold leaves it where
+    // it was when the run also reported errors. `lastEventAt` below does not
+    // advance either way: it answers "when did data last arrive", which an
+    // empty run does not move. Conflating the two is what made a dead puller
+    // read as a quiet one (ADR-128).
     lastSuccessAt:
       state.LastSuccessAt === null ? undefined : new Date(state.LastSuccessAt),
     lastEventAt:

@@ -67,7 +67,9 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Link } from "~/components/ui/link";
+import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -1006,7 +1008,99 @@ function SourceRow({
   );
 }
 
-function SourceComposerDrawer({
+/**
+ * What the create drawer puts behind "Advanced": the two settings an admin
+ * rarely changes, and both safe to leave closed. Cadence arrives holding the
+ * recommended schedule for the source type, and a source with no destination
+ * ingests normally — it simply routes no conversations onward until someone
+ * says where.
+ *
+ * Returns `undefined` rather than an empty fragment for a type that offers
+ * neither, because an element that renders nothing still counts as content to
+ * the group, and would leave a push source's drawer showing an "Advanced"
+ * button that opens onto an empty box.
+ */
+function composerAdvancedExtras({
+  composer,
+  setComposer,
+  destinationCtx,
+}: {
+  composer: ComposerState;
+  setComposer: (next: ComposerState) => void;
+  destinationCtx: DestinationContext;
+}): ReactNode | undefined {
+  // The same two predicates the fields themselves gate on, read here so the
+  // group knows whether it has anything to hold before it offers itself.
+  const offersCadence = recommendedPullSchedule(composer.sourceType) !== null;
+  const offersDestination = routesConversations(composer.sourceType);
+  if (!offersCadence && !offersDestination) return undefined;
+  return (
+    <>
+      {offersCadence && (
+        <PullCadenceField
+          sourceType={composer.sourceType}
+          value={composer.pullSchedule}
+          onChange={(pullSchedule) =>
+            setComposer({ ...composer, pullSchedule })
+          }
+        />
+      )}
+      {offersDestination && (
+        <TraceDestinationField
+          sourceType={composer.sourceType}
+          value={composer.traceProjectId}
+          onChange={(traceProjectId) =>
+            setComposer({ ...composer, traceProjectId })
+          }
+          mode="create"
+          {...destinationCtx}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * What the closed Advanced group owes the outside: one line saying where this
+ * source's conversations will go.
+ *
+ * The destination picker sits inside the group, so an admin who never opens it
+ * never reads what it says about leaving the destination unset — and a source
+ * created that way routes its conversations nowhere. The default is fine; the
+ * silence about it is not, so the outcome is stated where the admin is
+ * already looking.
+ *
+ * Only for types that route conversations. On a source that produces none,
+ * a line about where conversations land describes a decision its adapter
+ * never makes.
+ */
+function ComposerDestinationHint({
+  composer,
+  destinationCtx,
+}: {
+  composer: ComposerState;
+  destinationCtx: DestinationContext;
+}) {
+  if (!routesConversations(composer.sourceType)) return null;
+  // Named from the same list the picker offers, so the line and the control
+  // cannot disagree about which project was chosen.
+  const chosen = destinationCtx.availableProjects.find(
+    (project) => project.id === composer.traceProjectId,
+  );
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      data-testid="composer-destination-hint"
+    >
+      {composer.traceProjectId
+        ? `Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`
+        : "Conversations will not land anywhere until you pick a destination project under Advanced. Audit events are recorded either way."}
+    </Text>
+  );
+}
+
+export function SourceComposerDrawer({
   isOpen,
   organizationId,
   destinationCtx,
@@ -1026,6 +1120,11 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
+  const advancedExtras = composerAdvancedExtras({
+    composer,
+    setComposer,
+    destinationCtx,
+  });
   // The type was picked from the Add source menu, which is where the plan
   // gate lives (see gatedSourceTypeOptions) — the composer is committed to
   // it. Changing type means closing and picking again, exactly like the
@@ -1090,6 +1189,12 @@ function SourceComposerDrawer({
               onChange={(parserConfig) =>
                 setComposer({ ...composer, parserConfig })
               }
+              advancedExtras={advancedExtras}
+            />
+
+            <ComposerDestinationHint
+              composer={composer}
+              destinationCtx={destinationCtx}
             />
 
             <OttlEditor
@@ -1100,24 +1205,6 @@ function SourceComposerDrawer({
                 setComposer({ ...composer, ottlStatements })
               }
               enabled={isOttlEnabledSourceType(composer.sourceType)}
-            />
-
-            <PullCadenceField
-              sourceType={composer.sourceType}
-              value={composer.pullSchedule}
-              onChange={(pullSchedule) =>
-                setComposer({ ...composer, pullSchedule })
-              }
-            />
-
-            <TraceDestinationField
-              sourceType={composer.sourceType}
-              value={composer.traceProjectId}
-              onChange={(traceProjectId) =>
-                setComposer({ ...composer, traceProjectId })
-              }
-              mode="create"
-              {...destinationCtx}
             />
           </VStack>
         </Drawer.Body>
@@ -1319,6 +1406,7 @@ function PullConfigEditFields({
   pullSchedule,
   onPullScheduleChange,
   hasPulled,
+  destinationField,
 }: {
   sourceType: SourceType;
   parserConfig: Record<string, string>;
@@ -1327,6 +1415,14 @@ function PullConfigEditFields({
   onPullScheduleChange: (next: string) => void;
   /** Whether the source already holds a poller cursor. */
   hasPulled: boolean;
+  /**
+   * The destination picker, when this source type routes conversations, so it
+   * joins the cadence in the one Advanced group instead of opening a second.
+   * No type reaches here with one today — the two that route conversations
+   * are both absent from `EDITABLE_PULL_CONFIG_SOURCE_TYPES` — but the day
+   * one does, the drawer must not sprout a second collapsible for it.
+   */
+  destinationField?: ReactNode;
 }) {
   const isStartLocked = isBackfillStartLocked({
     hasPulled,
@@ -1345,6 +1441,18 @@ function PullConfigEditFields({
         onChange={onParserConfigChange}
         mode="edit"
         readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
+        // Same group, same order as the create drawer: the two forms edit the
+        // same source and must not disagree about where a setting lives.
+        advancedExtras={
+          <>
+            <PullCadenceField
+              sourceType={sourceType}
+              value={pullSchedule}
+              onChange={onPullScheduleChange}
+            />
+            {destinationField}
+          </>
+        }
       />
       {isReportLocked && (
         <Text fontSize="xs" color="fg.muted">
@@ -1366,11 +1474,6 @@ function PullConfigEditFields({
           restates the figures already recorded for that window.
         </Text>
       )}
-      <PullCadenceField
-        sourceType={sourceType}
-        value={pullSchedule}
-        onChange={onPullScheduleChange}
-      />
     </>
   );
 }
@@ -1555,6 +1658,37 @@ function SourceEditBody({
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // Read here rather than left to the field's own early return, because the
+  // Advanced group has to know whether it holds anything before it offers
+  // itself — a disclosure that opens onto an empty box is worse than none.
+  const offersDestination = routesConversations(
+    source.sourceType as SourceType,
+  );
+
+  const destinationField = offersDestination ? (
+    <TraceDestinationField
+      sourceType={source.sourceType as SourceType}
+      // Both props describe `value`, so both have to move together. An
+      // untouched picker shows the stored destination and the archived
+      // notice that describes it; the moment a replacement is picked, the
+      // flag stops applying — it described the project that has just been
+      // replaced, not the one now on screen. Left true, the picker seeds
+      // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
+      // picks a project, sees nothing selected under an unchanged warning,
+      // and concludes the control is dead.
+      value={
+        form.destination === undefined
+          ? (source.traceProjectId ?? null)
+          : form.destination
+      }
+      onChange={form.setDestination}
+      mode="edit"
+      destinationArchived={
+        form.destination === undefined && (source.traceProjectArchived ?? false)
+      }
+      {...destinationCtx}
+    />
+  ) : null;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -1565,7 +1699,7 @@ function SourceEditBody({
         onDescriptionChange={form.setDescription}
       />
 
-      {isPullMode && (
+      {isPullMode ? (
         <PullConfigEditFields
           sourceType={sourceType}
           parserConfig={form.parserConfig}
@@ -1573,7 +1707,14 @@ function SourceEditBody({
           pullSchedule={form.pullSchedule}
           onPullScheduleChange={form.setPullSchedule}
           hasPulled={hasPulled}
+          destinationField={destinationField}
         />
+      ) : (
+        // A source type this form builds no adapter config for still has a
+        // destination to place, and no parser fields to hang the group off.
+        destinationField && (
+          <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
+        )
       )}
 
       <OttlEditor
@@ -1582,30 +1723,6 @@ function SourceEditBody({
         statements={form.statements}
         onChange={form.setStatements}
         enabled={isOttlEnabledSourceType(source.sourceType)}
-      />
-
-      <TraceDestinationField
-        sourceType={source.sourceType as SourceType}
-        // Both props describe `value`, so both have to move together. An
-        // untouched picker shows the stored destination and the archived
-        // notice that describes it; the moment a replacement is picked, the
-        // flag stops applying — it described the project that has just been
-        // replaced, not the one now on screen. Left true, the picker seeds
-        // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
-        // picks a project, sees nothing selected under an unchanged warning,
-        // and concludes the control is dead.
-        value={
-          form.destination === undefined
-            ? (source.traceProjectId ?? null)
-            : form.destination
-        }
-        onChange={form.setDestination}
-        mode="edit"
-        destinationArchived={
-          form.destination === undefined &&
-          (source.traceProjectArchived ?? false)
-        }
-        {...destinationCtx}
       />
 
       <Text fontSize="xs" color="fg.muted">
@@ -1645,8 +1762,21 @@ interface FieldDef {
    * that showing it beats describing it — the point is to move the domain out
    * of the hint and into the control, so a wrong value is unreachable rather
    * than merely rejected. `date` is for values the admin thinks of as a day.
+   * `switch` is for a setting with exactly two states and a right answer for
+   * almost everyone: a two-entry select asks the admin to read both lines to
+   * find out it was already decided for them.
    */
-  control?: "select" | "date";
+  control?: "select" | "date" | "switch";
+  /**
+   * Where a `control: "switch"` sits before anyone touches it.
+   *
+   * Declared on the field rather than assumed, because the form holds strings
+   * and an untouched field holds nothing at all — so "no value" has to name a
+   * state somewhere, and this is the one declaration the render and the
+   * builder both read. They cannot drift into showing one answer and saving
+   * another.
+   */
+  defaultOn?: boolean;
   /**
    * The choices, for `control: "select"`.
    *
@@ -1681,7 +1811,8 @@ export interface FieldOption {
 export type FieldControl =
   | { kind: "text"; hint?: string }
   | { kind: "date"; hint?: string }
-  | { kind: "select"; options: readonly FieldOption[]; hint?: string };
+  | { kind: "select"; options: readonly FieldOption[]; hint?: string }
+  | { kind: "switch"; defaultOn: boolean; hint?: string };
 
 export function fieldControl({
   field,
@@ -1692,10 +1823,37 @@ export function fieldControl({
 }): FieldControl {
   const hint = field.contextHint?.(values);
   if (field.control === "date") return { kind: "date", hint };
+  if (field.control === "switch") {
+    return { kind: "switch", defaultOn: field.defaultOn ?? false, hint };
+  }
   if (field.control === "select") {
     return { kind: "select", options: field.options?.(values) ?? [], hint };
   }
   return { kind: "text", hint };
+}
+
+/**
+ * Whether a switch field is on, given what the form holds for it.
+ *
+ * The switch writes "true" or "false" and nothing else, so anything else is a
+ * value no control produced — an unset field, a source created before the
+ * field existed, a hand-edited config — and says nothing about what the admin
+ * chose. The field's own declared default is the answer for all of them, which
+ * is what keeps an untouched form and the config it saves agreeing.
+ *
+ * Read by the render and by the builders, deliberately: a second answer to
+ * "is this on" is how a toggle ends up showing one state and saving the other.
+ */
+export function switchFieldIsOn({
+  value,
+  defaultOn,
+}: {
+  value: string | undefined;
+  defaultOn: boolean;
+}): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultOn;
 }
 
 /**
@@ -1708,8 +1866,9 @@ export function fieldControl({
  * whole save for a field the form no longer even offers. Clearing it is the
  * only outcome that matches what the admin is being shown.
  *
- * Deliberately narrow: text and date fields are never touched, because their
- * domains are not enumerable and "not in the list" means nothing there.
+ * Deliberately narrow: text, date and switch fields are never touched,
+ * because their domains are not enumerable and "not in the list" means nothing
+ * there — for a switch it would mean silently turning a deliberate off back on.
  */
 export function reconcileParserValues({
   sourceType,
@@ -1804,6 +1963,17 @@ function anthropicBucketWidthOptions(
   ];
 }
 
+/**
+ * Whether a Copilot Studio source reads the tenant's seat licences when nobody
+ * has said either way.
+ *
+ * One constant because two readers need the same answer: the switch renders
+ * from it, and `buildCopilotStudioDataversePullConfig` saves from it for a form
+ * that was never touched. Split them and the form shows one state while the
+ * save stores the other.
+ */
+const READ_SEATS_DEFAULT_ON = true;
+
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
@@ -1894,6 +2064,28 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
       required: true,
       secret: true,
+    },
+    {
+      // NOT a `credentials*` field, unlike the three above. A subscription id
+      // is a coordinate rather than a secret, and the adapter reads it off the
+      // config itself; naming it `credentialsAzureSubscriptionId` would bury
+      // it in the encrypted subtree where the config schema never looks.
+      key: "azureSubscriptionId",
+      label: "Azure subscription ID (optional)",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "Add this to also record what the environment costs each day. The same app registration needs the Cost Management Reader role on the subscription. Leave it empty to record conversations only.",
+    },
+    {
+      key: "readSeats",
+      label: "Also record licence counts",
+      placeholder: "",
+      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      control: "switch",
+      defaultOn: READ_SEATS_DEFAULT_ON,
+      // Advanced because the default is already the answer for almost
+      // everyone: the collapsed group is where an admin goes to disagree, not
+      // where the setting hides.
+      advanced: true,
     },
   ],
   openai_compliance: [
@@ -2401,15 +2593,6 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 }
 
 /**
- * The Databricks Genie adapter config, or null when a required field is empty.
- *
- * Genie needs a real builder rather than the bare `{ adapter }` the other
- * reference pullers get, for two reasons the form cannot express on its own:
- * the token has to land under `credentials` so the server encrypts it, and
- * `spaceIds` is a comma-separated string in the form but an array in the
- * adapter's schema.
- */
-/**
  * The pullConfig for a Copilot Studio source reading Dataverse.
  *
  * All three credential fields travel in the `credentials` subtree — the only
@@ -2420,7 +2603,7 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  * the source would save looking complete and fail every run for want of a
  * credential it did ask for.
  */
-function buildCopilotStudioDataversePullConfig(
+export function buildCopilotStudioDataversePullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
@@ -2428,6 +2611,7 @@ function buildCopilotStudioDataversePullConfig(
   const tenantId = (p.credentialsTenantId ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
+  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
 
   // All three or none: two thirds of an app registration is not a sign-in,
   // and accepting it would save a source that cannot run.
@@ -2446,10 +2630,33 @@ function buildCopilotStudioDataversePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
       "*/15 * * * *",
+    // Omitted rather than sent empty, the same way Genie omits an unset
+    // warehouse: the adapter reads "no subscription named" as "do not read
+    // cost", and an empty string is a subscription id it would then ask Azure
+    // about — and the schema would refuse it as not a uuid, failing the save
+    // for a field the customer deliberately left blank.
+    ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
+    // A real boolean, because the adapter's schema is `z.boolean()` and would
+    // refuse the form's string on every run. The default comes from the field
+    // definition the switch renders from, so a form nobody touched saves the
+    // state it was showing.
+    readSeats: switchFieldIsOn({
+      value: p.readSeats,
+      defaultOn: READ_SEATS_DEFAULT_ON,
+    }),
     credentials: { tenantId, clientId, clientSecret },
   };
 }
 
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
 function buildDatabricksGeniePullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
@@ -2551,6 +2758,53 @@ export function parserFieldPresentation({
 }
 
 /**
+ * A two-state setting, rendered as a toggle.
+ *
+ * Its own component rather than another branch in `ParserFieldInput` because
+ * it is the only control whose displayed state is derived rather than held:
+ * the form stores a string that can be absent, and absent means the field's
+ * declared default. That derivation belongs beside the toggle that shows it.
+ */
+function ParserSwitchInput({
+  ariaLabel,
+  defaultOn,
+  fieldKey,
+  readOnly,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  defaultOn: boolean;
+  fieldKey: string;
+  readOnly: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const on = switchFieldIsOn({ value, defaultOn });
+
+  // Same reasoning as the select branch below: a switch has no readOnly
+  // either, and `disabled` would drop it out of the tab order where a keyboard
+  // or screen-reader user could not read what it holds. So a locked toggle is
+  // shown as its own state in a readOnly input instead.
+  if (readOnly) return <Input size="sm" value={on ? "On" : "Off"} readOnly />;
+
+  return (
+    <Switch
+      checked={on}
+      // Never blank: blank means the field's declared default, which is not
+      // always off, so writing it back would flip a deliberate choice.
+      onCheckedChange={({ checked }) => onChange(checked ? "true" : "false")}
+      // The field label beside this is a heading, not a bound <label>, so the
+      // accessible name has to come from the control itself.
+      inputProps={{
+        "aria-label": ariaLabel,
+        "data-testid": `parser-switch-${fieldKey}`,
+      }}
+    />
+  );
+}
+
+/**
  * The input itself, chosen by control kind.
  *
  * Split from `ParserConfigField` so the label, the required marker and the hint
@@ -2559,7 +2813,9 @@ export function parserFieldPresentation({
  * labelling another.
  */
 function ParserFieldInput({
+  ariaLabel,
   control,
+  fieldKey,
   isMultiline,
   isSecret,
   placeholder,
@@ -2567,7 +2823,14 @@ function ParserFieldInput({
   value,
   onChange,
 }: {
+  /**
+   * The field's label. Only the switch branch reads it: the label beside a
+   * field is a heading rather than a bound `<label>`, and every other control
+   * here is reachable by its own text or placeholder while a switch is not.
+   */
+  ariaLabel: string;
   control: FieldControl;
+  fieldKey: string;
   isMultiline: boolean;
   isSecret: boolean;
   placeholder: string;
@@ -2613,6 +2876,19 @@ function ParserFieldInput({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
+    );
+  }
+
+  if (control.kind === "switch") {
+    return (
+      <ParserSwitchInput
+        ariaLabel={ariaLabel}
+        defaultOn={control.defaultOn}
+        fieldKey={fieldKey}
+        readOnly={readOnly}
+        value={value}
+        onChange={onChange}
+      />
     );
   }
 
@@ -2666,16 +2942,29 @@ function ParserConfigField({
 
   return (
     <VStack align="stretch" gap={1}>
-      <Text fontSize="xs" fontWeight="medium">
-        {field.label}
-        {isRequired && (
-          <Text as="span" color="red.500" marginLeft={1}>
-            *
-          </Text>
+      {/* The explanation sits behind the (i), never under the input: a
+          paragraph per field turned this form into a wall of grey text an
+          admin scrolls past. See dev/docs/best_practices/copywriting.md. */}
+      <HStack gap={0} alignItems="center">
+        <Text fontSize="xs" fontWeight="medium">
+          {field.label}
+          {isRequired && (
+            <Text as="span" color="red.500" marginLeft={1}>
+              *
+            </Text>
+          )}
+        </Text>
+        {shownHint && (
+          <FieldInfoTooltip
+            description={shownHint}
+            testId={`parser-field-info-${field.key}`}
+          />
         )}
-      </Text>
+      </HStack>
       <ParserFieldInput
+        ariaLabel={field.label}
         control={control}
+        fieldKey={field.key}
         isMultiline={isMultiline}
         isSecret={isSecret}
         placeholder={placeholder}
@@ -2683,12 +2972,40 @@ function ParserConfigField({
         value={values[field.key] ?? ""}
         onChange={(next) => onChange({ ...values, [field.key]: next })}
       />
-      {shownHint && (
-        <Text fontSize="xs" color="fg.muted">
-          {shownHint}
-        </Text>
-      )}
     </VStack>
+  );
+}
+
+/**
+ * The one collapsed group a source drawer offers.
+ *
+ * Unmounted while closed, so the collapsed state genuinely holds nothing the
+ * admin needs: create must produce a working source without it ever being
+ * opened. Which is also the constraint on what goes in — anything here that
+ * kept its own state would throw the admin's choice away on every collapse,
+ * so every child is driven from the drawer's state.
+ *
+ * Extracted rather than left inside `ParserConfigFields` because the edit
+ * drawer reaches the group down a path that renders no parser fields at all:
+ * the two source types that route conversations are both absent from
+ * `EDITABLE_PULL_CONFIG_SOURCE_TYPES`, so their destination has to be grouped
+ * by something that does not belong to the parser config.
+ */
+function AdvancedSettingsGroup({ children }: { children: ReactNode }) {
+  return (
+    <Collapsible.Root lazyMount unmountOnExit>
+      <Collapsible.Trigger asChild>
+        <Button size="xs" variant="ghost" color="fg.muted">
+          <ChevronRight />
+          Advanced
+        </Button>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <VStack align="stretch" gap={3} paddingTop={2}>
+          {children}
+        </VStack>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }
 
@@ -2698,6 +3015,7 @@ export function ParserConfigFields({
   onChange,
   mode = "create",
   readOnlyKeys,
+  advancedExtras,
 }: {
   sourceType: SourceType;
   values: Record<string, string>;
@@ -2710,6 +3028,22 @@ export function ParserConfigFields({
    * nothing is worse than no input at all.
    */
   readOnlyKeys?: readonly string[];
+  /**
+   * Settings that belong in the Advanced group without being parser fields —
+   * the pull cadence and the trace destination. Passed in rather than given a
+   * collapsible of their own: two "Advanced" headings in one drawer would
+   * leave an admin guessing which holds the thing they came for.
+   *
+   * Pass `undefined` when the source type offers none of them. An element
+   * that happens to render nothing still counts as content here, and would
+   * leave a push source's drawer showing an "Advanced" button that opens onto
+   * an empty box.
+   *
+   * Whatever goes here must hold its value in the caller's state. The group
+   * unmounts its contents when it closes, so a child holding its own would
+   * silently discard the admin's choice on every collapse.
+   */
+  advancedExtras?: ReactNode;
 }) {
   // A held value can stop being offered without the admin touching its field —
   // switching the Anthropic report to `cost` retires every bucket width. Left
@@ -2724,13 +3058,17 @@ export function ParserConfigFields({
   const fields = PARSER_FIELDS[sourceType];
   const primaryFields = fields.filter((f) => !f.advanced);
   const advancedFields = fields.filter((f) => f.advanced);
-  if (fields.length === 0) return null;
+  // Extras alone are reason enough to render: a source type with no
+  // parser fields of its own still has a cadence to offer.
+  if (fields.length === 0 && !advancedExtras) return null;
   const isReadOnly = (key: string) => readOnlyKeys?.includes(key) ?? false;
   return (
     <VStack align="stretch" gap={3}>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Source-specific configuration
-      </Text>
+      {fields.length > 0 && (
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Source-specific configuration
+        </Text>
+      )}
       {primaryFields.map((f) => (
         <ParserConfigField
           key={f.key}
@@ -2741,31 +3079,20 @@ export function ParserConfigFields({
           readOnly={isReadOnly(f.key)}
         />
       ))}
-      {advancedFields.length > 0 && (
-        // Unmounted while closed so the collapsed state genuinely holds
-        // nothing the admin needs: create must work without ever opening it.
-        <Collapsible.Root lazyMount unmountOnExit>
-          <Collapsible.Trigger asChild>
-            <Button size="xs" variant="ghost" color="fg.muted">
-              <ChevronRight />
-              Advanced
-            </Button>
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <VStack align="stretch" gap={3} paddingTop={2}>
-              {advancedFields.map((f) => (
-                <ParserConfigField
-                  key={f.key}
-                  field={f}
-                  values={values}
-                  onChange={onChange}
-                  mode={mode}
-                  readOnly={isReadOnly(f.key)}
-                />
-              ))}
-            </VStack>
-          </Collapsible.Content>
-        </Collapsible.Root>
+      {(advancedFields.length > 0 || advancedExtras) && (
+        <AdvancedSettingsGroup>
+          {advancedFields.map((f) => (
+            <ParserConfigField
+              key={f.key}
+              field={f}
+              values={values}
+              onChange={onChange}
+              mode={mode}
+              readOnly={isReadOnly(f.key)}
+            />
+          ))}
+          {advancedExtras}
+        </AdvancedSettingsGroup>
       )}
     </VStack>
   );
@@ -2802,7 +3129,25 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // values winning the merge would leave a string where the adapter's schema
     // expects a list, and an address the destination check reads differently
     // from the one the adapter calls.
-    copilot_studio_dataverse: ["environmentUrl", "botIds"],
+    //
+    // `azureSubscriptionId` is here because the builder OMITS it when empty,
+    // exactly like Genie's `warehouseId`. An empty form value is already
+    // dropped before parserConfig, so this is not fixing a live escape — it
+    // keeps the single rule "a field a builder decides about is owned by the
+    // builder" true for this field too, so the day the builder starts
+    // normalising it there is no raw copy left to win the merge.
+    //
+    // `readSeats` is owned for a stronger reason than either: the builder
+    // converts it from the form's string to a boolean, so the raw "yes"
+    // winning the merge would reach the adapter as a string where its schema
+    // demands a boolean — a source that saved cleanly and fails to parse on
+    // every run.
+    copilot_studio_dataverse: [
+      "environmentUrl",
+      "botIds",
+      "azureSubscriptionId",
+      "readSeats",
+    ],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

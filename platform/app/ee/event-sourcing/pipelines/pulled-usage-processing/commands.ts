@@ -39,6 +39,12 @@ import {
 function pulledUsageObservationKey(data: PulledUsageObservedEventData): string {
   return [
     data.restatementKey,
+    data.costNanoMinor,
+    // Both, and both matter. A provider that re-denominates a period or lands
+    // its dollar conversion later has changed the record without changing the
+    // native amount, and a key blind to either would dedup that correction
+    // away as an unchanged re-pull.
+    data.currencyCode,
     data.costNanoUsd,
     data.tokensInput,
     data.tokensOutput,
@@ -70,7 +76,8 @@ export const RecordPulledUsageCommand = defineCommand({
     "payload.ingestion_source_id": data.ingestionSourceId,
     "payload.cost_basis": data.costBasis,
     "payload.cost_status": data.costStatus,
-    "payload.cost_nano_usd": data.costNanoUsd,
+    "payload.cost_nano_minor": data.costNanoMinor,
+    "payload.currency_code": data.currencyCode,
   }),
   makeJobId: (data) => pulledUsageObservationKey(data),
 });
