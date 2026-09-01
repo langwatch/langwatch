@@ -479,9 +479,13 @@ Old rows are facts; the lens moves, the facts don't.
    pseudonym — *before* writing the rollup row. Without this, a replay
    re-derives the original value from the raw event log and inserts it
    beside the pseudonymized row, duplicating the amount. The mapping is
-   a small table (`ErasedActorId(original, pseudonym)`), joined during
-   the fold's projection step. Test: erase, replay, assert the rollup
-   contains only the pseudonymized key with the correct total.
+   a small table (`ErasedActorId(organizationId, provider, original,
+   pseudonym)`), joined during the fold's projection step. The key
+   includes `organizationId` and `provider` because the same raw actor
+   id string can appear under different providers or tenants — scoping
+   prevents cross-tenant collisions. Test: erase, replay, assert the
+   rollup contains only the pseudonymized key with the correct total;
+   add a collision test with the same `original` under two providers.
 
 Retention policy (§7) covers event expiry; the identity tables carry
 their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
