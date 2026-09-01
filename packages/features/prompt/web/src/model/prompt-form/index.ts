@@ -20,3 +20,12 @@ export {
   createChangeHandleFormSchema,
   type ChangeHandleFormValues,
 } from "./change-handle-form.schemas";
+export {
+  inputsAndOutputsToDemostrationColumns,
+  withDerivedDemonstrationColumns,
+} from "./demonstration-columns";
+export {
+  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+} from "./versioned-prompt-form-values";
+export { computeInitialFormValuesForPrompt } from "./initial-form-values";

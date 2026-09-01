@@ -531,7 +531,7 @@ export class PromptService extends PromptServiceContract {
    * The hyphen is not cosmetic — `handleSchema` allows only lowercase letters,
    * digits, hyphens, underscores and one slash, and a handle that fails it is
    * silently forced into draft mode when the prompt is reopened (see
-   * `isHandleValid` in `llmPromptConfigUtils.ts`).
+   * `isHandleValid` in `versioned-prompt-form-values.ts`).
    *
    * @throws NotFoundError when the source prompt does not exist in the project
    * @throws HandleGenerationError when every candidate handle is taken
@@ -658,7 +658,7 @@ export class PromptService extends PromptServiceContract {
    * carry `handle: null` — and a display name is free-form text the handle
    * format rejects. Slugify anything that would not survive `handleSchema`,
    * because an invalid handle silently forces the prompt into draft mode when
-   * it is reopened (see `isHandleValid` in `llmPromptConfigUtils.ts`).
+   * it is reopened (see `isHandleValid` in `versioned-prompt-form-values.ts`).
    */
   private deriveBaseHandle(source: VersionedPrompt): string {
     const candidate = source.handle ?? source.name;

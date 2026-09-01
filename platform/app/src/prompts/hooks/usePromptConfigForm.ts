@@ -7,11 +7,11 @@ import {
   buildDefaultFormValues,
   formSchema,
   formSchemaForSave,
+  inputsAndOutputsToDemostrationColumns,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
 } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { salvageValidData } from "~/utils/zodSalvage";
-import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 
 interface UsePromptConfigFormProps {
   configId?: string;

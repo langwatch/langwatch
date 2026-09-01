@@ -2,9 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import {
+  type PromptConfigFormValues,
+  versionedPromptToPromptConfigFormValues,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
-import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmPromptConfigUtils";
 
 const logger = createLogger(
   "langwatch:optimization_studio:use-reset-form-with-latest-version",

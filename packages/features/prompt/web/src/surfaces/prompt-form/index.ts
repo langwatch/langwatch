@@ -1,7 +1,7 @@
 /**
  * The prompt form contract: the schema a prompt version is edited against, the
- * values that schema produces, and the pure comparisons that decide whether an
- * edit is savable.
+ * values that schema produces, the way a stored prompt becomes those values,
+ * and the pure comparisons that decide whether an edit is savable.
  *
  * It is a surface rather than screen-private code because the prompt form is
  * edited from more than one place — Prompt Studio, the prompt drawer and the
@@ -13,17 +13,22 @@ export {
   areFormValuesEqual,
   buildDefaultFormValues,
   changeHandleFormSchema,
+  computeInitialFormValuesForPrompt,
   createChangeHandleFormSchema,
   DEFAULT_FORM_VALUES,
   formSchema,
   formSchemaForSave,
   getSaveBlockerMessage,
   hasNonEmptySystemMessage,
+  inputsAndOutputsToDemostrationColumns,
   isNodeDataEqual,
   refinedFormSchemaWithModelLimits,
+  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
   versionMetadataSchema,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
+  withDerivedDemonstrationColumns,
   type ChangeHandleFormValues,
   type PromptConfigFormValues,
   type VersionMetadata,

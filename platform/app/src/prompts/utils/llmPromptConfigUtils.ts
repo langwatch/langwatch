@@ -1,5 +1,4 @@
 import type { Node } from "@xyflow/react";
-import isEqual from "lodash-es/isEqual";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { PromptScope } from "~/generated/prisma/client";
@@ -12,14 +11,13 @@ import type {
   Signature,
 } from "@langwatch/workflow-contract";
 import {
-  formSchema,
+  inputsAndOutputsToDemostrationColumns,
   type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
 } from "@langwatch/prompt-web/surfaces/prompt-form";
 import type { SaveVersionParams } from "~/prompts/providers/types";
-import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import { handleSchema, type VersionedPrompt } from "@langwatch/prompt-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,
@@ -355,98 +353,6 @@ export function nodeDataToLocalPromptConfig(
   };
 }
 
-export function inputsAndOutputsToDemostrationColumns(
-  inputs: PromptConfigFormValues["version"]["configData"]["inputs"],
-  outputs: PromptConfigFormValues["version"]["configData"]["outputs"],
-): { name: string; type: DatasetColumnType; id: string }[] {
-  return [
-    ...(inputs ?? [])
-      .filter(({ type }) => type !== "image")
-      .map((input) => ({
-        id: input.identifier,
-        name: input.identifier,
-        type: inputOutputTypeToDatasetColumnType(input.type),
-      })),
-    ...(outputs ?? []).map((output) => ({
-      id: output.identifier,
-      name: output.identifier,
-      type: inputOutputTypeToDatasetColumnType(output.type),
-    })),
-  ];
-}
-
-/**
- * The demonstrations a stored prompt settles on once it is in the form.
- *
- * The columns of the demonstrations dataset are DERIVED from the prompt's
- * inputs and outputs: the form recomputes them on load and writes them into
- * itself (`usePromptConfigForm`). A stored prompt carries no columns of its
- * own, so a dirty baseline taken straight from the document differs from the
- * form the moment it loads, and an untouched prompt reads as modified. Deriving
- * them here is what keeps both sides the same shape.
- *
- * Returns the demonstrations untouched, undefined included, when the columns
- * already match: the form leaves them alone in that case, and adding an empty
- * dataset would be the same difference in the other direction.
- */
-export function withDerivedDemonstrationColumns({
-  demonstrations,
-  inputs,
-  outputs,
-}: {
-  demonstrations: NodeDataset | undefined;
-  inputs: PromptConfigFormValues["version"]["configData"]["inputs"];
-  outputs: PromptConfigFormValues["version"]["configData"]["outputs"];
-}): NodeDataset | undefined {
-  const columnTypes = inputsAndOutputsToDemostrationColumns(inputs, outputs);
-  const current = demonstrations?.inline?.columnTypes ?? [];
-  if (isEqual(columnTypes, current)) return demonstrations;
-
-  return {
-    ...demonstrations,
-    inline: {
-      ...demonstrations?.inline,
-      columnTypes,
-      records: demonstrations?.inline?.records ?? {},
-    },
-  };
-}
-
-function inputOutputTypeToDatasetColumnType(
-  type_: LlmConfigInputType | LlmConfigOutputType,
-): DatasetColumnType {
-  switch (type_) {
-    case "str":
-      return "string";
-    case "float":
-      return "number";
-    case "bool":
-      return "boolean";
-    case "list[str]":
-      return "list";
-    case "image":
-      throw new Error("Image is not supported in demonstrations");
-    case "json_schema":
-      return "json";
-    case "list[float]":
-      return "list";
-    case "list[int]":
-      return "list";
-    case "list[bool]":
-      return "list";
-    case "dict":
-      return "json";
-    case "list":
-      return "list";
-    case "chat_messages":
-      return "json";
-    default:
-      type_ satisfies never;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Unknown input/output type: ${type_}`);
-  }
-}
-
 export function createNewOptimizationStudioPromptName(
   workflowName: string,
   nodes: Node<Component>[],
@@ -555,130 +461,6 @@ export function formValuesToTriggerSaveVersionParams(
     demonstrations: formValues.version.configData.demonstrations,
     parameters: formValues.version.parameters,
   };
-}
-
-/**
- * Extracts the short handle from a potentially full handle path.
- * Full handles may include scope prefixes that need to be stripped:
- * - project_XXX/ (project prefix)
- * - organization_XXX/ (organization prefix, long form)
- * - XXXXXXXXXXXXXXXXXXXXX/ (21-char nanoid prefix)
- *
- * This strips only the scope prefix, preserving folder structure in handles.
- *
- * Examples:
- * - "project_ABC123/gato" -> "gato"
- * - "organization_ABC123/folder/gato" -> "folder/gato"
- * - "iuc4aYIoL5YcI7imutYvl/gato" -> "gato" (nanoid prefix)
- * - "gato" -> "gato" (no change if no prefix)
- * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
- */
-const extractShortHandle = (handle: string | null | undefined): string | null => {
-  if (!handle) return null;
-
-  // Check for known prefixes: project_, org_, organization_
-  const knownPrefixMatch = handle.match(/^(?:project_|organization_)[^/]+\//);
-  if (knownPrefixMatch) {
-    return handle.slice(knownPrefixMatch[0].length);
-  }
-
-  // Check for 21-character nanoid prefix (e.g., "iuc4aYIoL5YcI7imutYvl/gato")
-  // Nanoids are alphanumeric, 21 chars, followed by /
-  const nanoidPrefixMatch = handle.match(/^[a-zA-Z0-9_-]{21}\//);
-  if (nanoidPrefixMatch) {
-    return handle.slice(nanoidPrefixMatch[0].length);
-  }
-
-  // No scope prefix, return as-is
-  return handle;
-};
-
-/**
- * Converts the versioned prompt to form values without the system message.
- */
-export function versionedPromptToPromptConfigFormValues(
-  prompt: VersionedPrompt,
-): PromptConfigFormValues {
-  /**
-   * Extract short handle from full path (e.g., "project_ABC/gato" -> "gato")
-   * The API may return full paths in some contexts (like version history)
-   * but forms should use the short handle.
-   */
-  const shortHandle = extractShortHandle(prompt.handle);
-
-  /**
-   * Because we have old handles that are not valid,
-   * we don't include them in the form values so it
-   * basically forces them to be a "draft" and then the user
-   * must resave the prompt to make it valid.
-   */
-  const isHandleValid = handleSchema.safeParse(shortHandle).success;
-
-  return formSchema.parse({
-    configId: prompt.id,
-    versionMetadata: {
-      versionId: prompt.versionId,
-      versionNumber: prompt.version,
-      versionCreatedAt: prompt.versionCreatedAt,
-    },
-    // Use short handle for form display
-    handle: isHandleValid ? shortHandle : null,
-    scope: prompt.scope,
-    version: {
-      parameters: prompt.parameters ?? {},
-      configData: {
-        prompt: prompt.prompt,
-        // The system message should be stored in the prompt field in the DB,
-        // so this shouldn't be necessary, but it's a precaution.
-        messages: prompt.messages.filter((msg) => msg.role !== "system"),
-        inputs: prompt.inputs,
-        outputs: prompt.outputs,
-        demonstrations: withDerivedDemonstrationColumns({
-          demonstrations: prompt.demonstrations,
-          inputs: prompt.inputs,
-          outputs: prompt.outputs,
-        }),
-        promptingTechnique: prompt.promptingTechnique,
-        responseFormat: prompt.responseFormat,
-        llm: {
-          model: prompt.model,
-          temperature: prompt.temperature,
-          maxTokens: prompt.maxTokens,
-          // Traditional sampling parameters
-          topP: prompt.topP,
-          frequencyPenalty: prompt.frequencyPenalty,
-          presencePenalty: prompt.presencePenalty,
-          // Other sampling parameters
-          seed: prompt.seed,
-          topK: prompt.topK,
-          minP: prompt.minP,
-          repetitionPenalty: prompt.repetitionPenalty,
-          // Reasoning parameter (canonical/unified field)
-          reasoning: prompt.reasoning,
-          verbosity: prompt.verbosity,
-        },
-      },
-    },
-  });
-}
-
-/**
- * Converts the versioned prompt to form values with the system message.
- * The system message is added to the messages array.
- */
-export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
-  prompt: VersionedPrompt,
-): PromptConfigFormValues {
-  const base = versionedPromptToPromptConfigFormValues(prompt);
-
-  if (prompt.prompt) {
-    base.version.configData.messages = [
-      { role: "system", content: prompt.prompt },
-      ...base.version.configData.messages,
-    ];
-  }
-
-  return base;
 }
 
 export function versionedPromptToOptimizationStudioNodeData(

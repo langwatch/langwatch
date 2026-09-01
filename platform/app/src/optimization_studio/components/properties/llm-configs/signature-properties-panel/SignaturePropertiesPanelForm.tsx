@@ -15,14 +15,16 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "@langwatch/workflow-web";
 import { computeMessageEdgeUpdate } from "@langwatch/workflow-web";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import {
+  type PromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { usePromptConfigForm } from "~/prompts";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "@langwatch/workflow-web";

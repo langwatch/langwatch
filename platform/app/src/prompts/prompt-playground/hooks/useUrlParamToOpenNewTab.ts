@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";
-import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import { computeInitialFormValuesForPrompt } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 

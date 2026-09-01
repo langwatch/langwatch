@@ -12,7 +12,7 @@ import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
 import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { useRenamePromptHandle } from "~/prompts/hooks/useRenamePromptHandle";
-import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import { computeInitialFormValuesForPrompt } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { getDisplayHandle } from "@langwatch/prompt-web/surfaces/prompt-reference";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";

@@ -1,12 +1,14 @@
 import { Box } from "@chakra-ui/react";
 import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import {
+  type PromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 /**

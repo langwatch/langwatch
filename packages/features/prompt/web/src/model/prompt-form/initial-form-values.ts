@@ -1,12 +1,11 @@
-import {
-  buildDefaultFormValues,
-  type PromptConfigFormValues,
-} from "@langwatch/prompt-web/surfaces/prompt-form";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
+
+import { buildDefaultFormValues } from "./default-form-values";
+import type { PromptConfigFormValues } from "./prompt-form.schemas";
 import {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+} from "./versioned-prompt-form-values";
 
 /**
  * computeInitialFormValuesForPrompt

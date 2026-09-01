@@ -4,6 +4,7 @@ export * from "./prompt.trpc-schemas";
 export * from "./prompt.errors";
 export * from "./prompt.service";
 export * from "./prompt.shorthand";
+export * from "./prompt.tags";
 export * from "./prompt.trace-reference";
 export * from "./prompt.enums";
 export {

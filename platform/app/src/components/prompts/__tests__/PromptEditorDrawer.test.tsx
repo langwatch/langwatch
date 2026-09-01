@@ -295,30 +295,30 @@ vi.mock("@langwatch/prompt-web/surfaces/prompt-form", async (importOriginal) => 
       return merged;
     },
     areFormValuesEqual: () => mockAreFormValuesEqual(),
+    versionedPromptToPromptConfigFormValuesWithSystemMessage: vi.fn((prompt: any) => ({
+      isNew: false,
+      configId: prompt.id,
+      handle: prompt.handle,
+      version: {
+        versionId: prompt.versionId,
+        configData: {
+          llm: prompt.configData?.llm ?? {
+            model: "openai/gpt-4o",
+            temperature: 0.7,
+          },
+          messages: [{ role: "system", content: prompt.prompt ?? "" }],
+          inputs: prompt.inputs ?? [],
+          outputs: prompt.outputs ?? [],
+        },
+        commitMessage: "",
+      },
+    })),
   };
 });
 
 // Mock the conversion utils
 vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
   formValuesToTriggerSaveVersionParams: vi.fn((values) => values),
-  versionedPromptToPromptConfigFormValuesWithSystemMessage: vi.fn((prompt) => ({
-    isNew: false,
-    configId: prompt.id,
-    handle: prompt.handle,
-    version: {
-      versionId: prompt.versionId,
-      configData: {
-        llm: prompt.configData?.llm ?? {
-          model: "openai/gpt-4o",
-          temperature: 0.7,
-        },
-        messages: [{ role: "system", content: prompt.prompt ?? "" }],
-        inputs: prompt.inputs ?? [],
-        outputs: prompt.outputs ?? [],
-      },
-      commitMessage: "",
-    },
-  })),
 }));
 
 // Mock areFormValuesEqual - start with default implementation.

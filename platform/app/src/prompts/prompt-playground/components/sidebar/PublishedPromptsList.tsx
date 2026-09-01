@@ -6,7 +6,7 @@ import { LangyContextTarget } from "@langwatch/langy-web";
 import { promptContextChip } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import { computeInitialFormValuesForPrompt } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PublishedPromptContent } from "./PublishedPromptContent";

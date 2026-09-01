@@ -10,8 +10,10 @@ import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { inferAllTargetMappings } from "~/experiments-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Field } from "@langwatch/workflow-contract";
-import { areFormValuesEqual } from "@langwatch/prompt-web/surfaces/prompt-form";
-import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import {
+  areFormValuesEqual,
+  computeInitialFormValuesForPrompt,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

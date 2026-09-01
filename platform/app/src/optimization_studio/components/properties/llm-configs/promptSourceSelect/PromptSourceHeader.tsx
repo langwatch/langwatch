@@ -8,16 +8,16 @@ import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import {
+  type PromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompts/forms/prompt-config-form/components/VersionSaveButton";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import {
-  formValuesToTriggerSaveVersionParams,
-  versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "~/prompts/utils/llmPromptConfigUtils";
+import { formValuesToTriggerSaveVersionParams } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";

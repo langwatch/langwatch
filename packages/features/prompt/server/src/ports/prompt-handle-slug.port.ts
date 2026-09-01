@@ -6,7 +6,7 @@
  * predate handles, and their `id` (`prompt_<nanoid>`) contains uppercase,
  * which `handleSchema` rejects. A handle that fails the schema is silently
  * treated as invalid and forces the prompt into draft mode when reopened
- * (see `isHandleValid` in `llmPromptConfigUtils.ts`).
+ * (see `isHandleValid` in `versioned-prompt-form-values.ts`).
  */
 export function toHandleSlug(input: string): string {
   const slug = input

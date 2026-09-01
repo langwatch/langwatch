@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabById } from "../../../prompt-playground-store/useTabById";
 import { usePromptTabSummary } from "./usePromptTabSummary";

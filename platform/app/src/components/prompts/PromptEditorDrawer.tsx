@@ -36,11 +36,9 @@ import {
   getSaveBlockerMessage,
   hasNonEmptySystemMessage,
   type PromptConfigFormValues,
-} from "@langwatch/prompt-web/surfaces/prompt-form";
-import {
-  formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "~/prompts/utils/llmPromptConfigUtils";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
+import { formValuesToTriggerSaveVersionParams } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import type { LlmConfigInputType } from "~/types";

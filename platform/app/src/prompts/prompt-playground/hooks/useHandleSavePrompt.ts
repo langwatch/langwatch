@@ -6,13 +6,11 @@ import { showErrorToast } from "~/features/errors";
 import {
   getSaveBlockerMessage,
   type PromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import {
-  formValuesToTriggerSaveVersionParams,
-  versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "~/prompts/utils/llmPromptConfigUtils";
+import { formValuesToTriggerSaveVersionParams } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
