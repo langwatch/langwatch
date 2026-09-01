@@ -20,10 +20,23 @@ type LaneRow = Awaited<
   ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
 >[number];
 
-/** A prisma double that answers the governance-project lookup and nothing else. */
-function prismaWithGovProject(id: string | null) {
+/** One ingestion source, as the stale-source read selects it. */
+type SourceRow = {
+  name: string;
+  status: string;
+  errorCount: number;
+  lastSuccessAt: Date | null;
+};
+
+/**
+ * A prisma double that answers the governance-project lookup and the source
+ * read behind the stale-data notice. `sources` defaults to none, which is the
+ * healthy answer: no source has stopped, so there is nothing to caveat.
+ */
+function prismaWithGovProject(id: string | null, sources: SourceRow[] = []) {
   return {
     project: { findFirst: vi.fn().mockResolvedValue(id ? { id } : null) },
+    ingestionSource: { findMany: vi.fn().mockResolvedValue(sources) },
   } as unknown as Parameters<typeof GovernanceCostService.create>[0]["prisma"];
 }
 
@@ -440,6 +453,105 @@ describe("GovernanceCostService.summary", () => {
         });
 
         expect(result.seats).toEqual({ status: "awaiting_data" });
+      });
+    });
+  });
+
+  // ADR-128 §4a. A source that has stopped pulling reports no spend, so the
+  // lanes fall and the screen looks like a cheap month. These say where the
+  // numbers stop being complete.
+  describe("given a source has stopped pulling", () => {
+    const brokenSince = (iso: string, name: string): SourceRow => ({
+      name,
+      status: "active",
+      errorCount: 5,
+      lastSuccessAt: new Date(iso),
+    });
+
+    describe("when requesting the summary", () => {
+      it("names the source and the day its data stops", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            brokenSince("2026-08-20T09:00:00.000Z", "Azure Billing"),
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.staleSources).toEqual({
+          oldestLastSuccessIso: "2026-08-20T09:00:00.000Z",
+          sourceNames: ["Azure Billing"],
+        });
+      });
+
+      /** @scenario "The gap is dated from the first source that fell over" */
+      it("dates the gap from the first source that fell over, not the last", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            brokenSince("2026-08-25T09:00:00.000Z", "OpenAI Compliance"),
+            brokenSince("2026-08-20T09:00:00.000Z", "Azure Billing"),
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        // The totals stopped being whole when the earlier one broke.
+        expect(result.staleSources?.oldestLastSuccessIso).toBe(
+          "2026-08-20T09:00:00.000Z",
+        );
+        expect(result.staleSources?.sourceNames).toEqual([
+          "Azure Billing",
+          "OpenAI Compliance",
+        ]);
+      });
+    });
+  });
+
+  describe("given every source is still pulling", () => {
+    describe("when requesting the summary", () => {
+      /** @scenario "A source nobody asked to run is not reported as an outage" */
+      it("says nothing, rather than caveating figures that are whole", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            {
+              name: "Azure Billing",
+              status: "active",
+              errorCount: 0,
+              lastSuccessAt: new Date("2026-09-01T09:00:00.000Z"),
+            },
+            // Switched off on purpose. A source nobody asked to run has not
+            // stopped pulling, and an outage notice here would be a lie.
+            {
+              name: "Retired Source",
+              status: "disabled",
+              errorCount: 9,
+              lastSuccessAt: new Date("2026-01-01T09:00:00.000Z"),
+            },
+            // Never succeeded, so there is no "since" to name.
+            {
+              name: "Brand New",
+              status: "active",
+              errorCount: 5,
+              lastSuccessAt: null,
+            },
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.staleSources).toBeNull();
       });
     });
   });

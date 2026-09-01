@@ -7,7 +7,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { GovernanceCostSummaryDto } from "@ee/governance/services/governanceCost.service";
+import type {
+  GovernanceCostStaleSourcesDto,
+  GovernanceCostSummaryDto,
+} from "@ee/governance/services/governanceCost.service";
 import numeral from "numeral";
 import { useMemo, useState } from "react";
 
@@ -240,6 +243,7 @@ function CostsBody({
 
   return (
     <VStack align="stretch" gap={6}>
+      <StaleSourcesNotice staleSources={data.staleSources} />
       <HStack align="stretch" gap={4} flexWrap="wrap">
         <CostLanePanel
           testId="cost-lane-billed"
@@ -259,6 +263,44 @@ function CostsBody({
       </HStack>
       <CostLanesChart series={data.series} />
     </VStack>
+  );
+}
+
+/**
+ * Where the numbers below stop being complete (ADR-128 §4a).
+ *
+ * A source that has stopped pulling still has a lane on this screen; it just
+ * contributes nothing to it, so the totals fall and nothing says why. Without
+ * this line a broken credential reads as a cheap month, which is the one
+ * reading of a cost screen that is worse than no cost screen.
+ *
+ * The sources are named because "something stopped" is not actionable and
+ * "Azure Billing stopped" is.
+ */
+function StaleSourcesNotice({
+  staleSources,
+}: {
+  staleSources: GovernanceCostStaleSourcesDto | null;
+}) {
+  if (!staleSources) return null;
+
+  const since = new Date(staleSources.oldestLastSuccessIso).toLocaleDateString(
+    undefined,
+    { year: "numeric", month: "short", day: "numeric" },
+  );
+
+  return (
+    <Alert.Root status="warning" data-testid="cost-stale-sources">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>No data since {since}</Alert.Title>
+        <Alert.Description>
+          {staleSources.sourceNames.join(", ")}{" "}
+          {staleSources.sourceNames.length === 1 ? "has" : "have"} stopped
+          pulling, so spend after that point is unknown rather than zero.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

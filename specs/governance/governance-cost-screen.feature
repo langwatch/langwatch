@@ -201,6 +201,47 @@ Feature: One cost screen, three honest lanes
     When a permitted viewer opens the cost screen
     Then the billed lane shows the negative amount as reported
 
+  Rule: The screen says where its numbers stop being complete
+    # ADR-128 4a. A source that has stopped pulling is not asked about
+    # anything, so it reports no spend, so the lanes fall. On screen that is
+    # indistinguishable from a cheap month, and a reader who takes an outage
+    # for a saving is worse off than one with no cost screen at all. The
+    # source pages already carry this line; only someone already suspicious
+    # goes there.
+
+    @integration
+    Scenario: The cost screen says where its numbers stop being complete
+      Given a contributing source that has stopped pulling
+      When a permitted viewer opens the cost screen
+      Then the screen names that source and the day its data stops
+      And the lanes are still shown
+      # The figures are caveated, not withdrawn. What was pulled before the
+      # outage is still the truth about those days.
+
+    @integration
+    Scenario: A screen whose sources are all pulling carries no outage notice
+      Given every contributing source pulling successfully
+      When a permitted viewer opens the cost screen
+      Then the screen carries no outage notice
+      # A caveat on whole figures teaches the reader to ignore caveats.
+
+    @unit
+    Scenario: The gap is dated from the first source that fell over
+      Given two contributing sources that stopped pulling on different days
+      When the cost summary is read
+      Then the gap is dated from the earlier of the two
+      # The totals stopped being whole when the first one broke, not the last.
+
+    @unit
+    Scenario: A source nobody asked to run is not reported as an outage
+      Given a disabled source whose last runs failed before it was switched off
+      And a source that has never pulled successfully
+      When the cost summary is read
+      Then neither is reported as having stopped pulling
+      # A disabled source is not failing to run, it is doing what an admin
+      # chose. One that never succeeded has no "since" to name, and its
+      # awaiting-first-event badge already says so.
+
   Rule: The seat lane reads the newest report of each pool, and nobody else's
 
     A licence count is a standing fact, not a running total. Each read of a

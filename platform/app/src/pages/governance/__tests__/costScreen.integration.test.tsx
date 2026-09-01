@@ -150,6 +150,8 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
     seats: { status: "awaiting_data" },
     series: [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }],
     windowDays: 30,
+    // Every source still pulling, so the figures need no caveat.
+    staleSources: null,
     ...overrides,
   };
 }
@@ -372,6 +374,68 @@ describe("the governance cost screen", () => {
       renderScreen();
 
       expect(screen.queryByTestId("cost-lane-billed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the per-day lane chart", () => {
+    // Both testids shipped unasserted, so nothing caught the chart swapping
+    // its populated and empty states.
+    it("draws the chart when the window holds days", () => {
+      renderScreen();
+
+      expect(screen.getByTestId("cost-lanes-chart")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("cost-lanes-chart-empty"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says the window is empty rather than drawing an empty chart", () => {
+      harness.query = {
+        data: summaryFixture({ series: [] }),
+        isLoading: false,
+        isError: false,
+      };
+
+      renderScreen();
+
+      expect(screen.getByTestId("cost-lanes-chart-empty")).toBeInTheDocument();
+      expect(screen.queryByTestId("cost-lanes-chart")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a contributing source has stopped pulling", () => {
+    /** @scenario "The cost screen says where its numbers stop being complete" */
+    it("names the source and the day, next to the lanes it undercounts", () => {
+      harness.query = {
+        data: summaryFixture({
+          staleSources: {
+            oldestLastSuccessIso: "2026-08-20T09:00:00.000Z",
+            sourceNames: ["Azure Billing"],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+
+      renderScreen();
+
+      const notice = screen.getByTestId("cost-stale-sources");
+      expect(within(notice).getByText(/Azure Billing/)).toBeInTheDocument();
+      expect(
+        within(notice).getByText(/unknown rather than zero/i),
+      ).toBeInTheDocument();
+      // The lanes still render. A stalled pull caveats the figures; it does
+      // not withdraw them.
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
+    });
+
+    /** @scenario "A screen whose sources are all pulling carries no outage notice" */
+    it("stays silent while every source is still pulling", () => {
+      renderScreen();
+
+      expect(
+        screen.queryByTestId("cost-stale-sources"),
+      ).not.toBeInTheDocument();
     });
   });
 });

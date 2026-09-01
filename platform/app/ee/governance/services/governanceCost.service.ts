@@ -31,6 +31,7 @@ import type {
   GovernanceSeatReportRow,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { resolveGovProjectId } from "@ee/governance/services/govProject";
+import { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
@@ -105,6 +106,25 @@ export interface GovernanceCostDayDto {
   gatewayUsd: number | null;
 }
 
+/**
+ * The point after which the lanes are missing at least one source (ADR-128 §4a).
+ *
+ * A source that has stopped pulling is not asked about anything, so it reports
+ * no spend, so the lanes quietly fall. That is indistinguishable on screen
+ * from a cheap month, and it is the difference between "we spent nothing" and
+ * "we do not know" — which is why this is surfaced rather than left to the
+ * source pages, where only someone already suspicious would look.
+ *
+ * The date is the OLDEST last-success among the stopped sources, because the
+ * totals stop being complete at the first one that fell over, not the last.
+ */
+export interface GovernanceCostStaleSourcesDto {
+  /** Oldest successful pull among the sources that have stopped. */
+  oldestLastSuccessIso: string;
+  /** Names of the stopped sources, alphabetical, so the notice can say which. */
+  sourceNames: string[];
+}
+
 export interface GovernanceCostSummaryDto {
   /**
    * Null when the screen has figures to show. Non-null means every lane is
@@ -120,6 +140,8 @@ export interface GovernanceCostSummaryDto {
   /** Oldest day first. Empty while unavailable. */
   series: GovernanceCostDayDto[];
   windowDays: number;
+  /** Null when every source is still pulling. */
+  staleSources: GovernanceCostStaleSourcesDto | null;
 }
 
 /** A lane nobody has a figure for. Null, never zero — see the file header. */
@@ -141,6 +163,9 @@ function unavailable({
     seats: { status: "awaiting_data" },
     series: [],
     windowDays,
+    // An unavailable screen has no lanes to caveat. The reason it prints
+    // already outranks "a source stopped pulling".
+    staleSources: null,
   };
 }
 
@@ -225,9 +250,10 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats] = await Promise.all([
+    const [rows, seats, staleSources] = await Promise.all([
       costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
       this.readSeats({ tenantId }),
+      this.readStaleSources({ organizationId }),
     ]);
 
     return {
@@ -237,6 +263,54 @@ export class GovernanceCostService {
       seats,
       series: seriesFrom(rows),
       windowDays,
+      staleSources,
+    };
+  }
+
+  /**
+   * Which sources have stopped pulling, and how far back the lanes are whole.
+   *
+   * Every non-archived source counts, not only the ones that produced rows in
+   * this window. A source broken for longer than the window produces nothing
+   * at all, and that is precisely the case where the screen most needs to say
+   * so — filtering on "contributed recently" would hide the worst outages.
+   */
+  private async readStaleSources({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GovernanceCostStaleSourcesDto | null> {
+    const sources = await this.deps.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: {
+        name: true,
+        status: true,
+        errorCount: true,
+        lastSuccessAt: true,
+      },
+    });
+
+    const stopped = sources.flatMap((source) => {
+      const notice = noDataSinceNotice({
+        status: source.status,
+        errorCount: source.errorCount,
+        lastSuccessAt: source.lastSuccessAt,
+      });
+      return notice
+        ? [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }]
+        : [];
+    });
+    if (stopped.length === 0) return null;
+
+    // Both ISO strings are UTC and fixed-width, so ordering them as text
+    // orders them as instants.
+    const oldest = stopped.reduce((earliest, candidate) =>
+      candidate.lastSuccessIso < earliest.lastSuccessIso ? candidate : earliest,
+    );
+
+    return {
+      oldestLastSuccessIso: oldest.lastSuccessIso,
+      sourceNames: stopped.map((source) => source.name).sort(),
     };
   }
 
