@@ -21,7 +21,17 @@ const LANGY_PAGE_CONTEXT = [
   {
     id: "dashboard:custom-chart-playground",
     kind: "dashboard" as const,
-    label: "Custom chart playground",
+    // Describes the resource, not an instruction (chip labels are rendered
+    // verbatim as page context, never as steering — see
+    // langyTurnContext.schema.ts, and are capped at MAX_LABEL_LENGTH=200).
+    // Names the current widget shape and where to read the full contract,
+    // the same way any other resource chip names what it points at, so the
+    // agent knows this page's format has moved off the raw-HTML srcdocHtml
+    // shape it may have seen elsewhere in the repo's history.
+    label:
+      "Custom chart playground: each widget is one React/TSX file (default " +
+      "export, may import react/react-dom/recharts) plus named LangWatchQL " +
+      "queries. Format: server/analytics/playgroundWidgetDefinition.ts",
   },
 ];
 
