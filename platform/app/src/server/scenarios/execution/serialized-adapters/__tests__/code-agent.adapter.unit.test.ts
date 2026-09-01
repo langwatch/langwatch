@@ -4,6 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { guardAgainstGlobalFetch } from "../../../../../test-utils/globalFetchGuard";
 import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { CodeAgentData } from "../../types";
 
@@ -97,19 +98,9 @@ vi.mock("undici", async () => {
   };
 });
 
-// The global fetch must never be used with an npm-undici dispatcher: Node's
-// global fetch is bound to the undici bundled with Node, and rejects one with
-// "invalid onRequestStart method". Pointing the global at the same mock would
-// let a regression back to it pass this suite, which is how that bug reached
-// production once already.
-vi.stubGlobal(
-  "fetch",
-  vi.fn(() => {
-    throw new Error(
-      "the adapter must call undici's fetch, not the global fetch",
-    );
-  }),
-);
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite, which is how that bug reached production once already.
+guardAgainstGlobalFetch();
 
 describe("SerializedCodeAgentAdapter", () => {
   const defaultConfig: CodeAgentData = {

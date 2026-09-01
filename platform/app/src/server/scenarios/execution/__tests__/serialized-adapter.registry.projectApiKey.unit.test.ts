@@ -22,6 +22,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { guardAgainstGlobalFetch } from "../../../../test-utils/globalFetchGuard";
 import { createAdapter } from "../serialized-adapter.registry";
 import type {
   CodeAgentData,
@@ -40,18 +41,9 @@ vi.mock("undici", async () => {
   return { ...actual, fetch: mockFetch };
 });
 
-// The global fetch must never be used with an npm-undici dispatcher: Node's
-// global fetch is bound to the undici bundled with Node, and rejects one with
-// "invalid onRequestStart method". Pointing the global at the same mock would
-// let a regression back to it pass this suite.
-vi.stubGlobal(
-  "fetch",
-  vi.fn(() => {
-    throw new Error(
-      "the adapter must call undici's fetch, not the global fetch",
-    );
-  }),
-);
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite.
+guardAgainstGlobalFetch();
 
 const defaultInput = {
   threadId: "thread_1",
