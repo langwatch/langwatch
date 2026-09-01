@@ -13,6 +13,7 @@
  * removes those panels rather than emptying them: a permanently blank panel
  * would imply we looked and found nothing.
  */
+import { useRef } from "react";
 
 /**
  * What the real reads have told us so far. `unknown` is a distinct answer
@@ -41,6 +42,39 @@ export function resolveRealDataState(
 }
 
 /**
+ * Hold the last real answer across a gap in the reads.
+ *
+ * Changing a filter chip re-keys every activity query, and until the new
+ * window lands they all read as unanswered again. Recomputing the default from
+ * that gap would take an organization that we already know is empty, decide we
+ * no longer know, and pull the sample panels off the screen until the new
+ * reads arrive — a flicker on every filter change. An answer we have already
+ * had stands until a later one replaces it.
+ */
+export function settleRealDataState(
+  previous: RealDataState,
+  current: RealDataState,
+): RealDataState {
+  return current === "unknown" ? previous : current;
+}
+
+/**
+ * `settleRealDataState` applied across renders. Writing the ref during render
+ * is safe because the result depends only on the arguments, so a repeated
+ * render reaches the same answer.
+ */
+export function useSettledRealDataState(
+  reads: ReadonlyArray<{ length: number } | null>,
+): RealDataState {
+  const settled = useRef<RealDataState>("unknown");
+  settled.current = settleRealDataState(
+    settled.current,
+    resolveRealDataState(reads),
+  );
+  return settled.current;
+}
+
+/**
  * Whether the sample panels render.
  *
  * `optIn` is the reader's own choice — `null` until they touch the toggle,
@@ -58,4 +92,3 @@ export function sampleModeActive({
   if (optIn !== null) return optIn;
   return realData === "absent";
 }
-

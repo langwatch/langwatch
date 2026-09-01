@@ -10,7 +10,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveRealDataState, sampleModeActive } from "../costSampleMode";
+import {
+  resolveRealDataState,
+  sampleModeActive,
+  settleRealDataState,
+} from "../costSampleMode";
 
 describe("reading the real cost reads", () => {
   describe("given every read has answered with rows", () => {
@@ -66,6 +70,31 @@ describe("deciding whether the sample panels render", () => {
       expect(sampleModeActive({ optIn: false, realData: "absent" })).toBe(
         false,
       );
+    });
+  });
+});
+
+describe("holding the answer across a gap in the reads", () => {
+  describe("given the reads go unanswered again", () => {
+    it("keeps the empty screen empty instead of forgetting it", () => {
+      expect(settleRealDataState("absent", "unknown")).toBe("absent");
+    });
+
+    it("keeps real figures real instead of forgetting them", () => {
+      expect(settleRealDataState("present", "unknown")).toBe("present");
+    });
+  });
+
+  describe("given a later window answers", () => {
+    it("takes the new answer over the held one", () => {
+      expect(settleRealDataState("absent", "present")).toBe("present");
+      expect(settleRealDataState("present", "absent")).toBe("absent");
+    });
+  });
+
+  describe("given nothing has answered yet", () => {
+    it("has nothing to hold", () => {
+      expect(settleRealDataState("unknown", "unknown")).toBe("unknown");
     });
   });
 });

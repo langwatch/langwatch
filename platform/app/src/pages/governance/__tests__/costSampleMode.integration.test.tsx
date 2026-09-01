@@ -101,12 +101,28 @@ import CostsPage from "../costs";
 /** One of the seven invented panels. If this is on screen, samples are on. */
 const A_SAMPLE_PANEL = "Tokens over time";
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <CostsPage />
-    </ChakraProvider>,
-  );
+const screenTree = () => (
+  <ChakraProvider value={defaultSystem}>
+    <CostsPage />
+  </ChakraProvider>
+);
+
+const renderScreen = () => render(screenTree());
+
+/**
+ * Every activity read goes back to unanswered, which is what react-query hands
+ * the page the instant a filter chip re-keys the queries. A fresh element each
+ * time, so React cannot bail out of reconciliation on reference equality.
+ */
+const withReadsBackInFlight = (rerender: (ui: React.ReactElement) => void) => {
+  harness.activity = {
+    summary: undefined,
+    spendByDepartment: undefined,
+    spendByUser: undefined,
+    spendOverTime: undefined,
+  };
+  rerender(screenTree());
+};
 
 /** Every real read answers, and one of them holds a row. */
 const withRealFigures = () => {
@@ -172,6 +188,14 @@ describe("the sample panels on the cost screen", () => {
         screen.getByRole("button", { name: "See sample data" }),
       ).toBeInTheDocument();
     });
+
+    it("does not let a filter change put the invented panels back", () => {
+      const { rerender } = renderScreen();
+
+      withReadsBackInFlight(rerender);
+
+      expect(screen.queryByText(A_SAMPLE_PANEL)).not.toBeInTheDocument();
+    });
   });
 
   describe("given the reads answered and measured nothing", () => {
@@ -189,6 +213,14 @@ describe("the sample panels on the cost screen", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         /nothing here is real/i,
       );
+    });
+
+    it("does not pull the invented panels away on a filter change", () => {
+      const { rerender } = renderScreen();
+
+      withReadsBackInFlight(rerender);
+
+      expect(screen.getByText(A_SAMPLE_PANEL)).toBeInTheDocument();
     });
   });
 

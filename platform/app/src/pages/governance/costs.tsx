@@ -31,8 +31,8 @@ import {
   CostSampleToggle,
 } from "~/components/governance/costs/CostSampleControls";
 import {
-  resolveRealDataState,
   sampleModeActive,
+  useSettledRealDataState,
 } from "~/components/governance/costs/costSampleMode";
 import {
   ALL_DEPARTMENTS,
@@ -128,13 +128,19 @@ function CostsPage() {
   // explorer applies to its sample traces — opting in is a decision about this
   // sitting, not a preference that follows you back tomorrow.
   const [sampleOptIn, setSampleOptIn] = useState<boolean | null>(null);
+  // Adoption counts as real data even with no spend behind it yet: showing a
+  // measured headcount beside invented money is the confusion this toggle
+  // exists to prevent.
   const showSample = sampleModeActive({
     optIn: sampleOptIn,
-    realData: resolveRealDataState([
+    realData: useSettledRealDataState([
       breakdowns.departmentRows,
       breakdowns.userRows,
       breakdowns.overTime,
       breakdowns.modelOverTime,
+      breakdowns.activeUsers === null
+        ? null
+        : { length: breakdowns.activeUsers },
     ]),
   });
 
