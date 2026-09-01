@@ -36,9 +36,7 @@ export interface TeamRepository {
    * (`src/server/__tests__/projectFilter.invariant.integration.test.ts`) can
    * drive this listing the way it drives every other one.
    */
-  findProjectsInTeam(params: {
-    teamId: string;
-  }): Promise<TeamProjectListing[]>;
+  findProjectsInTeam(params: { teamId: string }): Promise<TeamProjectListing[]>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;

@@ -53,6 +53,17 @@ Feature: Pulled provider cost has a home and never leaks
     And the same listing without the safeguard would have contained it
 
   @integration
+  Scenario: Every filtered project listing is a surface the leak gate drives
+    # The scenario above only proves the surfaces it names. A listing added
+    # later would filter the home on the day it lands and could quietly stop
+    # filtering it a year on with nothing failing, because no surface drives
+    # it. This closes that gap in both directions.
+    Given the sweep finds the project repository among the modules that filter the home
+    When every filtering module is matched against the surfaces this gate drives
+    Then no filtering module is left without a surface that proves it keeps filtering
+    And no surface names a module that no longer filters
+
+  @integration
   Scenario: A homed pulled row still never counts against spending limits
     Given a team whose spending is at its limit
     When a pulled usage record is stored under the governance home
