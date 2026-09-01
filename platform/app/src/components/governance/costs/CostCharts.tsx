@@ -49,10 +49,27 @@ export function formatDayTick(day: string | number): string {
   });
 }
 
-function EmptyPanel({ height }: { height: string }) {
+/**
+ * The two reasons a panel has nothing to draw, kept apart on purpose.
+ *
+ * A read that answered with no rows measured the window and found it empty.
+ * A read that never answered — still in flight, or never allowed to run —
+ * measured nothing at all. "Nothing in this window yet" is a result, so
+ * showing it for the second case reports a finding the screen does not have.
+ * `null` rows mean unanswered; an empty array means measured-and-empty.
+ */
+function EmptyPanel({
+  height,
+  unanswered,
+}: {
+  height: string;
+  unanswered: boolean;
+}) {
   return (
     <VStack align="center" justify="center" height={height} color="fg.muted">
-      <Text fontSize="sm">Nothing in this window yet.</Text>
+      <Text fontSize="sm">
+        {unanswered ? "Not available." : "Nothing in this window yet."}
+      </Text>
     </VStack>
   );
 }
@@ -67,17 +84,21 @@ export function CostRankList({
   format = fmtMoney,
   maxRows = 8,
 }: {
-  rows: RankRow[];
+  rows: RankRow[] | null;
   format?: (value: number) => string;
   maxRows?: number;
 }) {
   const shown = useMemo(
-    () => [...rows].sort((a, b) => b.value - a.value).slice(0, maxRows),
+    // Copied before sorting: these rows can be a query cache, and sorting in
+    // place would reorder what every other reader of that cache sees.
+    () => [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, maxRows),
     [rows, maxRows],
   );
   const leader = shown[0]?.value ?? 0;
 
-  if (shown.length === 0) return <EmptyPanel height="220px" />;
+  if (rows === null) return <EmptyPanel height="220px" unanswered />;
+  if (shown.length === 0)
+    return <EmptyPanel height="220px" unanswered={false} />;
 
   return (
     <VStack align="stretch" gap={2}>
@@ -124,7 +145,7 @@ export function CostDonut({ rows }: { rows: RankRow[] }) {
   );
   const total = shown.reduce((sum, row) => sum + row.value, 0);
 
-  if (total === 0) return <EmptyPanel height="220px" />;
+  if (total === 0) return <EmptyPanel height="220px" unanswered={false} />;
 
   return (
     <HStack align="center" gap={4}>
@@ -232,15 +253,20 @@ export function CostStackedBars({
   format = fmtMoney,
   showLegend = true,
 }: {
-  buckets: DailyBucket[];
+  buckets: DailyBucket[] | null;
   height?: string;
   format?: (value: number) => string;
   showLegend?: boolean;
 }) {
-  const keys = useMemo(() => seriesKeysOf(buckets), [buckets]);
-  const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
+  const keys = useMemo(() => seriesKeysOf(buckets ?? []), [buckets]);
+  const rows = useMemo(
+    () => widenBuckets(buckets ?? [], keys),
+    [buckets, keys],
+  );
 
-  if (rows.length === 0) return <EmptyPanel height={height} />;
+  if (buckets === null) return <EmptyPanel height={height} unanswered />;
+  if (rows.length === 0)
+    return <EmptyPanel height={height} unanswered={false} />;
 
   return (
     <Box height={height}>
@@ -301,7 +327,8 @@ export function CostForecastArea({
   const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
   const lastDay = rows[rows.length - 1]?.day;
 
-  if (rows.length === 0) return <EmptyPanel height={height} />;
+  if (rows.length === 0)
+    return <EmptyPanel height={height} unanswered={false} />;
 
   return (
     <Box height={height}>
@@ -381,7 +408,8 @@ export function CostLine({
   height?: string;
   format?: (value: number) => string;
 }) {
-  if (points.length === 0) return <EmptyPanel height={height} />;
+  if (points.length === 0)
+    return <EmptyPanel height={height} unanswered={false} />;
 
   return (
     <Box height={height}>

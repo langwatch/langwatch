@@ -215,17 +215,29 @@ function CostsBody({
   );
 }
 
+/**
+ * What the activity reads have answered so far.
+ *
+ * Every field is nullable and `null` means the read has not answered — still in
+ * flight, or never allowed to run because the viewer lacks the grant. It is
+ * deliberately NOT collapsed to `0`/`[]`: this screen does not show a figure it
+ * did not measure, and a zero is a measurement.
+ */
 interface Breakdowns {
   departments: Array<{ id: string; name: string }>;
   departmentRows: Array<{
     departmentId: string | null;
     departmentName: string;
     spendUsd: string;
-  }>;
-  userRows: Array<{ actor: string; spendUsd: string; requests: number }>;
-  activeUsers: number;
-  overTime: DailyBucket[];
-  modelOverTime: DailyBucket[];
+  }> | null;
+  userRows: Array<{
+    actor: string;
+    spendUsd: string;
+    requests: number;
+  }> | null;
+  activeUsers: number | null;
+  overTime: DailyBucket[] | null;
+  modelOverTime: DailyBucket[] | null;
 }
 
 /** Wire buckets carry money as strings; the charts want numbers. */
@@ -280,17 +292,22 @@ function useBreakdownQueries({
     options,
   );
 
-  const departmentRows = byDepartment.data ?? [];
+  const departmentRows = byDepartment.data ?? null;
   return {
     departmentRows,
-    departments: departmentRows.map((row) => ({
+    // The picker is the one place an unanswered read may fall back to empty:
+    // it offers choices, it does not report a measurement.
+    departments: (departmentRows ?? []).map((row) => ({
       id: row.departmentId ?? "unassigned",
       name: row.departmentName,
     })),
-    userRows: byUser.data ?? [],
-    activeUsers: summary.data?.activeUsersThisWindow ?? 0,
-    overTime: toDailyBuckets(overTime.data),
-    modelOverTime: toDailyBuckets(byModel.data),
+    userRows: byUser.data ?? null,
+    activeUsers: summary.data?.activeUsersThisWindow ?? null,
+    // `.buckets`, not the result object: the read answers a wrapper, and
+    // handing the wrapper to a function that maps over an array throws the
+    // moment a real answer arrives.
+    overTime: overTime.data ? toDailyBuckets(overTime.data.buckets) : null,
+    modelOverTime: byModel.data ? toDailyBuckets(byModel.data.buckets) : null,
   };
 }
 
@@ -323,17 +340,30 @@ function CostBreakdowns({
   );
   const sample = useSampleSeries(days, filters.interval);
 
-  const departmentRows = breakdowns.departmentRows
-    .filter(
-      (row) =>
-        filters.department === ALL_DEPARTMENTS ||
-        (row.departmentId ?? "unassigned") === filters.department,
-    )
-    .map((row) => ({
-      key: row.departmentId ?? "unassigned",
-      label: row.departmentName,
-      value: Number(row.spendUsd),
-    }));
+  // Null in, null out — an unanswered read stays unanswered all the way to the
+  // panel rather than turning into an empty list that reads as a measurement.
+  const departmentRows =
+    breakdowns.departmentRows === null
+      ? null
+      : breakdowns.departmentRows
+          .filter(
+            (row) =>
+              filters.department === ALL_DEPARTMENTS ||
+              (row.departmentId ?? "unassigned") === filters.department,
+          )
+          .map((row) => ({
+            key: row.departmentId ?? "unassigned",
+            label: row.departmentName,
+            value: Number(row.spendUsd),
+          }));
+  const userRows =
+    breakdowns.userRows === null
+      ? null
+      : breakdowns.userRows.map((row) => ({
+          key: row.actor,
+          label: row.actor,
+          value: Number(row.spendUsd),
+        }));
 
   return (
     <VStack align="stretch" gap={4}>
@@ -360,7 +390,11 @@ function CostBreakdowns({
         </CostPanel>
         <CostPanel title={`Cost evolution by ${filters.groupBy}`}>
           <CostStackedBars
-            buckets={aggregateBuckets(breakdowns.overTime, filters.interval)}
+            buckets={
+              breakdowns.overTime === null
+                ? null
+                : aggregateBuckets(breakdowns.overTime, filters.interval)
+            }
           />
         </CostPanel>
         <CostPanel title="Cost by department">
@@ -371,16 +405,16 @@ function CostBreakdowns({
           <CostRankList rows={sample.agents} />
         </CostPanel>
         <CostPanel title="Cost by model">
-          <CostRankList rows={totalPerSeries(breakdowns.modelOverTime)} />
+          <CostRankList
+            rows={
+              breakdowns.modelOverTime === null
+                ? null
+                : totalPerSeries(breakdowns.modelOverTime)
+            }
+          />
         </CostPanel>
         <CostPanel title="Cost by user">
-          <CostRankList
-            rows={breakdowns.userRows.map((row) => ({
-              key: row.actor,
-              label: row.actor,
-              value: Number(row.spendUsd),
-            }))}
-          />
+          <CostRankList rows={userRows} />
         </CostPanel>
 
         <CostPanel title="Genie questions over time" sample>
@@ -401,20 +435,30 @@ function CostBreakdowns({
   );
 }
 
+/**
+ * Active users for the window, and only that.
+ *
+ * An interaction count used to sit beside it, summed from the ranked user
+ * rows — but that read is a top-8, so the sum was the leaders' share wearing
+ * the name of an organization-wide total. There is no whole-window
+ * interaction count to put there instead, so the figure is gone rather than
+ * quietly wrong.
+ */
 function AdoptionRow({ breakdowns }: { breakdowns: Breakdowns }) {
-  const interactions = breakdowns.userRows.reduce(
-    (sum, row) => sum + row.requests,
-    0,
-  );
   return (
     <CostPanel title="Adoption">
-      <HStack gap={10} align="flex-end">
-        <Stat
-          label="Users"
-          value={numeral(breakdowns.activeUsers).format("0,0")}
-        />
-        <Stat label="Interactions" value={fmtCount(interactions)} />
-      </HStack>
+      {breakdowns.activeUsers === null ? (
+        <Text fontSize="sm" color="fg.muted">
+          Not available.
+        </Text>
+      ) : (
+        <HStack gap={10} align="flex-end">
+          <Stat
+            label="Users"
+            value={numeral(breakdowns.activeUsers).format("0,0")}
+          />
+        </HStack>
+      )}
     </CostPanel>
   );
 }
