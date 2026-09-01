@@ -521,6 +521,17 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # the bill and does so silently.
 
   @unit
+  Scenario: A next page cannot move the Azure token to another host
+    Given the puller is reading the bill from Azure Resource Manager
+    When a response offers a next page somewhere that is not Resource Manager
+    Then the puller holds the window rather than following it
+    # The link arrives inside a reply and would be followed carrying the
+    # bearer, so where it points is decided by parsing it, not by comparing
+    # text. A name that merely begins with Resource Manager's is not Resource
+    # Manager, and neither is its real name reached on another port or behind
+    # credentials smuggled in front of the host.
+
+  @unit
   Scenario: A cursor written before cost existed is still read
     Given a source whose stored position was written before cost was ever read
     When the puller runs

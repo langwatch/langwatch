@@ -1293,10 +1293,29 @@ describe("given an Azure bill that does not fit in one reply", () => {
         "https://management.azure.com/next-page",
       );
     });
+
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("still follows it when it differs from ARM's own only in letter case", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://MANAGEMENT.AZURE.COM/next-page",
+        }),
+      });
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 2.5 }),
+      });
+
+      expect(await readTheBill()).not.toBeNull();
+      expect(costCalls()).toHaveLength(2);
+    });
   });
 
   describe("when the next page points somewhere that is not Azure", () => {
-    /** @scenario "A cost reply spread over several pages is read whole" */
+    /** @scenario "A next page cannot move the Azure token to another host" */
     it("holds the window rather than report half a bill", async () => {
       responseQueue.push({
         status: 200,
@@ -1315,7 +1334,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
   });
 
   describe("when the next page is dressed up to look like Azure", () => {
-    /** @scenario "A cost reply spread over several pages is read whole" */
+    /** @scenario "A next page cannot move the Azure token to another host" */
     it.each([
       // The host carries on past the name ARM answers to.
       "https://management.azure.com.evil.example/next",
@@ -1347,25 +1366,11 @@ describe("given an Azure bill that does not fit in one reply", () => {
       expect(await readTheBill()).toBeNull();
       // One call: the first page. The dressed-up link was never followed.
       expect(costCalls()).toHaveLength(1);
-    });
-
-    /** @scenario "A cost reply spread over several pages is read whole" */
-    it("still follows Azure's own link when it differs only in letter case", async () => {
-      responseQueue.push({
-        status: 200,
-        body: costPage({
-          day: 20260801,
-          cost: 1.5,
-          nextLink: "https://MANAGEMENT.AZURE.COM/next-page",
-        }),
-      });
-      responseQueue.push({
-        status: 200,
-        body: costPage({ day: 20260801, cost: 2.5 }),
-      });
-
-      expect(await readTheBill()).not.toBeNull();
-      expect(costCalls()).toHaveLength(2);
+      // And the refusal is said out loud. A window that stalls silently is
+      // indistinguishable to an operator from one they have no permission on.
+      expect(errors.join(" ")).toContain(
+        "refusing an Azure cost next-page link",
+      );
     });
   });
 
