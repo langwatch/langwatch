@@ -28,6 +28,7 @@ import {
   ApiProductionComposition,
   composeApiDatabase,
   LoggedApiQueueAbsence,
+  resolveApiMetrics,
 } from "./api-production.composition";
 
 /**
@@ -101,13 +102,23 @@ export type ApiProductAdapters = Readonly<{
  * settings-secret port is a delegate over the cipher this process already
  * builds. Nothing here composes one today, because nothing here composes the
  * organization service that would take it.
+ *
+ * `ApiMetricsPort` left the list last, and it left for a different reason from
+ * everything above it: nothing it needed lived with the legacy application at
+ * all. It was here because no LangWatch package exposed a scrape surface for a
+ * standalone process to compose, so the Group Queue samples this process
+ * records went into a registry nothing could ever read. This process now
+ * renders that registry itself, behind the credential every tier already
+ * reads ({@link resolveApiMetrics}). It unlocks no product transport, and it
+ * is worth saying so: what a process can be scraped for is not what it can
+ * serve. The four entries that remain still name ports whose only
+ * implementation is the legacy application's.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
   "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
   "AuthzGrantsCommandDispatcher and AuthzRevocationTelemetry: the grant command pipeline",
   "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
   "IdentityEmailService and the Better Auth browser-session transport",
-  "ApiMetricsPort: no process-owned metric registry exists yet",
 ] as const;
 
 export type ApiStandaloneCompositionOptions = {
@@ -164,9 +175,8 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
       "API process started without product transports: no host supplied its service adapters",
     );
 
-    const routes = ApiProcessLifecycleRoutes.create(
-      this.options.metrics ? { metrics: this.options.metrics } : {},
-    );
+    const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
+    const routes = ApiProcessLifecycleRoutes.create(metrics ? { metrics } : {});
     const observability = createProcessObservability(options.observability);
     return ApiStandaloneProcess.create({
       listener: ApiHttpListener.create({

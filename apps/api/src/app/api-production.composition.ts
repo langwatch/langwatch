@@ -26,6 +26,10 @@ import {
   ApiQueueInfrastructure,
 } from "../platform/infrastructure/api-queue.infrastructure";
 import {
+  ApiMetricsAbsenceReportPort,
+  ApiMetricsInfrastructure,
+} from "../platform/infrastructure/api-metrics.infrastructure";
+import {
   ApiSecretEncryptionAbsenceReportPort,
   ApiSecretEncryptionInfrastructure,
 } from "../platform/infrastructure/api-secret-encryption.infrastructure";
@@ -75,6 +79,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     auth: ApiAuthSessionCompositionPort;
     audit?: ApiAuditPort;
     readiness?: ApiReadinessPort;
+    /**
+     * A host's already-composed metrics transport, when it has one.
+     *
+     * Optional since this process can build its own: see
+     * {@link resolveApiMetrics} for which wins.
+     */
     metrics?: ApiMetricsPort;
     featureDrain?: ApiFeatureDrainPort;
     queueStorage?: GroupQueueStoragePort;
@@ -129,7 +139,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     private readonly projectRestPolicy: ApiRestProjectPolicy,
     private readonly audit: ApiAuditPort | undefined,
     private readonly readiness: ApiReadinessPort | undefined,
-    private readonly metrics: ApiMetricsPort | undefined,
+    private readonly injectedMetrics: ApiMetricsPort | undefined,
     private readonly featureDrain: ApiFeatureDrainPort | undefined,
     private readonly queueStorage: GroupQueueStoragePort | undefined,
   ) {
@@ -150,7 +160,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       graph: options.graph,
       featureDrain: this.featureDrain,
       readiness: this.readiness ?? queueInfrastructure?.readiness,
-      metrics: this.metrics,
+      metrics: resolveApiMetrics({ options, injected: this.injectedMetrics }),
       listener: {
         host: options.config.host,
         port: options.config.port,
@@ -361,6 +371,57 @@ export function composeApiSecretEncryption(
     key: options.config.storedSecretEncryptionKey,
     report: LoggedApiSecretEncryptionAbsence.create(logger),
   });
+}
+
+/**
+ * The metrics transport this process serves scrapes from, and where it came
+ * from.
+ *
+ * Precedence, and the reason for it:
+ *
+ *  1. An injected transport wins. A host that already owns the product graph
+ *     owns one registry per process, and handing this process a second one to
+ *     render would split the samples between two scrape bodies.
+ *  2. Otherwise the process composes its own over the registry its packages
+ *     already write into, gated by the credential it was configured with.
+ *  3. With neither — no host transport, and no key in production — there is no
+ *     transport, and `/metrics` is not mounted at all. Absent, so a scrape is
+ *     answered "no such route" rather than by a door that refuses every caller
+ *     it will ever have.
+ *
+ * Shared by both compositions so the standalone process and the production one
+ * decide this the same way rather than drifting into two rules.
+ */
+export function resolveApiMetrics(input: {
+  options: ApiRuntimeCompositionOptions;
+  injected: ApiMetricsPort | undefined;
+}): ApiMetricsPort | undefined {
+  if (input.injected) return input.injected;
+
+  const logger = createLogger(input.options.config.serviceName);
+  return ApiMetricsInfrastructure.tryCreate({
+    key: input.options.config.metricsApiKey,
+    nodeEnvironment: input.options.config.nodeEnvironment,
+    report: LoggedApiMetricsAbsence.create(logger),
+  })?.metrics;
+}
+
+/** Names the absent credential once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiMetricsAbsence extends ApiMetricsAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiMetricsAbsence {
+    return new LoggedApiMetricsAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(): void {
+    this.logger.info(
+      { reason: "unconfigured" },
+      "API composed without a metrics credential in production: it serves no metrics endpoint",
+    );
+  }
 }
 
 /** Names the absent key once, at boot, rather than leaving it to be inferred. */

@@ -172,6 +172,15 @@ describe("API process configuration", () => {
     expect(resolveApiConfig({ CREDENTIALS_SECRET: "" }).storedSecretEncryptionKey).toBe("");
   });
 
+  it("carries the metrics credential through the process's one environment read", () => {
+    expect(resolveApiConfig({ METRICS_API_KEY: "scrape-me" }).metricsApiKey).toBe("scrape-me");
+  });
+
+  it("leaves the metrics credential unconfigured rather than refusing a process that serves none", () => {
+    expect(resolveApiConfig({}).metricsApiKey).toBeUndefined();
+    expect(resolveApiConfig({ METRICS_API_KEY: "" }).metricsApiKey).toBe("");
+  });
+
   it("resolves Redis and Group Queue settings before API composition", () => {
     const config = resolveApiConfig({
       REDIS_URL: "redis://redis.example.test:6379",

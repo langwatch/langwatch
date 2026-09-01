@@ -17,12 +17,20 @@ const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
   let rest: Hono | undefined;
   let secrets: unknown;
-  const create = vi.fn((options: { rest?: Hono; secrets?: unknown }) => {
+  let metrics: unknown;
+  const create = vi.fn((options: { rest?: Hono; secrets?: unknown; metrics?: unknown }) => {
     rest = options.rest;
     secrets = options.secrets;
+    metrics = options.metrics;
     return process;
   });
-  return { create, process, rest: () => rest, secrets: () => secrets };
+  return {
+    create,
+    process,
+    rest: () => rest,
+    secrets: () => secrets,
+    metrics: () => metrics,
+  };
 });
 
 vi.mock("../../api.process", async (importOriginal) => {
@@ -87,6 +95,7 @@ vi.mock("../../platform/infrastructure/api-database.infrastructure", async (impo
   return { ...actual, ApiDatabaseInfrastructure: { tryCreate: databaseMocks.tryCreate } };
 });
 
+import { ApiMetricsPort } from "../../api-process.lifecycle";
 import { ApiProcessGraphPort } from "../../api.process";
 import {
   ApiAuthSessionCompositionPort,
@@ -490,14 +499,71 @@ describe("ApiProductionComposition", () => {
       });
     });
   });
+
+  describe("given the metrics transport this process can now compose itself", () => {
+    describe("when a host supplied one", () => {
+      /** @scenario "An injected metrics transport answers every scrape" */
+      it("hands the process the host's transport, whatever this deployment configured", async () => {
+        const injected = new TestMetrics();
+
+        await composeWithout(
+          { METRICS_API_KEY: "a-key-this-process-never-uses" },
+          {
+            metrics: injected,
+          },
+        );
+
+        expect(processMocks.metrics()).toBe(injected);
+      });
+    });
+
+    describe("when the deployment configured a credential", () => {
+      /** @scenario "An authenticated scrape renders what this process recorded" */
+      it("composes its own, gated by that credential", async () => {
+        await composeWithout({ METRICS_API_KEY: "scrape-me" });
+
+        const composed = processMocks.metrics() as ApiMetricsPort;
+        expect(composed).toBeInstanceOf(ApiMetricsPort);
+        expect(await composed.respond(metricsScrape())).toHaveProperty("status", 401);
+        expect(await composed.respond(metricsScrape("Bearer scrape-me"))).toHaveProperty(
+          "status",
+          200,
+        );
+      });
+    });
+
+    describe("when a production deployment configured no credential", () => {
+      /** @scenario "In production an unset key leaves the process with no metrics endpoint" */
+      it("composes no transport, so the process mounts no metrics route", async () => {
+        await composeWithout({ NODE_ENV: "production" });
+
+        expect(processMocks.metrics()).toBeUndefined();
+      });
+    });
+  });
 });
 
+function metricsScrape(authorization?: string): Request {
+  return new Request("http://api.test/metrics", {
+    headers: authorization ? { authorization } : {},
+  });
+}
+
+class TestMetrics extends ApiMetricsPort {
+  async respond(): Promise<Response> {
+    return new Response("langwatch_api_up 1", { status: 200 });
+  }
+}
+
 function productionComposition(
-  overrides: { secrets?: SecretService } = { secrets: secretService().service },
+  overrides: { secrets?: SecretService; metrics?: ApiMetricsPort } = {
+    secrets: secretService().service,
+  },
 ): ApiProductionComposition {
   return ApiProductionComposition.create({
     agents: new Proxy(AgentService.prototype, {}),
     ...(overrides.secrets ? { secrets: overrides.secrets } : {}),
+    ...(overrides.metrics ? { metrics: overrides.metrics } : {}),
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
     organizations: organizationService(),
@@ -507,8 +573,9 @@ function productionComposition(
 
 async function composeWithout(
   source: Readonly<Record<string, unknown>>,
+  overrides: { metrics?: ApiMetricsPort } = {},
 ): Promise<ApiProductionComposition> {
-  const composition = productionComposition({});
+  const composition = productionComposition(overrides);
   await composition.compose({
     config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
     graph: new TestGraph(),

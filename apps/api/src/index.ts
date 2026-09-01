@@ -15,8 +15,10 @@ export {
   composeApiDatabase,
   composeApiSecretEncryption,
   LoggedApiDatabaseAbsence,
+  LoggedApiMetricsAbsence,
   LoggedApiQueueAbsence,
   LoggedApiSecretEncryptionAbsence,
+  resolveApiMetrics,
   type ApiOwnedRestFeaturePorts,
 } from "./app/api-production.composition";
 export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
@@ -227,6 +229,16 @@ export {
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
 } from "./platform/infrastructure/api-queue.infrastructure";
+export {
+  ApiMetricsAbsenceReportPort,
+  ApiMetricsInfrastructure,
+  type ApiMetricsInfrastructureOptions,
+} from "./platform/infrastructure/api-metrics.infrastructure";
+export {
+  PrometheusApiMetricsAdapter,
+  type ApiMetricsAccess,
+  type ApiMetricsRegistry,
+} from "./platform/infrastructure/prometheus.api-metrics.adapter";
 export {
   ApiSecretEncryptionAbsenceReportPort,
   ApiSecretEncryptionInfrastructure,

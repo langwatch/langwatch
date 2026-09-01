@@ -19,8 +19,11 @@ import {
 } from "../api-standalone.composition";
 import { resolveApiConfig, type ApiConfig } from "../../platform/config/api.config";
 
-function ephemeralConfig(): ApiConfig {
-  return { ...resolveApiConfig({ NODE_ENV: "test", API_HOST: "127.0.0.1" }), port: 0 };
+function ephemeralConfig(source: Readonly<Record<string, unknown>> = {}): ApiConfig {
+  return {
+    ...resolveApiConfig({ NODE_ENV: "test", API_HOST: "127.0.0.1", ...source }),
+    port: 0,
+  };
 }
 
 describe("ApiStandaloneComposition", () => {
@@ -41,7 +44,6 @@ describe("ApiStandaloneComposition", () => {
       expect(health.status).toBe(204);
       const head = await fetch(`http://127.0.0.1:${address.port}/api/health`, { method: "HEAD" });
       expect(head.status).toBe(204);
-      expect(await fetch(`http://127.0.0.1:${address.port}/metrics`)).toHaveProperty("status", 404);
 
       await process.close();
       await expect(fetch(`http://127.0.0.1:${address.port}/api/health`)).rejects.toThrow();
@@ -68,6 +70,12 @@ describe("ApiStandaloneComposition", () => {
       expect(named).not.toMatch(/PrismaQueryGuard|multitenancy|mass-delete/i);
     });
 
+    it("stops naming the metric registry, now that it composes and renders its own", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(/ApiMetricsPort|metric registry/i);
+    });
+
     it("stops naming the stored-secret key, now that it reads and uses its own", () => {
       const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
 
@@ -76,10 +84,11 @@ describe("ApiStandaloneComposition", () => {
       );
     });
 
-    it("serves the metrics route only once a metrics port is composed", async () => {
+    /** @scenario "An injected metrics transport answers every scrape" */
+    it("serves a host's metrics transport in preference to the one it would compose", async () => {
       const metrics = new TestMetrics();
       const process = await ApiStandaloneComposition.create({ metrics }).compose({
-        config: ephemeralConfig(),
+        config: ephemeralConfig({ METRICS_API_KEY: "a-key-this-process-never-uses" }),
         graph: new TestGraph(),
         observability: { serviceName: "langwatch-api-test" },
         resources: new ResourceScope(),
@@ -92,6 +101,74 @@ describe("ApiStandaloneComposition", () => {
       const response = await fetch(`http://127.0.0.1:${address.port}/metrics`);
       expect(response.status).toBe(200);
       expect(await response.text()).toBe("langwatch_api_up 1");
+
+      await process.close();
+    });
+
+    /** @scenario "An authenticated scrape renders what this process recorded" */
+    it("composes its own metrics transport behind the credential the deployment configured", async () => {
+      const process = await ApiStandaloneComposition.create().compose({
+        config: ephemeralConfig({ METRICS_API_KEY: "scrape-me" }),
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const address = await process.start();
+      if (!address)
+        throw new Error("The standalone API process did not report a listener address.");
+
+      const refused = await fetch(`http://127.0.0.1:${address.port}/metrics`);
+      expect(refused.status).toBe(401);
+      expect(await refused.text()).toBe("");
+
+      const scraped = await fetch(`http://127.0.0.1:${address.port}/metrics`, {
+        headers: { authorization: "Bearer scrape-me" },
+      });
+      expect(scraped.status).toBe(200);
+      expect(await scraped.text()).toContain("process_cpu_user_seconds_total");
+
+      await process.close();
+    });
+
+    /** @scenario "In production an unset key leaves the process with no metrics endpoint" */
+    it("mounts no metrics route in production without a credential, rather than an open one", async () => {
+      const process = await ApiStandaloneComposition.create().compose({
+        config: ephemeralConfig({ NODE_ENV: "production" }),
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const address = await process.start();
+      if (!address)
+        throw new Error("The standalone API process did not report a listener address.");
+
+      expect(await fetch(`http://127.0.0.1:${address.port}/metrics`)).toHaveProperty("status", 404);
+      expect(await fetch(`http://127.0.0.1:${address.port}/api/health`)).toHaveProperty(
+        "status",
+        204,
+      );
+
+      await process.close();
+    });
+
+    /** @scenario "Outside production an unset key leaves the endpoint open" */
+    it("serves its metrics openly outside production, as the web process always has", async () => {
+      const process = await ApiStandaloneComposition.create().compose({
+        config: ephemeralConfig(),
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const address = await process.start();
+      if (!address)
+        throw new Error("The standalone API process did not report a listener address.");
+
+      const response = await fetch(`http://127.0.0.1:${address.port}/metrics`);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain("process_cpu_user_seconds_total");
 
       await process.close();
     });

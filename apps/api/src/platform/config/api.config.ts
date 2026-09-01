@@ -118,6 +118,19 @@ export const apiConfigDefinition = RuntimeConfig.define({
   storedSecretEncryptionKey: Config.value(optionalEnvironmentString, {
     env: "CREDENTIALS_SECRET",
   }),
+  /**
+   * The bearer credential a caller must present to scrape this process's
+   * metrics, under the name every other LangWatch tier reads it by.
+   *
+   * An unvalidated optional string for the reason the two credentials above
+   * are: an operator who exports the variable blank has not configured a key,
+   * and `Config.secret` would refuse the whole boot over it. What an
+   * unconfigured key means is the gate's own rule and lives with it — in
+   * production it means this process serves no metrics endpoint at all.
+   */
+  metricsApiKey: Config.value(optionalEnvironmentString, {
+    env: "METRICS_API_KEY",
+  }),
   infrastructure: {
     /**
      * The Postgres connection the process composes its one guarded Prisma
