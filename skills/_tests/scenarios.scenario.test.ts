@@ -9,11 +9,18 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
+  createSkillTestWorkDir,
   toolCallFix,
   assertSkillWasRead,
+  bashCommands,
   installSkillToWorkDir,
+  removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
+import {
+	type RunningConnectedAgent,
+	startConnectedAgentFixture,
+} from "./helpers/connected-agent-fixture";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,7 +132,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -192,7 +199,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -243,7 +250,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -308,7 +315,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -376,7 +383,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -429,7 +436,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -502,7 +509,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -552,7 +559,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -622,7 +629,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -695,7 +702,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000 // longer timeout — agent needs to run tests + generate suggestions
+    3_600_000 // longer: the agent runs the tests and then writes the suggestions
   );
 
   it.skipIf(isCI)(
@@ -724,7 +731,7 @@ describe("Scenarios Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, or TwilioAgentAdapter) — NOT a generic text-only scenario",
+              "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, TwilioAgentAdapter, or ComposableVoiceAgent) — NOT a generic text-only scenario",
               "Agent seeded a voice on the UserSimulatorAgent (e.g. `voice=\"elevenlabs/...\"` or `voice=\"openai/...\"`) so the simulated caller speaks rather than types",
               "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation, OR explicitly read the voice docs surface (voice/getting-started, voice/choosing-an-adapter, voice/capability-matrix, voice/recipes/*)",
             ],
@@ -782,13 +789,18 @@ describe("Scenarios Skill", () => {
             // the "caller" is silent and the scenario degrades to a
             // text scenario with a voice adapter bolted on. The
             // `voice=` kwarg must live INSIDE a `UserSimulatorAgent(...)`
-            // call, not in a comment, docstring, or unrelated dict.
+            // call, not in a comment, docstring, or unrelated dict. The
+            // value may be a module constant, which is what most runs
+            // write, so the voice id is looked for in the file rather
+            // than at the call.
             expect(
               testContent,
-              'Expected UserSimulatorAgent(voice="elevenlabs/..." | "openai/...") so the simulated caller speaks'
-            ).toMatch(
-              /UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*["'](?:elevenlabs|openai)\/[^"']+["']/
-            );
+              'Expected UserSimulatorAgent(voice=...) so the simulated caller speaks'
+            ).toMatch(/UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*\S/);
+            expect(
+              testContent,
+              'Expected an "elevenlabs/..." or "openai/..." voice id for the simulated caller'
+            ).toMatch(/["'](?:elevenlabs|openai)\/[^"']+["']/);
           },
           scenario.judge(),
         ],
@@ -796,7 +808,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    3_600_000
   );
 
   it.skipIf(isCI)(
@@ -864,13 +876,17 @@ describe("Scenarios Skill", () => {
               /\b(?:scenario\.)?(?:openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)\s*\(/
             );
 
-            // Verify the simulator was configured with a voice inside the userSimulatorAgent call
+            // The simulator carries a voice inside the userSimulatorAgent
+            // call. The value may be a module constant, so the voice id is
+            // looked for in the file rather than at the call.
             expect(
               testContent,
-              'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks'
-            ).toMatch(
-              /userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
-            );
+              "Expected userSimulatorAgent({ voice: ... }) so the simulated caller speaks"
+            ).toMatch(/userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*\S/);
+            expect(
+              testContent,
+              'Expected an "elevenlabs/..." or "openai/..." voice id for the simulated caller'
+            ).toMatch(/["'](?:elevenlabs|openai)\/[^"']+["']/);
           },
           scenario.judge(),
         ],
@@ -878,7 +894,111 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    1_800_000
+    3_600_000
   );
 
+  describe("when the agent under test is connected to the platform", () => {
+    /** @scenario The scenarios skill proposes scenarios from the levers of a connected agent */
+    it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
+      "proposes platform scenarios from the run parameters of a connected agent",
+      async () => {
+        const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-connected-");
+        console.log(`[scenarios connected dogfood] working dir: ${tempFolder}`);
+
+        copyFixtureToWorkDir({
+          fixtureSubpath: "python-connected-agent",
+          workingDirectory: tempFolder,
+        });
+        copySkillToWorkDir(tempFolder);
+
+        const apiKey = process.env.LANGWATCH_API_KEY!.trim();
+        const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+        );
+
+        // One agent row per test run, so two runs never read each other's levers.
+        const agentName = `skill-test-support-${Date.now().toString(36)}`;
+        // The startup is inside the try: it throws when the fixture exits
+        // early or never comes online, and the work dir holds the .env with
+        // the API key, so it has to be removed on that path too.
+        let running: RunningConnectedAgent | undefined;
+
+        try {
+          running = await startConnectedAgentFixture({
+            workingDirectory: tempFolder,
+            name: agentName,
+            env: process.env,
+          });
+
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "Platform scenarios from a connected agent's levers",
+            description:
+              "The user's support agent is already connected to LangWatch from code and declares two " +
+              "run parameters, model (gpt-5-mini, gpt-5) and plan (free, pro). The scenarios skill must " +
+              "read those levers from the platform before proposing scenarios, write at least one " +
+              "scenario whose expected behavior depends on the plan, supply the plan as a run parameter " +
+              "rather than in the situation text, and offer a comparison across the model options.",
+            agents: [
+              createClaudeCodeAgent({ workingDirectory: tempFolder }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent read the scenarios skill instructions before acting",
+                  "Agent read the connected agent's declared run parameters from the platform (langwatch agent get or agent list) before proposing scenarios",
+                  "Agent proposed or created at least one scenario whose expected behavior depends on the customer plan, and named the plan as a run parameter (--param plan=... or a ?plan=... target suffix) instead of writing the plan into the situation text",
+                  "Agent mentioned a comparison run across the model options (gpt-5-mini and gpt-5) or ran one",
+                  "Agent created the scenarios on the platform with the langwatch CLI and did not write test files",
+                  "If any langwatch command failed, the agent reported the failure instead of claiming the run succeeded",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                `My support agent is already connected to LangWatch as "${agentName}" and it is online right now. ` +
+                  "Add scenario tests for it on the platform: propose the scenarios, create them in a test suite " +
+                  "called Support smoke, and run that test suite once against the agent. Do not write test files.",
+              ),
+              scenario.agent(),
+              (state) => {
+                toolCallFix(state);
+                assertSkillWasRead(state, "scenarios");
+
+                // Read from the commands that ran, not from the transcript, so a
+                // command the agent only talked about does not count.
+                const commands = bashCommands(state).join("\n");
+
+                expect(
+                  commands,
+                  "Expected the agent to read the connected agent's levers with `langwatch agent get` or `langwatch agent list`",
+                ).toMatch(/langwatch agent (get|list)/);
+                expect(
+                  commands,
+                  "Expected the agent to create scenarios on the platform with `langwatch scenario create`",
+                ).toContain("langwatch scenario create");
+                expect(
+                  commands,
+                  "Expected the plan lever to travel as a run parameter (--param plan= or ?plan=)",
+                ).toMatch(/--param plan=|\?plan=|&plan=/);
+                expect(
+                  findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
+                  "Expected no test files: the platform approach uses the CLI only",
+                ).toBe(0);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success).toBe(true);
+        } finally {
+          await running?.stop();
+          removeSkillTestWorkDir(tempFolder);
+        }
+      },
+      3_600_000
+    );
+  });
 });

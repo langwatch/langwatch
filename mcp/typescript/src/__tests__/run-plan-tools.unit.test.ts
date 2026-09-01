@@ -49,7 +49,7 @@ const samplePlan: RunPlan = {
   archivedAt: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
-  platformUrl: "https://app.langwatch.ai/proj/simulations/run-plans/plan_abc123",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const sampleRun: RunPlanRunResult = {
@@ -62,7 +62,7 @@ const sampleRun: RunPlanRunResult = {
   runPlanId: "plan_abc123",
   planName: "Regression Plan",
   created: true,
-  platformUrl: "https://app.langwatch.ai/proj/simulations/batches/batch_123",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const runInput = {
@@ -99,7 +99,7 @@ describe("handleRunPlan()", () => {
 
     it("includes the platform URL of the batch", () => {
       expect(result).toContain(
-        "**View**: https://app.langwatch.ai/proj/simulations/batches/batch_123",
+        "**View**: https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
       );
     });
 

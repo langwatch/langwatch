@@ -39,6 +39,20 @@ Feature: Served agent instance on runs
     When the instance is recorded
     Then the run keeps its status, its verdict and its finish time
 
+  # The parent stamps the record with the wall clock after the child exits, so
+  # its business time can land after the finished event's, and the fold can
+  # process the record first. The finished event then reads as out of order
+  # and re-folds the run from the event log, which may not return the finished
+  # event yet. Three production runs stayed IN_PROGRESS this way.
+  @unit
+  Scenario: A finished event folded after the instance record still finishes the run
+    Given a run whose instance was recorded 100 ms after its finished event's time
+    And the fold has folded the record but not the finished event
+    And the event log read does not return the finished event yet
+    When the finished event is folded
+    Then the run reads SUCCESS with its verdict and its finish time
+    And the metadata keeps the instance
+
   @integration
   Scenario: A finished run stores the instance that served it
     Given a run that was queued, finished and had its instance recorded

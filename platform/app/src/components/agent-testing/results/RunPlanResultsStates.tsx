@@ -1,11 +1,19 @@
 /**
  * What the results column reads while it has nothing to show: the read that
- * failed, the read that is still going, and the window that holds no run.
+ * failed, the read that is still going, the window that holds no run, and the
+ * run the address names before its first scenario has reported.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, EmptyState, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  EmptyState,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { RefreshCw } from "lucide-react";
 import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
@@ -71,6 +79,52 @@ export function NoRunInPeriod({
       </Text>
       <Text fontSize="12.5px" color={FG_MUTED} textAlign="center">
         This run plan has no run inside the selected period.
+      </Text>
+      <SmallButton
+        onClick={() => setRelativePeriod(wider.key)}
+        data-testid="widen-period-button"
+      >
+        {wider.label}
+      </SmallButton>
+    </VStack>
+  );
+}
+
+/**
+ * The address names a run the window does not hold. A link opened right after
+ * a run was started lands here before the first scenario has reported, and
+ * the run then reads as one that is coming, not as one that happened in the
+ * past. The live updates fill the column in as the scenarios report. The
+ * period button stays, for the reader who opened an old link instead.
+ */
+export function WaitingForFirstRun({
+  period,
+  setRelativePeriod,
+}: Pick<PeriodControls, "period" | "setRelativePeriod">) {
+  const wider = nextWiderWindow(period);
+
+  return (
+    <VStack
+      align="center"
+      gap={3}
+      paddingY={10}
+      data-testid="waiting-for-first-run"
+    >
+      <Spinner size="sm" color={FG_MUTED} />
+      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+        Waiting for the first result
+      </Text>
+      <Text
+        fontSize="12.5px"
+        color={FG_MUTED}
+        textAlign="center"
+        maxWidth="360px"
+      >
+        This run has not reported a scenario yet. The results appear here as
+        they arrive.
+      </Text>
+      <Text fontSize="11.5px" color={FG_MUTED} textAlign="center">
+        Looking for an older run instead?
       </Text>
       <SmallButton
         onClick={() => setRelativePeriod(wider.key)}

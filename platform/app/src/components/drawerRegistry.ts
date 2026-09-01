@@ -83,6 +83,10 @@ const ConnectedAgentDrawer = lazyDefault({
   factory: () => import("./agents/connected/ConnectedAgentDrawer"),
   key: "ConnectedAgentDrawer",
 });
+const ConnectFromCodeDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectFromCodeDrawer"),
+  key: "ConnectFromCodeDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -309,6 +313,7 @@ export const drawers = {
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentConnectedDetail: ConnectedAgentDrawer,
+  agentConnectFromCode: ConnectFromCodeDrawer,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,

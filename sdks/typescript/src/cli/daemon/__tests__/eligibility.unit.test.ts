@@ -257,6 +257,16 @@ describe("evaluateEligibility", () => {
         ),
       ).toEqual({ eligible: false, reason: "long-running-flag" });
     });
+
+    it("refuses --wait, which polls a run past the client's request deadline", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["test-suite", "run", "Smoke", "--target", "connected:a", "--wait"],
+          }),
+        ),
+      ).toEqual({ eligible: false, reason: "long-running-flag" });
+    });
   });
 
   describe("when no command is given", () => {

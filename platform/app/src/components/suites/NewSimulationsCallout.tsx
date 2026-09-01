@@ -2,29 +2,32 @@ import { Box, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import posthog from "posthog-js";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuMic, LuX } from "react-icons/lu";
+import { LuArrowRight, LuSparkles, LuX } from "react-icons/lu";
+import {
+  preferLegacySimulations,
+  useLegacySimulationsPreference,
+} from "~/hooks/useLegacySimulationsPreference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { Link } from "../ui/link";
 
 /**
- * Small announcement card pinned to the bottom of the simulations sidebar,
- * just above the collapse-toggle footer. A clean, subtle info card in the
- * simulations blue accent (`colorPalette="blue"` surface tokens + arrow CTA +
- * snooze-on-dismiss) at a sidebar-friendly size — styled with design-system
- * semantic tokens so it matches the rest of the product and adapts to
- * light/dark, rather than the previous clashing hardcoded blue→teal gradient.
+ * Small announcement card pinned to the bottom of the Agent Testing
+ * sidebars. It tells the reader they are on the new simulations screens and
+ * offers the way back to the previous ones: a click records the per-browser
+ * preference ({@link preferLegacySimulations}) and navigates to the previous
+ * screen that matches where the card sits, `target="scenarios"` to the
+ * scenario library and `target="runs"` to the runs list.
  *
- * The CTA opens the public Voice docs (Scenario `voice/getting-started`)
- * in a new tab, so we render a plain `<a>` rather than the in-app `<Link>`
- * (which resolves project-scoped paths).
+ * The dismissal key is its own, so people who dismissed the earlier voice
+ * announcement still see this one. Snoozes for {@link SNOOZE_DAYS} days per
+ * project; the key carries a `:v1:` version segment so a future announcement
+ * can recycle the card by bumping the version.
  *
- * Snoozes for {@link SNOOZE_DAYS} days per project; the snooze key includes
- * a `:v1:` version segment so we can recycle the card for a future
- * announcement by bumping the version without resurrecting old dismissals.
+ * @see specs/suites/new-simulations-callout.feature
  */
 const SNOOZE_DAYS = 14;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
-const STORAGE_PREFIX = "langwatch:simulations-voice-callout-dismissed:v1:";
-const TARGET_URL = "https://langwatch.ai/scenario/voice/getting-started";
+const STORAGE_PREFIX = "langwatch:new-simulations-callout-dismissed:v1:";
 
 const storageKey = (projectId: string) => `${STORAGE_PREFIX}${projectId}`;
 
@@ -50,15 +53,24 @@ function snooze(projectId: string) {
   }
 }
 
-export function VoiceAgentsCallout() {
+export function NewSimulationsCallout({
+  target,
+}: {
+  /** Which previous screen the card leads back to. */
+  target: "scenarios" | "runs";
+}) {
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const projectId = project?.id;
+  const projectSlug = project?.slug;
 
   const [hasMounted, setHasMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  // Someone who already chose the previous screens does not need the offer
+  // again while they browse the new ones.
+  const legacyPreferred = useLegacySimulationsPreference(projectId);
 
   useEffect(() => {
     setHasMounted(true);
@@ -68,35 +80,44 @@ export function VoiceAgentsCallout() {
     if (projectId) setDismissed(isSnoozed(projectId));
   }, [projectId]);
 
-  if (!hasMounted || !projectId || dismissed) return null;
+  if (!hasMounted || !projectId || !projectSlug || dismissed || legacyPreferred)
+    return null;
+
+  const href =
+    target === "scenarios"
+      ? `/${projectSlug}/simulations/scenarios`
+      : `/${projectSlug}/simulations`;
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (projectId) snooze(projectId);
+    snooze(projectId);
     setDismissed(true);
   };
 
   const handleClick = () => {
-    posthog.capture("voice_agents_callout_click", {
-      surface: "simulations_sidebar",
+    posthog.capture("new_simulations_callout_back_click", {
+      surface:
+        target === "scenarios"
+          ? "agent_testing_sidebar"
+          : "agent_testing_runs_sidebar",
       projectId,
     });
-    if (projectId) snooze(projectId);
+    preferLegacySimulations(projectId);
   };
 
   return (
-    <Box paddingX={3} paddingTop={2} paddingBottom={1}>
-      <a
-        href={TARGET_URL}
-        target="_blank"
-        rel="noopener noreferrer"
+    <Box paddingTop={2} paddingBottom={1}>
+      <Link
+        href={href}
         onClick={handleClick}
-        aria-label="Open Voice Agents getting started guide in a new tab"
-        style={{ textDecoration: "none", display: "block" }}
+        aria-label="Go back to the previous simulations screen"
+        textDecoration="none"
+        display="block"
+        _hover={{ textDecoration: "none" }}
       >
         <Box
-          colorPalette="blue"
+          colorPalette="teal"
           position="relative"
           borderRadius="lg"
           padding={3}
@@ -121,7 +142,7 @@ export function VoiceAgentsCallout() {
               borderRadius="full"
               bg="colorPalette.solid"
             >
-              <Icon as={LuMic} boxSize={3.5} color="white" />
+              <Icon as={LuSparkles} boxSize={3.5} color="white" />
             </Box>
             <VStack align="start" gap={1} flex={1} minWidth={0}>
               <Text
@@ -130,11 +151,12 @@ export function VoiceAgentsCallout() {
                 color="colorPalette.fg"
                 lineHeight={1.25}
                 letterSpacing="-0.005em"
+                paddingRight="18px"
               >
-                Try voice agent simulations
+                Welcome to the new simulations screen
               </Text>
               <Text fontSize="xs" color="fg.muted" lineHeight={1.4}>
-                Test your voice agent end-to-end with realtime voices.
+                Prefer the previous version? Click here to go back.
               </Text>
               <HStack
                 gap={1}
@@ -143,7 +165,7 @@ export function VoiceAgentsCallout() {
                 fontSize="xs"
                 fontWeight="600"
               >
-                <Text>Get started</Text>
+                <Text>Go back</Text>
                 <Icon as={LuArrowRight} boxSize={3} />
               </HStack>
             </VStack>
@@ -166,7 +188,7 @@ export function VoiceAgentsCallout() {
             <LuX size={12} />
           </IconButton>
         </Box>
-      </a>
+      </Link>
     </Box>
   );
 }

@@ -750,6 +750,15 @@ Feature: The Results tab
     Then an empty state says there is no run in this period
     And it offers to widen the period
 
+  @integration
+  Scenario: A run opened before its first scenario reports reads as waiting
+    Given a URL that names a run of the plan the window does not hold yet
+    When the plan is opened
+    Then the results column says it is waiting for the first result
+    And it does not say there is no run in this period
+    And the runs rail shows the run as starting
+    And it still offers to widen the period, for an old link
+
   # --- Loading and gating ---
 
   @integration

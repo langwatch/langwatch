@@ -440,16 +440,13 @@ describe("FoldProjectionExecutor.executeBatch", () => {
         init: batchInit,
         apply: batchApply,
       });
+      // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
+      const events = [makeEvent(1000, "r1"), makeEvent(2000, "r2")];
+      // The event log already holds the delivered events, so the replay
+      // folds each of them once.
       foldDef.eventLoader = vi
         .fn()
-        .mockResolvedValue([
-          makeEvent(1000, "r1"),
-          makeEvent(2000, "r2"),
-          makeEvent(3000, "r3"),
-        ]);
-
-      // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
-      const events = [makeEvent(1000, "b1"), makeEvent(2000, "b2")];
+        .mockResolvedValue([...events, makeEvent(3000, "r3")]);
 
       const result = await executor.executeBatch(foldDef, events, context);
 
