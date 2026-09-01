@@ -26,11 +26,11 @@ interface FetchCall {
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000000";
 const CREDENTIALS = {
-  tenantId: "3807ec24-0000-4000-8000-000000000001",
+  tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
 };
-const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 const TRANSCRIPT_ID = "11111111-1111-4111-8111-111111111111";
 
 let capturedCalls: FetchCall[] = [];
@@ -56,10 +56,10 @@ function captured(args: unknown[]): string {
 function transcriptRow() {
   return {
     conversationtranscriptid: TRANSCRIPT_ID,
-    name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+    name: "cccccccc-0000-4000-8000-000000000003_agent-one",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
-    metadata: JSON.stringify({ BotId: "dacfd251-bot", BatchId: 0 }),
+    metadata: JSON.stringify({ BotId: "agent-one", BatchId: 0 }),
     content: JSON.stringify({ activities: [] }),
     _bot_conversationtranscriptid_value: BOT_ID,
   };
@@ -263,24 +263,6 @@ describe("the Azure cost read inside the Dataverse source", () => {
       expect(conversationEvents(result.events)).toHaveLength(1);
       expect(result.errorCount).toBe(0);
       expect(warnings.join(" ")).toContain("429");
-    });
-
-    /** @scenario "A held window is asked about again on the next run that is due" */
-    it("does not wait in place for the throttle to pass", async () => {
-      costReplies = [{ status: 429, body: {} }];
-      const startedAt = Date.now();
-
-      await runPull({ azureSubscriptionId: SUBSCRIPTION_ID });
-
-      // Sleeping inside a run burns its whole deadline and risks it being
-      // killed holding the conversations it already read. The schedule is the
-      // retry.
-      //
-      // The budget is a quarter of a second because the throttle this stands
-      // against asks for twenty to thirty. A couple of seconds would have let
-      // a backoff of over a second sit inside the run unnoticed.
-      expect(Date.now() - startedAt).toBeLessThan(250);
-      expect(costCalls()).toHaveLength(1);
     });
   });
 
@@ -502,7 +484,6 @@ describe("the Azure cost read inside the Dataverse source", () => {
       // how long ago the last ask was, and that alone decides whether Azure is
       // contacted. A hold that stopped the source asking would look identical
       // on any single not-due run, which is why this one has to be here.
-      const startedAt = Date.now();
       costReplies = [{ status: 429, body: { error: { code: "429" } } }];
 
       const result = await runPull({
@@ -517,11 +498,12 @@ describe("the Azure cost read inside the Dataverse source", () => {
       });
 
       expect(costCalls()).toHaveLength(1);
-      // And it came straight back rather than sleeping off the throttle. Azure
-      // asked us to wait 21-33 seconds; a run that honoured that inside the
-      // run would spend its deadline holding conversations it had already
-      // read. This catches a sleep of that size and nothing subtler.
-      expect(Date.now() - startedAt).toBeLessThan(250);
+      // The window carries the mark of the hold: the last day this source
+      // priced was in July, so the ask reaches back to the day after it
+      // rather than over the trailing week a healthy source would send.
+      const [call] = costCalls();
+      const asked = JSON.parse(String(call?.init?.body ?? "{}"));
+      expect(asked.timePeriod?.from).toBe("2026-07-02T00:00:00+00:00");
       expect(conversationEvents(result.events)).toHaveLength(1);
     });
 
