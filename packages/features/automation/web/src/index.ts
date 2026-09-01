@@ -1,24 +1,24 @@
 export * from "@langwatch/automation-contract";
-export { AutomationClient, type AutomationClientOptions } from "./automation-client";
-export { AutomationCadenceField } from "./cadence-field";
-export * from "./graph-series";
-export type * from "./trigger-action-params";
+export { AutomationClient, type AutomationClientOptions } from "./behavior/automation-client";
+export { AutomationCadenceField } from "./features/authoring/ui/elements/cadence-field";
+export * from "./model/graph-series";
+export type * from "./features/overview/model/trigger-action-params";
 export {
   AutomationHistory,
   toAutomationActivityEntries,
   type AutomationActivityEntry,
   type AutomationActivityFire,
   type AutomationActivityTrigger,
-} from "./automation-history";
+} from "./features/overview/ui/elements/automation-history";
 export {
   AutomationUseCaseStrip,
   type AutomationUseCaseKind,
   type AutomationUseCasePrefill,
-} from "./automation-use-case-strip";
-export * from "./logic/daily-cap-advice";
-export * from "./logic/firing-rate";
-export * from "./logic/report-schedule";
-export * from "./logic/condition-query";
+} from "./features/overview/ui/elements/automation-use-case-strip";
+export * from "./features/authoring/model/daily-cap-advice";
+export * from "./features/authoring/model/firing-rate";
+export * from "./features/authoring/model/report-schedule";
+export * from "./features/authoring/model/condition-query";
 export {
   createAutomationDraftModel,
   INITIAL_GRAPH_ALERT_DRAFT,
@@ -44,7 +44,7 @@ export {
   type ReportDraft,
   type ReportSourceKind,
   type SetSliceAction,
-} from "./logic/draft-reducer";
+} from "./features/authoring/model/draft-reducer";
 export {
   createClientProviderRegistry,
   getSlice,
@@ -56,7 +56,7 @@ export {
   type NotifyPreview,
   type ProviderClients,
   type SliceFor,
-} from "./providers/registry";
+} from "./model/provider-registry";
 export {
   LIQUID_JSON_LANGUAGE_ID,
   LIQUID_LANGUAGE_ID,
@@ -71,37 +71,46 @@ export {
   type MonacoTextModel,
   type UnknownVariable,
   type VariableInfo as MonacoVariableInfo,
-} from "./editors/liquid-monaco";
-export * from "./templates/slack/registry";
-export { SlackBlockKitTemplatePicker } from "./templates/slack/template-picker";
-export * from "./editors/alert-variables";
-export * from "./editors/report-variables";
-export * from "./editors/liquid-json-substitution";
-export * from "./monaco-schemas";
-export { useMonacoTheme } from "./use-monaco-theme";
-export * from "./providers/types";
-export { VariableInfoIcon } from "./variable-info-icon";
-export { monacoBackgroundFor, trapEscapeInsideEditor } from "./monaco-editor-chrome";
-export * from "./automation-authoring.port";
-export { AutomationTypePicker, type AutomationSource } from "./authoring/automation-type-picker";
-export { AutomationTestFireButton } from "./authoring/test-fire-button";
+} from "./features/liquid-editor/behavior/liquid-monaco";
+export * from "./features/slack-templates/ui/elements/registry";
+export { SlackBlockKitTemplatePicker } from "./features/slack-templates/ui/blocks/template-picker";
+export * from "./features/liquid-editor/model/alert-variables";
+export * from "./features/liquid-editor/model/report-variables";
+export * from "./features/liquid-editor/model/liquid-json-substitution";
+export * from "./features/liquid-editor/model/monaco-schemas";
+export { useMonacoTheme } from "./features/liquid-editor/behavior/use-monaco-theme";
+export * from "./model/provider-types";
+export { VariableInfoIcon } from "./features/liquid-editor/ui/elements/variable-info-icon";
+export {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+} from "./features/liquid-editor/behavior/monaco-editor-chrome";
+export * from "./features/authoring/behavior/automation-authoring-port";
+export {
+  AutomationTypePicker,
+  type AutomationSource,
+} from "./features/authoring/ui/blocks/automation-type-picker";
+export { AutomationTestFireButton } from "./features/authoring/ui/elements/test-fire-button";
 export {
   createAutomationAuthoringStore,
   MAX_AUTOMATION_TEST_HISTORY,
   type AutomationAuthoringSection,
   type AutomationAuthoringStore,
   type AutomationTestFireAttempt,
-} from "./authoring/automation-authoring-store";
+} from "./features/authoring/behavior/automation-authoring-store";
 export {
   AutomationCadenceSection,
   type AutomationCadenceDraft,
   type AutomationGraphAlertDraft,
   type AutomationReportDraft,
-} from "./authoring/cadence-section";
-export { FacetSection, type FacetAccordionProps } from "./authoring/facet-section";
-export { AutomationNameField } from "./authoring/name-field";
-export { AutomationSeveritySection } from "./authoring/severity-section";
-export { AutomationTraceDebounceField } from "./authoring/trace-debounce-field";
-export { ReportScheduleField } from "./authoring/report-schedule-field";
-export { SourceCard } from "./authoring/source-card";
-export * from "./page/automation-table-cells";
+} from "./features/authoring/ui/blocks/cadence-section";
+export {
+  FacetSection,
+  type FacetAccordionProps,
+} from "./features/authoring/ui/elements/facet-section";
+export { AutomationNameField } from "./features/authoring/ui/elements/name-field";
+export { AutomationSeveritySection } from "./features/authoring/ui/blocks/severity-section";
+export { AutomationTraceDebounceField } from "./features/authoring/ui/elements/trace-debounce-field";
+export { ReportScheduleField } from "./features/authoring/ui/elements/report-schedule-field";
+export { SourceCard } from "./features/authoring/ui/elements/source-card";
+export * from "./features/overview/ui/elements/automation-table-cells";
