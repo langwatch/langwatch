@@ -71,9 +71,6 @@ Feature: Avatar initials survive every name we are given
       Then that content is shown untouched, because a caller that has already
            chosen the character is not asking for initials
 
-    @unit
-    Scenario: No surface reaches past it to the library's own avatar
-      Given the application source
-      Then only the shared avatar imports the component library's avatar,
-           because any other importer would silently get the broken initials
-           back
+    # That nothing reaches past it is a lint rule rather than a scenario:
+    # biome's noRestrictedImports refuses the library's avatar everywhere but
+    # the wrapper, the same way it already refuses its dialog and drawer.

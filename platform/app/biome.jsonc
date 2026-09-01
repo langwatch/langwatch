@@ -157,8 +157,30 @@
 					"options": {
 						"paths": {
 							"@chakra-ui/react": {
-								"importNames": ["Dialog", "Drawer", "Modal"],
-								"message": "Import Dialog or Drawer from ~/components/ui/dialog and ~/components/ui/drawer instead. Modal-style flows also use the Dialog wrapper (see AICreateModal, RunScenarioModal, etc.) — there is no Modal wrapper. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
+								"importNames": [
+									"Dialog",
+									"Drawer",
+									"Modal",
+									"Avatar",
+									"AvatarContext",
+									"AvatarFallback",
+									"AvatarFallbackProps",
+									"AvatarGroup",
+									"AvatarGroupProps",
+									"AvatarIcon",
+									"AvatarIconProps",
+									"AvatarImage",
+									"AvatarImageProps",
+									"AvatarProps",
+									"AvatarPropsProvider",
+									"AvatarRoot",
+									"AvatarRootBaseProps",
+									"AvatarRootProps",
+									"AvatarRootProvider",
+									"AvatarRootProviderBaseProps",
+									"AvatarRootProviderProps"
+								],
+								"message": "Import these from their wrapper in ~/components/ui: avatar, dialog, drawer. Modal-style flows use the Dialog wrapper too (see AICreateModal, RunScenarioModal) — there is no Modal wrapper. The avatar wrapper derives initials in grapheme clusters, where Chakra uses charAt(0) and returns half of any character outside the basic plane — customers do name projects and suites with a leading emoji; taking the first character of customer-typed text goes through ~/utils/firstGrapheme anywhere else too. The dialog and drawer wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Each re-exports the rest of the library's component unchanged, so the import is the whole difference."
 							}
 						}
 					}
@@ -491,6 +513,7 @@
 		},
 		{
 			"includes": [
+				"src/components/ui/avatar.tsx",
 				"src/components/ui/dialog.tsx",
 				"src/components/ui/drawer.tsx"
 			],
