@@ -265,7 +265,7 @@ describe("the Azure cost read inside the Dataverse source", () => {
       expect(warnings.join(" ")).toContain("429");
     });
 
-    /** @scenario "A held window is asked about again on the next run" */
+    /** @scenario "A held window is asked about again on the next run that is due" */
     it("does not wait in place for the throttle to pass", async () => {
       costReplies = [{ status: 429, body: {} }];
       const startedAt = Date.now();
@@ -275,7 +275,11 @@ describe("the Azure cost read inside the Dataverse source", () => {
       // Sleeping inside a run burns its whole deadline and risks it being
       // killed holding the conversations it already read. The schedule is the
       // retry.
-      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      //
+      // The budget is a quarter of a second because the throttle this stands
+      // against asks for twenty to thirty. A couple of seconds would have let
+      // a backoff of over a second sit inside the run unnoticed.
+      expect(Date.now() - startedAt).toBeLessThan(250);
       expect(costCalls()).toHaveLength(1);
     });
   });
@@ -381,6 +385,10 @@ describe("the Azure cost read inside the Dataverse source", () => {
         conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
         costPricedThroughDay: "2026-08-29",
         costHeldSinceMs: heldSinceMs,
+        // Asked recently, so this run is one of the many that ask nothing.
+        // A run that DID ask records the instant, which is movement in its
+        // own right; the no-progress case is the run that asked nothing.
+        costReadAtMs: Date.now() - 60_000,
       });
       costReplies = [{ status: 429, body: {} }];
       transcriptRows = [];
@@ -418,6 +426,151 @@ describe("the Azure cost read inside the Dataverse source", () => {
       const cursor = JSON.parse(String(result.cursor));
       expect(cursor).toHaveProperty("costHeldSinceMs", null);
       expect(cursor.costPricedThroughDay).not.toBe("2026-07-01");
+    });
+  });
+
+  /**
+   * Azure publishes this bill once a day and refuses a caller that asks too
+   * often. A live subscription on a five-minute schedule was refused every
+   * single time and read the bill zero times in half an hour, so the run has
+   * to decide whether to ask before it asks.
+   */
+  describe("when the bill is not due to be asked about yet", () => {
+    /** @scenario "The bill is not asked about on every run" */
+    it("makes no cost request and still delivers the conversations", async () => {
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: JSON.stringify({
+          createdon: "2026-08-20T10:00:00.000Z",
+          conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+          costPricedThroughDay: "2026-08-29",
+          costReadAtMs: Date.now() - 60_000,
+        }),
+      });
+
+      expect(costCalls()).toHaveLength(0);
+      expect(costEvents(result.events)).toHaveLength(0);
+      expect(conversationEvents(result.events)).toHaveLength(1);
+      expect(result.errorCount).toBe(0);
+    });
+
+    /** @scenario "A run that skips the bill neither holds the window nor abandons it" */
+    it("neither anchors a hold nor gives up on the window it never asked about", async () => {
+      // The hold instant here is already older than the cap. A run that asked
+      // nothing must not be the run that abandons the window: giving up is the
+      // answer to a read that failed, and this one never happened.
+      const previous = JSON.stringify({
+        createdon: "2026-08-20T10:00:00.000Z",
+        conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+        costPricedThroughDay: "2026-07-01",
+        costHeldSinceMs: 1_000,
+        costReadAtMs: Date.now() - 60_000,
+      });
+      transcriptRows = [];
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: previous,
+      });
+
+      expect(costCalls()).toHaveLength(0);
+      expect(result.errorCount).toBe(0);
+      expect(result.cursor).toBe(previous);
+    });
+
+    /** @scenario "A position carrying no record of when the bill was last asked about reads it at once" */
+    it("asks about the bill on a position written before the ask was recorded", async () => {
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: JSON.stringify({
+          createdon: "2026-08-20T10:00:00.000Z",
+          conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+          costPricedThroughDay: "2026-08-29",
+        }),
+      });
+
+      expect(costCalls()).toHaveLength(1);
+      expect(result.errorCount).toBe(0);
+      const cursor = JSON.parse(String(result.cursor));
+      expect(typeof cursor.costReadAtMs).toBe("number");
+    });
+
+    /** @scenario "A throttled window is asked about again once the wait has passed" */
+    it("asks again on a held window once the wait has passed", async () => {
+      // The contrast that gives the gate its meaning. Same held window, same
+      // dead endpoint, same source as the skip above — the only difference is
+      // how long ago the last ask was, and that alone decides whether Azure is
+      // contacted. A hold that stopped the source asking would look identical
+      // on any single not-due run, which is why this one has to be here.
+      const startedAt = Date.now();
+      costReplies = [{ status: 429, body: { error: { code: "429" } } }];
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: JSON.stringify({
+          createdon: "2026-08-20T10:00:00.000Z",
+          conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+          costPricedThroughDay: "2026-07-01",
+          costHeldSinceMs: Date.now() - 60_000,
+          costReadAtMs: Date.now() - 12 * 60 * 60_000,
+        }),
+      });
+
+      expect(costCalls()).toHaveLength(1);
+      // And it came straight back rather than sleeping off the throttle. Azure
+      // asked us to wait 21-33 seconds; a run that honoured that inside the
+      // run would spend its deadline holding conversations it had already
+      // read. This catches a sleep of that size and nothing subtler.
+      expect(Date.now() - startedAt).toBeLessThan(250);
+      expect(conversationEvents(result.events)).toHaveLength(1);
+    });
+
+    /** @scenario "A successful read records that the bill was asked about even when no figure changed" */
+    it("does not ask twice when a second run follows a first that changed nothing else", async () => {
+      // The one case a single run cannot show. This source has nothing new to
+      // report: the same transcript row it already has, a window still held,
+      // and a read that fails again. The ONLY thing the first run changes is
+      // the record of having asked — so if that record does not count as the
+      // position moving, the run is handed back its own incoming string, the
+      // record is thrown away, and the next run five minutes later asks Azure
+      // all over again. That is the live failure, restored in full, and every
+      // single-run test in this file stays green while it happens.
+      const heldWithinCap = Date.now() - 60_000;
+      const stored = {
+        // Matches the row the transcript mock serves, so the conversation side
+        // of the cursor cannot move and mask the term under test.
+        createdon: "2026-08-25T19:44:43Z",
+        conversationtranscriptid: TRANSCRIPT_ID,
+        costPricedThroughDay: "2026-07-01",
+        costHeldSinceMs: heldWithinCap,
+        costReadAtMs: null,
+      };
+      costReplies = [
+        { status: 429, body: { error: { code: "429" } } },
+        { status: 429, body: { error: { code: "429" } } },
+      ];
+
+      const first = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: JSON.stringify(stored),
+      });
+
+      expect(costCalls()).toHaveLength(1);
+      const afterFirst = JSON.parse(String(first.cursor));
+      expect(typeof afterFirst.costReadAtMs).toBe("number");
+      // Nothing else moved: the failed read kept the figure and the instant it
+      // was first held at, exactly as it would have without this gate.
+      expect(afterFirst.costPricedThroughDay).toBe("2026-07-01");
+      expect(afterFirst.costHeldSinceMs).toBe(heldWithinCap);
+
+      const second = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: String(first.cursor),
+      });
+
+      // Still one, five minutes of wall clock later in production terms.
+      expect(costCalls()).toHaveLength(1);
+      expect(second.cursor).toBe(first.cursor);
     });
   });
 
@@ -478,14 +631,17 @@ describe("the Azure cost read inside the Dataverse source", () => {
 
     /** @scenario "A conversation failure with no new bill still fails the run" */
     it("fails the run outright once the bill is already priced through today", async () => {
-      // What keeps a dead environment visible. The mark only moves on the
-      // day roll, so every run after the first that day has nothing to show
-      // for itself and hands back the incoming string — which the worker
-      // reads as no progress and fails.
+      // What keeps a dead environment visible. The mark only moves on the day
+      // roll, and the bill is only asked about a few times a day, so almost
+      // every run has nothing to show for itself and hands back the incoming
+      // string — which the worker reads as no progress and fails. The few runs
+      // a day that do ask record the instant and count as movement; the signal
+      // is the overwhelming majority that do not.
       const previous = JSON.stringify({
         ...TRANSCRIPT_POSITION,
         costPricedThroughDay: new Date().toISOString().slice(0, 10),
         costHeldSinceMs: null,
+        costReadAtMs: Date.now() - 60_000,
       });
       transcriptStatus = 503;
 

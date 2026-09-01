@@ -191,6 +191,7 @@ describe("what the next run asks for", () => {
       expect(next).toEqual({
         pricedThroughDay: "2026-08-30",
         heldSinceMs: null,
+        readAtMs: NOW_MS,
       });
     });
   });
@@ -222,7 +223,7 @@ describe("what the next run asks for", () => {
       expect(next.heldSinceMs).toBe(NOW_MS);
     });
 
-    /** @scenario "A held window is asked about again on the next run" */
+    /** @scenario "A window held across several failed reads keeps the instant it was first held at" */
     it("keeps the original hold instant across repeated failures", () => {
       const startedAt = NOW_MS - 60_000;
       const next = nextAzureCostCursor({
@@ -253,6 +254,30 @@ describe("what the next run asks for", () => {
       // Back to the trailing week: the day before the window's own start, so
       // the next run asks about the last seven days and no more.
       expect(next.pricedThroughDay).toBe("2026-08-23");
+    });
+
+    /** @scenario "A window held for too long is given up rather than held forever" */
+    it("gives up within the month and not before the third day", () => {
+      // Both bounds in absolute time rather than as offsets from the cap. An
+      // expectation built out of the constant it is meant to pin holds for
+      // any value of it, including one that puts giving up years away, which
+      // is the same as never giving up at all.
+      const heldFor = (days: number) =>
+        nextAzureCostCursor({
+          nowMs: NOW_MS,
+          previous: {
+            pricedThroughDay: "2026-07-01",
+            heldSinceMs: NOW_MS - days * 24 * 60 * 60 * 1000,
+          },
+          outcome: "held",
+        }).heldSinceMs;
+
+      // Three days of refusals is a throttle or an outage, not a window that
+      // will never be readable — keep waiting.
+      expect(heldFor(3)).not.toBe(null);
+      // A month is long past the point where the answer changes, and the
+      // source has been asking about an ever-widening span the whole time.
+      expect(heldFor(30)).toBe(null);
     });
   });
 });

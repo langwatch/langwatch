@@ -45,6 +45,7 @@ import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AZURE_COST_API_VERSION,
   azureCostEvents,
+  azureCostReadIsDue,
   azureCostReadWindow,
   azureCostRequestBody,
   nextAzureCostCursor,
@@ -288,6 +289,8 @@ const storedCursorSchema = z.object({
     .nullish(),
   /** When the current unpriced window started being held. */
   costHeldSinceMs: z.number().int().nonnegative().nullish(),
+  /** When a run last asked Cost Management anything, however it answered. */
+  costReadAtMs: z.number().int().nonnegative().nullish(),
   /** The last day the seat licences were reported for, `YYYY-MM-DD`. */
   seatsReportedThroughDay: z
     .string()
@@ -300,13 +303,17 @@ const storedCursorSchema = z.object({
 interface StoredCursor {
   /** Null until a run has read at least one transcript row. */
   transcript: Cursor | null;
-  cost: { pricedThroughDay: string | null; heldSinceMs: number | null };
+  cost: {
+    pricedThroughDay: string | null;
+    heldSinceMs: number | null;
+    readAtMs: number | null;
+  };
   seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
 }
 
 const NO_CURSOR: StoredCursor = {
   transcript: null,
-  cost: { pricedThroughDay: null, heldSinceMs: null },
+  cost: { pricedThroughDay: null, heldSinceMs: null, readAtMs: null },
   seats: { reportedThroughDay: null, heldSinceMs: null },
 };
 
@@ -326,6 +333,9 @@ function parseCursor(raw: string | null): StoredCursor {
       cost: {
         pricedThroughDay: parsed.data.costPricedThroughDay ?? null,
         heldSinceMs: parsed.data.costHeldSinceMs ?? null,
+        // Absent on every position written before the ask was recorded, which
+        // reads as never asked and so asks at once.
+        readAtMs: parsed.data.costReadAtMs ?? null,
       },
       seats: {
         reportedThroughDay: parsed.data.seatsReportedThroughDay ?? null,
@@ -345,6 +355,7 @@ function encodeCursor(cursor: StoredCursor): string {
     ...(cursor.transcript ?? {}),
     costPricedThroughDay: cursor.cost.pricedThroughDay,
     costHeldSinceMs: cursor.cost.heldSinceMs,
+    costReadAtMs: cursor.cost.readAtMs,
     seatsReportedThroughDay: cursor.seats.reportedThroughDay,
     seatsHeldSinceMs: cursor.seats.heldSinceMs,
   });
@@ -876,7 +887,12 @@ export class CopilotStudioDataversePuller
           previous.transcript?.conversationtranscriptid);
     const costMoved =
       cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
-      cost.heldSinceMs !== previous.cost.heldSinceMs;
+      cost.heldSinceMs !== previous.cost.heldSinceMs ||
+      // The instant of the ask counts as movement in its own right. A run that
+      // asked and found the same figure moves neither of the two above, and
+      // dropping the record of the ask would leave the source due again on the
+      // very next run.
+      cost.readAtMs !== previous.cost.readAtMs;
     const seatsMoved =
       seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
       seats.heldSinceMs !== previous.seats.heldSinceMs;
@@ -889,10 +905,14 @@ export class CopilotStudioDataversePuller
     // here bought that visibility by throwing away figures already in hand.
     //
     // What stops a dead environment reading as steady progress is that the
-    // cost and seat marks only move on the day roll. Every later run that day
-    // hands back the incoming cursor string verbatim, which the worker reads
-    // as no progress and fails. `refusesNextLink` still fails or warns exactly
-    // as it did, because there the transcript cursor is what moved.
+    // seat mark only moves on the day roll, and the cost mark only on the few
+    // runs a day that are due to ask about the bill at all. On a five-minute
+    // schedule that is four runs out of two hundred and eighty-eight; the rest
+    // hand back the incoming cursor string verbatim, which the worker reads as
+    // no progress and fails. The signal is weaker than it was when nothing but
+    // the day roll moved these marks, and it still holds. `refusesNextLink`
+    // still fails or warns exactly as it did, because there the transcript
+    // cursor is what moved.
     const moved = transcriptMoved || costMoved || seatsMoved;
 
     return {
@@ -928,10 +948,18 @@ export class CopilotStudioDataversePuller
   private async readAzureCost(params: {
     config: CopilotStudioDataverseConfig;
     options: PullRunOptions;
-    previous: { pricedThroughDay: string | null; heldSinceMs: number | null };
+    previous: {
+      pricedThroughDay: string | null;
+      heldSinceMs: number | null;
+      readAtMs: number | null;
+    };
   }): Promise<{
     events: NormalizedPullEvent[];
-    cost: { pricedThroughDay: string | null; heldSinceMs: number | null };
+    cost: {
+      pricedThroughDay: string | null;
+      heldSinceMs: number | null;
+      readAtMs: number | null;
+    };
   }> {
     const { config, options, previous } = params;
     const subscriptionId = config.azureSubscriptionId;
@@ -940,6 +968,15 @@ export class CopilotStudioDataversePuller
     if (!subscriptionId) return { events: [], cost: previous };
 
     const nowMs = Date.now();
+    // Neither of the two skips above and below is a failed read. Azure
+    // publishes this bill once a day and refuses a caller that asks too often,
+    // so a source on a five-minute schedule that asked every run would be
+    // throttled into never reading it at all. Handing back the position
+    // untouched leaves the hold anchored where it was and leaves the decision
+    // to give up to a run that actually asked.
+    if (!azureCostReadIsDue({ nowMs, readAtMs: previous.readAtMs })) {
+      return { events: [], cost: previous };
+    }
     const held = () => ({
       events: [],
       cost: nextAzureCostCursor({ nowMs, previous, outcome: "held" as const }),
