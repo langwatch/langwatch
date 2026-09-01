@@ -1200,13 +1200,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- .Values.clickhouse.auth.secretKeys.passwordKey | default "password" -}}
 {{- end -}}
 
-{{/* LangWatchQL Secret for chart-managed ClickHouse. Resolves IDENTICALLY to the
-     clickhouse-serverless subchart's own clickhouse-serverless.lwqlSecretName so
-     the app/workers read the langwatch_lwql password from exactly the Secret the
-     pod created the user from: clickhouse.lwql.existingSecret (tpl'd) when set,
-     else the ClickHouse credentials Secret (auth.existingSecret, else
-     <release>-clickhouse). Keeping the two resolutions in lockstep is what makes
-     the query password structurally unable to diverge from the provisioned one. */}}
+{{/* LangWatchQL Secret for chart-managed ClickHouse. Resolves to the SAME Secret
+     the clickhouse-serverless subchart mounts the langwatch_lwql user from, so
+     the app/workers read the query password from exactly where the pod created
+     it: clickhouse.lwql.existingSecret (tpl'd) when set, else the ClickHouse
+     credentials Secret.
+
+     Both this helper and the subchart's clickhouse-serverless.lwqlSecretName key
+     off `clickhouse.auth.existingSecret` for that credentials Secret, and the
+     parent's default for it ({{ printf "%s-clickhouse" .Release.Name }}, see
+     values.yaml) is shared and NON-empty — so on every supported path the two
+     resolve to the same name, verified against a >36-char release name.
+
+     LIMIT: the subchart's own fallback is clickhouse-serverless.fullname, which
+     `trunc 36`s the release name, while this helper's fallback does not. That
+     fallback is reached only if clickhouse.auth.existingSecret is emptied — an
+     unsupported config the autogen=false validation already forbids — so the
+     truncation never bites in practice, but a hand-emptied existingSecret on a
+     >36-char release would diverge. Keep auth.existingSecret set. */}}
 {{- define "langwatch.clickhouse.lwqlSecretName" -}}
   {{- $lwql := .Values.clickhouse.lwql | default dict -}}
   {{- if $lwql.existingSecret -}}
