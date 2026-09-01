@@ -2,7 +2,7 @@
 
 // Internal pages don't need to be server rendering
 
-import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -16,6 +16,7 @@ import {
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
 } from "~/components/scenarios/ScenarioWelcomeScreen";
+import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
 import { useAgentTestingRedirect } from "~/components/suites/useAgentTestingRedirect";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -182,6 +183,10 @@ function ScenarioLibraryPage() {
           </PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>
+
+      <Box paddingX={6} paddingBottom={2} width="full">
+        <ReturnToNewSimulationsBanner target="scenarios" />
+      </Box>
 
       <PageLayout.Container padding={0}>
         {isLoading && (

@@ -5,7 +5,8 @@
  * The person who clicks "go back" on the welcome callout gets the previous
  * screens on this machine only: the sidebar offers the Simulations group
  * again and `/simulations` addresses stop redirecting to Agent Testing.
- * Everyone else on the project keeps the new screens.
+ * Everyone else on the project keeps the new screens. The return banner on
+ * the previous screens clears the choice again.
  *
  * The write dispatches {@link CHANGE_EVENT} so every mounted reader (the
  * main menu above all) re-reads without a page load; the `storage` event
@@ -36,6 +37,17 @@ export function preferLegacySimulations(projectId: string): void {
   } catch {
     // A blocked localStorage still gets the navigation, just not the
     // persistent preference.
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+export function clearLegacySimulationsPreference(projectId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(storageKey(projectId));
+  } catch {
+    // A blocked localStorage still gets the navigation, just not the
+    // cleared preference.
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }

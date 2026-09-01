@@ -21,6 +21,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   })),
 }));
 
+// The bare rig has no router; the query object stands in for the address.
+const routerQuery: Record<string, unknown> = {};
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: vi.fn(() => ({ query: routerQuery })),
+}));
+
 // The link renders through react-router; the bare rig has no router, and
 // what is under test is the address and the click side effects.
 vi.mock("~/utils/compat/next-link", () => ({
@@ -57,11 +63,19 @@ describe("<NewSimulationsCallout />", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    for (const key of Object.keys(routerQuery)) delete routerQuery[key];
+    // The card retires on 2026-09-22; the tests read it while it still shows,
+    // whatever the machine's clock says.
+    vi.useFakeTimers({
+      toFake: ["Date"],
+      now: new Date("2026-09-05T12:00:00Z"),
+    });
   });
 
   afterEach(() => {
     cleanup();
     localStorage.clear();
+    vi.useRealTimers();
   });
 
   describe("given the person dismissed the earlier voice announcement", () => {
@@ -140,6 +154,49 @@ describe("<NewSimulationsCallout />", () => {
       expect(
         screen.queryByText("Welcome to the new simulations screen"),
       ).toBeNull();
+    });
+  });
+
+  describe("given three weeks passed since the new screens shipped", () => {
+    /** @scenario "The callout retires three weeks after the new screens shipped" */
+    it("renders nothing past the retirement date", () => {
+      vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+
+      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+      expect(
+        screen.queryByText("Welcome to the new simulations screen"),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the address carries simulations-welcome=1", () => {
+    /** @scenario "The simulations-welcome address parameter brings the callout back" */
+    it("shows past the retirement date", () => {
+      vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+      routerQuery["simulations-welcome"] = "1";
+
+      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+      expect(
+        screen.getByText("Welcome to the new simulations screen"),
+      ).toBeDefined();
+    });
+
+    /** @scenario "The simulations-welcome address parameter brings the callout back" */
+    it("shows past a dismissal and a recorded preference", () => {
+      localStorage.setItem(
+        SNOOZE_KEY,
+        String(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      );
+      localStorage.setItem(PREFERENCE_KEY, "1");
+      routerQuery["simulations-welcome"] = "1";
+
+      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+      expect(
+        screen.getByText("Welcome to the new simulations screen"),
+      ).toBeDefined();
     });
   });
 });
