@@ -95,26 +95,6 @@ const UploadCSVDrawer = lazyDefault({
   factory: () => import("./datasets/UploadCSVDrawer"),
   key: "UploadCSVDrawer",
 });
-const GroupDetailDrawer = lazyDefault({
-  factory: () => import("./ops/queues/groupDetail/GroupDetailDrawer"),
-  key: "GroupDetailDrawer",
-});
-const ProcessInstanceDrawer = lazyDefault({
-  factory: () => import("./ops/processes/instanceDrawer/ProcessInstanceDrawer"),
-  key: "ProcessInstanceDrawer",
-});
-const ProcessInstancesDrawer = lazyDefault({
-  factory: () => import("./ops/processes/ProcessInstancesDrawer"),
-  key: "ProcessInstancesDrawer",
-});
-const OpsBlobsDrawer = lazyDefault({
-  factory: () => import("./ops/blobs/OpsBlobsDrawer"),
-  key: "OpsBlobsDrawer",
-});
-const OpsReplayDrawer = lazyDefault({
-  factory: () => import("./ops/projections/OpsReplayDrawer"),
-  key: "OpsReplayDrawer",
-});
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
   key: "EditModelProviderDrawer",
@@ -158,10 +138,6 @@ const EvaluatorTypeSelectorDrawer = lazyDefault({
 const WorkflowSelectorForEvaluatorDrawer = lazyDefault({
   factory: () => import("./evaluators/WorkflowSelectorForEvaluatorDrawer"),
   key: "WorkflowSelectorForEvaluatorDrawer",
-});
-const FoundryDrawer = lazyDefault({
-  factory: () => import("~/features/ops/foundry-drawer.transport"),
-  key: "FoundryDrawer",
 });
 const CreateProjectDrawer = lazyDefault({
   factory: () => import("./projects/CreateProjectDrawer"),
@@ -306,14 +282,6 @@ export const drawers = {
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
-  // Dev tools
-  // Ops
-  foundry: FoundryDrawer,
-  opsGroupDetail: GroupDetailDrawer,
-  opsProcessInstance: ProcessInstanceDrawer,
-  opsProcessInstances: ProcessInstancesDrawer,
-  opsBlobs: OpsBlobsDrawer,
-  opsReplay: OpsReplayDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

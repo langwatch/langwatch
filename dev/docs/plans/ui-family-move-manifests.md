@@ -1,7 +1,7 @@
 # UI page-family move manifests
 
 Distilled from the 2026-09-01 closure survey (governance, gateway, me,
-automations), taken under the deletes-only ruling: platform/app may only
+automations, ops), taken under the deletes-only ruling: platform/app may only
 shrink, so "repoint the platform consumer" is never an option — a shared
 component is either promoted to a package first or the moving family takes
 its own copy and the platform copy dies later with its remaining consumers.
@@ -39,6 +39,11 @@ Design-system promotions landed as `4ffabc1735` (nine groups;
 HoverableBigText refused — needs a render-prop seam). Destination
 relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
 `0559f563df`, automation-web `648ed49987`.
+
+All five families have now moved. `@langwatch/ops-web` is the fifth and last
+governed web package of the pilot, and the ops move closed every blocker the
+ops relayout recorded as insurmountable: the browser transport, the session
+gate, the feedback capability, the page guard and `PageLayout` all exist.
 
 Governance moved first, and it is the reference every later family
 copies. What it added on top of the four gates, all of it reusable:
@@ -403,6 +408,148 @@ Known costs, all reported rather than suppressed:
   (`packages/features/automation/server/src/transport/api-trpc/automation.api.ts:1008`).
   Left red rather than rewritten: which of the two should change is a security
   question, not a page move's.
+
+### ops — MOVED. 19 keys (13 workspace + 6 backoffice), 95 prod files + 9 tests
+
+Moved fifth, and the largest: 13,646 deletions out of `platform/app` against
+automations' 12,348. It is also the family whose destination package had already
+been relaid out for it (`0958e06039`), which changes the shape of the work
+entirely — 41 of the 65 closure files were already in `@langwatch/ops-web`, and
+almost every platform file was a thin app adapter over a package view. The move
+is adapters plus pages, exactly as the automations survey predicted for a
+package that already owns its presentation.
+
+Every blocker the relayout commit named as insurmountable is gone, and none of
+them needed anything invented for this family: the transport is
+`behavior/ops-api.ts` over `createFeatureApi`, the admin gate is the session
+capability, the toaster and the error registry are `BrowserUiFeedback`, and the
+page chrome is the route tree's.
+
+What actually happened, against what was surveyed:
+
+- **The admin gate is two session grants, not a probe and a query.**
+  `platform/app` asked a live `ops.getScope` for the workspace and a separate
+  `user.isAdmin` for the Backoffice, decoupled on purpose so that widening
+  operator access could never widen the Backoffice. Both facts are already
+  platform-tier permissions in the authz registry (`ops.actions =
+  ["view","manage"]`, `scopes: ["platform"]`), so the host answers
+  `hasOpsAccess()` from `ops:view` and `isOpsAdmin()` from `ops:manage`, the two
+  page guards ask for those, and the decoupling is now PROVED rather than
+  documented — `tests/ops-page-policy.integration.test.tsx` mounts every
+  Backoffice resource under `ops:view` alone and asserts the refusal.
+- **Six Backoffice addresses collapse to one screen**, the automations
+  tab-as-prop shape taken a second time: `BackofficeShell` plus six three-line
+  page files becomes `ops-backoffice.screen.tsx` with a `resource` prop. 19 keys,
+  14 loaders.
+- **All six drawer-registry entries are deleted**, and unlike automations this
+  one costs almost nothing: five of the six had only family callers, so each
+  overlay keeps its own query key on the page that opens it
+  (`?payloadStore=`, `?replay=`, `?group=<queue>|<id>`, `?processes=`,
+  `?processInstance=<process>|<tenant>|<key>`), addressed through a shared
+  `behavior/ops-overlays.ts`. The retired `/ops/projections` redirect pins
+  `replay=open` instead of `drawer.open=opsReplay`, so a saved link still lands
+  with the wizard open.
+- The event-sourcing rail moved as the family's own `ui/sections/event-sourcing-layout.tsx`,
+  harvested from `SectionNavigationFrame` — the gateway precedent, third use.
+- `useOpsPermission` STAYS in `platform/app`: the navigation menu and the
+  command bar read it, and deletes-only forbids repointing them. The package has
+  its own reading of the same fact off the host, under the same name and the same
+  `{ hasAccess, scope, isLoading }` shape, so no call site changed.
+
+Hazards, as they actually resolved:
+
+- **THE DASHBOARD NO LONGER STREAMS.** `ops.dashboardStream` is a tRPC
+  SUBSCRIPTION and `apps/ui`'s transport declares none — the host routes those
+  over a WebSocket it configures from its own environment. The page always takes
+  the fallback it already had, `ops.getDashboardSnapshot` on a five-second poll,
+  and the connection indicator reports the poll rather than claiming a socket.
+  THE ONE FEATURE LOSS OF THIS MOVE, and the only one: every other surface came
+  over whole. It closes when `apps/ui` gains a subscription lane.
+- **The Foundry drawer is gone with its registry entry.** Its only opener was
+  the command bar's "open the Foundry" action, which is not this family's, so
+  `features/ops/foundry-drawer.transport.tsx` was deleted rather than moved. The
+  `/ops/foundry` PAGE is untouched; `selectHandlers.ts:105` fails to typecheck
+  and is left broken under the not-gradual ruling.
+- The house dialog is not the Design System dialog. `platform/app`'s
+  `DialogRoot` sets `trapFocus={false}`, and the impersonation dialog's
+  `initialFocusEl` only lands on the reason input with the trap off — importing
+  the Design System's root directly moved focus to the dialog container, which
+  the focus-on-open scenario caught. `ui/elements/ops-dialog.tsx` takes the two
+  props and nothing else.
+- `PinnedAwareJsonView` came over as a family-local copy: `@langwatch/trace-web`
+  publishes the explorer's stores and formatters, not its viewer, and two
+  platform files still render the original. `useShikiAdapter` did NOT need a
+  copy — it is `@langwatch/design-system/shiki`, which is what `trace-web` was
+  re-exporting.
+- The four Prisma enums the Backoffice forms offer (`PlanTypes`,
+  `SubscriptionStatus`, `Currency`, `PricingModel`) are restated in
+  `features/backoffice/model/backoffice-enums.ts` rather than taken from
+  `@langwatch/enterprise-billing-contract`. Three of them ARE in that contract,
+  and taking them would have put the commercial plan catalogue on the import
+  graph of every open-source build of the Ops workspace — `enterprise-direction`
+  is structural. The contract makes the same promise about its own copy ("Values
+  must stay aligned with Prisma enums").
+- `mutationOutcome` became a HOOK (`behavior/ops-mutation-outcome.ts`): the
+  toaster and the error toast are the host's now, and a host is read through
+  context. Every caller was already a hook, so the call sites moved one line up
+  and no handler body changed.
+- `keepPreviousData` is a local identity function, the gateway's answer to the
+  same import.
+
+Known costs, all reported rather than suppressed:
+
+- 8 new architecture-lint findings, every one attributed: `platform-api-client`
+  in the procedure map (the exception all four earlier families carry), the
+  Backoffice's `@tanstack/react-query` and `@langwatch/feature-flag-web` (which
+  is also the one new oxlint line, and the same web-to-web class governance
+  carries for authz-web), the Foundry's `localStorage` preset store — browser
+  state with no capability to answer it — the package's root `.` export, and the
+  two impersonation-banner surface lines. The last two are the relayout's
+  prediction, unchanged: 22 `platform/app` files still import `Kbd` and
+  `ImpersonationBanner` off the root entry, and the banner's own `fetch` plus
+  `window.location.href` cannot move behind a prop while its only consumers are
+  platform chrome that may not gain one.
+- ONE PLATFORM TYPECHECK ERROR ADDED, the Foundry drawer key above. The
+  whole-tree count is 14: 7 automations-drawer, 6 pre-existing (the stated
+  baseline of 5 undercounts by one — `vitest.browser.config.ts`), 1 this move's.
+- ONE PLATFORM ASSERTION DELETED, and it is a line rather than a case:
+  `legacy-page-loaders.unit.test.ts` asserted the registry holds more than 100
+  loaders, and it holds 83. The route-table half of the same non-vacuity guard
+  stays, as does the test that every registered key is reachable. The retired
+  `/ops/projections` redirect case was deleted whole — it asserted the old
+  `drawer.open=opsReplay` pin and carried no `@scenario`.
+- THREE RED TESTS INHERITED, not caused, and proved so:
+  `FeatureFlagsContent.scopeCopy` was already 3/3 red at HEAD in `platform/app`
+  (verified by running it there before deletion). Its fixture omitted
+  `families`, so every render threw on `catalogue.families.length`; the fixture
+  is repaired here, which turns the crash into what it was hiding — three copy
+  assertions the shared `@langwatch/feature-flag-web` catalogue view no longer
+  satisfies. The copy the test pins ("customers get the value set here") exists
+  nowhere in the repo since `3727210dc9` moved the view into that package. Which
+  of the two should change is a product-copy question in another feature's
+  package, not a page move's.
+- Scenario bindings 22 → 24, none lost: every moved test kept its annotations,
+  and the two new ones bind the replay overlay's address to two scenarios added
+  to `specs/ops/ops-dashboard-density.feature`. Three more were added to
+  `packages/features/ops/specs/admin.feature` for the two-tier gate and bound in
+  `apps/ui`.
+
+## The fifth family's own additions, for whoever governs the next package
+
+- The first family whose destination package was RELAID OUT FIRST, as its own
+  commit, months before the move. It is the cheapest shape by a distance: the
+  reconciliation step that dominated automations did not exist, because every
+  same-named file was provably an adapter. Whoever moves a family into a package
+  that already owns presentation should relayout first and move second.
+- The first host port with TWO access answers rather than one permission, and
+  the reason is worth keeping: a page family whose surfaces are gated at two
+  different tiers must model both, or the narrower one silently widens.
+- The first family to address FIVE overlays by query key in one move, through a
+  shared `useOpsOverlay(key)` rather than five hand-written pairs. The helper is
+  fifty lines and it is what made deleting six registry entries cheap.
+- A package-local dialog wrapper is sometimes load-bearing. `platform/app`'s
+  `components/ui/*` are not always re-exports of the Design System, and the
+  difference can be a behaviour a scenario pins. Diff them before substituting.
 
 ## Cross-family collisions (settle before dispatching pairs)
 

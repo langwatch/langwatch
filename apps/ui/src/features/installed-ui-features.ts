@@ -19,6 +19,7 @@ import type { UiFeatureInstall } from "../ui/sections/ui-application";
 import { automationsApiBinding, automationsPageLoaders } from "./automations";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
+import { opsApiBinding, opsPageLoaders } from "./ops";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
 export const installedUiFeatures: UiFeatureInstall = {
@@ -26,12 +27,14 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...automationsPageLoaders,
     ...gatewayPageLoaders,
     ...governancePageLoaders,
+    ...opsPageLoaders,
     ...personalWorkspacePageLoaders,
   },
   apis: [
     automationsApiBinding,
     gatewayApiBinding,
     governanceApiBinding,
+    opsApiBinding,
     ...personalWorkspaceApiBindings,
   ],
   capabilities: { feedback: BrowserUiFeedback.create() },

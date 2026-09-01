@@ -1,15 +1,10 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import type { PausedSchedule } from "../../model/paused-schedule";
 
 export const PAUSED_SCHEDULES_HREF = "/ops/event-sourcing/schedules";
 
-/** A schedule the operator switched off, named by what it fires. */
-export interface PausedSchedule {
-  id: string;
-  targetType: string;
-  targetId: string;
-  cron: string;
-}
+export type { PausedSchedule } from "../../model/paused-schedule";
 
 /**
  * Schedules that are switched off.

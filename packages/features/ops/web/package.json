@@ -17,6 +17,10 @@
     "./surfaces/impersonation": {
       "types": "./src/surfaces/impersonation/index.ts",
       "default": "./src/surfaces/impersonation/index.ts"
+    },
+    "./screens/ops": {
+      "types": "./src/screens/ops/index.ts",
+      "default": "./src/screens/ops/index.ts"
     }
   },
   "scripts": {
@@ -27,7 +31,10 @@
   "dependencies": {
     "@chakra-ui/react": "^3.34.0",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/feature-flag-web": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
@@ -42,9 +49,11 @@
     "lucide-react": "^1.22.0",
     "react": "19.2.4",
     "recharts": "^3.9.1",
+    "use-debounce": "^10.0.6",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.10.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.14",

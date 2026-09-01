@@ -10,6 +10,7 @@ import {
   Table,
   Text,
   VStack,
+  VisuallyHidden,
 } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Switch } from "@langwatch/design-system/switch";
@@ -22,6 +23,8 @@ import type {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface OperatorFeatureFlagCatalogueProps {
+  /** True on a shared (multi-tenant) install, where a PRODUCT flag reaches every customer. */
+  sharedInstall?: boolean;
   catalogue: OperatorFeatureFlagCatalogue;
   canManage: boolean;
   pendingKey?: string;
@@ -74,6 +77,7 @@ export function OperatorFeatureFlagCatalogueView({
   catalogue,
   canManage,
   pendingKey,
+  sharedInstall,
   onSetEnabled,
   onClear,
   onSetRules,
@@ -90,8 +94,9 @@ export function OperatorFeatureFlagCatalogueView({
 
       <ScopeSection
         heading="System"
-        description="Backend kill switches and pipeline toggles. Resolved from postgres, env, or registry default."
+        description="Backend kill switches and pipeline toggles. Resolved from the env override first, then this postgres store, then the registry default."
         rows={grouped.system}
+        sharedInstall={sharedInstall}
         canManage={canManage}
         pendingKey={pendingKey}
         onSetEnabled={onSetEnabled}
@@ -100,8 +105,9 @@ export function OperatorFeatureFlagCatalogueView({
       />
       <ScopeSection
         heading="Product"
-        description="Browser-visible product rollouts and experiments. They use the same operator rules, rows, and registry defaults."
+        description="Browser-visible product rollouts and experiments. Customers get the value set here when no targeting rule matches it first and no env override is set."
         rows={grouped.product}
+        sharedInstall={sharedInstall}
         canManage={canManage}
         pendingKey={pendingKey}
         onSetEnabled={onSetEnabled}
@@ -152,6 +158,7 @@ function ScopeSection({
   heading,
   description,
   rows,
+  sharedInstall,
   canManage,
   pendingKey,
   onSetEnabled,
@@ -161,6 +168,7 @@ function ScopeSection({
   heading: string;
   description: string;
   rows: OperatorFeatureFlag[];
+  sharedInstall?: boolean;
   canManage: boolean;
   pendingKey: string | undefined;
   onSetEnabled: OperatorFeatureFlagCatalogueProps["onSetEnabled"];
@@ -193,6 +201,7 @@ function ScopeSection({
           <Table.Body>
             {rows.map((row) => (
               <FlagRow
+          sharedInstall={sharedInstall}
                 key={row.key}
                 row={row}
                 canManage={canManage}
@@ -211,6 +220,7 @@ function ScopeSection({
 
 function FlagRow({
   row,
+  sharedInstall,
   canManage,
   pending,
   onSetEnabled,
@@ -218,6 +228,7 @@ function FlagRow({
   onSetRules,
 }: {
   row: OperatorFeatureFlag;
+  sharedInstall?: boolean;
   canManage: boolean;
   pending: boolean;
   onSetEnabled: OperatorFeatureFlagCatalogueProps["onSetEnabled"];
@@ -258,6 +269,15 @@ function FlagRow({
               {row.key}
             </Text>
             <ScopeBadge scope={row.scope} />
+            {row.scope === "PRODUCT" && sharedInstall && (
+              <Badge colorPalette="red" size="sm" variant="subtle">
+                All customers
+                <VisuallyHidden>
+                  Enabling this reaches the whole fleet when no targeting rule matches it first;
+                  scope the change with a per-organization or per-project rule instead.
+                </VisuallyHidden>
+              </Badge>
+            )}
           </HStack>
           <Text fontSize="xs" color="fg.muted">
             {row.description}

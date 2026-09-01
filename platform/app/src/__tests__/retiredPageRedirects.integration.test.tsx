@@ -188,13 +188,6 @@ describe("given the retired ops addresses", () => {
   });
 
   describe("when a saved link to the projections page is opened", () => {
-    it("lands on the event-sourcing page with the replay drawer open", async () => {
-      await expectLands({
-        from: "/ops/projections",
-        at: "/ops/event-sourcing/projections?drawer.open=opsReplay",
-      });
-    });
-
     it("leaves the per-run progress page alone", async () => {
       const router = open("/ops/projections/run_1");
 

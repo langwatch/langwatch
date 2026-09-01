@@ -5,6 +5,7 @@
     "@langwatch/automation-web",
     "@langwatch/enterprise-governance-web",
     "@langwatch/gateway-web",
+    "@langwatch/ops-web",
     "@langwatch/prompt-web",
     "@langwatch/user-web"
   ],
@@ -38,6 +39,14 @@
       "root": "governance",
       "uses": {
         "screens": ["@langwatch/enterprise-governance-web/screens/governance"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "ops",
+      "root": "ops",
+      "uses": {
+        "screens": ["@langwatch/ops-web/screens/ops"],
         "surfaces": []
       }
     },

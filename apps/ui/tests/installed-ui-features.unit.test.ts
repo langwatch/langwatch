@@ -49,6 +49,32 @@ const PERSONAL_WORKSPACE_PAGE_KEYS = [
   "pages/[project]/pull-requests",
 ];
 
+const OPS_PAGE_KEYS = [
+  "pages/ops/index",
+  "pages/ops/dejaview",
+  "pages/ops/event-sourcing/index",
+  "pages/ops/event-sourcing/dead-letters",
+  "pages/ops/event-sourcing/processes",
+  "pages/ops/event-sourcing/projections",
+  "pages/ops/event-sourcing/subscribers",
+  "pages/ops/event-sourcing/schedules",
+  "pages/ops/blobs",
+  "pages/ops/feature-flags",
+  "pages/ops/foundry",
+  "pages/ops/migrations",
+  "pages/ops/projections/[runId]",
+  // Six keys for ONE screen, the automations shape again: the Backoffice's six
+  // resources were six three-line page files around one admin-gated shell, so
+  // the feature maps each key to the resource it shows and the screen is told
+  // rather than reading the address.
+  "pages/ops/backoffice/bug-reports",
+  "pages/ops/backoffice/users",
+  "pages/ops/backoffice/organizations",
+  "pages/ops/backoffice/projects",
+  "pages/ops/backoffice/subscriptions",
+  "pages/ops/backoffice/sso-connections",
+];
+
 const GOVERNANCE_PAGE_KEYS = [
   "pages/governance/index",
   "pages/governance/inventory.enterprise",
@@ -94,19 +120,21 @@ describe("given what apps/ui serves itself", () => {
           ...AUTOMATION_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...OPS_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Five rather than four: the personal workspace mounts two, because the
+      // Six rather than five: the personal workspace mounts two, because the
       // coding-agent tables its screens render call procedures of their own and
       // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/automation-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
+        "@langwatch/ops-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
       ]);
@@ -157,10 +185,11 @@ describe("given what apps/ui serves itself", () => {
           ...AUTOMATION_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...OPS_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(5);
+      expect(merged.apis).toHaveLength(6);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

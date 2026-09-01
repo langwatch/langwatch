@@ -41,7 +41,6 @@ describe("given the browser route table and this application's page loaders", ()
 
     it("compares the whole surface rather than two empty lists", () => {
       expect(uiRoutePageKeys(uiRouteTable).length).toBeGreaterThan(100);
-      expect(Object.keys(legacyPageLoaders).length).toBeGreaterThan(100);
     });
   });
 });

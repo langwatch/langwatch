@@ -180,7 +180,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "route /ops/feature-flags -> pages/ops/feature-flags",
   "route /ops/foundry -> pages/ops/foundry",
   "route /ops/migrations -> pages/ops/migrations",
-  "redirect /ops/projections -> /ops/event-sourcing/projections (from /ops/projections) [pin drawer.open=opsReplay]",
+  "redirect /ops/projections -> /ops/event-sourcing/projections (from /ops/projections) [pin replay=open]",
   "route /ops/projections/:runId -> pages/ops/projections/[runId]",
   "redirect /ops/backoffice -> /ops/backoffice/users (from /ops/backoffice)",
   "route /ops/backoffice/bug-reports -> pages/ops/backoffice/bug-reports",

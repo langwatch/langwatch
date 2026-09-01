@@ -65,3 +65,27 @@ Feature: Platform administration package boundary
     When the Ops worker contribution reaches noon UTC
     Then it sends one daily_usage_stats report per organization
     And a failed organization report is captured without skipping later organizations
+
+  # The Ops workspace and the Back office are gated separately on purpose, and
+  # the page shells that carried the two checks said so out loud: widening
+  # operator access must never widen the Back office, which reads and writes
+  # every tenant's rows. Both are platform-tier grants — `ops:view` reads,
+  # `ops:manage` writes — so the distinction is the registry's, not a page's.
+
+  @integration
+  Scenario: An operator sees the Ops workspace
+    Given a reader holding the operator view grant
+    When they open a page of the Ops workspace
+    Then the page opens
+
+  @integration
+  Scenario: A reader without the operator grant is refused and told which grant
+    Given a reader holding no operator grant
+    When they open a page of the Ops workspace
+    Then they are refused and the grant they lack is named
+
+  @integration
+  Scenario: The Back office stays narrower than the workspace
+    Given a reader holding the operator view grant and not the manage grant
+    When they open a Back office resource
+    Then they are refused even though the Ops workspace opens for them
