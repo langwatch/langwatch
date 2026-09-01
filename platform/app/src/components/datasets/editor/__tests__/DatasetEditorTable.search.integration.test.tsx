@@ -31,6 +31,11 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const listPaginatedQuery = vi.fn();
+/** Shared across every served result, so "did the editor re-read?" is
+ *  observable. A per-result `vi.fn()` is not: nothing can tell the difference
+ *  between an editor that never refetched and one that refetched into a mock
+ *  that does nothing. */
+const refetchSpy = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -115,7 +120,7 @@ const serveDataset = (
           ),
         },
         isLoading: false,
-        refetch: vi.fn(),
+        refetch: refetchSpy,
       };
       cache.set(key, result);
       return result;
@@ -196,7 +201,7 @@ const serveDatasetsById = (
           ),
         },
         isLoading: false,
-        refetch: vi.fn(),
+        refetch: refetchSpy,
       };
       cache.set(key, result);
       return result;
@@ -217,6 +222,7 @@ beforeEach(() => {
   updateMutate.mockReset();
   deleteManyMutate.mockReset();
   listPaginatedQuery.mockReset();
+  refetchSpy.mockReset();
   // In-memory mode still calls the hook (gated by `enabled`), so it needs a
   // settled-but-empty result rather than undefined.
   listPaginatedQuery.mockReturnValue({
@@ -435,7 +441,13 @@ describe("given a saved dataset", () => {
       await user.type(editor, "resolved{Enter}");
 
       await waitFor(() => expect(updateMutate).toHaveBeenCalled());
+      // The row is still on screen with what was typed in it — and, the part
+      // that actually guards the decision, the editor did not re-read. Without
+      // this second assertion the test passes against an editor that refetches
+      // on every save: the mocked `refetch` returns nothing, so the grid keeps
+      // the row either way and the pixels cannot tell the two apart.
       expect(screen.getByText("resolved")).toBeInTheDocument();
+      expect(refetchSpy).not.toHaveBeenCalled();
     });
   });
 
