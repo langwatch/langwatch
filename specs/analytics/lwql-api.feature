@@ -797,15 +797,19 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # Chart-managed ClickHouse self-provisioning (issue #7331)
 
   @e2e
-  Scenario: Self-provisioning is enabled for chart-managed ClickHouse at any replica count
-    Given the chart is rendered with chart-managed ClickHouse at three replicas
-    Then the application container carries the LangWatchQL self-provisioning environment variable enabled
-    And rendering at one replica carries it enabled as well
-
-  @e2e
   Scenario: A ClickHouse mode transition rolls the application automatically
     Given the chart is rendered with chart-managed ClickHouse at one replica and at three replicas
     Then the application pod template differs between the two renders
+
+  # Design C: whoever owns the ClickHouse server owns the access model. The app
+  # self-provisions ONLY when it owns nothing else — external/BYO ClickHouse. For
+  # chart-managed ClickHouse the owning pod renders the access model as config, so
+  # the app must not also run the provisioning DDL (one owner per entity name).
+  @e2e
+  Scenario: App self-provisioning is exclusive to external ClickHouse under Design C
+    Given the chart is rendered once with chart-managed ClickHouse and once with external ClickHouse
+    Then the application carries the LangWatchQL self-provisioning environment variable only in the external-ClickHouse render
+    And the chart-managed render leaves provisioning to the ClickHouse server that owns the access model
 
   @e2e
   Scenario: A single-replica deployment provisions LangWatchQL unchanged

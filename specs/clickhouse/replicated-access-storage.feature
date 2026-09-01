@@ -59,6 +59,20 @@ Feature: Chart-managed ClickHouse owns the LangWatchQL access model
     When it writes the server configuration
     Then the lwql_postgres named collection is omitted
 
+  # The bridge needs host, database AND password together, matching the bash
+  # renderer and terraform contract; any one missing omits the collection.
+  @unit
+  Scenario: The lwql_postgres bridge is omitted without its PostgreSQL database
+    Given the ClickHouse config renderer runs with the LangWatchQL password, a PostgreSQL host and reader password, but no PostgreSQL database
+    When it writes the server configuration
+    Then the lwql_postgres named collection is omitted
+
+  @unit
+  Scenario: The lwql_postgres bridge user defaults to lwql_ro when unset
+    Given the ClickHouse config renderer runs with the LangWatchQL password, a PostgreSQL host, database and reader password, but no explicit reader user
+    When it writes the server configuration
+    Then the lwql_postgres named collection connects as the default lwql_ro reader
+
   @e2e
   Scenario: No replica carries a keeper-backed access or named-collection store
     Given a clustered chart-managed ClickHouse with three replicas
