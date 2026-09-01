@@ -148,7 +148,13 @@ Preparatory commits, each behaviour-neutral and landable independently:
   `createLegacyWorkerPorts` for transport, drains packaged then App).
 - **P5 — the pre-switch test suite** (below).
 
-P1 and P2 landed as `5e8a84ba4d` and `25885235b8`. A P1 finding widens
+P1 and P2 landed as `5e8a84ba4d` and `25885235b8`; P3 as `a6844f72fb`
+(the handoff type lives in
+`platform/app/src/server/app-layer/worker-eventing-handoff.ts`, and the
+presets binding is asserted structurally over the AST because end-to-end
+boot observation is blocked by the ClickHouse event store under
+BUILD_TIME, the ClickHouse runtime process singleton, and boot-leaked
+scheduler/Redis handles). A P1 finding widens
 P3/P4's scope: two consumer knobs are not yet wired to the new option —
 `apps/worker/src/platform/config/worker.config.ts` still binds
 `WORKER_EVENTING_CONSUMERS_ENABLED` through the fail-closed producer-only
