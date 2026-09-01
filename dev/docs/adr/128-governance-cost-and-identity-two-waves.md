@@ -398,6 +398,15 @@ config — the reason this waits for wave 2). The rule then reads:
   — its dollars are real and no bill claims them.
 - Mapped keys' gateway sum **exceeding** the bill is §2's variance line:
   total stays the bill, the overrun is shown, never subtracted.
+- **Cross-currency guard (§3):** the split/variance arithmetic requires
+  the bill and its mapped gateway rows to share a currency code. When
+  they differ (e.g. bill in EUR, gateway metering in USD) and no
+  biller-provided USD conversion exists (`BillerUsdNano = 0`), the
+  mapping is **ineligible** — both lanes render separately, each in its
+  own currency, until a biller conversion or a dated rate table (§3 b)
+  is available. Where a biller conversion *does* exist the split uses
+  the converted amount column and the variance is computed in that
+  currency; the original invoice currency is still shown alongside.
 
 The mapping lives with the source config (small admin list, audited,
 read at query time like every overlap rule). The exclusion filter stays
