@@ -84,6 +84,26 @@ export const commitsToResolve = ({
   compared: string[];
 }): string[] => [...new Set([...compared, after])].filter(Boolean);
 
+export type ResolvedCommit = {
+  commit: string;
+  pullRequests: AssociatedPullRequest[];
+};
+
+/** Which commit each pull request landed on, so a push carrying several can
+ * stamp each one with its own rather than with the whole push's tip.
+ *
+ * A rebase merge associates EVERY one of a pull request's commits with it,
+ * and the compare listing runs oldest first, so the last match is the one the
+ * pull request is final at. Keeping the first would name the commit the work
+ * started from. */
+export const landingCommits = (resolved: ResolvedCommit[]): Map<number, string> => {
+  const landedOn = new Map<number, string>();
+  for (const { commit, pullRequests } of resolved) {
+    for (const pull of pullRequests) landedOn.set(pull.number, commit);
+  }
+  return landedOn;
+};
+
 const githubHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: "application/vnd.github+json",
@@ -176,25 +196,22 @@ const run = async (): Promise<void> => {
     }),
   });
 
-  const associated: AssociatedPullRequest[] = [];
-  // Which commit carried which pull request, so a batch stamps each one with
-  // the commit it actually landed on rather than the whole batch's tip.
-  const landedOn = new Map<number, string>();
+  const resolved: ResolvedCommit[] = [];
   for (const commit of commits) {
-    const pulls = await fetchAssociatedPullRequests({
-      apiUrl,
-      token,
-      repository,
-      sha: commit,
+    resolved.push({
+      commit,
+      pullRequests: await fetchAssociatedPullRequests({
+        apiUrl,
+        token,
+        repository,
+        sha: commit,
+      }),
     });
-    for (const pull of pulls) {
-      if (!landedOn.has(pull.number)) landedOn.set(pull.number, commit);
-    }
-    associated.push(...pulls);
   }
+  const landedOn = landingCommits(resolved);
 
   const { refresh, forks } = mergeTargets({
-    pullRequests: associated,
+    pullRequests: resolved.flatMap((entry) => entry.pullRequests),
     branch,
     repository,
   });

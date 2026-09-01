@@ -164,6 +164,19 @@ Feature: PR token usage comment
       And no pull request merged earlier in the push is left behind
 
     @unit
+    Scenario: A pull request is stamped with the commit it landed on
+      Given a pull request whose commits all landed in this push
+      When the landing commit for each pull request is chosen
+      Then the last of its commits is named, never the first
+
+    @unit
+    Scenario: Each pull request in a batch keeps its own commit
+      Given a push that carried more than one pull request
+      When the landing commit for each pull request is chosen
+      Then each pull request is stamped with the commit that carried it
+      And never with the whole push's tip
+
+    @unit
     Scenario: A push with no comparable range still resolves its tip
       Given a push that created the branch, or a range that could not be read
       When the commits to resolve are chosen

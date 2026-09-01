@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   commitsToResolve,
+  landingCommits,
   mergeTargets,
   type AssociatedPullRequest,
 } from "./pr-token-usage-merged.ts";
@@ -90,6 +91,35 @@ describe("given a push that landed more than one commit", () => {
       assert.deepEqual(commitsToResolve({ after: "ccc", compared: [] }), [
         "ccc",
       ]);
+    });
+  });
+});
+
+describe("given a pull request whose commits all landed in this push", () => {
+  describe("when the landing commit for each pull request is chosen", () => {
+    /** @scenario "A pull request is stamped with the commit it landed on" */
+    it("takes the last of its commits, not the first", () => {
+      // A rebase merge associates every one of a pull request's commits with
+      // it, and compare lists them oldest first.
+      const landed = landingCommits([
+        { commit: "aaa", pullRequests: [pull({ number: 42 })] },
+        { commit: "bbb", pullRequests: [pull({ number: 42 })] },
+      ]);
+      assert.equal(landed.get(42), "bbb");
+    });
+
+    /** @scenario "Each pull request in a batch keeps its own commit" */
+    it("gives each pull request in a batch the commit that carried it", () => {
+      const landed = landingCommits([
+        { commit: "aaa", pullRequests: [pull({ number: 42 })] },
+        { commit: "bbb", pullRequests: [pull({ number: 43 })] },
+      ]);
+      assert.equal(landed.get(42), "aaa");
+      assert.equal(landed.get(43), "bbb");
+    });
+
+    it("names nothing for a commit that carried no pull request", () => {
+      assert.equal(landingCommits([{ commit: "aaa", pullRequests: [] }]).size, 0);
     });
   });
 });
