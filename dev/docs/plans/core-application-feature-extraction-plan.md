@@ -1298,6 +1298,28 @@ Gate: a fresh worker process consumes all queues and scheduled work without
 `platform/app`, while API producers dispatch through the same Eventing
 commands. Then delete old worker/runtime/event-sourcing/task registrations.
 
+#### Capability extraction ledger (census 2026-09-01)
+
+Of the 24 capabilities `packaged-worker.capabilities.ts` mapped, how each one
+reaches the packaged worker — the migration is turning every "synthesized"
+row into the eventing-maintenance shape (platform hands ports, the worker
+builds the pipeline):
+
+| Shape | Count | Capabilities |
+| ----- | ----- | ------------ |
+| Real (worker builds from raw deps) | 2 | eventing-maintenance, topic |
+| Extracted (this programme) | 1 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it) |
+| Hybrid (package installer, platform-built option bundle) | 2 | trace, governance-ingestion |
+| Synthesized wrapper (platform builds, worker receives) | 19 | automation, langy-maintenance, github, evaluation, coding-agent, governance-events, gateway-spend, metric, log, suite, scenario, experiment, langy-conversation, billing-reporting, authz, identity, sso-connection, scim-sync, join-request |
+| Riders (platform production code inside the mapper) | 2 | scenario `deferredComputeRunMetricsJob` (extraction in flight — moves to `@langwatch/scenario-server` with a drift guard, since both graphs register one queue job and two spellings would strand a key); SaaS `globalProjections` (billing meter projection + dispatch subscriber) |
+
+Transitional seam flagged in `e3ebed7963`: the worker composition's top-level
+`database` option defaults to the topic feature's PrismaClient — the one typed
+client the root holds. It dies when the worker root composes from
+configuration the way `apps/api` does (`ApiDatabaseInfrastructure` pattern).
+Postgres-backed extractions (github, langy-maintenance) ride that seam with no
+platform change.
+
 ### Wave 5: UI application shell
 
 #### Browser boot and providers
