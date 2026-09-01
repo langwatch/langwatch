@@ -54,10 +54,16 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the fold applies it to the Identifier projection
     And the projection cursor advances past the event
 
+  # Normalization folds case and trims, and it KEEPS a plus tag: the tag is
+  # part of the address. Stripping it merged an address somebody chose to keep
+  # separable into one they may already hold, and made the product lie -- the
+  # screen naming the tagged address while the confirmation went to the bare
+  # one, which on a domain that does not implement subaddressing is a mailbox
+  # they cannot read.
   @unit
   Scenario: Attaching an identifier records the fact and the projection row
     When an attach_identifier command is handled for "sam" with provider "google" and value "Sam.J+x@Acme.com"
-    Then an identifier_attached event is emitted with the normalized email "sam.j@acme.com"
+    Then an identifier_attached event is emitted with the normalized email "sam.j+x@acme.com"
     And the event payload carries the domain "acme.com" and an HMAC identifier hash
     And the event payload carries no password, token, or other secret
     And folding the event produces an Identifier row in state VERIFIED

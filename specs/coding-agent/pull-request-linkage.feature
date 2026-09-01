@@ -928,3 +928,98 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     When the pull request usage is read for that workspace
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
+
+# The question is organization-wide, so the v1 door authenticates at the
+# organization: an sk-lw organization key alone, with no project named
+# anywhere. The personal-workspace indirection on the legacy path existed only
+# to recover a calling user, which a user-bound key already carries — and a
+# service key, which carries none, is scoped by its own bindings instead.
+Rule: The v1 usage read needs only an organization credential
+
+  @integration
+  Scenario: An organization key reads pull request usage without naming a project
+    Given a user-bound organization API key
+    When the v1 pull request usage is read with no project id anywhere in the request
+    Then the answer is the caller's organization-wide rollup
+    And the read is recorded against the caller, the organization and the pull request
+
+  # A key can carry bindings NARROWER than its holder's own — that ceiling is
+  # the whole point of a restricted key — so the rollup intersects the
+  # holder's cut with the key's, the same key-plus-holder decision every
+  # other REST door asks.
+  @integration
+  Scenario: A narrowed key reads with its own scope, not its holder's
+    Given a holder who may view traces in two projects
+    And their organization key is bound to only one of them
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  @integration
+  Scenario: A key whose binding lacks the cost grant reads tokens with no cost
+    Given an organization key bound to one project with a role that cannot price
+    When the v1 pull request usage is read with that key
+    Then the bound project's rows carry token counts
+    And every cost in the answer is absent
+
+  # An organization service key acts as nobody — it is the credential a
+  # continuous integration job holds, where there is no person to mint a key
+  # for — so its scope is its own bindings alone: the projects they grant
+  # traces:view appear, and cost only where they grant cost:view. The read is
+  # still recorded, attributed to the key identity rather than an invented
+  # person.
+  @integration
+  Scenario: An organization service key reads the rollup scoped by its own bindings
+    Given an organization API key created without a user, bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project the bindings may view
+    And the read is recorded against the key identity, the organization and the pull request
+
+  @integration
+  Scenario: A service key without the cost grant reads tokens with every cost null
+    Given a service key whose bindings grant viewing but not pricing
+    When the v1 pull request usage is read with that key
+    Then the rows carry token counts
+    And every cost in the answer is absent
+
+  @integration
+  Scenario: A service key bound to one project sees only that project's rows
+    Given a service key bound to one project of the organization
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  # One collected grant snapshot decides every project. Deciding per project
+  # opened a database pass of several queries per project per permission, and
+  # a large organization's concurrent fan-out exhausted the connection pool —
+  # the rollup answered a ten-second 500 before it had even looked the pull
+  # request up.
+  @integration
+  Scenario: A large organization's rollup is decided from one grant snapshot
+    Given an organization on the authorization engine with dozens of projects
+    And an organization service key bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project of the organization
+    And the ceiling reads the same number of rows for dozens of projects as for a few
+    And the key's grants are collected once, not once per project
+
+  # A legacy project key carries no organization and no user, so it cannot
+  # authenticate at the organization door at all. The refusal names the
+  # credential class to swap, because the caller is holding a working key of
+  # the wrong family, not a typo.
+  @integration
+  Scenario: A legacy project key cannot reach the v1 usage read
+    Given a legacy project API key
+    When the v1 pull request usage is read
+    Then the refusal carries the credential class mismatch code
+    And the refusal names the organization key as the class this door needs
+
+  # The mapping is per organization, so another organization's key holds no
+  # question this instance can answer for that pull request — and learning
+  # whether the mapping exists elsewhere is not its to learn.
+  @integration
+  Scenario: An organization key from another organization learns nothing
+    Given a user-bound organization API key from a different organization
+    When the v1 pull request usage is read for a pull request mapped elsewhere
+    Then the caller receives the pull request not mapped failure
+    And nothing says the pull request is mapped for anyone else

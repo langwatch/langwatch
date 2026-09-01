@@ -37,6 +37,9 @@ function googleAccount(): BackfillAccountRow {
   return {
     id: "acc_google",
     provider: "google",
+    // The row's own issuer, which the adoption carries onto the fact rather
+    // than re-deriving — Google's is a real URL, not a synthetic form.
+    issuer: "https://accounts.google.com",
     providerAccountId: "google-sub-123",
     createdAtMs: ACCOUNT_CREATED_AT,
   };

@@ -12,7 +12,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { RunParameterValues } from "../parameters";
+import type {
+  RunParameterValues,
+  ScenarioParameterDefinition,
+} from "../parameters";
 import { resolveRunParameters } from "../resolve-run-parameters";
 import type { ScenarioRunConfig } from "../scenario.repository";
 
@@ -25,6 +28,7 @@ function scenario(
     id: "scen_1",
     name: "Refund flow",
     situation: "A customer asks for a refund",
+    version: 1,
     criteria: ["Answers the question"],
     parameters: null,
     ...overrides,
@@ -216,6 +220,58 @@ describe("resolveRunParameters", () => {
         });
         expect(resolved.get("scen_none")?.secretParameters).toEqual({});
         expect(resolved.get("scen_none")?.parameters).toEqual({});
+      });
+    });
+  });
+
+  describe("given a target declaring a required parameter with no default", () => {
+    const targetDefinitions: ScenarioParameterDefinition[] = [
+      { name: "plan", required: true },
+      { name: "model", defaultValue: "gpt-5-mini" },
+    ];
+
+    describe("when the run supplies no value for it", () => {
+      /** @scenario "A required parameter with no value is refused before scheduling" */
+      it("rejects the run naming the parameter", async () => {
+        await expect(
+          resolveRunParameters({
+            scenarios: [scenario({ parameters: [] })],
+            targetDefinitions,
+          }),
+        ).rejects.toMatchObject({
+          code: "scenario_parameter_required",
+          meta: { names: ["plan"] },
+        });
+      });
+    });
+
+    describe("when the run supplies its value", () => {
+      it("resolves it beside the target's other defaults", async () => {
+        const resolved = await resolveRunParameters({
+          scenarios: [scenario({ parameters: [] })],
+          targetDefinitions,
+          values: { plan: "enterprise" },
+        });
+
+        expect(resolved.get("scen_1")?.parameters).toEqual({
+          plan: "enterprise",
+          model: "gpt-5-mini",
+        });
+      });
+    });
+
+    describe("when the scenario declares a default for the same name", () => {
+      it("accepts the run and resolves the scenario's default", async () => {
+        const resolved = await resolveRunParameters({
+          scenarios: [
+            scenario({ parameters: [{ name: "plan", defaultValue: "free" }] }),
+          ],
+          targetDefinitions,
+        });
+
+        expect(resolved.get("scen_1")?.parameters).toMatchObject({
+          plan: "free",
+        });
       });
     });
   });

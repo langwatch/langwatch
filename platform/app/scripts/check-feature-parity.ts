@@ -151,6 +151,10 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
+  // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
+  // nothing else.
+  "services/idpsim",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -291,8 +295,8 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/me-usage-rest-api.feature",
   "specs/ai-gateway/governance/my-settings.feature",
   "specs/ai-gateway/governance/no-spy-mode.feature",
-  "specs/ai-gateway/governance/persona-aware-chrome.feature",
   "specs/ai-gateway/governance/persona-home-content.feature",
+  "specs/ai-gateway/governance/persona-home-resolver.feature",
   "specs/ai-gateway/governance/personal-keys.feature",
   "specs/ai-gateway/governance/personal-project-ingest-via-template.feature",
   "specs/ai-gateway/governance/personal-workspace-features.feature",
@@ -342,7 +346,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
   "specs/ai-governance/puller-framework/http-polling.feature",
   "specs/ai-governance/puller-framework/puller-adapter-contract.feature",
-  "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/ai-governance/sessions/admin-max-ttl.feature",
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
@@ -405,7 +408,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",
-  "specs/experiments-v3/evaluation-execution.feature",
   "specs/experiments-v3/evaluator-configuration.feature",
   "specs/experiments-v3/evaluator-mappings.feature",
   "specs/experiments-v3/execution-controls.feature",
@@ -428,10 +430,7 @@ const LEGACY_INERT: string[] = [
   "specs/features/monitor-cli.feature",
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
-  "specs/features/scenario-cli.feature",
   "specs/features/secret-cli.feature",
-  "specs/features/simulation-runs-cli.feature",
-  "specs/features/suite-cli.feature",
   "specs/features/suites/collapsible-suite-sidebar.feature",
   "specs/features/suites/footer-to-header-migration.feature",
   "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
@@ -450,6 +449,11 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
+  // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
+  // specs ship ahead of the code, and the PR that builds each surface binds its
+  // file as it lands. Remove each entry with its first binding.
+  "specs/identity/org-admin-identity-surface.feature",
+  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",
@@ -458,7 +462,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
-  "specs/langy/langy-native-skills.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
@@ -504,7 +507,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/navigation/child-drawer-nesting.feature",
-  "specs/navigation/home-navigation.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
@@ -543,7 +545,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
-  "specs/scenarios/scenario-api.feature",
   "specs/scenarios/scenario-bulk-actions.feature",
   "specs/scenarios/scenario-deferred-persistence.feature",
   "specs/scenarios/scenario-deletion.feature",

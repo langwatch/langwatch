@@ -336,17 +336,16 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("remove retired plugin dir: %w", err)
 	}
 
-	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
-	// AGENTS.md keeps the literal placeholder; we resolve it here so each worker
-	// emits concrete URLs in its replies. The template bytes are read once at
-	// Pool.New (from the embedded assets) — only the per-worker ReplaceAll happens
-	// here, so a spawn no longer touches disk for AGENTS.md.
+	// The operating contract, written through byte for byte. The template bytes
+	// are read once at Pool.New (from the embedded assets), so a spawn does not
+	// touch disk for AGENTS.md. Nothing is substituted into it: the prompt
+	// reaches the user through the reply, so an address only the worker can use
+	// must never enter it.
 	if in.AgentsTemplate == "" {
 		return fmt.Errorf("AGENTS.md template unavailable")
 	}
-	rendered := strings.ReplaceAll(in.AgentsTemplate, "${LANGWATCH_ENDPOINT}", in.Creds.LangwatchEndpoint)
 	agentsPath := filepath.Join(in.Home, "AGENTS.md")
-	if err := os.WriteFile(agentsPath, []byte(rendered), 0o600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(in.AgentsTemplate), 0o600); err != nil {
 		return fmt.Errorf("write AGENTS.md: %w", err)
 	}
 	if err := in.Runner.Chown(agentsPath, in.UID); err != nil {

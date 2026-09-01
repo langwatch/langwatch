@@ -153,8 +153,10 @@ interface ParsedErrorBody {
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
 
 /**
- * Parses an error response body as a handled-error envelope. Accepts both the
- * REST shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
+ * Parses an error response body as a handled-error envelope. Accepts three
+ * shapes: the canonical v1 envelope
+ * (`{ error: { type, code, message, meta?, trace_id } }`), the legacy REST
+ * shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
  * serialized tRPC shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`).
  * Returns an empty object when the body is not a recognizable error envelope.
  */
@@ -164,7 +166,16 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return {};
     }
-    const body = parsed as Record<string, unknown>;
+    const envelope = parsed as Record<string, unknown>;
+    // The canonical v1 envelope nests everything under `error`. Read the
+    // nested object as the body so one parser serves both generations.
+    const nested =
+      typeof envelope.error === "object" &&
+      envelope.error !== null &&
+      !Array.isArray(envelope.error)
+        ? (envelope.error as Record<string, unknown>)
+        : null;
+    const body = nested ?? envelope;
     // Prefer `code` (the domain discriminant) over `error` — the
     // packages/api unversioned envelope uses `error` for the HTTP status
     // text ("Not Found") while `code` holds the real code.

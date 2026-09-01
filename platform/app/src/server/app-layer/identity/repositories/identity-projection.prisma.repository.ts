@@ -4,6 +4,7 @@ import {
   LIVE_IDENTIFIER_STATES,
 } from "@langwatch/identity";
 import type { IdentityReservationRepository } from "@langwatch/identity-server";
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
@@ -28,6 +29,7 @@ export const FOLD_OWNED_ACCOUNT_COLUMNS = [
   "id",
   "userId",
   "provider",
+  "issuer",
   "providerAccountId",
 ] as const;
 
@@ -355,6 +357,13 @@ export class PrismaIdentityProjectionRepository
    * writing the folded one makes a held user's account unfindable by the
    * library that wrote it. A fact stated before ADR-116 carries neither a
    * subject nor an unfolded id, and its row is left as better-auth's own.
+   *
+   * The issuer is written for the same reason, one step further out:
+   * better-auth 1.7 looks an account up by `(issuer, accountId)`, and for a
+   * real OIDC connection the issuer is the IdP's own URL — nothing the fold
+   * could derive from anything else the identifier holds. So it is stated on
+   * the fact, carried by the identifier and projected here, never computed.
+   * A fact stated before it carried one leaves the column as it found it.
    */
   private async upsertLiveAccount(fact: LinkedIdentifier): Promise<void> {
     if (!isLiveIdentifierState(fact.state)) return;
@@ -362,6 +371,7 @@ export class PrismaIdentityProjectionRepository
     const columns = {
       userId: fact.userId,
       ...(fact.providerId === null ? {} : { provider: fact.providerId }),
+      ...(fact.issuer === null ? {} : { issuer: fact.issuer }),
       providerAccountId: fact.providerAccountId,
     };
     await this.prisma.account.upsert({
@@ -370,6 +380,13 @@ export class PrismaIdentityProjectionRepository
         id: fact.accountId,
         ...columns,
         provider: fact.providerId ?? fact.provider,
+        // A row created without one is a row better-auth cannot find, so the
+        // create floors it at the synthetic issuer 1.7 would have minted
+        // itself. Only reachable for a fact stated before the issuer was
+        // carried; a fact that names one always wins, because a real OIDC
+        // issuer is never what this derivation would produce.
+        issuer:
+          fact.issuer ?? issuerForProviderId(fact.providerId ?? fact.provider),
       },
       update: columns,
     });

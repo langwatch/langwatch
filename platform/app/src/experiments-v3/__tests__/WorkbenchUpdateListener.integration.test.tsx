@@ -38,7 +38,11 @@ vi.mock("~/utils/api", () => ({
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useWorkbenchUpdateListener } from "../hooks/useWorkbenchUpdateListener";
 
-function emitSignal(version: number, slug = "my-exp") {
+function emitSignal(
+  version: number,
+  slug = "my-exp",
+  extra: { runId?: string } = {},
+) {
   const call = sseCalls.at(-1)!;
   act(() => {
     call.options.onData({
@@ -48,6 +52,7 @@ function emitSignal(version: number, slug = "my-exp") {
         slug,
         version,
         actorLabel: "langy",
+        ...extra,
       }),
       timestamp: Date.now(),
     });
@@ -168,6 +173,112 @@ describe("useWorkbenchUpdateListener", () => {
         }),
       );
       expect(reloadFromServer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the version was written by a run this page started", () => {
+    /** @scenario "A page takes a version its own run wrote" */
+    it("takes that version and leaves the reader alone", async () => {
+      // The page streamed every cell that run produced, so its own run's write
+      // carries nothing it does not already hold. Bannering here would ask the
+      // reader to reload over edits the run had nothing to do with.
+      const reloadFromServer = vi.fn(async () => undefined);
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .rememberRunStartedHere("bold-jolly-bee");
+      });
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(7, "my-exp", { runId: "bold-jolly-bee" });
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(7),
+      );
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
+      expect(reloadFromServer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A page still stands down for a version somebody else wrote" */
+    it("still stands down for a run it did not start", async () => {
+      const reloadFromServer = vi.fn(async () => undefined);
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .rememberRunStartedHere("bold-jolly-bee");
+        // Autosave already stood down, so nothing of this page's own is coming.
+        useEvaluationsV3Store
+          .getState()
+          .setAutosaveStatus("evaluation", "error", "Network error");
+      });
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(7, "my-exp", { runId: "some-other-run" });
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+          serverVersion: 7,
+          actorLabel: "langy",
+        }),
+      );
+      expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(4);
+    });
+  });
+
+  describe("when a second version lands while the first reload is still running", () => {
+    /** @scenario A burst of backend saves leaves the page on the newest one */
+    it("reloads again for the version it could not serve", async () => {
+      // One agent turn that duplicates a target, writes its prompt and runs it
+      // is three saves in a row, so the second and third signals arrive while
+      // the reload for the first is still fetching.
+      let releaseFirstReload: (() => void) | undefined;
+      let reloads = 0;
+      const reloadFromServer = vi.fn(async () => {
+        reloads += 1;
+        if (reloads > 1) {
+          useEvaluationsV3Store.getState().setWorkbenchVersion(6);
+          return;
+        }
+        await new Promise<void>((resolve) => {
+          releaseFirstReload = resolve;
+        });
+        // The fetch left the server before version 6 was written, so it can
+        // only bring back 5. The new target lives in 6.
+        useEvaluationsV3Store.getState().setWorkbenchVersion(5);
+      });
+
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: false,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(5);
+      await waitFor(() => expect(reloadFromServer).toHaveBeenCalledTimes(1));
+
+      emitSignal(6);
+      act(() => releaseFirstReload?.());
+
+      await waitFor(() => expect(reloadFromServer).toHaveBeenCalledTimes(2));
+      expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(6);
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
     });
   });
 

@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
+import { formatStatNumber } from "./derived-cards/statFigure";
 import { NumberTicker } from "./NumberTicker";
 
 /**
@@ -51,7 +52,7 @@ export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
               format={
                 metric.format ??
                 (metric.suffix
-                  ? (n) => `${n.toLocaleString()}${metric.suffix}`
+                  ? (n) => `${formatStatNumber(n)}${metric.suffix}`
                   : undefined)
               }
             />

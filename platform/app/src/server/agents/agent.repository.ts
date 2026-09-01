@@ -3,23 +3,29 @@ import type { Agent, PrismaClient } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
 import {
   type CodeComponentConfig,
+  type ConnectedComponentConfig,
   type CustomComponentConfig,
   codeComponentSchema,
+  connectedComponentSchema,
   customComponentSchema,
   type HttpComponentConfig,
   httpComponentSchema,
   type SignatureComponentConfig,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { connectedAgentVisibleWhere } from "./connected-agent-visibility";
+import { AgentRegisterOnlyError } from "./errors";
 
 /**
- * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http
+ * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http,
+ * plus "connected": an agent registered from code by the SDK (ADR-128).
  */
 export const agentTypeSchema = z.enum([
   "signature",
   "code",
   "workflow",
   "http",
+  "connected",
 ]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
@@ -30,12 +36,13 @@ export type AgentComponentConfig =
   | SignatureComponentConfig
   | CodeComponentConfig
   | CustomComponentConfig
-  | HttpComponentConfig;
+  | HttpComponentConfig
+  | ConnectedComponentConfig;
 
 /**
  * Get the appropriate config schema based on agent type
  */
-const getConfigSchemaForType = (type: AgentType) => {
+export const getConfigSchemaForType = (type: AgentType) => {
   switch (type) {
     case "signature":
       return signatureComponentSchema;
@@ -45,6 +52,8 @@ const getConfigSchemaForType = (type: AgentType) => {
       return customComponentSchema;
     case "http":
       return httpComponentSchema;
+    case "connected":
+      return connectedComponentSchema;
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -101,6 +110,19 @@ export type CreateAgentInput = {
   config: AgentComponentConfig;
   workflowId?: string;
   copiedFromAgentId?: string;
+  /** The identity of a connected agent (ADR-128); unset for every other type. */
+  identity?: ConnectedAgentIdentity;
+};
+
+/**
+ * What tells one connected agent row from another: the environment the SDK
+ * resolved, the scope of a development agent, and the key that folds them.
+ */
+export type ConnectedAgentIdentity = {
+  environment: string;
+  ownerUserId: string | null;
+  hostLabel: string | null;
+  identityKey: string;
 };
 
 /**
@@ -130,29 +152,32 @@ export class AgentRepository {
 
   /**
    * Find multiple agents by IDs regardless of archived status.
-   * Returns only id and archivedAt for lightweight classification.
+   * Returns what a run reads before it schedules: id, name, type, raw config,
+   * environment, ownerUserId, hostLabel, lastSeenAt and archivedAt.
    */
   async findManyIncludingArchived(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null }[]> {
-    return this.prisma.agent.findMany({
+  }): Promise<AgentIdentityRow[]> {
+    const rows = await this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
-      select: { id: true, archivedAt: true },
+      select: IDENTITY_SELECT,
     });
+    return rows.map((row) => ({ ...row, type: row.type as AgentType }));
   }
 
   /**
-   * Find agent names by IDs regardless of archived status.
+   * Find agent names by IDs regardless of archived status, with the
+   * environment and owner a connected agent's label reads.
    * Used for displaying human-readable names in UI warnings.
    */
   async findNamesByIds(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; name: string }[]> {
+  }): Promise<AgentNameRow[]> {
     return this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, environment: true, ownerUserId: true },
     });
   }
 
@@ -194,8 +219,30 @@ export class AgentRepository {
   }
 
   /**
+   * Finds a single agent by id within a project, archived rows included.
+   *
+   * Read by a rule that decides from what the row is rather than from
+   * whether it is listed: a connected agent stays SDK-owned once archived.
+   */
+  async findByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<TypedAgent | null> {
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+      },
+    });
+
+    if (!agent) return null;
+    return parseAgent(agent);
+  }
+
+  /**
    * Finds all agents for a project with copy-count for replica UI.
-   * Excludes archived agents. Orders by most recently updated.
+   * Excludes archived agents and connected agents unseen for too long.
+   * Orders by most recently updated.
    * Returns typed agents with parsed config.
    */
   async findAll(input: { projectId: string }): Promise<TypedAgent[]> {
@@ -203,6 +250,7 @@ export class AgentRepository {
       where: {
         projectId: input.projectId,
         archivedAt: null,
+        ...connectedAgentVisibleWhere(),
       },
       orderBy: {
         updatedAt: "desc",
@@ -217,7 +265,8 @@ export class AgentRepository {
 
   /**
    * Finds agents for a project with pagination.
-   * Excludes archived agents. Orders by most recently updated.
+   * Excludes archived agents and connected agents unseen for too long.
+   * Orders by most recently updated.
    */
   async findAllPaginated(input: {
     projectId: string;
@@ -227,6 +276,7 @@ export class AgentRepository {
     const where = {
       projectId: input.projectId,
       archivedAt: null,
+      ...connectedAgentVisibleWhere(),
     };
 
     const [agents, total] = await Promise.all([
@@ -250,6 +300,14 @@ export class AgentRepository {
     // Validate type
     const type = agentTypeSchema.parse(input.type);
 
+    // A connected agent row is addressed by its identity key, so one written
+    // without an identity is a row the process that runs the agent can never
+    // find: it would register a second row beside it. Only a register writes
+    // one, and a register always carries the identity.
+    if (type === "connected" && !input.identity) {
+      throw new AgentRegisterOnlyError();
+    }
+
     // Validate config matches type's DSL schema
     const validatedConfig = validateConfig(type, input.config);
 
@@ -264,10 +322,95 @@ export class AgentRepository {
         ...(input.copiedFromAgentId && {
           copiedFromAgentId: input.copiedFromAgentId,
         }),
+        ...(input.identity && {
+          environment: input.identity.environment,
+          ownerUserId: input.identity.ownerUserId,
+          hostLabel: input.identity.hostLabel,
+          identityKey: input.identity.identityKey,
+          lastSeenAt: new Date(),
+        }),
       },
     });
 
     return parseAgent(agent);
+  }
+
+  /**
+   * Finds a connected agent by its identity key, whatever its state, so a
+   * process that registers the same identity writes the row it already has.
+   */
+  async findByIdentityKey(input: {
+    projectId: string;
+    identityKey: string;
+  }): Promise<TypedAgent | null> {
+    const agent = await this.prisma.agent.findFirst({
+      where: { projectId: input.projectId, identityKey: input.identityKey },
+    });
+    if (!agent) return null;
+    return parseAgent(agent);
+  }
+
+  /**
+   * Finds connected agents by name and environment, archived ones and ones
+   * unseen for too long excluded.
+   *
+   * Several rows can answer: one per scope in a development environment. The
+   * caller decides which of them a reference addresses.
+   */
+  async findConnectedByNameAndEnvironment(input: {
+    projectId: string;
+    name: string;
+    environment: string;
+  }): Promise<TypedAgent[]> {
+    const agents = await this.prisma.agent.findMany({
+      where: {
+        projectId: input.projectId,
+        type: "connected",
+        name: input.name,
+        environment: input.environment,
+        archivedAt: null,
+        ...connectedAgentVisibleWhere(),
+      },
+    });
+    return agents.map(parseAgent);
+  }
+
+  /**
+   * Re-registers a connected agent on its existing row: the name and the
+   * config the SDK sent now, and the presence projection fresh. A row unseen
+   * for too long is listed again because `lastSeenAt` moved. A row archived
+   * by hand is restored, because an agent has no manual way back and a
+   * delete means "hidden until the process connects again".
+   */
+  async reregisterConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: AgentComponentConfig;
+  }): Promise<TypedAgent> {
+    const validatedConfig = validateConfig("connected", input.config);
+    const agent = await this.prisma.agent.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: {
+        name: input.name,
+        config: validatedConfig as unknown as Prisma.InputJsonValue,
+        archivedAt: null,
+        lastSeenAt: new Date(),
+      },
+    });
+    return parseAgent(agent);
+  }
+
+  /** Writes the presence projection of one agent. */
+  async touchLastSeenAt(input: {
+    id: string;
+    projectId: string;
+    at: Date;
+  }): Promise<void> {
+    await this.prisma.agent.updateMany({
+      where: { id: input.id, projectId: input.projectId },
+      data: { lastSeenAt: input.at },
+    });
   }
 
   /**
@@ -433,6 +576,44 @@ export class AgentRepository {
     return copies as AgentCopyRow[];
   }
 }
+
+/**
+ * What a run reads off an agent before it schedules. Returned by
+ * findManyIncludingArchived; the config is raw so an archived or malformed
+ * row still classifies instead of failing the read.
+ */
+const IDENTITY_SELECT = {
+  id: true,
+  name: true,
+  type: true,
+  config: true,
+  environment: true,
+  ownerUserId: true,
+  hostLabel: true,
+  lastSeenAt: true,
+  archivedAt: true,
+} as const;
+
+/** What a label reads off an agent: its name, and for a connected one its
+ *  environment and owner. */
+export type AgentNameRow = {
+  id: string;
+  name: string;
+  environment: string | null;
+  ownerUserId: string | null;
+};
+
+export type AgentIdentityRow = {
+  id: string;
+  name: string;
+  type: AgentType;
+  config: Prisma.JsonValue;
+  environment: string | null;
+  ownerUserId: string | null;
+  hostLabel: string | null;
+  lastSeenAt: Date | null;
+  archivedAt: Date | null;
+};
 
 /**
  * Row shape for agent copies (with project/team/org for fullPath).

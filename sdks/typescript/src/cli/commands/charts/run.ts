@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import {
   type ChartParameterValue,
-  type ChartRunGranularitySeconds,
   ChartsApiService,
 } from "@/client-sdk/services/charts/charts-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -17,6 +16,15 @@ import type { CommandResult } from "../../utils/output";
  * with a message that names the steps instead of a schema rejection.
  */
 const OFFERED_GRANULARITY_STEPS = [1, 60, 3600] as const;
+
+/**
+ * One of the offered datapoint steps, in seconds — validated locally against
+ * `OFFERED_GRANULARITY_STEPS` before a request is made. `runQuery` itself
+ * accepts the plain `number` the shared query door's request body types it
+ * as (issue #7565): the door is not chart-specific, so it does not know
+ * about this CLI's offered-steps list.
+ */
+type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 

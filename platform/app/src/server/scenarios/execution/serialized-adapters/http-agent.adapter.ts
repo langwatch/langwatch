@@ -8,7 +8,7 @@
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
@@ -28,6 +28,7 @@ import {
   resolveAuthSecrets,
 } from "../secret-references";
 import type { HttpAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in
@@ -41,6 +42,67 @@ function previewResponseBody(body: string): string {
     return body;
   }
   return `${body.slice(0, RESPONSE_BODY_PREVIEW_CHARS)}…`;
+}
+
+/**
+ * A call that never reached the target: DNS did not resolve, the connection
+ * was refused or reset, or the request timed out at the socket. This is not
+ * the target rejecting the request — a non-2xx answer keeps its own error —
+ * and what fetch throws for it reads as a Node crash ("TypeError: fetch
+ * failed") rather than a reason a customer can act on.
+ *
+ * The message names the host and the failure kind, and ends with the
+ * underlying text so the infra-error classifier still recognises the
+ * ECONNREFUSED / getaddrinfo markers it keys on. The raw error rides on
+ * `cause`, so the log and any debugger keep everything.
+ */
+export class HttpAgentTransportError extends Error {
+  constructor({
+    host,
+    reason,
+    cause,
+  }: {
+    host: string;
+    reason: string;
+    cause: unknown;
+  }) {
+    super(`HTTP agent target ${host} could not be reached: ${reason}`);
+    this.name = "HttpAgentTransportError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * The host of a request url. A url that does not parse gets a fixed label:
+ * it can carry a credential in its query, and this text reaches a customer.
+ */
+function hostForMessage(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "configured target";
+  }
+}
+
+/**
+ * Flattens an error and its causes into one line of messages.
+ *
+ * undici reports a transport failure as a bare `TypeError: fetch failed`
+ * whose real reason lives on `cause`, so the top message alone classifies as
+ * nothing. Messages only — a stack never enters the text a customer reads.
+ */
+function flattenErrorMessages(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    const message = current.message.trim();
+    if (message.length > 0 && !parts.includes(message)) parts.push(message);
+    current = (current as { cause?: unknown }).cause;
+  }
+  if (parts.length === 0) return String(error);
+  return parts.join(": ");
 }
 
 /**
@@ -101,7 +163,7 @@ function pickUpstreamRequestId(headers: {
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedHttpAgentAdapter extends AgentAdapter {
+export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: HttpAgentData;
@@ -143,6 +205,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         scenarioMappings: this.config.scenarioMappings,
         parameters: this.parameters,
         traceContext: { traceId, traceparent },
+        session: this.sessionOf(input.threadId),
       });
       const url = this.buildUrl(templateContext);
       const headers = this.buildRequestHeaders(
@@ -151,6 +214,10 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       );
       const body = this.buildRequestBody(input, templateContext);
       const responseData = await this.executeHttpRequest(url, headers, body);
+      this.storeSession({
+        threadId: input.threadId,
+        session: this.extractSession(responseData),
+      });
       return this.extractResponseContent(responseData);
     } catch (error) {
       throw this.scrubErrorChain(error);
@@ -264,6 +331,48 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return restore(renderUrlTemplate({ template, context }));
   }
 
+  /**
+   * Logs an upstream error response and throws the error the caller reports.
+   * It never returns.
+   */
+  private async failOnErrorResponse({
+    response,
+    loggedUrl,
+    method,
+    durationMs,
+    redactedHeaders,
+  }: {
+    response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+    loggedUrl: string;
+    method: string;
+    durationMs: number;
+    redactedHeaders: Record<string, string>;
+  }): Promise<never> {
+    const responseBody = this.scrub(
+      typeof response.text === "function"
+        ? await response.text().catch(() => "")
+        : "",
+    );
+    const upstreamRequestId = pickUpstreamRequestId(response.headers);
+    this.logger.warn(
+      {
+        url: loggedUrl,
+        method,
+        statusCode: response.status,
+        durationMs,
+        responseBodyPreview: previewResponseBody(responseBody),
+        requestId: upstreamRequestId,
+        headers: redactedHeaders,
+      },
+      "http call failed",
+    );
+    throw new Error(
+      `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
+        upstreamRequestId ?? "none"
+      }): ${previewErrorBody(responseBody)}`,
+    );
+  }
+
   private async executeHttpRequest(
     url: string,
     headers: Record<string, string>,
@@ -297,35 +406,23 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
         },
         "http call failed",
       );
-      throw error;
+      throw new HttpAgentTransportError({
+        host: hostForMessage(url),
+        reason: this.scrub(flattenErrorMessages(error)),
+        cause: error,
+      });
     }
 
     const durationMs = Date.now() - startedAt;
 
     if (!response.ok) {
-      const responseBody = this.scrub(
-        typeof response.text === "function"
-          ? await response.text().catch(() => "")
-          : "",
-      );
-      const upstreamRequestId = pickUpstreamRequestId(response.headers);
-      this.logger.warn(
-        {
-          url: loggedUrl,
-          method,
-          statusCode: response.status,
-          durationMs,
-          responseBodyPreview: previewResponseBody(responseBody),
-          requestId: upstreamRequestId,
-          headers: redactedHeaders,
-        },
-        "http call failed",
-      );
-      throw new Error(
-        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
-          upstreamRequestId ?? "none"
-        }): ${previewErrorBody(responseBody)}`,
-      );
+      await this.failOnErrorResponse({
+        response,
+        loggedUrl,
+        method,
+        durationMs,
+        redactedHeaders,
+      });
     }
 
     this.logger.info(
@@ -360,6 +457,31 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return this.stringify(extracted[0]);
     } catch {
       return this.stringify(data);
+    }
+  }
+
+  /**
+   * The session the response carries at `sessionPath`, or nothing: no path
+   * configured, a body that is not JSON, a path that matches nothing and a
+   * path that does not parse all leave the held value as it is. A match is
+   * kept as the JSON value found there, so the next turn renders exactly it.
+   */
+  private extractSession(data: unknown): unknown {
+    const path = this.config.sessionPath?.trim();
+    if (!path || data === null || typeof data !== "object") return undefined;
+
+    try {
+      const extracted = JSONPath({ path, json: data }) as unknown[];
+      return extracted.length > 0 ? extracted[0] : undefined;
+    } catch (error) {
+      this.logger.warn(
+        {
+          sessionPath: path,
+          message: error instanceof Error ? error.message : String(error),
+        },
+        "session path did not parse, keeping the held session",
+      );
+      return undefined;
     }
   }
 

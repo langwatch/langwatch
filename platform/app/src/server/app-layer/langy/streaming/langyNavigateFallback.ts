@@ -30,6 +30,7 @@ import { DatasetService } from "~/server/datasets/dataset.service";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { PromptService } from "~/server/prompt-config/prompt.service";
+import { readTestingInterface } from "~/server/suites/platform-path";
 
 type UrlForProjectSlug = (projectSlug: string) => string;
 
@@ -103,8 +104,9 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
       scenarioRunId: resourceId,
     });
     if (!run) return null;
+    const ui = await readTestingInterface({ projectId });
     return (projectSlug) =>
-      scenarioRunPlatformUrl({ projectSlug, scenarioRunId: resourceId });
+      scenarioRunPlatformUrl({ projectSlug, scenarioRunId: resourceId, ui });
   },
 
   prompt_: async ({ projectId, resourceId }) => {

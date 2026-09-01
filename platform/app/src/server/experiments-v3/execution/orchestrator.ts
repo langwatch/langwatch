@@ -14,6 +14,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import { comparisonDependencies } from "~/experiments-v3/execution/buildExecutionRequest";
 import type {
   ComparisonEvaluatorConfig,
   EvaluationsV3State,
@@ -33,11 +34,20 @@ import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation"
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type {
+  StudioClientEvent,
+  StudioServerEvent,
+} from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import { prisma } from "~/server/db";
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "~/server/evaluations/evaluators";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
@@ -52,7 +62,12 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
-import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
+import {
+  type LoadedWorkflow,
+  promptLoadKey,
+  workflowLoadKey,
+} from "./dataLoader";
+import { EvaluatorNoInputsResolvedError } from "./errors";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
@@ -63,6 +78,7 @@ import {
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
 import {
+  type CarriedOverCell,
   type EvaluationV3Event,
   type ExecutionCell,
   type ExecutionScope,
@@ -112,6 +128,11 @@ export type OrchestratorInput = {
     string,
     { output: unknown; cost?: number; duration?: number }
   >;
+  /**
+   * Board cells the run carries rather than produces, so the run holds the
+   * whole board and not only the column that was clicked.
+   */
+  carriedOverCells?: CarriedOverCell[];
 };
 
 /**
@@ -157,6 +178,26 @@ export const resolveScopedRowIndices = ({
 };
 
 /**
+ * The dataset id a run reads its mapping buckets from.
+ *
+ * Rows come from the ACTIVE dataset, so `mappings[datasetId]` has to be keyed
+ * on that same dataset. The saved-state path hands the orchestrator EVERY
+ * dataset the workbench has, and the active one is not always the first, so
+ * reading `datasets[0]` there picks another dataset's bucket and every node
+ * runs with no inputs. The first dataset stays as the fallback for state that
+ * names no active dataset.
+ */
+const resolveMappingDatasetId = (
+  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">,
+): string => {
+  const activeId = state.activeDatasetId;
+  if (activeId && state.datasets.some((d) => d.id === activeId)) {
+    return activeId;
+  }
+  return state.datasets[0]?.id ?? activeId ?? "dataset-1";
+};
+
+/**
  * Generates all cells to execute based on the scope.
  */
 export const generateCells = (
@@ -174,8 +215,7 @@ export const generateCells = (
   } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
 
   // Handle evaluator-all-rows scope - run one evaluator across all rows with existing target outputs
   if (scope.type === "evaluator-all-rows") {
@@ -268,20 +308,28 @@ export const generateCells = (
 
   // Determine which targets to process.
   //
-  // For target-/cell-scoped runs against a comparison column-target, the
-  // verdict needs every variant's output to exist before Phase 2 can
-  // synthesize the comparison cell. If the user hits Play on the Comparison
-  // column without first running the variants, expand the scope to include
-  // those variants so Phase 1 produces what Phase 2 needs. Without this, only
-  // the comparison target is dispatched, Phase 1 skips it (column-style
-  // comparisons are always Phase-2-only), and the run completes with 0 cells —
-  // visible to the user as a silent no-op with "No verdict yet" everywhere.
+  // A scoped run that touches a comparison needs the OTHER columns that
+  // comparison reads, or Phase 2 has nothing to judge. Two shapes reach this
+  // and both used to leave the same hole:
+  //
+  //   - a comparison column-target: hitting Play on it alone dispatched only
+  //     that column, which Phase 1 always skips, so the run finished with 0
+  //     cells and "No verdict yet" everywhere;
+  //   - a chip comparison whose variants are plain columns: running one
+  //     candidate alone left the judge with no output for the others, and
+  //     Phase 2 wrote "Waiting on …" over verdicts nobody asked to re-run.
+  //
+  // Expanding covers the columns the run has nothing saved for; the caller's
+  // `seedTargetOutputs` covers the rest, and the loop below skips those.
+  const comparisonDeps = (id: string): string[] =>
+    comparisonDependencies({
+      targets: state.targets,
+      evaluators: state.evaluators,
+      targetId: id,
+    });
+
   const expandComparisonDeps = (id: string): string[] => {
-    const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (t?.type !== "evaluator") return [id];
-    const deps = (toComparisonConfig(t)?.variants ?? []).filter(
-      (v): v is string => !!v,
-    );
+    const deps = comparisonDeps(id);
     if (deps.length === 0) return [id];
     return Array.from(new Set([...deps, id]));
   };
@@ -305,15 +353,7 @@ export const generateCells = (
       : scope.type === "target-rows"
         ? scope.targetIds
         : []
-    ).flatMap((scopedId) => {
-      const scopedTarget = state.targets.find(
-        (target) => target.id === scopedId,
-      );
-      if (!scopedTarget) return [];
-      return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
-        (variant): variant is string => !!variant,
-      );
-    }),
+    ).flatMap(comparisonDeps),
   );
 
   // Generate cells, skipping empty rows
@@ -444,11 +484,30 @@ export type ComparisonSkipReason = {
    *    the picked output field is gone (renamed schema) or the output was
    *    empty/unserializable. Re-running the target will NOT help; the config or
    *    the output is the problem.
+   *  - "too-few-variants": fewer than two columns are picked, so there is
+   *    nothing to compare against.
+   *  - "golden-not-set": the comparison is set to judge against a golden
+   *    answer but no dataset column is picked for it.
+   *  - "variant-not-found": a picked column no longer exists in the workbench.
+   *
+   * The last three are setup problems rather than data problems: no cell can be
+   * built for ANY row until the user finishes configuring the comparison.
    */
-  kind: "missing-output" | "empty-output";
+  kind:
+    | "missing-output"
+    | "empty-output"
+    | "too-few-variants"
+    | "golden-not-set"
+    | "variant-not-found";
   /** Display-friendly identifiers of the variants that triggered the skip. */
   variantNames: string[];
 };
+
+/** Why one comparison could not be resolved into cells at all. */
+type ComparisonSetupSkip = Extract<
+  ComparisonSkipReason["kind"],
+  "too-few-variants" | "golden-not-set" | "variant-not-found"
+>;
 
 /**
  * "a", "a and b", "a, b and c" — for the skip-reason message, which used to be
@@ -457,6 +516,53 @@ export type ComparisonSkipReason = {
 export const formatList = (names: string[]): string => {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+};
+
+/**
+ * The row-level error copy for a skipped comparison: what happened, and the one
+ * thing the user can do about it.
+ *
+ * Exported so the wording and the `error_type` are pinned by tests without
+ * running a whole orchestration.
+ */
+export const comparisonSkipMessage = (
+  reason: Pick<ComparisonSkipReason, "kind" | "variantNames">,
+): { detail: string; errorType: string } => {
+  const which = formatList(reason.variantNames);
+  switch (reason.kind) {
+    case "missing-output":
+      return {
+        detail: `Waiting on ${which}: no ${
+          reason.variantNames.length > 1 ? "outputs" : "output"
+        } for this row yet. Run ${which} first, then re-run this comparison.`,
+        errorType: "MissingVariantOutput",
+      };
+    case "empty-output":
+      // Re-running will not help: the output is empty or the picked field is
+      // gone. Point the user at the output-field config.
+      return {
+        detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
+        errorType: "EmptyVariantOutput",
+      };
+    case "too-few-variants":
+      return {
+        detail:
+          "This comparison needs at least 2 columns to compare. Pick the columns to compare in the evaluator settings, then run again.",
+        errorType: "TooFewComparisonVariants",
+      };
+    case "golden-not-set":
+      return {
+        detail:
+          "This comparison judges against a golden answer but no column is picked for it. Pick the golden field in the evaluator settings, then run again.",
+        errorType: "GoldenFieldNotSet",
+      };
+    case "variant-not-found":
+      return {
+        detail:
+          "A column this comparison compares no longer exists. Pick the columns to compare in the evaluator settings, then run again.",
+        errorType: "ComparisonVariantNotFound",
+      };
+  }
 };
 
 export const generateComparisonCells = ({
@@ -502,8 +608,7 @@ export const generateComparisonCells = ({
 }): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
   const rowsInScope =
     scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
 
@@ -607,7 +712,7 @@ export const generateComparisonCells = ({
   // KSUID wouldn't normalize and the verdict would be dropped.
   const variantIdentifierFor = (t: TargetConfig): string => {
     if (t.type === "prompt" && t.promptId) {
-      const handle = loadedPrompts?.get(t.promptId)?.handle;
+      const handle = loadedPrompts?.get(promptLoadKey(t))?.handle;
       if (handle) return handle;
     }
     return t.id;
@@ -654,7 +759,7 @@ export const generateComparisonCells = ({
   const variantDisplayNameFor = (t: TargetConfig): string => {
     if (t.type === "prompt") {
       if (!t.promptId) return "New Prompt";
-      const loaded = loadedPrompts?.get(t.promptId);
+      const loaded = loadedPrompts?.get(promptLoadKey(t));
       return loaded?.handle ?? loaded?.name ?? "New Prompt";
     }
     if (t.type === "evaluator" && t.targetEvaluatorId) {
@@ -676,23 +781,30 @@ export const generateComparisonCells = ({
   ): string[] => disambiguateNames(resolvedVariants.map(variantDisplayNameFor));
 
   /**
-   * Resolve configured variant ids to their TargetConfigs, or null if
-   * unusable. Applies the same "is this comparison usable" gate to every
-   * comparison carrier — chip-style (evaluator.comparison) and column-style
-   * (target.comparison) alike — so a comparison missing its golden field
-   * (see isGoldenFieldSatisfied, #5378) is skipped consistently rather than
-   * running with an empty `golden` while its settings claim golden-aware.
+   * Resolve configured variant ids to their TargetConfigs, or the reason the
+   * comparison is unusable. Applies the same "is this comparison usable" gate
+   * to every comparison carrier — chip-style (evaluator.comparison) and
+   * column-style (target.comparison) alike — so a comparison missing its
+   * golden field (see isGoldenFieldSatisfied, #5378) is skipped consistently
+   * rather than running with an empty `golden` while its settings claim
+   * golden-aware.
+   *
+   * Every skip is returned rather than only logged: an unfinished comparison
+   * produces no cell for any row, and a column that renders "No verdict yet"
+   * forever tells the user nothing about what to fix.
    */
   const resolveVariants = (
     cfg: ComparisonEvaluatorConfig,
     ownerId: string,
-  ): TargetConfig[] | null => {
+  ):
+    | { variants: TargetConfig[]; skip?: never }
+    | { skip: ComparisonSetupSkip; variants?: never } => {
     if (!cfg.variants || cfg.variants.length < 2) {
       logger.warn(
         { ownerId, variants: cfg.variants },
         "Comparison skipped: fewer than 2 variants configured",
       );
-      return null;
+      return { skip: "too-few-variants" };
     }
     if (!isGoldenFieldSatisfied(cfg)) {
       logger.debug(
@@ -704,7 +816,7 @@ export const generateComparisonCells = ({
         },
         "Comparison skipped: golden field not configured",
       );
-      return null;
+      return { skip: "golden-not-set" };
     }
     const resolved = cfg.variants.map((id) =>
       state.targets.find((t) => t.id === id),
@@ -714,9 +826,46 @@ export const generateComparisonCells = ({
         { ownerId, variants: cfg.variants },
         "Comparison skipped: one or more variant targets not found",
       );
-      return null;
+      return { skip: "variant-not-found" };
     }
-    return resolved as TargetConfig[];
+    return { variants: resolved as TargetConfig[] };
+  };
+
+  /**
+   * The column a chip-style comparison's verdict hangs under: its first
+   * variant. An unfinished comparison still needs one, so the first variant
+   * that names a target the workbench still has is used. With none, the
+   * comparison has no cell in the grid to report into and the log line above
+   * is all there is.
+   */
+  const anchorVariantId = (
+    cfg: ComparisonEvaluatorConfig,
+  ): string | undefined =>
+    (cfg.variants ?? []).find((id) => state.targets.some((t) => t.id === id));
+
+  /** One error row per scoped row for a comparison that cannot be built. */
+  const pushSetupSkips = ({
+    kind,
+    targetId,
+    evaluatorId,
+  }: {
+    kind: ComparisonSetupSkip;
+    targetId: string;
+    evaluatorId: string;
+  }): void => {
+    for (const rowIndex of rowsInScope) {
+      const datasetEntry = datasetRows[rowIndex];
+      // The same gate `generateCells` applies: a blank trailing row never ran,
+      // so an unfinished comparison must not paint a red cell onto it.
+      if (!datasetEntry || isRowEmpty(datasetEntry)) continue;
+      skipReasons.push({
+        rowIndex,
+        targetId,
+        evaluatorId,
+        kind,
+        variantNames: [],
+      });
+    }
   };
 
   /**
@@ -820,8 +969,19 @@ export const generateComparisonCells = ({
     const cfg = toComparisonConfig(evaluator);
     if (!cfg) continue;
 
-    const resolvedVariants = resolveVariants(cfg, evaluator.id);
-    if (!resolvedVariants) continue;
+    const resolution = resolveVariants(cfg, evaluator.id);
+    if (resolution.skip) {
+      const anchorId = anchorVariantId(cfg);
+      if (anchorId) {
+        pushSetupSkips({
+          kind: resolution.skip,
+          targetId: anchorId,
+          evaluatorId: evaluator.id,
+        });
+      }
+      continue;
+    }
+    const resolvedVariants = resolution.variants;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
     const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
@@ -882,8 +1042,17 @@ export const generateComparisonCells = ({
     // variants, or a golden field the settings claim but didn't pick) is
     // skipped the same way a chip-style comparison would be, rather than
     // hitting the judge endpoint and rendering a verdict-shaped 400 error.
-    const resolvedVariants = resolveVariants(cfg, target.id);
-    if (!resolvedVariants) continue;
+    const resolution = resolveVariants(cfg, target.id);
+    if (resolution.skip) {
+      // A comparison COLUMN always has a cell to report into: its own.
+      pushSetupSkips({
+        kind: resolution.skip,
+        targetId: target.id,
+        evaluatorId: target.id,
+      });
+      continue;
+    }
+    const resolvedVariants = resolution.variants;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
     const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
@@ -1107,6 +1276,26 @@ async function* runOneCellEvaluator({
 }): AsyncGenerator<EvaluationV3Event> {
   const evaluatorInputs = buildEvaluatorInputs(cell, evaluatorId, targetOutput);
 
+  // The dispatch decision. An evaluator whose every input resolved empty is
+  // not run: it would score empty against empty and report that as a verdict.
+  const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
+  if (
+    evaluator &&
+    hasNoResolvedInputs({ cell, evaluator, inputs: evaluatorInputs })
+  ) {
+    logger.info(
+      {
+        rowIndex: cell.rowIndex,
+        targetId: cell.targetId,
+        evaluatorId,
+        evaluatorType: evaluator.evaluatorType,
+      },
+      "Evaluator not dispatched: every input resolved empty",
+    );
+    yield noInputsResolvedResult({ cell, evaluator, evaluatorId });
+    return;
+  }
+
   const evaluatorEvent = {
     type: "execute_component" as const,
     payload: {
@@ -1219,6 +1408,82 @@ async function* runCellEvaluators({
 }
 
 /**
+ * Whether any target this run executes puts Python in a sandbox, which is the
+ * only thing the agent cache credential is for.
+ */
+function runExecutesCode({
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): boolean {
+  for (const agent of loadedAgents.values()) {
+    if (agent.type === "code") return true;
+  }
+  for (const workflow of loadedWorkflows?.values() ?? []) {
+    if (workflow.dsl.nodes.some((node) => node.type === "code")) return true;
+  }
+  return false;
+}
+
+/**
+ * The credential every code node of this run authenticates with, or undefined.
+ *
+ * One key for the whole run, and the same key the project's other runs hold:
+ * every row shares the cache entries the run writes, and a key per row or per
+ * run would leave a ledger of live credentials behind. A run that cannot get
+ * one still runs, and every row does its own work.
+ */
+async function mintRunSandboxApiKey({
+  projectId,
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  projectId: string;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): Promise<string | undefined> {
+  if (!runExecutesCode({ loadedAgents, loadedWorkflows })) return undefined;
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  const organizationId = project?.team?.organizationId;
+  if (!organizationId) return undefined;
+
+  return tryGetAgentSandboxApiKey({ prisma, projectId, organizationId });
+}
+
+/**
+ * Sets the run's sandbox credential on an event's workflow.
+ *
+ * Applied after `addEnvs` rather than inside it: `addEnvs` is shared by about
+ * ten callers and knows nothing about a run, so widening it would put a
+ * credential on events that have no run behind them. A one-off Studio run
+ * therefore carries no key, and every row of it does its own work.
+ */
+function withSandboxApiKey(
+  event: StudioClientEvent,
+  sandboxApiKey: string | undefined,
+): StudioClientEvent {
+  const { payload } = event;
+  if (!sandboxApiKey || !("workflow" in payload)) return event;
+  // The cast is what every writer of this union does: spreading one member of
+  // a discriminated union widens the payload back to the union, and there is
+  // no narrowing that survives the spread. `addEnvs` returns the same shape
+  // the same way.
+  return {
+    ...event,
+    payload: {
+      ...payload,
+      workflow: { ...payload.workflow, sandbox_api_key: sandboxApiKey },
+    },
+  } as StudioClientEvent;
+}
+
+/**
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
  */
@@ -1230,6 +1495,8 @@ export async function* executeCell(
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
     evaluators?: Map<string, { id: string; name: string; config: unknown }>;
+    /** The run's agent cache credential, when it minted one. */
+    sandboxApiKey?: string;
   },
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
@@ -1242,6 +1509,26 @@ export async function* executeCell(
   };
 
   try {
+    // The dispatch decision for an evaluator COLUMN. Nothing mapped means
+    // nothing to score, and scoring empty against empty passes.
+    if (
+      evaluatorTargetHasNoResolvedInputs({
+        cell,
+        loadedEvaluators: loadedData.evaluators,
+      })
+    ) {
+      const name = evaluatorTargetDisplayName({
+        target: cell.targetConfig,
+        loadedEvaluators: loadedData.evaluators,
+      });
+      logger.info(
+        { rowIndex: cell.rowIndex, targetId: cell.targetId, name },
+        "Evaluator column not dispatched: every input resolved empty",
+      );
+      yield evaluatorTargetNoInputsResult({ cell, name });
+      return;
+    }
+
     // Build the workflow
     const { workflow, targetNodeId, evaluatorNodeIds } = buildCellWorkflow(
       {
@@ -1308,9 +1595,9 @@ export async function* executeCell(
       };
 
       // Add environment variables and process datasets
-      const enrichedEvent = await loadDatasets(
-        await addEnvs(rawEvent, projectId),
-        projectId,
+      const enrichedEvent = withSandboxApiKey(
+        await loadDatasets(await addEnvs(rawEvent, projectId), projectId),
+        loadedData.sandboxApiKey,
       );
 
       // Execute target and collect events
@@ -1424,6 +1711,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators,
   resultMapperConfig,
   isAborted,
+  sandboxApiKey,
 }: {
   cell: ExecutionCell;
   projectId: string;
@@ -1432,6 +1720,8 @@ export async function* executeWorkflowCell({
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
+  /** The run's agent cache credential, when it minted one. */
+  sandboxApiKey?: string;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
@@ -1468,9 +1758,9 @@ export async function* executeWorkflowCell({
       },
     };
 
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId),
-      projectId,
+    const enrichedEvent = withSandboxApiKey(
+      await loadDatasets(await addEnvs(rawEvent, projectId), projectId),
+      sandboxApiKey,
     );
 
     const events: StudioServerEvent[] = [];
@@ -1808,6 +2098,187 @@ export const buildEvaluatorInputs = (
   return inputs;
 };
 
+/** The `error_type` a row carries when an evaluator resolved no input at all. */
+export const NO_INPUTS_RESOLVED = "NoInputsResolved";
+
+/** A resolved value that carries nothing for the evaluator to read. */
+const isEmptyInputValue = (value: unknown): boolean =>
+  value === undefined ||
+  value === null ||
+  (typeof value === "string" && value.trim() === "");
+
+/**
+ * A type's fields from the catalog, required plus optional. Optional counts —
+ * an evaluator whose only field is optional is just as broken when that field
+ * is unmapped as one whose field is required.
+ */
+const catalogFields = (evaluatorType: string | undefined): string[] => {
+  const definition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  return [
+    ...(definition?.requiredFields ?? []),
+    ...(definition?.optionalFields ?? []),
+  ];
+};
+
+/**
+ * The fields an evaluator reads: the ones declared on its own config, and the
+ * catalog's otherwise.
+ */
+const declaredEvaluatorFields = (evaluator: EvaluatorConfig): string[] => {
+  const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
+  if (declared.length > 0) return declared;
+  return catalogFields(evaluator.evaluatorType);
+};
+
+/** What the row calls the evaluator that could not run. */
+const evaluatorDisplayName = (evaluator: EvaluatorConfig): string =>
+  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
+  evaluator.evaluatorType;
+
+/** DB evaluator rows a run has loaded, keyed by their own id. */
+type LoadedEvaluators = Map<
+  string,
+  { id: string; name: string; config: unknown }
+>;
+
+/**
+ * The fields an evaluator COLUMN reads. Its own declared inputs when it has
+ * them; otherwise the catalog fields of the DB evaluator behind it, whose type
+ * only the loaded row knows (a target carries the evaluator's id, not its type).
+ */
+const evaluatorTargetFields = ({
+  target,
+  loadedEvaluators,
+}: {
+  target: TargetConfig;
+  loadedEvaluators?: LoadedEvaluators;
+}): string[] => {
+  const declared = target.inputs?.map((field) => field.identifier) ?? [];
+  if (declared.length > 0) return declared;
+  const dbConfig = loadedEvaluators?.get(target.targetEvaluatorId ?? "")
+    ?.config as { evaluatorType?: string } | undefined;
+  return catalogFields(dbConfig?.evaluatorType);
+};
+
+/** What the row calls the evaluator column that could not run. */
+export const evaluatorTargetDisplayName = ({
+  target,
+  loadedEvaluators,
+}: {
+  target: TargetConfig;
+  loadedEvaluators?: LoadedEvaluators;
+}): string =>
+  target.localEvaluatorConfig?.name ??
+  loadedEvaluators?.get(target.targetEvaluatorId ?? "")?.name ??
+  target.id;
+
+/**
+ * Whether dispatching this evaluator COLUMN would hand it nothing to read.
+ *
+ * The chip guard above covers evaluators attached to a target; a column whose
+ * target IS an evaluator dispatches through `buildTargetInputs` instead and
+ * needs the same answer, for the same reason: `exact_match` comparing "" to ""
+ * reports a pass, and that pass is counted in the run's pass rate.
+ *
+ * A comparison column is exempt — its payload is the candidate list Phase 2
+ * builds, not the cell's mappings. So is a cell running a precomputed output,
+ * which dispatches no target at all.
+ */
+export const evaluatorTargetHasNoResolvedInputs = ({
+  cell,
+  loadedEvaluators,
+}: {
+  cell: ExecutionCell;
+  loadedEvaluators?: LoadedEvaluators;
+}): boolean => {
+  const target = cell.targetConfig;
+  if (target.type !== "evaluator") return false;
+  if (cell.comparison || cell.skipTarget) return false;
+
+  const fields = evaluatorTargetFields({ target, loadedEvaluators });
+  if (fields.length === 0) return false;
+
+  return Object.values(buildTargetInputs(cell)).every(isEmptyInputValue);
+};
+
+/** The error cell an evaluator column with nothing mapped reports for itself. */
+const evaluatorTargetNoInputsResult = ({
+  cell,
+  name,
+}: {
+  cell: ExecutionCell;
+  name: string;
+}): EvaluationV3Event => ({
+  type: "target_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  output: undefined,
+  domainError: new EvaluatorNoInputsResolvedError(name).serialize(),
+});
+
+/**
+ * Whether dispatching would hand the evaluator nothing to read.
+ *
+ * An evaluator that declares fields and resolves every one of them empty
+ * cannot produce a verdict, but it does produce a RESULT: `exact_match`
+ * compares "" to "" and reports a pass, and that pass is counted in the run's
+ * pass rate. The row reports the unmapped fields instead of running.
+ *
+ * A comparison cell is exempt. `buildCandidates` refuses to build a cell whose
+ * candidates carry no text and reports the missing or empty variants with its
+ * own error, so the payload is resolved as long as one candidate has text.
+ */
+export const hasNoResolvedInputs = ({
+  cell,
+  evaluator,
+  inputs,
+}: {
+  cell: ExecutionCell;
+  evaluator: EvaluatorConfig;
+  inputs: Record<string, unknown>;
+}): boolean => {
+  if (cell.comparison && toComparisonConfig(evaluator)) {
+    return !cell.comparison.candidates.some(
+      (candidate) => !isEmptyInputValue(candidate.output),
+    );
+  }
+
+  // An evaluator that declares no field reads nothing from the row, so there is
+  // nothing to be missing.
+  if (declaredEvaluatorFields(evaluator).length === 0) return false;
+
+  // An empty payload is the shape the production failure takes: no mapping
+  // resolved, so no key was ever written.
+  return Object.values(inputs).every(isEmptyInputValue);
+};
+
+/** The error row an evaluator with nothing mapped reports for itself. */
+const noInputsResolvedResult = ({
+  cell,
+  evaluator,
+  evaluatorId,
+}: {
+  cell: ExecutionCell;
+  evaluator: EvaluatorConfig;
+  evaluatorId: string;
+}): EvaluationV3Event => ({
+  type: "evaluator_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  evaluatorId,
+  result: {
+    status: "error",
+    error_type: NO_INPUTS_RESOLVED,
+    details: `${evaluatorDisplayName(
+      evaluator,
+    )} received no input for this row. Map its fields in the evaluator settings, then run again.`,
+    traceback: [],
+    domainError: new EvaluatorNoInputsResolvedError(
+      evaluatorDisplayName(evaluator),
+    ).serialize(),
+  },
+});
+
 /**
  * Builds the input values for a target from the cell's dataset entry.
  *
@@ -1866,7 +2337,7 @@ export const buildTargetMetadata = ({
     }
     // Otherwise, check loaded prompts (for saved prompts)
     else if (t.type === "prompt" && t.promptId) {
-      const loadedPrompt = loadedPrompts.get(t.promptId);
+      const loadedPrompt = loadedPrompts.get(promptLoadKey(t));
       if (loadedPrompt?.model) {
         model = loadedPrompt.model;
       }
@@ -1903,7 +2374,7 @@ export const buildTargetMetadata = ({
 
     // Get name from loaded entity
     if (t.type === "prompt" && t.promptId) {
-      name = loadedPrompts.get(t.promptId)?.name ?? null;
+      name = loadedPrompts.get(promptLoadKey(t))?.name ?? null;
     } else if (t.type === "agent" && t.dbAgentId) {
       name = loadedAgents.get(t.dbAgentId)?.name ?? null;
     } else if (t.type === "evaluator" && t.targetEvaluatorId) {
@@ -2069,6 +2540,271 @@ export const buildEvaluatorResultDispatch = ({
 };
 
 /**
+ * The optional halves of a carried cell, each present only when the board
+ * holds it. An absent cost is not a zero cost, and an absent trace is not a
+ * missing one.
+ */
+const carriedCellFields = (cell: CarriedOverCell) => ({
+  ...(cell.cost !== undefined ? { cost: cell.cost } : {}),
+  ...(cell.duration !== undefined ? { duration: cell.duration } : {}),
+  ...(cell.traceId !== undefined ? { traceId: cell.traceId } : {}),
+  ...(cell.error !== undefined ? { error: cell.error } : {}),
+  ...(cell.domainError !== undefined ? { domainError: cell.domainError } : {}),
+});
+
+/** The statuses the store knows. A verdict with any other is dropped. */
+const isStorableVerdict = (
+  result: SingleEvaluationResult | undefined,
+): result is SingleEvaluationResult =>
+  result?.status === "processed" ||
+  result?.status === "error" ||
+  result?.status === "skipped";
+
+/**
+ * The target row a carried cell contributes, or null when it holds none.
+ *
+ * A cell with neither an output nor a failure gets no row: writing one would
+ * say the column produced nothing, which reads as a result rather than as an
+ * empty cell.
+ */
+const carriedTargetResult = ({
+  tenantId,
+  runId,
+  experimentId,
+  cell,
+  datasetEntry,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cell: CarriedOverCell;
+  datasetEntry: Record<string, unknown>;
+  occurredAt: number;
+}): RecordTargetResultCommandData | null => {
+  const hasOutput = cell.output !== undefined && cell.output !== null;
+  if (!hasOutput && !cell.error) return null;
+
+  const dispatch = buildTargetResultDispatch({
+    tenantId,
+    runId,
+    experimentId,
+    event: {
+      type: "target_result",
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+      output: cell.output,
+      ...carriedCellFields(cell),
+    },
+    datasetEntry,
+    occurredAt,
+  });
+
+  return dispatch ? { ...dispatch, carriedOver: true } : null;
+};
+
+/** The verdict rows a carried cell contributes, in board order. */
+const carriedEvaluatorResults = ({
+  tenantId,
+  runId,
+  experimentId,
+  cell,
+  evaluatorNameFor,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cell: CarriedOverCell;
+  evaluatorNameFor: (evaluatorId: string) => string | null;
+  occurredAt: number;
+}): RecordEvaluatorResultCommandData[] =>
+  cell.evaluatorResults.flatMap((verdict) => {
+    const result = verdict.result as SingleEvaluationResult | undefined;
+    if (!isStorableVerdict(result)) return [];
+
+    return [
+      {
+        ...buildEvaluatorResultDispatch({
+          tenantId,
+          runId,
+          experimentId,
+          event: {
+            rowIndex: cell.rowIndex,
+            targetId: cell.targetId,
+            evaluatorId: verdict.evaluatorId,
+          },
+          result,
+          evaluatorName: evaluatorNameFor(verdict.evaluatorId),
+          occurredAt,
+        }),
+        carriedOver: true,
+      },
+    ];
+  });
+
+/**
+ * The stored rows for the board cells a run carries rather than produces.
+ *
+ * A run holds a snapshot of the whole board, so opening it shows what the
+ * person was looking at instead of the one column they clicked. The cells
+ * outside the execution scope are copied in at run start; the cells inside it
+ * fill in as they execute.
+ *
+ * Built through the same two dispatch builders a live cell goes through, so a
+ * carried cell and a produced cell are the same row in every respect but one:
+ * `carriedOver`. That flag is what keeps the run's cost, duration and progress
+ * about the run's own work. Money and time belong to this run; verdicts and
+ * scores belong to the board.
+ *
+ * A cell with neither an output nor a failure gets no target row. Writing one
+ * would say the column produced nothing, which reads as a result rather than
+ * as an empty cell. A verdict whose status is not one the store knows is
+ * dropped for the same reason.
+ *
+ * Exported for unit testing.
+ */
+export const buildCarriedOverDispatches = ({
+  tenantId,
+  runId,
+  experimentId,
+  cells,
+  datasetRows,
+  evaluatorNameFor,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cells: CarriedOverCell[];
+  datasetRows: Array<Record<string, unknown>>;
+  evaluatorNameFor: (evaluatorId: string) => string | null;
+  occurredAt: number;
+}): {
+  targetResults: RecordTargetResultCommandData[];
+  evaluatorResults: RecordEvaluatorResultCommandData[];
+} => {
+  const targetResults: RecordTargetResultCommandData[] = [];
+  const evaluatorResults: RecordEvaluatorResultCommandData[] = [];
+
+  for (const cell of cells) {
+    const datasetEntry = datasetRows[cell.rowIndex];
+    if (!datasetEntry) continue;
+
+    const target = carriedTargetResult({
+      tenantId,
+      runId,
+      experimentId,
+      cell,
+      datasetEntry,
+      occurredAt,
+    });
+    if (target) targetResults.push(target);
+
+    evaluatorResults.push(
+      ...carriedEvaluatorResults({
+        tenantId,
+        runId,
+        experimentId,
+        cell,
+        evaluatorNameFor,
+        occurredAt,
+      }),
+    );
+  }
+
+  return { targetResults, evaluatorResults };
+};
+
+/**
+ * Writes the board cells the run carries into the run's stored results.
+ *
+ * Deliberately not routed through `processEventForStorage`, and deliberately
+ * not put on the SSE stream. That helper also reports every evaluator result
+ * into the evaluations pipeline, which would re-report verdicts from earlier
+ * runs as if they had just happened; and a carried cell on the stream would
+ * enter the backend runner's results draft and be written back over workbench
+ * cells this run never produced.
+ *
+ * A failure to write one carried row is logged and dropped. The board is
+ * context around the column the person asked for, so losing part of it must
+ * not stop the run they started.
+ */
+const recordCarriedOverBoard = async ({
+  projectId,
+  runId,
+  experimentId,
+  cells,
+  datasetRows,
+  state,
+  loadedEvaluators,
+  commands,
+}: {
+  projectId: string;
+  runId: string;
+  experimentId: string;
+  cells: CarriedOverCell[];
+  datasetRows: Array<Record<string, unknown>>;
+  state: EvaluationsV3State;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  commands: ReturnType<typeof getApp>["experimentRuns"];
+}): Promise<void> => {
+  if (cells.length === 0) return;
+
+  const { targetResults, evaluatorResults } = buildCarriedOverDispatches({
+    tenantId: projectId,
+    runId,
+    experimentId,
+    cells,
+    datasetRows,
+    evaluatorNameFor: (evaluatorId) => {
+      const config = state.evaluators.find(
+        (evaluator) => evaluator.id === evaluatorId,
+      );
+      const dbEvaluator = config?.dbEvaluatorId
+        ? loadedEvaluators?.get(config.dbEvaluatorId)
+        : null;
+      return dbEvaluator?.name ?? null;
+    },
+    occurredAt: Date.now(),
+  });
+
+  for (const dispatch of targetResults) {
+    await commands.recordTargetResult(dispatch).catch((err: unknown) => {
+      logger.warn(
+        { err, runId, targetId: dispatch.targetId, index: dispatch.index },
+        "Failed to record a carried-over target result",
+      );
+    });
+  }
+
+  for (const dispatch of evaluatorResults) {
+    await commands.recordEvaluatorResult(dispatch).catch((err: unknown) => {
+      logger.warn(
+        {
+          err,
+          runId,
+          targetId: dispatch.targetId,
+          evaluatorId: dispatch.evaluatorId,
+          index: dispatch.index,
+        },
+        "Failed to record a carried-over evaluator result",
+      );
+    });
+  }
+
+  logger.info(
+    {
+      runId,
+      experimentId,
+      carriedTargetResults: targetResults.length,
+      carriedEvaluatorResults: evaluatorResults.length,
+    },
+    "Carried the board into the run",
+  );
+};
+
+/**
  * Main orchestrator - executes all cells and yields SSE events.
  * Uses parallel execution with semaphore-based rate limiting.
  */
@@ -2090,6 +2826,7 @@ export async function* runOrchestrator(
     runId: providedRunId,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
+    carriedOverCells,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -2117,8 +2854,9 @@ export async function* runOrchestrator(
     "Starting orchestrator",
   );
 
-  // Set running flag + record the owner so abort can authorize this run even
-  // on the interactive SSE path, which never creates a polling run-state record.
+  // Set running flag + record the owner, which is what abort authorizes
+  // against. Set here rather than by the caller, so every dispatch path has it
+  // from the first frame.
   await abortManager.setRunning(runId, projectId);
 
   // Get commands for ClickHouse dual-write (unconditional)
@@ -2186,6 +2924,15 @@ export async function* runOrchestrator(
     stripScoreEvaluatorIds: buildStripScoreEvaluatorIds(state.evaluators),
   };
 
+  // One agent cache credential for this whole run, minted only when a target
+  // actually runs Python. Undefined when nothing does, or when the mint
+  // failed, and the engine then injects nothing.
+  const sandboxApiKey = await mintRunSandboxApiKey({
+    projectId,
+    loadedAgents,
+    loadedWorkflows,
+  });
+
   // Dispatch event to ClickHouse.
   if (experimentId) {
     chDispatchTotal++;
@@ -2208,6 +2955,17 @@ export async function* runOrchestrator(
       await abortManager.clearRunning(runId);
       throw err;
     }
+
+    await recordCarriedOverBoard({
+      projectId,
+      runId,
+      experimentId,
+      cells: carriedOverCells ?? [],
+      datasetRows,
+      state,
+      loadedEvaluators,
+      commands,
+    });
   }
 
   // Helper to process event for ClickHouse dispatch
@@ -2468,6 +3226,7 @@ export async function* runOrchestrator(
                 loadedWorkflows,
               ),
               evaluators: loadedEvaluators,
+              sandboxApiKey,
             };
 
             // Create abort checker bound to this run
@@ -2493,6 +3252,7 @@ export async function* runOrchestrator(
                   loadedEvaluators,
                   resultMapperConfig,
                   isAborted: checkAbort,
+                  sandboxApiKey,
                 })
               : executeCell(
                   cell,
@@ -2622,21 +3382,7 @@ export async function* runOrchestrator(
             aborted = true;
             break;
           }
-          const which = formatList(reason.variantNames);
-          const { detail, errorType } =
-            reason.kind === "missing-output"
-              ? {
-                  detail: `Waiting on ${which} — no ${
-                    reason.variantNames.length > 1 ? "outputs" : "output"
-                  } for this row yet. Run ${which} first, then re-run this comparison.`,
-                  errorType: "MissingVariantOutput",
-                }
-              : {
-                  // Re-running won't help — the output is empty or the picked
-                  // field is gone. Point the user at the output-field config.
-                  detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
-                  errorType: "EmptyVariantOutput",
-                };
+          const { detail, errorType } = comparisonSkipMessage(reason);
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
@@ -2724,6 +3470,7 @@ export async function* runOrchestrator(
                     loadedAgents,
                   ),
                   evaluators: loadedEvaluators,
+                  sandboxApiKey,
                 };
 
                 const checkAbort = () => abortManager.isAborted(runId);
@@ -2880,7 +3627,7 @@ const getLoadedDataForTarget = (
   workflow?: LoadedWorkflow;
 } => {
   if (targetConfig.type === "prompt" && targetConfig.promptId) {
-    const prompt = loadedPrompts.get(targetConfig.promptId);
+    const prompt = loadedPrompts.get(promptLoadKey(targetConfig));
     if (prompt) {
       return { prompt };
     }

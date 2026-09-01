@@ -10,12 +10,14 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { RunParameterValues } from "../parameters";
 import {
   SerializedCodeAgentAdapter,
+  SerializedConnectedAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
   SerializedWorkflowAgentAdapter,
 } from "./serialized-adapters";
 import type {
   CodeAgentData,
+  ConnectedAgentData,
   HttpAgentData,
   LiteLLMParams,
   PromptConfigData,
@@ -77,6 +79,18 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
     return new SerializedWorkflowAgentAdapter({
       config: data as WorkflowAgentData,
       nlpServiceUrl,
+      projectApiKey,
+      parameters,
+    });
+  },
+  // The relay route authenticates the child with the project key, the same
+  // credential the code and workflow adapters carry to the engine.
+  connected: ({ data, projectApiKey, parameters }) => {
+    if (!projectApiKey) {
+      throw new Error("Connected adapter requires projectApiKey");
+    }
+    return new SerializedConnectedAgentAdapter({
+      config: data as ConnectedAgentData,
       projectApiKey,
       parameters,
     });

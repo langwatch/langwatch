@@ -38,6 +38,7 @@ export const PRIMARY_CHANGED_EVENT_TYPE =
 export const IDENTIFIER_DETACHED_EVENT_TYPE =
   "lw.identity.identifier_detached" as const;
 export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
+export const LINK_PROPOSED_EVENT_TYPE = "lw.identity.link_proposed" as const;
 
 export const IDENTITY_EVENT_TYPES = [
   IDENTIFIER_ATTACHED_EVENT_TYPE,
@@ -46,6 +47,7 @@ export const IDENTITY_EVENT_TYPES = [
   PRIMARY_CHANGED_EVENT_TYPE,
   IDENTIFIER_DETACHED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
+  LINK_PROPOSED_EVENT_TYPE,
 ] as const;
 export type IdentityEventType = (typeof IDENTITY_EVENT_TYPES)[number];
 
@@ -68,6 +70,30 @@ export const identifierAttachedPayloadSchema = z.object({
    *  column it keys its uniqueness by is this one. Null for an identifier
    *  no protocol row backs (the email adopted from `User.email`). */
   providerId: z.string().min(1).nullable(),
+  /**
+   * WHO asserted the subject below — the other half of the account key, and
+   * the half that makes the subject mean anything.
+   *
+   * A subject is unique only WITHIN an issuer, so `providerAccountId` alone
+   * names nobody: two enterprise IdPs minting the same `sub` are two
+   * different people. `providerId` has stood in for the issuer until now,
+   * and only because there is currently exactly one connection per
+   * configured provider — a stand-in the projection's own unique index
+   * warns is temporary, because every customer connecting their own IdP
+   * directly breaks it.
+   *
+   * better-auth 1.7 keys an account by `(issuer, accountId)` and hands this
+   * value to the ceremony on the row it is about to write, so the fact
+   * carries what the library itself decided rather than a reconstruction.
+   * For a provider that declares no issuer of its own the library
+   * synthesises one; for a real OIDC connection it is the IdP's, and that is
+   * a fact about the customer's identity we cannot derive from anything
+   * else we hold.
+   *
+   * Null exactly when `providerId` is: an identifier no protocol row backs
+   * has no issuer to name.
+   */
+  issuer: z.string().min(1).nullable(),
   /** The provider's own subject for this user - `sub` for OIDC, the
    *  mailbox for `email`. It is what an IdP callback arrives holding, so
    *  the projection has to carry it to answer "who is this?" without the
@@ -124,12 +150,53 @@ export const userErasedPayloadSchema = z.object({
 });
 
 /**
+ * Why a callback's link was not made automatically (ADR-117 §3). Each value is
+ * a refusal a human has to resolve, and the org-admin surface renders it.
+ */
+export const linkProposalReasonSchema = z.enum([
+  /** The matched row holds the address with no verification evidence at all —
+   *  the "unverified orphan cannot be hijacked" invariant, kept. */
+  "unverified_orphan",
+  /** More than one user holds the asserted address. */
+  "ambiguous_candidates",
+  /** The matched user holds identifiers on domains the organization cannot
+   *  vouch for, so the connection may not claim the whole row. */
+  "unvouched_identifiers",
+]);
+export type LinkProposalReason = z.infer<typeof linkProposalReasonSchema>;
+
+/**
+ * A callback matched somebody, but not unambiguously enough to link without a
+ * human (ADR-117 §3). Stated as a fact rather than a row so the proposal has
+ * the same history, the same erasure and the same replay as every other thing
+ * we know about an identity — and so the refusal an operator is asked about
+ * later is evidenced rather than reconstructed.
+ */
+export const linkProposedPayloadSchema = z.object({
+  proposalId: z.string().min(1),
+  /** The user the callback would have been linked to. */
+  userId: z.string().min(1),
+  /** The connection whose callback proposed it; null until D04 gives the
+   *  legacy env provider a connection of its own. */
+  connectionId: z.string().nullable(),
+  provider: identifierProviderSchema,
+  /** The IdP's own subject — an opaque identifier, never a secret. */
+  providerAccountId: z.string().min(1),
+  /** Normalized asserted value; wiped by erasure, like every other value. */
+  value: z.string().nullable(),
+  /** Org-level fact; survives erasure. */
+  domain: z.string().nullable(),
+  reason: linkProposalReasonSchema,
+  actor: identityActorSchema,
+});
+
+/**
  * A fact as a command decides it: the type and the payload. The framework
  * envelope (aggregate, tenant, ids, idempotency key) and `occurredAt` are
  * stamped by whoever appends — the app's pipeline envelope — from the
  * command that produced it.
  */
-export const identityFactInputSchema = z.discriminatedUnion("type", [
+export const identifierFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(IDENTIFIER_ATTACHED_EVENT_TYPE),
     data: identifierAttachedPayloadSchema,
@@ -154,8 +221,12 @@ export const identityFactInputSchema = z.discriminatedUnion("type", [
     type: z.literal(USER_ERASED_EVENT_TYPE),
     data: userErasedPayloadSchema,
   }),
+  z.object({
+    type: z.literal(LINK_PROPOSED_EVENT_TYPE),
+    data: linkProposedPayloadSchema,
+  }),
 ]);
-export type IdentityFactInput = z.infer<typeof identityFactInputSchema>;
+export type IdentityFactInput = z.infer<typeof identifierFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. Every framework
  *  identity event is structurally one of these. */
@@ -163,6 +234,13 @@ export type IdentityFact = IdentityFactInput & { occurredAt: number };
 
 export type IdentityFactOf<T extends IdentityEventType> = Extract<
   IdentityFact,
+  { type: T }
+>;
+
+/** The same narrowing on a fact a command has decided but nobody has stamped
+ *  yet — what a guard returns when it states exactly one kind of fact. */
+export type IdentityFactInputOf<T extends IdentityEventType> = Extract<
+  IdentityFactInput,
   { type: T }
 >;
 
@@ -182,6 +260,9 @@ export interface IdentifierFact {
    *  the projected `Account` row is keyed by. Null when no protocol row
    *  backs the identifier. */
   providerId: string | null;
+  /** Who asserted the subject — the account key's other half (see the
+   *  attached payload). Null exactly when `providerId` is. */
+  issuer: string | null;
   /** The provider's own subject (ADR-116) - the IdP callback's lookup key. */
   providerAccountId: string | null;
   connectionId: string | null;
@@ -228,6 +309,7 @@ export const MARK_PRIMARY_COMMAND_TYPE = "lw.identity.mark_primary" as const;
 export const DETACH_IDENTIFIER_COMMAND_TYPE =
   "lw.identity.detach_identifier" as const;
 export const ERASE_USER_COMMAND_TYPE = "lw.identity.erase_user" as const;
+export const PROPOSE_LINK_COMMAND_TYPE = "lw.identity.propose_link" as const;
 
 export const IDENTITY_COMMAND_TYPES = [
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -235,6 +317,7 @@ export const IDENTITY_COMMAND_TYPES = [
   MARK_PRIMARY_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
+  PROPOSE_LINK_COMMAND_TYPE,
 ] as const;
 export type IdentityCommandType = (typeof IDENTITY_COMMAND_TYPES)[number];
 
@@ -253,8 +336,14 @@ const commandIdentitySchema = z.object({
  * `userId` — a caller wiring them differently would persist the event under
  * one tenant's stream and fold it into another user's projection, which
  * nothing downstream can detect. Refused at the wire boundary instead.
+ *
+ * Exported because `mfa.ts` is the same shape of aggregate — one history per
+ * person, the person as the tenant — and the invariant has to hold there for
+ * the same reason. Two copies of a refinement is two ways for it to drift.
  */
-function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+) {
   return commandIdentitySchema
     .extend(shape)
     .refine((data) => data.tenantId === data.userId, {
@@ -263,12 +352,15 @@ function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
     });
 }
 
-export const attachIdentifierCommandDataSchema = commandDataSchema({
+export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
   /** The better-auth protocol row, when one exists. */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
   /** better-auth's own provider id, verbatim — see the fact payload. */
   providerId: z.string().min(1).nullable(),
+  /** The account key's other half, as better-auth decided it — see the
+   *  fact payload. Null exactly when `providerId` is. */
+  issuer: z.string().min(1).nullable(),
   /** The provider's own account id (OAuth `providerAccountId`) — part of
    *  the identifier's deterministic identity when present, and from
    *  ADR-116 stated on the fact so the projection can answer an IdP
@@ -291,7 +383,7 @@ export type AttachIdentifierCommandData = z.infer<
   typeof attachIdentifierCommandDataSchema
 >;
 
-export const verifyIdentifierCommandDataSchema = commandDataSchema({
+export const verifyIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   /** The consumed Verification record (magic-link ceremonies). */
   verificationId: z.string().min(1).nullable(),
@@ -303,7 +395,7 @@ export type VerifyIdentifierCommandData = z.infer<
   typeof verifyIdentifierCommandDataSchema
 >;
 
-export const markPrimaryCommandDataSchema = commandDataSchema({
+export const markPrimaryCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
@@ -312,7 +404,7 @@ export type MarkPrimaryCommandData = z.infer<
   typeof markPrimaryCommandDataSchema
 >;
 
-export const detachIdentifierCommandDataSchema = commandDataSchema({
+export const detachIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
@@ -321,11 +413,26 @@ export type DetachIdentifierCommandData = z.infer<
   typeof detachIdentifierCommandDataSchema
 >;
 
-export const eraseUserCommandDataSchema = commandDataSchema({
+export const eraseUserCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
 export type EraseUserCommandData = z.infer<typeof eraseUserCommandDataSchema>;
+
+export const proposeLinkCommandDataSchema = userTenantedCommandSchema({
+  proposalId: z.string().min(1),
+  connectionId: z.string().min(1).nullable(),
+  provider: identifierProviderSchema,
+  providerAccountId: z.string().min(1),
+  /** RAW value as the callback asserted it — normalized by the guard. */
+  value: z.string().min(1),
+  reason: linkProposalReasonSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+});
+export type ProposeLinkCommandData = z.infer<
+  typeof proposeLinkCommandDataSchema
+>;
 
 /** One identity command, typed on its verb — what the ledger stages. */
 export type IdentityCommand =
@@ -333,4 +440,5 @@ export type IdentityCommand =
   | { type: typeof VERIFY_IDENTIFIER_COMMAND_TYPE; data: VerifyIdentifierCommandData }
   | { type: typeof MARK_PRIMARY_COMMAND_TYPE; data: MarkPrimaryCommandData }
   | { type: typeof DETACH_IDENTIFIER_COMMAND_TYPE; data: DetachIdentifierCommandData }
-  | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData };
+  | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData }
+  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData };

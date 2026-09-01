@@ -62,8 +62,8 @@ export class LicenseEnforcementRepository
    * Counts full members in organization:
    * - Users with ADMIN or MEMBER org role
    * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
-   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with ADMIN or MEMBER role
-   * - PENDING and WAITING_APPROVAL invites with custom role that has non-view permissions
+   * - PENDING invites (not expired, or no expiration) with ADMIN or MEMBER role
+   * - PENDING invites with custom role that has non-view permissions
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -73,7 +73,7 @@ export class LicenseEnforcementRepository
   /**
    * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - PENDING invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -105,7 +105,7 @@ export class LicenseEnforcementRepository
     const pendingInvites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: { in: [INVITE_STATUS.PENDING, INVITE_STATUS.WAITING_APPROVAL] },
+        status: INVITE_STATUS.PENDING,
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
       select: { role: true, teamAssignments: true },

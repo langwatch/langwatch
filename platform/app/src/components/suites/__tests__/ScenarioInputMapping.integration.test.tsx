@@ -85,6 +85,13 @@ describe("ScenarioInputMappingSection", () => {
           screen.getByTestId("variable-name-threadId"),
         ).toBeInTheDocument();
       });
+
+      /** @scenario "The scenario mappings offer the session as a source" */
+      it("shows a row for the session", () => {
+        renderSection();
+
+        expect(screen.getByTestId("variable-name-session")).toBeInTheDocument();
+      });
     });
   });
 

@@ -5,9 +5,10 @@
  * deletion — because the at-most-once and away-detection guarantees live in
  * how those primitives are sequenced.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   LangyUiActionService,
+  UI_ACTION_MAX_BUDGET_MS,
   type UiActionBlockingRedis,
   type UiActionRedis,
   uiActionKeys,
@@ -280,6 +281,49 @@ describe("LangyUiActionService", () => {
       ).rejects.toMatchObject({ code: "langy_ui_timeout" });
       // Two waits: the claim window, then the remaining execute budget.
       expect(blpopCalls).toHaveLength(2);
+    });
+
+    /**
+     * The dispatch blocks a `langwatch ui call` inside an agent worker, and
+     * that worker's harness stops any command at 30 seconds. With the ceiling
+     * at 30 seconds too, the harness and the server gave up together: the CLI
+     * was killed before it could print the warning that the action may already
+     * have applied, which is the one thing an agent needs before it retries.
+     */
+    /** @scenario "The server gives up before the harness kills the command" */
+    it("gives up inside the ceiling, which is under the CLI deadline and the harness", async () => {
+      // The two numbers this ceiling has to stay under. They belong to other
+      // layers, so they are written here as the boundary this test pins:
+      // change one and this fails rather than the ordering breaking in silence.
+      const CLI_REQUEST_DEADLINE_MS = 20_000;
+      const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
+
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      const { redis, store, blpopCalls } = makeRedis([
+        () => {
+          const actionId = appended[0]!.actionId;
+          store.kv.set(uiActionKeys.claim(actionId), "user-1");
+        },
+        "wait-empty",
+      ]);
+      const service = makeService({ redis, appended });
+
+      // `workbench.run` declares 600s, far over the ceiling, so the total wait
+      // is the ceiling itself and not the manifest's number.
+      await expect(
+        service.dispatch({ ...DISPATCH, kind: "workbench.run", payload: {} }),
+      ).rejects.toMatchObject({ code: "langy_ui_timeout" });
+
+      const totalWaitMs = blpopCalls.reduce((sum, s) => sum + s, 0) * 1000;
+      expect(totalWaitMs).toBeLessThanOrEqual(UI_ACTION_MAX_BUDGET_MS);
+      expect(UI_ACTION_MAX_BUDGET_MS).toBeLessThan(CLI_REQUEST_DEADLINE_MS);
+      expect(CLI_REQUEST_DEADLINE_MS).toBeLessThan(
+        AGENT_HARNESS_COMMAND_LIMIT_MS,
+      );
     });
   });
 
@@ -588,6 +632,38 @@ describe("LangyUiActionService", () => {
       expect(appended).toHaveLength(1);
       // A zombie tab claiming late must find nothing to claim.
       expect(pendingAtRunnerTime).toBe(false);
+    });
+  });
+
+  describe("when the backend takes the action and goes silent", () => {
+    /** @scenario A backend action that runs past the ceiling is reported by the server */
+    it("stops waiting at the ceiling rather than holding the caller's budget", async () => {
+      // The ceiling is the WHOLE server wait. Awaiting the runner unbounded
+      // hands the failure to the CLI's own deadline, which is the layer above,
+      // so the caller is told a timeout happened rather than which one.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { redis } = makeRedis(["wait-empty"]);
+        const service = makeService({
+          redis,
+          backendRunner: () => new Promise(() => undefined),
+        });
+
+        const dispatch = service.dispatch({
+          ...DISPATCH,
+          kind: "workbench.duplicateTarget",
+          payload: { targetId: "t1" },
+          experimentSlug: "my-exp",
+        });
+        const settled = expect(dispatch).rejects.toMatchObject({
+          code: "langy_ui_timeout",
+        });
+
+        await vi.advanceTimersByTimeAsync(UI_ACTION_MAX_BUDGET_MS);
+        await settled;
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

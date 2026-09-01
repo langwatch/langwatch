@@ -158,6 +158,7 @@ export class IdentityBackfillService {
         accountId: plan.accountId,
         provider: plan.provider,
         providerId: plan.providerId,
+        issuer: plan.issuer,
         providerAccountId: plan.providerAccountId,
         value: email,
         occurredAtMs: plan.occurredAtMs,

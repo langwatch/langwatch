@@ -34,6 +34,12 @@ export interface HandledErrorAlertProps {
    * the description. Inline alerts have the room; toasts don't.
    */
   showAllTips?: boolean;
+  /**
+   * A surface that paints its own ground — the signed-out front door's glass —
+   * hooks its treatment on here. The alert keeps its own structure and colour;
+   * only the pane it sits on changes.
+   */
+  className?: string;
 }
 
 /**
@@ -50,6 +56,7 @@ export function HandledErrorAlert({
   title,
   fallbackTitle,
   showAllTips = true,
+  className,
 }: HandledErrorAlertProps) {
   if (!error) return null;
 
@@ -68,6 +75,7 @@ export function HandledErrorAlert({
   return (
     <Box
       role="alert"
+      className={className}
       borderWidth="1px"
       borderColor={HAIRLINE}
       borderRadius="12px"

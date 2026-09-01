@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -70,6 +71,7 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -223,10 +225,27 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+} from "./identity/join-request-adapters";
+import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
+import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
+import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
+import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "./identity/repositories/sso-connection-reads.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -304,6 +323,10 @@ import { PrismaShareRepository } from "./share/repositories/share.prisma.reposit
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
 import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
+import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import { RunConfigurationsClickHouseRepository } from "./simulations/run-configurations/run-configurations.clickhouse.repository";
+import { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
@@ -604,6 +627,14 @@ export function initializeDefaultApp(options?: {
   const scenarioRunExport = ScenarioRunExportService.create(
     simulationReads.repository,
   );
+  const resultAtoms = new ResultAtomsService(
+    new ResultAtomsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
+  );
+  const runConfigurations = new RunConfigurationsService(
+    new RunConfigurationsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
+  );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -795,6 +826,9 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
+    prisma,
+  );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
   const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
@@ -903,6 +937,28 @@ export function initializeDefaultApp(options?: {
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
     identityUsers: new PrismaIdentityUsersRepository(prisma),
     identityReservations,
+    mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
+    mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
+      prisma,
+    ),
+    ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
+    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
+    // One repository, two roles (D08): the fold's store and the guards' read
+    // are the same `ScimSyncState` rows, so composing them separately would
+    // be two objects that must agree about a JSON column and eventually
+    // would not.
+    scimSyncProjection: scimSyncProjectionRepository,
+    scimSyncReads: scimSyncProjectionRepository,
+    joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
+    joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
+    joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
+      prisma,
+      new EmailJoinRequestNotifier(prisma),
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -994,6 +1050,14 @@ export function initializeDefaultApp(options?: {
   // and the gateway ledger's PRINCIPAL rows.
   const personalUsageRepository = clickhouseEnabled
     ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // The /governance activity-monitor read side (spend rollups, per-source
+  // events and health). Org-scoped aggregates, but the queries key on the
+  // hidden governance Project, so it takes the standard per-tenant resolver —
+  // getClickHouseClientForTenant maps a project id to its org's route.
+  const activityMonitorRepository = clickhouseEnabled
+    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
     : undefined;
 
   // Billing-month usage rollups (billable_events + trace_summaries),
@@ -1405,6 +1469,7 @@ export function initializeDefaultApp(options?: {
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
+    resolveRunModels: createRunModelsResolver(prisma),
   });
 
   const traceCollection = traced(
@@ -1753,7 +1818,12 @@ export function initializeDefaultApp(options?: {
     emailSuppressions,
     dspySteps: { steps: dspySteps },
     analytics: { service: analyticsService },
-    simulations: { runs: simulationReads, export: scenarioRunExport },
+    simulations: {
+      runs: simulationReads,
+      results: resultAtoms,
+      runConfigurations,
+      export: scenarioRunExport,
+    },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1797,6 +1867,7 @@ export function initializeDefaultApp(options?: {
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
+      activityMonitor: activityMonitorRepository,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -1870,7 +1941,19 @@ export function initializeDefaultApp(options?: {
 }
 
 /** Tests — noop commands, null-backed services. */
-export function createTestApp(overrides?: Partial<AppDependencies>): App {
+/**
+ * Overrides a test app takes.
+ *
+ * `simulations` merges into the preset's group rather than replacing it, so a
+ * test that names the one service it cares about keeps the rest. Replacing the
+ * whole group made every test that named two of three services fail to compile
+ * the moment a third was added.
+ */
+export type TestAppOverrides = Omit<Partial<AppDependencies>, "simulations"> & {
+  simulations?: Partial<AppDependencies["simulations"]>;
+};
+
+export function createTestApp(overrides?: TestAppOverrides): App {
   const testPrisma = globalPrisma;
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
@@ -1886,6 +1969,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // Hoisted so the export shares the null repository with `runs`, matching how
   // the production preset wires the pair.
   const testSimulationReads = SimulationRunService.create(null);
+
+  // The caller's overrides merge into this group rather than replacing it, so
+  // a test that names the one service it cares about keeps the rest. Replacing
+  // the whole group made every test naming two of three services stop
+  // compiling the moment a fourth service was added.
+  const testSimulations = {
+    runs: testSimulationReads,
+    // The results read has no null repository. It fails on use rather than
+    // answering an empty page, so a test that reaches it says so instead of
+    // reading as a project with no runs.
+    results: new ResultAtomsService(
+      new ResultAtomsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    runConfigurations: new RunConfigurationsService(
+      new RunConfigurationsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    export: ScenarioRunExportService.create(testSimulationReads.repository),
+    ...overrides?.simulations,
+  };
   const noop = async () => {
     /* noop */
   };
@@ -2080,10 +2188,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
-    simulations: {
-      runs: testSimulationReads,
-      export: ScenarioRunExportService.create(testSimulationReads.repository),
-    },
     suiteRuns: {
       runs: SuiteRunService.create({
         resolveClickHouseClient: null,
@@ -2133,6 +2237,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traceActivity: undefined,
       kpis: undefined,
       personalUsage: undefined,
+      activityMonitor: undefined,
     },
     billableEvents: undefined,
     codingAgents: {
@@ -2295,6 +2400,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        recordAgentInstance: noop,
         cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,
@@ -2393,5 +2499,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
+    // After the spread, which would otherwise replace the whole group with
+    // whatever subset the caller named.
+    simulations: testSimulations,
   });
 }

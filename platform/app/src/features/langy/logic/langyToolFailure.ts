@@ -341,10 +341,19 @@ export function presentLangyToolError({
   // pins the copy to a regex, breaks the moment the sentence is reworded, and
   // hides the real defect (whoever dropped the document) instead of fixing it.
   if (!domain) {
+    // ...unless the text is a traceback. A traceback is the engine talking to
+    // itself: a file path, a line number and an exception class from inside a
+    // process, none of it written for a reader
+    // (dev/docs/best_practices/error-handling.md). Its most quotable line reads
+    // exactly like a detail sentence, so `firstLine` lifted
+    // "json.decoder.JSONDecodeError: ..." into a card body. The body stays the
+    // plain sentence and the whole text keeps its place behind the disclosure.
+    const detail = raw && !isEngineTraceback(raw) ? firstLine(raw) : undefined;
     return {
       title: `${title} failed`,
       message: "This step couldn't be completed.",
-      ...(raw ? { detail: firstLine(raw), raw } : {}),
+      ...(detail ? { detail } : {}),
+      ...(raw ? { raw } : {}),
     };
   }
 
@@ -392,6 +401,24 @@ export function presentLangyToolError({
     ...(logsUrl ? { logsUrl } : {}),
     ...(raw ? { raw } : {}),
   };
+}
+
+/**
+ * The marks of a stack trace, in the two languages the tools we run are written
+ * in. Any one of them is enough: a truncated traceback keeps its frames without
+ * its header, and a process that printed only the exception line still printed
+ * an exception line.
+ */
+const TRACEBACK_SIGNALS = [
+  /^\s*Traceback \(most recent call last\)/m,
+  /^\s*File "[^"]+", line \d+/m,
+  /^\s*at [\w$.<>[\] ]+ \(?[^\s]+:\d+:\d+\)?$/m,
+  /^[A-Za-z_][\w.]*(?:Error|Exception|Warning)\s*:/m,
+];
+
+/** Whether raw failure text is a stack trace rather than a sentence. */
+function isEngineTraceback(raw: string): boolean {
+  return TRACEBACK_SIGNALS.some((signal) => signal.test(raw));
 }
 
 /** The most informative single line of an unstructured failure. */

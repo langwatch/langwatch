@@ -184,6 +184,9 @@ function attachData(overrides?: Record<string, unknown>) {
     accountId: null,
     provider: "google" as const,
     providerId: "google",
+    // Google's real issuer, which is what better-auth keys the account by —
+    // not the synthetic form a derivation from the provider id would give.
+    issuer: "https://accounts.google.com",
     providerAccountId: "gid_1",
     value: "Sam.J@Acme.com",
     occurredAtMs: T0,

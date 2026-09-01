@@ -109,7 +109,7 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
   // test measures the environment, not the behaviour.
   describe("When the platform computes the link for a specific scenario run", () => {
     /** @scenario "The platform link for a simulation run lands on that run" */
-    it("lands on that run's detail view, not the simulations index page", async () => {
+    it("lands on that run's detail view, not the results index page", async () => {
       withRuns({ getScenarioRunData: makeRun() });
 
       const res = await get("/api/simulation-runs/run_1");
@@ -117,17 +117,17 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
       const body = (await res.json()) as { platformUrl: string };
 
       expect(body.platformUrl).toContain(
-        `/${testProject.slug}/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1`,
+        `/${testProject.slug}/agent-testing/results?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1`,
       );
       expect(body.platformUrl).not.toMatch(
-        new RegExp(`/${testProject.slug}/simulations$`),
+        new RegExp(`/${testProject.slug}/agent-testing/results$`),
       );
     });
   });
 
   describe("When the run's scenario set cannot be resolved", () => {
     /** @scenario "Every run gets a precise address, even when its set is unknown" */
-    it("still addresses the run's own drawer — never the simulations index", async () => {
+    it("still addresses the run's own drawer — never the results index", async () => {
       withRuns({
         getScenarioRunData: makeRun({ scenarioSetId: undefined }),
       });
@@ -137,7 +137,7 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
       const body = (await res.json()) as { platformUrl: string };
 
       expect(body.platformUrl).toContain(
-        `/${testProject.slug}/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1`,
+        `/${testProject.slug}/agent-testing/results?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1`,
       );
     });
   });

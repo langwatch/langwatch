@@ -167,6 +167,30 @@ Feature: Langy recognises its own CLI behind a shell tool call
       Then the code is selectable on the card
       And one action copies the whole failure for a support thread
 
+  # A count that hit a malformed response printed a Python traceback, and the
+  # most quotable line of it, the exception class and its message, was lifted
+  # into the card body. A traceback is the engine talking to itself: file paths,
+  # line numbers and class names, none of it written for a reader
+  # (dev/docs/best_practices/error-handling.md).
+  Rule: A failure card never draws a traceback as its body
+
+    @unit
+    Scenario: A traceback is kept out of the card body
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the card says the step couldn't be completed
+      And it adds no detail line taken from the traceback
+
+    @unit
+    Scenario: A one-line failure sentence is still shown as a detail
+      When Langy's tool call fails with a plain sentence and no structured failure
+      Then the card shows that sentence as its detail
+
+    @integration
+    Scenario: The traceback stays reachable behind the disclosure
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the traceback is not in the card body
+      And one action reveals the whole traceback on the card
+
   # The user asked Langy to create a scenario on a free plan that already had
   # three. The card told them their access in the project didn't cover the
   # action, sending them to check permissions they had nothing wrong with.

@@ -16,7 +16,7 @@
     "dark": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
-  "description": "LangWatch is an open-source LLMOps platform for observability, evaluations, prompt optimization, and agent simulations.",
+  "description": "LangWatch is an open-source LLMOps platform for observability, evaluations, prompt optimization, and agent testing.",
   "seo": {
     "indexing": "navigable",
     "organization": {
@@ -98,24 +98,46 @@
             ]
           },
           {
-            "group": "Agent Simulations",
+            "group": "Agent Testing",
             "pages": [
-              "agent-simulations/introduction",
+              "agent-testing/overview",
+              {
+                "group": "Get started",
+                "pages": [
+                  "agent-testing/test-from-the-platform",
+                  "agent-testing/scenarios-in-code"
+                ]
+              },
               {
                 "group": "Connect your agent",
                 "pages": [
-                  "agent-simulations/connect-your-agent",
-                  "agent-simulations/remote-traces",
-                  "agent-simulations/local-development",
-                  "agent-simulations/scenario-parameters",
-                  "agent-simulations/authenticated-agents"
+                  "agent-testing/connect-your-agent",
+                  "agent-testing/targets",
+                  "agent-testing/environments",
+                  "agent-testing/linking-your-traces",
+                  "agent-testing/authenticated-agents",
+                  "agent-testing/other-ways-to-connect"
                 ]
               },
-              "agent-simulations/testing-your-agent",
-              "agent-simulations/getting-started",
-              "agent-simulations/run-suites-from-ci",
-              "agent-simulations/voice-agents",
-              "agent-simulations/red-teaming"
+              {
+                "group": "Scenarios",
+                "pages": [
+                  "agent-testing/scenarios",
+                  "agent-testing/test-suites",
+                  "agent-testing/run-parameters"
+                ]
+              },
+              {
+                "group": "Runs and results",
+                "pages": [
+                  "agent-testing/run-plans",
+                  "agent-testing/results",
+                  "agent-testing/compare-agents",
+                  "agent-testing/run-from-ci"
+                ]
+              },
+              "agent-testing/voice-agents",
+              "agent-testing/red-teaming"
             ]
           },
           {
@@ -315,6 +337,7 @@
                 "pages": [
                   "integration/python/guide",
                   "integration/python/reference",
+                  "integration/python/agent-reference",
                   "integration/python/tutorials/manual-instrumentation",
                   "integration/python/tutorials/open-telemetry"
                 ]
@@ -325,6 +348,7 @@
                 "pages": [
                   "integration/typescript/guide",
                   "integration/typescript/reference",
+                  "integration/typescript/agent-reference",
                   "integration/typescript/tutorials/filtering-spans",
                   "integration/typescript/tutorials/manual-instrumentation",
                   "integration/typescript/tutorials/opentelemetry-migration",
@@ -513,10 +537,6 @@
           {
             "group": "Tools",
             "pages": [
-              "integration/tools/integrations/claude-code",
-              "integration/tools/integrations/openai-codex",
-              "integration/tools/integrations/github-copilot-cli",
-              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -743,8 +763,6 @@
             "group": "Get Started",
             "pages": [
               "ai-governance/overview",
-              "ai-governance/track-your-claude-code-usage",
-              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -828,6 +846,91 @@
         ]
       },
       {
+        "anchor": "Coding Agents",
+        "icon": "square-terminal",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "coding-agents/overview",
+              "coding-agents/quickstart",
+              "coding-agents/claude-code-usage"
+            ]
+          },
+          {
+            "group": "Set Up Your Agent",
+            "pages": [
+              {
+                "group": "Claude Code",
+                "icon": "/images/logos/claude-code.svg",
+                "pages": [
+                  "coding-agents/claude-code"
+                ]
+              },
+              {
+                "group": "Codex",
+                "icon": "/images/logos/codex.svg",
+                "pages": [
+                  "coding-agents/openai-codex"
+                ]
+              },
+              {
+                "group": "GitHub Copilot",
+                "icon": "/images/logos/github-copilot.svg",
+                "pages": [
+                  "coding-agents/github-copilot-cli"
+                ]
+              },
+              {
+                "group": "Gemini CLI",
+                "icon": "/images/logos/gemini.svg",
+                "pages": [
+                  "coding-agents/gemini-cli"
+                ]
+              },
+              {
+                "group": "OpenCode",
+                "icon": "/images/logos/opencode.svg",
+                "pages": [
+                  "coding-agents/opencode"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "See Your Usage",
+            "pages": [
+              "coding-agents/sessions",
+              "coding-agents/pull-requests",
+              "coding-agents/usage-analytics",
+              "coding-agents/repository-and-pr-attribution"
+            ]
+          },
+          {
+            "group": "Teams & Fleets",
+            "pages": [
+              "coding-agents/team-projects",
+              "coding-agents/headless-and-ci"
+            ]
+          },
+          {
+            "group": "Privacy & Security",
+            "pages": [
+              "coding-agents/privacy",
+              "coding-agents/secrets-redaction"
+            ]
+          },
+          {
+            "group": "Investigate With Your Agent",
+            "pages": [
+              "coding-agents/explore-your-usage-with-your-own-agent",
+              "coding-agents/find-your-context-sweet-spot",
+              "coding-agents/compare-provider-costs"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Langy",
         "icon": "robot",
         "groups": [
@@ -843,6 +946,7 @@
             "group": "Using Langy",
             "pages": [
               "langy/chat",
+              "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
               "langy/insights"
@@ -1093,6 +1197,7 @@
               "api-reference/experiments/read-run-results",
               "api-reference/experiments/report-dspy-optimizer-steps",
               "api-reference/experiments/post-create-an-experiment",
+              "api-reference/experiments/read-one-experiment",
               "api-reference/experiments/list-an-experiment-s-versions",
               "api-reference/experiments/read-an-experiment-s-setup",
               "api-reference/experiments/save-an-experiment-s-setup",
@@ -1149,7 +1254,10 @@
               "api-reference/scenarios/list-scenarios",
               "api-reference/scenarios/create-scenarios",
               "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/list-a-scenario-s-versions",
+              "api-reference/scenarios/read-one-scenario-version",
               "api-reference/scenarios/update-scenarios",
+              "api-reference/scenarios/patch-update-scenarios",
               "api-reference/scenarios/delete-scenarios"
             ]
           },
@@ -1173,6 +1281,29 @@
             ]
           },
           {
+            "group": "Run Plans",
+            "pages": [
+              "api-reference/run-plans/overview",
+              "api-reference/run-plans/list-run-plans",
+              "api-reference/run-plans/create-run",
+              "api-reference/run-plans/get-run-plans",
+              "api-reference/run-plans/run-a-plan-again",
+              "api-reference/run-plans/delete-run-plans"
+            ]
+          },
+          {
+            "group": "Test Suites",
+            "pages": [
+              "api-reference/test-suites/overview",
+              "api-reference/test-suites/list-test-suites",
+              "api-reference/test-suites/create-test-suites",
+              "api-reference/test-suites/read-one-test-suite",
+              "api-reference/test-suites/update-test-suites",
+              "api-reference/test-suites/run-a-test-suite",
+              "api-reference/test-suites/delete-test-suites"
+            ]
+          },
+          {
             "group": "Suites",
             "pages": [
               "api-reference/suites/overview",
@@ -1190,9 +1321,15 @@
             "pages": [
               "api-reference/agents/overview",
               "api-reference/agents/list-agents",
+              "api-reference/agents/list-poll",
               "api-reference/agents/create-agents",
+              "api-reference/agents/create-frames",
+              "api-reference/agents/create-register",
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
+              "api-reference/agents/put-update-agents",
+              "api-reference/agents/action-call",
+              "api-reference/agents/action-test",
               "api-reference/agents/delete-agents"
             ]
           },
@@ -1201,6 +1338,7 @@
             "pages": [
               "api-reference/coding-agents/overview",
               "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/get-pull-request-usage",
               "api-reference/coding-agents/list-coding-agent-session-events"
             ]
           },
@@ -1270,6 +1408,14 @@
             ]
           },
           {
+            "group": "Query",
+            "pages": [
+              "api-reference/query/overview",
+              "api-reference/query/discover-the-queryable-langwatchql-schema",
+              "api-reference/query/run-a-langwatchql-query"
+            ]
+          },
+          {
             "group": "Secrets",
             "pages": [
               "api-reference/secrets/overview",
@@ -1278,6 +1424,16 @@
               "api-reference/secrets/get-secrets",
               "api-reference/secrets/update-secrets",
               "api-reference/secrets/delete-secrets"
+            ]
+          },
+          {
+            "group": "Agent Cache",
+            "pages": [
+              "api-reference/agent-cache/overview",
+              "api-reference/agent-cache/get-entry",
+              "api-reference/agent-cache/put-entry",
+              "api-reference/agent-cache/claim-entry",
+              "api-reference/agent-cache/delete-entry"
             ]
           },
           {
@@ -1505,16 +1661,6 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Sign In to LangWatch",
-          "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=sidebar-signin",
-          "icon": "house"
-        },
-        {
-          "anchor": "Visit GitHub",
-          "href": "https://github.com/langwatch/langwatch",
-          "icon": "github"
-        },
-        {
           "anchor": "Get Support",
           "href": "https://docs.langwatch.ai/support#email-support",
           "icon": "life-ring"
@@ -1538,26 +1684,6 @@
       "href": "https://github.com/langwatch/langwatch"
     }
   },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/langwatch/langwatch",
-      "website": "https://langwatch.ai",
-      "x-twitter": "https://x.com/langwatchai",
-      "linkedin": "https://www.linkedin.com/company/langwatch/",
-      "youtube": "https://www.youtube.com/@LangWatch"
-    },
-    "links": [
-      {
-        "header": "For agents",
-        "items": [
-          {
-            "label": "For agents: report an issue using npx langwatch report",
-            "href": "https://langwatch.ai/docs/support"
-          }
-        ]
-      }
-    ]
-  },
   "integrations": {
     "gtm": {
       "tagId": "GTM-KJ4S6Z9C"
@@ -1565,8 +1691,32 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1787635540",
+      "source": "/ci/cache/busted/1788185642",
       "destination": "/introduction"
+    },
+    {
+      "source": "/integration/tools/integrations/claude-code",
+      "destination": "/coding-agents/claude-code"
+    },
+    {
+      "source": "/integration/tools/integrations/openai-codex",
+      "destination": "/coding-agents/openai-codex"
+    },
+    {
+      "source": "/integration/tools/integrations/github-copilot-cli",
+      "destination": "/coding-agents/github-copilot-cli"
+    },
+    {
+      "source": "/integration/tools/integrations/opencode",
+      "destination": "/coding-agents/opencode"
+    },
+    {
+      "source": "/ai-governance/track-your-claude-code-usage",
+      "destination": "/coding-agents/claude-code-usage"
+    },
+    {
+      "source": "/ai-governance/explore-your-usage-with-your-own-agent",
+      "destination": "/coding-agents/explore-your-usage-with-your-own-agent"
     },
     {
       "source": "/langevals/:path*",
@@ -1645,44 +1795,48 @@
       "destination": "/self-hosting/deployment/docker-compose"
     },
     {
+      "source": "/agent-simulations/local-development",
+      "destination": "/agent-testing/other-ways-to-connect"
+    },
+    {
       "source": "/agent-simulations/overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/set-overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/batch-runs",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/individual-run",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/getting-started",
-      "destination": "/agent-simulations/getting-started"
+      "destination": "/agent-testing/scenarios-in-code"
     },
     {
       "source": "/simulations/introduction",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/features/prompt-versioning",
@@ -1835,6 +1989,46 @@
     {
       "source": "/api-reference/endpoint/:path*",
       "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/agent-simulations/introduction",
+      "destination": "/agent-testing/overview"
+    },
+    {
+      "source": "/agent-simulations/testing-your-agent",
+      "destination": "/agent-testing/test-from-the-platform"
+    },
+    {
+      "source": "/agent-simulations/getting-started",
+      "destination": "/agent-testing/scenarios-in-code"
+    },
+    {
+      "source": "/agent-simulations/remote-traces",
+      "destination": "/agent-testing/linking-your-traces"
+    },
+    {
+      "source": "/agent-simulations/scenario-parameters",
+      "destination": "/agent-testing/run-parameters"
+    },
+    {
+      "source": "/agent-simulations/run-suites-from-ci",
+      "destination": "/agent-testing/run-from-ci"
+    },
+    {
+      "source": "/agent-simulations/connect-your-agent",
+      "destination": "/agent-testing/connect-your-agent"
+    },
+    {
+      "source": "/agent-simulations/authenticated-agents",
+      "destination": "/agent-testing/authenticated-agents"
+    },
+    {
+      "source": "/agent-simulations/voice-agents",
+      "destination": "/agent-testing/voice-agents"
+    },
+    {
+      "source": "/agent-simulations/red-teaming",
+      "destination": "/agent-testing/red-teaming"
     }
   ]
 }

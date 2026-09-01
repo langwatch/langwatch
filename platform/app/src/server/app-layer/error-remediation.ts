@@ -34,6 +34,15 @@ const registry = {
     ],
   },
 
+  // ---- dataset storage ----
+  storage_not_writable: {
+    tips: [
+      "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
+      "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
+      "The server log line next to this failure names the directory that was refused",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
@@ -313,11 +322,132 @@ const registry = {
     ],
   },
 
+  // ---- agent cache ----
+  // Read by agent code inside a run, so the tips name the next call rather
+  // than a page to open.
+  cache_entry_not_found: {
+    tips: [
+      "Store the entry before you read it; a read never creates one",
+      "Check the name, which is case sensitive",
+      "An entry is gone once its lifetime passes; store it again with a longer one if the run needs it for longer",
+    ],
+    docsPath: "/agent-testing/authenticated-agents",
+  },
+
+  // ---- connected agents ----
+  agent_register_only: {
+    tips: [
+      "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
+      "This API can archive the agent; every other field is the SDK's to write",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_test_refused: {
+    tips: [
+      "A test run sends the agent one message and waits for its answer; it needs an HTTP, code, workflow or connected agent whose configuration is complete",
+      "Open the agent, fix what the message names, save it and test again",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  scenario_parameter_option_invalid: {
+    tips: [
+      "A parameter with options accepts only the values it lists; pick one of them for this run",
+      "To accept another value, widen the options on the scenario, or on the decorated function of a connected agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_not_found: {
+    tips: [
+      "List the project's agents with `langwatch agent list` and use an id from that list",
+      "An archived agent is not found; a connected agent that registers again restores its row",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_offline: {
+    tips: [
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "Check that the process connects with the same project and environment as the agent you are running against",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_owner_only: {
+    tips: [
+      "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
+      "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_call_timeout: {
+    tips: [
+      "Raise the agent's timeout, up to the platform cap of 300 seconds",
+      "Check the agent logs for the turn that did not finish",
+    ],
+  },
+  agent_call_failed: {
+    tips: [
+      "Fix the error the function raised, then test again; the process logs carry the stack",
+    ],
+  },
+  agent_disconnected: {
+    tips: [
+      "The turn is never sent again once the call reached the process, since the function may have side effects; start the process again and run again",
+    ],
+  },
+  agent_instance_lost: {
+    tips: [
+      "A sticky agent pins each conversation to one instance; when that instance is gone the conversation fails rather than moving to another one",
+      "Set `sticky` to false if the agent keeps no local state per conversation",
+    ],
+  },
+  agent_busy: {
+    tips: [
+      "Wait `meta.retryAfterMs` milliseconds and send the call again",
+      "Raise `concurrency` on the decorated function, or connect more instances",
+    ],
+  },
+  agent_parameter_invalid: {
+    tips: [
+      "Parameter names start with a letter or underscore and hold only letters, digits and underscores",
+      "Declare at most 20 parameters and at most 50 options per parameter",
+      "A secret is declared on the scenario, never on the agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_register_refused: {
+    tips: [
+      "Read `meta.reason`: api_key_invalid, project_required, permission_denied, key_type_not_allowed, replica_count_unsupported, parameters_invalid or environment_invalid",
+      "The key needs `scenarios:manage`; an ingestion key or a Langy session key can never connect",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_session_unknown: {
+    tips: [
+      "Post a new register frame to /api/v1/agents/connect/register and use the instance token it answers with",
+      "A session expires five minutes after its last poll",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_payload_too_large: {
+    tips: [
+      "Read `meta.what` and `meta.limitBytes`, and `meta.sizeBytes` when the payload was measured",
+      "On a self-hosted deployment raise the cap with LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
+    ],
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [
       "Run `langwatch agent dev` again on the machine that started the tunnel; a new session repoints the agent automatically",
       "If you are done developing locally, restore the agent's URL in its settings",
+    ],
+  },
+
+  // ---- scenario runs ----
+  scenario_reserved_set_id: {
+    tips: [
+      "Send the run without a setId; it is then recorded in the project's own one-off bucket",
+      "To group runs of your own, send a setId of your own choosing; any name outside the `__internal__` namespace is free",
+      "A `__internal__<suiteId>__suite` address belongs to a run plan; start a run on that plan instead of writing into its address",
     ],
   },
 
@@ -372,6 +502,20 @@ const registry = {
       "Or pick an existing one: langwatch evaluator list",
     ],
     docsPath: "/evaluations/evaluators/list",
+  },
+
+  // ---- default models ----
+  model_not_configured: {
+    // The write is almost always organization scoped: providers are org rows,
+    // and the onboarding seed lands the default config at ORGANIZATION so the
+    // whole organization inherits. Naming the page AND the scope is what makes
+    // this recoverable without a support round trip.
+    tips: [
+      "Open Settings, then Default Models, and set a model for the role in meta.role",
+      "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
+      "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
   },
 
   // ---- langy ----

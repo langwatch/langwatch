@@ -32,7 +32,7 @@
         "promptFile": "scenarios.docs.txt"
       },
       {
-        "title": "Connect my agent to LangWatch simulations",
+        "title": "Connect my agent to LangWatch agent testing",
         "skill": "langwatch/skills/connect-agent",
         "slashCommand": "/connect-agent",
         "promptFile": "connect-agent.docs.txt"
@@ -50,7 +50,19 @@
         "promptFile": "datasets.docs.txt"
       },
       {
-        "boldPrefix": "⭐ All of the above:",
+        "title": "Find my coding agent's context sweet spot",
+        "skill": "langwatch/skills/context-sweet-spot",
+        "slashCommand": "/context-sweet-spot",
+        "promptFile": "context-sweet-spot.docs.txt"
+      },
+      {
+        "title": "Check if another provider would be cheaper",
+        "skill": "langwatch/skills/provider-cost-comparison",
+        "slashCommand": "/provider-cost-comparison",
+        "promptFile": "provider-cost-comparison.docs.txt"
+      },
+      {
+        "boldPrefix": "\u2b50 All of the above:",
         "title": "Take my agent to the next level",
         "skill": "langwatch/skills/level-up",
         "slashCommand": "/level-up",
@@ -59,7 +71,7 @@
     ],
     "recipes": [
       {
-        "boldPrefix": "⭐",
+        "boldPrefix": "\u2b50",
         "title": "What should I do next to improve my agent?",
         "skill": "langwatch/skills/agent-improve",
         "slashCommand": "/agent-improve",
@@ -149,14 +161,34 @@
       }
     ]
   },
-  "agent-simulations/connect-your-agent.mdx": {
+  "agent-testing/connect-your-agent.mdx": {
     "connect-agent": [
       {
-        "title": "Connect my agent to LangWatch simulations",
+        "title": "Connect my agent to LangWatch agent testing",
         "skill": "langwatch/skills/connect-agent",
         "slashCommand": "/connect-agent",
         "promptFile": "connect-agent.docs.txt",
         "static": true
+      }
+    ]
+  },
+  "coding-agents/find-your-context-sweet-spot.mdx": {
+    "skill": [
+      {
+        "title": "Find my context sweet spot",
+        "skill": "langwatch/skills/context-sweet-spot",
+        "slashCommand": "/context-sweet-spot",
+        "promptFile": "context-sweet-spot.docs.txt"
+      }
+    ]
+  },
+  "coding-agents/compare-provider-costs.mdx": {
+    "skill": [
+      {
+        "title": "Would another provider be cheaper for my usage?",
+        "skill": "langwatch/skills/provider-cost-comparison",
+        "slashCommand": "/provider-cost-comparison",
+        "promptFile": "provider-cost-comparison.docs.txt"
       }
     ]
   }

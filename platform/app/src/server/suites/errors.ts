@@ -115,6 +115,62 @@ export class AllTargetsArchivedError extends SuiteDomainError {
   }
 }
 
+/**
+ * Thrown when a run is requested for a suite that has no target at all.
+ *
+ * Distinct from {@link AllTargetsArchivedError}: that one says the targets the
+ * suite had are gone, this one says none were ever chosen. A test suite starts
+ * with no targets and gets them from the run dialog, so this is the expected
+ * first-run state, not a broken reference.
+ */
+export class SuiteTargetsRequiredError extends SuiteDomainError {
+  declare readonly code: "suite_targets_required";
+
+  constructor() {
+    super("This suite has no target to run against. Choose one, then run.", {
+      code: "suite_targets_required",
+      httpStatus: 422,
+    });
+    this.name = "SuiteTargetsRequiredError";
+  }
+}
+
+/**
+ * Thrown when a run plan's scope covers no scenario at all.
+ *
+ * Distinct from {@link AllScenariosArchivedError}: that one says the scenarios the
+ * plan named are archived, this one says the rule the plan carries matches
+ * nothing right now, which a new label or an emptied test suite can cause
+ * without any scenario being archived.
+ */
+export class SuiteScopeEmptyError extends SuiteDomainError {
+  declare readonly code: "suite_scope_empty";
+
+  constructor() {
+    super("This run plan covers no scenario. Widen its scope, then run.", {
+      code: "suite_scope_empty",
+      httpStatus: 422,
+    });
+    this.name = "SuiteScopeEmptyError";
+  }
+}
+
+/** Thrown when a scope is written on a suite whose membership is its filing. */
+export class SuiteScopeNotAllowedError extends SuiteDomainError {
+  declare readonly code: "suite_scope_not_allowed";
+
+  constructor() {
+    super(
+      "A test suite runs the scenarios filed in it, so it takes no scope.",
+      {
+        code: "suite_scope_not_allowed",
+        httpStatus: 422,
+      },
+    );
+    this.name = "SuiteScopeNotAllowedError";
+  }
+}
+
 /** Thrown when a suite name is already in use within the project */
 export class SuiteNameTakenError extends SuiteDomainError {
   declare readonly code: "suite_name_taken";

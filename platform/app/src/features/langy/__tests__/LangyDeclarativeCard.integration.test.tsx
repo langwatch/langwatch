@@ -407,6 +407,26 @@ describe("LangyDeclarativeCard", () => {
       });
     });
 
+    describe("when the hydration reports no total of its own", () => {
+      /** @scenario A list too large for the chat counts the rows the reduction removed */
+      it("titles the card with the digest total, not the rows it sampled", () => {
+        useCapabilityDataMock.mockReturnValue({
+          status: "hydrated",
+          rows: [
+            { id: "prompt_1", primary: "support/greeting" },
+            { id: "prompt_2", primary: "support/refund" },
+          ],
+          loadedCount: 2,
+          totalCount: null,
+          isHydrating: false,
+        });
+        renderHydrated();
+
+        expect(screen.getByText("7 prompts")).toBeTruthy();
+        expect(screen.getByText("+5 more")).toBeTruthy();
+      });
+    });
+
     describe("when none of the referenced prompts exist any more", () => {
       it("says so honestly instead of inventing an empty list", () => {
         useCapabilityDataMock.mockReturnValue({

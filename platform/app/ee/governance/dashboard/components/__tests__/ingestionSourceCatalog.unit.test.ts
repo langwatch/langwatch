@@ -11,8 +11,12 @@ import {
   gatedSourceTypeOptions,
   groupForMode,
   SOURCE_GROUP_META,
+  SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
 } from "../ingestionSourceCatalog";
+
+/** What the menu should offer: everything the catalog still sells. */
+const offerable = SOURCE_TYPE_OPTIONS.filter((o) => !o.deprecated);
 
 describe("given the ingestion-source catalog", () => {
   describe("when a non-enterprise plan gates the options", () => {
@@ -21,15 +25,48 @@ describe("given the ingestion-source catalog", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: false });
       const unlocked = options.filter((o) => !o.locked).map((o) => o.value);
       expect(unlocked).toEqual(["otel_generic"]);
-      expect(options.length).toBe(SOURCE_TYPE_OPTIONS.length);
+      expect(options.length).toBe(offerable.length);
     });
 
-    /** @scenario "The composer and the menu share one plan gate" */
-    it("keeps every option visible so the locked ones can say why", () => {
+    /**
+     * "Every option" means every option still on offer. A retired type is
+     * dropped rather than locked: locked is a sales message about what
+     * Enterprise unlocks, and a retired source is not something to sell.
+     *
+     * @scenario "The composer and the menu share one plan gate"
+     */
+    it("keeps every offerable option visible so the locked ones can say why", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: false });
       expect(options.map((o) => o.value)).toEqual(
-        SOURCE_TYPE_OPTIONS.map((o) => o.value),
+        offerable.map((o) => o.value),
       );
+    });
+  });
+
+  describe("when a source type has been retired", () => {
+    /** @scenario "The old Copilot source can no longer be chosen" */
+    it("is not offered on any plan", () => {
+      for (const isEnterprise of [true, false]) {
+        const offered = gatedSourceTypeOptions({ isEnterprise }).map(
+          (o) => o.value,
+        );
+        expect(offered).not.toContain("copilot_studio");
+      }
+    });
+
+    /**
+     * The entry stays in the catalog on purpose. `SOURCE_TYPE_LABEL` is built
+     * from this list and read without a fallback where a configured source's
+     * type is displayed, so deleting the entry turns an existing source's
+     * name into a blank — and the completeness guard in the catalog would
+     * stop the build first.
+     */
+    /** @scenario "Sources already configured on the old type still display" */
+    it("still resolves a label for sources already configured on it", () => {
+      expect(SOURCE_TYPE_LABEL.copilot_studio).toBeTruthy();
+      expect(
+        SOURCE_TYPE_OPTIONS.some((o) => o.value === "copilot_studio"),
+      ).toBe(true);
     });
   });
 
@@ -38,6 +75,21 @@ describe("given the ingestion-source catalog", () => {
     it("locks nothing", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: true });
       expect(options.every((o) => !o.locked)).toBe(true);
+    });
+  });
+
+  describe("when a vendor's spend can only be read once", () => {
+    /** @scenario "Adding a second source for the same organization warns the admin" */
+    it("says in the OpenAI Admin blurb that a second source counts the spend twice", () => {
+      const option = SOURCE_TYPE_OPTIONS.find(
+        (o) => o.value === "openai_admin",
+      );
+
+      // The warning is the copy, not a guard: nothing refuses the second
+      // source, here or on any other vendor, so the admin reads it before
+      // choosing rather than being stopped after.
+      expect(option?.blurb).toMatch(/only ever create one per organization/i);
+      expect(option?.blurb).toMatch(/count the same spend twice/i);
     });
   });
 

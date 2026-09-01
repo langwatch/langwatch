@@ -9,6 +9,8 @@ import {
 } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
+import { runParameterValuesSchema } from "../parameters";
+import { runActorLabelSchema } from "../run-actor";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -63,8 +65,103 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code", "workflow"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  /**
+   * The key the target folds under: the reference id alone, or the reference
+   * id and a hash of the target's parameter overrides when it carries any.
+   * Stamped at queue time. Absent on runs recorded before targets carried
+   * parameters, which read as the reference id alone.
+   *
+   * @see specs/features/agent-testing/results-atoms.feature
+   */
+  targetKey: z.string().optional(),
+  /**
+   * The parameter overrides of this target alone, so a reader can name the
+   * variant. Absent when the target carries none. The merged values the run
+   * resolved sit beside the namespace under `parameters`, as they always did.
+   */
+  targetParameters: runParameterValuesSchema.optional(),
   simulationSuiteId: z.string().optional(),
+  /**
+   * The version of the scenario at the moment the run was queued. A later
+   * edit of the scenario never changes what an old run says. Absent on runs
+   * recorded before versions existed.
+   *
+   * @see specs/scenarios/scenario-version-on-runs.feature
+   */
+  scenarioVersion: z.number().int().optional(),
+  /**
+   * The simulation models the run plan was CONFIGURED with, stamped at queue
+   * time. Absent when the plan names none and the project default is used,
+   * and absent on runs recorded before this was stamped. Both read back as
+   * "this configuration named no model", which is what a person chose.
+   *
+   * Not the model the run resolved to: the same choice has to key the same
+   * way after a project default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /**
+   * The simulation models the run RESOLVED, stamped at queue time: the run
+   * plan's choice, else the case's own choice, else the project default for
+   * that role.
+   *
+   * This is what a person reads back off the run. The project default changes
+   * over time, so a run that recorded only the configured value cannot say
+   * which model judged it a month later.
+   *
+   * Absent when the project had no model set for the role, and absent on runs
+   * recorded before this was stamped. Both read the same way.
+   *
+   * @see specs/scenarios/resolved-run-models-on-runs.feature
+   */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /**
+   * Who started the run: the platform user id, and the surface that person
+   * acted through. Stamped at queue time, and absent whenever the caller
+   * named no person, which is every project-key and SDK run.
+   *
+   * The id and not a name, so a run still points at the right person after
+   * they rename themselves.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
+  /**
+   * The connected agent instance that served the run, recorded when the run
+   * finished. Absent for every other kind of target, and for a run recorded
+   * before instances were.
+   *
+   * @see specs/scenarios/served-agent-instance-on-runs.feature
+   */
+  agentInstance: z
+    .object({ hostname: z.string(), label: z.string().nullable() })
+    .optional(),
+});
+
+/**
+ * One participant of a run, as the code that pushed the run names it.
+ *
+ * The SDK reports every agent it wired into the run: the agent under test,
+ * the user simulator and the judge. Only the `agent` role names what the run
+ * was pointed at, so a run pushed from code can say which agent it tested
+ * without the platform holding a target for it.
+ *
+ * `name` is the adapter's own name, or its class name when it was given none,
+ * for example "AgnoAgentAdapter".
+ *
+ * It sits beside `name` and `description` on the metadata rather than inside
+ * the reserved `langwatch` namespace, which only the platform writes.
+ *
+ * @see specs/features/agent-testing/results-atoms.feature
+ */
+export const scenarioAgentSchema = z.object({
+  name: z.string(),
+  role: z.enum(["agent", "user", "judge"]),
 });
 
 /**
@@ -80,6 +177,25 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
+      /**
+       * One short line describing why the run was started. Any caller that can
+       * set run metadata can set it, platform or SDK.
+       *
+       * Trimmed, and dropped when it holds only spaces, so a note that arrives
+       * on an event reads the same as a note the platform stamped. The
+       * 200-character limit of the platform and CLI input paths is NOT applied
+       * here: an event is a record of a run that already happened, and
+       * refusing it over the length of its note would lose the run itself.
+       *
+       * @see specs/suites/run-note-metadata-convention.feature
+       */
+      note: z
+        .string()
+        .trim()
+        .transform((note) => (note === "" ? undefined : note))
+        .optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),
