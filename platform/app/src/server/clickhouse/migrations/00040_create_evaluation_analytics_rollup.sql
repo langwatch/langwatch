@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics_rollup
     -- explicit value defaults to the same generous floor every other managed
     -- table uses. Sparse encoding compresses the column to ~zero bytes on parts
     -- where every row holds the same value.
-    `_retention_days` UInt16 DEFAULT 308 CODEC(Delta(2), ZSTD(1))
+    `_retention_days` SimpleAggregateFunction(max, UInt16) DEFAULT 308 CODEC(Delta(2), ZSTD(1))
 )
 ENGINE = AggregatingMergeTree()
 -- Partition weekly on the same column the ORDER BY (and time-range reads) lead
