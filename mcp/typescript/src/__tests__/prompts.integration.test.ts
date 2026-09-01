@@ -45,43 +45,45 @@ beforeEach(() => {
  */
 
 describe("handleGetPrompt()", () => {
-  describe("when the returned version has every renderable field set", () => {
-    /** @scenario "Rendering every field that changes how the prompt is called" */
-    it("renders headings and readable text for parameters, inputs, outputs, model, temperature, maxTokens, and responseFormat", async () => {
-      const fixture: PromptDetailResponse = {
-        id: "prompt_1",
-        handle: "my-prompt",
-        version: 3,
-        versionId: "ver_rich001",
-        model: "gpt-5-mini",
-        temperature: 0.7,
-        maxTokens: 512,
-        responseFormat: { type: "json_schema", name: "answer_schema" },
-        parameters: { reasoning_effort: "low" },
-        inputs: [{ identifier: "question", type: "str" }],
-        outputs: [{ identifier: "answer", type: "str" }],
-        messages: [{ role: "user", content: "{{question}}" }],
-        tags: [],
-      };
-      mockGetPrompt.mockResolvedValue(fixture);
+  describe("given the API returns the latest version with full data", () => {
+    describe("when the returned version has every renderable field set", () => {
+      /** @scenario "Rendering every field that changes how the prompt is called" */
+      it("renders headings and readable text for parameters, inputs, outputs, model, temperature, maxTokens, and responseFormat", async () => {
+        const fixture: PromptDetailResponse = {
+          id: "prompt_1",
+          handle: "my-prompt",
+          version: 3,
+          versionId: "ver_rich001",
+          model: "gpt-5-mini",
+          temperature: 0.7,
+          maxTokens: 512,
+          responseFormat: { type: "json_schema", name: "answer_schema" },
+          parameters: { reasoning_effort: "low" },
+          inputs: [{ identifier: "question", type: "str" }],
+          outputs: [{ identifier: "answer", type: "str" }],
+          messages: [{ role: "user", content: "{{question}}" }],
+          tags: [],
+        };
+        mockGetPrompt.mockResolvedValue(fixture);
 
-      const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
+        const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
-      expect(result).toMatch(/parameters/i);
-      expect(result).toMatch(/inputs/i);
-      expect(result).toMatch(/outputs/i);
-      expect(result).toMatch(/model/i);
-      expect(result).toMatch(/temperature/i);
-      expect(result).toMatch(/max ?tokens/i);
-      expect(result).toMatch(/response ?format/i);
-      expect(result).toContain("reasoning_effort");
-      expect(result).toContain("question");
-      expect(result).toContain("str");
-      expect(result).toContain("answer");
-      expect(result).not.toContain("[object Object]");
+        expect(result).toMatch(/parameters/i);
+        expect(result).toMatch(/inputs/i);
+        expect(result).toMatch(/outputs/i);
+        expect(result).toMatch(/model/i);
+        expect(result).toMatch(/temperature/i);
+        expect(result).toMatch(/max ?tokens/i);
+        expect(result).toMatch(/response ?format/i);
+        expect(result).toContain("reasoning_effort");
+        expect(result).toContain("question");
+        expect(result).toContain("str");
+        expect(result).toContain("answer");
+        expect(result).not.toContain("[object Object]");
+      });
     });
-  });
 
+  });
   describe("when the returned version has none of those fields set", () => {
     /** @scenario "Omitting headings for fields absent from the API response" */
     it("renders no heading for parameters, inputs, outputs, model, temperature, maxTokens, or responseFormat", async () => {

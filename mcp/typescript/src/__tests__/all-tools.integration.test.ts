@@ -365,6 +365,15 @@ const CANNED_MODEL_PROVIDER_SET = {
 /** Track last request for each route so tests can assert on request body/params. */
 const lastRequests: Record<string, { method: string; url: string; body: string }> = {};
 
+/**
+ * Mutable prompt detail so the mock is stateful: a PUT updates it and the
+ * subsequent confirmation GET reflects the new version. Reset per test.
+ */
+let promptDetailState: typeof CANNED_PROMPT_DETAIL = { ...CANNED_PROMPT_DETAIL };
+beforeEach(() => {
+  promptDetailState = { ...CANNED_PROMPT_DETAIL };
+});
+
 function createMockServer(): Server {
   return createServer((req, res) => {
     const authToken = req.headers["x-auth-token"];
@@ -429,11 +438,32 @@ function createMockServer(): Server {
         method === "GET"
       ) {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
+        res.end(JSON.stringify(promptDetailState));
       } else if (
         url.match(/^\/api\/prompts\/[^/]+$/) &&
         method === "PUT"
       ) {
+        const parsed = JSON.parse(body) as {
+          commitMessage?: string;
+          model?: string;
+          messages?: Array<{ role: string; content: string }>;
+          tags?: string[];
+        };
+        const newVersionId = "ver_p1v4";
+        promptDetailState = {
+          ...promptDetailState,
+          version: 4,
+          versionId: newVersionId,
+          commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
+          model: parsed.model ?? promptDetailState.model,
+          messages: parsed.messages ?? promptDetailState.messages,
+          tags: [
+            { name: "latest", versionId: newVersionId },
+            ...(parsed.tags ?? [])
+              .filter((name) => name !== "latest")
+              .map((name) => ({ name, versionId: newVersionId })),
+          ],
+        };
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       }
@@ -1118,6 +1148,8 @@ describe("All MCP tools integration", () => {
 
         expect(result).toContain("updated successfully");
         expect(result).toContain("Switch to mini");
+        expect(result).toContain("**Version**: v4");
+        expect(result).toContain("**Version ID**: ver_p1v4");
       });
     });
 

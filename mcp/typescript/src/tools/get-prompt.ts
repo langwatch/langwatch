@@ -70,7 +70,13 @@ export async function handleGetPrompt(params: {
   // Renders a field list of any shape the API may return: an array of
   // { identifier, type } entries (inputs/outputs), an object map of
   // name -> value (parameters), or absent/empty (no heading at all).
-  const renderFieldList = (heading: string, fields: unknown) => {
+  const renderFieldList = ({
+    heading,
+    fields,
+  }: {
+    heading: string;
+    fields: unknown;
+  }) => {
     const entries: string[] = [];
     if (Array.isArray(fields)) {
       for (const field of fields) {
@@ -93,9 +99,9 @@ export async function handleGetPrompt(params: {
     lines.push(...entries);
   };
 
-  renderFieldList("Parameters", prompt.parameters);
-  renderFieldList("Inputs", prompt.inputs);
-  renderFieldList("Outputs", prompt.outputs);
+  renderFieldList({ heading: "Parameters", fields: prompt.parameters });
+  renderFieldList({ heading: "Inputs", fields: prompt.inputs });
+  renderFieldList({ heading: "Outputs", fields: prompt.outputs });
 
   const messages = prompt.messages;
   if (Array.isArray(messages) && messages.length > 0) {
