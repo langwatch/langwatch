@@ -29,10 +29,6 @@ const optionalProxyValue = optionalEnvironmentString.transform((value) => {
   return trimmed || undefined;
 });
 
-const producerOnlyEventingSchema = environmentBooleanSchema
-  .default(false)
-  .refine((enabled) => !enabled, "Eventing consumers are not enabled in Wave 1.");
-
 export const workerConfigDefinition = RuntimeConfig.define({
   /** A standalone worker owns background consumer behaviour once installed. */
   processRole: Config.value(z.literal("worker").default("worker"), { env: "WORKER_PROCESS_ROLE" }),
@@ -62,12 +58,6 @@ export const workerConfigDefinition = RuntimeConfig.define({
     endpoint: Config.url({ optional: true, env: "LANGWATCH_ENDPOINT" }),
     processorType: Config.value(z.enum(["simple", "batch"]).default("batch"), {
       env: "LANGWATCH_PROCESSOR_TYPE",
-    }),
-  },
-  eventing: {
-    /** Explicitly fail closed until the complete shared queue registry moves. */
-    consumersEnabled: Config.value(producerOnlyEventingSchema, {
-      env: "WORKER_EVENTING_CONSUMERS_ENABLED",
     }),
   },
   shutdown: {
@@ -166,7 +156,6 @@ export type WorkerConfig = Readonly<{
   serviceVersion?: string;
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
-  eventing: WorkerConfigProjection["eventing"];
   shutdown: WorkerShutdownConfig;
   infrastructure: WorkerInfrastructureConfig;
 }>;
@@ -186,7 +175,6 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     serviceVersion: value.serviceVersion,
     logger: value.logger,
     observability: value.observability,
-    eventing: value.eventing,
     shutdown: resolveWorkerShutdownConfig({
       nodeEnvironment: value.nodeEnvironment,
       environment: value.environment,

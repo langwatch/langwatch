@@ -23,7 +23,6 @@ describe("resolveWorkerConfig", () => {
         endpoint: undefined,
         processorType: "batch",
       },
-      eventing: { consumersEnabled: false },
       shutdown: { processDeadlineMs: 25_000 },
       infrastructure: {
         redis: { configured: false, reason: "unconfigured", warnings: [] },
@@ -56,7 +55,6 @@ describe("resolveWorkerConfig", () => {
 
     expect(config.environment).toBe("production");
     expect(config.nodeEnvironment).toBe("development");
-    expect(config.eventing.consumersEnabled).toBe(false);
   });
 
   it("parses tracing credentials at the process boundary without exposing them in errors", () => {
@@ -218,10 +216,8 @@ describe("resolveWorkerConfig", () => {
     );
   });
 
-  it("fails closed when a deployment attempts to enable partial consumers", () => {
-    expect(() => resolveWorkerConfig({ WORKER_EVENTING_CONSUMERS_ENABLED: "true" })).toThrow(
-      InvalidRuntimeConfigError,
-    );
+  it("ignores the retired consumer knob: composition roots own that decision now", () => {
+    expect(() => resolveWorkerConfig({ WORKER_EVENTING_CONSUMERS_ENABLED: "true" })).not.toThrow();
   });
 
   it("rejects an unknown stored-object backend before worker composition", () => {

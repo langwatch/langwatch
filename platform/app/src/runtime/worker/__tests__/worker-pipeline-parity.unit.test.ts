@@ -2,10 +2,10 @@
  * Whether the extracted worker's graph and the live legacy registry agree on
  * what they consume from `event-sourcing/jobs`.
  *
- * They are the two halves of an unfinished move. `platform/app`'s
- * `PipelineRegistry` is what runs — `workers.ts` boots `WorkerExecutable` with
- * `LegacyWorkerExecutableComposition`, which builds the legacy app graph — and
- * `apps/worker`'s `WorkerProductionComposition` is where it is going.
+ * They are the two halves of the completed switch. `workers.ts` boots
+ * `WorkerExecutable` with `PackagedWorkerExecutableComposition`, which mounts
+ * `apps/worker`'s `WorkerProductionComposition` over the registry the App's
+ * `PipelineRegistry` exports; the App composes as a producer only.
  *
  * Nothing compared them, and the switchover cannot be safe until something
  * does: a pipeline that only the legacy side registers would stop being

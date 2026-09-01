@@ -77,7 +77,7 @@ describe("executable import boundaries", () => {
     const workers = source("workers.ts");
 
     expect(workers).toContain('await import("@langwatch/worker")');
-    expect(workers).toContain('await import("./runtime/worker/legacy-worker.executable.adapter")');
+    expect(workers).toContain('await import("./runtime/worker/packaged-worker.executable.adapter")');
     expect(workers).not.toContain('await import("./runtime/worker")');
   });
 });

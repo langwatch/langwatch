@@ -126,7 +126,7 @@ describe("legacy executable logger bootstrap order", () => {
         "./instrumentation.node",
         "./server/handled-error-wiring",
         "@langwatch/worker",
-        "./runtime/worker/legacy-worker.executable.adapter",
+        "./runtime/worker/packaged-worker.executable.adapter",
       ],
     ],
     [

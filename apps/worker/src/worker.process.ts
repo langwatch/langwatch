@@ -9,6 +9,14 @@ import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker
 
 export type WorkerProcessComposition = {
   readonly application: WorkerApplicationPort;
+  /**
+   * Who consumes the shared Eventing queue in this process, stated by the
+   * composition that decided it. The process itself cannot know: consumer
+   * ownership is a property of which graph the boot root composed, so the
+   * boot log reports what the composition declares rather than asserting a
+   * mode the process may not be in.
+   */
+  readonly eventingConsumers?: "packaged" | "app-owned";
 };
 
 export type WorkerApplicationPort = {
@@ -59,20 +67,16 @@ export class WorkerProcess {
       setup: options.observability?.setup ?? toObservabilitySetup(config),
     });
 
-    observability.logger.info(
-      {
-        consumersEnabled: config.eventing.consumersEnabled,
-        mode: "producer-only",
-      },
-      "worker Eventing consumer is disabled until the complete registry is mounted",
-    );
-
     try {
       const composition = await options.createComposition({
         config,
         resources,
         observability,
       });
+      observability.logger.info(
+        { eventingConsumers: composition.eventingConsumers ?? "unstated" },
+        "worker composition ready",
+      );
       return WorkerProcess.create({ config, resources, observability, composition });
     } catch (error) {
       await observability.shutdown().catch(() => void 0);

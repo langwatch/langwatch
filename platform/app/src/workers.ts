@@ -27,12 +27,12 @@ void (async () => {
 
   try {
     const { WorkerExecutable } = await import("@langwatch/worker");
-    const { LegacyWorkerExecutableComposition } =
-      await import("./runtime/worker/legacy-worker.executable.adapter");
+    const { PackagedWorkerExecutableComposition } =
+      await import("./runtime/worker/packaged-worker.executable.adapter");
     const { telemetryFlushes } = await import("./server/shutdown/telemetry");
     const worker = await WorkerExecutable.boot({
       source: process.env,
-      composition: LegacyWorkerExecutableComposition.create({ source: process.env }),
+      composition: PackagedWorkerExecutableComposition.create({ source: process.env }),
       observability: {
         // Platform instrumentation remains the live telemetry provider until
         // the complete Eventing registry moves. It flushes through the

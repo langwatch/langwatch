@@ -104,8 +104,32 @@ describe("bootWorker", () => {
     ]);
     expect(mocks.shutdown).toHaveBeenCalledOnce();
     expect(mocks.logger.info).toHaveBeenCalledWith(
-      { consumersEnabled: false, mode: "producer-only" },
-      "worker Eventing consumer is disabled until the complete registry is mounted",
+      { eventingConsumers: "unstated" },
+      "worker composition ready",
+    );
+  });
+
+  it("logs the consumer ownership the composition declares", async () => {
+    const createComposition = vi.fn(async () => ({
+      eventingConsumers: "packaged" as const,
+      application: {
+        start: vi.fn(async () => void 0),
+        drain: vi.fn(async () => void 0),
+        closeResources: vi.fn(async () => void 0),
+        close: vi.fn(async () => void 0),
+      },
+    }));
+
+    const worker = await bootWorker({ source: { NODE_ENV: "test" }, createComposition });
+    await worker.close();
+
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      { eventingConsumers: "packaged" },
+      "worker composition ready",
+    );
+    expect(mocks.logger.info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "producer-only" }),
+      expect.anything(),
     );
   });
 

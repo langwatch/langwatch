@@ -83,6 +83,7 @@ export class PackagedWorkerExecutableComposition extends WorkerExecutableComposi
       throw new Error("Packaged worker composition produced no application.");
     }
     return {
+      eventingConsumers: "packaged",
       application: PackagedBootedWorkerApplication.create({
         application,
         releaseBoot: booted.close,

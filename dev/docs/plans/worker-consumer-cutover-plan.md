@@ -169,11 +169,18 @@ schema, and `worker.process.ts:64` logs `mode: "producer-only"`
 unconditionally. The switch must reconcile both or the boot log will state
 the opposite of what the process does.
 
-The one atomic switch commit: `workers.ts` selects
-`PackagedWorkerExecutableComposition` by default with
-`LANGWATCH_WORKER_COMPOSITION=legacy` as the escape hatch, plus the ledger
-update. Cleanup one stable release later deletes the legacy composition and
-the flag.
+The one atomic switch commit: `workers.ts` boots
+`PackagedWorkerExecutableComposition`, unconditionally. The plan originally
+kept `LANGWATCH_WORKER_COMPOSITION=legacy` as an escape hatch with the
+legacy composition retained one release; Alex ruled on 2026-09-01 that the
+migration is not gradual and platform/app need not keep working during it,
+so the switch deletes `LegacyWorkerExecutableComposition` outright and
+rollback is reverting the commit. The switch also reconciles the two stale
+knobs: the `WORKER_EVENTING_CONSUMERS_ENABLED` config leaf is deleted (a
+composition root owns the decision now), and the unconditional
+producer-only boot log is replaced by the composition self-reporting its
+consumer ownership (`eventingConsumers` on `WorkerProcessComposition`,
+logged after composition).
 
 ## Tests that must exist before the switch
 
