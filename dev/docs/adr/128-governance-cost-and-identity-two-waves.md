@@ -474,6 +474,14 @@ Old rows are facts; the lens moves, the facts don't.
    is part of the ORDER BY / dedup key, so the pseudonym must be
    deterministic (e.g. `SHA-256(secret ‖ original)` truncated to the same
    length) to avoid splitting or collapsing rollup rows.
+4. **Replay safety:** the fold / replay pipeline (§4) must apply the
+   erasure mapping — a lookup from original `RawActorId` to its
+   pseudonym — *before* writing the rollup row. Without this, a replay
+   re-derives the original value from the raw event log and inserts it
+   beside the pseudonymized row, duplicating the amount. The mapping is
+   a small table (`ErasedActorId(original, pseudonym)`), joined during
+   the fold's projection step. Test: erase, replay, assert the rollup
+   contains only the pseudonymized key with the correct total.
 
 Retention policy (§7) covers event expiry; the identity tables carry
 their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
