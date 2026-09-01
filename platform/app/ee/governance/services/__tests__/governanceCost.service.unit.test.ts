@@ -32,6 +32,17 @@ function rollupReturning(rows: LaneRow[]) {
   } as unknown as GovernanceCostRollupClickHouseRepository;
 }
 
+/** One (day, lane) row, priced in dollars and complete, unless said otherwise. */
+function laneRow(overrides: Partial<LaneRow> & { costSource: string }): LaneRow {
+  return {
+    day: "2026-08-01",
+    amountNanoUsd: 0,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    ...overrides,
+  };
+}
+
 const NANO = 1_000_000_000;
 
 describe("GovernanceCostService.summary", () => {
@@ -85,18 +96,8 @@ describe("GovernanceCostService.summary", () => {
     describe("when requesting the summary", () => {
       it("keeps each lane's figure in its own lane", async () => {
         const rollup = rollupReturning([
-          {
-            day: "2026-08-01",
-            costSource: "pulled",
-            amountNanoUsd: 12 * NANO,
-            cellsWithoutAmount: 0,
-          },
-          {
-            day: "2026-08-01",
-            costSource: "gateway",
-            amountNanoUsd: 7 * NANO,
-            cellsWithoutAmount: 0,
-          },
+          laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO }),
+          laneRow({ costSource: "gateway", amountNanoUsd: 7 * NANO }),
         ]);
         const service = GovernanceCostService.create({
           prisma: prismaWithGovProject("gov-1"),
@@ -114,7 +115,13 @@ describe("GovernanceCostService.summary", () => {
         expect(result.billed.amountUsd).toBe(12);
         expect(result.gateway.amountUsd).toBe(7);
         expect(result.series).toEqual([
-          { day: "2026-08-01", billedUsd: 12, gatewayUsd: 7 },
+          {
+            day: "2026-08-01",
+            billedUsd: 12,
+            gatewayUsd: 7,
+            billedCellsWithoutAmount: 0,
+            gatewayCellsWithoutAmount: 0,
+          },
         ]);
       });
     });
@@ -148,12 +155,11 @@ describe("GovernanceCostService.summary", () => {
         const service = GovernanceCostService.create({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning([
-            {
-              day: "2026-08-01",
+            laneRow({
               costSource: "pulled",
               amountNanoUsd: null,
               cellsWithoutAmount: 3,
-            },
+            }),
           ]),
         });
 
@@ -172,18 +178,93 @@ describe("GovernanceCostService.summary", () => {
     });
   });
 
+  describe("given a lane mixing dollar usage with usage billed elsewhere", () => {
+    describe("when requesting the summary", () => {
+      /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
+      it("withholds the total rather than offering the dollar part of it", async () => {
+        const service = GovernanceCostService.create({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning([
+            laneRow({
+              day: "2026-08-01",
+              costSource: "pulled",
+              amountNanoUsd: 100 * NANO,
+            }),
+            laneRow({
+              day: "2026-08-02",
+              costSource: "pulled",
+              amountNanoUsd: null,
+              cellsWithoutAmount: 1,
+              currenciesWithoutUsdAmount: ["EUR"],
+            }),
+          ]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-02T12:00:00.000Z"),
+        });
+
+        // The defect this exists to catch is 100 — the dollar part alone,
+        // rendered under a label that reads as the lane's whole figure.
+        expect(result.billed.amountUsd).toBeNull();
+        expect(result.billed.amountUsd).not.toBe(100);
+        expect(result.billed.cellsWithoutAmount).toBe(1);
+        expect(result.billed.currenciesWithoutUsdAmount).toEqual(["EUR"]);
+      });
+
+      /** @scenario "A day mixing stated and unstated amounts holds no figure for that lane" */
+      it("gaps the mixed day for that lane and leaves the other lane alone", async () => {
+        const service = GovernanceCostService.create({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning([
+            // A day the lane DID price part of: the partial figure exists and
+            // is exactly what must not be plotted.
+            laneRow({
+              day: "2026-08-01",
+              costSource: "pulled",
+              amountNanoUsd: 60 * NANO,
+              cellsWithoutAmount: 2,
+              currenciesWithoutUsdAmount: ["EUR"],
+            }),
+            laneRow({
+              day: "2026-08-01",
+              costSource: "gateway",
+              amountNanoUsd: 7 * NANO,
+            }),
+          ]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-01T12:00:00.000Z"),
+        });
+
+        const day = result.series[0]!;
+        expect(day.day).toBe("2026-08-01");
+        // A gap, not a point at 60 sitting lower than the day really cost.
+        expect(day.billedUsd).toBeNull();
+        expect(day.billedCellsWithoutAmount).toBe(2);
+        // The other lane is complete and keeps its point — otherwise this
+        // would pass against an implementation that blanks the whole day.
+        expect(day.gatewayUsd).toBe(7);
+        expect(day.gatewayCellsWithoutAmount).toBe(0);
+      });
+    });
+  });
+
   describe("given a refund-heavy billed day", () => {
     describe("when requesting the summary", () => {
       it("passes the negative total through without interpretation", async () => {
         const service = GovernanceCostService.create({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning([
-            {
-              day: "2026-08-01",
+            laneRow({
               costSource: "pulled",
               amountNanoUsd: -42.5 * NANO,
-              cellsWithoutAmount: 0,
-            },
+            }),
           ]),
         });
 

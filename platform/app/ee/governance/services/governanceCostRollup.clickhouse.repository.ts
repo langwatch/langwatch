@@ -3,7 +3,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
-import { GOVERNANCE_COST_ROLLUP_TABLE } from "../projections/governanceCostRollup.constants";
+import {
+  GOVERNANCE_COST_CURRENCY_USD,
+  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+  GOVERNANCE_COST_ROLLUP_TABLE,
+} from "../projections/governanceCostRollup.constants";
 import type { GovernanceCostRollupCell } from "../projections/governanceCostRollup.foldProjection";
 
 const logger = createLogger("langwatch:governance:cost-rollup:repository");
@@ -126,6 +130,16 @@ function nullableInt(value: unknown): number | null {
 function str(value: unknown): string {
   return String(value ?? "");
 }
+
+/**
+ * At most this many distinct currency codes are collected per (day, lane).
+ *
+ * The screen names them in a sentence, so a list long enough to need
+ * truncation is already longer than anybody reads. The cap is what keeps the
+ * aggregate's memory bounded no matter how many currencies a tenant's
+ * providers bill in.
+ */
+const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
 
 /** An Array(String) column, defensive about a shape the driver did not give. */
 function strArray(value: unknown): string[] {
@@ -285,6 +299,20 @@ export class GovernanceCostRollupClickHouseRepository {
    * The `Day` range prunes partitions (`PARTITION BY toYYYYMM(Day)`), and
    * TenantId leads the predicate because nothing else here is unique across
    * tenants.
+   *
+   * `Version` is filtered to the shape this build writes, which is the same
+   * rule the store's read-back applies (`governanceCostRollup.store.ts`): a
+   * row written by an older shape is not trusted. The filter sits INSIDE the
+   * dedup so an older row can never win a cell, and a cell that has only older
+   * rows drops out entirely rather than contributing a figure nothing on this
+   * build can vouch for. Nothing ever removes such a row on its own — a row
+   * under an older stamp is a different version of the same key, not a
+   * replacement for it — so without this it would be summed forever.
+   *
+   * The distinct currencies of the cells holding no USD figure ride along
+   * because `CurrencyCode` is already a key column in the inner `GROUP BY`:
+   * the screen can then say WHICH currency it could not state a total in,
+   * rather than only that it could not.
    */
   async sumDaysByLane(input: {
     tenantId: string;
@@ -298,6 +326,12 @@ export class GovernanceCostRollupClickHouseRepository {
       costSource: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
+      /**
+       * Currency codes of the cells holding no USD figure, excluding USD
+       * itself — a USD cell without a USD figure names no currency the screen
+       * could report, so it is counted and not named.
+       */
+      currenciesWithoutUsdAmount: string[];
     }>
   > {
     const client = await this.resolveClient(input.tenantId);
@@ -307,7 +341,13 @@ export class GovernanceCostRollupClickHouseRepository {
           Day                              AS Day,
           CostSource                       AS CostSource,
           sumOrNull(LatestAmountNanoUsd)   AS AmountNanoUsd,
-          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
+          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount,
+          arraySort(
+            groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
+              CurrencyCode,
+              LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
+            )
+          ) AS CurrenciesWithoutUsdAmount
         FROM (
           SELECT
             ${KEY_COLUMNS.join(",\n            ")},
@@ -316,6 +356,7 @@ export class GovernanceCostRollupClickHouseRepository {
           WHERE TenantId = {tenantid:String}
             AND Day >= {fromday:Date}
             AND Day <= {today:Date}
+            AND Version = {version:String}
           GROUP BY ${KEY_COLUMNS.join(", ")}
         )
         GROUP BY Day, CostSource
@@ -325,6 +366,8 @@ export class GovernanceCostRollupClickHouseRepository {
         tenantid: input.tenantId,
         fromday: input.fromDay,
         today: input.toDay,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+        usd: GOVERNANCE_COST_CURRENCY_USD,
       },
       format: "JSONEachRow",
     });
@@ -334,6 +377,7 @@ export class GovernanceCostRollupClickHouseRepository {
       costSource: String(row.CostSource ?? ""),
       amountNanoUsd: nullableInt(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
     }));
   }
 
