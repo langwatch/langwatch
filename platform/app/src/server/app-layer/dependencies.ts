@@ -9,6 +9,7 @@ import type {
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { AppShutdownResources } from "./app";
+import type { WorkerEventingHandoff } from "./worker-eventing-handoff";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { PresenceService } from "@langwatch/presence-contract";
 import type { SecretService } from "@langwatch/secret-contract";
@@ -376,6 +377,12 @@ export interface AppDependencies {
   share: ShareService;
   commands: AppCommands;
   ops: OpsDependencies;
+
+  /**
+   * What a packaged worker composition needs to mount the same eventing graph
+   * on a second runtime in this process. Present on worker-capable roles only.
+   */
+  workerEventingHandoff?: WorkerEventingHandoff;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: EventSourcing;

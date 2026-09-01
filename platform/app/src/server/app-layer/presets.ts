@@ -106,6 +106,7 @@ import {
   createEventingGroupQueueFactory,
   Deferred,
   EventSourcing,
+  type EventingGroupQueueFactoryOptions,
   InMemoryProcessStore,
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
@@ -406,6 +407,11 @@ import {
   type ProcessRole,
   roleRunsWorkers,
 } from "./config";
+import {
+  appOwnsEventingConsumersFor,
+  type EventingConsumerOwnership,
+  type WorkerEventingHandoff,
+} from "./worker-eventing-handoff";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -491,6 +497,7 @@ import {
   EventingTopicClusteringScheduleAdapter,
   PostgresTopicAdapter,
   TopicServerInstaller,
+  type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import {
   AppTopicClusteringMetricsAdapter,
@@ -1043,8 +1050,10 @@ export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
 }
 
-export function initializeWorkerApp(): App {
-  return initializeDefaultApp({ processRole: "worker" });
+export function initializeWorkerApp(
+  options?: Omit<DefaultAppCompositionOptions, "processRole">,
+): App {
+  return initializeDefaultApp({ ...options, processRole: "worker" });
 }
 
 /**
@@ -1061,6 +1070,11 @@ export function initializeInProcessApp(): App {
 export interface DefaultAppCompositionOptions {
   processRole?: ProcessRole;
   prismaConnection?: PrismaConnection;
+  /**
+   * Who claims `event-sourcing/jobs` in this process. Absent means this App
+   * does, on any worker-capable role — what every caller has always got.
+   */
+  eventingConsumers?: EventingConsumerOwnership;
 }
 
 export function initializeDefaultApp(options?: DefaultAppCompositionOptions): App {
@@ -1263,7 +1277,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     permissions: authzFeature.permissions,
   }).build();
 
-  const topic = TopicServerInstaller.create({
+  const topicInstallerDependencies: TopicServerInstallerDependencies = {
     database: prisma,
     processStore,
     redis,
@@ -1274,7 +1288,8 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       langevalsPayload: config.langevals.payload,
     }),
     metrics: new AppTopicClusteringMetricsAdapter(),
-  });
+  };
+  const topic = TopicServerInstaller.create(topicInstallerDependencies);
   const prompts = PostgresPromptAdapter.create({
     database: prisma,
     modelProvider: modelProviders,
@@ -2106,15 +2121,30 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         retentionPolicyResolver: eventingRetention,
       })
     : undefined;
-  const queueFactory = redis
+  // Consumer ownership, decided once and read at the three places that make a
+  // process a consumer: the queue factory below (which instantiates a
+  // GroupQueueConsumer per queue definition), the runtime that owns those
+  // definitions, and the one-time boot seeds further down. Everything else on
+  // this role stays keyed on `roleRunsWorkers` — a scheduler, a report handler
+  // and a migration pass are worker-process responsibilities, and they belong
+  // to the process whichever composition claims the queue.
+  const appOwnsEventingConsumers = appOwnsEventingConsumersFor({
+    eventingConsumers: options?.eventingConsumers,
+    processRole: config.processRole,
+  });
+  const groupQueueDependencies: EventingGroupQueueFactoryOptions["dependencies"] | undefined = redis
+    ? {
+        redis,
+        policy: config.groupQueue,
+        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+        resolveStorageDestination: resolveProjectStorageDestination,
+      }
+    : undefined;
+  const replayMarkerChecker = redis ? new RedisReplayMarkerChecker(redis) : undefined;
+  const queueFactory = groupQueueDependencies
     ? createEventingGroupQueueFactory({
-        consumersEnabled: roleRunsWorkers(config.processRole),
-        dependencies: {
-          redis,
-          policy: config.groupQueue,
-          objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-          resolveStorageDestination: resolveProjectStorageDestination,
-        },
+        consumersEnabled: appOwnsEventingConsumers,
+        dependencies: groupQueueDependencies,
       })
     : undefined;
 
@@ -2122,9 +2152,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     eventStore,
     queueFactory,
     enabled: true,
-    consumersEnabled: roleRunsWorkers(config.processRole),
+    consumersEnabled: appOwnsEventingConsumers,
     executionTarget: config.processRole === "all" ? undefined : config.processRole,
-    replayMarkerChecker: redis ? new RedisReplayMarkerChecker(redis) : undefined,
+    replayMarkerChecker,
     retentionPolicyResolver: eventingRetention,
     warnWhenProjectionsRunInline: config.nodeEnv === "production",
     configureGlobalProjections: config.isSaas
@@ -2525,13 +2555,44 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       })
     : undefined;
 
-  if (roleRunsWorkers(config.processRole)) {
+  if (appOwnsEventingConsumers) {
     // One-time background seeds on worker boot (ADR-051): topic-model
     // history onto the event stream, and daily-wake schedules for
     // pre-cutover projects. The migration owns its own wiring, coordination,
     // and error handling — a failure is logged and the next boot retries.
+    //
+    // Gated on consumer ownership rather than on the role, because these seeds
+    // write onto the event stream the consumer then drains: run from both
+    // graphs in one process they would seed the same history twice, so the
+    // composition that claims the queue is the one that seeds it.
     topic.startBootSeeds();
   }
+
+  // What a packaged worker composition needs to mount this same graph on a
+  // second Eventing runtime in this process (cutover P4). The registry's own
+  // export seam carries the definitions; everything beside it is the substrate
+  // THIS App built, handed over as instances rather than as a recipe, so both
+  // graphs share one Prisma client, one ClickHouse resolver, one group-queue
+  // dependency set and one replay marker. Only a worker-capable role has
+  // anything to hand over.
+  const workerEventingHandoff: WorkerEventingHandoff | undefined = roleRunsWorkers(
+    config.processRole,
+  )
+    ? {
+        appOwnsEventingConsumers,
+        isSaas: config.isSaas,
+        capabilities: registry.exportWorkerCapabilities(),
+        substrate: {
+          prisma,
+          resolveClickHouseClient,
+          groupQueue: groupQueueDependencies,
+          persistenceRetention: eventingPersistenceRetention,
+          retentionPolicyResolver: eventingRetention,
+          replayMarkerChecker,
+        },
+        topic: topicInstallerDependencies,
+      }
+    : undefined;
 
   // The organization's GitHub connection: the install/webhook lifecycle, and
   // the token mints Langy (write) and pull-request linkage (read) ask for. The
@@ -3003,6 +3064,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     share,
     commands,
     ops,
+    workerEventingHandoff,
     _eventSourcing: es,
     _authzMigration: authzFeature.migration,
     _shutdownResources: shutdownResources,

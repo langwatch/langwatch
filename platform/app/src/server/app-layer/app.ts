@@ -46,6 +46,7 @@ import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
 import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
+import type { WorkerEventingHandoff } from "./worker-eventing-handoff";
 
 const logger = createLogger("langwatch:app");
 
@@ -322,6 +323,16 @@ export class App {
   readonly ops: OpsApp;
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
+  /**
+   * What a packaged worker composition needs to mount this App's eventing
+   * graph on a second runtime inside the same process, and whether this App
+   * claimed the shared queue itself.
+   *
+   * Present on worker-capable roles only. A web process has no packaged worker
+   * to hand anything to, and `undefined` here is the honest answer rather than
+   * an empty handoff a caller could mistake for a usable one.
+   */
+  readonly workerEventingHandoff?: WorkerEventingHandoff;
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -582,6 +593,7 @@ export class App {
     });
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
+    this.workerEventingHandoff = deps.workerEventingHandoff;
     this._eventSourcing = deps._eventSourcing;
     this._authzMigration = deps._authzMigration;
     this._shutdownResources = deps._shutdownResources ?? new AppShutdownResources();
