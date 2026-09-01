@@ -157,7 +157,13 @@
 					"options": {
 						"paths": {
 							"@chakra-ui/react": {
+								// "*" is the namespace form, not a wildcard over the
+								// names below: it refuses `import * as Chakra` and
+								// `export * from`, which reach every export including
+								// the ones listed here and would otherwise walk past
+								// this rule. Ordinary named imports stay allowed.
 								"importNames": [
+									"*",
 									"Dialog",
 									"Drawer",
 									"Modal",

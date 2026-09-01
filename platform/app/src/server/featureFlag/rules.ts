@@ -102,28 +102,40 @@ export interface RuleEvaluationContext {
    * When the calling organization was created. Only an age rule
    * (`organizationCreatedAfter`) reads it, so callers leave it out and the
    * store fetches it lazily — and only for a flag whose rules ask for it
-   * (see `rulesTargetOrganizationAge`). Absent means "unknown", which no age
+   * (see `readNeedsOrganizationAge`). Absent means "unknown", which no age
    * rule matches.
    */
   organizationCreatedAt?: Date | string | null;
 }
 
 /**
- * True when a rule that can actually decide the outcome targets organization
- * age, which is the store's signal that it must resolve
- * `organizationCreatedAt` before evaluating. Checked per read so a flag with
- * no age rule — every kill switch on the per-event hot path — never pays for
- * an organization lookup.
+ * True when this read cannot be answered without knowing how old the
+ * organization is, which is the store's signal to resolve
+ * `organizationCreatedAt` before evaluating. Asked per read so a flag with no
+ * age rule — every kill switch on the per-event hot path — never pays for an
+ * organization lookup.
  *
- * The walk stops at the first rule with no conditions, which matches every
- * context and settles the flag there. An age rule below one cannot affect the
- * answer, and reading a date for it would put a database query on the path of
- * every previously unseen organization to no end.
+ * The question is about this context, not about the rule list: rules are
+ * first-match-wins, so the first rule that can match here also settles the
+ * flag here. A rule naming another organization is skipped, and one that
+ * matches on conditions the store already holds answers without a date — an
+ * age rule below either of those never gets a say, and reading a date for it
+ * would put a query on the path of every previously unseen organization to
+ * no end.
  */
-export function rulesTargetOrganizationAge(rules: FeatureFlagRules): boolean {
+export function readNeedsOrganizationAge({
+  rules,
+  ctx,
+}: {
+  rules: FeatureFlagRules;
+  ctx: RuleEvaluationContext;
+}): boolean {
   for (const rule of rules) {
-    if (rule.match.organizationCreatedAfter !== undefined) return true;
-    if (Object.keys(rule.match).length === 0) return false;
+    const { organizationCreatedAfter, ...rest } = rule.match;
+    // Conditions other than the age decide whether this rule is about this
+    // context at all, and they are answerable from what the caller passed.
+    if (!matchesContext(rest, ctx)) continue;
+    return organizationCreatedAfter !== undefined;
   }
   return false;
 }

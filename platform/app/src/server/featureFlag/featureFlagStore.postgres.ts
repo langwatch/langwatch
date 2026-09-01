@@ -8,7 +8,7 @@ import {
   type FeatureFlagRules,
   parseRules,
   type RuleEvaluationContext,
-  rulesTargetOrganizationAge,
+  readNeedsOrganizationAge,
 } from "./rules";
 
 /**
@@ -113,7 +113,7 @@ export class FeatureFlagStorePostgres {
   ): Promise<RuleEvaluationContext> {
     if (ctx.organizationCreatedAt !== undefined) return ctx;
     if (!ctx.organizationId) return ctx;
-    if (!rulesTargetOrganizationAge(rules)) return ctx;
+    if (!readNeedsOrganizationAge({ rules, ctx })) return ctx;
     return {
       ...ctx,
       organizationCreatedAt: await this.getOrganizationCreatedAt(

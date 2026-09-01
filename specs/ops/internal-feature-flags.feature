@@ -297,6 +297,13 @@ Feature: Internal feature flag system for system-level kill switches
            the flag before the age rule is ever consulted
 
     @unit
+    Scenario: no creation date is fetched once an earlier rule already decides the read
+      Given a flag whose rules name this organization above a New users rule
+      When the flag is read for that organization
+      Then no organization record is read, because the first rule that can
+           match is the one that answers
+
+    @unit
     Scenario: an operator cannot save an age rule without a readable date
       Given an operator writes a New users rule from the Ops UI
       When the date is blank or is not a date

@@ -16,7 +16,7 @@ import {
   type FeatureFlagRules,
   featureFlagRulesWriteSchema,
   parseRules,
-  rulesTargetOrganizationAge,
+  readNeedsOrganizationAge,
 } from "../rules";
 
 const ROLLOUT_START = "2026-06-01";
@@ -118,27 +118,72 @@ describe("given an age rule alongside rules for named targets", () => {
   });
 });
 
-describe("rulesTargetOrganizationAge", () => {
+describe("readNeedsOrganizationAge", () => {
+  const ctx = {
+    organizationId: "organization_a",
+    projectId: "project_a",
+  } as const;
+
   describe("when no rule names a date", () => {
     /** @scenario "the creation date is fetched only for a flag that has an age rule" */
     it("reports false, which is what keeps the hot path free of a lookup", () => {
       expect(
-        rulesTargetOrganizationAge([
-          { match: { projectId: "project_a" }, enabled: true },
-          { match: { organizationId: "organization_a" }, enabled: false },
-          { match: {}, enabled: false },
-        ]),
+        readNeedsOrganizationAge({
+          rules: [
+            { match: { projectId: "project_b" }, enabled: true },
+            { match: { organizationId: "organization_b" }, enabled: false },
+            { match: {}, enabled: false },
+          ],
+          ctx,
+        }),
       ).toBe(false);
     });
   });
 
-  describe("when any rule names a date", () => {
-    it("reports true even when the rule is not the first one", () => {
+  describe("when a date rule sits behind rules about other tenants", () => {
+    it("reports true, because none of those decides this read", () => {
       expect(
-        rulesTargetOrganizationAge([
-          { match: { projectId: "project_a" }, enabled: true },
-          ...NEW_USERS_RULE,
-        ]),
+        readNeedsOrganizationAge({
+          rules: [
+            { match: { projectId: "project_b" }, enabled: true },
+            ...NEW_USERS_RULE,
+          ],
+          ctx,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a rule about this very context sits above the date rule", () => {
+    /** @scenario "no creation date is fetched once an earlier rule already decides the read" */
+    it("reports false, because that rule answers before the date is needed", () => {
+      expect(
+        readNeedsOrganizationAge({
+          rules: [
+            { match: { organizationId: "organization_a" }, enabled: true },
+            ...NEW_USERS_RULE,
+          ],
+          ctx,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the rule above the date rule names this organization and a date", () => {
+    it("reports true, since its own date is what decides whether it matches", () => {
+      expect(
+        readNeedsOrganizationAge({
+          rules: [
+            {
+              match: {
+                organizationId: "organization_a",
+                organizationCreatedAfter: "2026-06-01",
+              },
+              enabled: true,
+            },
+          ],
+          ctx,
+        }),
       ).toBe(true);
     });
   });
