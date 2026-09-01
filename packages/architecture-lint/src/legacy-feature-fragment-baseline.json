@@ -523,7 +523,6 @@
     {"feature":"project","file":"platform/app/src/pages/onboarding/[team]/project.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/pages/ops/backoffice/projects.tsx","kind":"page-shell"},
     {"feature":"project","file":"platform/app/src/runtime/app/features/project.ts","kind":"composition"},
-    {"feature":"project","file":"platform/app/src/server/projects/reserved-secret-names.ts","kind":"legacy-implementation"},
     {"feature":"prompt","file":"platform/app/src/components/prompts/PromptEditorDrawer.tsx","kind":"page-shell"},
     {"feature":"prompt","file":"platform/app/src/components/prompts/PromptListDrawer.tsx","kind":"page-shell"},
     {"feature":"prompt","file":"platform/app/src/components/prompts/utils/localConfigToFormValues.ts","kind":"page-shell"},

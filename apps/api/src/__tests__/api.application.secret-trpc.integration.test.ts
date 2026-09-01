@@ -25,17 +25,32 @@ function createCaller(service: TestSecretService) {
   const actor = vi.fn(() => ({ id: "user-1" }));
   const authorize = vi.fn(async () => undefined);
   const app = ApiApplication.create({ secrets: service });
-  return { actor, authorize, caller: app.createCaller({ actor, authorize }) };
+  return { actor, authorize, secrets: secretRouterOf(app.createCaller({ actor, authorize })) };
+}
+
+/**
+ * The secret router, or a failed test.
+ *
+ * The root composes the router only for a process that was given a secret
+ * service, so its type is optional at every caller. Narrowing here says which
+ * of the two shapes each scenario below is about.
+ */
+function secretRouterOf<Caller extends { secrets?: unknown }>(
+  caller: Caller,
+): NonNullable<Caller["secrets"]> {
+  const secrets = caller.secrets;
+  if (!secrets) throw new Error("Secret router was not composed.");
+  return secrets as NonNullable<Caller["secrets"]>;
 }
 
 describe("ApiApplication Secret tRPC composition", () => {
   it("composes the fragment and preserves list and create shapes", async () => {
     const service = new TestSecretService();
-    const { actor, authorize, caller } = createCaller(service);
+    const { actor, authorize, secrets } = createCaller(service);
 
-    await expect(caller.secrets.list({ projectId: "project-1" })).resolves.toEqual([secret]);
+    await expect(secrets.list({ projectId: "project-1" })).resolves.toEqual([secret]);
     await expect(
-      caller.secrets.create({
+      secrets.create({
         projectId: "project-1",
         name: "MY_SECRET",
         value: "secret-value",
@@ -56,20 +71,20 @@ describe("ApiApplication Secret tRPC composition", () => {
 
   it("preserves legacy update and delete inputs and success responses", async () => {
     const service = new TestSecretService();
-    const { authorize, caller } = createCaller(service);
+    const { authorize, secrets } = createCaller(service);
 
     await expect(
-      caller.secrets.update({
+      secrets.update({
         projectId: "project-1",
         secretId: "secret-1",
         value: "rotated-value",
       }),
     ).resolves.toEqual({ success: true });
-    await expect(
-      caller.secrets.delete({ projectId: "project-1", secretId: "secret-1" }),
-    ).resolves.toEqual({
-      success: true,
-    });
+    await expect(secrets.delete({ projectId: "project-1", secretId: "secret-1" })).resolves.toEqual(
+      {
+        success: true,
+      },
+    );
 
     expect(authorize).toHaveBeenNthCalledWith(1, "secrets:manage", { projectId: "project-1" });
     expect(authorize).toHaveBeenNthCalledWith(2, "secrets:manage", { projectId: "project-1" });
@@ -86,25 +101,25 @@ describe("ApiApplication Secret tRPC composition", () => {
     const service = new TestSecretService();
     const authorizationError = new Error("project access denied");
     const app = ApiApplication.create({ secrets: service });
-    const caller = app.createCaller({
-      actor: () => ({ id: "user-1" }),
-      authorize: async () => {
-        throw authorizationError;
-      },
-    });
-
-    await expect(caller.secrets.list({ projectId: "project-1" })).rejects.toThrow(
-      "project access denied",
+    const secrets = secretRouterOf(
+      app.createCaller({
+        actor: () => ({ id: "user-1" }),
+        authorize: async () => {
+          throw authorizationError;
+        },
+      }),
     );
+
+    await expect(secrets.list({ projectId: "project-1" })).rejects.toThrow("project access denied");
     expect(service.list).not.toHaveBeenCalled();
   });
 
   it("validates a legacy mutation input before authorization or service dispatch", async () => {
     const service = new TestSecretService();
-    const { authorize, caller } = createCaller(service);
+    const { authorize, secrets } = createCaller(service);
 
     await expect(
-      caller.secrets.update({
+      secrets.update({
         projectId: "project-1",
         secretId: "secret-1",
         value: "",
@@ -122,8 +137,8 @@ describe("ApiApplication Secret tRPC composition", () => {
       authorize: async () => undefined,
     };
 
-    await app.createCaller(callerContext).secrets.list({ projectId: "project-1" });
-    await app.createCaller(callerContext).secrets.list({ projectId: "project-2" });
+    await secretRouterOf(app.createCaller(callerContext)).list({ projectId: "project-1" });
+    await secretRouterOf(app.createCaller(callerContext)).list({ projectId: "project-2" });
 
     expect(service.list).toHaveBeenCalledTimes(2);
     expect(service.list).toHaveBeenNthCalledWith(1, { projectId: "project-1" });
@@ -134,10 +149,10 @@ describe("ApiApplication Secret tRPC composition", () => {
     const service = new TestSecretService();
     const error = new SecretNotFoundError();
     service.update.mockRejectedValueOnce(error);
-    const { caller } = createCaller(service);
+    const { secrets } = createCaller(service);
 
     await expect(
-      caller.secrets.update({
+      secrets.update({
         projectId: "project-1",
         secretId: "secret-1",
         value: "rotated-value",

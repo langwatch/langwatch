@@ -7,19 +7,22 @@ import {
 import { AuthService } from "@langwatch/auth-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { SecretService, type Secret } from "@langwatch/secret-contract";
+import { LANGY_VK_SECRET_NAME, SecretService, type Secret } from "@langwatch/secret-contract";
+import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { Hono } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
   let rest: Hono | undefined;
-  const create = vi.fn((options: { rest?: Hono }) => {
+  let secrets: unknown;
+  const create = vi.fn((options: { rest?: Hono; secrets?: unknown }) => {
     rest = options.rest;
+    secrets = options.secrets;
     return process;
   });
-  return { create, process, rest: () => rest };
+  return { create, process, rest: () => rest, secrets: () => secrets };
 });
 
 vi.mock("../../api.process", async (importOriginal) => {
@@ -44,6 +47,44 @@ vi.mock("../../platform/infrastructure/api-queue.infrastructure", async (importO
   const actual =
     await importOriginal<typeof import("../../platform/infrastructure/api-queue.infrastructure")>();
   return { ...actual, ApiQueueInfrastructure: { tryCreate: queueMocks.tryCreate } };
+});
+
+// Composing a real database infrastructure opens a pg pool. Only the
+// construction decision is intercepted: what it hands back is the fake client
+// below, so the packaged secret adapter, its repository and the cipher all
+// stay real — they are what these scenarios are about.
+const databaseMocks = vi.hoisted(() => {
+  const rows: Array<{ name: string; encryptedValue: string }> = [];
+  const findMany = vi.fn(async (query: { select?: Record<string, unknown> }) =>
+    query.select && "encryptedValue" in query.select
+      ? rows
+      : rows.map((row) => ({
+          id: `secret-${row.name}`,
+          projectId: "project-1",
+          name: row.name,
+          createdAt: new Date("2026-08-28T00:00:00.000Z"),
+          updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+          createdBy: { name: "Alex" },
+          updatedBy: { name: "Alex" },
+        })),
+  );
+  const client = { projectSecret: { findMany } };
+  const configured: { value: boolean } = { value: false };
+  return {
+    rows,
+    findMany,
+    client,
+    configured,
+    tryCreate: vi.fn(() => (configured.value ? { connection: { client } } : undefined)),
+  };
+});
+
+vi.mock("../../platform/infrastructure/api-database.infrastructure", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../platform/infrastructure/api-database.infrastructure")
+    >();
+  return { ...actual, ApiDatabaseInfrastructure: { tryCreate: databaseMocks.tryCreate } };
 });
 
 import { ApiProcessGraphPort } from "../../api.process";
@@ -75,6 +116,8 @@ const resolvedKey: ResolvedApiKeyToken = {
     ownerUserId: null,
   },
 };
+
+const ENCRYPTION_KEY = "0f".repeat(32);
 
 const secret: Secret = {
   id: "secret-1",
@@ -291,17 +334,188 @@ describe("ApiProductionComposition", () => {
       });
     });
   });
+
+  describe("given the secret service this process can now compose itself", () => {
+    beforeEach(() => {
+      databaseMocks.rows.length = 0;
+      databaseMocks.configured.value = false;
+      databaseMocks.findMany.mockClear();
+    });
+
+    describe("when a host supplied one", () => {
+      /** @scenario "A process with no key composes no secret service" */
+      it("serves the host's service, whatever this deployment was configured with", async () => {
+        databaseMocks.configured.value = true;
+        const injected = secretService().service;
+        const composition = productionComposition({ secrets: injected });
+
+        await composition.compose({
+          config: resolveApiConfig({
+            NODE_ENV: "test",
+            API_PORT: "5560",
+            DATABASE_URL: "postgresql://localhost/langwatch",
+            CREDENTIALS_SECRET: ENCRYPTION_KEY,
+          }),
+          graph: new TestGraph(),
+          observability: { serviceName: "langwatch-api-test" },
+          resources: new ResourceScope(),
+        });
+
+        expect(processMocks.secrets()).toBe(injected);
+        expect(databaseMocks.findMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the deployment configured a database and a key", () => {
+      it("composes its own service over the guarded client, with no host supplying one", async () => {
+        databaseMocks.configured.value = true;
+
+        await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+          CREDENTIALS_SECRET: ENCRYPTION_KEY,
+        });
+
+        const composed = processMocks.secrets() as SecretService;
+        expect(composed).toBeInstanceOf(SecretService);
+        await expect(composed.list({ projectId: "project-1" })).resolves.toEqual([]);
+        expect(databaseMocks.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { projectId: "project-1" } }),
+        );
+      });
+
+      /** @scenario "One at-rest format for every process" */
+      it("reads a stored row back with the key the deployment configured", async () => {
+        databaseMocks.configured.value = true;
+        databaseMocks.rows.push({
+          name: "OPENAI_API_KEY",
+          encryptedValue: AesGcmSecretEncryptionAdapter.create({
+            key: ENCRYPTION_KEY,
+          }).encrypt("sk-live-abc123"),
+        });
+
+        await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+          CREDENTIALS_SECRET: ENCRYPTION_KEY,
+        });
+
+        const composed = processMocks.secrets() as SecretService;
+        await expect(composed.getValues({ projectId: "project-1" })).resolves.toEqual({
+          OPENAI_API_KEY: "sk-live-abc123",
+        });
+      });
+
+      /** @scenario "A key that is not the key refuses rather than guesses" */
+      it("refuses a row written under a different key rather than answering with rubbish", async () => {
+        databaseMocks.configured.value = true;
+        databaseMocks.rows.push({
+          name: "OPENAI_API_KEY",
+          encryptedValue: AesGcmSecretEncryptionAdapter.create({
+            key: "a1".repeat(32),
+          }).encrypt("sk-live-abc123"),
+        });
+
+        await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+          CREDENTIALS_SECRET: ENCRYPTION_KEY,
+        });
+
+        const composed = processMocks.secrets() as SecretService;
+        await expect(composed.getValues({ projectId: "project-1" })).rejects.toThrow(
+          /OPENAI_API_KEY/,
+        );
+      });
+
+      it("hides the product-owned names the contract reserves, as the platform app does", async () => {
+        databaseMocks.configured.value = true;
+        databaseMocks.rows.push({ name: LANGY_VK_SECRET_NAME, encryptedValue: "unused" });
+        databaseMocks.rows.push({ name: "OPENAI_API_KEY", encryptedValue: "unused" });
+
+        await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+          CREDENTIALS_SECRET: ENCRYPTION_KEY,
+        });
+
+        const composed = processMocks.secrets() as SecretService;
+        await expect(composed.list({ projectId: "project-1" })).resolves.toEqual([
+          expect.objectContaining({ name: "OPENAI_API_KEY" }),
+        ]);
+      });
+    });
+
+    describe("when the deployment configured a key but no database", () => {
+      it("composes no secret service, because a cipher is not a service", async () => {
+        await composeWithout({ CREDENTIALS_SECRET: ENCRYPTION_KEY });
+
+        expect(processMocks.secrets()).toBeUndefined();
+      });
+    });
+
+    describe("when the deployment configured a database but no key", () => {
+      it("composes no secret service rather than one that fails on every request", async () => {
+        databaseMocks.configured.value = true;
+
+        await composeWithout({ DATABASE_URL: "postgresql://localhost/langwatch" });
+
+        expect(processMocks.secrets()).toBeUndefined();
+      });
+
+      /** @scenario "A process with no key composes no secret service" */
+      it("mounts no secret door, so the route is absent rather than broken", async () => {
+        databaseMocks.configured.value = true;
+
+        await composeWithout({ DATABASE_URL: "postgresql://localhost/langwatch" });
+
+        const rest = processMocks.rest();
+        if (!rest) throw new Error("The production composition mounted no REST door at all.");
+
+        expect(await rest.request("/api/v1/secret", { method: "GET" })).toHaveProperty(
+          "status",
+          404,
+        );
+      });
+
+      it("still mounts the families that need neither the client nor the key", async () => {
+        databaseMocks.configured.value = true;
+
+        await composeWithout({ DATABASE_URL: "postgresql://localhost/langwatch" });
+
+        const rest = processMocks.rest();
+        if (!rest) throw new Error("The production composition mounted no REST door at all.");
+
+        expect(
+          await rest.request("/api/api-keys", {
+            headers: { "X-Auth-Token": "token" },
+          }),
+        ).not.toHaveProperty("status", 404);
+      });
+    });
+  });
 });
 
-function productionComposition(): ApiProductionComposition {
+function productionComposition(
+  overrides: { secrets?: SecretService } = { secrets: secretService().service },
+): ApiProductionComposition {
   return ApiProductionComposition.create({
     agents: new Proxy(AgentService.prototype, {}),
-    secrets: secretService().service,
+    ...(overrides.secrets ? { secrets: overrides.secrets } : {}),
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
     organizations: organizationService(),
     auth: new TestAuthComposition(),
   });
+}
+
+async function composeWithout(
+  source: Readonly<Record<string, unknown>>,
+): Promise<ApiProductionComposition> {
+  const composition = productionComposition({});
+  await composition.compose({
+    config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
+    graph: new TestGraph(),
+    observability: { serviceName: "langwatch-api-test" },
+    resources: new ResourceScope(),
+  });
+  return composition;
 }
 
 async function composedFeaturePorts(

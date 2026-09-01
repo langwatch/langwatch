@@ -149,6 +149,29 @@ describe("API process configuration", () => {
     expect(resolveApiConfig({}).infrastructure.database).toEqual({ url: undefined });
   });
 
+  it("carries the stored-secret key the process builds its cipher from", () => {
+    expect(
+      resolveApiConfig({ CREDENTIALS_SECRET: "0f".repeat(32) }).storedSecretEncryptionKey,
+    ).toBe("0f".repeat(32));
+  });
+
+  it("falls back to the second name the platform app has always accepted for it", () => {
+    expect(resolveApiConfig({ NEXTAUTH_SECRET: "a1".repeat(32) }).storedSecretEncryptionKey).toBe(
+      "a1".repeat(32),
+    );
+    expect(
+      resolveApiConfig({
+        CREDENTIALS_SECRET: "0f".repeat(32),
+        NEXTAUTH_SECRET: "a1".repeat(32),
+      }).storedSecretEncryptionKey,
+    ).toBe("0f".repeat(32));
+  });
+
+  it("leaves the key unconfigured rather than refusing a process that composes no secrets", () => {
+    expect(resolveApiConfig({}).storedSecretEncryptionKey).toBeUndefined();
+    expect(resolveApiConfig({ CREDENTIALS_SECRET: "" }).storedSecretEncryptionKey).toBe("");
+  });
+
   it("resolves Redis and Group Queue settings before API composition", () => {
     const config = resolveApiConfig({
       REDIS_URL: "redis://redis.example.test:6379",

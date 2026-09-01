@@ -7,6 +7,8 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
+import { PostgresSecretAdapter } from "@langwatch/secret-server";
+import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
 import { Hono } from "hono";
 import {
   ApiAuditPort,
@@ -23,6 +25,10 @@ import {
   ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
 } from "../platform/infrastructure/api-queue.infrastructure";
+import {
+  ApiSecretEncryptionAbsenceReportPort,
+  ApiSecretEncryptionInfrastructure,
+} from "../platform/infrastructure/api-secret-encryption.infrastructure";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
@@ -56,7 +62,13 @@ export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminK
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   static create(options: {
     agents: AgentService;
-    secrets: SecretService;
+    /**
+     * A host's already-composed secret service, when it has one.
+     *
+     * Optional since this process can build its own: see
+     * {@link ApiProductionComposition.resolveSecrets} for which wins.
+     */
+    secrets?: SecretService;
     apiKeys: ApiKeyService;
     authz: AuthzService;
     organizations: OrganizationService;
@@ -105,10 +117,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
   private composedDatabase: ApiDatabaseInfrastructure | undefined;
+  private secrets: SecretService | undefined;
 
   private constructor(
     private readonly agents: AgentService,
-    private readonly secrets: SecretService,
+    private readonly injectedSecrets: SecretService | undefined,
     private readonly apiKeys: ApiKeyService,
     private readonly authz: AuthzService,
     readonly policy: ApiRequestPolicy,
@@ -126,6 +139,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
     this.composedDatabase = composeApiDatabase(options);
+    this.secrets = this.resolveSecrets(options);
     this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
     const process = ApiProcess.create({
       agents: this.agents,
@@ -186,16 +200,57 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The secret service this process serves, and where it came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. An injected service wins. A host that already owns the product graph
+   *     has one composed service per process, and a test that binds a double
+   *     is asking for that double rather than for Postgres.
+   *  2. Otherwise the process composes its own, over the guarded client
+   *     {@link composeApiDatabase} opened and the cipher its configured key
+   *     built. This is the first product service the API package builds for
+   *     itself rather than receiving.
+   *  3. With neither — no host service, and no database or no key — there is
+   *     no secret service, and the transports that would call one are not
+   *     mounted. A door that answered every call with a 500 would be worse
+   *     than a door that is not there.
+   *
+   * The reserved names come from the contract rather than from this root, so
+   * a product-owned secret is hidden by this process on the same terms the
+   * platform app hides it.
+   */
+  private resolveSecrets(options: ApiRuntimeCompositionOptions): SecretService | undefined {
+    if (this.injectedSecrets) return this.injectedSecrets;
+
+    const database = this.composedDatabase;
+    const encryption = composeApiSecretEncryption(options);
+    if (!database || !encryption) return undefined;
+
+    return PostgresSecretAdapter.create({
+      database: database.connection.client,
+      encryption: encryption.encryption,
+      reservedNames: RESERVED_PROJECT_SECRET_NAMES,
+    }).build();
+  }
+
+  /**
    * The public REST door: each family is the packaged builder over the one
    * {@link ApiRestSecurity}. Secret rides the additive public-REST builder,
    * so it takes the four-callable projection; API keys is a packaged
    * framework family, so it takes the `AppRestSecurity` directly.
+   *
+   * The secret family is mounted only when a service was resolved, for the
+   * reason {@link ApiProductionComposition.resolveSecrets} gives.
    */
   private composeRest(): Hono {
+    const secrets = this.secrets;
     return new Hono()
       .route(
         "/",
-        ApiSecretRestFeature.create({ secrets: this.secrets, security: this.projectRestPolicy }),
+        secrets
+          ? ApiSecretRestFeature.create({ secrets, security: this.projectRestPolicy })
+          : new Hono(),
       )
       .route(
         "/",
@@ -289,6 +344,41 @@ export function composeApiDatabase(
     nodeEnvironment: options.config.nodeEnvironment,
     report: LoggedApiDatabaseAbsence.create(logger),
   });
+}
+
+/**
+ * Composes the process's stored-secret cipher from its validated key.
+ *
+ * Separate from {@link composeApiDatabase} because the two absences are
+ * different facts: a deployment can have a database and no key, or a key and
+ * no database, and each one is worth naming on its own.
+ */
+export function composeApiSecretEncryption(
+  options: ApiRuntimeCompositionOptions,
+): ApiSecretEncryptionInfrastructure | undefined {
+  const logger = createLogger(options.config.serviceName);
+  return ApiSecretEncryptionInfrastructure.tryCreate({
+    key: options.config.storedSecretEncryptionKey,
+    report: LoggedApiSecretEncryptionAbsence.create(logger),
+  });
+}
+
+/** Names the absent key once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiSecretEncryptionAbsence extends ApiSecretEncryptionAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiSecretEncryptionAbsence {
+    return new LoggedApiSecretEncryptionAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(): void {
+    this.logger.info(
+      { reason: "unconfigured" },
+      "API composed without a stored-secret key: it can neither read nor write project secrets",
+    );
+  }
 }
 
 /** Names the absent database once, at boot, rather than leaving it to be inferred. */

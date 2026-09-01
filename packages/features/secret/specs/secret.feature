@@ -42,6 +42,25 @@ Feature: Canonical project-secret lifecycle
     Then the response contains its id, name, project and timestamps
     And the response contains neither its value nor its encrypted value
 
+  Scenario: One at-rest format for every process
+    Given a project secret encrypted and stored by one LangWatch process
+    When a different process reads that row under the same key
+    Then it recovers the stored value unchanged
+    And a value that process writes back is readable by the first
+
+  Scenario: A key that is not the key refuses rather than guesses
+    Given a stored secret encrypted under one key
+    When a process reads it under a different key, or the row has been altered
+    Then the read fails and no partial value is returned
+    And a key that is not a 32-byte hex string is refused when the process composes, not when a customer reads
+
+  Scenario: A process with no key composes no secret service
+    Given a process configured with no stored-secret key, or no database
+    When it composes
+    Then it names the absence at boot
+    And it mounts no secret transport, rather than one that fails on every request
+    And a host that already owns a secret service can still supply one
+
   Scenario: Product-owned secrets are hidden and immutable
     Given application composition reserves a secret name for another feature
     When a caller lists, reads, updates, deletes, or creates that name

@@ -39,7 +39,17 @@ import {
  */
 export type ApiProductAdapters = Readonly<{
   agents: AgentService;
-  secrets: SecretService;
+  /**
+   * The one product service on this list the API package CAN build.
+   *
+   * A host supplies it to override what the process would compose — a test
+   * binding a double, or a deployment that already owns one instance of the
+   * service graph. Left out, the process composes its own from its guarded
+   * client and its configured key
+   * ({@link ApiProductionComposition.resolveSecrets}), and mounts no secret
+   * door if it has neither.
+   */
+  secrets?: SecretService;
   apiKeys: ApiKeyService;
   authz: AuthzService;
   organizations: OrganizationService;
@@ -72,10 +82,27 @@ export type ApiProductAdapters = Readonly<{
  * unlocks the seam a packaged `Postgres*Adapter` takes — a typed
  * `PrismaClient` from a composition root — and nothing beyond it: every
  * adapter still needs the ports the remaining entries name, so composing the
- * client is not composing the services, and none of those families moved.
+ * client is not composing the services.
+ *
+ * The stored-secret encryption key is the first of those seams to close, and
+ * with it the first product service this package composes rather than
+ * receives. The key is a validated config leaf, the cipher over it is
+ * `@langwatch/secret-server`'s own — so this process brings no cipher of its
+ * own, and the format it writes is pinned to the one the platform app reads by
+ * a row both suites decrypt — and `PostgresSecretAdapter` over the guarded
+ * client turns the two into a `SecretService`
+ * ({@link ApiProductionComposition.resolveSecrets}).
+ *
+ * `OrganizationSettingsSecretPort` left with it, and it is worth being exact
+ * about why: it was on this list because the KEY was missing, and the key is
+ * not missing any more — the port is the same two methods over the same
+ * cipher. What still keeps the organization service out of this process is the
+ * entry below that names its identity ports, and when that entry closes its
+ * settings-secret port is a delegate over the cipher this process already
+ * builds. Nothing here composes one today, because nothing here composes the
+ * organization service that would take it.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
-  "SecretEncryptionPort and OrganizationSettingsSecretPort: the stored-secret encryption key",
   "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
   "AuthzGrantsCommandDispatcher and AuthzRevocationTelemetry: the grant command pipeline",
   "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",

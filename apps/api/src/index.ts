@@ -13,8 +13,10 @@ export { ApiRestObservabilityComposition } from "./app/api-rest-observability.co
 export {
   ApiProductionComposition,
   composeApiDatabase,
+  composeApiSecretEncryption,
   LoggedApiDatabaseAbsence,
   LoggedApiQueueAbsence,
+  LoggedApiSecretEncryptionAbsence,
   type ApiOwnedRestFeaturePorts,
 } from "./app/api-production.composition";
 export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
@@ -208,6 +210,7 @@ export {
   apiLoggerConfiguration,
   resolveApiConfig,
   API_PORT_ENV_PRECEDENCE,
+  STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE,
   type ApiConfig,
   type ApiDatabaseConfigResolution,
   type ApiInfrastructureConfig,
@@ -224,6 +227,11 @@ export {
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
 } from "./platform/infrastructure/api-queue.infrastructure";
+export {
+  ApiSecretEncryptionAbsenceReportPort,
+  ApiSecretEncryptionInfrastructure,
+  type ApiSecretEncryptionInfrastructureOptions,
+} from "./platform/infrastructure/api-secret-encryption.infrastructure";
 export {
   ApiRateLimitInfrastructure,
   type ApiRateLimitConnectionPort,

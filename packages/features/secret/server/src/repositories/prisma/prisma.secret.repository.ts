@@ -22,8 +22,8 @@ export class PrismaSecretRepository extends SecretRepository {
     super();
   }
 
-  static create(database: object): PrismaSecretRepository {
-    return new PrismaSecretRepository(database as PrismaClient);
+  static create(database: PrismaClient): PrismaSecretRepository {
+    return new PrismaSecretRepository(database);
   }
 
   async list(projectId: string): Promise<Secret[]> {

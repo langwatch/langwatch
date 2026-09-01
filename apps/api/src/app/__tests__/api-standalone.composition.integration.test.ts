@@ -49,7 +49,7 @@ describe("ApiStandaloneComposition", () => {
 
     it("names every adapter it is still waiting on rather than leaving the gap implicit", () => {
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
-        "SecretEncryptionPort and OrganizationSettingsSecretPort: the stored-secret encryption key",
+        "IdentityEmailService and the Better Auth browser-session transport",
       );
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
         "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
@@ -66,6 +66,14 @@ describe("ApiStandaloneComposition", () => {
       const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
 
       expect(named).not.toMatch(/PrismaQueryGuard|multitenancy|mass-delete/i);
+    });
+
+    it("stops naming the stored-secret key, now that it reads and uses its own", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(
+        /SecretEncryptionPort|OrganizationSettingsSecretPort|encryption key/i,
+      );
     });
 
     it("serves the metrics route only once a metrics port is composed", async () => {
@@ -117,6 +125,34 @@ describe("ApiStandaloneComposition", () => {
       await process.close();
 
       expect(phases).toEqual(["feature drain", "graph drain", "graph close"]);
+    });
+  });
+
+  describe("when a host supplied every product adapter except the secret service", () => {
+    it("serves the rest of the process without a secret door, rather than refusing to boot", async () => {
+      const { secrets: _injected, ...withoutSecrets } = testProducts();
+      const composed = await ApiStandaloneComposition.create({
+        products: withoutSecrets,
+      }).compose({
+        config: ephemeralConfig(),
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const address = await composed.start();
+      if (!address) throw new Error("The API process did not report a listener address.");
+
+      expect(await fetch(`http://127.0.0.1:${address.port}/api/health`)).toHaveProperty(
+        "status",
+        204,
+      );
+      const secretDoor = await fetch(`http://127.0.0.1:${address.port}/api/secret`, {
+        method: "POST",
+      });
+      expect(secretDoor.status).toBe(404);
+
+      await composed.close();
     });
   });
 

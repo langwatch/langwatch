@@ -32,6 +32,20 @@ const PROCESS_CLOSE_SLACK_MS = 15_000;
  */
 export const API_PORT_ENV_PRECEDENCE = ["API_PORT", "LANGWATCH_API_PORT", "PORT"] as const;
 
+/**
+ * The stored-secret encryption key, under the two names the platform app has
+ * always read it by, in the platform app's own order.
+ *
+ * The precedence is not a convenience: rows encrypted by one process are read
+ * back by the other, so a deployment that set only `NEXTAUTH_SECRET` must give
+ * both processes the same key or the API process would write values the app
+ * cannot read.
+ */
+export const STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = [
+  "CREDENTIALS_SECRET",
+  "NEXTAUTH_SECRET",
+] as const;
+
 export const apiConfigDefinition = RuntimeConfig.define({
   /** A standalone API owns dispatch-only web behaviour. */
   processRole: Config.value(z.literal("web").default("web"), { env: "API_PROCESS_ROLE" }),
@@ -84,6 +98,25 @@ export const apiConfigDefinition = RuntimeConfig.define({
    */
   instanceAdminApiKey: Config.value(optionalEnvironmentString, {
     env: "LANGWATCH_INSTANCE_ADMIN_API_KEY",
+  }),
+  /**
+   * The key the stored-secret cipher runs under, resolved from
+   * {@link STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE}.
+   *
+   * An unvalidated optional string for the same reason the admin credential
+   * and `DATABASE_URL` are: `Config.secret` is `z.string().min(1)`, so an
+   * operator who exports the variable blank would take the whole process down
+   * — including a deployment that composes no product services and needs no
+   * key at all. `Config.secret` buys nothing else here; it carries no
+   * redaction, only that refusal.
+   *
+   * What a blank export means, and what a key of the wrong shape means, are
+   * the cipher's rules and they live with it: blank is unconfigured, and a
+   * key that is not 32 bytes of hex refuses at boot rather than at the first
+   * secret a customer reads.
+   */
+  storedSecretEncryptionKey: Config.value(optionalEnvironmentString, {
+    env: "CREDENTIALS_SECRET",
   }),
   infrastructure: {
     /**
@@ -159,6 +192,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     source: {
       ...source,
       API_PORT: firstDefined(source, API_PORT_ENV_PRECEDENCE),
+      CREDENTIALS_SECRET: firstDefined(source, STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE),
     },
   }).value;
   return {

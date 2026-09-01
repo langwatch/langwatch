@@ -4,7 +4,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
-import type { SecretService } from "@langwatch/secret-contract";
+import { SecretService } from "@langwatch/secret-contract";
 import { SecretApp, SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
 import { TRPCError, type TRPCDefaultErrorShape } from "@trpc/server";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
@@ -128,6 +128,45 @@ class MissingAgentService extends AgentService {
   }
 }
 
+/**
+ * What stands in when a process composed no secret service.
+ *
+ * Its methods are unreachable through HTTP — the router and the REST family
+ * are not mounted without a service — and it exists so the tRPC context keeps
+ * one shape whether or not the service was composed. A caller that reaches it
+ * some other way is told the process is not configured for secrets rather
+ * than getting a null-pointer failure three layers down.
+ */
+class MissingSecretService extends SecretService {
+  private unavailable(): never {
+    throw new Error("Secret service is not configured for this API application.");
+  }
+
+  list() {
+    return this.unavailable();
+  }
+
+  getValues() {
+    return this.unavailable();
+  }
+
+  get() {
+    return this.unavailable();
+  }
+
+  create() {
+    return this.unavailable();
+  }
+
+  update() {
+    return this.unavailable();
+  }
+
+  delete() {
+    return this.unavailable();
+  }
+}
+
 function handledErrorCode(error: HandledError): TRPCError["code"] {
   const codes: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
@@ -172,9 +211,17 @@ export class ApiApplication {
     agents: new MissingAgentService(),
   });
 
+  private static readonly unavailableSecrets = SecretApp.create({
+    secrets: new MissingSecretService(),
+  });
+
   static create(options: {
     agents?: AgentService;
-    secrets: SecretService;
+    /**
+     * Absent for a process that composed no secret service: its tRPC router is
+     * left off the root, the same way the agent router is.
+     */
+    secrets?: SecretService;
     topic?: TopicApiFeature;
     http?: ApiHttpOptions;
     rest?: Hono;
@@ -183,7 +230,7 @@ export class ApiApplication {
     return new ApiApplication(
       {
         agents: options.agents ? AgentApp.create({ agents: options.agents }) : undefined,
-        secrets: SecretApp.create({ secrets: options.secrets }),
+        secrets: options.secrets ? SecretApp.create({ secrets: options.secrets }) : undefined,
       },
       options.http,
       options.rest,
@@ -199,7 +246,7 @@ export class ApiApplication {
   private constructor(
     private readonly services: Readonly<{
       agents: AgentApp | undefined;
-      secrets: SecretApp;
+      secrets: SecretApp | undefined;
     }>,
     private readonly http: ApiHttpOptions | undefined,
     rest: Hono | undefined,
@@ -210,8 +257,13 @@ export class ApiApplication {
     const agents = services.agents
       ? AgentTrpcApi.create(this.root, { protected: protectedProcedure })
       : undefined;
-    const secrets = SecretTrpcApi.create(this.root, { protected: protectedProcedure });
-    this.trpc = this.root.router({ ...(agents ? { agents } : {}), secrets });
+    const secrets = services.secrets
+      ? SecretTrpcApi.create(this.root, { protected: protectedProcedure })
+      : undefined;
+    this.trpc = this.root.router({
+      ...(agents ? { agents } : {}),
+      ...(secrets ? { secrets } : {}),
+    });
     this.hono = http ? this.createHono(http, rest) : undefined;
   }
 
@@ -222,7 +274,7 @@ export class ApiApplication {
   private requireServices(): ApiServices {
     return {
       agents: this.services.agents ?? ApiApplication.unavailableAgents,
-      secrets: this.services.secrets,
+      secrets: this.services.secrets ?? ApiApplication.unavailableSecrets,
     };
   }
 

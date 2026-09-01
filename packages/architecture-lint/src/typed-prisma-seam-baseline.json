@@ -53,7 +53,6 @@
     "packages/features/organization/server/src/repositories/prisma/prisma.organization.repository.ts",
     "packages/features/organization/server/src/repositories/prisma/prisma.team.repository.ts",
     "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
-    "packages/features/role/server/src/repositories/prisma/prisma.role.repository.ts",
-    "packages/features/secret/server/src/repositories/prisma/prisma.secret.repository.ts"
+    "packages/features/role/server/src/repositories/prisma/prisma.role.repository.ts"
   ]
 }

@@ -1,3 +1,4 @@
+export * from "./adapters/aes-gcm.secret-encryption.adapter";
 export * from "./adapters/postgres.secret.adapter";
 export * from "./app/secret.app";
 export * from "./transport/api-trpc/secret.api";

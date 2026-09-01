@@ -1,5 +1,5 @@
 import { RestVersionSelector } from "@langwatch/api/rest";
-import type { SecretService } from "@langwatch/secret-contract";
+import { RESERVED_PROJECT_SECRET_NAMES, type SecretService } from "@langwatch/secret-contract";
 import {
   PostgresSecretAdapter,
   SecretEncryptionPort,
@@ -8,7 +8,6 @@ import {
 import { Hono } from "hono";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createProjectRestApiService } from "~/server/api/project-service";
-import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
 import { decrypt, encrypt } from "~/utils/encryption";
 
 const restVersionSelector = RestVersionSelector.create({
