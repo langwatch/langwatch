@@ -27,10 +27,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }
 
   static create(
-    database: object,
+    database: PrismaClient,
     settingsSecrets: OrganizationSettingsSecretPort,
   ): PrismaOrganizationRepository {
-    return new PrismaOrganizationRepository(database as PrismaClient, settingsSecrets);
+    return new PrismaOrganizationRepository(database, settingsSecrets);
   }
 
   async tryFindStoredSettings(organizationId: string): Promise<OrganizationSettings | null> {

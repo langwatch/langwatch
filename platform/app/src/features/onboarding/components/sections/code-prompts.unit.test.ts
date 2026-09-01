@@ -40,7 +40,8 @@ const GEMINI_AT_COMMAND_REGEX = new RegExp(
  * macOS and Linux cap a single filesystem path component at NAME_MAX = 255
  * bytes. Observed longest component for realistic content today: 121 bytes
  * (cloud) and 160 bytes (self-hosted with the longest LANGWATCH_API_KEY
- * format LangWatch issues — fixed at 54 bytes, see apiKeyGenerator.ts). A
+ * format LangWatch issues — fixed at 54 bytes, see
+ * @langwatch/project-server's project-credentials.adapter.ts). A
  * 32-byte safety margin below NAME_MAX leaves headroom for future edits
  * while still catching any regression that reintroduces the issue-#3104
  * crash pattern (where the longest component was 2179 bytes).
@@ -134,7 +135,8 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
 
 describe("buildMcpJson Gemini CLI compatibility (issue #3104)", () => {
   // LangWatch API keys have a fixed format: `sk-lw-` + 48 alphanumeric
-  // characters = 54 bytes total (see server/utils/apiKeyGenerator.ts).
+  // characters = 54 bytes total (see @langwatch/project-server's
+  // adapters/project-credentials.adapter.ts).
   // The MCP config JSON is also pasteable via the onboarding "Copy Config"
   // button, so it must extract cleanly under Gemini's regex too. The `/`
   // in the scoped package name `@langwatch/mcp-server` naturally splits

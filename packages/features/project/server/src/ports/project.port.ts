@@ -1,9 +1,3 @@
-/** Structural database capability accepted by the composition adapter. */
-export interface ProjectDatabase {
-  readonly project: object;
-  readonly team: object;
-}
-
 export abstract class ProjectCredentialsPort {
   abstract generateProjectId(): string;
   abstract generateApiKey(): string;

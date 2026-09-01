@@ -1,4 +1,6 @@
 export * from "./adapters/postgres.api-key.adapter";
+export { ApiKeyBindingIdAdapter } from "./adapters/api-key-binding-id.adapter";
+export { ApiKeyDiagnosticsAdapter } from "./adapters/api-key-diagnostics.adapter";
 export {
   type AgentSandboxMaintenancePipelineDeps,
   EventingAgentSandboxMaintenanceAdapter,

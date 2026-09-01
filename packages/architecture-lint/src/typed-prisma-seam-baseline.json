@@ -49,10 +49,6 @@
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-cost.repository.ts",
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-provider.repository.ts",
-    "packages/features/organization/server/src/repositories/prisma/prisma.group.repository.ts",
-    "packages/features/organization/server/src/repositories/prisma/prisma.organization.repository.ts",
-    "packages/features/organization/server/src/repositories/prisma/prisma.team.repository.ts",
-    "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
     "packages/features/role/server/src/repositories/prisma/prisma.role.repository.ts"
   ]
 }

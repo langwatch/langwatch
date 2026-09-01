@@ -108,3 +108,39 @@ Feature: Shared organization service
     When bindings are removed and group membership is changed in one request
     Then the service revokes access before changing membership
     And it attaches new access only after the group edit succeeds
+
+  @unit
+  Scenario: A personal workspace is born with packaged identifiers
+    Given a process composes the organization service
+    When the service creates a user's personal workspace
+    Then the feature package mints the team, project, role binding and ingestion key
+    And each identifier carries the resource prefix the existing rows already use
+    And the team and the project receive separate slugs seeded from the user identifier
+    And no composition root describes any of those formats
+
+  @unit
+  Scenario: A shared team is born with packaged identifiers
+    When the organization service creates a shared team
+    Then the feature package mints the team identifier and its role binding
+    And the team identifier keeps the shape the existing Team rows carry
+    And the slug ends with the leading characters of that identifier
+
+  @unit
+  Scenario: An organization group is born with packaged identifiers
+    When the organization service creates a group
+    Then the feature package mints the group identifier and its role binding
+    And the slug it returns carries no identifier tail
+    And the service appends its own suffix when the base slug is taken
+
+  @unit
+  Scenario: A team or group slug survives a URL
+    Given a name containing separators, accents or symbols
+    When a team slug or a group slug is minted from it
+    Then the result is lower-case ASCII words joined by single dashes
+    And a team and a group minted from the same name slug identically
+
+  @unit
+  Scenario: A personal-workspace warning reaches the process logger
+    Given a process supplies a named logger to the organization service
+    When the service reports a personal-workspace diagnostic
+    Then the logger receives the context and the message in its own argument order

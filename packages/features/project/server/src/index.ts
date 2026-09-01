@@ -2,6 +2,7 @@ export {
   PostgresProjectAdapter,
   type PostgresProjectAdapterOptions,
 } from "./adapters/postgres.project.adapter";
+export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter";
 export {
   ProjectApp,
   type ProjectAppDependencies,
@@ -15,7 +16,6 @@ export {
   ProjectDiagnosticsPort,
   ProjectKeyMapPort,
   ProjectStoredObjectsPort,
-  type ProjectDatabase,
 } from "./ports/project.port";
 export { createProjectRestApp } from "./transport/api-rest/project.api";
 export {

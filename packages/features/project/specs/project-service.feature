@@ -59,3 +59,11 @@ Feature: Shared project service
     When tRPC or the project REST API handles a project operation
     Then it reads ProjectService from the process application context
     And it does not construct Prisma or a Project repository per request
+
+  @unit
+  Scenario: A project is born with packaged credentials
+    Given a process composes the project service
+    When the service creates a project
+    Then the feature package mints the project identifier and the ingestion key
+    And the ingestion key keeps the prefixed 54-byte alphanumeric shape the onboarding snippets are sized against
+    And no composition root describes either format

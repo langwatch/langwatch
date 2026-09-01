@@ -30,3 +30,16 @@ Feature: API key lifecycle
     When a CLI login key is minted
     Then older keys for the same user, organization and device are revoked
     And a newer concurrent key is not revoked
+
+  @unit
+  Scenario: An API-key binding identifier is minted by the feature
+    When a key's grant needs an AuthZ binding identifier
+    Then the feature package mints it
+    And it carries the same resource prefix a member's binding carries
+    And no composition root describes that prefix
+
+  @unit
+  Scenario: An API-key grant warning reaches the process logger
+    Given a process supplies a named logger to the API-key service
+    When a grant the service expected to revoke is already gone
+    Then the logger receives the context and the message unchanged

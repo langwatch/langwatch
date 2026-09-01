@@ -1,5 +1,6 @@
 import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   GroupIdentityPort,
   PersonalWorkspaceDiagnosticsPort,
@@ -13,7 +14,15 @@ import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.reposit
 import { OrganizationService } from "../services/organization.service";
 
 export interface PostgresOrganizationAdapterOptions {
-  database: object;
+  /**
+   * The composition root's own guarded client, typed.
+   *
+   * It used to arrive as `object` and be cast back to a `PrismaClient` inside
+   * each of the three repositories below, which let a caller hand in something
+   * that was not a client at all and find out on the first query. Every
+   * process that composes this adapter already holds the typed client.
+   */
+  database: PrismaClient;
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;
   groupIdentities: GroupIdentityPort;

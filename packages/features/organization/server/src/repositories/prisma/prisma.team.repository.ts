@@ -26,8 +26,8 @@ export class PrismaTeamRepository extends TeamRepository {
     super();
   }
 
-  static create(database: object): PrismaTeamRepository {
-    return new PrismaTeamRepository(database as PrismaClient);
+  static create(database: PrismaClient): PrismaTeamRepository {
+    return new PrismaTeamRepository(database);
   }
 
   async get(input: {

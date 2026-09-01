@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationSettingsSecretPort } from "../../../ports/organization.port";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository";
@@ -16,7 +17,7 @@ describe("PrismaOrganizationRepository settings", () => {
   it("preserves partial-update semantics and encrypts S3 credentials", async () => {
     const update = vi.fn().mockResolvedValue(void 0);
     const repository = PrismaOrganizationRepository.create(
-      { organization: { update } },
+      { organization: { update } } as unknown as PrismaClient,
       new TestSettingsSecrets(),
     );
 
@@ -59,7 +60,7 @@ describe("PrismaOrganizationRepository settings", () => {
       updatedAt: new Date(2),
     });
     const repository = PrismaOrganizationRepository.create(
-      { organization: { findUnique } },
+      { organization: { findUnique } } as unknown as PrismaClient,
       new TestSettingsSecrets(),
     );
 

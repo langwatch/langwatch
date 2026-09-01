@@ -28,8 +28,8 @@ export class PrismaGroupRepository extends GroupRepository {
     super();
   }
 
-  static create(database: object): PrismaGroupRepository {
-    return new PrismaGroupRepository(database as PrismaClient);
+  static create(database: PrismaClient): PrismaGroupRepository {
+    return new PrismaGroupRepository(database);
   }
 
   async get(input: {

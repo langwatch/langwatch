@@ -1,4 +1,10 @@
 export {
+  GroupIdentityAdapter,
+  PersonalWorkspaceIdentityAdapter,
+  TeamIdentityAdapter,
+} from "./adapters/resource-identifiers.adapter";
+export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter";
+export {
   PostgresOrganizationAdapter,
   type PostgresOrganizationAdapterOptions,
 } from "./adapters/postgres.organization.adapter";

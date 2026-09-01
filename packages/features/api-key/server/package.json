@@ -27,6 +27,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

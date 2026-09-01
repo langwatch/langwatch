@@ -24,7 +24,6 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import type { ProjectDatabase } from "../../ports/project.port";
 import {
   mapProjectIdentityRow,
   PROJECT_IDENTITY_SELECT,
@@ -40,8 +39,8 @@ export class PrismaProjectRepository extends ProjectRepository {
     super();
   }
 
-  static create(database: ProjectDatabase): PrismaProjectRepository {
-    return new PrismaProjectRepository(database as PrismaClient);
+  static create(database: PrismaClient): PrismaProjectRepository {
+    return new PrismaProjectRepository(database);
   }
 
   async tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null> {

@@ -111,7 +111,7 @@ import {
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
 import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
-import { AppApiKeyDiagnostics, AppApiKeyRuntime } from "~/runtime/app/features/api-key";
+import { AppApiKeyRuntime } from "~/runtime/app/features/api-key";
 import {
   AppAutomationClock,
   AppAutomationRuntime,
@@ -252,7 +252,6 @@ import {
 import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
@@ -1199,8 +1198,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const projects = traced(
     AppProjectRuntime.create({
       database: prisma,
-      generateProjectId: nanoid,
-      generateApiKey,
       organizations: canonicalOrganizations,
       keyMap: LwqlKeyMapService.create(new LwqlKeyMapClickHouseRepository(resolveClickHouseClient)),
       storedObjects: {
@@ -1307,7 +1304,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       organizations: canonicalOrganizations,
       projects,
       deriveBindingId: AuthzFeature.deriveGrantId,
-      diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key")),
+      logger: createLogger("langwatch:api-key"),
     }).build(),
     "ApiKeyService",
   );
@@ -3213,8 +3210,6 @@ export function createTestApp(
   const testProjects = traced(
     AppProjectRuntime.create({
       database: testPrisma,
-      generateProjectId: nanoid,
-      generateApiKey,
       organizations: testCanonicalOrganizations,
       keyMap: LwqlKeyMapService.create(new NullLwqlKeyMapRepository()),
     }).build(),
@@ -3295,7 +3290,7 @@ export function createTestApp(
     organizations: nullOrganizations,
     projects: testProjects,
     deriveBindingId: AuthzFeature.deriveGrantId,
-    diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
+    logger: createLogger("langwatch:api-key:test"),
   }).build();
   // One adapter for the test app's Langy graph: `createSessionKeys` memoises,
   // so the credential composition and the service share one session-key store.

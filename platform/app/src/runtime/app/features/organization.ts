@@ -1,75 +1,29 @@
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
-  PersonalWorkspaceDiagnosticsPort,
-  PersonalWorkspaceIdentityPort,
+  GroupIdentityAdapter,
   OrganizationSettingsSecretPort,
+  PersonalWorkspaceDiagnosticsAdapter,
+  PersonalWorkspaceIdentityAdapter,
   PostgresOrganizationAdapter,
-  GroupIdentityPort,
-  TeamIdentityPort,
-  type PersonalWorkspaceResourceIds,
+  TeamIdentityAdapter,
 } from "@langwatch/organization-server";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { slugify } from "~/utils/slugify";
 import { decrypt, encrypt } from "~/utils/encryption";
 
 const logger = createLogger("langwatch:organization");
 
-class AppPersonalWorkspaceIdentityPort extends PersonalWorkspaceIdentityPort {
-  create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds {
-    const slugPrefix = input.userId.toLowerCase().slice(0, 12);
-    return {
-      teamId: generate(KSUID_RESOURCES.TEAM).toString(),
-      teamSlug: `personal-${slugPrefix}-${nanoid(6).toLowerCase()}`,
-      projectId: generate(KSUID_RESOURCES.PROJECT).toString(),
-      projectSlug: `personal-${slugPrefix}-${nanoid(6).toLowerCase()}`,
-      projectApiKey: `pkey_${nanoid(40)}`,
-      ownerBindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-    };
-  }
-}
-
-class AppPersonalWorkspaceDiagnosticsPort extends PersonalWorkspaceDiagnosticsPort {
-  warn(message: string, context: Record<string, unknown>): void {
-    logger.warn(context, message);
-  }
-}
-
-class AppTeamIdentityPort extends TeamIdentityPort {
-  createTeam(input: { name: string }): {
-    teamId: string;
-    slug: string;
-  } {
-    const teamId = `team_${nanoid()}`;
-    return {
-      teamId,
-      slug: `${slugify(input.name, { lower: true, strict: true })}-${teamId.substring(0, 11)}`,
-    };
-  }
-
-  createBindingId(): string {
-    return generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-  }
-}
-
-class AppGroupIdentityPort extends GroupIdentityPort {
-  createGroupId(): string {
-    return generate(KSUID_RESOURCES.GROUP).toString();
-  }
-
-  createBindingId(): string {
-    return generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-  }
-
-  slugify(name: string): string {
-    return slugify(name, { lower: true, strict: true });
-  }
-}
-
+/**
+ * The one organization collaborator this process still owns.
+ *
+ * The identity and diagnostics ports moved into `@langwatch/organization-server`
+ * — they mint persisted id and slug formats, which belong to the feature, not
+ * to whichever process happens to compose it. This one stays because what it
+ * delegates to is process-owned: `~/utils/encryption` resolves the key from
+ * THIS application's environment. A second composition root supplies its own
+ * cipher over its own configured key, and both write the same at-rest format.
+ */
 class AppOrganizationSettingsSecretPort extends OrganizationSettingsSecretPort {
   encrypt(value: string): string {
     return encrypt(value);
@@ -98,13 +52,13 @@ export class AppOrganizationRuntime {
   build(): OrganizationService {
     return PostgresOrganizationAdapter.create({
       database: this.database,
-      identities: new AppPersonalWorkspaceIdentityPort(),
-      teamIdentities: new AppTeamIdentityPort(),
-      groupIdentities: new AppGroupIdentityPort(),
+      identities: PersonalWorkspaceIdentityAdapter.create(),
+      teamIdentities: TeamIdentityAdapter.create(),
+      groupIdentities: GroupIdentityAdapter.create(),
       authz: this.authz,
       grants: this.grants,
       settingsSecrets: new AppOrganizationSettingsSecretPort(),
-      diagnostics: new AppPersonalWorkspaceDiagnosticsPort(),
+      diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
     }).build();
   }
 }
