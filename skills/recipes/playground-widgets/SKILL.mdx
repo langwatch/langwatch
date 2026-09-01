@@ -4,6 +4,7 @@ user-prompt: "Build me a custom chart widget"
 description: Author a custom-chart-playground widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.
 license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
+feature-flag: release_custom_chart_playground
 metadata:
   category: recipe
 ---
@@ -160,6 +161,7 @@ langwatch playground-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `playground-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `playground_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `playground_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `period_start`, `period_end`, or `period_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.

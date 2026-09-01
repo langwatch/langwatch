@@ -343,6 +343,15 @@ export const FEATURE_FLAGS = [
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
   },
   {
+    key: "release_custom_chart_playground",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Custom Chart Playground",
+    description:
+      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
+  },
+  {
     key: "release_ui_home_signal_focused_enabled",
     scope: "PRODUCT",
     defaultValue: false,

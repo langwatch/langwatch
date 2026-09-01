@@ -32,6 +32,8 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { Project } from "~/generated/prisma/client";
 
+import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widgets/access";
+import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/playground-widgets/errors";
 import {
   type PlaygroundWidget,
   PlaygroundWidgetService,
@@ -172,6 +174,32 @@ function widgetService(): PlaygroundWidgetService {
 }
 
 /**
+ * The project this playground-widgets request runs for: `lwqlProject`'s
+ * usual pair of checks (credential/path match, then the whole-surface LWQL
+ * flag), plus this route family's OWN flag — the page and the CLI must agree
+ * on whether the playground exists at all, and the whole point of a REST
+ * surface is that it cannot be reached by skipping a browser-only check.
+ *
+ * @throws {CustomChartPlaygroundNotEnabledError} when
+ *   `release_custom_chart_playground` is off for this project.
+ */
+async function playgroundWidgetsProject({
+  project,
+  requestedProjectId,
+}: {
+  project: Project;
+  requestedProjectId: string | undefined;
+}): Promise<Project> {
+  const resolved = await lwqlProject({ project, requestedProjectId });
+  const enabled = await customChartPlaygroundEnabled({
+    prisma,
+    projectId: resolved.id,
+  });
+  if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
+  return resolved;
+}
+
+/**
  * The widget id the path matched.
  *
  * @throws {Error} when a widget route matched without one — a routing fault,
@@ -206,7 +234,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await playgroundWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -236,7 +264,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createWidgetSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await playgroundWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -268,7 +296,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await playgroundWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -300,7 +328,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateWidgetSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await playgroundWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -334,7 +362,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await playgroundWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });

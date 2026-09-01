@@ -414,6 +414,11 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
+  saved_workbench_charts_disabled_for_playground: {
+    title: "Saved charts are off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off saved workbench charts. Use the playground to build a chart instead.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -977,6 +982,11 @@ const presentations = {
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
+  },
+  custom_chart_playground_not_enabled: {
+    title: "Custom chart playground isn't switched on here",
+    describe: () =>
+      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
   },
   custom_role_not_found: {
     title: "Custom role not found",
@@ -2259,6 +2269,15 @@ const presentations = {
   langy_dispatch_rejected: {
     title: "That request couldn't be understood",
     describe: () => "Rephrase and try again.",
+  },
+  langy_skill_not_available: {
+    title: "That capability isn't turned on yet",
+    describe: (error) => {
+      const skillId = str(error, "skillId", "");
+      return skillId
+        ? `The "${skillId}" capability isn't enabled for this project. Try describing what you want a different way.`
+        : "That capability isn't enabled for this project.";
+    },
   },
   langy_rate_limited: {
     // Raised when someone sends faster than their own Langy allowance. The

@@ -1,14 +1,17 @@
 /**
- * Dev-only playground for authoring persisted, sandboxed custom-chart widgets
- * against the real LangWatchQL endpoint. Two gates: the conditional route
- * registration in `src/routes.tsx` (chunk excluded from prod builds) and the
- * NODE_ENV check below (dead-code-eliminated in prod) — belt and suspenders.
+ * Playground for authoring persisted, sandboxed custom-chart widgets against
+ * the real LangWatchQL endpoint. Always on in local development; anywhere
+ * else it's behind release_custom_chart_playground (see the flag check
+ * below) — the route in `src/routes.tsx` is registered unconditionally so
+ * the flag has something to open outside dev.
  */
 
 import { Badge } from "@chakra-ui/react";
 import { useEffect } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { LoadingScreen } from "~/components/LoadingScreen";
+import { NotFoundScene } from "~/components/NotFoundScene";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { CustomChartPlayground } from "~/features/custom-chart-playground/CustomChartPlayground";
@@ -16,6 +19,9 @@ import { useRegisterLangyPageContext } from "~/features/langy/LangyContext";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useCustomChartPlaygroundGate } from "./useCustomChartPlaygroundGate";
+
+const IS_DEV = process.env.NODE_ENV === "development";
 
 const LANGY_PAGE_CONTEXT = [
   {
@@ -43,9 +49,23 @@ const LANGY_PAGE_CONTEXT = [
   },
 ];
 
+/** Why LW.query will reject on this page, or undefined when LWQL is fine. */
+function unavailableReasonOf(availability: {
+  data: { available: boolean; reason?: string } | undefined;
+  error: unknown;
+}): string | undefined {
+  if (availability.data && availability.data.available !== true) {
+    return availability.data.reason ?? "unknown";
+  }
+  if (availability.error) return "availability check failed";
+  return undefined;
+}
+
 function CustomChartPlaygroundPage() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
+
+  const gate = useCustomChartPlaygroundGate();
 
   // Langy open by default on this surface, with the page named as context.
   const openPanel = useLangyStore((s) => s.openPanel);
@@ -57,7 +77,7 @@ function CustomChartPlaygroundPage() {
   const availability = api.analytics.lwql.availability.useQuery(
     { projectId },
     {
-      enabled: projectId.length > 0,
+      enabled: projectId.length > 0 && gate === "open",
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
@@ -65,23 +85,17 @@ function CustomChartPlaygroundPage() {
     },
   );
 
-  if (process.env.NODE_ENV !== "development") {
-    return null;
-  }
+  if (gate === "loading") return <LoadingScreen />;
+  if (gate === "blocked") return <NotFoundScene />;
 
-  const unavailableReason =
-    availability.data && availability.data.available !== true
-      ? (availability.data.reason ?? "unknown")
-      : availability.error
-        ? "availability check failed"
-        : undefined;
+  const unavailableReason = unavailableReasonOf(availability);
 
   return (
     <DashboardLayout>
       <PageLayout.Header>
         <PageLayout.Heading>Custom chart playground</PageLayout.Heading>
         <Badge size="sm" variant="outline" colorPalette="orange">
-          dev only
+          {IS_DEV ? "dev only" : "preview"}
         </Badge>
       </PageLayout.Header>
       {projectId.length > 0 && (

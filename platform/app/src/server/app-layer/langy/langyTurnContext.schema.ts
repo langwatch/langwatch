@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { LANGY_RESOURCE_KINDS } from "~/shared/langy/langyResourceKinds";
-import { LANGY_SKILLS } from "~/shared/langy/langySkills";
+import { isSkillAvailable, LANGY_SKILLS } from "~/shared/langy/langySkills";
 import { CHIP_KIND_TO_MANIFEST } from "./ui-actions/pageManifests";
 
 /**
@@ -81,6 +81,66 @@ const MAX_SKILL_CHIPS = 6;
 const SKILL_IDS = LANGY_SKILLS.filter(
   (skill) => skill.source !== "client-command",
 ).map((skill) => skill.id) as [string, ...string[]];
+
+/**
+ * Skill id -> the flag(s) that decide it, for the skills that declare a
+ * `featureFlag` and/or `excludedByFlag` (a mutually-exclusive pair like
+ * `lwql-charts` / `playground-widgets` today) — most skills declare
+ * neither and are always available. Derived from `LANGY_SKILLS` the same
+ * way `SKILL_IDS` is, so a skill's gate can never drift between the
+ * palette, the wire schema, and this map.
+ */
+const SKILL_GATES: ReadonlyMap<
+  string,
+  Pick<(typeof LANGY_SKILLS)[number], "featureFlag" | "excludedByFlag">
+> = new Map(
+  LANGY_SKILLS.filter((skill) => skill.featureFlag || skill.excludedByFlag).map(
+    (skill) => [
+      skill.id,
+      { featureFlag: skill.featureFlag, excludedByFlag: skill.excludedByFlag },
+    ],
+  ),
+);
+
+/** Every flag any gated skill references — what a caller needs to resolve. */
+export function skillGateFlags(ids: readonly string[]): string[] {
+  const flags = new Set<string>();
+  for (const id of ids) {
+    const gate = SKILL_GATES.get(id);
+    if (gate?.featureFlag) flags.add(gate.featureFlag);
+    if (gate?.excludedByFlag) flags.add(gate.excludedByFlag);
+  }
+  return [...flags];
+}
+
+/**
+ * The one flag whose current value explains why this skill id is disabled —
+ * for naming it in a rejection message. Whichever of the two gates a skill
+ * declares (they are never both set on the same skill today), that is the
+ * flag a caller would need to change to make this id usable again.
+ */
+export function skillGateFlagFor(id: string): string | undefined {
+  const gate = SKILL_GATES.get(id);
+  return gate?.featureFlag ?? gate?.excludedByFlag;
+}
+
+/**
+ * Which of a turn's requested skill ids are gated off right now, given the
+ * caller's resolved flag state. The zod enum above only proves an id names a
+ * REAL skill; this proves it names one this caller may currently ask for —
+ * a gated-off id gets the same fate as an unknown one: the turn is rejected,
+ * not silently rendered without it, so the client sees why and can offer the
+ * fallback skill (e.g. lwql-charts) instead of retrying the same request.
+ */
+export function disabledSkillIds(
+  ids: readonly string[],
+  isFlagEnabled: (flag: string) => boolean,
+): string[] {
+  return ids.filter((id) => {
+    const gate = SKILL_GATES.get(id);
+    return gate !== undefined && !isSkillAvailable(gate, isFlagEnabled);
+  });
+}
 
 /**
  * A resource the user is looking at, attached so the agent can resolve "this

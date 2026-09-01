@@ -66,6 +66,20 @@ export interface LangySkill {
   prompt?: string;
   /** Matched against the `/` palette's query. */
   searchText: string;
+  /**
+   * The feature flag gating this skill's offer, if any — from the skill's
+   * own `feature-flag` front-matter. Absent = always offered. Neither side
+   * (palette, wire schema) may re-derive this; both read it from here.
+   */
+  featureFlag?: string;
+  /**
+   * The feature flag that, when ON, excludes this skill instead — from the
+   * skill's own `exclude-when-flag` front-matter. Paired with `featureFlag`
+   * on another skill, this is how two skills become mutually exclusive
+   * (`lwql-charts` vs `playground-widgets` on
+   * `release_custom_chart_playground`): see `isSkillAvailable`.
+   */
+  excludedByFlag?: string;
 }
 
 interface GeneratedSkill {
@@ -74,6 +88,8 @@ interface GeneratedSkill {
   description: string;
   category: "skill" | "recipe";
   userPrompt?: string;
+  featureFlag?: string;
+  excludedByFlag?: string;
 }
 
 /**
@@ -93,6 +109,8 @@ const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map(
     prompt: skill.userPrompt,
     searchText:
       `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
+    ...(skill.featureFlag ? { featureFlag: skill.featureFlag } : {}),
+    ...(skill.excludedByFlag ? { excludedByFlag: skill.excludedByFlag } : {}),
   }),
 );
 
@@ -179,4 +197,33 @@ export const LANGY_SKILLS: LangySkill[] = [
 
 export function findSkill(id: string): LangySkill | undefined {
   return LANGY_SKILLS.find((skill) => skill.id === id);
+}
+
+/**
+ * Whether a skill is currently offerable, given which flags are on.
+ *
+ * The ONE predicate both the palette (client) and the wire schema (server)
+ * call, so a skill's availability can only ever drift by editing the skill
+ * itself — never by the two call sites disagreeing. Two independent gates,
+ * checked the same way for every skill regardless of which (if either) it
+ * declares:
+ *
+ *   - `featureFlag`: the skill needs this flag ON.
+ *   - `excludedByFlag`: the skill is hidden while this flag is ON.
+ *
+ * Pairing one skill's `featureFlag` with another's matching `excludedByFlag`
+ * is how two skills become mutually exclusive (`lwql-charts` vs
+ * `playground-widgets` on `release_custom_chart_playground`) — the flag
+ * picks exactly one, never both, never neither, so the agent is never
+ * handed a choice between them to get wrong.
+ */
+export function isSkillAvailable(
+  skill: Pick<LangySkill, "featureFlag" | "excludedByFlag">,
+  isFlagEnabled: (flag: string) => boolean,
+): boolean {
+  if (skill.featureFlag && !isFlagEnabled(skill.featureFlag)) return false;
+  if (skill.excludedByFlag && isFlagEnabled(skill.excludedByFlag)) {
+    return false;
+  }
+  return true;
 }
