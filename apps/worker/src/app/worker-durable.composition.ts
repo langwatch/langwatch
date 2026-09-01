@@ -65,12 +65,12 @@ export type WorkerDurableCompositionOptions = Readonly<{
  * rather than two that could disagree about which Redis or which retention
  * they are using.
  *
- * Consumers stay disabled. `WorkerEventingRuntime.createProduction` forces
- * them off, and that is not a default this composition may relax:
+ * Consumers stay disabled. This composition asks for none, and it may not:
  * `event-sourcing/jobs` is one shared queue holding every pipeline, so a
  * worker that claimed it while any pipeline were still unmounted would reject
- * and redeliver that pipeline's jobs indefinitely. The switch belongs to the
- * change that completes the registry, not to this one.
+ * and redeliver that pipeline's jobs indefinitely. The graph it builds mounts
+ * only the features its caller supplies, which is never all of them yet.
+ * Claiming the queue belongs to the composition that completes the registry.
  */
 export function createWorkerDurableComposition(
   options: WorkerDurableCompositionOptions,

@@ -90,6 +90,7 @@ export {
 } from "./platform/config/worker.config";
 export {
   WorkerEventingRuntime,
+  type WorkerEventingConsumerOptions,
   type WorkerEventingDependencies,
   type WorkerEventingProductionOptions,
 } from "./platform/eventing/worker-eventing.runtime";

@@ -284,7 +284,7 @@ describe("WorkerProductionComposition", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const traceFeature = createTraceFeature(eventing);
     const capability = new TopicCapability();
@@ -358,7 +358,7 @@ describe("WorkerProductionComposition", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const traceFeature = createTraceFeature(eventing);
     const capability = new TopicCapability();
@@ -396,7 +396,7 @@ describe("WorkerProductionComposition", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const traceFeature = createTraceFeature(eventing);
     const capability = new EventingTopicCapability();
@@ -434,7 +434,7 @@ describe("WorkerProductionComposition", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const traceFeature = createTraceFeature(eventing);
     const resources = new ResourceScope();

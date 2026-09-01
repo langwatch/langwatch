@@ -108,6 +108,7 @@ import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feat
 import type { WorkerConfig } from "../platform/config/worker.config";
 import {
   WorkerEventingRuntime,
+  type WorkerEventingConsumerOptions,
   type WorkerEventingProductionOptions,
 } from "../platform/eventing/worker-eventing.runtime";
 import {
@@ -268,6 +269,17 @@ export type WorkerInfrastructureCompositionOptions = Omit<
   "resources"
 >;
 
+/**
+ * Consumer ownership, stated alongside the Eventing ports it applies to.
+ *
+ * `EventingServerRuntimeOptions.consumersEnabled` is omitted from both arms
+ * below in its favour, so the graph has one place that decides whether it
+ * claims `event-sourcing/jobs` rather than two that could disagree.
+ */
+type WorkerEventingConsumerCompositionOptions = {
+  consumers?: WorkerEventingConsumerOptions;
+};
+
 type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
   lifecycle: WorkerLifecyclePort;
@@ -307,13 +319,15 @@ type WorkerProductionCompositionBaseOptions = {
 export type WorkerProductionCompositionOptions =
   | (WorkerProductionCompositionBaseOptions & {
       /** Constructs the process-owned Redis/AWS/storage foundation. */
-      eventing: Omit<EventingServerRuntimeOptions, "groupQueue">;
+      eventing: Omit<EventingServerRuntimeOptions, "groupQueue" | "consumersEnabled"> &
+        WorkerEventingConsumerCompositionOptions;
       infrastructure: WorkerInfrastructureCompositionOptions;
       resources: ResourceScope;
     })
   | (WorkerProductionCompositionBaseOptions & {
       /** Compatibility path for already-composed technical test ports. */
-      eventing: EventingServerRuntimeOptions;
+      eventing: Omit<EventingServerRuntimeOptions, "consumersEnabled"> &
+        WorkerEventingConsumerCompositionOptions;
       infrastructure?: undefined;
       resources?: ResourceScope;
     });
@@ -321,10 +335,13 @@ export type WorkerProductionCompositionOptions =
 /**
  * Fully composed background-worker graph for extractable worker surfaces.
  *
- * It deliberately leaves the shared Eventing consumer disabled. A consumer
- * must register the complete Eventing job registry, including Trace's
- * `assignTopic` pipeline consumer, before it can safely claim
- * `event-sourcing/jobs`. The live legacy worker remains that registry today.
+ * The shared Eventing consumer is off unless the caller asks for it. A
+ * consumer must be able to route the complete Eventing job registry,
+ * including Trace's `assignTopic` pipeline consumer, before it can safely
+ * claim `event-sourcing/jobs`: the queue rejects an unroutable job for
+ * redelivery rather than dropping it, so a graph missing one handler stalls
+ * that handler's work while every health signal stays green. Only a caller
+ * that has mounted the complete registry may pass `eventing.consumers`.
  */
 export class WorkerProductionComposition {
   static create(options: WorkerProductionCompositionOptions): WorkerProductionComposition {
@@ -342,6 +359,7 @@ export class WorkerProductionComposition {
       ...(options.globalProjections
         ? { configureGlobalProjections: options.globalProjections.configure }
         : {}),
+      ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
     const automation = options.automation
       ? AutomationWorkerFeatureInstaller.create({
@@ -816,12 +834,20 @@ function createEventingPersistence(
   options: WorkerProductionCompositionOptions,
   infrastructure: WorkerInfrastructureAdapter | undefined,
 ): EventingServerRuntimeOptions {
-  if (!options.infrastructure) return options.eventing;
+  if (!options.infrastructure) return withoutConsumers(options.eventing);
   if (!infrastructure) {
     throw new Error("Worker infrastructure was not constructed for the production graph.");
   }
   return {
-    ...options.eventing,
+    ...withoutConsumers(options.eventing),
     groupQueue: infrastructure.queueDependencies,
   };
+}
+
+/** Consumer ownership belongs to the Eventing runtime, not to its adapters. */
+function withoutConsumers<Options extends WorkerEventingConsumerCompositionOptions>(
+  options: Options,
+): Omit<Options, "consumers"> {
+  const { consumers: _consumers, ...persistence } = options;
+  return persistence;
 }

@@ -58,7 +58,7 @@ function createEventing(phases: string[]): WorkerEventingRuntime {
     processStore: InMemoryProcessStore.createForTesting(),
     executionTarget: "worker",
     warnWhenProjectionsRunInline: false,
-    consumersEnabled: false,
+    consumers: { enabled: false },
   });
 }
 
@@ -114,7 +114,7 @@ describe("WorkerApplication", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const application = WorkerApplication.create({
       runtime: WorkerRuntime.create({ lifecycle: new Lifecycle(), transport: new Transport() }),
@@ -193,7 +193,7 @@ describe("WorkerApplication", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const feature = new FeatureInstaller();
     feature.handle.close.mockImplementation(async () => {
@@ -283,7 +283,7 @@ describe("WorkerApplication", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
     const application = WorkerApplication.create({
       runtime: WorkerRuntime.create({ lifecycle, transport: new Transport() }),

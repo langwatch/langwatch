@@ -1,14 +1,27 @@
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
   InMemoryProcessStore,
   type Event,
   type EventSourcedQueueProcessor,
   type MapProjectionDefinition,
+  type ProcessStore,
+  type ReplayMarkerChecker,
   type SubscriberDispatchDefinition,
 } from "@langwatch/eventing";
-import { createBlobMaintenancePipeline } from "@langwatch/eventing/server";
+import {
+  createBlobMaintenancePipeline,
+  createEventingRetentionConfiguration,
+  EventingServerRuntime,
+} from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerEventingRuntime } from "../worker-eventing.runtime";
+import {
+  WorkerEventingRuntime,
+  type WorkerEventingConsumerOptions,
+  type WorkerEventingProductionOptions,
+} from "../worker-eventing.runtime";
 
 /**
  * A cross-pipeline map projection and the subscriber that follows it, reduced
@@ -117,7 +130,7 @@ describe("WorkerEventingRuntime", () => {
       processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: false,
+      consumers: { enabled: false },
     });
 
     runtime.completeRegistrations();
@@ -137,7 +150,7 @@ describe("WorkerEventingRuntime global projections", () => {
           processStore: InMemoryProcessStore.createForTesting(),
           executionTarget: "worker",
           warnWhenProjectionsRunInline: false,
-          consumersEnabled: false,
+          consumers: { enabled: false },
           configureGlobalProjections: (registry) => {
             registry.registerMapProjection(meterProjection);
             registry.registerMapSubscriber("orgBillableEventsMeter", meterDispatch);
@@ -165,7 +178,7 @@ describe("WorkerEventingRuntime global projections", () => {
           processStore: InMemoryProcessStore.createForTesting(),
           executionTarget: "worker",
           warnWhenProjectionsRunInline: false,
-          consumersEnabled: false,
+          consumers: { enabled: false },
         });
 
         runtime.eventSourcing.register(anyPipeline());
@@ -176,6 +189,181 @@ describe("WorkerEventingRuntime global projections", () => {
           ),
         ).toEqual([]);
       });
+    });
+  });
+});
+
+/**
+ * Consumer ownership is one decision with two effects, and a graph that got
+ * only one of them is worse than one that got neither: the Group Queue factory
+ * decides whether a queue definition also starts a consumer loop, and the
+ * Eventing runtime decides whether the process-manager outbox, wake and
+ * schedule workers run. A runtime that claims jobs but never drains its own
+ * process managers looks healthy and settles nothing.
+ */
+describe("WorkerEventingRuntime consumer ownership", () => {
+  /** Ports the stubbed server runtime never reads; only the decision matters. */
+  function serverPersistence(): WorkerEventingProductionOptions["persistence"] {
+    return {
+      database: {} as never,
+      resolveClickHouseClient: (async () => ({})) as never,
+      groupQueue: { redis: {} as never },
+      retention: createEventingRetentionConfiguration({ defaultRetentionDays: 30 }),
+    };
+  }
+
+  function stubServerRuntime(processStore: ProcessStore): EventingServerRuntime {
+    return {
+      dependencies: () => ({
+        eventStore: EventStoreMemory.createForTesting(),
+        processStore,
+        queueFactory: () => new TestQueue(),
+      }),
+    } as unknown as EventingServerRuntime;
+  }
+
+  describe("given a production graph built with no consumer option", () => {
+    it("leaves both the queue factory and the process-manager workers producer-only", async () => {
+      const processStore = InMemoryProcessStore.createForTesting();
+      const leaseDueMessages = vi.spyOn(processStore, "leaseDueMessages");
+      const create = vi
+        .spyOn(EventingServerRuntime, "create")
+        .mockReturnValue(stubServerRuntime(processStore));
+
+      try {
+        const runtime = WorkerEventingRuntime.createProduction({
+          persistence: serverPersistence(),
+          warnWhenProjectionsRunInline: false,
+        });
+        runtime.eventSourcing.register(anyPipeline());
+
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ consumersEnabled: false }));
+        await runtime.close();
+        expect(leaseDueMessages).not.toHaveBeenCalled();
+      } finally {
+        create.mockRestore();
+      }
+    });
+  });
+
+  describe("given a production graph the composition root asks to consume", () => {
+    it("enables both the queue factory and the process-manager workers", async () => {
+      const processStore = InMemoryProcessStore.createForTesting();
+      const leaseDueMessages = vi.spyOn(processStore, "leaseDueMessages");
+      const create = vi
+        .spyOn(EventingServerRuntime, "create")
+        .mockReturnValue(stubServerRuntime(processStore));
+
+      try {
+        const runtime = WorkerEventingRuntime.createProduction({
+          persistence: serverPersistence(),
+          warnWhenProjectionsRunInline: false,
+          consumers: { enabled: true },
+        });
+        runtime.eventSourcing.register(anyPipeline());
+
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ consumersEnabled: true }));
+        await vi.waitFor(() => expect(leaseDueMessages).toHaveBeenCalled());
+        await runtime.close();
+      } finally {
+        create.mockRestore();
+      }
+    });
+  });
+});
+
+/**
+ * The replay marker is a consuming-side concern and nothing else: the CLI
+ * writes a cutoff to Redis and the projection that folds the event is what has
+ * to read it. A packaged consumer without one applies events a replay is
+ * mid-way through re-deriving, and both writers land on the same aggregate.
+ */
+describe("WorkerEventingRuntime replay markers", () => {
+  function projectionFixture(consumers: WorkerEventingConsumerOptions) {
+    const map = vi.fn((event: Event) => ({ eventId: event.id }));
+    const runtime = WorkerEventingRuntime.create({
+      eventStore: EventStoreMemory.createForTesting(),
+      queueFactory: () => new TestQueue(),
+      processStore: InMemoryProcessStore.createForTesting(),
+      executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
+      consumers,
+    });
+    runtime.eventSourcing.register(
+      definePipeline<Event>({
+        name: "replay_probe",
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(["lw.obs.trace.span_received"] as const),
+        }),
+      })
+        .withClickHouseMapProjection({
+          name: "replayProbe",
+          eventTypes: ["lw.obs.trace.span_received"],
+          map,
+          store: { append: async () => void 0 },
+        })
+        .build(),
+    );
+    const entry = runtime.eventSourcing.globalJobRegistry.get("replay_probe:handler:replayProbe");
+    if (!entry) throw new Error("the probe pipeline registered no map projection job");
+    return { map, runtime, process: entry.process };
+  }
+
+  const spanReceived = {
+    id: "event-1",
+    aggregateId: "trace-1",
+    aggregateType: "trace",
+    tenantId: "project_test",
+    type: "lw.obs.trace.span_received",
+    createdAt: 1,
+    occurredAt: 1,
+    version: "2026-01-01",
+    data: {},
+  };
+
+  describe("given a consuming runtime the composition root gave a checker", () => {
+    describe("when the checker defers to an active replay", () => {
+      it("leaves the event to the replay rather than applying it", async () => {
+        const checker: ReplayMarkerChecker = {
+          check: vi.fn(async (_projectionName: string, _event: Event) => "skip" as const),
+        };
+        const fixture = projectionFixture({
+          enabled: true,
+          replayMarkerChecker: checker,
+        });
+
+        await fixture.process(spanReceived);
+        await fixture.runtime.close();
+
+        expect(checker.check).toHaveBeenCalledWith("replayProbe", spanReceived);
+        expect(fixture.map).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when no replay is active", () => {
+      it("applies the event, as the checker told it to", async () => {
+        const fixture = projectionFixture({
+          enabled: true,
+          replayMarkerChecker: { check: async () => "process" },
+        });
+
+        await fixture.process(spanReceived);
+        await fixture.runtime.close();
+
+        expect(fixture.map).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
+  describe("given a consuming runtime the composition root gave none", () => {
+    it("applies the event with no marker read at all", async () => {
+      const fixture = projectionFixture({ enabled: true });
+
+      await fixture.process(spanReceived);
+      await fixture.runtime.close();
+
+      expect(fixture.map).toHaveBeenCalledOnce();
     });
   });
 });

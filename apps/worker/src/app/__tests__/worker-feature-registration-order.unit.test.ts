@@ -130,7 +130,7 @@ function createEventing(registered: string[]) {
     processStore: InMemoryProcessStore.createForTesting(),
     executionTarget: "worker",
     warnWhenProjectionsRunInline: false,
-    consumersEnabled: false,
+    consumers: { enabled: false },
   });
   // Registration itself is the eventing package's contract; what this suite
   // observes is which definition reaches it, and in what order.

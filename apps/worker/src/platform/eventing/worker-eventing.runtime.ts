@@ -6,12 +6,35 @@ import {
   type EventStore,
   type ExecutionTarget,
   type ProcessStore,
+  type ReplayMarkerChecker,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import {
   EventingServerRuntime,
   type EventingServerRuntimeOptions,
 } from "@langwatch/eventing/server";
+
+/**
+ * Whether this runtime claims `event-sourcing/jobs`, and what claiming it needs
+ * beyond the producer surface.
+ *
+ * Absent means disabled. Exactly one process may consume the shared queue, so
+ * the composition that owns the consumer has to say so; every other
+ * construction stays a producer by omission rather than by remembering to opt
+ * out.
+ */
+export type WorkerEventingConsumerOptions =
+  | {
+      enabled: true;
+      /**
+       * Consulted per event before a projection applies it, so it only ever
+       * runs where the jobs are processed. A consumer without one applies
+       * events a projection replay is mid-way through re-deriving, and the two
+       * writers race for the same aggregate.
+       */
+      replayMarkerChecker?: ReplayMarkerChecker;
+    }
+  | { enabled: false };
 
 export interface WorkerEventingDependencies {
   eventStore: EventStore;
@@ -22,11 +45,8 @@ export interface WorkerEventingDependencies {
   executionTarget: ExecutionTarget;
   /** Production-only diagnostic for missing shared projection queues. */
   warnWhenProjectionsRunInline: boolean;
-  /**
-   * Kept as an explicit false-only assertion until the complete shared queue
-   * registry moves into a dedicated consumer-capable composition.
-   */
-  consumersEnabled?: false;
+  /** Consumer ownership for this runtime. Absent leaves it producer-only. */
+  consumers?: WorkerEventingConsumerOptions;
   retentionPolicyResolver?: RetentionPolicyResolver;
   /**
    * Projections that span pipelines, configured before any of them exist.
@@ -50,6 +70,8 @@ export interface WorkerEventingProductionOptions {
   warnWhenProjectionsRunInline: boolean;
   /** Cross-pipeline projections, registered before the first pipeline. */
   configureGlobalProjections?: EventSourcingOptions["configureGlobalProjections"];
+  /** Consumer ownership for this runtime. Absent leaves it producer-only. */
+  consumers?: WorkerEventingConsumerOptions;
 }
 
 /**
@@ -65,18 +87,25 @@ export class WorkerEventingRuntime {
   /**
    * Builds the Worker’s one durable Eventing graph from the sealed server
    * adapters. The process root supplies Prisma, ClickHouse, retention, and
-   * Group Queue ports; this boundary keeps consumers disabled until the full
-   * legacy registry has moved.
+   * Group Queue ports, and says whether this process is the one that consumes
+   * the shared queue — a runtime built without that option produces only.
+   *
+   * The decision reaches two places from here. The Group Queue factory decides
+   * whether a queue definition also starts a consumer loop, and the Eventing
+   * runtime decides whether the process-manager outbox, wake and schedule
+   * workers run. Half of that is a graph that claims jobs and never drains its
+   * own process managers.
    */
   static createProduction(options: WorkerEventingProductionOptions): WorkerEventingRuntime {
+    const consumers = options.consumers ?? { enabled: false };
     const server = EventingServerRuntime.create({
       ...options.persistence,
-      consumersEnabled: false,
+      consumersEnabled: consumers.enabled,
     });
     return WorkerEventingRuntime.create({
       ...server.dependencies(),
       executionTarget: "worker",
-      consumersEnabled: false,
+      consumers,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
       ...(options.configureGlobalProjections
         ? { configureGlobalProjections: options.configureGlobalProjections }
@@ -95,16 +124,22 @@ export class WorkerEventingRuntime {
   private constructor(dependencies: WorkerEventingDependencies) {
     this.eventStore = dependencies.eventStore;
     this.processStore = dependencies.processStore;
+    const consumers = dependencies.consumers ?? { enabled: false };
     this.eventSourcing = new EventSourcing({
       enabled: true,
       eventStore: this.eventStore,
       queueFactory: dependencies.queueFactory,
-      consumersEnabled: false,
+      consumersEnabled: consumers.enabled,
       executionTarget: dependencies.executionTarget,
       processStore: this.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,
       warnWhenProjectionsRunInline: dependencies.warnWhenProjectionsRunInline,
       configureGlobalProjections: dependencies.configureGlobalProjections,
+      // Spread rather than assigned, so a producer-only runtime hands Eventing
+      // the same option keys it did before this seam existed.
+      ...(consumers.enabled && consumers.replayMarkerChecker
+        ? { replayMarkerChecker: consumers.replayMarkerChecker }
+        : {}),
     });
   }
 
