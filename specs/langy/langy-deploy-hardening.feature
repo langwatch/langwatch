@@ -10,20 +10,38 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   #             runtime requirement and the per-worker UID isolation model.
   #   ADR-047 — Langy Foundations: the hardening batch this spec belongs to
   #             (authored alongside these changes).
+  #   ADR-130 — per-worker identity isolation is the operator's choice: the
+  #             posture scenarios in the third section below.
+  #   ADR-131 — the opencode harness is removed; pi is the only harness.
   #
-  # Why this matters. The langy-agent pod runs many opencode workers, each
-  # holding a DIFFERENT user's live credentials and executing LLM-generated
-  # shell — so a prompt-injected worker A can be induced to attack worker B.
-  # Two invariants keep that safe:
+  # Why this matters. The langy-agent pod runs many workers, each holding a
+  # DIFFERENT user's live credentials and executing LLM-generated shell — so a
+  # prompt-injected worker A can be induced to attack worker B. Two controls
+  # bound that:
   #   (1) the pod runs under a sandboxed runtime (gVisor/runsc) so a worker that
   #       breaks OUT of the container still cannot reach the node kernel;
   #   (2) the manager runs as root with a narrow capability set so it can hand
-  #       each worker a DISTINCT UID (per-worker child_process spawn) — without
-  #       which sibling workers share a UID and can read each other's project
-  #       API key + GitHub token straight off disk.
+  #       each worker a DISTINCT UID — without which sibling workers share a UID
+  #       and can read each other's live credentials out of the process
+  #       environment, and each other's conversation content out of the session
+  #       directory.
+  #
+  # Neither is an invariant, and this spec used to call them both one. Each is
+  # a DEFAULT the operator can trade, deliberately and on the record: (1) via
+  # acceptUnsandboxedRuntime, because most self-managed clusters cannot offer a
+  # sandboxed runtime; (2) via the isolation posture in ADR-130, because a
+  # cluster enforcing non-root admits no pod that can do (2) at all. What is
+  # invariant is that neither is given up by accident — every trade is a value
+  # written in the operator's own file, and the chart refuses to render without
+  # it.
+  #
+  # On credentials: workers keep no secret on disk. The exposure a shared
+  # identity opens is the worker's process environment and its session
+  # directory, not a credential file — there isn't one (ADR-131 removed the
+  # harness that had one).
+  #
   # The chart already fails the render when replicaCount != 1 or when
-  # service.type != ClusterIP. The sandboxed-runtime guard below is the third
-  # invariant in that same render-time-guard family.
+  # service.type != ClusterIP. The guards below are the same family.
 
   # ===========================================================================
   # Chart render-time guard: no managed deploy without a sandboxed runtime
