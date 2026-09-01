@@ -34,7 +34,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import type { EventSourcingOptions, StaticPipelineDefinition } from "@langwatch/eventing";
+import type { EventSourcingOptions } from "@langwatch/eventing";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { LogRuntimeAdapter } from "@langwatch/log-server";
@@ -50,7 +50,10 @@ import {
   WorkerTransportPort,
 } from "@langwatch/worker";
 import { AuthzFeature } from "~/runtime/app/features/authz";
-import { PipelineRegistry } from "~/server/event-sourcing/registration/pipelineRegistry";
+import {
+  PipelineRegistry,
+  type PipelineRegistryWorkerCapabilities,
+} from "~/server/event-sourcing/registration/pipelineRegistry";
 import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
 import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
 
@@ -64,7 +67,7 @@ const WORKER_CATALOGUE = join(REPO_ROOT, "apps/worker/src/features/catalogue.jso
 const WORKER_JOB_REGISTRY = join(REPO_ROOT, "apps/worker/src/features/job-registry.json");
 
 /**
- * What each legacy `eventSourcing.register(...)` call registers, by the worker
+ * What each legacy `this.registerPipeline(...)` call registers, by the worker
  * feature that owns the same pipeline.
  *
  * Keyed on the expression the registry passes, because that is what a reader
@@ -98,7 +101,7 @@ const LEGACY_REGISTRATIONS: Readonly<Record<string, string>> = {
 
 /**
  * Three features register through an installer of their own rather than
- * through an `eventSourcing.register(...)` the sweep below can see: Trace
+ * through a `this.registerPipeline(...)` the sweep below can see: Trace
  * hands its pipeline to `TraceProcessingServerInstaller`, Topic to
  * `TopicServerInstaller`, and Governance's two ingestion pipelines register
  * inside `AppGovernanceEventingAdapter.register()`.
@@ -115,16 +118,23 @@ const INSTALLER_REGISTERED: Readonly<Record<string, string>> = {
   "AppGovernanceEventingAdapter.create": "governance-ingestion",
 };
 
-/** Every expression the legacy registry passes to `eventSourcing.register`. */
+/**
+ * Every expression the legacy registry passes to its recorder.
+ *
+ * `registerPipeline` is the private method every registration goes through —
+ * recording the definition for `exportWorkerCapabilities()` and delegating to
+ * `eventSourcing.register`. Reading the recorder rather than the delegate is
+ * what keeps this sweep pointed at the call sites a reader sees.
+ */
 function legacyRegistrationExpressions(): string[] {
   const lines = readFileSync(REGISTRY, "utf8").split("\n");
   const found: string[] = [];
   for (const [index, line] of lines.entries()) {
-    if (!line.includes("eventSourcing.register(")) continue;
+    if (!line.includes("this.registerPipeline(")) continue;
     // The expression is on the same line or the next one, depending only on
     // where the formatter broke the call.
     const call = `${line.trim()} ${(lines[index + 1] ?? "").trim()}`;
-    const match = /register\(\s*([A-Za-z0-9_.]+)/.exec(call);
+    const match = /registerPipeline\(\s*([A-Za-z0-9_.]+)/.exec(call);
     expect(
       match,
       `no registered expression read at pipelineRegistry.ts:${index + 1}`,
@@ -142,11 +152,13 @@ function workerFeatures(): string[] {
 describe("worker pipeline parity", () => {
   describe("given the live legacy registry", () => {
     it("registers only pipelines this table accounts for", () => {
-      const unmapped = legacyRegistrationExpressions().filter(
-        (expression) => !(expression in LEGACY_REGISTRATIONS),
-      );
+      const registered = legacyRegistrationExpressions();
 
-      expect(unmapped, "a legacy pipeline with no worker feature mapped to it").toEqual([]);
+      // Both directions, so a renamed recorder that matches nothing fails here
+      // rather than reporting an empty sweep as a clean one.
+      expect([...new Set(registered)].sort(), "the sweep read no registrations at all").toEqual(
+        Object.keys(LEGACY_REGISTRATIONS).sort(),
+      );
     });
 
     it("still registers Trace and Topic through their installers", () => {
@@ -232,7 +244,9 @@ function expectedRoutingKeys(expected: ExpectedJobRegistry): string[] {
     ...expected.pipelines.flatMap((pipeline) =>
       pipeline.jobs.map((job) => `${pipeline.name}:${job}`),
     ),
-    ...expected.globalProjections.jobs.map((job) => `${expected.globalProjections.pipeline}:${job}`),
+    ...expected.globalProjections.jobs.map(
+      (job) => `${expected.globalProjections.pipeline}:${job}`,
+    ),
   ].sort();
 }
 
@@ -243,14 +257,14 @@ type BuiltRegistry = {
   routingKeys: string[];
 };
 
-/** Exactly what the legacy registry hands the Trace installer it builds. */
-type TraceInstallerOptions = Parameters<typeof TraceProcessingServerInstaller.create>[0];
-
 type LegacyBuild = BuiltRegistry & {
-  definitions: StaticPipelineDefinition<any, any, any>[];
-  traceInstallerOptions: TraceInstallerOptions | undefined;
+  /**
+   * The registry's own production export seam, rather than what spies could
+   * observe of its internals. Anything this cannot carry across is a gap in
+   * the switch itself, not in the test.
+   */
+  capabilities: PipelineRegistryWorkerCapabilities;
   topicInstallerOptions: unknown;
-  governanceRuntime: unknown;
 };
 
 /**
@@ -272,13 +286,6 @@ function buildLegacyRegistry(): LegacyBuild {
     configureGlobalProjections,
   });
 
-  const definitions: StaticPipelineDefinition<any, any, any>[] = [];
-  const register = eventSourcing.register.bind(eventSourcing);
-  vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
-    definitions.push(definition);
-    return register(definition);
-  });
-
   const redaction = autoStub();
   const topicInstallerOptions = {
     database: autoStub(),
@@ -287,19 +294,6 @@ function buildLegacyRegistry(): LegacyBuild {
     execution: autoStub(),
     metrics: autoStub(),
   };
-  const governanceRuntime = autoStub();
-
-  // The trace installer is built inside the registry from fifty collaborators.
-  // Capturing its options is what lets the packaged half build an equivalent
-  // one without this suite restating that construction.
-  let traceInstallerOptions: TraceInstallerOptions | undefined;
-  const traceCreate = vi
-    .spyOn(TraceProcessingServerInstaller, "create")
-    .mockImplementation((options) => {
-      traceInstallerOptions = options;
-      traceCreate.mockRestore();
-      return TraceProcessingServerInstaller.create(options);
-    });
 
   const supplied: Record<string, unknown> = {
     eventSourcing,
@@ -323,25 +317,41 @@ function buildLegacyRegistry(): LegacyBuild {
       connect: () => void 0,
     },
     topicClustering: { installer: TopicServerInstaller.create(topicInstallerOptions as never) },
-    enterprisePipelines: governanceRuntime,
+    enterprisePipelines: autoStub(),
   };
 
-  new PipelineRegistry(
+  const registry = new PipelineRegistry(
     new Proxy(supplied, {
       get: (target, property) =>
         property in target ? (target as Record<string | symbol, unknown>)[property] : autoStub(),
     }) as never,
-  ).registerAll();
+  );
+  registry.registerAll();
 
   return {
     pipelines: eventSourcing.definitions.map((definition) => definition.metadata.name),
     routingKeys: [...eventSourcing.globalJobRegistry.keys()].sort(),
-    definitions,
-    traceInstallerOptions,
+    capabilities: registry.exportWorkerCapabilities(),
     topicInstallerOptions,
-    governanceRuntime,
   };
 }
+
+describe("worker capability export", () => {
+  describe("given a registry whose pipelines have not been registered", () => {
+    /**
+     * Exporting first would hand a caller an empty graph rather than an error,
+     * and the packaged consumer built from it would claim `event-sourcing/jobs`
+     * with nothing to route the queue's jobs to.
+     */
+    it("refuses to export, and says which call has to come first", () => {
+      const registry = new PipelineRegistry(autoStub());
+
+      expect(() => registry.exportWorkerCapabilities()).toThrow(
+        "PipelineRegistry.exportWorkerCapabilities() exports what registerAll() registered; call registerAll() first.",
+      );
+    });
+  });
+});
 
 class NoopLifecycle extends WorkerLifecyclePort {
   async close(): Promise<void> {}
@@ -362,7 +372,7 @@ function processPersistenceDatabase() {
   return {
     $executeRaw: async () => 0,
     $queryRaw: async () => [],
-    $transaction: async <Result,>(run: (transaction: object) => Promise<Result>) => run({}),
+    $transaction: async <Result>(run: (transaction: object) => Promise<Result>) => run({}),
     processManagerInbox: {},
     processManagerInstance: {},
     processManagerOutbox: {},
@@ -380,20 +390,8 @@ function processPersistenceDatabase() {
  * installer graph carries all of them onto one runtime, in mount order, with
  * no key gained or lost on the way.
  */
-/** The captured options, named rather than asserted, so a miss says why. */
-function traceInstallerOptions(legacy: LegacyBuild): TraceInstallerOptions {
-  if (!legacy.traceInstallerOptions) {
-    throw new Error("the legacy registry built no Trace processing installer");
-  }
-  return legacy.traceInstallerOptions;
-}
-
 async function buildPackagedRegistry(legacy: LegacyBuild): Promise<BuiltRegistry> {
-  const definition = (name: string) => {
-    const found = legacy.definitions.find((candidate) => candidate?.metadata?.name === name);
-    if (!found) throw new Error(`the legacy registry registered no pipeline named "${name}"`);
-    return found as never;
-  };
+  const definition = (name: string) => legacy.capabilities.definition(name) as never;
 
   // Topic's boot seeds are a one-time data migration that pages Postgres, not
   // a registration; `worker-feature-registration-order` covers that the
@@ -418,7 +416,7 @@ async function buildPackagedRegistry(legacy: LegacyBuild): Promise<BuiltRegistry
       transport: new NoopTransport(),
       globalProjections: { configure: configureGlobalProjections },
       automation: { installer: { buildPipeline: () => definition("automations") } },
-      eventingMaintenance: { blobSweep: autoStub(), retentionMetrics: autoStub() },
+      eventingMaintenance: legacy.capabilities.eventingMaintenance,
       langyMaintenance: { installer: { buildProcessing: () => definition("langy_maintenance") } },
       apiKey: { installer: { buildMaintenance: () => definition("agent_sandbox_maintenance") } },
       github: { installer: { buildMaintenance: () => definition("github_maintenance") } },
@@ -434,7 +432,7 @@ async function buildPackagedRegistry(legacy: LegacyBuild): Promise<BuiltRegistry
       metric: { installer: { buildProcessing: () => definition("metric_processing") } },
       log: { installer: { buildProcessing: () => definition("log_processing") } },
       trace: {
-        installer: TraceProcessingServerInstaller.create(traceInstallerOptions(legacy)),
+        installer: TraceProcessingServerInstaller.create(legacy.capabilities.trace),
       },
       topic: legacy.topicInstallerOptions as never,
       suite: { installer: { buildProcessing: () => definition("suite_run_processing") } },
@@ -464,7 +462,7 @@ async function buildPackagedRegistry(legacy: LegacyBuild): Promise<BuiltRegistry
           register: (eventSourcing: never) =>
             AppGovernanceEventingAdapter.create(
               eventSourcing,
-              legacy.governanceRuntime as never,
+              legacy.capabilities.governanceRuntime,
             ).register(),
         },
       },

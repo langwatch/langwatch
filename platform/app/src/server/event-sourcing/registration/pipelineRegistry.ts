@@ -35,12 +35,15 @@ import {
 import { AppGovernanceWebhookAdapter } from "@langwatch/enterprise-api/governance/governance-webhook.adapter";
 import type {
   AppendStore,
+  Event,
   EventSourcing,
   EventSourcedQueueProcessor,
   FoldProjectionStore,
+  NoCommands,
   Projection,
   ProjectionStore,
   ProcessStore,
+  RegisteredCommand,
   StateProjectionStore,
   StaticPipelineDefinition,
   TriggerContext,
@@ -599,6 +602,33 @@ class AppGovernanceTraceAlertMatchPort extends TraceAlertTriggerMatchPort {
   }
 }
 
+/** Exactly what this registry hands the Trace processing installer. */
+type TraceProcessingInstallerOptions = Parameters<typeof TraceProcessingServerInstaller.create>[0];
+
+/**
+ * What a packaged worker composition needs from this registry to mount the
+ * same graph onto a second Eventing runtime.
+ *
+ * A pipeline DEFINITION is a static description, so handing one across
+ * registers the identical routing keys wherever it lands; the collaborators
+ * its handlers will call stay where they are. The three entries beside
+ * `definition` are the registrations that do not arrive as a definition:
+ * Trace's, which its own installer builds from fifty collaborators;
+ * Governance's two ingestion pipelines, which register inside the adapter; and
+ * the substrate sweeps, whose ports this registry constructs rather than
+ * receives.
+ */
+export type PipelineRegistryWorkerCapabilities = {
+  /** The definition registered under `name`. Throws if nothing registered it. */
+  definition(name: string): StaticPipelineDefinition<any, any, any>;
+  trace: TraceProcessingInstallerOptions;
+  eventingMaintenance: {
+    blobSweep: BlobSweeper;
+    retentionMetrics: ProcessRetentionMetricsPort;
+  };
+  governanceRuntime: AppGovernanceEventingRuntime;
+};
+
 /**
  * Composition root for all event-sourcing pipelines.
  *
@@ -611,6 +641,66 @@ export class PipelineRegistry {
     | ReturnType<AppGovernanceEventingAdapter["register"]>["lifecycle"]
     | undefined;
   constructor(private readonly deps: PipelineRegistryDeps) {}
+
+  private readonly registeredDefinitions = new Map<
+    string,
+    StaticPipelineDefinition<any, any, any>
+  >();
+  private traceProcessingOptions: TraceProcessingInstallerOptions | undefined;
+  private eventingMaintenancePorts:
+    | PipelineRegistryWorkerCapabilities["eventingMaintenance"]
+    | undefined;
+
+  /**
+   * The one place a pipeline definition reaches the runtime.
+   *
+   * Recording it by name is what lets `exportWorkerCapabilities()` hand the
+   * same definition to a second graph. A registration that goes straight to
+   * `this.deps.eventSourcing` is invisible to that export, and the graph built
+   * from it is then missing that pipeline's routing keys — which the one
+   * shared queue answers by redelivering those jobs indefinitely rather than
+   * dropping them.
+   */
+  private registerPipeline<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand = NoCommands,
+  >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>) {
+    this.registeredDefinitions.set(definition.metadata.name, definition);
+    return this.deps.eventSourcing.register(definition);
+  }
+
+  /**
+   * The registered graph, as the objects a second composition mounts.
+   *
+   * Everything it returns is produced by `registerAll()`, so it only answers
+   * after that has run — the definitions are recorded as they register, and
+   * the Trace installer's options and the substrate sweep ports are built on
+   * the way through.
+   */
+  exportWorkerCapabilities(): PipelineRegistryWorkerCapabilities {
+    const trace = this.traceProcessingOptions;
+    const eventingMaintenance = this.eventingMaintenancePorts;
+    if (!trace || !eventingMaintenance) {
+      throw new Error(
+        "PipelineRegistry.exportWorkerCapabilities() exports what registerAll() registered; call registerAll() first.",
+      );
+    }
+    return {
+      definition: (name) => this.registeredDefinition(name),
+      trace,
+      eventingMaintenance,
+      governanceRuntime: this.deps.enterprisePipelines,
+    };
+  }
+
+  private registeredDefinition(name: string): StaticPipelineDefinition<any, any, any> {
+    const definition = this.registeredDefinitions.get(name);
+    if (!definition) {
+      throw new Error(`No pipeline named "${name}" was registered.`);
+    }
+    return definition;
+  }
 
   /**
    * ADR-051: the trace pipeline's projectMetadata subscriber bootstraps a
@@ -637,7 +727,7 @@ export class PipelineRegistry {
 
     const automationPorts = this.deps.automations.ports;
     const graphActivityHandler = createGraphTriggerActivityHandler(this.deps.automation);
-    const automationPipeline = this.deps.eventSourcing.register(
+    const automationPipeline = this.registerPipeline(
       createAutomationsPipeline({
         scheduledIntents: this.deps.automation,
         settlement: automationPorts.settlement,
@@ -648,7 +738,9 @@ export class PipelineRegistry {
     // only arms the schedule where `roleRunsWorkers` holds, so on web this is
     // inert shape rather than a second fleet sweeping the same keyspace.
     const blobSweeper = new BlobSweeper({ redis: this.deps.redis });
-    this.deps.eventSourcing.register(
+    const retentionMetrics = new AppProcessRetentionMetricsPort();
+    this.eventingMaintenancePorts = { blobSweep: blobSweeper, retentionMetrics };
+    this.registerPipeline(
       createBlobMaintenancePipeline({
         cleanup: {
           sweep: () => blobSweeper.sweep(),
@@ -662,7 +754,7 @@ export class PipelineRegistry {
     // unconditionally and independently of any domain: it reaps by predicate
     // across every processName, so no process manager has to opt in and none
     // added later can be forgotten.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       createProcessManagerMaintenancePipeline({
         retentionSweep: {
           deleteDispatchedOutboxBatch: (params) =>
@@ -671,7 +763,7 @@ export class PipelineRegistry {
             this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
           deleteConsumedInboxBatch: (params) =>
             this.deps.repositories.processStore.deleteConsumedInboxBatch(params),
-          metrics: new AppProcessRetentionMetricsPort(),
+          metrics: retentionMetrics,
         },
       }),
     );
@@ -679,7 +771,7 @@ export class PipelineRegistry {
     // Langy credential maintenance, on the same footing. The reaper existed and
     // was routed for cron, but the chart ships no CronJobs — so until now the
     // backstop for keys orphaned by a SIGKILLed manager had no caller at all.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       EventingLangyMaintenanceAdapter.create({
         sessionKeyReap: {
           reap: () => this.deps.langy.sessionKeys.reapExpired(),
@@ -692,7 +784,7 @@ export class PipelineRegistry {
     // Code agent credential maintenance, on the same footing. A sandbox key is
     // minted per run and nothing revokes it at the end of one, so this sweep
     // is what retires it.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       EventingAgentSandboxMaintenanceAdapter.create({
         sandboxKeyReap: {
           reap: () => reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
@@ -706,7 +798,7 @@ export class PipelineRegistry {
     // `setTimeout` chain on every replica with no lock, so the fleet ran the
     // same cross-tenant scan N times every ten minutes.
     if (this.deps.github) {
-      this.deps.eventSourcing.register(
+      this.registerPipeline(
         EventingGithubMaintenanceAdapter.create({
           github: this.deps.github,
           processStore: this.deps.repositories.processStore,
@@ -809,13 +901,13 @@ export class PipelineRegistry {
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.
-    const authzPipeline = this.deps.eventSourcing.register(this.deps.authz.pipeline);
+    const authzPipeline = this.registerPipeline(this.deps.authz.pipeline);
     this.deps.authz.connect(authzPipeline.commands);
     // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
     // writer dispatches these commands until the identity adapter lands, and
     // the adapter's per-user write gate itself ships closed until a user's
     // backfill (PR 2) latches — a deploy changes nothing on its own.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       createIdentityPipeline({
         identityProjectionStore: this.deps.repositories.identityProjection,
         identityGuards: new IdentityGuards(
@@ -837,7 +929,7 @@ export class PipelineRegistry {
     // production writer until D05 is the grandfather migration, which is
     // paced by per-organization enrollment like every other in-place
     // migration — a deploy changes nothing on its own.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       createSsoConnectionPipeline({
         connectionProjectionStore: this.deps.repositories.ssoConnectionProjection,
         connectionGuards: new SsoConnectionGuards({
@@ -857,7 +949,7 @@ export class PipelineRegistry {
     // whether the flag is on or not: a history nobody writes to costs
     // nothing, and one that only exists once the flag flips would have no
     // past to show on the day it mattered.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       createScimSyncPipeline({
         scimSyncProjectionStore: this.deps.repositories.scimSyncProjection,
         scimSyncGuards: new ScimSyncGuards({
@@ -870,7 +962,7 @@ export class PipelineRegistry {
     // defaults off, so nothing dispatches a join command, no interstitial
     // renders and no admin panel appears — a deploy changes nothing on its
     // own, and rollback is the flag.
-    this.deps.eventSourcing.register(
+    this.registerPipeline(
       createJoinRequestPipeline({
         joinRequestProjectionStore: this.deps.repositories.joinRequestProjection,
         joinRequestGuards: new JoinRequestGuards({
@@ -933,7 +1025,7 @@ export class PipelineRegistry {
       titleGenerator: this.deps.langy.titleGenerator,
       sessionKeys: this.deps.langy.sessionKeys,
     });
-    const pipeline = this.deps.eventSourcing.register(langy.buildProcessing());
+    const pipeline = this.registerPipeline(langy.buildProcessing());
     const commands = mapCommands(pipeline.commands);
     langy.connectCommands({
       failAgentResponse: commands.failAgentResponse,
@@ -950,7 +1042,7 @@ export class PipelineRegistry {
   }: {
     subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
   }) {
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       this.deps.metricProcessing.buildProcessing({
         subscribers,
       }),
@@ -967,7 +1059,7 @@ export class PipelineRegistry {
    * this pipeline's delivery process has no producer without spend.
    */
   private registerGovernanceEventsPipeline() {
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       createGovernanceEventsPipeline({
         webhookDelivery: this.deps.webhookDelivery
           ? AppGovernanceWebhookAdapter.create(this.deps.webhookDelivery).build()
@@ -1017,7 +1109,7 @@ export class PipelineRegistry {
         findOpenAdmissions: (params) => openAdmissions.findOpenAdmissions(params),
       },
     });
-    const pipeline = this.deps.eventSourcing.register(spend.buildProcessing());
+    const pipeline = this.registerPipeline(spend.buildProcessing());
     // The sweeper's `settleSpend` sender is produced by the very registration
     // that mounts it, so the loop closes here rather than through a by-name
     // pipeline lookup at settlement time: a mis-registered graph now fails at
@@ -1043,7 +1135,7 @@ export class PipelineRegistry {
    * registers before all three.
    */
   private registerCodingAgentPipeline(costMetrics: OtelCodingAgentCostMetricsAdapter) {
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       EventingCodingAgentProcessingAdapter.create({
         traceCanonicalisation: this.deps.traceCanonicalisation,
         modelProviders: this.deps.modelProviders,
@@ -1068,7 +1160,7 @@ export class PipelineRegistry {
   }: {
     subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];
   }) {
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       this.deps.logProcessing.buildProcessing({
         subscribers,
       }),
@@ -1109,7 +1201,7 @@ export class PipelineRegistry {
       retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
     }).buildStores();
 
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       createEvaluationProcessingPipeline({
         evalRunStore: evaluationStores.evalRunStore,
         evaluationAnalyticsStore: this.cached(
@@ -1247,7 +1339,10 @@ export class PipelineRegistry {
         }
       : undefined;
 
-    const traceInstaller = TraceProcessingServerInstaller.create({
+    // Held rather than passed straight through: a second graph mounting Trace
+    // has to build an equivalent installer, and this construction is fifty
+    // collaborators wide.
+    this.traceProcessingOptions = {
       pipeline: AppTraceProcessingPipeline.create({
         recordSpanCommand: AppTraceRecordSpanAdapter.create({
           modelProviders: this.deps.modelProviders,
@@ -1300,7 +1395,8 @@ export class PipelineRegistry {
         subscribers: codingAgentSubscribers,
       }),
       datasetNormalization: this.deps.datasetNormalization,
-    });
+    };
+    const traceInstaller = TraceProcessingServerInstaller.create(this.traceProcessingOptions);
     const installedTrace = traceInstaller.install(this.deps.eventSourcing);
     const tracePipeline = installedTrace.pipeline;
 
@@ -1328,7 +1424,7 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
-    return this.deps.eventSourcing.register(
+    return this.registerPipeline(
       createSuiteRunProcessingPipeline({
         suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
           new RepositoryFoldStore<SuiteRunStateData>(
@@ -1385,7 +1481,7 @@ export class PipelineRegistry {
       },
     });
 
-    const simulationPipeline = this.deps.eventSourcing.register(
+    const simulationPipeline = this.registerPipeline(
       SimulationProcessingPipelineAdapter.create({
         simulationRunStore,
         simulationRunMetricsStore: this.deps.repositories.simulationRunMetricsStore,
@@ -1494,7 +1590,7 @@ export class PipelineRegistry {
       errorReporter: AppBillingErrorReporter.create(),
     });
 
-    const pipeline = this.deps.eventSourcing.register(billingReporting.buildProcessing());
+    const pipeline = this.registerPipeline(billingReporting.buildProcessing());
     billingReporting.connectSelfDispatch((data) =>
       pipeline.commands.reportUsageForMonth.send(data),
     );
@@ -1512,7 +1608,7 @@ export class PipelineRegistry {
       "experiment_runs",
     );
 
-    const experimentRunPipeline = this.deps.eventSourcing.register(
+    const experimentRunPipeline = this.registerPipeline(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
