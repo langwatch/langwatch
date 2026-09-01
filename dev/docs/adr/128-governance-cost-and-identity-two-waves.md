@@ -640,12 +640,13 @@ knowingly disagree with the provider's own console).
 
 ### §16. Idle seats split across the waves (FR3)
 
-- **Wave 1, the aggregate**: "you pay for N seats, M were active" per
-  provider — SKU/roster counts × a distinct-count over raw actor ids on
-  usage rows. No identity needed.
-- **Wave 2, the names**: listing *which* seats are idle requires the
-  roster ↔ usage-actor join (§11). Idle default: no activity for 30 days,
-  adjustable per org; last-activity date always shown.
+- **Wave 1, the aggregate**: "you pay for N seats, M are assigned" per
+  provider — both numbers straight from the provider's SKU/roster counts
+  (bought vs assigned). No identity needed, no usage join.
+- **Wave 2, the names and the activity**: an *active*-seat count (distinct
+  raw actor ids on usage rows) and listing *which* seats are idle both
+  require the roster ↔ usage-actor join (§11). Idle default: no activity
+  for 30 days, adjustable per org; last-activity date always shown.
 - FR3 is **partially** met in wave 1, met in wave 2 — the ADR says so
   rather than rounding up.
 
