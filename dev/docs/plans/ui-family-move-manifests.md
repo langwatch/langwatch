@@ -622,3 +622,57 @@ setQuery/navigate/succeeded/failed` is now written out three times. Promotion
   adapts its own host into `@langwatch/coding-agent-web`'s narrower one and
   mounts it around the four screens that render a table. That is what an
   ungoverned package's presentation costs, and it is cheaper than governing it.
+
+## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
+
+82 keys → 80 distinct modules at survey time; the evaluations redirect
+retirement below took it to 81 keys. Chrome baseline noise: every page's
+raw closure drags 733 files through DashboardLayout → CurrentDrawer →
+drawerRegistry (45 lazy drawers) → traces-v2's TraceDrawer; exclusive
+closures are computed net of that.
+
+**Dispatch order (effort = moving prod files + tests touching):**
+
+| # | Family | Keys | Effort | Gate |
+|---|---|---|---|---|
+| 1 | agents | 1 | ~2+0 | none — agent-web governed+catalogued, transport half already in apps/ui; take query-key overlays, platform drawer entries stay for their other callers |
+| 2 | settings S5 data governance | 4 | 5+5 | relayout data-retention/privacy-web first; 2 server-type contract moves; lands the SettingsLayout harvest |
+| 3 | datasets | 2 | 6+6 | relayout dataset-web; one AppRouter type → contract DTO; touches NO drawer entries |
+| 4 | settings S4 model config | 2 | 7+6 | create model-provider-web; 2 one-line platform breaks |
+| 5 | prompts | 1 | 44+14 | "model out first" is now just NINE family-local copies (5 optimization_studio consumers die with workflows); ~70 prompt fragment lines retire; prompt-web governed, 57% adapter ratio |
+| 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
+| 7 | settings S2 RBAC | 2 | 8+4 | ~/server/api/rbac fix (shared with governance's baseline suppression); governing authz-web clears 14 findings governance+gateway carry |
+| 8 | annotations | 5 | 12+7 | traceV2Details chrome gap; relayout annotation-web; tab-as-prop |
+| 9 | settings S6 credentials + /cli/auth | 3 | 14+12 | MUST ship together (cli imports api-keys files); create api-key-web; rbac fix |
+| 10 | analytics | 9 | 49+17 | six ~/server modules; retires 4 of automations' 7 platform breaks; custom/[id] is tab-as-prop |
+| 11 | evaluations/evaluators | 7 | 16+8 | WORST drawer sharing (evaluatorEditor 20 callers); entangled with experiments at module level |
+| 12 | workflows/studio/chat | 3 | 53+19 | killing it also kills the prompt-model platform copies |
+| 13 | auth front door + public (joint) | 13 | ~76 | ZERO blockers of any kind but NO destination package — create auth/identity web |
+| 14 | onboarding | 4 | 54+11 | order after traces (traces-v2/onboarding is the largest consumer) |
+| 15 | settings S1 org/members/teams | 5 | 25+7 | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it) |
+| 16 | settings S3 billing | 4 | 17+9 | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first |
+| 17 | settings S8 integrations | 2 | 2+2 | zero blockers, no destination — ride along with any settings package |
+| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces | | | anti-targets / downstream |
+
+**Cross-cutting gates:**
+- tRPC subscriptions: apps/ui's transport declares none — blocks traces (5
+  consumers), experiments workbench, langy layout, simulations+agent-testing.
+- The chrome layout route that would mount CurrentDrawer for package-served
+  screens is SEPARATE work from moving ProjectLangyLayout, and it is what
+  closes the recorded me/automations/gateway drawer gaps.
+- ProjectLangyLayout: DO NOT move it — nothing below it is blocked (children
+  resolve through the merged registry); govern @langwatch/langy-web as its
+  own relayout commit first, then reassess.
+- Prisma enum value exports needed: TeamUserRole + RoleBindingScopeType
+  (authz-contract has schemas), AnnotationScoreDataType (annotation-contract),
+  OrganizationUserRole (NO home — the hard one), OrganizationIntent,
+  ExperimentType.
+
+**Retired without moves (landed with this survey):** the
+/:project/evaluations key became a route-table redirect to
+/:project/experiments (module stays — the experiments key serves its named
+export); dead pair pages/settings/api-keys/{ProjectApiKeySection,CodeBlock}
+deleted; dead drawer entry evaluatorTypeSelector deleted; gateway-web and
+enterprise-governance-web root exports deleted (zero importers; the
+governance-web count previously recorded here was stale). ops-web root
+export stands (17 platform importers); user-web's stands (one test).

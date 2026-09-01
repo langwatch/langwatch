@@ -179,7 +179,6 @@ export function packagedWorkerCapabilities(options: {
     automation: { installer: { buildPipeline: () => definition("automations") } },
     eventingMaintenance: capabilities.eventingMaintenance,
     langyMaintenance: { installer: { buildProcessing: () => definition("langy_maintenance") } },
-    apiKey: { installer: { buildMaintenance: () => definition("agent_sandbox_maintenance") } },
     github: { installer: { buildMaintenance: () => definition("github_maintenance") } },
     evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
     codingAgent: { installer: { buildProcessing: () => definition("coding_agent_processing") } },

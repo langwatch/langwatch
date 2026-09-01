@@ -74,7 +74,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/datasets": () => import("~/pages/[project]/datasets"),
   "pages/[project]/datasets/[id]": () => import("~/pages/[project]/datasets/[id]"),
   "pages/[project]/evaluators": () => import("~/pages/[project]/evaluators"),
-  "pages/[project]/evaluations": () => import("~/pages/[project]/evaluations"),
   "pages/[project]/online-evaluations": () => import("~/pages/[project]/online-evaluations"),
   "pages/[project]/evaluations/wizard": () => import("~/pages/[project]/evaluations/wizard"),
   "pages/[project]/evaluations/wizard/[slug]": () => import("~/pages/[project]/evaluations/wizard"),

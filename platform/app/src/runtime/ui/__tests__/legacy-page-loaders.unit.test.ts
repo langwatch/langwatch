@@ -47,7 +47,6 @@ describe("given the browser route table and this application's page loaders", ()
 
 describe("given the addresses that share one screen", () => {
   const sharing: ReadonlyArray<[string, () => null]> = [
-    ["pages/[project]/evaluations", screens.evaluations],
     ["pages/[project]/experiments/index", screens.experiments],
     ["pages/[project]/evaluations/wizard", screens.wizard],
     ["pages/[project]/evaluations/wizard/[slug]", screens.wizard],

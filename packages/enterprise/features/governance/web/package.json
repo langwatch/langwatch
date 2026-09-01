@@ -11,10 +11,6 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
     "./screens/governance": {
       "types": "./src/screens/governance/index.ts",
       "default": "./src/screens/governance/index.ts"

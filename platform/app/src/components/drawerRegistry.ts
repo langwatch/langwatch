@@ -131,10 +131,6 @@ const EvaluatorListDrawer = lazyDefault({
   factory: () => import("./evaluators/EvaluatorListDrawer"),
   key: "EvaluatorListDrawer",
 });
-const EvaluatorTypeSelectorDrawer = lazyDefault({
-  factory: () => import("./evaluators/EvaluatorTypeSelectorDrawer"),
-  key: "EvaluatorTypeSelectorDrawer",
-});
 const WorkflowSelectorForEvaluatorDrawer = lazyDefault({
   factory: () => import("./evaluators/WorkflowSelectorForEvaluatorDrawer"),
   key: "WorkflowSelectorForEvaluatorDrawer",
@@ -258,7 +254,6 @@ export const drawers = {
   comparisonLeaderboard: ComparisonLeaderboardDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
-  evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
   evaluatorEditor: EvaluatorEditorDrawer,
   codeEvaluatorEditor: CodeEvaluatorEditorDrawer,
   // Workflow selector specifically for evaluators (creates evaluator, not agent)

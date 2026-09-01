@@ -553,8 +553,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/[project]/evaluators",
       },
       {
+        // The page's default export was nothing but this replace; a table row
+        // says the same thing without a loader.
         path: "/:project/evaluations",
-        page: "pages/[project]/evaluations",
+        redirect: {
+          from: "/:project/evaluations",
+          to: "/:project/experiments",
+        },
       },
       {
         path: "/:project/online-evaluations",
