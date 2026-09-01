@@ -134,12 +134,16 @@ func TestRouter_RejectedRequestIsStillCounted(t *testing.T) {
 
 	// Rejected before model resolution, so provider and model are genuinely
 	// unknown, but the request still has to show up on the error rate.
-	// The route folds onto the mounted pattern rather than the leaf: chi
-	// has not matched a leaf route yet when the auth middleware rejects.
-	// That is the right answer for cardinality, and the request still
-	// lands on the error rate.
+	//
+	// The route label is the leaf pattern. Auth now runs inside a group
+	// under /v1 rather than on the /v1 router itself, because the vendor
+	// webhook is the one route there that carries no virtual key, so chi has
+	// resolved the leaf by the time auth rejects. A 401 therefore counts
+	// against the same route label as a 200 on the same path, which it did
+	// not before: those used to land on /v1/* and could not be compared.
+	// Cardinality is unchanged in kind, since routes are a fixed set.
 	assert.Contains(t, gatewaySeries(t, router),
-		`gateway_http_requests_total{model="unknown",provider="unknown",route="/v1/*",status="401"} 1`)
+		`gateway_http_requests_total{model="unknown",provider="unknown",route="/v1/chat/completions",status="401"} 1`)
 }
 
 // @scenario "A customer-fault rejection is counted against the key that sent it"

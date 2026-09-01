@@ -1,5 +1,98 @@
 # Changelog
 
+## [1.11.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.10.0...typescript-sdk@v1.11.0) (2026-08-31)
+
+
+### Features
+
+* agent testing v2, suites, run notes, versioning and a new testing surface (flagged) ([#7529](https://github.com/langwatch/langwatch/issues/7529)) ([86ab7f7](https://github.com/langwatch/langwatch/commit/86ab7f794d02c477b53a2cc46804972649ee37b3))
+* **agent-cache:** a code agent logs in once for a whole run ([#7545](https://github.com/langwatch/langwatch/issues/7545)) ([52bedc0](https://github.com/langwatch/langwatch/commit/52bedc0bb7d23fd8cd72efc2207edf6172096083))
+* **agent-cache:** take a name with a claim, so one row does the work ([#7596](https://github.com/langwatch/langwatch/issues/7596)) ([6dfa6d7](https://github.com/langwatch/langwatch/commit/6dfa6d74c824ae5e04bb97196e33911940861cb0))
+* **agent-testing:** compare agents in one run ([#7654](https://github.com/langwatch/langwatch/issues/7654)) ([3e73916](https://github.com/langwatch/langwatch/commit/3e7391698f5e9b1cac2f8c5f0d0cacc9dec4d02a))
+* **agent-testing:** v2 polish round 6 ([#7590](https://github.com/langwatch/langwatch/issues/7590)) ([1f9efad](https://github.com/langwatch/langwatch/commit/1f9efad30ab94e86d00f57ea478bf0685b437f23))
+* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+* **experiments:** the workbench copilot measures before it edits ([#7550](https://github.com/langwatch/langwatch/issues/7550)) ([2343dd5](https://github.com/langwatch/langwatch/commit/2343dd587777edf8b567754fe3523ff9cd6b7b1c))
+
+
+### Bug Fixes
+
+* **cli:** name a codex session that emits no user_message event ([#7417](https://github.com/langwatch/langwatch/issues/7417)) ([00770f6](https://github.com/langwatch/langwatch/commit/00770f682c02006691e98c5d5b9e18162c749a72))
+* **data-privacy:** stop redaction replacing the product's own record ids ([#7543](https://github.com/langwatch/langwatch/issues/7543)) ([6caf87c](https://github.com/langwatch/langwatch/commit/6caf87c074e2b378c1000f581236d1cd74f50628))
+* **experiments:** an evaluator chip says what it checks, and the box has jq ([#7615](https://github.com/langwatch/langwatch/issues/7615)) ([2b113b3](https://github.com/langwatch/langwatch/commit/2b113b346c29f2e871d7d59d647420cdd63d11be))
+* **experiments:** the numbers agree across the workbench, the results page and the CLI ([#7606](https://github.com/langwatch/langwatch/issues/7606)) ([07ade28](https://github.com/langwatch/langwatch/commit/07ade28e92ba93610c0e274c06f87beb1a3b81d9))
+* optional legacy answer fields, one vocabulary for test suites and run plans, and named targets for runs from code ([#7638](https://github.com/langwatch/langwatch/issues/7638)) ([6fd37f3](https://github.com/langwatch/langwatch/commit/6fd37f30428c9fc468230fa9e4a79e3dee8cc58f))
+* **scenarios:** fix the seven defects found while dogfooding a customer onboarding demo ([#7271](https://github.com/langwatch/langwatch/issues/7271)) ([7eeac5b](https://github.com/langwatch/langwatch/commit/7eeac5ba6809ed217ce3179d0a1fbb7656f2db52))
+* **typescript-sdk:** stop excludeHttpRequests from dropping user verb-word spans ([#7457](https://github.com/langwatch/langwatch/issues/7457)) ([7b1c204](https://github.com/langwatch/langwatch/commit/7b1c204b79f99f68ac45e9038d0a298a9257eed5))
+
+
+### Documentation
+
+* give coding agents their own top-level section ([#7546](https://github.com/langwatch/langwatch/issues/7546)) ([058882c](https://github.com/langwatch/langwatch/commit/058882c08cfd9070210c9db2d0a46fe837647d28))
+
+## [1.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.9.0...typescript-sdk@v1.10.0) (2026-08-25)
+
+
+### Features
+
+* **agent-plugin:** agent-declared working context with langwatch ingest context ([#7464](https://github.com/langwatch/langwatch/issues/7464)) ([9ffa03d](https://github.com/langwatch/langwatch/commit/9ffa03dfc1b1b2b777ee37bb42703de5c8fef0e0))
+
+## [1.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.8.0...typescript-sdk@v1.9.0) (2026-08-25)
+
+
+### Features
+
+* **cli-auth:** langwatch login mints a user-scoped key that inherits the user's permissions ([#7410](https://github.com/langwatch/langwatch/issues/7410)) ([c935339](https://github.com/langwatch/langwatch/commit/c935339ca69bbbc9e0272f8a0f71eadf170c0ce6))
+* **langy:** drive the experiments workbench as a prompt improvement copilot ([#7424](https://github.com/langwatch/langwatch/issues/7424)) ([1e0d104](https://github.com/langwatch/langwatch/commit/1e0d1040b39c13089ecca01e437a15d2590224ae))
+* **lwql:** workbench epic - granularity contract, run-by-chart-id, dashboard widgets, chart CLI, Langy skill, QA fixes ([#7474](https://github.com/langwatch/langwatch/issues/7474)) ([df4f775](https://github.com/langwatch/langwatch/commit/df4f775bd2a3d3547bad95822278a8ec69682a1c))
+
+
+### Bug Fixes
+
+* **cli:** the codex harvest reads the checkout, so a session reports the branch it is on ([#7415](https://github.com/langwatch/langwatch/issues/7415)) ([b1bc36f](https://github.com/langwatch/langwatch/commit/b1bc36fef3e787d4152a7e3bb2ecdd7e51519704))
+
+## [1.8.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.7.0...typescript-sdk@v1.8.0) (2026-08-22)
+
+
+### Features
+
+* **scenarios:** secret run parameters and a truthful batch completion signal ([#7397](https://github.com/langwatch/langwatch/issues/7397)) ([ab564c0](https://github.com/langwatch/langwatch/commit/ab564c0e01afefeebe1864e2990d0c9afebfe806))
+
+
+### Bug Fixes
+
+* **cli:** the session-context hook follows a native worktree switch ([#7400](https://github.com/langwatch/langwatch/issues/7400)) ([f7efa27](https://github.com/langwatch/langwatch/commit/f7efa275f61ef878ec5f3c23da9fdb048b2e36e1))
+* **governance:** one projection hold per ingestion-key rotation, and a spinner while the wrapper sets up ([#7395](https://github.com/langwatch/langwatch/issues/7395)) ([a22237f](https://github.com/langwatch/langwatch/commit/a22237fd016181469d1cdc450a3f7b26829739be))
+* **langy:** composer typing performance, session resume, and cards that tell the truth ([#7403](https://github.com/langwatch/langwatch/issues/7403)) ([6dc0d81](https://github.com/langwatch/langwatch/commit/6dc0d8153995d263a2f0ca5a5c4218380e3a6777))
+
+## [1.7.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.6.0...typescript-sdk@v1.7.0) (2026-08-21)
+
+
+### Features
+
+* **cli:** create the HTTP agent on the spot when agent dev finds none ([#7156](https://github.com/langwatch/langwatch/issues/7156)) ([13b40a8](https://github.com/langwatch/langwatch/commit/13b40a8509a3eafbb49449fc58d1227f3359cccb))
+* **gateway:** one budget-overview service for /me, the CLI epilogue, and budgets surfaces ([#6420](https://github.com/langwatch/langwatch/issues/6420)) ([7dcd14d](https://github.com/langwatch/langwatch/commit/7dcd14d9389824c6a114d333ecdec1ad364ff873))
+* **langy:** minimal harness, own system prompt, scoped tools, outcome-based judge, overfit-resistant skills ([#7266](https://github.com/langwatch/langwatch/issues/7266)) ([084324f](https://github.com/langwatch/langwatch/commit/084324f9db077cdaea0cc822ff505485b593d278))
+* **navigation:** product switcher and icon rail behind one flag, gateway/governance URL moves ([#7076](https://github.com/langwatch/langwatch/issues/7076)) ([aadd411](https://github.com/langwatch/langwatch/commit/aadd4112e6a92e3a50f7db8b34a3f4dd376efefd))
+
+
+### Bug Fixes
+
+* **coding-agent:** a row exists once the session says something, and its orchestrator can name it ([#7197](https://github.com/langwatch/langwatch/issues/7197)) ([52df144](https://github.com/langwatch/langwatch/commit/52df144ee06d86c25403ca094d2005c448a89799))
+* **data-privacy:** catch vendor API keys the allow-list missed, and stop custom patterns erasing trace text ([#6816](https://github.com/langwatch/langwatch/issues/6816)) ([8668f2c](https://github.com/langwatch/langwatch/commit/8668f2c4eb2d5e9ed72b564caf7f6e0512bb4aee))
+* **governance:** the codex harvest caps a long conversation in one pass ([#7336](https://github.com/langwatch/langwatch/issues/7336)) ([4b032cd](https://github.com/langwatch/langwatch/commit/4b032cd4f617fb86565ae68613acedf07181ec7a))
+* **sdk-ts:** migrate to the OpenTelemetry logs SDK 0.221 API surface ([#7274](https://github.com/langwatch/langwatch/issues/7274)) ([dc60f46](https://github.com/langwatch/langwatch/commit/dc60f46eb127513e9af34a3a8f450b88df71417b))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
+* **deps:** bump chalk from 5.6.2 to 6.0.0 ([#6803](https://github.com/langwatch/langwatch/issues/6803)) ([82c62ea](https://github.com/langwatch/langwatch/commit/82c62eacb15d9a9ae33e5f4a14da82feaf1de033))
+
+
+### Code Refactoring
+
+* **api:** migrate hono-openapi 0.4.8 -&gt; 1.3.1 ([#7286](https://github.com/langwatch/langwatch/issues/7286)) ([f814e42](https://github.com/langwatch/langwatch/commit/f814e42612ed86650dfd0014df3be70bf0e42b8c))
+
 ## [1.6.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.5.0...typescript-sdk@v1.6.0) (2026-08-18)
 
 

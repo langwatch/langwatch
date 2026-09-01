@@ -507,6 +507,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the result is identical across runs over unchanged data
 
   @integration
+  Scenario: A query naming a column that does not exist is refused with the column named
+    Given an authenticated API client
+    When it submits a query selecting a column no dataset carries
+    Then the query is refused with error code lwql_unknown_identifier at HTTP 400
+    And the response names the column the server could not resolve
+    And the fault is the caller's, and the remediation tells them to check the name against the dataset's columns
+    And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
+
+  @integration
   Scenario: A parameterized query missing a bound value is refused before execution
     Given an authenticated API client
     When it submits a parameterized query without a value for one of its parameters

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { IntentSpec } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 
 export const SIMULATION_RUN_EXECUTION_PROCESS_NAME =
   "simulation_run_execution" as const;
@@ -88,10 +89,15 @@ export const executeRunIntentSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   target: z.object({
-    type: z.enum(["prompt", "http", "code", "workflow"]),
+    type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
     referenceId: z.string(),
   }),
   parameters: runParameterValuesSchema.optional(),
+  /**
+   * The run's secret parameter values, still encrypted. The pool job carries
+   * them as they are; the prefetch is the only place that decrypts.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
 });
 export type ExecuteRunIntent = z.infer<typeof executeRunIntentSchema>;
 
@@ -127,7 +133,7 @@ export const simulationRunProcessEventViewSchema = z.object({
   name: z.string().nullable(),
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
       referenceId: z.string(),
     })
     .nullable(),
@@ -138,6 +144,18 @@ export const simulationRunProcessEventViewSchema = z.object({
    * parse instead of redelivering forever.
    */
   parameters: runParameterValuesSchema.nullable().default(null),
+  /**
+   * The run's secret parameter values, as recorded on the queued event and
+   * still encrypted. This view is persisted verbatim as the inbox payload, so
+   * only the encrypted form may travel here.
+   */
+  secretParameters: runSecretCiphertextSchema.nullable().default(null),
+  /**
+   * The names the queued event declared secret, from `metadata`. They are what
+   * the ciphertext beside them is checked against: a run that declares a
+   * credential and carries no readable value for it must not execute.
+   */
+  secretParameterNames: z.array(z.string()).nullable().default(null),
 });
 export type SimulationRunProcessEventView = z.infer<
   typeof simulationRunProcessEventViewSchema

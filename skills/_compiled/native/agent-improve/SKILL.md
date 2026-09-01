@@ -16,6 +16,8 @@ This skill is an improvement engine with a teaching stance: every proposal is a 
 
 Improvements start from evidence, never from generic advice.
 
+**No traces in the project?** Then there is no production evidence to mine and this skill cannot start. Say so in one line and switch method: measure the answers against a dataset instead of against live traffic. In Langy, run the prompt improvement loop (`prompt-optimization`). In a coding agent, use the `experiments` skill. Come back here once real traffic exists.
+
 1. **Use an existing diagnosis when there is one.** Look for `agent-performance-report.html` (or ask if a recent diagnosis exists). If present, read it and extract the findings and their example trace IDs.
 2. **No diagnosis available?** Run a focused evidence sweep yourself:
 
@@ -93,7 +95,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if the CLI is pointed at a self-hosted endpoint. Read the endpoint the CLI actually uses, which can come from `.env`, from the process environment, or from the saved CLI configuration.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Step 5: Close the Loop

@@ -1,9 +1,10 @@
 /**
- * The enrollment wiring in runtime.ts, on a CLOUD installation: the pass's
- * cohort is read from `SystemMigrationEnrollment` fresh at the start of every
- * pass, the cutover's own stage is a separate per-call read, and the retired
- * environment knobs change nothing except a warning. Storage and the
- * event-sourcing stack are stubbed - the composition is what is under test.
+ * The cohort wiring in runtime.ts, on a CLOUD installation: a migration
+ * enrollment still paces reads `SystemMigrationEnrollment` fresh at the start
+ * of every pass, a migration declaring `enrolledAutomatically` skips that
+ * read and admits every organization, and the retired environment knobs
+ * change nothing except a warning. Storage and the event-sourcing stack are
+ * stubbed - the composition is what is under test.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,9 +12,13 @@ const stubs = vi.hoisted(() => {
   const enrollmentFindMany = vi.fn();
   const enrollmentFindUnique = vi.fn();
   const warnings: Array<[string, unknown, unknown]> = [];
+  const organizationUserFindMany = vi.fn().mockResolvedValue([]);
+  const organizationUserFindFirst = vi.fn().mockResolvedValue(null);
   return {
     enrollmentFindMany,
     enrollmentFindUnique,
+    organizationUserFindMany,
+    organizationUserFindFirst,
     warnings,
     prisma: {
       systemMigrationEnrollment: {
@@ -25,9 +30,35 @@ const stubs = vi.hoisted(() => {
       organization: {
         findMany: vi.fn().mockResolvedValue([]),
       },
+      // The user-rooted leg pages users the same way.
+      user: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      organizationUser: {
+        findMany: organizationUserFindMany,
+        findFirst: organizationUserFindFirst,
+      },
     },
   };
 });
+
+/** Answers the cohort's per-user membership probes from a plain map. */
+function stubMemberships(memberships: Record<string, string[]>): void {
+  stubs.organizationUserFindFirst.mockImplementation(
+    async ({
+      where,
+    }: {
+      where: { userId: string; organizationId: { in: string[] } };
+    }) => {
+      const organizations = memberships[where.userId] ?? [];
+      return organizations.some((organizationId) =>
+        where.organizationId.in.includes(organizationId),
+      )
+        ? { userId: where.userId }
+        : null;
+    },
+  );
+}
 
 vi.mock("~/server/db", () => ({ prisma: stubs.prisma }));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
@@ -39,6 +70,9 @@ vi.mock("../../authz/epoch", () => ({
 }));
 vi.mock("../../authz/ledger", () => ({ authzGrantsCommands: vi.fn() }));
 vi.mock("../../authz/runtime", () => ({ authzCollector: {} }));
+vi.mock("../../../clickhouse/clickhouseClient", () => ({
+  getPrivateClickHouseUrls: () => new Map([["org_private", "http://private"]]),
+}));
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@langwatch/observability")>();
@@ -61,10 +95,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
 import {
-  cutoverEnrollmentCohort,
   migrationPassCohort,
   runSystemMigrationPass,
+  runSystemMigrationTargetedPass,
+  userMigrationPassCohort,
 } from "../runtime";
 
 describe("migrationPassCohort on cloud", () => {
@@ -116,7 +153,6 @@ describe("migrationPassCohort on cloud", () => {
           migrationName: "authz-team-user-backfill",
         },
       ]);
-      stubs.enrollmentFindUnique.mockResolvedValueOnce(null);
 
       const cohort = await migrationPassCohort();
       expect(
@@ -131,25 +167,49 @@ describe("migrationPassCohort on cloud", () => {
           migrationName: "authz-grants-cutover",
         }),
       ).toBe(false);
-      await expect(cutoverEnrollmentCohort("org_acme")).resolves.toBe(false);
+    });
+  });
 
-      expect(stubs.enrollmentFindUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            organizationId_migrationName: {
-              organizationId: "org_acme",
-              migrationName: "authz-grants-cutover",
-            },
-          },
+  describe("when the migration declares itself enrolled automatically", () => {
+    /** @scenario "An organization nobody enrolled migrates for an automatically enrolled migration" */
+    it("admits an organization no enrollment row names", async () => {
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await migrationPassCohort();
+
+      // The registered authorization-engine migration is the one that
+      // declares it; a name nothing registered answers to stays paced.
+      expect(
+        cohort({
+          tenantId: "org_born_later",
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
         }),
-      );
+      ).toBe(true);
+      expect(
+        cohort({
+          tenantId: "org_born_later",
+          migrationName: "authz-team-user-backfill",
+        }),
+      ).toBe(false);
     });
 
-    it("admits the cutover once it is enrolled itself", async () => {
-      stubs.enrollmentFindUnique.mockResolvedValueOnce({
-        organizationId: "org_acme",
-      });
-      await expect(cutoverEnrollmentCohort("org_acme")).resolves.toBe(true);
+    /** @scenario "An automatic cohort includes a private-dataplane organization" */
+    it("admits the organizations the private ClickHouse routing table names", async () => {
+      // The routing table is mocked with "org_private" above. An
+      // organization-rooted append is placed on that organization's own
+      // instance, so there is nothing to keep out of the shared log - and
+      // keeping it out would strand that customer on the legacy
+      // authorization path forever.
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await migrationPassCohort();
+
+      expect(
+        cohort({
+          tenantId: "org_private",
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        }),
+      ).toBe(true);
     });
   });
 
@@ -176,6 +236,130 @@ describe("migrationPassCohort on cloud", () => {
       // "all" did not widen anything and "none" did not narrow anything:
       // the cohort still came from the enrollment table.
       expect(stubs.enrollmentFindMany).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("userMigrationPassCohort on cloud", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when one organization is enrolled in the identifier backfill and another is not", () => {
+    /** @scenario "Organization enrollment is what puts a user in the backfill's cohort" */
+    it("admits exactly the enrolled organizations' members; org-less users stay out", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      stubs.enrollmentFindMany.mockResolvedValueOnce([
+        { organizationId: "org_acme", migrationName: backfill },
+      ]);
+      stubMemberships({
+        user_sam: ["org_acme"],
+        user_ann: ["org_acme"],
+        user_gil: ["org_globex"],
+      });
+
+      const cohort = await userMigrationPassCohort();
+
+      await expect(
+        cohort({ tenantId: "user_sam", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_ann", migrationName: backfill }),
+      ).resolves.toBe(true);
+      // Only a member of globex, which nobody enrolled.
+      await expect(
+        cohort({ tenantId: "user_gil", migrationName: backfill }),
+      ).resolves.toBe(false);
+      // Outside every organization: nothing enrolls them on cloud.
+      await expect(
+        cohort({ tenantId: "user_solo", migrationName: backfill }),
+      ).resolves.toBe(false);
+      // Membership is probed per user against the enrolled organizations
+      // only - never materialized fleet-wide.
+      expect(stubs.organizationUserFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: "user_sam",
+            organizationId: { in: ["org_acme"] },
+          }),
+        }),
+      );
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an enrolled organization's member also belongs to a private-dataplane organization", () => {
+    // A user tenant resolves now — to the shared instance, whoever they
+    // belong to — so there is nothing left for this to protect against, and
+    // excluding these people would strand exactly them on the legacy path.
+    // Their enrolment reads like anybody else's.
+    it("admits that member, and admits them through their private-dataplane organization too", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      stubs.enrollmentFindMany.mockResolvedValueOnce([
+        { organizationId: "org_acme", migrationName: backfill },
+        { organizationId: "org_private", migrationName: backfill },
+      ]);
+      stubMemberships({
+        user_sam: ["org_acme"],
+        user_both: ["org_private", "org_acme"],
+        user_private_only: ["org_private"],
+      });
+
+      const cohort = await userMigrationPassCohort();
+
+      await expect(
+        cohort({ tenantId: "user_sam", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_both", migrationName: backfill }),
+      ).resolves.toBe(true);
+      // The enrolled private-dataplane organization is a real enrolment, not
+      // a filtered-out one: somebody who reaches the migration only through
+      // it is in the cohort.
+      await expect(
+        cohort({ tenantId: "user_private_only", migrationName: backfill }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when nothing is enrolled", () => {
+    it("reads no membership and admits nobody", async () => {
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await userMigrationPassCohort();
+
+      await expect(
+        cohort({
+          tenantId: "user_sam",
+          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+        }),
+      ).resolves.toBe(false);
+      // An empty enrolled set answers false before any membership probe.
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("runSystemMigrationTargetedPass for a user-rooted migration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when the named organization runs a private dataplane", () => {
+    // This used to refuse outright, because a member's identity events could
+    // not be placed anywhere. They can be now — on the shared instance, like
+    // every other user — so the operator's targeted lever reaches these
+    // organizations like any other, and the run gets as far as reading
+    // members rather than being turned away at the door.
+    it("runs rather than refusing, and reads the organization's members", async () => {
+      await expect(
+        runSystemMigrationTargetedPass({
+          organizationId: "org_private",
+          migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+        }),
+      ).resolves.toBeDefined();
+      expect(stubs.organizationUserFindMany).toHaveBeenCalled();
     });
   });
 });

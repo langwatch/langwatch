@@ -5,12 +5,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.put_api_dashboards_reorder_body import PutApiDashboardsReorderBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PutApiDashboardsReorderBody | Unset = UNSET,
+    body: PutApiDashboardsReorderBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -19,8 +19,7 @@ def _get_kwargs(
         "url": "/api/dashboards/reorder",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -49,13 +48,13 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiDashboardsReorderBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiDashboardsReorderBody,
 ) -> Response[Any]:
     """Reorder dashboards by providing an ordered list of IDs
 
     Args:
-        body (PutApiDashboardsReorderBody | Unset):
+        body (PutApiDashboardsReorderBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -78,13 +77,13 @@ def sync_detailed(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiDashboardsReorderBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiDashboardsReorderBody,
 ) -> Response[Any]:
     """Reorder dashboards by providing an ordered list of IDs
 
     Args:
-        body (PutApiDashboardsReorderBody | Unset):
+        body (PutApiDashboardsReorderBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

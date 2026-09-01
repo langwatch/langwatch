@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Checkbox } from "~/components/ui/checkbox";
 import { ListTable } from "~/components/ui/ListTable";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
@@ -301,7 +302,7 @@ function MigrationSection({
         <Spacer />
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
-            {isSaaS && (
+            {isSaaS && !migration.enrolledAutomatically && (
               <>
                 <EnrollAction
                   migrationName={migration.name}
@@ -340,7 +341,16 @@ function MigrationSection({
         </Text>
       ) : (
         <Stack gap={4}>
-          {isSaaS && (
+          {isSaaS && migration.enrolledAutomatically && (
+            <Text fontSize="sm" color="fg.muted">
+              Every organization runs this step, including any created from now
+              on, so there is nothing to enroll. Roll an organization back to
+              take it out: that works whatever state the organization is in,
+              including one that keeps erroring and one this step has not
+              reached yet, and it keeps every later pass off it.
+            </Text>
+          )}
+          {isSaaS && !migration.enrolledAutomatically && (
             <EnrollmentTable enrollments={enrollments} canManage={canManage} />
           )}
           {migration.attention.length === 0 ? (
@@ -529,25 +539,128 @@ function EnrollAction({
 /**
  * Enroll a sampled cohort for THIS migration in one action. The first
  * step's sample is drawn from organizations not yet enrolled; a later
- * step's from the step before it. The platform excludes the ones it
- * already knows to leave alone by data: an active enterprise
+ * step's from the step before it. The platform leaves out the ones it
+ * already knows to hold back, by data: an active enterprise
  * subscription, or a dedicated data plane configured in the environment.
  * No organization is ever named in code to exclude it.
+ *
+ * Both are defaults an operator can lift, one at a time, which is how a
+ * proven rollout is finished without enrolling the held-back
+ * organizations one id at a time. The description says which of them this
+ * draw will include, because "left out" and "included" must never be a
+ * guess about a checkbox the reader has already ticked.
  */
 function cohortDialogDescription({
   previousMigrationTitle,
   requiresConfirmation,
+  includeEnterprise,
+  includePrivateDataplane,
 }: {
   previousMigrationTitle?: string;
   requiresConfirmation: boolean;
+  includeEnterprise: boolean;
+  includePrivateDataplane: boolean;
 }): string {
   const pool = previousMigrationTitle
     ? `Enrolls a random sample of organizations enrolled for the ${previousMigrationTitle.toLowerCase()} but not yet for this step. `
     : "Enrolls a random sample of organizations not yet enrolled for this step. ";
   const consequence = requiresConfirmation
-    ? "Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. Organizations on an enterprise plan or with a dedicated data plane are always left out."
-    : "It changes nothing about who answers permission checks. Organizations on an enterprise plan or with a dedicated data plane are always left out.";
-  return pool + consequence;
+    ? "Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. "
+    : "It changes nothing about who answers permission checks. ";
+  const included = [
+    includeEnterprise ? "on an enterprise plan" : undefined,
+    includePrivateDataplane ? "with a dedicated data plane" : undefined,
+  ].filter((phrase) => phrase !== undefined);
+  const heldBack = [
+    includeEnterprise ? undefined : "on an enterprise plan",
+    includePrivateDataplane ? undefined : "with a dedicated data plane",
+  ].filter((phrase) => phrase !== undefined);
+  const sentence = (phrases: string[], verb: string) =>
+    `Organizations ${phrases.join(" or ")} ${verb}`;
+  const scope =
+    included.length === 0
+      ? `${sentence(heldBack, "are left out.")}`
+      : heldBack.length === 0
+        ? `${sentence(included, "can be drawn.")}`
+        : `${sentence(included, "can be drawn;")} ${sentence(
+            heldBack,
+            "are left out.",
+          ).toLowerCase()}`;
+  return pool + consequence + scope;
+}
+
+/**
+ * What a finished cohort draw says. A short pool is not an error — the
+ * action asked for a sample and got everything that was left — so it reads
+ * as success with the shortfall explained, and an empty pool as information.
+ */
+function cohortResultToast({
+  enrolledCount,
+  sampleSize,
+}: {
+  enrolledCount: number;
+  sampleSize: number;
+}) {
+  if (enrolledCount === 0) {
+    return {
+      title: "No organizations enrolled",
+      description:
+        "No eligible organizations remained to enroll for this step.",
+      type: "info" as const,
+    };
+  }
+  return {
+    title:
+      enrolledCount === 1
+        ? "1 organization enrolled"
+        : `${enrolledCount} organizations enrolled`,
+    description:
+      enrolledCount < sampleSize
+        ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
+        : "The next migration pass picks the cohort up automatically.",
+    type: "success" as const,
+  };
+}
+
+/**
+ * The two classes a cohort leaves out by default, each on its own switch.
+ * Separate because the risks are different in kind — an enterprise
+ * organization is a commercial relationship, a dedicated-data-plane one
+ * keeps its events in a ClickHouse instance of its own — and a single
+ * "include everything" control would hide that from whoever ticks it.
+ */
+function HeldBackClassFields({
+  includeEnterprise,
+  onIncludeEnterpriseChange,
+  includePrivateDataplane,
+  onIncludePrivateDataplaneChange,
+}: {
+  includeEnterprise: boolean;
+  onIncludeEnterpriseChange: (next: boolean) => void;
+  includePrivateDataplane: boolean;
+  onIncludePrivateDataplaneChange: (next: boolean) => void;
+}) {
+  return (
+    <Stack gap={2} paddingTop={3}>
+      <Text fontSize="sm">Organizations normally held back</Text>
+      <Checkbox
+        size="sm"
+        checked={includeEnterprise}
+        onCheckedChange={() => onIncludeEnterpriseChange(!includeEnterprise)}
+      >
+        Include organizations on an enterprise plan
+      </Checkbox>
+      <Checkbox
+        size="sm"
+        checked={includePrivateDataplane}
+        onCheckedChange={() =>
+          onIncludePrivateDataplaneChange(!includePrivateDataplane)
+        }
+      >
+        Include organizations with a dedicated data plane
+      </Checkbox>
+    </Stack>
+  );
 }
 
 function EnrollCohortAction({
@@ -563,36 +676,47 @@ function EnrollCohortAction({
   requiresConfirmation: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [sampleSizeText, setSampleSizeText] = useState("50");
-  // Number, not parseInt: "1e3" and "50.5" must disable Confirm rather than
-  // be silently reinterpreted as 1 and 50.
-  const sampleSize = Number(sampleSizeText);
-  const sampleSizeValid =
-    Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Users size={13} /> Enroll cohort…
+      </Button>
+      {/* Mounted only while open, so the draft — the sample size and both
+       *  lifted exclusions — starts fresh on every open. Lifting an
+       *  exclusion is a decision about ONE cohort, and a checkbox that
+       *  remembered its last state would silently widen the next draw. */}
+      {open && (
+        <CohortDialog
+          migrationName={migrationName}
+          migrationTitle={migrationTitle}
+          previousMigrationTitle={previousMigrationTitle}
+          requiresConfirmation={requiresConfirmation}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** The mutation behind the cohort dialog, with the surfaces it refreshes. */
+function useEnrollCohort({
+  sampleSize,
+  onEnrolled,
+}: {
+  sampleSize: number;
+  onEnrolled: () => void;
+}) {
   const utils = api.useUtils();
-  const enrollCohort = api.ops.enrollMigrationCohort.useMutation({
+  return api.ops.enrollMigrationCohort.useMutation({
     onSuccess: async (result) => {
       toaster.create(
-        result.enrolled.length === 0
-          ? {
-              title: "No organizations enrolled",
-              description:
-                "No eligible organizations remained to enroll for this step.",
-              type: "info",
-            }
-          : {
-              title:
-                result.enrolled.length === 1
-                  ? "1 organization enrolled"
-                  : `${result.enrolled.length} organizations enrolled`,
-              description:
-                result.enrolled.length < sampleSize
-                  ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
-                  : "The next migration pass picks the cohort up automatically.",
-              type: "success",
-            },
+        cohortResultToast({
+          enrolledCount: result.enrolled.length,
+          sampleSize,
+        }),
       );
-      setOpen(false);
+      onEnrolled();
       await Promise.all([
         utils.ops.listMigrationEnrollments.invalidate(),
         utils.ops.listSystemMigrations.invalidate(),
@@ -601,45 +725,74 @@ function EnrollCohortAction({
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't enroll the cohort" }),
   });
+}
+
+function CohortDialog({
+  migrationName,
+  migrationTitle,
+  previousMigrationTitle,
+  requiresConfirmation,
+  onClose,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+  onClose: () => void;
+}) {
+  const [sampleSizeText, setSampleSizeText] = useState("50");
+  const [includeEnterprise, setIncludeEnterprise] = useState(false);
+  const [includePrivateDataplane, setIncludePrivateDataplane] = useState(false);
+  // Number, not parseInt: "1e3" and "50.5" must disable Confirm rather than
+  // be silently reinterpreted as 1 and 50.
+  const sampleSize = Number(sampleSizeText);
+  const sampleSizeValid =
+    Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
+  const enrollCohort = useEnrollCohort({ sampleSize, onEnrolled: onClose });
 
   return (
-    <>
-      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
-        <Users size={13} /> Enroll cohort…
-      </Button>
-      <ConfirmDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        onConfirm={() => {
-          if (!sampleSizeValid) return;
-          enrollCohort.mutate({
-            migrationName,
-            sampleSize,
-            ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
-          });
-        }}
-        title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
-        description={cohortDialogDescription({
-          previousMigrationTitle,
-          requiresConfirmation,
-        })}
-        isLoading={enrollCohort.isPending}
-        confirmDisabled={!sampleSizeValid}
-      >
-        <Stack gap={1}>
-          <Text fontSize="sm">How many organizations to enroll</Text>
-          <Input
-            size="sm"
-            type="number"
-            min={1}
-            max={1000}
-            step={1}
-            value={sampleSizeText}
-            onChange={(event) => setSampleSizeText(event.target.value)}
-          />
-        </Stack>
-      </ConfirmDialog>
-    </>
+    <ConfirmDialog
+      open
+      onClose={onClose}
+      onConfirm={() => {
+        if (!sampleSizeValid) return;
+        enrollCohort.mutate({
+          migrationName,
+          sampleSize,
+          includeEnterprise,
+          includePrivateDataplane,
+          ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
+        });
+      }}
+      title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
+      description={cohortDialogDescription({
+        previousMigrationTitle,
+        requiresConfirmation,
+        includeEnterprise,
+        includePrivateDataplane,
+      })}
+      isLoading={enrollCohort.isPending}
+      confirmDisabled={!sampleSizeValid}
+    >
+      <Stack gap={1}>
+        <Text fontSize="sm">How many organizations to enroll</Text>
+        <Input
+          size="sm"
+          type="number"
+          min={1}
+          max={1000}
+          step={1}
+          value={sampleSizeText}
+          onChange={(event) => setSampleSizeText(event.target.value)}
+        />
+        <HeldBackClassFields
+          includeEnterprise={includeEnterprise}
+          onIncludeEnterpriseChange={setIncludeEnterprise}
+          includePrivateDataplane={includePrivateDataplane}
+          onIncludePrivateDataplaneChange={setIncludePrivateDataplane}
+        />
+      </Stack>
+    </ConfirmDialog>
   );
 }
 
@@ -765,7 +918,7 @@ function RollBackAction({
           });
         }}
         title={`Roll an organization back from the ${migrationTitle.toLowerCase()}`}
-        description="The organization returns to the behavior it had before this step finalized, and stays there until an operator intervenes again. Only migrated or finalized organizations can be rolled back."
+        description="The organization returns to the behavior it had before this step finalized, and every later pass leaves it alone, until an operator intervenes again. Any organization can be rolled back, including one that keeps erroring and one this step has not reached yet."
         isLoading={rollBack.isPending}
         confirmDisabled={organization === null}
       >

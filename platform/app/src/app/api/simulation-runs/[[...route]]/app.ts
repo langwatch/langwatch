@@ -5,6 +5,11 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import type {
+  BatchSummary,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
+import { readTestingInterface } from "~/server/suites/platform-path";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -35,10 +40,39 @@ const scenarioRunResponseSchema = z.object({
       content: z.string(),
     }),
   ),
+  messagesTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      "True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all.",
+    ),
   timestamp: z.number(),
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+  /**
+   * `note` and `scenarioVersion` are optional in the document, not in the
+   * answer: every server sends both. They arrived after clients were generated
+   * from this family, and a client that reads them as required fails against
+   * a server that predates them.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
+  note: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes.",
+    ),
+  scenarioVersion: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.",
+    ),
 });
 
 const scenarioRunResponseWithPlatformUrlSchema =
@@ -52,18 +86,79 @@ const batchSummarySchema = z.object({
   passCount: z.number(),
   failCount: z.number(),
   runningCount: z.number(),
+  settledCount: z.number(),
   stalledCount: z.number(),
   lastRunAt: z.number(),
   lastUpdatedAt: z.number(),
   firstCompletedAt: z.number().nullable(),
-  allCompletedAt: z.number().nullable(),
+  allCompletedAt: z
+    .number()
+    .nullable()
+    .describe(
+      "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+    )
+    // Machine-readable beside the sentence: a generated client marks the field
+    // deprecated from this, not from the prose.
+    .openapi({ deprecated: true }),
+  isComplete: z
+    .boolean()
+    .describe("True when every run of the batch reached a terminal status."),
+  note: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes.",
+    ),
 });
+
+/**
+ * Adds the completion flag the API exposes on top of the stored counts.
+ * An empty batch is never complete: it has nothing that settled.
+ */
+function toBatchSummaryResponse(batch: BatchSummary) {
+  return {
+    batchRunId: batch.batchRunId,
+    totalCount: batch.totalCount,
+    passCount: batch.passCount,
+    failCount: batch.failCount,
+    runningCount: batch.runningCount,
+    settledCount: batch.settledCount,
+    stalledCount: batch.stalledCount,
+    lastRunAt: batch.lastRunAt,
+    lastUpdatedAt: batch.lastUpdatedAt,
+    firstCompletedAt: batch.firstCompletedAt,
+    allCompletedAt: batch.allCompletedAt,
+    isComplete: batch.settledCount === batch.totalCount && batch.totalCount > 0,
+    note: batch.note,
+  };
+}
+
+/**
+ * The API's view of one run. The published fields are mapped one by one off
+ * the run's metadata, and the metadata itself stays out of the response: its
+ * layout is internal, the fields are the contract.
+ */
+function toRunResponse(run: ScenarioRunData) {
+  const { metadata, ...rest } = run;
+  return {
+    ...rest,
+    note: metadata?.note ?? null,
+    scenarioVersion: metadata?.langwatch?.scenarioVersion ?? null,
+  };
+}
 
 const listQuerySchema = z.object({
   scenarioSetId: z.string().optional(),
   batchRunId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
   cursor: z.string().optional(),
+  include: z
+    .literal("messages")
+    .optional()
+    .describe(
+      "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary.",
+    ),
 });
 
 const batchQuerySchema = z.object({
@@ -79,7 +174,7 @@ secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
     description:
-      "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
+      "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     responses: {
       ...baseResponses,
       200: {
@@ -101,11 +196,17 @@ secured.access(requires("scenarios:view")).get(
   zValidator("query", listQuerySchema),
   async (c) => {
     const project = c.get("project");
-    const { scenarioSetId, batchRunId, limit, cursor } = c.req.valid("query");
+    const { scenarioSetId, batchRunId, limit, cursor, include } =
+      c.req.valid("query");
+    const shouldIncludeMessages = include === "messages";
     logger.info(
       { projectId: project.id, scenarioSetId, batchRunId },
       "Listing simulation runs",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
 
@@ -126,10 +227,11 @@ secured.access(requires("scenarios:view")).get(
       const runs = "runs" in result ? result.runs : [];
       return c.json({
         runs: runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: false,
@@ -143,14 +245,16 @@ secured.access(requires("scenarios:view")).get(
         scenarioSetId,
         limit,
         cursor,
+        shouldIncludeMessages,
       });
 
       return c.json({
         runs: result.runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: result.hasMore,
@@ -163,6 +267,7 @@ secured.access(requires("scenarios:view")).get(
       projectId: project.id,
       limit,
       cursor,
+      shouldIncludeMessages,
     });
 
     if (!result.changed) {
@@ -171,10 +276,11 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       runs: result.runs.map((r) => ({
-        ...r,
+        ...toRunResponse(r),
         platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
           scenarioRunId: r.scenarioRunId,
+          ui,
         }),
       })),
       hasMore: result.hasMore,
@@ -213,6 +319,10 @@ secured.access(requires("scenarios:view")).get(
       { projectId: project.id, scenarioRunId },
       "Getting simulation run",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
     const run = await simulationRuns.getScenarioRunData({
@@ -225,10 +335,11 @@ secured.access(requires("scenarios:view")).get(
     }
 
     return c.json({
-      ...run,
+      ...toRunResponse(run),
       platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
         scenarioRunId: run.scenarioRunId,
+        ui,
       }),
     });
   },
@@ -276,21 +387,51 @@ secured.access(requires("scenarios:view")).get(
     });
 
     return c.json({
-      batches: result.batches.map((b) => ({
-        batchRunId: b.batchRunId,
-        totalCount: b.totalCount,
-        passCount: b.passCount,
-        failCount: b.failCount,
-        runningCount: b.runningCount,
-        stalledCount: b.stalledCount,
-        lastRunAt: b.lastRunAt,
-        lastUpdatedAt: b.lastUpdatedAt,
-        firstCompletedAt: b.firstCompletedAt,
-        allCompletedAt: b.allCompletedAt,
-      })),
+      batches: result.batches.map(toBatchSummaryResponse),
       hasMore: result.hasMore,
       nextCursor: result.nextCursor,
     });
+  },
+);
+
+// ── Get Single Batch ──────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
+  "/batches/:batchRunId",
+  describeRoute({
+    description:
+      "Get the summary of a single batch run, including its completion flag",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": { schema: resolver(batchSummarySchema) },
+        },
+      },
+      404: {
+        description: "Batch run not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { batchRunId } = c.req.param();
+    logger.info({ projectId: project.id, batchRunId }, "Getting batch summary");
+
+    const simulationRuns = getApp().simulations.runs;
+    const batch = await simulationRuns.getBatchSummary({
+      projectId: project.id,
+      batchRunId,
+    });
+
+    if (!batch) {
+      return c.json({ error: "Batch run not found" }, 404);
+    }
+
+    return c.json(toBatchSummaryResponse(batch));
   },
 );
 

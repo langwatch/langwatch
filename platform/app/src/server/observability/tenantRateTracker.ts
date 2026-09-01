@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 
@@ -100,6 +101,9 @@ export class TenantRateTracker {
         {
           distinctId: tenantId,
           defaultValue: false,
+          // The observability tenant id is the project id on this platform.
+          projectId: tenantId,
+          organizationId: NOT_TARGETED,
           cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
         },
       );

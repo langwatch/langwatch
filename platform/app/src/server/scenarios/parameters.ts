@@ -8,7 +8,12 @@
  * the declared default. The resolved record is handed to the target under test
  * and is what the scenario's own situation and criteria read as `params.NAME`.
  *
+ * A parameter can also be declared secret. A secret parameter carries no
+ * default, its value is supplied when the run starts, and it is delivered to
+ * the target under test through the `secrets` namespace instead of `params`.
+ *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { z } from "zod";
@@ -34,6 +39,17 @@ export const MAX_PARAMETER_NAME_LENGTH = 64;
 
 /** How long a parameter's description may be. */
 export const MAX_PARAMETER_DESCRIPTION_LENGTH = 500;
+
+/** How many values a closed option list may hold. */
+export const MAX_PARAMETER_OPTIONS = 50;
+
+/** The value types a declaration can name. */
+export const SCENARIO_PARAMETER_TYPES = [
+  "string",
+  "number",
+  "boolean",
+] as const;
+export type ScenarioParameterType = (typeof SCENARIO_PARAMETER_TYPES)[number];
 
 /**
  * The grammar a parameter name must satisfy.
@@ -79,6 +95,14 @@ const parameterValueSchema = z.union([
   z.boolean(),
 ]);
 
+/** What a secret parameter with a default value is refused with. */
+export const SECRET_PARAMETER_DEFAULT_MESSAGE =
+  "A secret parameter cannot carry a default value";
+
+/** What a secret parameter with an option list is refused with. */
+export const SECRET_PARAMETER_OPTIONS_MESSAGE =
+  "A secret parameter cannot list options";
+
 /** One declared parameter, as authored on the scenario. */
 export const scenarioParameterDefinitionSchema = z.object({
   name: z
@@ -90,7 +114,58 @@ export const scenarioParameterDefinitionSchema = z.object({
       message: RESERVED_NAME_MESSAGE,
     }),
   description: z.string().max(MAX_PARAMETER_DESCRIPTION_LENGTH).optional(),
-  defaultValue: parameterValueSchema.optional(),
+  defaultValue: parameterValueSchema
+    .optional()
+    .describe(
+      "The value the run uses when it supplies none. A secret parameter cannot carry one.",
+    ),
+  /**
+   * Whether the value is a credential. A secret value is supplied per run,
+   * encrypted before it is recorded, and read by the target as
+   * `secrets.NAME` rather than `params.NAME`.
+   */
+  secret: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue.",
+    ),
+  /**
+   * The value type. Absent on a declaration authored before types existed,
+   * which reads as text. A connected agent declares it from the function's
+   * own annotations.
+   */
+  type: z
+    .enum(SCENARIO_PARAMETER_TYPES)
+    .optional()
+    .describe(
+      "The value type: string, number or boolean. Absent reads as string.",
+    ),
+  /**
+   * A closed list of the values the parameter accepts. A run that supplies a
+   * value outside the list is refused before anything is scheduled.
+   */
+  options: z
+    .array(parameterValueSchema)
+    .max(
+      MAX_PARAMETER_OPTIONS,
+      `A parameter can list at most ${MAX_PARAMETER_OPTIONS} options`,
+    )
+    .optional()
+    .describe(
+      `The values the parameter accepts, at most ${MAX_PARAMETER_OPTIONS}. A run supplying another value is refused.`,
+    ),
+  /**
+   * Whether a run must supply a value. Declared by a connected agent whose
+   * function has no default for the parameter; the SDK refuses a call that
+   * carries none before the function runs.
+   */
+  required: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the run must supply a value. Set by a connected agent for a parameter with no default.",
+    ),
 });
 
 /**
@@ -109,11 +184,35 @@ export const scenarioParameterDefinitionsSchema = z
   .superRefine((definitions, ctx) => {
     const seen = new Set<string>();
     definitions.forEach((definition, index) => {
+      // A default on a secret parameter is a credential typed into the
+      // scenario itself: stored in clear on the scenario row, and readable by
+      // everyone who can open the scenario. The declaration is refused rather
+      // than quietly ignored.
+      if (definition.secret === true && definition.defaultValue !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "defaultValue"],
+          message: SECRET_PARAMETER_DEFAULT_MESSAGE,
+          params: { rule: "secret-default" },
+        });
+      }
+      // An option list on a secret parameter is the same fault as a default:
+      // the credentials sit in clear on the scenario row, and a refusal
+      // repeats them back to the caller beside the value it rejected.
+      if (definition.secret === true && definition.options !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "options"],
+          message: SECRET_PARAMETER_OPTIONS_MESSAGE,
+          params: { rule: "secret-options" },
+        });
+      }
       if (seen.has(definition.name)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [index, "name"],
           message: `Duplicate parameter name "${definition.name}"`,
+          params: { rule: "duplicate-name" },
         });
         return;
       }
@@ -178,7 +277,49 @@ export type ScenarioParameterValue = z.infer<typeof parameterValueSchema>;
 export type ScenarioParameterDefinition = z.infer<
   typeof scenarioParameterDefinitionSchema
 >;
+
+/**
+ * A parameter as a connected agent declares it: one definition with the type
+ * always known, since it is read from the function's own annotations, and
+ * never secret. Secrets stay scenario-declared and run-level.
+ */
+export type ParameterSpec = Omit<ScenarioParameterDefinition, "secret"> & {
+  type: ScenarioParameterType;
+};
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
+
+/**
+ * Reads parameter values back off the raw JSON a run stored them as.
+ *
+ * Tolerant on purpose: a value the current shape does not understand is
+ * dropped rather than taking the whole read down, the same way a stored scope
+ * that no longer parses still runs. A run that stored none reads as the empty
+ * string, and so does a run recorded before the field existed.
+ */
+export function parseRunParametersJson(raw: string): RunParameterValues {
+  if (raw === "") return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+
+  const values: RunParameterValues = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      values[name] = value;
+    }
+  }
+  return values;
+}
 
 /**
  * Reads the declarations off a scenario's stored JSON column.
@@ -194,6 +335,43 @@ export function parseScenarioParameterDefinitions(
   if (json === null || json === undefined) return [];
   const parsed = scenarioParameterDefinitionsSchema.safeParse(json);
   return parsed.success ? parsed.data : [];
+}
+
+/**
+ * Splits declarations into the ones the run merges into `params` and the ones
+ * it delivers through `secrets`.
+ *
+ * The split runs before anything merges a value, so a secret value never
+ * enters the record that renders the scenario's text or reaches the child's
+ * `params` namespace.
+ */
+export function partitionParameterDefinitions(
+  definitions: readonly ScenarioParameterDefinition[],
+): {
+  plain: ScenarioParameterDefinition[];
+  secret: ScenarioParameterDefinition[];
+} {
+  const plain: ScenarioParameterDefinition[] = [];
+  const secret: ScenarioParameterDefinition[] = [];
+  for (const definition of definitions) {
+    if (definition.secret === true) secret.push(definition);
+    else plain.push(definition);
+  }
+  return { plain, secret };
+}
+
+/** The supplied values with the given names taken out of them. */
+export function withoutParameterNames({
+  values,
+  names,
+}: {
+  values?: RunParameterValues;
+  names: ReadonlySet<string>;
+}): RunParameterValues | undefined {
+  if (!values || names.size === 0) return values;
+  return Object.fromEntries(
+    Object.entries(values).filter(([name]) => !names.has(name)),
+  );
 }
 
 /**

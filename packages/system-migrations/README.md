@@ -22,8 +22,10 @@ The properties the contract guarantees:
   per pass; everyone else stands down. Losing the lease mid-pass just ends
   the pass early — migrations are idempotent by contract.
 - **Self-hosted migrates silently.** The cohort predicate is composition:
-  self-hosted answers true for every tenant; cloud reads a rollout cohort
-  from the environment and widens it deliberately.
+  self-hosted answers true for every tenant; cloud answers from the
+  migration's own `enrolledAutomatically` declaration, and for a migration
+  still mid-rollout, from the per-migration enrollment rows an operator
+  writes.
 - **Finalization is proved, not assumed.** A migration returns `finalized`
   only when it verified the tenant behaves identically without its legacy
   path; disagreements hold the tenant (`migrated`) with a report, and later
@@ -45,5 +47,5 @@ first is the ADR-092 stage-B authorization backfill in
 `@langwatch/authz-server`; the identity program's D01 Account backfill is
 the expected second.
 
-Spec: `specs/rbac/in-place-authz-migration.feature`. Delivery plan:
-`dev/docs/plans/adr-092-authz-delivery-plan.md` (runbook rows M1/M2).
+Spec: `specs/migration/system-migrations-runner.feature`. Delivery plan:
+`dev/docs/adr/110-grant-aggregates-are-grants.md` (runbook rows M1/M2).

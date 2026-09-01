@@ -182,6 +182,9 @@ jobs:
               # Root workspace members the app's `...` closure installs from
               # source — a change there is a change to the app.
               - 'packages/**'
+              # @langwatch/langyworker tests + typecheck run on unit shard 1;
+              # without this a wrapper-only change runs zero app CI.
+              - 'services/langyworker/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config all live at the repo root since ADR-076. A PR that
               # bumps a dependency or adds a security override touches ONLY
@@ -338,7 +341,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          # langyworker is not a dependency of web, and its tests and
+          # typecheck run on this job's shard 1, so it needs its own
+          # install root.
+          install: "@langwatch/web... @langwatch/langyworker..."
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -383,6 +389,20 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/clickhouse-client run test:unit
 
+      # @langwatch/redaction is the canonical secret and PII scrubber the
+      # ingestion pipeline runs on every attribute, and the CLI ships a
+      # byte-for-byte copy of it. Same reason again, and the sharpest one: its
+      # suite was the only thing asserting which values a rule must NOT take,
+      # and while it ran nowhere a rule change reached production that blanked
+      # the product's own record ids.
+      - name: Run @langwatch/redaction unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run test:unit
+
+      - name: Typecheck @langwatch/redaction
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run typecheck
+
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.
@@ -390,9 +410,35 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz run test
 
+      # @langwatch/actor is the actor vocabulary (who caused an action) —
+      # dependency-free raw TypeScript, same shard-1 arrangement.
+      - name: Run @langwatch/actor unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/actor run test
+
       - name: Run @langwatch/authz-server unit tests
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz-server run test
+
+      # @langwatch/identity is the pure identity core (ADR-115) and
+      # @langwatch/identity-server its storage-port runtime — same raw
+      # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
+      # step the authz pair lacks: sources and tests are only compiled here.
+      - name: Run @langwatch/identity unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity run test
+
+      - name: Typecheck @langwatch/identity
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity run typecheck
+
+      - name: Run @langwatch/identity-server unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-server run test
+
+      - name: Typecheck @langwatch/identity-server
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-server run typecheck
 
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
@@ -406,6 +452,19 @@ jobs:
       - name: Typecheck @langwatch/system-migrations
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/system-migrations run typecheck
+
+      # @langwatch/langyworker is the langy-worker pi-harness wrapper
+      # (services/langyworker) the langyagent image compiles into the worker
+      # binary. It sits outside platform/app, so the root typecheck and the
+      # sharded app suite never see it, same raw-TypeScript, shard-1
+      # arrangement as the packages above.
+      - name: Run @langwatch/langyworker unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run test
+
+      - name: Typecheck @langwatch/langyworker
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langyworker run typecheck
 
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
@@ -1290,12 +1349,23 @@ jobs:
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
-      # its postinstall always falls back to `node-gyp rebuild`. With
-      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
-      # by default — install it globally before any install that hits
-      # mcp-server's onlyBuiltDependencies allowlist.
+      # its postinstall always falls back to `node-gyp rebuild`, which pnpm
+      # runs with its own vendored node-gyp. That copy ships `gyp/gyp_main.py`
+      # mode 644, so an mtime-driven Makefile regeneration executes it and
+      # dies with "Permission denied" / error 126. Installing node-gyp
+      # globally does not displace it on its own: pnpm exports
+      # `npm_config_node_gyp` at its vendored copy and that wins over PATH.
+      # Point the variable at the published node-gyp, which ships the script
+      # executable. sdk-javascript-ci.yml and npx-server-smoke.yml do the same.
       - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
       # One install. mcp-server is a workspace dependency of the app, so the
       # trailing `...` pulls it in — it used to be installed separately here
@@ -1374,6 +1444,42 @@ jobs:
       # guard. This job's gate already lists `.github/scripts/**`.
       - name: Test guard-deployment-impact.ts
         run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
+  # The npm artifact's staging filters, run over the real tree.
+  #
+  # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
+  # receives. Its filters are rsync patterns, and a pattern that is broader than
+  # it means to be drops application source: twice already the published server
+  # died at first boot ~20 minutes in on exactly that. The guard inside the
+  # script compares what git tracks against what staging kept, and `--check-filters`
+  # runs it without a build and without packing, in about ten seconds.
+  #
+  # It used to run only inside npx-server-smoke, which does not run on main and
+  # whose path filter names none of the trees the guard reads. A `.gitignore`
+  # added under dev/scripts therefore merged green and turned every branch that
+  # merged main red.
+  #
+  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # package.json names, and a path filter listing them would be a second copy of
+  # that list, stale the day someone edits it. A minute on an unrelated pull
+  # request is the cheaper mistake.
+  pack-filters:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # None of it is in the package's `files`.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - name: Check the npm pack filters
+        run: bash dev/scripts/pack-npm.sh --check-filters
 
   ci-self-test:
     needs: changes
@@ -1500,7 +1606,7 @@ jobs:
           path: vitest.durations.json
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test, pack-filters]
     if: always()
     runs-on: ubuntu-latest
     steps:

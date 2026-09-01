@@ -65,7 +65,14 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
     // root client it stands in for.
     $connect: vi.fn(),
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
-    organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
+    organizationInvite: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      // The acceptance claim is a compare-and-set: `applyInvite` claims the
+      // row with updateMany and writes the membership only if it matched.
+      // Zero here is the honest default for a mock whose findFirst says
+      // there is no invite to claim.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     organizationUser: {
       create: vi.fn().mockResolvedValue(undefined),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -274,6 +281,10 @@ describe("afterUserCreate", () => {
       };
 
       const inviteUpdate = vi.fn().mockResolvedValue(undefined);
+      // Acceptance is the claim, not a later write: applyInvite moves the
+      // row to ACCEPTED and writes the membership in one transaction, so a
+      // matched claim is what the membership hangs off.
+      const inviteClaim = vi.fn().mockResolvedValue({ count: 1 });
       const orgUserCreateMany = vi.fn().mockResolvedValue({ count: 1 });
 
       const prisma = makePrismaMock({
@@ -286,6 +297,7 @@ describe("afterUserCreate", () => {
         organizationInvite: {
           findFirst: vi.fn().mockResolvedValue(pendingInvite),
           update: inviteUpdate,
+          updateMany: inviteClaim,
         },
         organizationUser: {
           create: vi.fn(),
@@ -356,11 +368,22 @@ describe("afterUserCreate", () => {
         "team_2",
       ]);
 
-      // Invite flipped to ACCEPTED so the link stops looking outstanding.
-      expect(inviteUpdate).toHaveBeenCalledWith({
-        where: { id: "inv_1", organizationId: "org_1" },
-        data: { status: "ACCEPTED" },
-      });
+      // Invite flipped to ACCEPTED so the link stops looking outstanding -
+      // and the claim is guarded, so only an invite that is still open can
+      // be the one this membership came from.
+      expect(inviteClaim).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "PENDING",
+          }),
+          data: expect.objectContaining({
+            status: "ACCEPTED",
+            acceptedByUserId: "user_1",
+          }),
+        }),
+      );
     });
   });
 

@@ -1,4 +1,3 @@
-import { Box, VStack } from "@chakra-ui/react";
 import {
   Bot,
   ClipboardList,
@@ -6,49 +5,30 @@ import {
   Gauge,
   GitPullRequest,
   ListTree,
-  Settings as SettingsIcon,
   Sliders,
   Sparkles,
   SquareTerminal,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { findPersonalProject } from "~/utils/personalProject";
-
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { GovernSection } from "./sidebar/GovernSection";
 import { isOnlineEvaluationsActivePath } from "./sidebar/navigationActiveState";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
-import { SupportMenu } from "./sidebar/SupportMenu";
-import { ThemeToggle } from "./sidebar/ThemeToggle";
 
 /**
- * Personal-scope sidebar rendered by DashboardLayout when
- * `personalScope=true`. Mirrors MainMenu's column shape (compact-on-hover,
- * width math, top-aligned primary nav + bottom-aligned utilities) so the
- * page geometry stays identical between project and personal scopes.
- *
- * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
- *       — Persona 1 / Persona 2 (personal scope)
- */
-/**
- * The personal navigation links, extracted so the navigation-v2 Me
- * sidebar renders the same list as the legacy chrome and the two cannot
- * drift. The v2 sidebar drops the Govern group because the product
- * switcher replaces it.
+ * The personal navigation links, rendered by the Me sidebar. The Govern
+ * group is gone because the product switcher replaces it.
  *
  * Spec: specs/navigation/product-sidebars.feature
  */
 export const PersonalSidebarLinks = function PersonalSidebarLinks({
   showExpanded,
-  shouldIncludeGovernSection = true,
 }: {
   showExpanded: boolean;
-  shouldIncludeGovernSection?: boolean;
 }) {
   const router = useRouter();
   const { personalProjectSlug, features } = usePersonalWorkspace();
@@ -101,9 +81,6 @@ export const PersonalSidebarLinks = function PersonalSidebarLinks({
         isActive={router.pathname.startsWith("/me/configure")}
         showLabel={showExpanded}
       />
-      {shouldIncludeGovernSection && (
-        <GovernSection showExpanded={showExpanded} />
-      )}
     </>
   );
 };
@@ -209,74 +186,3 @@ function PersonalLibraryLinks({
     </>
   );
 }
-
-export const PersonalSidebar = React.memo(function PersonalSidebar({
-  isCompact = false,
-}: {
-  isCompact?: boolean;
-}) {
-  const router = useRouter();
-  const [isHovered, setIsHovered] = useState(false);
-
-  const showExpanded = !isCompact || isHovered;
-  const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
-
-  const isOrgSettingsActive = router.pathname.startsWith("/settings");
-  const { hasPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-
-  return (
-    <Box
-      background="bg.page"
-      width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
-      minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
-      height="calc(100vh - 60px)"
-      position="relative"
-      onMouseEnter={() => isCompact && setIsHovered(true)}
-      onMouseLeave={() => isCompact && setIsHovered(false)}
-    >
-      <Box
-        position={isCompact ? "absolute" : "relative"}
-        zIndex={isCompact ? 100 : "auto"}
-        top={0}
-        left={0}
-        width={currentWidth}
-        height="calc(100vh - 60px)"
-        background="bg.page"
-        transition="width 0.15s ease-in-out"
-        overflow="hidden"
-      >
-        <VStack
-          paddingX={2}
-          paddingTop={2}
-          paddingBottom={2}
-          gap={0}
-          height="100%"
-          align="start"
-          width={MENU_WIDTH_EXPANDED}
-          justifyContent="space-between"
-        >
-          <VStack width="full" gap={0.5} align="start">
-            <PersonalSidebarLinks showExpanded={showExpanded} />
-          </VStack>
-
-          <VStack width="full" gap={0.5} align="start">
-            {hasPermission("organization:view") && (
-              <SideMenuLink
-                icon={SettingsIcon}
-                label="Settings"
-                href="/settings"
-                isActive={isOrgSettingsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            <SupportMenu showLabel={showExpanded} />
-            <ThemeToggle showLabel={showExpanded} />
-          </VStack>
-        </VStack>
-      </Box>
-    </Box>
-  );
-});

@@ -10,7 +10,49 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
+
+// A stand-in for the embedded AGENTS.md. It carries no placeholder, because
+// the provision renders nothing into the template: whatever is in the prompt
+// can reach the user in a reply.
+const agentsTemplateFixture = "# AGENTS\nOperating contract.\n"
+
+// The prompt used to be rendered per worker, which put the worker's own
+// endpoint into the one paragraph that forbids giving the user internal
+// addresses. The substitution is gone, so the template must arrive intact.
+//
+// @scenario "The prompt reaches the worker exactly as it was written"
+func TestProvision_WritesTheAgentsTemplateUnchanged(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:          home,
+		WorkspaceRoot: workspace,
+		Creds: domain.Credentials{
+			LangwatchAPIKey:   "sk-lw-test-key",
+			LLMVirtualKey:     "vk-test",
+			GatewayBaseURL:    "https://gateway.test",
+			LangwatchEndpoint: "https://app.test",
+		},
+		UID:            0,
+		AgentsTemplate: agentsTemplateFixture,
+		Runner:         localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(home, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	if string(got) != agentsTemplateFixture {
+		t.Errorf("AGENTS.md = %q, want the template written through unchanged (%q)", got, agentsTemplateFixture)
+	}
+}
 
 func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 	for k, v := range map[string]string{
@@ -56,7 +98,7 @@ func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 		t.Setenv(k, v)
 	}
 
-	env := workerBaseEnv()
+	env := workerenv.BaseEnv()
 
 	mustBeAbsent := []string{
 		"LANGY_INTERNAL_SECRET=",
@@ -110,14 +152,14 @@ func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 		}
 	}
 
-	allowed := make(map[string]bool, len(workerInheritedEnvKeys))
-	for _, key := range workerInheritedEnvKeys {
+	allowed := make(map[string]bool, len(workerenv.InheritedEnvKeys))
+	for _, key := range workerenv.InheritedEnvKeys {
 		allowed[key] = true
 	}
 	for _, kv := range env {
 		key, _, _ := strings.Cut(kv, "=")
 		if !allowed[key] {
-			t.Fatalf("workerBaseEnv inherited non-allowlisted key %q", key)
+			t.Fatalf("workerenv.BaseEnv inherited non-allowlisted key %q", key)
 		}
 	}
 }
@@ -141,8 +183,8 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 		t.Fatalf("GenerateBearerToken: %v", err)
 	}
 
-	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA, 19001, Mediation{}, nil)
-	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB, 19002, Mediation{}, nil)
+	envA := buildWorkerEnv("/workspace/sessions/conv-a", "conv-a", creds, pwA, 19001, Mediation{}, nil)
+	envB := buildWorkerEnv("/workspace/sessions/conv-b", "conv-b", creds, pwB, 19002, Mediation{}, nil)
 
 	if got := valueOfEnv(envA, "OPENCODE_SERVER_PASSWORD"); got != pwA {
 		t.Fatalf("worker A env OPENCODE_SERVER_PASSWORD = %q, want %q", got, pwA)
@@ -165,8 +207,8 @@ func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
 // @scenario "The worker runs only the skills we ship it"
 func TestBuildWorkerEnv_DisablesExternalSkillScans(t *testing.T) {
 	env := buildWorkerEnv(
-		"conv-a",
 		"/workspace/sessions/conv-a",
+		"conv-a",
 		domain.Credentials{LangwatchAPIKey: "lw-key"},
 		"pw",
 		19001,
@@ -197,7 +239,7 @@ func TestBuildWorkerEnv_InjectsCredentials(t *testing.T) {
 		GatewayBaseURL:    "https://gateway.internal/v1",
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, Mediation{}, nil)
+	env := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 0, Mediation{}, nil)
 
 	wants := map[string]string{
 		"OPENAI_BASE_URL":    "https://gateway.internal/v1",
@@ -242,7 +284,7 @@ func TestBuildWorkerEnv_MediatedTelemetryAndLLMCarryNoSecrets(t *testing.T) {
 		OTLPEndpoint: "http://127.0.0.1:41000/w/tok123",
 		LLMBaseURL:   "http://127.0.0.1:41000/w/tok123/llm",
 	}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, med, nil)
+	env := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 0, med, nil)
 
 	wants := map[string]string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT": med.OTLPEndpoint,
@@ -286,7 +328,7 @@ func TestBuildWorkerEnv_UnmediatedFallback(t *testing.T) {
 		GatewayBaseURL:    "https://gateway.internal/v1",
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, Mediation{}, nil)
+	env := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 0, Mediation{}, nil)
 	if got := valueOfEnv(env, "OPENAI_BASE_URL"); got != creds.GatewayBaseURL {
 		t.Errorf("OPENAI_BASE_URL = %q, want direct gateway %q", got, creds.GatewayBaseURL)
 	}
@@ -319,7 +361,7 @@ func TestBuildWorkerEnv_AppendsCapabilityEnv(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 	caps := []app.Capability{fakeCap{env: []string{"CAP_A=1", "CAP_B=2"}}}
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, Mediation{}, caps)
+	env := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 0, Mediation{}, caps)
 	if valueOfEnv(env, "CAP_A") != "1" || valueOfEnv(env, "CAP_B") != "2" {
 		t.Errorf("capability env not folded into the worker env: %v", env)
 	}
@@ -338,7 +380,7 @@ func TestBuildWorkerEnv_InjectsEgressProxy(t *testing.T) {
 		LangwatchEndpoint: "https://app.langwatch.ai",
 	}
 
-	env := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 19555, Mediation{}, nil)
+	env := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 19555, Mediation{}, nil)
 	wantProxy := "http://127.0.0.1:19555"
 	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
 		if got := valueOfEnv(env, key); got != wantProxy {
@@ -356,7 +398,7 @@ func TestBuildWorkerEnv_InjectsEgressProxy(t *testing.T) {
 	}
 
 	// No egress port ⇒ no proxy env at all.
-	direct := buildWorkerEnv("conv-x", "/workspace/sessions/conv-x", creds, "pw", 0, Mediation{}, nil)
+	direct := buildWorkerEnv("/workspace/sessions/conv-x", "conv-x", creds, "pw", 0, Mediation{}, nil)
 	if got := valueOfEnv(direct, "HTTPS_PROXY"); got != "" {
 		t.Errorf("HTTPS_PROXY must be absent when no egress port is set, got %q", got)
 	}
@@ -412,7 +454,7 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 		WorkspaceRoot:  workspace,
 		Creds:          creds,
 		UID:            0,
-		AgentsTemplate: "# AGENTS\n${LANGWATCH_ENDPOINT}\n",
+		AgentsTemplate: agentsTemplateFixture,
 		Runner:         localunsafe.Runner{},
 	})
 	if err != nil {
@@ -891,5 +933,31 @@ func TestSkillsSymlink_PointsAtSharedTemplateDir(t *testing.T) {
 	}
 	if target != "/workspace/skills" {
 		t.Errorf("skills link target = %q, want /workspace/skills", target)
+	}
+}
+
+// The CLI's `ui call` names the conversation it drives with this variable;
+// parity with the pi harness, which sets the same key.
+//
+// @scenario "The worker env carries the conversation id for the UI channel"
+func TestBuildWorkerEnv_CarriesConversationID(t *testing.T) {
+	env := buildWorkerEnv(
+		"/workspace/sessions/conv-ui",
+		"conv-ui",
+		domain.Credentials{LangwatchAPIKey: "lw-key"},
+		"pw",
+		0,
+		Mediation{},
+		nil,
+	)
+
+	found := false
+	for _, kv := range env {
+		if kv == "LANGY_CONVERSATION_ID=conv-ui" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("LANGY_CONVERSATION_ID=conv-ui missing from worker env")
 	}
 }

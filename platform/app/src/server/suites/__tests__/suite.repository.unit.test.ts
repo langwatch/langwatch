@@ -20,6 +20,8 @@ function makeSuiteRow(
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],
@@ -153,14 +155,37 @@ describe("SuiteRepository", () => {
           prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue(suites);
 
-        const result = await repository.findAll({ projectId: "proj_1" });
+        const result = await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+        });
 
         expect(result).toEqual(suites);
         expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
           where: {
             projectId: "proj_1",
+            kind: { in: ["run_plan"] },
             archivedAt: null,
           },
+          orderBy: { updatedAt: "desc" },
+        });
+      });
+    });
+
+    describe("when the caller asks for archived rows too", () => {
+      it("drops the archivedAt filter", async () => {
+        (
+          prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([]);
+
+        await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+          includeArchived: true,
+        });
+
+        expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
+          where: { projectId: "proj_1", kind: { in: ["run_plan"] } },
           orderBy: { updatedAt: "desc" },
         });
       });
@@ -172,7 +197,10 @@ describe("SuiteRepository", () => {
           prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue([]);
 
-        const result = await repository.findAll({ projectId: "proj_1" });
+        const result = await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+        });
 
         expect(result).toEqual([]);
       });

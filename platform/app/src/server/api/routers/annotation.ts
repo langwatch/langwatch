@@ -16,6 +16,7 @@ import {
   withReadableAnnotationAnchor,
 } from "~/server/annotations/annotationAnchor";
 import { getApp } from "~/server/app-layer/app";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
@@ -23,7 +24,6 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -230,7 +230,7 @@ const carrySuggestionToOverlay = async ({
   });
   if (!target) return;
 
-  if (!(await hasProjectPermission(ctx, projectId, "annotations:update"))) {
+  if (!(await probeProjectPermission(ctx, projectId, "annotations:update"))) {
     return;
   }
 
@@ -336,7 +336,7 @@ export const annotationRouter = createTRPCRouter({
         .merge(annotationAnchorColumnsSchema)
         .superRefine(refineAnnotationAnchorColumns),
     )
-    .use(checkProjectPermission("annotations:create"))
+    .permission("annotations:create")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
@@ -401,7 +401,7 @@ export const annotationRouter = createTRPCRouter({
         scoreOptions: scoreOptions,
       }),
     )
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
@@ -459,7 +459,7 @@ export const annotationRouter = createTRPCRouter({
         anchor: annotationAnchorScopeSchema.optional().default("all"),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const annotations = await ctx.prisma.annotation.findMany({
         where: {
@@ -492,7 +492,7 @@ export const annotationRouter = createTRPCRouter({
         anchor: annotationAnchorScopeSchema.optional().default("all"),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const annotations = await ctx.prisma.annotation.findMany({
         where: {
@@ -525,7 +525,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findUnique({
         where: {
@@ -536,7 +536,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("annotations:delete"))
+    .permission("annotations:delete")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
@@ -581,7 +581,7 @@ export const annotationRouter = createTRPCRouter({
         endDate: z.date().optional(),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -612,7 +612,7 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("annotations:create"))
+    .permission("annotations:create")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
       await service.assertQueueConfigurationReferences({
@@ -695,7 +695,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueues: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueue.findMany({
         where: { projectId: input.projectId },
@@ -713,7 +713,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueueItems: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
       const organizationId = await service.getProjectOrganizationId({
@@ -769,7 +769,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getPendingItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.count({
         where: {
@@ -795,7 +795,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getAssignedItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.count({
         where: {
@@ -807,7 +807,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueueItemsCounts: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -874,7 +874,7 @@ export const annotationRouter = createTRPCRouter({
         annotators: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("annotations:create"))
+    .permission("annotations:create")
     .mutation(async ({ ctx, input }) => {
       return await createOrUpdateQueueItems({
         traceIds: input.traceIds,
@@ -901,7 +901,7 @@ export const annotationRouter = createTRPCRouter({
         queueItemIds: z.array(z.string()).min(1),
       }),
     )
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
       const organizationId = await service.getProjectOrganizationId({
@@ -927,7 +927,7 @@ export const annotationRouter = createTRPCRouter({
    */
   markQueueItemDone: protectedProcedure
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
       const organizationId = await service.getProjectOrganizationId({
@@ -966,7 +966,7 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
       const organizationId = await service.getProjectOrganizationId({
@@ -1014,7 +1014,7 @@ export const annotationRouter = createTRPCRouter({
         endDate: z.date().optional(),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const service = AnnotationService.create({ prisma: ctx.prisma });

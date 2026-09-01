@@ -38,8 +38,8 @@ func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 // entire promise the worker skill and the client connect card are built on.
 func TestGithubGate_NoCredential(t *testing.T) {
 	t.Run("when a settled tool command reaches for GitHub", func(t *testing.T) {
-		cancelled := false
-		gate := newGithubGate(false, func() { cancelled = true })
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
 
 		gate.Observe(toolEndFrame(t, "gh repo clone acme/service-x -- --depth 1", true,
 			"gh: To use GitHub CLI in automation, set GH_TOKEN"))
@@ -54,7 +54,7 @@ func TestGithubGate_NoCredential(t *testing.T) {
 		if message == "" {
 			t.Error("tripped gate must carry a message")
 		}
-		if !cancelled {
+		if !canceled {
 			t.Error("trip must cancel the stream")
 		}
 	})
@@ -108,8 +108,8 @@ func TestGithubGate_WithCredential(t *testing.T) {
 	})
 
 	t.Run("when the clone 404s on a repo outside the installation", func(t *testing.T) {
-		cancelled := false
-		gate := newGithubGate(true, func() { cancelled = true })
+		canceled := false
+		gate := newGithubGate(true, func() { canceled = true })
 		gate.Observe(toolEndFrame(t, "gh repo clone acme/other-repo", true,
 			"GraphQL: Could not resolve to a Repository with the name 'acme/other-repo'."))
 
@@ -120,7 +120,7 @@ func TestGithubGate_WithCredential(t *testing.T) {
 		if code != "langy_github_repo_not_accessible" {
 			t.Errorf("code = %q, want langy_github_repo_not_accessible", code)
 		}
-		if !cancelled {
+		if !canceled {
 			t.Error("trip must cancel the stream")
 		}
 	})

@@ -8,8 +8,13 @@
  * assumed a shared one). The notice names the identity, and the two commands
  * that change it, in one line:
  *
- *   device mode   Using your personal project (device login). Read another project: langwatch login --project
- *   api-key mode  Using API key for project "<name>". Switch: langwatch login --project | --device
+ *   device mode           Using your personal project (device login). Read another project: langwatch login --project
+ *   device-login-key mode Using your login key on your personal project. Read another project: add --project <id|slug>
+ *   api-key mode          Using API key for project "<name>". Switch: langwatch login --project | --device
+ *
+ * A command carrying an explicit `--project` prints no notice at all: the
+ * identity is named on the command line, so there is nothing implicit to
+ * warn about.
  *
  * Contract, in order of importance:
  *   - ALWAYS stderr. Stdout belongs to the command's output; `-o json` and
@@ -48,7 +53,7 @@ const STATE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
  * make every CLI command feel slow. */
 const NAME_FETCH_TIMEOUT_MS = 1_500;
 
-export type NoticeMode = "device" | "api-key";
+export type NoticeMode = "device" | "device-login-key" | "api-key";
 
 interface NoticeState {
   /** sha256(mode:credential) -> epoch ms the notice was last shown. */
@@ -144,6 +149,9 @@ async function fetchProjectName(
 function renderLine(mode: NoticeMode, projectName: string | undefined): string {
   if (mode === "device") {
     return "Using your personal project (device login). Read another project: langwatch login --project";
+  }
+  if (mode === "device-login-key") {
+    return "Using your login key on your personal project. Read another project: add --project <id|slug>";
   }
   if (projectName) {
     return `Using API key for project "${projectName}". Switch: langwatch login --project | --device`;

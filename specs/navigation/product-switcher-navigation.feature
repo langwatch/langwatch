@@ -116,3 +116,38 @@ Feature: Product switcher navigation
     When I open one of its pages
     Then the page renders as a project page in the LLM Ops product
     And it does not render as the personal or the settings surface
+
+  @integration
+  Scenario: A large project list opens with a focused search field
+    Given my organization holds more than eight projects
+    When I open the project menu
+    Then a search field sits at the top of the menu and holds the focus
+    And typing narrows the list to projects whose name or team matches
+
+  @integration
+  Scenario: A short project list stays a plain menu
+    Given my organization holds eight projects or fewer
+    When I open the project menu
+    Then the menu lists the projects with no search field
+
+  @integration
+  Scenario: The project search answers the keyboard
+    Given my organization holds more than eight projects
+    And the project menu is open
+    When I move down the list with the arrow keys and press Enter
+    Then the highlighted project opens
+
+  @integration
+  Scenario: Typing highlights the top result
+    Given my organization holds more than eight projects
+    And the project menu is open
+    When I type enough of a project's name to narrow the list
+    Then the first result is already highlighted, with no arrow key pressed
+    When I press Enter
+    Then that project opens
+
+  @integration
+  Scenario: Creating a project stays available while the list is unfiltered
+    Given my organization holds more than eight projects
+    When I open the project menu without typing
+    Then each team I can create a project in offers "New Project"

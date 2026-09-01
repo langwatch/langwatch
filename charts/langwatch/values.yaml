@@ -143,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.15.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.15.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.15.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -1122,6 +1122,23 @@ langwatch_nlp:
   security:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
+
+  # Ceiling on how long a workflow code block may run inside the sandboxed
+  # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
+  # 710 is the engine's stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS,
+  # 720s default) minus the 10s safety margin the Lambda client clamps to
+  # (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS) — a ceiling above 710 races the
+  # stream shutting down.
+  #
+  # The app and the workers derive their own fetch deadline from this number
+  # and get it whether or not the NLP service is deployed here, so even with
+  # langwatch_nlp.enabled false the chart still enforces the same ceiling
+  # check — refusing a value that would let the clients' deadline outrun any
+  # engine's real limit — but otherwise passes the value through unchanged;
+  # a shortened value is a legal external-engine config. Configure the real
+  # ceiling on the external service and match it here.
+  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep at or below 710 — the engine's stream idle timeout (720s default) minus a 10s safety margin. When langwatch_nlp.enabled is false the engine is external: set the real ceiling there and match it here.
+  codeBlockTimeoutSeconds: 600
 
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox

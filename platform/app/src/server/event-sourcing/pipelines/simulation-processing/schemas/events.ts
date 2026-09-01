@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { EventSchema } from "../../../domain/types";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -20,10 +21,19 @@ export const simulationRunQueuedEventDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  /**
+   * The run's secret parameter values, encrypted, keyed by name.
+   *
+   * A sibling of `metadata`, not a member of it: the fold projection copies
+   * the metadata object into the runs store, so a worker on an older build
+   * would carry anything inside it into that store and a sibling is dropped
+   * instead. The names, in clear, ride `metadata.secretParameterNames`.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
       referenceId: z.string(),
     })
     .optional(),
@@ -216,6 +226,35 @@ export type SimulationRunCancelRequestedEvent = z.infer<
 >;
 
 /**
+ * AgentInstanceRecorded event - emitted once the run knows which connected
+ * agent instance answered it. The fold writes it into the run's metadata
+ * under `langwatch.agentInstance`, so the results page can show where the
+ * run was served. It arrives after the run finished: the child learns the
+ * instance during the run and the parent records it when the child exits.
+ */
+export const simulationRunAgentInstanceRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  agentInstance: z.object({
+    hostname: z.string(),
+    label: z.string().nullable(),
+  }),
+});
+export type SimulationRunAgentInstanceRecordedEventData = z.infer<
+  typeof simulationRunAgentInstanceRecordedEventDataSchema
+>;
+
+export const SimulationRunAgentInstanceRecordedEventSchema = EventSchema.extend(
+  {
+    type: z.literal(SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED),
+    version: z.literal(SIMULATION_EVENT_VERSIONS.AGENT_INSTANCE_RECORDED),
+    data: simulationRunAgentInstanceRecordedEventDataSchema,
+  },
+);
+export type SimulationRunAgentInstanceRecordedEvent = z.infer<
+  typeof SimulationRunAgentInstanceRecordedEventSchema
+>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 export const simulationRunDeletedEventDataSchema = z.object({
@@ -280,11 +319,13 @@ export type SimulationProcessingEvent =
   | SimulationRunFinishedEvent
   | SimulationRunMetricsComputedEvent
   | SimulationRunCancelRequestedEvent
+  | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
 export {
   isSimulationMessageSnapshotEvent,
+  isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,

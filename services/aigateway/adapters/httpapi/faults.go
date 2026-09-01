@@ -1,10 +1,14 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -69,7 +73,7 @@ func faultForCode(code herr.Code) Fault {
 	switch code {
 	case domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
-		domain.ErrProviderNotBound,
+		domain.ErrProviderNotBound, domain.ErrModelNotRecognized,
 		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
 		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrKeyExpired,
 		domain.ErrNoProviderConfigured,
@@ -78,28 +82,57 @@ func faultForCode(code herr.Code) Fault {
 		// so it is their fault in the only sense this attribution means: whose
 		// action fixes it. Counted per key too, which is what shows an
 		// operator a key wedged in a re-authenticate loop.
-		domain.ErrCodexSessionExpired:
+		domain.ErrCodexSessionExpired,
+		// The three terminal provider-setup failures. "Whose action fixes it"
+		// is the only question this attribution asks, and the answer for all
+		// three is the customer: re-paste the credential, or declare the model
+		// on the key. Reading them as provider faults — which is what they did
+		// while they wore provider_timeout — put a settings mistake on the warn
+		// line operators watch for provider outages, and left the customer
+		// looking at a provider status page for something only they can change.
+		domain.ErrProviderCredentialInvalid, domain.ErrProviderCredentialRejected,
+		domain.ErrProviderConfigInvalid:
 		return FaultCustomer
 	case domain.ErrProviderError, domain.ErrProviderTimeout,
+		domain.ErrProviderConnectionFailed,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen:
 		return FaultProvider
+	case domain.ErrRequestAbandoned:
+		// Nobody's fault, and nothing to page for: the caller left. Info level,
+		// the same as a customer fault, but deliberately not counted as a
+		// client rejection — see recordClientReject.
+		return FaultCustomer
 	default:
 		// internal_error, auth_upstream_unavailable, anything unrecognized.
 		return FaultPlatform
 	}
 }
 
+// requestError is one failure, as the log line states it.
+type requestError struct {
+	fault   Fault
+	code    string
+	status  int
+	message string
+	// reason is the provider's own words for a forwarded rejection, when its
+	// body states something our message does not.
+	reason string
+}
+
 // logRequestError emits the single stable failure log line CloudWatch metric
 // filters key on: msg="gateway_request_failed" with fault/code/status fields,
 // plus the calling identity when the request was authenticated.
-func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code string, status int, message string) {
+func logRequestError(logger *zap.Logger, ctx context.Context, failure requestError) {
 	fields := []zap.Field{
-		zap.String("fault", string(fault)),
-		zap.String("code", code),
-		zap.String("message", message),
+		zap.String("fault", string(failure.fault)),
+		zap.String("code", failure.code),
+		zap.String("message", failure.message),
 	}
-	if status > 0 {
-		fields = append(fields, zap.Int("status", status))
+	if failure.status > 0 {
+		fields = append(fields, zap.Int("status", failure.status))
+	}
+	if failure.reason != "" {
+		fields = append(fields, zap.String("upstream_reason", failure.reason))
 	}
 	if bundle := BundleFromContext(ctx); bundle != nil {
 		fields = append(fields,
@@ -108,7 +141,87 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 			zap.String("virtual_key_id", bundle.VirtualKeyID),
 		)
 	}
-	logger.Log(fault.level(), "gateway_request_failed", fields...)
+	logger.Log(failure.fault.level(), "gateway_request_failed", fields...)
+}
+
+// handledCause reads the underlying error a handled error was built from, for
+// the operator's half of the log line. The customer-facing message states what
+// happened and what to do; the cause states WHY, and only one of the two can be
+// both actionable and safe to show a customer.
+//
+// This closes the hole that made a production Vertex failure undiagnosable:
+// Bifrost splits a failure into a category ("error creating auth token source")
+// and a wrapped cause ("failed to parse auth credentials JSON: ..."), the
+// gateway carried only the category, and the category is the same string for
+// six different credential problems with different fixes.
+//
+// Capped and never quoted from a request body — a reason here is authored by
+// the engine or a provider SDK, not echoed from customer input.
+func handledCause(message string, e herr.E) string {
+	for _, reason := range e.Reasons {
+		if reason == nil {
+			continue
+		}
+		text := cappedReason(reason.Error())
+		if text == "" || strings.Contains(message, text) {
+			continue
+		}
+		return text
+	}
+	return ""
+}
+
+// upstreamReasonLimit caps the reason field: long enough for any provider's
+// rejection sentence, short enough that a provider answering at length cannot
+// take the log line over.
+const upstreamReasonLimit = 256
+
+// upstreamReason reads the provider's own explanation out of a forwarded error
+// body. Providers state it in different places: OpenAI and Anthropic use
+// error.message, the codex backend answers "detail", several others use a bare
+// message or a plain error string. Each of those is a field the provider wrote
+// to explain itself, which is what the operator needs.
+//
+// A body in none of those shapes is described, never quoted. An HTML edge page
+// or a plain-text rejection can reflect the request that caused it, so quoting
+// it would put a prompt, a key or personal data on a log line. The status, the
+// code and the size still say who answered and that we could not read it.
+func upstreamReason(body []byte) string {
+	for _, path := range []string{"error.message", "detail", "message", "error"} {
+		if value := gjson.GetBytes(body, path); value.Type == gjson.String && value.Str != "" {
+			return cappedReason(value.Str)
+		}
+	}
+	return unreadableReason(body)
+}
+
+// unreadableReason states that a body carried no reason we can read, and how
+// big it was, with nothing of the body itself.
+func unreadableReason(body []byte) string {
+	size := len(bytes.TrimSpace(body))
+	if size == 0 {
+		return ""
+	}
+	return fmt.Sprintf("unrecognized upstream body, %d bytes", size)
+}
+
+// unstatedReason is upstreamReason minus what the message already says, so a
+// provider whose words we forwarded as the message is not quoted twice.
+func unstatedReason(message string, body []byte) string {
+	reason := upstreamReason(body)
+	if reason == "" || strings.Contains(message, reason) {
+		return ""
+	}
+	return reason
+}
+
+func cappedReason(text string) string {
+	text = strings.TrimSpace(text)
+	if len(text) <= upstreamReasonLimit {
+		return text
+	}
+	const ellipsis = "..."
+	return strings.ToValidUTF8(text[:upstreamReasonLimit-len(ellipsis)], "") + ellipsis
 }
 
 // recordClientReject counts a rejection the GATEWAY issued against the caller.
@@ -127,7 +240,11 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 // pin this counter and mute the alert it exists for, and that rejection is
 // already carried by gateway_rate_limit_denied_total.
 func recordClientReject(ctx context.Context, code herr.Code) {
-	if faultForCode(code) != FaultCustomer || code == domain.ErrRateLimited {
+	// domain.ErrRequestAbandoned is excluded alongside the rate limit: the
+	// caller disconnecting is not a rejection the gateway issued, and a client
+	// on a flaky network would otherwise read as one looping on bad bodies.
+	if faultForCode(code) != FaultCustomer ||
+		code == domain.ErrRateLimited || code == domain.ErrRequestAbandoned {
 		return
 	}
 	virtualKeyID := ""
@@ -146,7 +263,13 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 		if status <= 0 {
 			status = http.StatusBadGateway
 		}
-		logRequestError(logger, ctx, faultForUpstreamStatus(ue.StatusCode), "upstream_error", status, ue.Message)
+		logRequestError(logger, ctx, requestError{
+			fault:   faultForUpstreamStatus(ue.StatusCode),
+			code:    "upstream_error",
+			status:  status,
+			message: ue.Message,
+			reason:  unstatedReason(ue.Message, ue.Body),
+		})
 		return
 	}
 	var e herr.E
@@ -155,9 +278,18 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 		if m, ok := e.Meta["message"].(string); ok {
 			msg = m
 		}
-		logRequestError(logger, ctx, faultForCode(e.Code), e.Code.String(), 0, msg)
+		logRequestError(logger, ctx, requestError{
+			fault:   faultForCode(e.Code),
+			code:    e.Code.String(),
+			message: msg,
+			reason:  handledCause(msg, e),
+		})
 		recordClientReject(ctx, e.Code)
 		return
 	}
-	logRequestError(logger, ctx, FaultPlatform, "unhandled", 0, err.Error())
+	logRequestError(logger, ctx, requestError{
+		fault:   FaultPlatform,
+		code:    "unhandled",
+		message: err.Error(),
+	})
 }

@@ -51,8 +51,14 @@ export {
   LangWatchQLService,
   setLangWatchQLService,
 } from "./lwql.service";
-export type { LangWatchQLTimeWindowResolution } from "./resolveTimeWindow";
-export { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
+export type {
+  LangWatchQLGranularityResolution,
+  LangWatchQLTimeWindowResolution,
+} from "./resolveTimeWindow";
+export {
+  resolveLangWatchQLGranularity,
+  resolveLangWatchQLTimeWindow,
+} from "./resolveTimeWindow";
 export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,

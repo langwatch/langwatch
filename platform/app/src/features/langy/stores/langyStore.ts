@@ -201,16 +201,6 @@ interface LangyState extends TurnPhaseState {
   closePanel: () => void;
   togglePanel: () => void;
 
-  /**
-   * The one-time "you can hand me things off the page" hint has been retired.
-   *
-   * Persisted per browser, and set two ways: the user dismisses it, or they do
-   * the thing it teaches (see `absorbContextTarget`). Teaching a gesture is
-   * worth exactly one showing — a hint that comes back is an ad.
-   */
-  contextHintDismissed: boolean;
-  dismissContextHint: () => void;
-
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
   // (never persisted) — it exists only for the hop between the bar and the panel.
@@ -221,14 +211,18 @@ interface LangyState extends TurnPhaseState {
   consumePendingPrompt: () => void;
 
   /**
-   * An `askLangy` handoff also asks the panel's composer to take focus: the
-   * reader just handed a question over and expects to keep typing, not to
-   * click the field first. A flag rather than an imperative call because the
-   * composer may not be mounted yet when the handoff fires — it honors the
-   * request on mount or on change, then consumes it so focus is taken exactly
-   * once. Ephemeral, like `pendingPrompt`.
+   * The panel's composer is asked to take focus. Three producers: an
+   * `askLangy` handoff (the reader just handed a question over and expects to
+   * keep typing), a new chat (the one gesture whose whole point is to write
+   * the next message), and a dialog that took the cursor away and gives it
+   * back on close. A flag rather than an imperative call because the composer
+   * may not be mounted yet when the request fires — it honors the request on
+   * mount or on change, then consumes it so focus is taken exactly once.
+   * Ephemeral, like `pendingPrompt`.
    */
   composerFocusRequested: boolean;
+  /** Ask the composer to take focus. */
+  requestComposerFocus: () => void;
   /** The composer has taken the requested focus — clear it so it fires once. */
   consumeComposerFocus: () => void;
 
@@ -281,8 +275,50 @@ interface LangyState extends TurnPhaseState {
   homeAskOpen: boolean;
   setHomeAskOpen: (open: boolean) => void;
 
+  /**
+   * What the page Langy is driving is doing this second, in the page's own
+   * words, or null when it is doing nothing.
+   *
+   * The status line may only say true things, so with no tool running and no
+   * tokens arriving it falls back to a verb that claims nothing ("Cooking…").
+   * That was honest and useless: while Langy runs a column the page knows
+   * which one and how many rows are back, and nothing carried that the few
+   * feet from the table to the panel. This is that channel, and the page that
+   * writes it is the page that is doing the work, so the line stays true.
+   *
+   * Session-only, never persisted: it describes this second. A page that
+   * reloaded into "running 12 of 20 rows" would be claiming work no one is
+   * doing, which is the whole failure this exists to avoid.
+   */
+  pageActivity: string | null;
+  setPageActivity: (activity: string | null) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
+  /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). NOT the active conversation,
+   * nothing durable exists under it yet; the first send adopts it (the
+   * transport passes it to `createConversation`) so the turn lands on the
+   * worker the warm already booted. Cleared whenever the panel points at a
+   * different chat (new conversation, ask handoff, selection, scope change).
+   */
+  pendingConversationId: string | null;
+  /** The warm hook stores the id its mutation returned; null clears it. */
+  setPendingConversationId: (id: string | null) => void;
+  /**
+   * The conversation whose worker the last warm PROVED alive (`warmed: true`
+   * from `langy.warmWorker`). The thinking line reads it: a first message to a
+   * warmed worker skips the cold-boot ladder and says "Thinking…" from the
+   * first frame, because the workspace it would claim to be preparing already
+   * exists. Only ever compared against the ids on screen, so a stale value is
+   * inert; if the worker was reaped since, the manager's own readiness status
+   * corrects the line moments later, exactly as it does on a follow-up.
+   * Session-only, never persisted.
+   */
+  warmedConversationId: string | null;
+  /** A warm answered `warmed: true` for this conversation's worker. */
+  markConversationWarmed: (id: string) => void;
   /**
    * The conversation whose durable server history should hydrate the chat
    * engine. Set only when the USER selects a conversation; cleared once the
@@ -320,19 +356,49 @@ interface LangyState extends TurnPhaseState {
   setDraft: (draft: string) => void;
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
+  /**
+   * Seeding: the panel writing the resolved default, or an allowlist snap.
+   * Either way the model is not the user's choice, so this clears the pick
+   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
+   * panel has taken away must not go on holding the pill off the default.
+   */
   setModelOverride: (model: string) => void;
+  /** The user choosing a model in the picker. Their pick, not a seed. */
+  pickModel: (model: string) => void;
+  /**
+   * Whether the model in the picker is the user's own choice rather than a
+   * seeded value. Session-only, never persisted, and cleared with the
+   * conversation it was made in.
+   *
+   * The flag exists because the two are otherwise indistinguishable at the
+   * one moment it matters: accept "make it the default" and the pick BECOMES
+   * the default, so every "is this still the default?" test reads an explicit
+   * choice as untouched and the follow rules below overwrite it.
+   */
+  isModelPickedByUser: boolean;
+  /**
+   * Which conversation the picker was last seeded for from the durable
+   * record — so a poll of the same history does not re-apply a model the
+   * user has since picked away from. Session-only, never persisted.
+   */
+  modelSeededForConversationId: string | null;
+  /**
+   * A conversation remembers the model its last turn ran on; opening it
+   * brings that model back to the picker. Applies once per selection, and
+   * never over the user's own pick.
+   */
+  followConversationModel: (args: {
+    conversationId: string;
+    model: string;
+  }) => void;
   /**
    * The project's coding default changed server-side (a codex connect flow
    * wrote the LANGY role default). Follow it with the composer's pill ONLY
-   * when the pill is still on the default it replaced: an empty override, or
-   * one equal to the outgoing default (the panel seeds the override from the
-   * resolved default on open), both mean the user never explicitly diverged.
-   * A model the user picked on purpose is never hijacked.
+   * while the pill still holds a seeded value: the user's own pick is never
+   * hijacked, including when they picked the model that just became the
+   * default.
    */
-  followCodingDefaultChange: (change: {
-    previousDefault: string | null;
-    nextDefault: string;
-  }) => void;
+  followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
@@ -424,6 +490,13 @@ interface LangyState extends TurnPhaseState {
   /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
   requestStop: () => void;
   /**
+   * The conversation whose last turn THIS browser stopped (ADR-078). What lets
+   * an empty stopped reply read "Interrupted" instead of "No content". Session
+   * truth only: set when the stop dispatches, cleared by the next send and by
+   * the scope reset — a reloaded page falls back to the plain empty state.
+   */
+  interruptedConversationId: string | null;
+  /**
    * The stop request never reached the backend: `stopping` → `active`. The
    * spinner is a promise that a stop is on its way, so it may not outlive a
    * request that failed to go out.
@@ -462,6 +535,15 @@ interface LangyState extends TurnPhaseState {
   applyTurnEvents: (events: readonly LangyConversationTurnWireEvent[]) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
+  /**
+   * The current turnStatus is the manager's pre-first-frame readiness line
+   * ("Starting Langy…", "Thinking…") — a placeholder for silence. The panel
+   * must never render it under an answer that is already visible: a stream
+   * replay can re-deliver it after text is on screen, and "Thinking…" below
+   * the reply reads as a contradiction. Statuses the agent reports mid-turn
+   * keep rendering regardless.
+   */
+  turnStatusIsReadiness: boolean;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
   turnProgress: number | null;
   /** Latest measured X/Y sample used for smooth, rate-aware interpolation. */
@@ -480,6 +562,8 @@ interface LangyState extends TurnPhaseState {
    */
   turnPlan: Array<{ content: string; status: string }> | null;
   setTurnStatus: (status: string | null) => void;
+  /** Set the manager's readiness placeholder status (see turnStatusIsReadiness). */
+  setTurnReadinessStatus: (status: string | null) => void;
   setTurnProgress: (progress: number | null) => void;
   setTurnProgressSample: (sample: LangyProgressSample | null) => void;
   /** Append a run of streamed reasoning tokens to the live thinking. */
@@ -558,12 +642,17 @@ const emptyConversationState = () => ({
   ...initialTurnPhaseState,
   turnProjection: initialLangyTurnProjection,
   turnStatus: null as string | null,
+  turnStatusIsReadiness: false as boolean,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
   turnReasoning: null as string | null,
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  // A conversation change also drops the id a panel-open warm minted: the
+  // pending id belongs to the fresh chat the warm was fired for, and the warm
+  // hook re-warms (and re-mints) for whatever the panel points at next.
+  pendingConversationId: null as string | null,
 });
 
 /**
@@ -577,11 +666,10 @@ const emptyConversationState = () => ({
  * forgotten INTO the reset, which is the harmless direction.
  *
  * Each entry earns its place:
- *   isOpen, panelMode, panelEffect, devMode, contextHintDismissed
+ *   isOpen, panelMode, panelEffect, devMode
  *     — browser-level preferences. They describe how this person likes the panel,
- *       not what they were looking at. Closing the panel or forgetting that the
- *       gesture hint was already retired, every time somebody changes project,
- *       would be a bug of its own.
+ *       not what they were looking at. Closing the panel every time somebody
+ *       changes project would be a bug of its own.
  *   dockShellClaims, dockShifted
  *     — not preferences and not data: a live count of what is mounted RIGHT NOW.
  *       Zeroing them would tell the app shell the dock is free while it is still
@@ -596,7 +684,6 @@ const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "panelMode",
   "panelEffect",
   "devMode",
-  "contextHintDismissed",
   "dockShellClaims",
   "dockShifted",
 ]);
@@ -635,11 +722,6 @@ export const useLangyStore = create<LangyState>()(
       openPanel: () => set({ isOpen: true }),
       closePanel: () => set({ isOpen: false }),
 
-      contextHintDismissed: false,
-      dismissContextHint: () =>
-        set((state) =>
-          state.contextHintDismissed ? state : { contextHintDismissed: true },
-        ),
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
 
       pendingPrompt: null,
@@ -660,6 +742,12 @@ export const useLangyStore = create<LangyState>()(
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
+          // The model pick belongs to the conversation being left behind, the
+          // same as a new chat. Kept, it would steer a conversation the user
+          // never picked it for, and hold the pill off the default for good.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
@@ -670,6 +758,7 @@ export const useLangyStore = create<LangyState>()(
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
       composerFocusRequested: false,
+      requestComposerFocus: () => set({ composerFocusRequested: true }),
       consumeComposerFocus: () => set({ composerFocusRequested: false }),
 
       // Sidebar by default: docked inside the app shell as a second content
@@ -702,18 +791,34 @@ export const useLangyStore = create<LangyState>()(
       homeAskOpen: false,
       setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
 
+      pageActivity: null,
+      setPageActivity: (pageActivity) => set({ pageActivity }),
+
       activeConversationId: null,
       activeConversationScope: null,
       scopeAnnounced: false,
       conversationEpoch: 0,
       historyLoadConversationId: null,
+      pendingConversationId: null,
+      setPendingConversationId: (id) => set({ pendingConversationId: id }),
+      warmedConversationId: null,
+      markConversationWarmed: (id) => set({ warmedConversationId: id }),
       selectConversation: (id) =>
         set({
           activeConversationId: id,
           historyLoadConversationId: id,
+          // The pick belongs to the conversation being left behind; the one
+          // being opened seeds its own from the durable record (or the
+          // default) once its history lands.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
-      adoptConversation: (id) => set({ activeConversationId: id }),
+      // The pending id is retired either way: adopted (the send used it and it
+      // just became the active id) or superseded (the server minted its own).
+      adoptConversation: (id) =>
+        set({ activeConversationId: id, pendingConversationId: null }),
       startNewConversation: () =>
         set((state) => ({
           activeConversationId: null,
@@ -723,24 +828,48 @@ export const useLangyStore = create<LangyState>()(
           // primed to be sent into the new one. (`resetForScope` already
           // cleared the draft — it was simply missed here.)
           draft: "",
+          // A model pick lives with its conversation ("Just this
+          // conversation" is the dialog's promise) — a new chat starts on
+          // the resolved default again.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           chosenChipIds: new Set<string>(),
           // The targets the user pointed at were gathered for the conversation
           // being left behind; the epoch is what tells the target store to let
           // them go (see its subscription).
           conversationEpoch: state.conversationEpoch + 1,
           ...emptyConversationState(),
+          // A new chat exists to be written in, so it opens with the cursor
+          // already in the composer.
+          composerFocusRequested: true,
         })),
       consumeHistoryLoad: () => set({ historyLoadConversationId: null }),
 
       draft: "",
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
-      setModelOverride: (modelOverride) => set({ modelOverride }),
-      followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
+      setModelOverride: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: false }),
+      pickModel: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: true }),
+      isModelPickedByUser: false,
+      modelSeededForConversationId: null,
+      followConversationModel: ({ conversationId, model }) =>
+        set((state) => {
+          if (state.activeConversationId !== conversationId) return state;
+          if (state.modelSeededForConversationId === conversationId)
+            return state;
+          return state.isModelPickedByUser
+            ? { modelSeededForConversationId: conversationId }
+            : {
+                modelOverride: model,
+                modelSeededForConversationId: conversationId,
+              };
+        }),
+      followCodingDefaultChange: ({ nextDefault }) =>
         set((state) =>
-          state.modelOverride === "" || state.modelOverride === previousDefault
-            ? { modelOverride: nextDefault }
-            : state,
+          state.isModelPickedByUser ? state : { modelOverride: nextDefault },
         ),
 
       chosenChipIds: new Set<string>(),
@@ -885,10 +1014,17 @@ export const useLangyStore = create<LangyState>()(
               ? s.unconfirmedConversations
               : { ...s.unconfirmedConversations, [conversationId]: true },
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
           turnPlan: null,
+          interruptedConversationId: null,
+          // The warmed id is spent: this turn either adopted it or the server
+          // minted its own. Keeping it would let the NEXT new chat send its
+          // first message into this conversation, because the create path
+          // reads the pending id whenever no conversation is active.
+          pendingConversationId: null,
         })),
       unconfirmedConversations: {},
       confirmConversation: (id) =>
@@ -897,8 +1033,23 @@ export const useLangyStore = create<LangyState>()(
           const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
           return { unconfirmedConversations: rest };
         }),
-      requestStop: () => set((s) => reduceRequestStop(s)),
-      abandonStop: () => set((s) => reduceAbandonStop(s)),
+      interruptedConversationId: null,
+      requestStop: () =>
+        set((s) => ({
+          ...reduceRequestStop(s),
+          // Only a stop that actually moved the machine counts as an
+          // interruption — requestStop is a no-op outside `active`.
+          interruptedConversationId:
+            s.turnPhase === "active"
+              ? s.activeConversationId
+              : s.interruptedConversationId,
+        })),
+      abandonStop: () =>
+        set((s) => ({
+          ...reduceAbandonStop(s),
+          // The stop never went out, so nothing was interrupted.
+          interruptedConversationId: null,
+        })),
       observeBackendTurn: (inFlight) =>
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
@@ -983,11 +1134,15 @@ export const useLangyStore = create<LangyState>()(
           return { turnProjection };
         }),
       turnStatus: null,
+      turnStatusIsReadiness: false,
       turnProgress: null,
       turnProgressSample: null,
       turnReasoning: null,
       turnPlan: null,
-      setTurnStatus: (turnStatus) => set({ turnStatus }),
+      setTurnStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: false }),
+      setTurnReadinessStatus: (turnStatus) =>
+        set({ turnStatus, turnStatusIsReadiness: true }),
       setTurnProgress: (turnProgress) => set({ turnProgress }),
       setTurnProgressSample: (turnProgressSample) =>
         set({ turnProgressSample }),
@@ -997,6 +1152,7 @@ export const useLangyStore = create<LangyState>()(
       resetTurnSignals: () =>
         set({
           turnStatus: null,
+          turnStatusIsReadiness: false,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
@@ -1095,7 +1251,6 @@ export const useLangyStore = create<LangyState>()(
       partialize: (state) => ({
         isOpen: state.isOpen,
         devMode: state.devMode,
-        contextHintDismissed: state.contextHintDismissed,
         panelMode: state.panelMode,
         panelEffect: state.panelEffect,
         activeConversationId: state.activeConversationId,

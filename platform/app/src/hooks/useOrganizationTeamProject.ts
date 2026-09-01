@@ -1,7 +1,5 @@
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { isLegacyNavigationDevice } from "~/features/navigation/logic/resolveNavigationMode";
-import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -294,9 +292,6 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const [lastVisitedHomeKind, setLastVisitedHomeKind] = useLocalStorage<
-    "" | "project" | "personal"
-  >("lastVisitedHomeKind", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -519,34 +514,11 @@ export const useOrganizationTeamProject = (
         setLocalStorageProjectSlug(project.slug);
       }
     }
-    // Visiting an actual /[project]/* page marks the implicit home preference
-    // as "project". Pairs with MyLayout's "personal" marker so the `/` index
-    // resolver can fall through to whichever home was visited last when the
-    // user has no explicit pin. Gate on the URL actually carrying a project
-    // slug: `project` also resolves from the persisted selectedProjectSlug on
-    // non-project routes (e.g. /me), and marking "project" there would clobber
-    // MyLayout's "personal" and wrongly bounce `/` back to the project.
-    // `projectSlugFromUrl` (not raw `router.query.project`) so reserved slugs
-    // like /messages or /datasets don't count as project visits either.
-    if (project && !!projectSlugFromUrl && lastVisitedHomeKind !== "project") {
-      // Guarded like the setters above: every unguarded write dispatches a
-      // storage event that setStates all mounted subscribers, which can cascade
-      // past React's nested-update limit during route transitions.
-      setLastVisitedHomeKind("project");
-    }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo, organization, project, team, router.query.project]);
-
-  // Subscribed, not read once. The store holds the last flag answer this
-  // device saw, which is device-wide: a reader who leaves an organization
-  // with the new navigation on for one with it off starts as a v2 device
-  // and becomes a legacy one when the flag answers. The redirect effect
-  // below must run again on that answer, so it reads a subscribed value.
-  // Spec: specs/navigation/navigation-v2-landing.feature
-  const isLegacyNavigation = useNavigationModeStore(isLegacyNavigationDevice);
 
   useEffect(() => {
     if (
@@ -608,28 +580,10 @@ export const useOrganizationTeamProject = (
       return;
     }
 
-    const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
-      (team) => team.projects.length > 0,
-    );
-    if (
-      !hasTeamsWithProjectsOnCurrentOrg &&
-      teamsWithProjectsOnAnyOrg.length > 0 &&
-      // In the navigation-v2 modes the org switch and the landing resolver
-      // own cross-organization destinations; this teleport to another
-      // org's project would fight them mid-navigation.
-      // Spec: specs/navigation/navigation-v2-landing.feature
-      isLegacyNavigation
-    ) {
-      // Personal workspaces are never a valid project-home target — only
-      // redirect when a shared team's project exists (ADR-038 v6).
-      const availableProjectSlug = teamsWithProjectsOnAnyOrg.find(
-        (team) => !team.isPersonal,
-      )?.projects[0]?.slug;
-      if (availableProjectSlug) {
-        void router.push(`/${availableProjectSlug}`);
-        return;
-      }
-    }
+    // The org switch and the landing resolver own cross-organization
+    // destinations; a teleport to another org's project would fight them
+    // mid-navigation, so a member kept in an organization without projects
+    // stays put. Spec: specs/navigation/navigation-v2-landing.feature
 
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
@@ -656,7 +610,6 @@ export const useOrganizationTeamProject = (
     }
   }, [
     isDemo,
-    isLegacyNavigation,
     organization,
     organizations.data,
     finalProject,

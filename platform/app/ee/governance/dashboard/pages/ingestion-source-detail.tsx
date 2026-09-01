@@ -20,11 +20,12 @@ import {
   CircleX,
   Copy,
   KeyRound,
+  Pencil,
   RotateCw,
   Trash2,
 } from "lucide-react";
 import numeral from "numeral";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -51,14 +52,26 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import type { SourceType } from "../components/ingestionSourceCatalog";
+import { needsIngestSecret } from "../components/ingestionSourceCatalog";
+import { SourceEventsTable } from "../components/SourceEventsTable";
+import {
+  type SourceEventsPager,
+  useSourceEventsPager,
+} from "../components/useSourceEventsPager";
+import type { PageRequest } from "../logic/eventsPager";
+import { useDestinationContext } from "./ingestionSourceForms";
+import { SourceEditDrawer } from "./inventory";
 
 /**
- * Per-source detail page - health metrics + recent events with raw vs
- * normalised side-by-side. Wired to api.activityMonitor.eventsForSource +
- * sourceHealthMetrics (Sergey f2cb9de7a).
+ * Per-source detail page - health metrics + a cursor-walked table of every
+ * event the source ever ingested, raw vs normalised on expand. Wired to
+ * api.activityMonitor.eventsForSource + sourceHealthMetrics.
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
- *       (scenario "Per-source detail page shows health")
+ *       (scenario "Per-source detail page shows health" and rule "The
+ *       events table pages through everything the source ever ingested")
  */
 
 type Source = RouterOutputs["ingestionSources"]["get"];
@@ -94,23 +107,8 @@ function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
-const fmtUsd = (n: number | string) => {
-  const v = typeof n === "string" ? Number(n) : n;
-  return v === 0 ? "$0.00" : numeral(v).format("$0,0.0000");
-};
-
-const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "-";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
-};
+const fmtRelative = (iso: string | null): string =>
+  iso ? (formatTimeAgo(new Date(iso).getTime()) ?? "-") : "-";
 
 /** Back link, name, status, and the two manage-only controls. */
 function SourceDetailHeader({
@@ -120,6 +118,7 @@ function SourceDetailHeader({
   isArchiving,
   onRotate,
   onArchive,
+  onEdit,
 }: {
   source: Source;
   canManage: boolean;
@@ -127,6 +126,7 @@ function SourceDetailHeader({
   isArchiving: boolean;
   onRotate: () => void;
   onArchive: () => void;
+  onEdit: () => void;
 }) {
   const status =
     STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
@@ -136,7 +136,7 @@ function SourceDetailHeader({
       <VStack align="start" gap={1}>
         <HStack gap={2}>
           <Link
-            href="/governance/ingestion-sources"
+            href="/governance/inventory?tab=sources"
             color="blue.600"
             fontSize="xs"
           >
@@ -167,19 +167,31 @@ function SourceDetailHeader({
         )}
       </VStack>
       <Spacer />
-      {/* Rotating a secret and archiving are both
+      {/* Editing, rotating a secret and archiving are all
           `ingestionSources:manage`. */}
       {canManage && (
         <>
           <Button
             size="sm"
             variant="outline"
-            onClick={onRotate}
-            loading={isRotating}
-            title="Mint a new ingestSecret (24h grace on the old one)"
+            onClick={onEdit}
+            title="Edit this source's configuration"
           >
-            <RotateCw size={14} /> Rotate secret
+            <Pencil size={14} /> Edit
           </Button>
+          {needsIngestSecret({
+            sourceType: source.sourceType as SourceType,
+          }) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRotate}
+              loading={isRotating}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -252,62 +264,6 @@ function SourceHealthCards({
   );
 }
 
-/** The newest 50 OCSF-normalised events, raw next to normalised. */
-function RecentEventsPanel({
-  source,
-  events,
-  error,
-  isLoading,
-}: {
-  source: Source;
-  events: EventRow[];
-  error: unknown;
-  isLoading: boolean;
-}) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={5}
-    >
-      <VStack align="start" gap={1} marginBottom={3}>
-        <Heading as="h3" size="sm">
-          Recent events
-        </Heading>
-        {!error && (
-          <Text fontSize="sm" color="fg.muted">
-            Last {events.length} OCSF-normalised events from this source. Raw
-            payload + normalised fields shown side-by-side. Newest first.
-          </Text>
-        )}
-      </VStack>
-
-      {isLoading && <Spinner size="sm" />}
-
-      {/* `EmptyEventsHint` walks an admin through setting up an integration.
-          Showing it because the events query failed sends someone debugging a
-          live source off to re-install something that is already working. */}
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load recent events"
-      />
-
-      {!isLoading && !error && events.length === 0 && (
-        <EmptyEventsHint source={source} />
-      )}
-
-      {events.length > 0 && (
-        <VStack align="stretch" gap={2}>
-          {events.map((ev) => (
-            <EventRow key={ev.eventId} event={ev} />
-          ))}
-        </VStack>
-      )}
-    </Box>
-  );
-}
-
 /**
  * Health counts, the stale-timestamp callout and the event feed. All three
  * come from the activity monitor, which has a grant of its own, so naming
@@ -318,7 +274,7 @@ function SourceActivityPanels({
   source,
   canReadActivity,
   healthQuery,
-  eventsQuery,
+  eventsPager,
 }: {
   source: Source;
   canReadActivity: boolean;
@@ -327,11 +283,7 @@ function SourceActivityPanels({
     error: unknown;
     isLoading: boolean;
   };
-  eventsQuery: {
-    data: EventRow[] | undefined;
-    error: unknown;
-    isLoading: boolean;
-  };
+  eventsPager: SourceEventsPager<EventRow>;
 }) {
   if (!canReadActivity) {
     return (
@@ -342,7 +294,6 @@ function SourceActivityPanels({
     );
   }
   const health = healthQuery.data;
-  const events = eventsQuery.data ?? [];
   return (
     <>
       <SourceHealthCards
@@ -352,13 +303,15 @@ function SourceActivityPanels({
       />
       <StaleTimestampCallout
         health={health ?? null}
-        eventsCount={events.length}
+        eventsCount={eventsPager.loadedCount}
       />
-      <RecentEventsPanel
-        source={source}
-        events={events}
-        error={eventsQuery.error}
-        isLoading={eventsQuery.isLoading}
+      {/* `EmptyEventsHint` walks an admin through setting up an integration.
+          The table only shows it once a load SUCCEEDED and came back empty —
+          showing it on a failed load sends someone debugging a live source
+          off to re-install something that is already working. */}
+      <SourceEventsTable
+        pager={eventsPager}
+        emptyState={<EmptyEventsHint source={source} />}
       />
     </>
   );
@@ -400,21 +353,38 @@ function SourceDetailShell({
 }
 
 /**
- * The two writes this page offers. Both are `ingestionSources:manage`; a
+ * The three writes this page offers. All are `ingestionSources:manage`; a
  * rotate reveals the new secret once, an archive sends the admin back to the
- * list.
+ * list, and an edit reopens the same drawer the source list uses.
  */
 function useSourceDetailMutations({
   orgId,
   sourceId,
   onSecretRevealed,
+  onEdited,
 }: {
   orgId: string;
   sourceId: string | undefined;
   onSecretRevealed: (details: { secret: string; sourceName: string }) => void;
+  onEdited: () => void;
 }) {
   const router = useRouter();
   const utils = api.useUtils();
+  const update = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void utils.ingestionSources.get.invalidate({
+        organizationId: orgId,
+        id: sourceId,
+      });
+      toaster.create({ title: "Source updated", type: "success" });
+      onEdited();
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the source",
+      }),
+  });
   const rotate = api.ingestionSources.rotateSecret.useMutation({
     onSuccess: (data) => {
       void utils.ingestionSources.get.invalidate({
@@ -432,7 +402,7 @@ function useSourceDetailMutations({
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/governance/ingestion-sources");
+      void router.push("/governance/inventory?tab=sources");
     },
     onError: (e) =>
       showErrorToast({
@@ -440,12 +410,12 @@ function useSourceDetailMutations({
         fallbackTitle: "Couldn't archive the source",
       }),
   });
-  return { rotate, archive };
+  return { rotate, archive, update };
 }
 
 /**
  * Everything the page needs: the source it addresses, what the viewer may do,
- * the three queries behind it and the two mutations that act on it. State and
+ * the three queries behind it and the three mutations that act on it. State and
  * callbacks only, the component owns the markup.
  */
 function useIngestionSourceDetailPage() {
@@ -455,6 +425,9 @@ function useIngestionSourceDetailPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  // Same derivation the inventory page uses, so the drawer offers the same
+  // destinations whichever surface opened it.
+  const destinationCtx = useDestinationContext(organization);
   const canRead = hasAnyPermission("ingestionSources:view");
   const canReadActivity = hasAnyPermission("activityMonitor:view");
 
@@ -469,38 +442,60 @@ function useIngestionSourceDetailPage() {
       refetchOnWindowFocus: false,
     },
   );
-  const eventsQuery = api.activityMonitor.eventsForSource.useQuery(
-    { organizationId: orgId, sourceId: sourceId ?? "", limit: 20 },
-    {
-      enabled: !!orgId && !!sourceId && canReadActivity,
-      refetchOnWindowFocus: false,
-    },
+  // The events table walks the timestamp cursor itself (see
+  // logic/eventsPager.ts), so it fetches imperatively through the utils
+  // client instead of useQuery: pages once loaded are kept and never
+  // refetched, which pins the first page's time anchor.
+  const utils = api.useUtils();
+  const fetchEventsPage = useCallback(
+    (request: PageRequest) =>
+      utils.activityMonitor.eventsForSource.fetch({
+        organizationId: orgId,
+        sourceId: sourceId ?? "",
+        limit: request.limit,
+        ...(request.beforeIso ? { beforeIso: request.beforeIso } : {}),
+      }),
+    [utils, orgId, sourceId],
   );
+  const eventsPager = useSourceEventsPager<EventRow>({
+    enabled: !!orgId && !!sourceId && canReadActivity,
+    fetchPage: fetchEventsPage,
+  });
   const [secretReveal, setSecretReveal] = useState<{
     secret: string;
     sourceName: string;
   } | null>(null);
 
-  const { rotate: rotateMutation, archive: archiveMutation } =
-    useSourceDetailMutations({
-      orgId,
-      sourceId,
-      onSecretRevealed: setSecretReveal,
-    });
+  const [isEditing, setIsEditing] = useState(false);
+
+  const {
+    rotate: rotateMutation,
+    archive: archiveMutation,
+    update: updateMutation,
+  } = useSourceDetailMutations({
+    orgId,
+    sourceId,
+    onSecretRevealed: setSecretReveal,
+    onEdited: () => setIsEditing(false),
+  });
 
   return {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage: hasAnyPermission("ingestionSources:manage"),
     canReadActivity,
     sourceQuery,
     healthQuery,
-    eventsQuery,
+    eventsPager,
     secretReveal,
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   };
 }
 
@@ -508,16 +503,20 @@ function IngestionSourceDetailPage() {
   const {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage,
     canReadActivity,
     sourceQuery,
     healthQuery,
-    eventsQuery,
+    eventsPager,
     secretReveal,
     setSecretReveal,
     rotateMutation,
     archiveMutation,
+    updateMutation,
+    isEditing,
+    setIsEditing,
   } = useIngestionSourceDetailPage();
 
   if (!sourceId) {
@@ -557,6 +556,68 @@ function IngestionSourceDetailPage() {
   }
 
   return (
+    <LoadedSourceDetail
+      pageTitle={pageTitle}
+      source={source}
+      orgId={orgId}
+      destinationCtx={destinationCtx}
+      canManage={canManage}
+      canReadActivity={canReadActivity}
+      healthQuery={healthQuery}
+      eventsPager={eventsPager}
+      secretReveal={secretReveal}
+      setSecretReveal={setSecretReveal}
+      rotateMutation={rotateMutation}
+      archiveMutation={archiveMutation}
+      updateMutation={updateMutation}
+      isEditing={isEditing}
+      setIsEditing={setIsEditing}
+    />
+  );
+}
+
+/**
+ * The page once the source has actually loaded. Split from the function above
+ * so that one reads as the scene chooser it is — not found, denied, errored,
+ * loading, loaded — without the whole loaded layout inlined at the bottom of
+ * the same chain.
+ */
+function LoadedSourceDetail({
+  pageTitle,
+  source,
+  orgId,
+  destinationCtx,
+  canManage,
+  canReadActivity,
+  healthQuery,
+  eventsPager,
+  secretReveal,
+  setSecretReveal,
+  rotateMutation,
+  archiveMutation,
+  updateMutation,
+  isEditing,
+  setIsEditing,
+}: {
+  pageTitle: string;
+  source: Source;
+  orgId: string;
+} & Pick<
+  ReturnType<typeof useIngestionSourceDetailPage>,
+  | "destinationCtx"
+  | "canManage"
+  | "canReadActivity"
+  | "healthQuery"
+  | "eventsPager"
+  | "secretReveal"
+  | "setSecretReveal"
+  | "rotateMutation"
+  | "archiveMutation"
+  | "updateMutation"
+  | "isEditing"
+  | "setIsEditing"
+>) {
+  return (
     <SourceDetailShell pageTitle={pageTitle}>
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <SourceDetailHeader
@@ -570,13 +631,25 @@ function IngestionSourceDetailPage() {
           onArchive={() =>
             archiveMutation.mutate({ organizationId: orgId, id: source.id })
           }
+          onEdit={() => setIsEditing(true)}
+        />
+
+        {/* The same drawer the source list opens, so the two surfaces cannot
+            drift into offering different edits of the same row. */}
+        <SourceEditDrawer
+          organizationId={orgId}
+          destinationCtx={destinationCtx}
+          source={isEditing ? source : null}
+          onClose={() => setIsEditing(false)}
+          onSubmit={(input) => updateMutation.mutate(input)}
+          isPending={updateMutation.isPending}
         />
 
         <SourceActivityPanels
           source={source}
           canReadActivity={canReadActivity}
           healthQuery={healthQuery}
-          eventsQuery={eventsQuery}
+          eventsPager={eventsPager}
         />
       </VStack>
 
@@ -619,7 +692,8 @@ function StaleTimestampCallout({
       borderRadius="md"
     >
       <Text fontSize="sm" color="amber.900">
-        <strong>Heads up:</strong> the events list shows {eventsCount} event
+        <strong>Heads up:</strong> the events table below has loaded{" "}
+        {eventsCount} event
         {eventsCount === 1 ? "" : "s"}, but the rolling
         24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero. Your
         events likely have a stale <Code fontSize="xs">startTimeUnixNano</Code>{" "}
@@ -758,128 +832,6 @@ function MetricCard({
   );
 }
 
-function EventRow({ event }: { event: EventRow }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="sm"
-      padding={3}
-    >
-      <HStack gap={3} cursor="pointer" onClick={() => setExpanded((e) => !e)}>
-        <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <HStack gap={2} wrap="wrap">
-            <Badge size="sm" variant="surface">
-              {event.eventType}
-            </Badge>
-            <Text fontSize="sm" fontWeight="medium">
-              {event.actor}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              · {event.action}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              {event.target ? `→ ${event.target}` : ""}
-            </Text>
-          </HStack>
-          <Text fontSize="xs" color="fg.muted">
-            {fmtRelative(event.eventTimestampIso)} · cost{" "}
-            {fmtUsd(event.costUsd)}
-            {(event.tokensInput > 0 || event.tokensOutput > 0) && (
-              <>
-                {" · "}
-                {numeral(event.tokensInput).format("0,0")} →{" "}
-                {numeral(event.tokensOutput).format("0,0")} tokens
-              </>
-            )}
-          </Text>
-        </VStack>
-        <Text fontSize="xs" color="fg.muted">
-          {expanded ? "▲" : "▼"}
-        </Text>
-      </HStack>
-      {expanded && (
-        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3} marginTop={3}>
-          <NormalisedPanel event={event} />
-          <RawPanel event={event} />
-        </SimpleGrid>
-      )}
-    </Box>
-  );
-}
-
-function NormalisedPanel({ event }: { event: EventRow }) {
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Normalised (OCSF)
-      </Text>
-      <Code
-        display="block"
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-all"
-        backgroundColor="bg.subtle"
-      >
-        {JSON.stringify(
-          {
-            eventId: event.eventId,
-            eventType: event.eventType,
-            actor: event.actor,
-            action: event.action,
-            target: event.target,
-            costUsd: event.costUsd,
-            tokensInput: event.tokensInput,
-            tokensOutput: event.tokensOutput,
-            eventTimestamp: event.eventTimestampIso,
-            ingestedAt: event.ingestedAtIso,
-          },
-          null,
-          2,
-        )}
-      </Code>
-    </Box>
-  );
-}
-
-function RawPanel({ event }: { event: EventRow }) {
-  let parsed: unknown = null;
-  try {
-    parsed = JSON.parse(event.rawPayload);
-  } catch {
-    // not JSON, render as text
-  }
-  return (
-    <Box>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        marginBottom={1}
-      >
-        Raw payload (as ingested)
-      </Text>
-      <Code
-        display="block"
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre-wrap"
-        wordBreak="break-all"
-        backgroundColor="bg.subtle"
-      >
-        {parsed != null ? JSON.stringify(parsed, null, 2) : event.rawPayload}
-      </Code>
-    </Box>
-  );
-}
-
 function SecretRevealModal({
   details,
   sourceId,
@@ -903,7 +855,7 @@ function SecretRevealModal({
     sourceType === "otel_generic" ||
     sourceType === "claude_cowork" ||
     sourceType === "claude_code";
-  const usesWebhookUrl = sourceType === "workato";
+  const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
   // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1

@@ -30,7 +30,7 @@ func GenerateBearerToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// authProxy is a per-worker reverse proxy that fronts opencode's HTTP server.
+// AuthProxy is a per-worker reverse proxy that fronts opencode's HTTP server.
 // It listens on 127.0.0.1:externalPort, requires a per-worker Bearer token, and
 // proxies validated requests to opencode at 127.0.0.1:internalPort.
 //
@@ -51,7 +51,7 @@ type AuthProxy struct {
 	listen net.Listener
 }
 
-// StartAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorised
+// StartAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorized
 // requests to 127.0.0.1:internalPort. The returned proxy is already serving in
 // a goroutine; the caller closes it via shutdown(). The context carries the
 // logger (clog) used by the serve goroutine — the proxy outlives any single
@@ -67,7 +67,7 @@ func StartAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 	// -1 forces a flush after every write so opencode's SSE / ndjson stream is
 	// never buffered by the proxy, regardless of content-type detection. Without
 	// it, httputil.ReverseProxy only flushes eagerly for content types it
-	// recognises as streaming, which would stall the per-turn event stream.
+	// recognizes as streaming, which would stall the per-turn event stream.
 	rev.FlushInterval = -1
 
 	// Default ReverseProxy uses http.DefaultTransport — fine; it pools
@@ -100,7 +100,7 @@ func StartAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", externalPort)
-	listener, err := net.Listen("tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("authproxy listen %s: %w", addr, err)
 	}
@@ -121,7 +121,7 @@ func StartAuthProxy(ctx context.Context, externalPort, internalPort int, bearerT
 	return &AuthProxy{server: srv, listen: listener}, nil
 }
 
-// shutdown stops the proxy goroutine. Best-effort: a 1s deadline is enough for
+// Shutdown stops the proxy goroutine. Best-effort: a 1s deadline is enough for
 // in-flight HTTP turns to drain on a healthy worker; we drop anything longer
 // rather than block a worker recycle.
 func (p *AuthProxy) Shutdown() {

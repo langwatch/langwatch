@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "~/generated/prisma/client";
+import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import type { AgentRepository } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
@@ -12,6 +12,7 @@ import {
 } from "../errors";
 import type { SuiteRepository } from "../suite.repository";
 import { SuiteService, type SuiteTarget } from "../suite.service";
+import { targetKeyOf } from "../target-key";
 
 function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
@@ -19,6 +20,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "proj_1",
     name: "Test Suite",
     slug: "test-suite",
+    kind: "run_plan",
+    scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [
@@ -47,7 +50,12 @@ function makeMockRepository(
     create: vi.fn(),
     findById: vi.fn(),
     findBySlug: vi.fn().mockResolvedValue(null),
-    findAll: vi.fn(),
+    findAll: vi.fn().mockResolvedValue([]),
+    findSlugsByPrefix: vi.fn().mockResolvedValue([]),
+    findFirstByLabel: vi.fn().mockResolvedValue(null),
+    findNamesByIds: vi.fn(async () => []),
+    // No plan answers to a name unless a scenario says one does.
+    findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
     archive: vi.fn(),
     ...overrides,
@@ -57,7 +65,10 @@ function makeMockRepository(
 type MockScenarioRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
   findNamesByIds: ReturnType<typeof vi.fn>;
+  findActiveNamesByIds: ReturnType<typeof vi.fn>;
   findRunConfigByIds: ReturnType<typeof vi.fn>;
+  findManyByTestSuite: ReturnType<typeof vi.fn>;
+  findAll: ReturnType<typeof vi.fn>;
 };
 
 type MockAgentRepository = {
@@ -78,6 +89,7 @@ function makeMockScenarioRepository(
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
     findNamesByIds: vi.fn(async () => []),
+    findActiveNamesByIds: vi.fn(async () => []),
     findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({
         id,
@@ -85,8 +97,11 @@ function makeMockScenarioRepository(
         situation: "A customer asks for help",
         criteria: ["Answers the question"],
         parameters: null,
+        version: 1,
       })),
     ),
+    findManyByTestSuite: vi.fn(async () => []),
+    findAll: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -137,6 +152,8 @@ function createService(overrides?: {
   scenarioRepository?: Partial<MockScenarioRepository>;
   agentRepository?: Partial<MockAgentRepository>;
   llmConfigRepository?: Partial<MockLlmConfigRepository>;
+  /** Only the paths that resolve a rule against the project read this. */
+  prisma?: Record<string, unknown>;
 }) {
   const suiteRepo = makeMockRepository(overrides?.suiteRepository);
   const scenarioRepo = makeMockScenarioRepository(
@@ -148,12 +165,26 @@ function createService(overrides?: {
   );
   const suiteRunService = createMockSuiteRunService();
 
+  // Resolving a run plan by name takes an advisory lock, so the stub answers
+  // `$transaction` and the `$executeRaw` that takes the lock. There is no
+  // database in this lane: the body runs at once and the transaction client
+  // is the stub itself, so a read under `tx` sees the same fixtures as a read
+  // that names the client directly. What the lock holds apart is proven by
+  // the datastore-lane test, `plan-identity.integration.test.ts`.
+  const prismaStub: Record<string, unknown> = {
+    $executeRaw: vi.fn(async () => 0),
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(prismaStub),
+    ...(overrides?.prisma ?? {}),
+  };
+
   const service = new SuiteService(
     suiteRepo as unknown as SuiteRepository,
     scenarioRepo as unknown as ScenarioRepository,
     agentRepo as unknown as AgentRepository,
     llmConfigRepo as unknown as LlmConfigRepository,
     suiteRunService,
+    prismaStub as unknown as PrismaClient,
   );
 
   return {
@@ -276,6 +307,7 @@ describe("SuiteService", () => {
             situation: "A {{ params.account_tier }} customer asks for help",
             criteria: ["Answers the question"],
             parameters,
+            version: 1,
           })),
         ),
       });
@@ -295,14 +327,193 @@ describe("SuiteService", () => {
             parameters: { account_tier: "platinum" },
           });
 
-          const { parametersByScenarioId } = suiteRunService.startRun.mock
+          const { parametersByTargetKey } = suiteRunService.startRun.mock
             .calls[0]?.[0] as {
-            parametersByScenarioId: Map<string, Record<string, unknown>>;
+            parametersByTargetKey: Map<
+              string,
+              Map<string, Record<string, unknown>>
+            >;
           };
-          expect(parametersByScenarioId.get("scen_1")).toEqual({
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
             account_tier: "platinum",
             region: "eu-central",
           });
+          expect(parametersByTargetKey.get("prompt_1")?.get("scen_1")).toEqual({
+            account_tier: "platinum",
+            region: "eu-central",
+          });
+        });
+      });
+
+      describe("when a target carries overrides of its own", () => {
+        const twoTargets = [
+          { type: "http", referenceId: "agent_1" },
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { account_tier: "silver" },
+          },
+        ] as SuiteTarget[];
+
+        /** @scenario "Each target receives its own parameters merged over the run parameters" */
+        it("merges them over the run's values, the target winning", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "region", defaultValue: "eu-central" },
+            ]),
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"], targets: twoTargets }),
+            ...RUN_DEFAULTS,
+            parameters: { region: "us-east" },
+          });
+
+          const { parametersByTargetKey, activeTargets } = suiteRunService
+            .startRun.mock.calls[0]?.[0] as {
+            parametersByTargetKey: Map<
+              string,
+              Map<string, Record<string, unknown>>
+            >;
+            activeTargets: SuiteTarget[];
+          };
+          const variantKey = targetKeyOf(twoTargets[1]!);
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
+            account_tier: "gold",
+            region: "us-east",
+          });
+          expect(parametersByTargetKey.get(variantKey)?.get("scen_1")).toEqual({
+            account_tier: "silver",
+            region: "us-east",
+          });
+          // The overrides travel with the target, so the stamp can name them.
+          expect(activeTargets[1]?.runParameters).toEqual({
+            account_tier: "silver",
+          });
+        });
+
+        /** @scenario "A target override no scenario in the run declares is refused" */
+        it("rejects an override no scenario declares before anything is scheduled", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  { type: "http", referenceId: "agent_1" },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { seats: 12 },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A target override naming a secret parameter is refused" */
+        it("rejects an override that names a secret parameter", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "api_token", secret: true },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { api_token: "tok-live-1" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+              parameters: { api_token: "tok-live-1" },
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "Two identical targets are refused" */
+        it("rejects two targets with one key before anything is read", async () => {
+          const { service, suiteRunService, scenarioRepo } = createService();
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "silver" },
+                  },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "silver" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(scenarioRepo.findManyIncludingArchived).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "Two targets that differ only by a typed default are refused" */
+        it("rejects two targets that differ only by a typed default", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  { type: "http", referenceId: "agent_1" },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "gold" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
 
@@ -321,6 +532,73 @@ describe("SuiteService", () => {
               parameters: { regoin: "eu-central" },
             }),
           ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when a scenario declares one of them secret", () => {
+        const declaringSecret = {
+          findRunConfigByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+            ids.map((id) => ({
+              id,
+              name: id,
+              situation: "A {{ params.account_tier }} customer asks for help",
+              criteria: ["Answers the question"],
+              parameters: [
+                { name: "account_tier", defaultValue: "gold" },
+                { name: "api_token", secret: true },
+              ],
+            })),
+          ),
+        };
+
+        // The store boundary itself is covered where it is crossed, in
+        // suite-run-parameters.integration.test.ts. What this pins is the
+        // handoff: the value leaves the suite service encrypted, and the plain
+        // record it travels beside never holds it.
+        it("hands the secret to suiteRunService encrypted and out of the plain values", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"] }),
+            ...RUN_DEFAULTS,
+            parameters: { api_token: "tok-live-1" },
+          });
+
+          const { parametersByTargetKey, secretParametersByScenarioId } =
+            suiteRunService.startRun.mock.calls[0]?.[0] as {
+              parametersByTargetKey: Map<
+                string,
+                Map<string, Record<string, unknown>>
+              >;
+              secretParametersByScenarioId: Map<string, Record<string, string>>;
+            };
+
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
+            account_tier: "gold",
+          });
+          const stamped = secretParametersByScenarioId.get("scen_1");
+          expect(Object.keys(stamped!)).toEqual(["api_token"]);
+          expect(stamped!.api_token).not.toContain("tok-live-1");
+        });
+
+        /** @scenario "A secret parameter value must be supplied when the run starts" */
+        it("rejects the run when the secret has no value", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaringSecret,
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({ scenarioIds: ["scen_1"] }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "scenario_secret_parameter_missing",
+          });
 
           expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
@@ -509,6 +787,45 @@ describe("SuiteService", () => {
             expect.objectContaining({
               activeTargets: [{ type: "http", referenceId: "agent_1" }],
               skippedArchived: { scenarios: [], targets: ["agent_archived"] },
+            }),
+          );
+        });
+      });
+    });
+
+    describe("given a connected target unseen for thirty one days", () => {
+      describe("when the suite run is triggered", () => {
+        /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+        it("skips it the way it skips an archived target", async () => {
+          const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+          const { service, suiteRunService } = createService({
+            agentRepository: {
+              findManyIncludingArchived: vi.fn(
+                async ({ ids }: { ids: string[] }) =>
+                  ids.map((id) => ({
+                    id,
+                    type: id === "agent_unseen" ? "connected" : "http",
+                    archivedAt: null,
+                    lastSeenAt: id === "agent_unseen" ? unseenAt : null,
+                  })),
+              ),
+            },
+          });
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "connected", referenceId: "agent_unseen" },
+            ] as SuiteTarget[],
+          });
+
+          const result = await service.run({ suite, ...RUN_DEFAULTS });
+
+          expect(result.jobCount).toBe(1);
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeTargets: [{ type: "http", referenceId: "agent_1" }],
+              skippedArchived: { scenarios: [], targets: ["agent_unseen"] },
             }),
           );
         });
@@ -1102,6 +1419,493 @@ describe("SuiteService", () => {
           projectId: "proj_1",
           organizationId: "org_1",
         });
+      });
+    });
+  });
+
+  describe("getAll()", () => {
+    describe("when the caller names no kind", () => {
+      /** @scenario "A caller that names no kind of suite gets run plans only" */
+      it("asks the repository for custom suites only", async () => {
+        const { service, suiteRepo } = createService();
+        suiteRepo.findAll.mockResolvedValue([makeSuite()]);
+
+        await service.getAll({ projectId: "proj_1" });
+
+        expect(suiteRepo.findAll).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+        });
+      });
+    });
+
+    describe("when the caller names kinds explicitly", () => {
+      it("passes them through", async () => {
+        const { service, suiteRepo } = createService();
+
+        await service.getAll({
+          projectId: "proj_1",
+          kinds: ["test_suite", "run_plan"],
+        });
+
+        expect(suiteRepo.findAll).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          kinds: ["test_suite", "run_plan"],
+        });
+      });
+    });
+
+    describe("when the caller asks for archived rows", () => {
+      /** @scenario "Archived run plans are listed only when the caller asks for them" */
+      it("asks for them only when told to", async () => {
+        const { service, suiteRepo } = createService();
+
+        await service.getAll({ projectId: "proj_1" });
+        expect(suiteRepo.findAll).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+        });
+
+        await service.getAll({ projectId: "proj_1", includeArchived: true });
+        expect(suiteRepo.findAll).toHaveBeenLastCalledWith({
+          projectId: "proj_1",
+          kinds: ["run_plan"],
+          includeArchived: true,
+        });
+      });
+    });
+  });
+
+  describe("getTestSuiteDetail()", () => {
+    describe("given a test suite holding active and archived scenarios", () => {
+      /** @scenario "A test suite reads back with the scenarios filed in it" */
+      it("names every active scenario in the order the test suite holds them", async () => {
+        const { service, suiteRepo } = createService({
+          scenarioRepository: {
+            findActiveNamesByIds: vi.fn().mockResolvedValue([
+              { id: "scen_2", name: "Second" },
+              { id: "scen_1", name: "First" },
+            ]),
+          },
+        });
+        suiteRepo.findById.mockResolvedValue(
+          makeSuite({
+            id: "test_suite_1",
+            kind: "test_suite",
+            name: "Refunds",
+            scenarioIds: ["scen_1", "scen_2", "scen_archived"],
+          }),
+        );
+
+        const detail = await service.getTestSuiteDetail({
+          projectId: "proj_1",
+          testSuiteId: "test_suite_1",
+        });
+
+        expect(detail.name).toBe("Refunds");
+        expect(detail.scenarios).toEqual([
+          { id: "scen_1", name: "First" },
+          { id: "scen_2", name: "Second" },
+        ]);
+      });
+    });
+
+    describe("given the id names a run plan", () => {
+      it("refuses with suite_not_found", async () => {
+        const { service, suiteRepo } = createService();
+        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "run_plan" }));
+
+        await expect(
+          service.getTestSuiteDetail({
+            projectId: "proj_1",
+            testSuiteId: "suite_abc123",
+          }),
+        ).rejects.toMatchObject({ code: "suite_not_found" });
+      });
+    });
+  });
+
+  describe("createTestSuite()", () => {
+    describe("when the name is only spaces", () => {
+      /** @scenario "A test suite created with a blank name is rejected with validation_error" */
+      it("rejects with validation_error and stores nothing", async () => {
+        const { service, suiteRepo } = createService();
+
+        await expect(
+          service.createTestSuite({ projectId: "proj_1", name: "   " }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+
+        expect(suiteRepo.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the slug is free", () => {
+      it("creates an empty test suite", async () => {
+        const { service, suiteRepo } = createService();
+        suiteRepo.create.mockImplementation(
+          async (input: Record<string, unknown>) => makeSuite(input),
+        );
+
+        await service.createTestSuite({ projectId: "proj_1", name: "Refunds" });
+
+        expect(suiteRepo.create).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          name: "Refunds",
+          slug: "refunds",
+          kind: "test_suite",
+          scenarioIds: [],
+          targets: [],
+          repeatCount: 1,
+          labels: [],
+        });
+      });
+    });
+
+    describe("when another suite already holds the slug", () => {
+      /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
+      it("appends a numeric suffix instead of refusing", async () => {
+        const { service, suiteRepo } = createService({
+          suiteRepository: {
+            findSlugsByPrefix: vi
+              .fn()
+              .mockResolvedValue(["refunds", "refunds-2"]),
+          },
+        });
+        suiteRepo.create.mockImplementation(
+          async (input: Record<string, unknown>) => makeSuite(input),
+        );
+
+        const testSuite = await service.createTestSuite({
+          projectId: "proj_1",
+          name: "Refunds",
+        });
+
+        expect(testSuite.name).toBe("Refunds");
+        expect(testSuite.slug).toBe("refunds-3");
+      });
+
+      it("retries once when the insert loses the slug race", async () => {
+        const raceLoss = Object.assign(new Error("unique"), {
+          code: "P2002",
+        });
+        const { service, suiteRepo } = createService();
+        suiteRepo.findSlugsByPrefix
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(["refunds"]);
+        suiteRepo.create
+          .mockRejectedValueOnce(raceLoss)
+          .mockImplementation(async (input: Record<string, unknown>) =>
+            makeSuite(input),
+          );
+
+        const testSuite = await service.createTestSuite({
+          projectId: "proj_1",
+          name: "Refunds",
+        });
+
+        expect(testSuite.slug).toBe("refunds-2");
+        expect(suiteRepo.create).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("when running a test suite", () => {
+    /** The plan row runTestSuite resolves, so the run has something to run. */
+    function testSuiteRunService() {
+      const created = createService({
+        suiteRepository: {
+          findNamesByIds: vi
+            .fn()
+            .mockResolvedValue([{ id: "test_suite_1", name: "Refunds" }]),
+        },
+        scenarioRepository: {
+          findNamesByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+            ids.map((id) => ({ id, name: id })),
+          ),
+        },
+        agentRepository: {
+          findNamesByIds: vi
+            .fn()
+            .mockResolvedValue([{ id: "agent_1", name: "prod-agent" }]),
+        },
+        prisma: {
+          simulationSuite: {
+            findMany: vi.fn(async () => [
+              { id: "test_suite_1" },
+              { id: "test_suite_2" },
+            ]),
+          },
+          scenario: {
+            findMany: vi.fn(async () => [{ id: "scen_1" }, { id: "scen_2" }]),
+          },
+        },
+      });
+      created.suiteRepo.findById.mockResolvedValue(
+        makeSuite({ id: "test_suite_1", kind: "test_suite", name: "Refunds" }),
+      );
+      created.suiteRepo.create.mockImplementation(
+        async (input: Record<string, unknown>) => makeSuite(input),
+      );
+      return created;
+    }
+
+    describe("when the run carries a repeat count", () => {
+      /** @scenario "A test suite run honours the repeat count sent with the run" */
+      it("schedules scenarios x targets x repeat count runs", async () => {
+        const { service, suiteRunService, suiteRepo } = testSuiteRunService();
+
+        const result = await service.runTestSuite({
+          ...RUN_DEFAULTS,
+          testSuiteId: "test_suite_1",
+          targets: [{ type: "http", referenceId: "agent_1" }],
+          repeatCount: 3,
+        });
+
+        expect(result.jobCount).toBe(6);
+        expect(suiteRunService.startRun).toHaveBeenCalledWith(
+          expect.objectContaining({ repeatCount: 3 }),
+        );
+        // The settings land on the run plan the run resolved, never on the
+        // test suite row.
+        // The second argument carries the transaction client, so the plan is
+        // written under the name lock that the matching read was taken with.
+        expect(suiteRepo.create).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "run_plan", repeatCount: 3 }),
+          expect.objectContaining({ tx: expect.anything() }),
+        );
+        expect(suiteRepo.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run names no target", () => {
+      it("refuses with suite_targets_required before reading the suite", async () => {
+        const { service, suiteRepo, suiteRunService } = testSuiteRunService();
+
+        await expect(
+          service.runTestSuite({
+            ...RUN_DEFAULTS,
+            testSuiteId: "test_suite_1",
+            targets: [],
+          }),
+        ).rejects.toMatchObject({ code: "suite_targets_required" });
+
+        expect(suiteRepo.findById).not.toHaveBeenCalled();
+        expect(suiteRunService.startRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the id names a run plan", () => {
+      it("refuses with suite_not_found", async () => {
+        const { service, suiteRepo } = testSuiteRunService();
+        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "run_plan" }));
+
+        await expect(
+          service.runTestSuite({
+            ...RUN_DEFAULTS,
+            testSuiteId: "suite_abc123",
+            targets: [{ type: "http", referenceId: "agent_1" }],
+          }),
+        ).rejects.toMatchObject({ code: "suite_not_found" });
+      });
+    });
+
+    describe("when the run carries no name", () => {
+      /** @scenario "A run started with no name is named after its scope and targets" */
+      it("names the plan after the suite and its targets", async () => {
+        const { service, suiteRepo, agentRepo } = testSuiteRunService();
+        agentRepo.findNamesByIds.mockResolvedValue([
+          { id: "agent_1", name: "dev-agent" },
+          { id: "agent_2", name: "prod-agent" },
+        ]);
+
+        const result = await service.runTestSuite({
+          ...RUN_DEFAULTS,
+          testSuiteId: "test_suite_1",
+          targets: [
+            { type: "http", referenceId: "agent_2" },
+            { type: "http", referenceId: "agent_1" },
+          ],
+        });
+
+        expect(result.planName).toBe("Refunds dev-agent vs prod-agent");
+        expect(suiteRepo.create).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Refunds dev-agent vs prod-agent" }),
+          expect.objectContaining({ tx: expect.anything() }),
+        );
+      });
+    });
+  });
+
+  describe("when running one scenario", () => {
+    describe("when the scenario does not exist", () => {
+      it("refuses before anything is scheduled", async () => {
+        const { service, suiteRunService } = createService({
+          scenarioRepository: { findNamesByIds: vi.fn(async () => []) },
+        });
+
+        await expect(
+          service.runScenario({
+            ...RUN_DEFAULTS,
+            scenarioId: "scen_missing",
+            targets: [{ type: "http", referenceId: "agent_1" }],
+          }),
+        ).rejects.toMatchObject({ name: "ScenarioNotFoundError" });
+
+        expect(suiteRunService.startRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run carries no name", () => {
+      it("names the plan after the scenario and its target", async () => {
+        const { service, suiteRepo } = createService({
+          scenarioRepository: {
+            findNamesByIds: vi
+              .fn()
+              .mockResolvedValue([
+                { id: "scen_1", name: "Angry refund request" },
+              ]),
+          },
+          agentRepository: {
+            findNamesByIds: vi
+              .fn()
+              .mockResolvedValue([{ id: "agent_1", name: "prod-agent" }]),
+          },
+        });
+        suiteRepo.create.mockImplementation(
+          async (input: Record<string, unknown>) => makeSuite(input),
+        );
+
+        const result = await service.runScenario({
+          ...RUN_DEFAULTS,
+          scenarioId: "scen_1",
+          targets: [{ type: "http", referenceId: "agent_1" }],
+        });
+
+        expect(result.planName).toBe("Angry refund request prod-agent");
+      });
+    });
+  });
+
+  describe("when a run plan is run by its id", () => {
+    /** @scenario "A run plan run through the test suite path refuses stored execution settings" */
+    it("refuses a request that carries execution settings", async () => {
+      const { service, suiteRunService } = createService();
+
+      await expect(
+        service.run({
+          suite: makeSuite(),
+          ...RUN_DEFAULTS,
+          targets: [{ type: "http", referenceId: "agent_9" }],
+          repeatCount: 2,
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: {
+          fieldErrors: {
+            targets: [expect.stringContaining("stored configuration")],
+            repeatCount: [expect.stringContaining("stored configuration")],
+          },
+        },
+      });
+
+      expect(suiteRunService.startRun).not.toHaveBeenCalled();
+    });
+
+    it("runs its stored configuration when the request carries none", async () => {
+      const { service, suiteRunService } = createService();
+
+      const result = await service.run({ suite: makeSuite(), ...RUN_DEFAULTS });
+
+      expect(result.jobCount).toBe(6);
+      expect(suiteRunService.startRun).toHaveBeenCalled();
+    });
+  });
+
+  describe("given a test suite", () => {
+    describe("when the suite editor updates it", () => {
+      /** @scenario "The suite editor refuses execution settings on a test suite" */
+      it("saves the name and labels and refuses every execution field", async () => {
+        const { service, suiteRepo } = createService();
+        const stored = makeSuite({
+          id: "test_suite_1",
+          kind: "test_suite",
+          slug: "refunds",
+          name: "Refunds",
+        });
+        suiteRepo.findById.mockResolvedValue(stored);
+        suiteRepo.update.mockImplementation(
+          async ({ data }: { data: Record<string, unknown> }) =>
+            makeSuite({ ...stored, ...data }),
+        );
+
+        await service.update({
+          id: stored.id,
+          projectId: stored.projectId,
+          data: { name: "Refunds v2", labels: ["priority"] },
+        });
+
+        expect(suiteRepo.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: stored.id,
+            data: expect.not.objectContaining({ slug: expect.anything() }),
+          }),
+        );
+        const firstCall = suiteRepo.update.mock.calls[0];
+        if (!firstCall) throw new Error("update was not called");
+        const data = firstCall[0].data as Record<string, unknown>;
+        expect(data.name).toBe("Refunds v2");
+        expect(data.labels).toEqual(["priority"]);
+
+        suiteRepo.update.mockClear();
+        await expect(
+          service.update({
+            id: stored.id,
+            projectId: stored.projectId,
+            data: {
+              targets: [
+                { type: "http", referenceId: "agent_2" },
+              ] as SuiteTarget[],
+              repeatCount: 3,
+              simulatorModel: "openai/gpt-5-mini",
+              judgeModel: "openai/gpt-5-mini",
+            },
+          }),
+        ).rejects.toMatchObject({
+          code: "validation_error",
+          meta: {
+            fieldErrors: {
+              targets: expect.any(Array),
+              repeatCount: expect.any(Array),
+              simulatorModel: expect.any(Array),
+              judgeModel: expect.any(Array),
+            },
+          },
+        });
+        expect(suiteRepo.update).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "The suite editor refuses to broaden a test suite into a code-owned suite" */
+      it("refuses a scope or scenarioIds write on a test suite", async () => {
+        const { service, suiteRepo } = createService();
+        suiteRepo.findById.mockResolvedValue(
+          makeSuite({ id: "test_suite_1", kind: "test_suite" }),
+        );
+
+        await expect(
+          service.update({
+            id: "test_suite_1",
+            projectId: "proj_1",
+            data: { scope: { mode: "all" } },
+          }),
+        ).rejects.toMatchObject({ code: "suite_scope_not_allowed" });
+
+        await expect(
+          service.update({
+            id: "test_suite_1",
+            projectId: "proj_1",
+            data: { scenarioIds: ["scen_x"] },
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
       });
     });
   });

@@ -19,6 +19,10 @@ import {
 	harvestAndEmitCodexIO,
 	harvestCodexThread,
 } from "../codex-rollout-otlp";
+import {
+	readSpooledDeclarations,
+	writeSpooledDeclaration,
+} from "../session-context-spool";
 import { assertCodexTurnHarvest } from "../shell-rc";
 
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
@@ -109,6 +113,37 @@ const spansOf = (bodies: any[]) =>
 
 const attrOf = (span: any, key: string) =>
 	span.attributes.find((a: any) => a.key === key)?.value?.stringValue;
+
+/** One attribute of the session-context record, from the logs POST. */
+const contextAttr = ({
+	bodies,
+	urls,
+	key,
+}: {
+	bodies: any[];
+	urls: string[];
+	key: string;
+}) => {
+	const at = urls.indexOf("https://e/v1/logs");
+	// Without this the missing POST reads as `bodies[-1]` and the chain
+	// throws a TypeError, which hides which expectation actually failed.
+	expect(at, "no session-context record was posted").toBeGreaterThan(-1);
+	return attrOf(bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0], key);
+};
+
+/**
+ * A working directory git answers for: the checkout the session is sitting in,
+ * on the branch it is on right now, which is what the harvest reads instead of
+ * trusting the transcript's record of the session's first minute.
+ */
+const checkoutOn =
+	(branch: string) =>
+	({ args }: { args: string[]; cwd: string }): string | null => {
+		if (args[0] === "remote") return "https://github.com/acme/acme-app.git";
+		if (args[0] === "branch") return branch;
+		// Not a linked worktree, so readWorktreeName finds nothing to name.
+		return null;
+	};
 
 describe("harvestCodexThread", () => {
 	describe("given a session that ran without the langwatch wrapper", () => {
@@ -308,12 +343,23 @@ describe("harvestCodexThread", () => {
 		};
 		let stateDir: string;
 
+		let tmpRoot: string;
+		let previousTmpdir: string | undefined;
+
 		beforeEach(() => {
 			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// The fallback queue lives in the temp directory: give this suite its
+			// own rather than the one shared with the rest of the machine.
+			tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+			previousTmpdir = process.env.TMPDIR;
+			process.env.TMPDIR = tmpRoot;
 		});
 
 		afterEach(() => {
+			if (previousTmpdir === undefined) delete process.env.TMPDIR;
+			else process.env.TMPDIR = previousTmpdir;
 			rmSync(stateDir, { recursive: true, force: true });
+			rmSync(tmpRoot, { recursive: true, force: true });
 		});
 
 		describe("when the session is harvested", () => {
@@ -351,6 +397,158 @@ describe("harvestCodexThread", () => {
 				expect(attr("vcs.repository.name")).toBe("acme-app");
 				expect(attr("vcs.ref.head.name")).toBe("feat/pricing");
 				expect(urls).toContain("https://e/v1/traces");
+			});
+
+			describe("when a declaration is queued from a sandboxed shell", () => {
+				/** @scenario "The next session report sends the queued declaration" */
+				it("sends it after its own context, so it is the latest branch", async () => {
+					writeRollout(THREAD, [
+						sessionMeta(GIT),
+						taskStarted(TRACE),
+						userMessage("hi"),
+						agentFinal("hello"),
+					]);
+					writeSpooledDeclaration({
+						stateDir,
+						agent: "codex",
+						sessionId: THREAD,
+						fingerprint: "declared-fingerprint",
+						payload: {
+							resourceLogs: [
+								{
+									scopeLogs: [
+										{
+											logRecords: [
+												{
+													attributes: [
+														{
+															key: "vcs.ref.head.name",
+															value: { stringValue: "feat/declared" },
+														},
+													],
+												},
+											],
+										},
+									],
+								},
+							],
+						},
+						now: () => 1785654950000,
+					});
+					const { bodies, urls, impl } = recordingFetch();
+
+					await harvestCodexThread({
+						threadId: THREAD,
+						nowMs: 1785654950000,
+						endpoint: "https://e/v1/traces",
+						logsEndpoint: "https://e/v1/logs",
+						token: "sk-lw-test",
+						sessionsRoot: root,
+						stateDir,
+						fetchImpl: impl,
+					});
+
+					const branchOf = (body: any) =>
+						body.resourceLogs?.[0].scopeLogs[0].logRecords[0].attributes.find(
+							(a: any) => a.key === "vcs.ref.head.name",
+						)?.value?.stringValue;
+					const logBranches = bodies
+						.filter((_, index) => urls[index] === "https://e/v1/logs")
+						.map(branchOf);
+					expect(logBranches[0]).toBe("feat/pricing");
+					expect(logBranches[logBranches.length - 1]).toBe("feat/declared");
+					expect(
+						readSpooledDeclarations({ stateDir, now: () => 1785654950000 }),
+					).toEqual([]);
+				});
+			});
+
+			/** @scenario "The reported branch follows the checkout, not the session's first minute" */
+			it("reports the branch the checkout is on now", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: checkoutOn("review/pr-7412"),
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"review/pr-7412",
+				);
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
+					"acme-app",
+				);
+			});
+
+			/** @scenario "A session whose transcript records no repository still reports one" */
+			it("reports the working directory's repository when the transcript has none", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: checkoutOn("review/pr-7412"),
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.owner" })).toBe("acme");
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"review/pr-7412",
+				);
+			});
+
+			/** @scenario "A transcript harvested away from its checkout keeps what codex recorded" */
+			it("falls back to the transcript when git cannot read the directory", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: () => null,
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"feat/pricing",
+				);
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
+					"acme-app",
+				);
 			});
 
 			/** @scenario "A notify that fires after every turn posts the repository once" */
@@ -424,12 +622,23 @@ describe("harvestCodexThread", () => {
 		});
 		let stateDir: string;
 
+		let tmpRoot: string;
+		let previousTmpdir: string | undefined;
+
 		beforeEach(() => {
 			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// The fallback queue lives in the temp directory: give this suite its
+			// own rather than the one shared with the rest of the machine.
+			tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+			previousTmpdir = process.env.TMPDIR;
+			process.env.TMPDIR = tmpRoot;
 		});
 
 		afterEach(() => {
+			if (previousTmpdir === undefined) delete process.env.TMPDIR;
+			else process.env.TMPDIR = previousTmpdir;
 			rmSync(stateDir, { recursive: true, force: true });
+			rmSync(tmpRoot, { recursive: true, force: true });
 		});
 
 		const harvest = async (impl: typeof fetch) =>
@@ -443,24 +652,6 @@ describe("harvestCodexThread", () => {
 				stateDir,
 				fetchImpl: impl,
 			});
-
-		const contextAttr = ({
-			bodies,
-			urls,
-			key,
-		}: {
-			bodies: any[];
-			urls: string[];
-			key: string;
-		}) => {
-			const at = urls.indexOf("https://e/v1/logs");
-			// Without this the missing POST reads as `bodies[-1]` and the chain
-			// throws a TypeError, which hides which expectation actually failed.
-			expect(at, "no session-context record was posted").toBeGreaterThan(-1);
-			return bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
-				(a: any) => a.key === key,
-			)?.value?.stringValue;
-		};
 
 		describe("when the session is harvested", () => {
 			/** @scenario "The harvest names the session by the first thing the user asked" */
@@ -482,7 +673,7 @@ describe("harvestCodexThread", () => {
 			});
 
 			/** @scenario "A machine-injected first prompt does not name the session" */
-			it("posts no title when the first prompt is an injected tag", async () => {
+			it("names it by the typed prompt, not the injected tag", async () => {
 				writeRollout(THREAD, [
 					sessionMeta(GIT),
 					typedPrompt("<environment_context>...</environment_context>"),
@@ -495,9 +686,12 @@ describe("harvestCodexThread", () => {
 				await harvest(impl);
 
 				expect(urls).toContain("https://e/v1/logs");
+				// The injected block is skipped wherever it appears, so the prompt
+				// the person actually typed names the session rather than the
+				// session going unnamed with a usable prompt sitting right there.
 				expect(
 					contextAttr({ bodies, urls, key: "langwatch.session.title" }),
-				).toBeUndefined();
+				).toBe("hi");
 			});
 		});
 	});
@@ -522,7 +716,12 @@ describe("harvestCodexThread", () => {
 				writeRollout(THREAD, [
 					sessionMeta(),
 					taskStarted(TRACE),
-					userMessage("hi"),
+					// Injected context, not a typed prompt: it leaves the session with
+					// nothing to name it while still giving the turn a conversation to
+					// post.
+					userMessage(
+						"<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>",
+					),
 					agentFinal("hello"),
 				]);
 				const { urls, impl } = recordingFetch();

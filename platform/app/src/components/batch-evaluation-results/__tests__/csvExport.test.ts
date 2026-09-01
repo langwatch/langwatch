@@ -1311,3 +1311,42 @@ describe("csvExport", () => {
     });
   });
 });
+
+describe("given two targets stored under the same name", () => {
+  describe("when the results are exported to CSV", () => {
+    /** @scenario "The CSV export keeps a column block per same-named target" */
+    it("numbers each target's headers so no header repeats", () => {
+      const run: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        targets: [
+          { id: "target-1", name: "classifier", type: "prompt" },
+          { id: "target-2", name: "classifier", type: "prompt" },
+        ],
+        dataset: [
+          {
+            index: 0,
+            targetId: "target-1",
+            entry: { input: "a question" },
+            predicted: { output: "first answer" },
+          },
+          {
+            index: 0,
+            targetId: "target-2",
+            entry: { input: "a question" },
+            predicted: { output: "second answer" },
+          },
+        ],
+        evaluations: [],
+        timestamps: { createdAt: 1, updatedAt: 1, finishedAt: 2 },
+      };
+
+      const headers = buildCsvHeaders(transformBatchEvaluationData(run));
+
+      expect(headers).toContain("classifier_(1)_output");
+      expect(headers).toContain("classifier_(2)_output");
+      expect(new Set(headers).size).toBe(headers.length);
+    });
+  });
+});

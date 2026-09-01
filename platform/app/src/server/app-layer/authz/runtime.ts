@@ -23,11 +23,11 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../../db";
+import { demoProjectId } from "./demo-project";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
-import { demoProjectId } from "./shadow";
 
 /**
  * COLLECT policies over the read repository, which since delivery-plan PR 3

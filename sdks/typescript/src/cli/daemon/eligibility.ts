@@ -77,14 +77,26 @@ const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
   // `agent` would take `agent list` with it, so the phrases are matched.
   ["agent", "dev"],
   ["agent", "tunnel"],
+  // `ingest context` reads the CALLER's identity out of its environment
+  // (CLAUDE_CODE_SESSION_ID, TRACEPARENT, CODEX_HOME) — none of which the
+  // forwarded-env allowlist carries, so a daemon-served run would resolve
+  // the wrong session or none. `ingest guidance` is a claude hook whose
+  // stdout is injected into the session; same caller-owned contract.
+  ["ingest", "context"],
+  ["ingest", "guidance"],
 ];
 
 /**
  * Flags that make a command unbounded in time. A `--follow` would pin one
  * daemon request open forever, holding the working-directory window (see
  * execution.ts) and defeating the idle timeout.
+ *
+ * `--wait` polls a scheduled run until every scenario settles, which takes
+ * minutes, and the client abandons a daemon request at 25 seconds
+ * (client.ts). Served by the daemon, `test-suite run --wait` printed nothing,
+ * exited 124 and left the run going, although it had been scheduled.
  */
-const DENIED_FLAGS = new Set(["--follow", "--watch"]);
+const DENIED_FLAGS = new Set(["--follow", "--watch", "--wait"]);
 
 /**
  * Flags that make the CALLER's standard input part of the command's input.

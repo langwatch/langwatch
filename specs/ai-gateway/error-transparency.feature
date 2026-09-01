@@ -155,6 +155,150 @@ Feature: AI Gateway — transparent upstream error forwarding
     So that an admin can tell which provider account to look at without reading gateway source
 
   # ==========================================================================
+  # Engine-origin failures: a request that never reached a provider
+  # ==========================================================================
+  # The dispatch engine can fail before any provider is dialed — a credential
+  # that mints no token, a key that declares no such model, a deployment map
+  # that is missing, an operation the provider does not implement. These carry
+  # no HTTP status because no HTTP call was made, and the gateway used to read
+  # that absent status as a timeout: every one of them reached the client as a
+  # retryable 504 "Gateway Timeout", was attributed to the provider, was
+  # retried across the whole credential chain, and counted a circuit-breaker
+  # failure against a slot that was perfectly healthy.
+  #
+  # Over one production week that mask covered 23 failures and not one of them
+  # was a timeout. Two thirds completed in under 100ms. They were: "no keys
+  # found that support model", "deployments not set", "chat_completion is not
+  # supported by elevenlabs provider", and "failed to retrieve aws
+  # credentials". All four are settings mistakes, terminal, and unfixable by
+  # any retry.
+  #
+  # The engine states which kind of failure it had, and the gateway must read
+  # it: whether the PROVIDER produced the error or the engine did, the error
+  # type it stamped, and the wrapped cause underneath its category message.
+  #
+  # Bindings: services/aigateway/adapters/providers/bifrost_error_test.go,
+  # services/aigateway/app/dispatch_test.go
+
+  @bdd @error-transparency @unit
+  Scenario Outline: An engine failure that never reached a provider is terminal, not a timeout
+    Given the dispatch engine fails with "<failure>" before any provider is dialed
+    When the client calls the gateway with "vk-demo"
+    Then the error code is "<code>", never "provider_timeout"
+    And the client receives a terminal 4xx, so no retry loop begins
+    And the failure is attributed to the customer, whose settings fix it
+
+    Examples:
+      | failure                                            | code                        |
+      | the credential mints no authentication token       | provider_credential_invalid |
+      | no key on the slot declares the requested model    | provider_config_invalid     |
+      | the provider slot has no deployment map            | provider_config_invalid     |
+      | the provider does not implement the operation      | provider_config_invalid     |
+
+  @bdd @error-transparency @unit
+  Scenario: A genuine timeout is still called a timeout
+    Given the engine stamps the failure with its request-timed-out signal
+    When the client calls the gateway with "vk-demo"
+    Then the error code is "provider_timeout"
+    And the failure is attributed to the provider
+    And the request is retried on the next credential
+
+  @bdd @error-transparency @unit
+  Scenario: A provider that was never reached is retryable, unlike a settings mistake
+    Given the request fails in transport before the provider answers
+    When the client calls the gateway with "vk-demo"
+    Then the error code is "provider_connection_failed"
+    And the request is retried on the next credential
+    And the failure counts toward opening that credential's circuit breaker
+
+  # An error the engine produced is not an answer any provider gave, so it must
+  # not be dressed as one. The engine says which it is; forwarding its own
+  # synthesised status as an upstream response would claim a provider answered
+  # when none did.
+  @bdd @error-transparency @unit
+  Scenario: An engine-produced error is never forwarded as a provider answer
+    Given the engine fails a request without any provider responding
+    When the gateway classifies that failure
+    Then the failure carries the gateway's own error code
+    And it is not forwarded as an upstream provider response
+
+  # The engine's own message is a category; the reason sits in the cause it
+  # wrapped. "error creating auth token source" is the identical sentence for a
+  # credential that is not JSON, one missing a "type" field, and an environment
+  # with no default credentials — three problems with three different fixes.
+  @bdd @error-transparency @unit
+  Scenario: The engine's wrapped cause survives classification
+    Given the engine reports a category message with a wrapped cause underneath
+    When the gateway classifies that failure
+    Then the cause travels with the error for the operator
+    And the cause is never placed in the client-facing metadata
+    And the customer reads what to change instead of what broke internally
+
+  # A failure that arrives once the stream is open reaches the caller through a
+  # different writer than the one every other failure uses, so "the customer
+  # never reads the internal cause" has to be stated for both or it holds for
+  # one. The streaming writer rendered the whole error object, metadata and
+  # wrapped cause included.
+  @bdd @error-transparency @integration
+  Scenario: A handled failure states the same thing mid-stream as it does before the stream opens
+    Given a failure the gateway can name, carrying an internal cause
+    When it happens after the response stream has already opened
+    Then the caller reads the same customer-facing sentence as on the non-streaming path
+    And the error keeps the code that names the failure
+    And neither the internal cause nor the diagnostic metadata appears in the stream
+
+  @bdd @error-transparency @unit
+  Scenario: A terminal setup failure does not spend the fallback chain
+    Given "vk-demo" has two credentials in its fallback chain
+    And the first credential cannot authenticate at all
+    When the client calls the gateway with "vk-demo"
+    Then no second credential is dialed, because the same failure would repeat
+    And the credential's circuit breaker is not moved by the refusal
+
+  @bdd @error-transparency @unit
+  Scenario: The engine's own refusal to fall over is honored
+    Given the dispatch engine marks a failure as one no other credential can improve
+    When the client calls the gateway with "vk-demo"
+    Then the chain stops at that credential
+    And the client still receives the same error the engine produced
+
+  # ==========================================================================
+  # Remediation: a terminal failure says what to change
+  # ==========================================================================
+  # A gateway error is usually read by an agent or an SDK, not by a person
+  # looking at our UI, and often by someone who cannot see our settings screens
+  # at all. For the terminal failures — the ones no retry can clear — the
+  # remediation IS the interface, and the copy has to name the artefact the
+  # reader must go and change.
+  #
+  # "Check your credentials" means something different for every provider: a
+  # service-account JSON document for Vertex, an access key and secret for
+  # Bedrock, a key plus a resource endpoint for Azure. The Vertex report this
+  # feature grew out of is the case in point — the reader, given nothing
+  # specific, went looking at the region, which was correct all along.
+  #
+  # Bindings: services/aigateway/domain/remediation_test.go,
+  # platform/app/src/features/errors/components/__tests__/HandledErrorAlert.integration.test.tsx
+
+  @bdd @error-transparency @unit
+  Scenario: A terminal provider failure tells the caller how to fix it
+    Given a request fails because the provider's credentials cannot authenticate
+    When the gateway answers the caller
+    Then the answer carries remediation steps naming what that provider's credential is
+    And it links the setup page for that provider, not a generic index
+    And it says the failure will repeat until the credential is corrected
+    And every page it links exists
+
+  @bdd @error-transparency @unit
+  Scenario: A provider-setup failure tells the customer how to fix it
+    Given a provider-setup failure surfaces in the product
+    When the customer reads the error
+    Then it names which provider and which model, rather than "this provider"
+    And it shows the remediation steps the gateway sent
+    And it offers the provider's own documentation
+    And it never tells them to retry a credential that cannot work
+
+  # ==========================================================================
   # Fallback semantics: provider failures fail over, gateway refusals do not
   # ==========================================================================
   # Failing over past a dead credential is the whole point of a fallback

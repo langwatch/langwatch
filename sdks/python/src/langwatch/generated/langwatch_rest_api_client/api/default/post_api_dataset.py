@@ -5,12 +5,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_body import PostApiDatasetBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiDatasetBody | Unset = UNSET,
+    body: PostApiDatasetBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -19,8 +19,7 @@ def _get_kwargs(
         "url": "/api/dataset",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -49,13 +48,13 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
 ) -> Response[Any]:
     """Create a new dataset
 
     Args:
-        body (PostApiDatasetBody | Unset):
+        body (PostApiDatasetBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -78,13 +77,13 @@ def sync_detailed(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBody,
 ) -> Response[Any]:
     """Create a new dataset
 
     Args:
-        body (PostApiDatasetBody | Unset):
+        body (PostApiDatasetBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

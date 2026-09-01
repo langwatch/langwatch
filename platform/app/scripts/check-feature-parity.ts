@@ -72,6 +72,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // behavior. Without this root those specs could only be @unimplemented.
   "platform/app/e2e",
   "packages",
+  // Langy's pi-harness wrapper: the process that turns the manager's config
+  // into pi's model registry and speaks the stdio protocol. Scenarios about
+  // what the wrapper generates can only bind from its own vitest suite.
+  "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
@@ -151,6 +155,10 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
+  // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
+  // nothing else.
+  "services/idpsim",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -274,7 +282,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/caching-passthrough.feature",
   "specs/ai-gateway/cli-integrations.feature",
   "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/admin-oversight.feature",
@@ -292,14 +299,13 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/feature-flag-gating.feature",
   "specs/ai-gateway/governance/folds.feature",
   "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
-  "specs/ai-gateway/governance/governance-home-routing.feature",
   "specs/ai-gateway/governance/guardrails-project-scope.feature",
   "specs/ai-gateway/governance/ingestion-attribution.feature",
   "specs/ai-gateway/governance/me-usage-rest-api.feature",
   "specs/ai-gateway/governance/my-settings.feature",
   "specs/ai-gateway/governance/no-spy-mode.feature",
-  "specs/ai-gateway/governance/persona-aware-chrome.feature",
   "specs/ai-gateway/governance/persona-home-content.feature",
+  "specs/ai-gateway/governance/persona-home-resolver.feature",
   "specs/ai-gateway/governance/personal-keys.feature",
   "specs/ai-gateway/governance/personal-project-ingest-via-template.feature",
   "specs/ai-gateway/governance/personal-workspace-features.feature",
@@ -319,7 +325,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
@@ -350,11 +355,9 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
   "specs/ai-governance/puller-framework/http-polling.feature",
   "specs/ai-governance/puller-framework/puller-adapter-contract.feature",
-  "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/ai-governance/sessions/admin-max-ttl.feature",
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
-  "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/posthog-cost-control.feature",
   "specs/audit-log/audit-log.feature",
   "specs/auth/auth-signin-flows.feature",
@@ -411,11 +414,9 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/pipeline-model.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
-  "specs/event-sourcing/work-conserving-fair-dispatch.feature",
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",
-  "specs/experiments-v3/evaluation-execution.feature",
   "specs/experiments-v3/evaluator-configuration.feature",
   "specs/experiments-v3/evaluator-mappings.feature",
   "specs/experiments-v3/execution-controls.feature",
@@ -438,11 +439,7 @@ const LEGACY_INERT: string[] = [
   "specs/features/monitor-cli.feature",
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
-  "specs/features/scenario-cli.feature",
   "specs/features/secret-cli.feature",
-  "specs/features/simulation-runs-cli.feature",
-  "specs/features/suite-cli.feature",
-  "specs/features/suites/collapsible-suite-sidebar.feature",
   "specs/features/suites/footer-to-header-migration.feature",
   "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
   "specs/features/suites/sidebar-summary-status.feature",
@@ -460,18 +457,19 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
+  // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
+  // specs ship ahead of the code, and the PR that builds each surface binds its
+  // file as it lands. Remove each entry with its first binding.
+  "specs/identity/org-admin-identity-surface.feature",
+  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",
-  "specs/langy/langy-choice-questions.feature",
   "specs/langy/langy-command-bar-activation.feature",
-  "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
-  "specs/langy/langy-native-skills.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
@@ -479,7 +477,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
-  "specs/licensing/billing-meter-dispatch.feature",
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-activation-ui.feature",
@@ -494,7 +491,6 @@ const LEGACY_INERT: string[] = [
   "specs/mcp-server/experiment-results-tool.feature",
   "specs/mcp-server/project-api-key-tools.feature",
   "specs/mcp-server/project-tools.feature",
-  "specs/mcp-server/prompt-tools.feature",
   "specs/mcp-server/scenario-tool-formatters.feature",
   "specs/migration/vite-migration.feature",
   "specs/model-config/anthropic-empty-content.feature",
@@ -517,7 +513,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/navigation/child-drawer-nesting.feature",
-  "specs/navigation/home-navigation.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
@@ -537,7 +532,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/clickhouse-backup-metrics.feature",
   "specs/ops/dashboard-latency.feature",
   "specs/ops/dejaview-impersonation-access.feature",
-  "specs/ops/internal-feature-flags.feature",
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
@@ -557,7 +551,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
-  "specs/scenarios/scenario-api.feature",
   "specs/scenarios/scenario-bulk-actions.feature",
   "specs/scenarios/scenario-deferred-persistence.feature",
   "specs/scenarios/scenario-deletion.feature",
@@ -582,15 +575,11 @@ const LEGACY_INERT: string[] = [
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
-  "specs/skills/empty-state-skill-setup.feature",
   "specs/skills/onboarding-skills-architecture.feature",
   "specs/skills/platform-integration.feature",
   "specs/skills/prompt-compiler.feature",
-  "specs/skills/skills-testing.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "specs/suites/voice-agents-callout.feature",
-  "specs/topic-clustering/event-sourced-scheduling.feature",
   "specs/topic-clustering/run-history.feature",
   "specs/topic-clustering/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
@@ -645,7 +634,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces/vertex-adk-canonicalisation.feature",
   "specs/triggers/event-sourced-graph-triggers.feature",
   "specs/typescript-sdk/cli-docs.feature",
-  "specs/typescript-sdk/cli-error-handling.feature",
   "specs/typescript-sdk/cli-projects-api-keys.feature",
   "specs/typescript-sdk/prompt-tags.feature",
   "specs/variables-ui/prompt-editor-drawer-mappings.feature",
@@ -842,8 +830,129 @@ export function discoverFeatureFiles(
 // Non-backtracking: find `@scenario <title>` tokens, then verify proximity
 // to an `it(` / `test(` call with a linear forward scan (see
 // `isFollowedByTestCall`). Doing it all in the regex invites ReDoS.
+//
+// The token has to open its comment, or, when it opens no comment of its own,
+// be inside one already: `markerlessBindingSpans` below decides that case. The
+// unquoted alternative here accepts a bare title, so without the anchor any
+// sentence containing the word binds to whatever follows it: a comment reading "carries no @scenario annotation:
+// this guards a temporary exclusion" bound a scenario named "annotation: this
+// guards a temporary", and the failure then named a scenario nobody wrote at a
+// line whose comment says the opposite. The prefix allows the comment markers
+// actually used in this repo, including a `*` continuation that opens a nested
+// `/**`, and a `#` for the Python and Bats forms.
+//
+// Each marker there is a fixed two characters or one, never `/*+`. A variable
+// repeat inside the alternation makes `/**` splittable both as one `/*+` and
+// as `/*` then `*`, which gives a line of `/**/**/...` exponentially many
+// parses: measured at 6.8s for thirty repetitions, against every source file
+// in the repo on every run. Spelled this way each marker is consumed exactly
+// once, so there is nothing to backtrack over, and the accepted set is the
+// same because `/**` is just `/*` followed by one more iteration.
 const ANNOTATION_RE =
-  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+  /^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+
+/**
+ * The spans of `src` that a MARKER-LESS annotation is allowed to live in: block
+ * comments, and the triple-quoted strings Python writes its docstrings as.
+ *
+ * WHY THIS EXISTS. The annotation prefix above accepts zero comment markers,
+ * because the marker-less form is real: five live bindings in the Python SDK
+ * sit on their own line inside a `"""` docstring, and requiring a marker would
+ * un-bind all five without a word, which is the vacuous green this gate exists
+ * to remove. But zero markers also matches a bare source line, and a line regex
+ * cannot tell an unmarked line inside a block comment from one outside it: the
+ * deciding context is on an earlier line. Only reading the file in order
+ * answers that.
+ *
+ * WHY IT IS NOT CONSULTED FOR A MARKED ANNOTATION. It was, in the first
+ * version, and it dropped 9 live bindings out of 7133. A template literal on an
+ * earlier line desynchronised the string tracking, and the phantom string then
+ * swallowed the `/**` of a real annotation six lines later. Marked annotations
+ * are 7128 of the 7133; putting a hand-written scanner in front of all of them
+ * risks far more than it can win. So a marker is still proof on its own, and
+ * this only decides the marker-less case, where the worst a mistake can do is
+ * accept one annotation the old code accepted too.
+ *
+ * That is also why strings are not tracked here. A stray `/*` inside a string
+ * can open a span that is not really a comment, and the cost of that is bounded
+ * by the paragraph above.
+ */
+/** The offset just past `close` after `from`, or the end of `src`. */
+function spanEnd(src: string, from: number, close: string): number {
+  const at = src.indexOf(close, from);
+  return at === -1 ? src.length : at + close.length;
+}
+
+/** The end of the block comment opening at `i`, or null if none opens there. */
+function blockCommentAt(src: string, i: number): number | null {
+  return src[i] === "/" && src[i + 1] === "*"
+    ? spanEnd(src, i + 2, "*/")
+    : null;
+}
+
+/** The end of the triple-quoted string opening at `i`, or null if none does. */
+function tripleQuoteAt(src: string, i: number): number | null {
+  const ch = src[i];
+  if (ch !== '"' && ch !== "'") return null;
+  const quote = ch.repeat(3);
+  return src.startsWith(quote, i) ? spanEnd(src, i + 3, quote) : null;
+}
+
+function markerlessBindingSpans(src: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = [];
+
+  for (let i = 0; i < src.length; ) {
+    const end = blockCommentAt(src, i) ?? tripleQuoteAt(src, i);
+    if (end === null) {
+      i++;
+      continue;
+    }
+    spans.push({ start: i, end });
+    i = end;
+  }
+
+  return spans;
+}
+
+/** Whether the annotation opened its own comment, which needs no further proof. */
+const MARKED_ANNOTATION = /^[ \t]*(?:\/\/|\/\*|\*|#)/;
+
+/**
+ * Every `@scenario` annotation in `src`, with the offset just past each match so
+ * callers can run their own proximity check.
+ *
+ * Exported because this is where the "the token has to open its comment" rule
+ * lives, and that rule is easy to get wrong in both directions: too loose and
+ * prose binds, too tight and the hash-comment form used by Python tests stops
+ * binding. Three collectors shared this loop verbatim before; they now share it
+ * for real, so the rule cannot drift between languages.
+ */
+export function findScenarioAnnotations(
+  src: string,
+): { title: string; index: number; end: number }[] {
+  const found: { title: string; index: number; end: number }[] = [];
+  let spans: { start: number; end: number }[] | null = null;
+
+  let m: RegExpExecArray | null;
+  ANNOTATION_RE.lastIndex = 0;
+  while ((m = ANNOTATION_RE.exec(src)) !== null) {
+    const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    if (!title) continue;
+
+    if (!MARKED_ANNOTATION.test(m[0])) {
+      // Computed on first need: most files have no marker-less annotation at
+      // all, and this walks the whole source.
+      spans ??= markerlessBindingSpans(src);
+      // The match starts at the line's indentation, so the token's own offset
+      // is what has to be inside the span.
+      const at = m.index + m[0].indexOf("@scenario");
+      if (!spans.some((span) => at >= span.start && at < span.end)) continue;
+    }
+
+    found.push({ title, index: m.index, end: m.index + m[0].length });
+  }
+  return found;
+}
 
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -884,15 +993,11 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByTestCall(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByTestCall(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1145,15 +1250,11 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByGoTestFunc(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByGoTestFunc(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1231,15 +1332,11 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
     const src = readFileSync(file, "utf8");
 
     // Block-comment form (mirrors TS / Go).
-    let m: RegExpExecArray | null;
-    ANNOTATION_RE.lastIndex = 0;
-    while ((m = ANNOTATION_RE.exec(src)) !== null) {
-      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      if (!title) continue;
-      if (!isFollowedByPythonTestFunc(src, m.index + m[0].length)) continue;
-      const line = src.slice(0, m.index).split("\n").length;
+    for (const a of findScenarioAnnotations(src)) {
+      if (!isFollowedByPythonTestFunc(src, a.end)) continue;
+      const line = src.slice(0, a.index).split("\n").length;
       bindings.push({
-        title,
+        title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
       });
     }
@@ -1485,15 +1582,57 @@ function printNewInert(reports: InertReport[]): void {
   }
 }
 
-function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
-  if (unknown.length === 0) return;
-  console.log(
+/**
+ * The verdict, above the per-file sections as well as below them.
+ *
+ * Every `✓ all bound` under a `▸` heading is scoped to one feature file, and a
+ * run can fail on something belonging to no heading at all, so reading the tick
+ * next to your own change and stopping there is the obvious mistake. Takes the
+ * same reasons the exit code is built from, so the banner and the trailing FAIL
+ * line cannot disagree.
+ */
+export function formatFailureBanner(reasons: string[]): string[] {
+  if (reasons.length === 0) return [];
+  return [
+    `\n✗ THIS RUN FAILS: ${reasons.join(", ")}.`,
+    `  A ✓ below means that feature file is fully bound, not that the run passed.`,
+  ];
+}
+
+/**
+ * Unknown annotations, grouped under the file they were written in.
+ *
+ * They belong to no `▸` feature section, because the scenario they name is in
+ * no feature file at all, so a flat trailing list leaves them unattributed and
+ * far from the change that introduced them.
+ */
+export function formatUnknownAnnotations(
+  unknown: UnknownAnnotation[],
+): string[] {
+  if (unknown.length === 0) return [];
+  const lines = [
     `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
-  );
+  ];
+  const byFile = new Map<string, UnknownAnnotation[]>();
   for (const a of unknown) {
-    console.log(`  ✗ @scenario ${a.title}`);
-    console.log(`    ${a.ref.file}:${a.ref.line}`);
+    const list = byFile.get(a.ref.file);
+    if (list) list.push(a);
+    else byFile.set(a.ref.file, [a]);
   }
+  for (const [file, entries] of [...byFile].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    lines.push(`\n  ▸ ${file}`);
+    for (const a of entries) {
+      lines.push(`    ✗ @scenario ${a.title}`);
+      lines.push(`      line ${a.ref.line}`);
+    }
+  }
+  return lines;
+}
+
+function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
+  for (const line of formatUnknownAnnotations(unknown)) console.log(line);
 }
 
 function validateExemptionList({
@@ -1629,6 +1768,14 @@ function printParityReport(a: ParityAnalysis): void {
   console.log(
     `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
+
+  // The verdict goes above the per-file sections as well as below them. Every
+  // `✓ all bound` under a `▸` heading is scoped to that one feature file, and a
+  // run can fail on something that belongs to no heading at all, so reading the
+  // tick next to your own change and stopping there is the obvious mistake. The
+  // reasons come from the same function the exit code does, so this banner and
+  // the trailing FAIL line cannot disagree.
+  for (const line of formatFailureBanner(fatalReasons(a))) console.log(line);
 
   for (const r of a.enforced) printEnforcedReport(r);
   printLegacySummary(a.legacy);

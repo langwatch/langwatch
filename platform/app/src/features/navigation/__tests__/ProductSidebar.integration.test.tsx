@@ -153,6 +153,7 @@ vi.mock("~/utils/tracking", () => ({
 }));
 
 import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
+import { forgetMenuScrollPositions } from "~/components/sidebar/useMenuScrollPosition";
 import { ProductSidebar } from "../shell/ProductSidebar";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
@@ -180,19 +181,46 @@ function recordScrollIntoView(): {
   return scrolls;
 }
 
+const MENU_ENTRY_HEIGHT = 32;
+
 /**
- * jsdom reports every box at the origin, so the one measurement the reveal
- * reads is stubbed: how far each named entry sits below the top of the menu
- * it scrolls in.
+ * jsdom lays nothing out, so the measurements the menu reads are stubbed: how
+ * tall the menu's own box is, and how far each named entry sits below the top
+ * of the content it scrolls through.
+ *
+ * The entries move with the scroll, the way they would in a browser. A stub
+ * that held them still would report an entry as out of view however far the
+ * menu had already scrolled to reach it, and every test would read a menu that
+ * scrolls without end.
  */
-function stubEntryOffsets(offsets: Record<string, number>) {
-  const rectAt = (top: number) => ({ ...EMPTY_RECT, top, y: top });
+function stubMenuLayout({
+  entryOffsets,
+  menuHeight,
+}: {
+  entryOffsets: Record<string, number>;
+  menuHeight: number;
+}) {
+  const rectAt = ({ top, height }: { top: number; height: number }) => ({
+    ...EMPTY_RECT,
+    top,
+    y: top,
+    height,
+    bottom: top + height,
+  });
   window.HTMLElement.prototype.getBoundingClientRect = function (
     this: HTMLElement,
   ) {
-    if (this.dataset.testid === "sidebar-scroll-region") return rectAt(0);
+    if (this.dataset.testid === "sidebar-scroll-region")
+      return rectAt({ top: 0, height: menuHeight });
     const label = this.getAttribute("aria-label");
-    return rectAt((label ? offsets[label] : undefined) ?? 0);
+    const scrolled =
+      document.querySelector<HTMLElement>(
+        '[data-testid="sidebar-scroll-region"]',
+      )?.scrollTop ?? 0;
+    return rectAt({
+      top: ((label ? entryOffsets[label] : undefined) ?? 0) - scrolled,
+      height: MENU_ENTRY_HEIGHT,
+    });
   } as HTMLElement["getBoundingClientRect"];
 }
 
@@ -241,6 +269,8 @@ beforeEach(() => {
   commandBarOpenMock.mockReset();
   toggleSupportChatMock.mockReset();
   localStorage.clear();
+  // The menu's places outlive a test, the way they outlive a page change.
+  forgetMenuScrollPositions();
 });
 
 const realGetBoundingClientRect =
@@ -331,15 +361,20 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
-      expect(screen.getByText("Ingestion Sources")).toBeInTheDocument();
+      expect(screen.getByText("Inventory")).toBeInTheDocument();
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
-      expect(screen.getByText("Tool Catalog")).toBeInTheDocument();
-      expect(screen.getByText("Departments")).toBeInTheDocument();
+      expect(screen.getByText("People")).toBeInTheDocument();
+      // The flag mock reports every flag enabled, so the billed-cost
+      // placeholders are visible here too.
+      expect(screen.getByText("Costs")).toBeInTheDocument();
+      expect(screen.getByText("Billed")).toBeInTheDocument();
+      // Tool Tiles folded into Inventory's Catalog tab.
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
     });
   });
 
   describe("when a page is opened by its address", () => {
-    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
     it("brings that page's entry into view", async () => {
       const scrolls = recordScrollIntoView();
 
@@ -358,11 +393,14 @@ describe("the product sidebar", () => {
       ).toBe(true);
     });
 
-    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
     it("scrolls the menu so that entry sits at the top of the column", async () => {
       // jsdom lays nothing out, so the entry is placed by hand: 300px
-      // down a menu whose own box starts at the top of the viewport.
-      stubEntryOffsets({ "Virtual Keys": 300 });
+      // down a menu 200px tall, which puts it below the fold.
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300 },
+        menuHeight: 200,
+      });
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");
@@ -372,11 +410,33 @@ describe("the product sidebar", () => {
       });
     });
 
+    /** @scenario "Opening a page whose entry is in view leaves the menu alone" */
+    it("leaves the menu at its start when the entry is already in view", async () => {
+      // Where the first entries of a menu sit: below Quick Search and the
+      // heading of the first group, and well inside a menu this tall.
+      stubMenuLayout({ entryOffsets: { "Virtual Keys": 71 }, menuHeight: 690 });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(
+          screen.getByRole("link", { name: "Virtual Keys" }),
+        ).toHaveAttribute("aria-current", "page");
+      });
+      // Anything above zero has taken Quick Search and the heading with it.
+      expect(region.scrollTop).toBe(0);
+    });
+
     /** @scenario "Moving inside the menu leaves the scroll where it is" */
     it("does not move the menu when another page in it is opened", async () => {
       // Budgets sits further down than Virtual Keys, so a menu that
       // revealed the newly opened page would land on a different number.
-      stubEntryOffsets({ "Virtual Keys": 300, Budgets: 520 });
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300, Budgets: 520 },
+        menuHeight: 200,
+      });
 
       mockPathname = "/gateway/virtual-keys";
       const { rerender } = renderSidebar("gateway");
@@ -405,9 +465,53 @@ describe("the product sidebar", () => {
       expect(region.scrollTop).toBe(300);
     });
 
+    /** @scenario "The menu keeps its place while I move around the product" */
+    it("keeps the menu where the reader left it when the column is rebuilt", async () => {
+      // Opening a page rebuilds the column from nothing, so the menu the
+      // reader scrolled is not the menu that comes back.
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300, Budgets: 380 },
+        menuHeight: 400,
+      });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const reachedFurtherDown = 260;
+      const scrolled = screen.getByTestId("sidebar-scroll-region");
+      scrolled.dispatchEvent(new Event("wheel"));
+      scrolled.scrollTop = reachedFurtherDown;
+      scrolled.dispatchEvent(new Event("scroll"));
+
+      // React takes the node out of the page before it tears the column
+      // down, and a node out of the page reports a scroll of zero. Reading
+      // the menu on the way out therefore reads the top, so the place the
+      // reader reached has to be held before then.
+      Object.defineProperty(scrolled, "scrollTop", {
+        configurable: true,
+        get: () => 0,
+      });
+
+      cleanup();
+      mockPathname = "/gateway/budgets";
+      renderSidebar("gateway");
+
+      const rebuilt = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+      });
+      expect(rebuilt.scrollTop).toBe(reachedFurtherDown);
+    });
+
     /** @scenario "A reader who scrolls the menu keeps the position they chose" */
     it("leaves the scroll alone once the reader takes over", async () => {
-      stubEntryOffsets({ "Virtual Keys": 300 });
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300 },
+        menuHeight: 200,
+      });
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");

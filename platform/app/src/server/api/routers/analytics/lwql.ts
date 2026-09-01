@@ -20,7 +20,6 @@
  * @see specs/analytics/lwql-workbench.feature
  */
 
-import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
@@ -28,12 +27,15 @@ import {
   MAX_LWQL_LENGTH,
 } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
-import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 
-import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
+import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 /**
@@ -85,7 +87,7 @@ export interface LangWatchQLAvailability {
  */
 const availability = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .query(async ({ ctx, input }): Promise<LangWatchQLAvailability> => {
     const enabled = await lwqlEnabled({
       prisma: ctx.prisma,
@@ -102,7 +104,7 @@ const availability = protectedProcedure
 /** The LangWatchQL datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return getLangWatchQLService().describeSchema({
@@ -129,30 +131,33 @@ const query = protectedProcedure
       sql: z.string().min(1).max(MAX_LWQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
       timeWindow: lwqlTimeWindowSchema.optional(),
+      /**
+       * The datapoint step for a statement that declares
+       * `{period_granularity_seconds:UInt32}`, in seconds — restricted to the
+       * offered steps ({@link lwqlGranularityStepSchema}) so an off-list value
+       * is a schema rejection here rather than reaching the service's backstop.
+       * The bucket-budget arithmetic and its refusal are still the service's.
+       */
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
     }),
   )
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    // The project's LangWatchQL secret is hashed into the tenant capability
-    // the query runs under. It is read server-side and never leaves this
-    // function — no field of it appears in the response.
-    const project = await ctx.prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { id: true, lwqlKey: true },
+    const { project, protections } = await resolveLangWatchQLCaller({
+      ctx,
+      projectId: input.projectId,
     });
-    if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
-    }
 
     return getLangWatchQLService().execute({
       project,
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: project.id,
-      }),
+      protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+      ...(input.granularitySeconds === undefined
+        ? {}
+        : { granularitySeconds: input.granularitySeconds }),
     });
   });
 

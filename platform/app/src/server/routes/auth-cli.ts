@@ -54,16 +54,24 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-} from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
+  type CliKeySelection,
+  CliLoginKeyService,
+} from "~/server/api-key/cli-login-key.service";
+import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -205,6 +213,13 @@ interface DeviceCodeRecord {
     project_name: string;
     api_key: string;
   };
+  /**
+   * For `credential_type: "device_session"` after approval — the scope +
+   * permission selection the authorize screen approved (or the server-side
+   * default when the client sent none). Consumed by /exchange, which mints
+   * the user-scoped CLI ApiKey from it. Approval itself mints nothing.
+   */
+  key_selection?: CliKeySelection;
 }
 
 /**
@@ -236,6 +251,12 @@ interface RefreshTokenRecord {
   expires_at: number;
   /** Phase 8 — present when the CLI sent client_info on /exchange. */
   client_info?: ClientInfo;
+  /**
+   * The user-scoped CLI ApiKey /exchange minted for this session, carried
+   * across /refresh rotations so /logout can revoke the key alongside the
+   * tokens. Absent for sessions that minted no key.
+   */
+  cli_api_key_id?: string;
 }
 
 interface AccessTokenRecord {
@@ -246,6 +267,8 @@ interface AccessTokenRecord {
   /** Phase 8 — mirror of refresh-token client_info; useful for the
    * devices inventory, which reads access tokens directly. */
   client_info?: ClientInfo;
+  /** Mirror of the refresh-token field; see there. */
+  cli_api_key_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,11 +401,10 @@ async function refuseProjectKeyHandout(
       400,
     );
   }
-  const canWriteProject = await hasProjectPermission(
+  const canWriteProject = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: userId } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "project:update",
   );
@@ -452,12 +474,16 @@ async function ensureActiveOrgMemberOr403(
       where: { id: tokenRecord.user_id },
       select: { deactivatedAt: true },
     }),
-    prisma.organizationUser.findUnique({
+    // `disabledAt` is part of the predicate: a seat an admin disabled to
+    // reclaim it is not an active membership, and the keys minted here are
+    // the ones the owner ceiling never reaches — a project key has no owner,
+    // and the gateway honours a personal virtual key on its own status. A
+    // disabled row reads as no membership, and the session is severed below.
+    prisma.organizationUser.findFirst({
       where: {
-        userId_organizationId: {
-          userId: tokenRecord.user_id,
-          organizationId: tokenRecord.organization_id,
-        },
+        userId: tokenRecord.user_id,
+        organizationId: tokenRecord.organization_id,
+        disabledAt: null,
       },
       select: { userId: true },
     }),
@@ -745,6 +771,36 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // Membership is re-derived HERE, not trusted from approval time: an admin
+    // can disable the seat between approve and exchange, and both branches
+    // below hand out credentials the owner ceiling never reaches (a project
+    // key has no owner; a device session mints keys of its own). Refused,
+    // the device code is consumed and the answer is the same fatal
+    // access_denied/410 the mint below already gives a removed member, so the
+    // CLI stops polling for a session it will never get.
+    const activeMembership = await prisma.organizationUser.findFirst({
+      where: {
+        userId: user.id,
+        organizationId: organization.id,
+        disabledAt: null,
+      },
+      select: { userId: true },
+    });
+    if (!activeMembership) {
+      await redis.del(deviceCodeKey(device_code));
+      await redis.del(userCodeKey(record.user_code));
+      // The poll-rate key too: consumed means the next poll learns the code
+      // is gone (408), not that it polled too soon (429).
+      await redis.del(pollRateKey(device_code));
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: "Not an active member of the organization",
+        },
+        410,
+      );
+    }
+
     const responseEndpoint = controlPlaneBaseUrl();
 
     // No-paste API-key flow: the user picked a project on /cli/auth and the
@@ -829,6 +885,78 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // User-scoped CLI ApiKey — minted HERE, from the selection approval
+    // stamped, so an approval that is never exchanged mints nothing. Minted
+    // before the session tokens: a mint failure fails the whole exchange
+    // (handled error via onError) rather than leaving a half-logged-in CLI
+    // holding tokens but no key. Re-login from the same device label revokes
+    // the previous login key inside the service, so logins never accumulate
+    // credentials.
+    let cliApiKey: string | undefined;
+    let cliApiKeyId: string | undefined;
+    let cliApiKeyScope:
+      | {
+          kind: "organization" | "projects";
+          project_ids: string[];
+          permissions: string[];
+        }
+      | undefined;
+    if (record.key_selection) {
+      // Same normalization the other label paths use, and the user-chosen
+      // label wins over the machine hostname. The value names the key AND
+      // matches the previous login key for replacement, so an unnormalized
+      // value would leave the old key alive on a hostname or formatting
+      // change and let credentials accumulate.
+      const deviceLabel =
+        sanitizeDeviceLabel(
+          parsed.data.client_info?.device_label ??
+            parsed.data.client_info?.hostname,
+        ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
+      let minted: Awaited<
+        ReturnType<CliLoginKeyService["mintForDeviceSession"]>
+      >;
+      try {
+        minted = await CliLoginKeyService.create(prisma).mintForDeviceSession({
+          userId: user.id,
+          organizationId: organization.id,
+          deviceLabel,
+          selection: record.key_selection,
+        });
+      } catch (err) {
+        // A ceiling refusal is permanent: the selection was approved minutes
+        // ago and the approver has lost access since, so every later poll
+        // would refuse again. The CLI treats a non-200 as "keep polling", so
+        // leaving the record approved for its remaining TTL means one full
+        // ceiling walk every 4 seconds with no terminal error on screen.
+        // Burn the device code and answer with the one code the CLI already
+        // treats as fatal.
+        if (ApiKeyScopeViolationError.is(err)) {
+          logger.warn(
+            { err, userId: user.id, organizationId: organization.id },
+            "[auth-cli] CLI login key refused at exchange; terminating the device code",
+          );
+          await redis.del(deviceCodeKey(device_code));
+          await redis.del(userCodeKey(record.user_code));
+          return c.json(
+            {
+              error: "access_denied",
+              error_description:
+                "Your access changed after you approved this login. Run `langwatch login` again.",
+            },
+            410,
+          );
+        }
+        throw err;
+      }
+      cliApiKey = minted.token;
+      cliApiKeyId = minted.apiKeyId;
+      cliApiKeyScope = {
+        kind: minted.scope.kind,
+        project_ids: minted.scope.projectIds,
+        permissions: minted.permissions,
+      };
+    }
+
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
     // tokens against an authoritative store.
@@ -848,6 +976,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     const refreshRecord: RefreshTokenRecord = {
       user_id: user.id,
@@ -855,6 +984,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       issued_at: now,
       expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
       client_info: clientInfoStamped,
+      cli_api_key_id: cliApiKeyId,
     };
     // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot. The two records can briefly diverge
@@ -913,6 +1043,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         },
         default_personal_vk: record.personal_vk,
         personal_project: personalProject,
+        // The user-scoped key + its reach summary. Additive: an older CLI
+        // ignores both and keeps using personal_project exactly as before.
+        ...(cliApiKey && cliApiKeyScope
+          ? { cli_api_key: cliApiKey, cli_api_key_scope: cliApiKeyScope }
+          : {}),
         endpoint: responseEndpoint,
       },
       200,
@@ -1018,6 +1153,36 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     }
   }
 
+  // Rotation mints a new credential pair, so it re-derives membership the way
+  // the other minting endpoints do: a member whose seat an admin disabled
+  // (or who was removed) after the session started must not be able to
+  // renew it. Bearer-only routes still honour the access token already in
+  // hand until it expires (one hour), the same window a removed member has;
+  // this is what stops that window from rolling forward for ninety days.
+  const activeMembership = await prisma.organizationUser.findFirst({
+    where: {
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      disabledAt: null,
+    },
+    select: { userId: true },
+  });
+  if (!activeMembership) {
+    await redis.del(refreshTokenKey(refresh_token));
+    logger.info(
+      { userId: record.user_id, organizationId: record.organization_id },
+      "rejecting refresh: caller is not an active member of the organization",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description:
+          "Your access to this organization is no longer active. Please run `langwatch login` to start a new session.",
+      },
+      401,
+    );
+  }
+
   // Rotate: mint new pair, invalidate old. (Sliding-window rotation —
   // standard OAuth pattern, helps detect stolen tokens.)
   const newAccessToken = generateAccessToken();
@@ -1032,6 +1197,9 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    // Carried across rotations so /logout can still revoke the CLI key
+    // this session minted at /exchange.
+    cli_api_key_id: record.cli_api_key_id,
   };
   const newRefreshRecord: RefreshTokenRecord = {
     user_id: record.user_id,
@@ -1039,6 +1207,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     issued_at: now,
     expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
     client_info: carriedClientInfo,
+    cli_api_key_id: record.cli_api_key_id,
   };
 
   await redis
@@ -1230,6 +1399,39 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
     budgetRepository: getApp().gateway.budgets,
   });
   const result = await service.resolve({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget-overview
+// ---------------------------------------------------------------------------
+// Every budget that binds the caller's own keys, labelled per scope, for
+// the `langwatch login` epilogue. Wire shape matches the tRPC
+// `api.user.budgetOverview` procedure byte-for-byte (both surfaces share
+// BudgetOverviewService), replacing the collapsed single number the
+// /bootstrap `budget` field carries for older CLIs.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = BudgetOverviewService.create(
+    prisma,
+    getApp().gateway.budgets,
+  );
+  const result = await service.overviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1627,8 +1829,8 @@ async function ensureGovernancePermissionOr403(
   tokenRecord: { user_id: string; organization_id: string },
   permission: Permission,
 ): Promise<Response | null> {
-  const allowed = await hasOrganizationPermission(
-    { prisma, session: { user: { id: tokenRecord.user_id } } } as any,
+  const allowed = await probeOrganizationPermission(
+    { session: { user: { id: tokenRecord.user_id } } } as any,
     tokenRecord.organization_id,
     permission,
   );
@@ -1751,7 +1953,10 @@ secured
       );
     }
 
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({
+      prisma,
+      repository: getApp().governance.activityMonitor,
+    });
     const events = await monitor.eventsForSource({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -1810,7 +2015,10 @@ secured
         404,
       );
     }
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({
+      prisma,
+      repository: getApp().governance.activityMonitor,
+    });
     const health = await monitor.sourceHealthMetrics({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -2031,11 +2239,10 @@ async function mintProjectIngestionKey(
     );
   }
 
-  const allowed = await hasProjectPermission(
+  const allowed = await probeProjectPermission(
     {
-      prisma,
       session: { user: { id: tokenRecord.user_id } },
-    } as Parameters<typeof hasProjectPermission>[0],
+    } as Parameters<typeof probeProjectPermission>[0],
     project.id,
     "traces:create",
   );
@@ -2370,6 +2577,30 @@ const approveRequestSchema = z.object({
    * verbatim copy of `Project.apiKey` for the SDK to consume).
    */
   project_id: z.string().optional(),
+  /**
+   * For `device_session` approvals — the scope + permission selection the
+   * authorize screen collected for the user-scoped CLI key /exchange mints.
+   * Optional: a client that sends none gets the server-side default (the
+   * widest scope the approving user holds, with the default CLI permission
+   * list narrowed to what they hold there).
+   */
+  key_selection: z
+    .object({
+      // Bounded at the edge: the ceiling assertion runs one database round
+      // per binding per permission, so an unbounded body is a request-thread
+      // fan-out that starves the connection pool, and every unrecognised
+      // permission is echoed back in the field errors.
+      bindings: z
+        .array(
+          z.object({
+            scope_type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+            scope_id: z.string().min(1).max(64),
+          }),
+        )
+        .max(200),
+      permissions: z.array(z.string().min(1).max(128)).max(500),
+    })
+    .optional(),
 });
 
 secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
@@ -2394,14 +2625,16 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   }
   const { user_code, organization_id, project_id } = parsed.data;
 
-  // Verify caller is a member of the org they're issuing a key for.
-  const membership = await prisma.organizationUser.findUnique({
+  // Verify the caller is an ACTIVE member of the org they're issuing a key
+  // for: a membership an admin disabled to reclaim its seat must not approve
+  // a device and hand out a key it could not use itself.
+  const membership = await prisma.organizationUser.findFirst({
     where: {
-      userId_organizationId: {
-        userId: session.user.id,
-        organizationId: organization_id,
-      },
+      userId: session.user.id,
+      organizationId: organization_id,
+      disabledAt: null,
     },
+    select: { userId: true },
   });
   if (!membership) {
     return c.json(
@@ -2453,7 +2686,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     // Resolve the picked project: it must live in the chosen org and not be
     // archived. Authorization is NOT decided by this lookup. The
-    // `hasProjectPermission(..., "project:update")` check below is the source
+    // `probeProjectPermission(..., "project:update")` check below is the source
     // of truth, and it re-derives the org from the project id and inspects
     // project-, team- and org-scoped role bindings plus the org role. So an
     // org-level admin (or an org/team-scoped role-binding admin) who sees the
@@ -2533,6 +2766,8 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
+      // Device login picks an organization, not a project.
+      projectId: NOT_TARGETED,
       organizationId: organization_id,
       defaultValue: true,
     })
@@ -2548,15 +2783,67 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     );
   }
 
-  // Approval proves identity and nothing else. The personal virtual key is
-  // minted later, by POST /virtual-key, the first time a tool resolves to
-  // gateway mode: a key issued here would be handed to users who only send
-  // traces, and every re-login on an already-keyed machine would leave one
-  // more VirtualKey row behind.
+  // Approval proves identity and stamps the key SELECTION — it still mints
+  // no credential. The personal virtual key is minted later, by POST
+  // /virtual-key, and the user-scoped CLI ApiKey is minted by /exchange from
+  // the selection stamped here, so an approval that is never exchanged
+  // leaves no ApiKey row behind.
+  const cliLoginKeys = CliLoginKeyService.create(prisma);
+  let keySelection: CliKeySelection | undefined;
+  if (parsed.data.key_selection) {
+    // Explicit selection from the authorize screen: validated against the
+    // registry and the approving user's own ceiling. A violation throws a
+    // HandledError (cli_key_selection_invalid / api_key_scope_violation /
+    // personal_workspace_not_managed_here) and nothing is stamped.
+    keySelection = await cliLoginKeys.validateSelection({
+      userId: session.user.id,
+      organizationId: organization_id,
+      selection: {
+        bindings: parsed.data.key_selection.bindings.map((binding) => ({
+          scopeType: binding.scope_type,
+          scopeId: binding.scope_id,
+        })),
+        permissions: parsed.data.key_selection.permissions,
+      },
+    });
+  } else {
+    // Legacy client (no selection): stamp the server-side default. The
+    // personal workspace is ensured first so its team can be part of the
+    // default reach — idempotent, and not a credential. Both steps are
+    // best-effort: a default that cannot be resolved must not fail the
+    // login, it just completes without a scoped key.
+    try {
+      await new PersonalWorkspaceService(prisma).ensure({
+        userId: session.user.id,
+        organizationId: organization_id,
+        displayName: session.user.name,
+        displayEmail: session.user.email,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not ensure personal workspace at approve; default key selection proceeds without it",
+      );
+    }
+    try {
+      keySelection =
+        (await cliLoginKeys.resolveDefaultSelection({
+          userId: session.user.id,
+          organizationId: organization_id,
+        })) ?? undefined;
+    } catch (err) {
+      logger.warn(
+        { err, userId: session.user.id, organizationId: organization_id },
+        "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
+      );
+    }
+  }
+
   await approveDeviceCode({
     deviceCode: record.device_code,
     userId: session.user.id,
     organizationId: organization_id,
+    keySelection,
   });
 
   return c.json({ ok: true, organization_id }, 200);
@@ -2600,6 +2887,9 @@ secured.access(CLI_POLICY).post("/deny", async (c: Context) => {
 // only the refresh is revoked and the access token expires naturally
 // in up to 1h — which is a real security gap if the access token was
 // stolen, hence the new `access_token` field added alongside refresh.
+// Also revokes the user-scoped CLI ApiKey the session's /exchange minted
+// (its id rides on the token records), so a logout leaves no live
+// credential behind.
 // ---------------------------------------------------------------------------
 const logoutRequestSchema = z.object({
   refresh_token: z.string().optional(),
@@ -2615,6 +2905,19 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     // to fail if they pass garbage; just nothing to revoke.
     return c.json({ ok: true });
   }
+
+  // Read the records BEFORE the delete: they carry the id of the CLI ApiKey
+  // /exchange minted for this session, which logout revokes alongside the
+  // tokens so the wiped config leaves no live credential behind.
+  const [refreshRaw, accessRaw] = await Promise.all([
+    parsed.data.refresh_token
+      ? redis.get(refreshTokenKey(parsed.data.refresh_token))
+      : null,
+    parsed.data.access_token
+      ? redis.get(accessTokenKey(parsed.data.access_token))
+      : null,
+  ]);
+
   const ops = redis.multi();
   if (parsed.data.refresh_token) {
     ops.del(refreshTokenKey(parsed.data.refresh_token));
@@ -2623,8 +2926,47 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     ops.del(accessTokenKey(parsed.data.access_token));
   }
   await ops.exec();
+
+  await revokeCliKeysFromTokenRecords([refreshRaw, accessRaw]);
+
   return c.json({ ok: true });
 });
+
+/**
+ * Revokes the CLI ApiKeys named by a logout's token records. Best-effort and
+ * idempotent, like the token deletes beside it: logout stays a 200 whatever
+ * state the key is in, and a failed revoke is logged rather than surfaced —
+ * the key still dies with the owner's next re-login from the same device.
+ */
+async function revokeCliKeysFromTokenRecords(
+  raws: Array<string | null>,
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const raw of raws) {
+    if (!raw) continue;
+    let record: RefreshTokenRecord | AccessTokenRecord;
+    try {
+      record = JSON.parse(raw) as RefreshTokenRecord;
+    } catch {
+      continue;
+    }
+    const apiKeyId = record.cli_api_key_id;
+    if (!apiKeyId || seen.has(apiKeyId)) continue;
+    seen.add(apiKeyId);
+    try {
+      await CliLoginKeyService.create(prisma).revokeForLogout({
+        apiKeyId,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId, userId: record.user_id },
+        "[auth-cli] failed to revoke the CLI key on logout",
+      );
+    }
+  }
+}
 
 export const app = secured.hono;
 
@@ -2661,6 +3003,7 @@ export async function approveDeviceCode({
   userId,
   organizationId,
   projectApiKey,
+  keySelection,
 }: {
   deviceCode: string;
   userId: string;
@@ -2671,6 +3014,12 @@ export async function approveDeviceCode({
     project_name: string;
     api_key: string;
   };
+  /**
+   * For a `device_session` code — the validated scope + permission selection
+   * /exchange mints the user-scoped CLI key from. Stamping it here mints
+   * nothing.
+   */
+  keySelection?: CliKeySelection;
 }): Promise<{ approved: boolean }> {
   const redis = getRedis();
   const raw = await redis.get(deviceCodeKey(deviceCode));
@@ -2685,6 +3034,7 @@ export async function approveDeviceCode({
     user_id: userId,
     organization_id: organizationId,
     project_api_key: projectApiKey,
+    key_selection: keySelection,
   };
 
   // Preserve original TTL by computing remaining seconds.

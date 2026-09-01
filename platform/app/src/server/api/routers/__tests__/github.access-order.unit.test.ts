@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -40,6 +39,14 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
   getGithubAppConfig: () => appConfig,
 }));
@@ -57,21 +64,12 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
-    checkOrganizationPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
+    hasOrganizationPermission: vi.fn(
+      async (_ctx: unknown, _organizationId: string, permission: string) => {
         permissionsAsked.push(permission);
-        if (!hasOrgPermission()) {
-          // The top-level TRPCError binding is safe here: this closure runs
-          // at request time, long after the hoisted factory phase.
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission",
-          });
-        }
-        ctx.permissionChecked = true;
-        return next();
+        return hasOrgPermission();
       },
+    ),
   };
 });
 
@@ -222,7 +220,7 @@ describe("githubRouter access gates", () => {
 
       await expect(
         caller().listRepos({ organizationId: "org-1" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
     });
@@ -236,7 +234,7 @@ describe("githubRouter access gates", () => {
           organizationId: "org-1",
           installationId: "555",
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(getByInstallationId).not.toHaveBeenCalled();
     });

@@ -1,12 +1,18 @@
 Feature: Governance home — route, nav promotion, persona detection
   The governance product surface lives at top-level `/governance` (a
   daily-use org-scoped home), NOT under Settings. The whole family
-  lives there: `/governance/ingestion-sources*`, `/governance/anomaly-rules`,
-  `/governance/tool-catalog`, `/governance/departments`. Routing policies
-  are gateway behavior and live at `/gateway/routing-policies` instead. The
-  legacy `/settings/governance*` and `/settings/routing-policies` addresses
+  lives there: `/governance/inventory*`, `/governance/anomaly-rules`,
+  `/governance/people`, and — behind the
+  `release_ui_governance_billed_cost_enabled` flag — `/governance/costs`
+  and `/governance/billed`. Routing policies are gateway behavior and
+  live at `/gateway/routing-policies` instead. The legacy
+  `/settings/governance*` and `/settings/routing-policies` addresses
   redirect permanently to the new ones
-  (specs/navigation/gateway-url-move.feature).
+  (specs/navigation/gateway-url-move.feature), and four retired
+  governance addresses redirect too: `/governance/catalog*` and
+  `/governance/ingestion-sources*` (both meant the sources surface),
+  `/governance/tool-catalog` (now the Inventory catalog tab) and
+  `/governance/departments` (renamed People).
 
   A `Governance` entry surfaces in the MainMenu sidebar ONLY for org
   admins whose org has actual governance state. Vast-majority current
@@ -40,12 +46,133 @@ Feature: Governance home — route, nav promotion, persona detection
 
   @bdd @ui @governance-home @route @sub-routes
   Scenario: Admin-authoring sub-routes live under /governance
-    Then "/governance/ingestion-sources" is the list page
-    And "/governance/ingestion-sources/<id>" is the per-source
+    Then "/governance/inventory" is the tabbed inventory surface
+      (Catalog + Sources)
+    And "/governance/inventory/<id>" is the per-source
       detail page
     And "/governance/anomaly-rules" is the rule authoring surface
     # The daily-use dashboard at /governance links into them, and into the
     # routing-policy surface the gateway owns at /gateway/routing-policies.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The retired ingestion sources address lands on the inventory Sources tab
+    When the admin cold-loads "/governance/ingestion-sources"
+    Then they land on "/governance/inventory?tab=sources"
+    And the old address is not kept in the browser history
+    # Direct, not chained through the also-retired /governance/catalog:
+    # each retired address maps straight to its final home.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: An old ingestion source deep link lands on the inventory detail page
+    When the admin cold-loads "/governance/ingestion-sources/src_123?range=30d"
+    Then they land on "/governance/inventory/src_123?range=30d"
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The retired catalog address keeps meaning the sources surface
+    When the admin cold-loads "/governance/catalog"
+    Then they land on "/governance/inventory?tab=sources"
+    # Bare /governance/catalog always meant the sources list. The new
+    # default tab on /governance/inventory is Catalog (tool tiles), so
+    # the redirect must pin ?tab=sources or every stored sources link —
+    # quarantine alerts, source chips, post-archive returns — would
+    # silently land on the tool-tiles pane.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: A stale tab value on a retired sources address still lands on Sources
+    When the admin cold-loads "/governance/catalog?tab=catalog"
+    Then they land on "/governance/inventory?tab=sources"
+    # The retired addresses offered exactly one pane, so every ?tab= value
+    # they ever carried rendered the sources list — an unknown value fell
+    # back to the only tab there was. Carrying such a value forward would
+    # hand the reader a different pane than the address used to mean, so
+    # the retired sources addresses pin the tab rather than default it.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: An old catalog detail deep link lands on the inventory detail page
+    When the admin cold-loads "/governance/catalog/src_123?range=30d"
+    Then they land on "/governance/inventory/src_123?range=30d"
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The retired tool-catalog address lands on the inventory page
+    When the admin cold-loads "/governance/tool-catalog"
+    Then they land on "/governance/inventory"
+    And as an aiTools:manage holder their default tab is Catalog —
+      the same editor the retired address served
+    # Bare, no ?tab=: the bare address means "your default pane". A
+    # viewer following the same stored link lands on Sources instead,
+    # which is the pane they can actually read.
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The retired departments address lands on People
+    When the admin cold-loads "/governance/departments"
+    Then they land on "/governance/people"
+
+  @bdd @ui @governance-home @route @alias @integration
+  Scenario: The cost-centers redirect is retargeted to People in one hop
+    When the admin cold-loads "/governance/cost-centers"
+    Then they land on "/governance/people"
+    # Retargeted, not chained: the old cost-centers → departments
+    # redirect must not become cost-centers → departments → people.
+
+  # ---------------------------------------------------------------------------
+  # Inventory tab shell — the inventory page is a tabbed surface: Catalog
+  # (the tool-tiles editor, formerly /governance/tool-catalog, carrying its
+  # own inner Tool Tiles / Ingestion Templates tabs unchanged) and Sources
+  # (the ingestion-sources table). A selected non-default tab is part of
+  # the address (?tab=); the default stays out of it. The default is
+  # permission-sensitive: Catalog for admins holding aiTools:manage,
+  # Sources otherwise — so the BARE address means "your default pane" and
+  # can resolve differently for different recipients of the same link.
+  # That is accepted deliberately: the ?tab= form is the stable shareable
+  # address, and both resolutions are the same page.
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @governance-home @inventory-tabs @integration
+  Scenario: The inventory default tab stays out of the address
+    When the admin opens "/governance/inventory"
+    Then the Catalog tab is selected and the tool-tiles editor renders inside it
+    And the address carries no "tab" parameter
+
+  @bdd @ui @governance-home @inventory-tabs @integration
+  Scenario: The Sources tab is addressable
+    When the admin opens "/governance/inventory?tab=sources"
+    Then the Sources tab is selected and the sources table renders inside it
+
+  @bdd @ui @governance-home @inventory-tabs @integration
+  Scenario: A delegated viewer without aiTools:manage defaults to Sources
+    Given a delegated viewer holding governance:view and
+      ingestionSources:view but NOT aiTools:manage
+    When they open "/governance/inventory"
+    Then the Sources tab is selected and the sources table renders
+    And the Catalog tab is still listed — selecting it shows the
+      aiTools:manage permission notice inside the pane (the notice the
+      old tool-catalog page showed full-page, now scoped to the tab)
+
+  @bdd @ui @governance-home @inventory-tabs @integration
+  Scenario: An unknown tab value falls back to the default
+    When the admin opens "/governance/inventory?tab=nonsense"
+    Then the Catalog tab is selected and the tool-tiles editor renders
+    # Never a blank pane: a stale or mistyped tab value degrades to the
+    # default instead of selecting nothing.
+
+  @bdd @ui @governance-home @bypass-project-redirect @unit
+  Scenario: The inventory family is exempt from the no-organization onboarding bouncer
+    Given a session that belongs to no organization yet
+    When it sits on "/governance/inventory", "/governance/inventory/<id>",
+      "/governance/people", "/governance/costs" or "/governance/billed"
+    Then the route is recognized as bouncer-exempt, like every sibling
+      governance route, instead of bouncing to "/onboarding/welcome"
+    # The bounce fires only for zero-ORG sessions (an org with zero
+    # projects never bounces — useOrganizationTeamProject returns early).
+    # The exemption is an exact-match lookup over noOrgBouncerRoutes
+    # against the pattern resolvePathname derives from ROUTE_PATTERNS,
+    # which falls back to the raw pathname when no pattern matches — so
+    # /governance/catalog/<id> needs BOTH lists or the exemption misses.
+    # The retired addresses (ingestion-sources, catalog, tool-catalog,
+    # departments, cost-centers) stay listed too, so each redirect
+    # route renders before the bouncer fires (cost-centers precedent).
+    # Sibling pages also carry withPermissionGuard's
+    # bypassOnboardingRedirect as a third layer; the catalog page keeps it.
 
   # ---------------------------------------------------------------------------
   # Persona / nav promotion via api.governance.setupState
@@ -132,6 +259,8 @@ Feature: Governance home — route, nav promotion, persona detection
 
   @bdd @ui @governance-home @layout
   Scenario: /governance renders with the GovernanceLayout (top-level chrome)
+    Given "release_ui_governance_billed_cost_enabled" is disabled
+      for the organization
     When the admin loads "/governance"
     Then the page renders inside GovernanceLayout — NOT SettingsLayout
     And the header replaces the per-project ProjectSelector with an
@@ -141,13 +270,18 @@ Feature: Governance home — route, nav promotion, persona detection
       sub-routes:
       | label             | href                                          |
       | Overview          | /governance                                   |
-      | Ingestion Sources | /governance/ingestion-sources                 |
+      | Inventory         | /governance/inventory                         |
       | Anomaly Rules     | /governance/anomaly-rules                     |
+      | People            | /governance/people                            |
+    # Tool Tiles is gone from the rail — it lives inside Inventory as
+    # the Catalog tab. Costs and Billed join the rail only when
+    # release_ui_governance_billed_cost_enabled is on (see the
+    # billed-cost flag section below).
 
   @bdd @ui @governance-home @layout @sub-routes
   Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
-    When the admin clicks "Ingestion Sources" in the GovernanceLayout
-      left rail and lands on "/governance/ingestion-sources"
+    When the admin clicks "Inventory" in the GovernanceLayout
+      left rail and lands on "/governance/inventory"
     Then the page renders inside GovernanceLayout, the same chrome as
       the daily-use home
     And the same applies to "/governance/anomaly-rules"
@@ -162,3 +296,34 @@ Feature: Governance home — route, nav promotion, persona detection
       `personalScope` for `/me/*` routes)
     And the org-name chip + indicator render correctly even with
       project=null
+
+  # ---------------------------------------------------------------------------
+  # Costs + Billed placeholders — behind release_ui_governance_billed_cost_enabled
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @governance-home @billed-cost-flag @integration
+  Scenario: With the billed-cost flag off, Costs and Billed do not exist
+    Given "release_ui_governance_billed_cost_enabled" is disabled
+      for the organization
+    When the admin looks at the GOVERNANCE rail
+    Then no "Costs" and no "Billed" entries are listed
+    And cold-loading "/governance/costs" or "/governance/billed"
+      shows the not-found scene, the same off-behavior every
+      flag-guarded governance page already has
+    # Unreachable, not merely unlisted: an empty page behind a hidden
+    # nav item is a half-gate. Off-behavior follows the existing
+    # withFeatureFlagGuard semantic (NotFoundScene), not a redirect.
+    # Composition: both pages sit behind release_ui_ai_governance_enabled
+    # AND this flag — the section-wide gate in feature-flag-gating.feature
+    # still hides every governance surface on its own.
+
+  @bdd @ui @governance-home @billed-cost-flag @integration
+  Scenario: With the billed-cost flag on, Costs and Billed appear as placeholders
+    Given "release_ui_governance_billed_cost_enabled" is enabled
+      for the organization
+    When the admin looks at the GOVERNANCE rail
+    Then "Costs" (/governance/costs) and "Billed" (/governance/billed)
+      are listed between Overview and Inventory
+    And each page renders its heading and an empty-state placeholder —
+      no data, no queries; the pages exist so the rail shape ships
+      ahead of the spend views

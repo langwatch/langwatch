@@ -1,3 +1,9 @@
+/**
+ * Batch aggregates over the simulation_runs table.
+ *
+ * @see specs/features/simulation-runs-batch-completion.feature
+ */
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -242,6 +248,130 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
+  describe("getRunDataForScenarioSet() message truncation", () => {
+    /** Ten messages: four more than the trimmed projection keeps. */
+    function longConversation() {
+      const count = 10;
+      return {
+        "Messages.Id": Array.from({ length: count }, (_, i) => `msg-${i}`),
+        "Messages.Role": Array.from({ length: count }, (_, i) =>
+          i % 2 === 0 ? "user" : "assistant",
+        ),
+        "Messages.Content": Array.from(
+          { length: count },
+          (_, i) => `turn ${i}`,
+        ),
+        "Messages.TraceId": Array.from({ length: count }, () => ""),
+        "Messages.Rest": Array.from({ length: count }, () => "{}"),
+      };
+    }
+
+    describe("when a run holds more messages than the list keeps", () => {
+      /** @scenario "A set-level list marks a run whose messages were trimmed" */
+      it("returns the first 6 and reports the trim", async () => {
+        const scenarioSetId = `set-trunc-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-trunc-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(6);
+        expect(run.messagesTruncated).toBe(true);
+      });
+
+      /** @scenario "include=messages returns every message on a set-level list" */
+      it("returns every message when the caller includes them", async () => {
+        const scenarioSetId = `set-full-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-full-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+          shouldIncludeMessages: true,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(10);
+        expect(run.messagesTruncated).toBe(false);
+      });
+    });
+
+    describe("when a run holds no more messages than the list keeps", () => {
+      /** @scenario "A run within the message limit is not marked as truncated" */
+      it("returns them all and reports no trim", async () => {
+        const scenarioSetId = `set-short-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-short-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+          }),
+        );
+
+        const result = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+
+        expect(result.runs).toHaveLength(1);
+        const run = result.runs[0]!;
+        expect(run.messages).toHaveLength(1);
+        expect(run.messagesTruncated).toBe(false);
+      });
+    });
+
+    describe("when the runs are read through the batch-scoped query", () => {
+      /** @scenario "A batch-scoped list is unchanged by the include parameter" */
+      it("carries whole conversations without an include parameter", async () => {
+        const batchRunId = `batch-full-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-batch-full-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ...longConversation(),
+          }),
+        );
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        const runs = "runs" in result ? result.runs : [];
+        expect(runs).toHaveLength(1);
+        expect(runs[0]!.messages).toHaveLength(10);
+        expect(runs[0]!.messagesTruncated).toBe(false);
+      });
+    });
+  });
+
   describe("getRunDataForBatchRun()", () => {
     describe("when runs have metadata", () => {
       it("returns runs with metadata", async () => {
@@ -409,6 +539,9 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
 
+        // The page is ordered by `max(CreatedAt)` and breaks ties on the batch
+        // id. Every other row of this file shares one `CreatedAt`, so a newer
+        // one here puts this batch on the first page whatever the random ids.
         await insertRow(
           ch,
           makeInsertRow({
@@ -416,6 +549,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batchRunId,
             ScenarioSetId: scenarioSetId,
             Metadata: JSON.stringify({ all_suites: true }),
+            CreatedAt: new Date(now + 60_000),
           }),
         );
 
@@ -819,6 +953,117 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(legacyEntry).toBeUndefined();
         expect(defaultEntry).toBeDefined();
       });
+    });
+  });
+
+  describe("given a batch in the project's agent test set", () => {
+    const agentTestSetId = `__internal__${tenantId}__agent-test`;
+    const batchRunId = `batch-agent-test-${nanoid()}`;
+    const scenarioRunId = `run-agent-test-${nanoid()}`;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          ScenarioRunId: scenarioRunId,
+          BatchRunId: batchRunId,
+          ScenarioSetId: agentTestSetId,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now),
+          UpdatedAt: new Date(now),
+        }),
+      );
+    });
+
+    /** @scenario "The results lists leave the agent test batches out" */
+    it("is in no set list, no batch list and no last-result summary", async () => {
+      const sets = await repo.getScenarioSetsData({ projectId: tenantId });
+      expect(
+        sets.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const batches = await repo.getRunDataForAllSuites({
+        projectId: tenantId,
+        limit: 100,
+      });
+      if (!batches.changed) throw new Error("expected changed");
+      expect(
+        batches.runs.find((r) => r.batchRunId === batchRunId),
+      ).toBeUndefined();
+      expect(batches.scenarioSetIds[batchRunId]).toBeUndefined();
+
+      const internal = await repo.getInternalSuiteSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        internal.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+      const external = await repo.getExternalSetSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        external.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const summaries = await repo.getLastResultSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        summaries.find((s) => s.scenarioId === "__internal__agent-test"),
+      ).toBeUndefined();
+    });
+
+    /** @scenario "The run drawer opens a test run by its id" */
+    it("is still read by its own run id", async () => {
+      const run = await repo.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId,
+      });
+      expect(run?.scenarioRunId).toBe(scenarioRunId);
+      expect(run?.batchRunId).toBe(batchRunId);
+    });
+  });
+
+  describe("given an agent test batch newer than every other run", () => {
+    const freshnessTenantId = `test-sim-freshness-${nanoid()}`;
+    const lastRealUpdatedAt = now;
+    const agentTestUpdatedAt = now + 60_000;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: "default",
+          Status: "SUCCESS",
+          CreatedAt: new Date(lastRealUpdatedAt),
+          UpdatedAt: new Date(lastRealUpdatedAt),
+        }),
+      );
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: `__internal__${freshnessTenantId}__agent-test`,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(agentTestUpdatedAt),
+          UpdatedAt: new Date(agentTestUpdatedAt),
+        }),
+      );
+    });
+
+    /** @scenario "A test run does not make the results page look stale" */
+    it("answers that nothing changed, so the freshness cursor stays where it is", async () => {
+      const result = await repo.getRunDataForAllSuites({
+        projectId: freshnessTenantId,
+        limit: 100,
+        sinceTimestamp: lastRealUpdatedAt,
+      });
+
+      expect(result.changed).toBe(false);
+      expect(result.lastUpdatedAt).toBe(lastRealUpdatedAt);
     });
   });
 
@@ -1289,6 +1534,127 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(previewQuery!.query_params?.minStartedAtMs).toBe(
           String(oldStartedAtMs),
         );
+      });
+    });
+
+    /**
+     * Seeds one batch and returns the ids the assertions need. A queued run
+     * carries no FinishedAt: the queue writes the row before the worker picks
+     * it up.
+     */
+    async function seedBatch(statuses: string[]) {
+      const setId = `set-completion-${nanoid()}`;
+      const batchRunId = `batch-completion-${nanoid()}`;
+
+      for (const status of statuses) {
+        const settled = status !== "QUEUED";
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            Status: status,
+            FinishedAt: settled ? new Date(now) : null,
+          }),
+        );
+      }
+
+      return { setId, batchRunId };
+    }
+
+    async function readBatch({
+      setId,
+      batchRunId,
+    }: {
+      setId: string;
+      batchRunId: string;
+    }) {
+      const result = await repo.getBatchHistoryForScenarioSet({
+        projectId: tenantId,
+        scenarioSetId: setId,
+        limit: 10,
+      });
+      const batch = result.batches.find((b) => b.batchRunId === batchRunId);
+      if (!batch) throw new Error("expected the seeded batch");
+      return batch;
+    }
+
+    describe("when the batch still holds a queued run", () => {
+      /** @scenario "A batch with queued runs is not complete" */
+      it("counts the queued run as running and the finished one as settled", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(1);
+        expect(batch.settledCount).toBe(1);
+      });
+
+      /** @scenario "allCompletedAt stays null until the last run settles" */
+      it("leaves allCompletedAt null while the queued run waits", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.allCompletedAt).toBeNull();
+      });
+    });
+
+    describe("when every run of the batch reached a terminal status", () => {
+      /** @scenario "A batch is complete when every run is terminal" */
+      it("settles every run and carries a completion timestamp", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(0);
+        expect(batch.settledCount).toBe(batch.totalCount);
+        expect(batch.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when one batch is read by its batch run id", () => {
+      it("returns the same counts as the history page, without items", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.batchRunId).toBe(batchRunId);
+        expect(summary!.totalCount).toBe(2);
+        expect(summary!.runningCount).toBe(1);
+        expect(summary!.settledCount).toBe(1);
+        expect(summary!.allCompletedAt).toBeNull();
+      });
+
+      it("carries a completion timestamp once every run is terminal", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.settledCount).toBe(2);
+        expect(summary!.runningCount).toBe(0);
+        expect(summary!.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when the batch run id belongs to no run of the project", () => {
+      it("returns null", async () => {
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId: `batch-unknown-${nanoid()}`,
+        });
+
+        expect(summary).toBeNull();
       });
     });
   });

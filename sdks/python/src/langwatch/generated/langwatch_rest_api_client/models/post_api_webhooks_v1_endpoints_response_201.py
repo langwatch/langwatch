@@ -7,7 +7,12 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
-    from ..models.post_api_webhooks_v1_endpoints_response_201_data import PostApiWebhooksV1EndpointsResponse201Data
+    from ..models.post_api_webhooks_v1_endpoints_response_201_data_type_0 import (
+        PostApiWebhooksV1EndpointsResponse201DataType0,
+    )
+    from ..models.post_api_webhooks_v1_endpoints_response_201_data_type_1 import (
+        PostApiWebhooksV1EndpointsResponse201DataType1,
+    )
 
 
 T = TypeVar("T", bound="PostApiWebhooksV1EndpointsResponse201")
@@ -17,14 +22,22 @@ T = TypeVar("T", bound="PostApiWebhooksV1EndpointsResponse201")
 class PostApiWebhooksV1EndpointsResponse201:
     """
     Attributes:
-        data (PostApiWebhooksV1EndpointsResponse201Data):
+        data (PostApiWebhooksV1EndpointsResponse201DataType0 | PostApiWebhooksV1EndpointsResponse201DataType1):
     """
 
-    data: PostApiWebhooksV1EndpointsResponse201Data
+    data: PostApiWebhooksV1EndpointsResponse201DataType0 | PostApiWebhooksV1EndpointsResponse201DataType1
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data = self.data.to_dict()
+        from ..models.post_api_webhooks_v1_endpoints_response_201_data_type_0 import (
+            PostApiWebhooksV1EndpointsResponse201DataType0,
+        )
+
+        data: dict[str, Any]
+        if isinstance(self.data, PostApiWebhooksV1EndpointsResponse201DataType0):
+            data = self.data.to_dict()
+        else:
+            data = self.data.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -38,10 +51,33 @@ class PostApiWebhooksV1EndpointsResponse201:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_webhooks_v1_endpoints_response_201_data import PostApiWebhooksV1EndpointsResponse201Data
+        from ..models.post_api_webhooks_v1_endpoints_response_201_data_type_0 import (
+            PostApiWebhooksV1EndpointsResponse201DataType0,
+        )
+        from ..models.post_api_webhooks_v1_endpoints_response_201_data_type_1 import (
+            PostApiWebhooksV1EndpointsResponse201DataType1,
+        )
 
         d = dict(src_dict)
-        data = PostApiWebhooksV1EndpointsResponse201Data.from_dict(d.pop("data"))
+
+        def _parse_data(
+            data: object,
+        ) -> PostApiWebhooksV1EndpointsResponse201DataType0 | PostApiWebhooksV1EndpointsResponse201DataType1:
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                data_type_0 = PostApiWebhooksV1EndpointsResponse201DataType0.from_dict(data)
+
+                return data_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            data_type_1 = PostApiWebhooksV1EndpointsResponse201DataType1.from_dict(data)
+
+            return data_type_1
+
+        data = _parse_data(d.pop("data"))
 
         post_api_webhooks_v1_endpoints_response_201 = cls(
             data=data,

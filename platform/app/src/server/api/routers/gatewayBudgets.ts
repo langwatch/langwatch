@@ -18,8 +18,11 @@ import {
   providerLabelFor,
   resolveProviderLabels,
 } from "~/server/gateway/providerLabels";
+import {
+  resolveScopeTargetsBatch,
+  scopeTargetKey,
+} from "~/server/gateway/scopeTargets";
 
-import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeSchema = z.discriminatedUnion("kind", [
@@ -54,7 +57,7 @@ async function requireOrgAccess(
 export const gatewayBudgetsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
@@ -78,7 +81,8 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           ...toDto(b),
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-          scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+          scopeTarget:
+            scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
           providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
@@ -86,7 +90,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   listForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -113,7 +117,8 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           ...toDto(b),
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-          scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+          scopeTarget:
+            scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
           providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
@@ -121,7 +126,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:view"))
+    .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
@@ -166,7 +171,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
    */
   groupTargets: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:create"))
+    .permission("gatewayBudgets:create")
     .query(async ({ ctx, input }) => {
       const groups = await ctx.prisma.group.findMany({
         where: { organizationId: input.organizationId },
@@ -231,7 +236,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         allowUnreachable: z.boolean().optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:create"))
+    .permission("gatewayBudgets:create")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -266,7 +271,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         timezone: z.string().nullable().optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -281,7 +286,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("gatewayBudgets:delete"))
+    .permission("gatewayBudgets:delete")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -303,7 +308,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         reason: z.string().max(500).optional(),
       }),
     )
-    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
@@ -319,196 +324,6 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       return toDto(row);
     }),
 });
-
-export type BudgetListScopeTarget = {
-  kind: string;
-  id: string;
-  name: string;
-  secondary: string | null;
-  projectSlug?: string | null;
-  /** GROUP targets only: how many members the per-member allowance covers. */
-  memberCount?: number;
-};
-
-// Batch-resolves scope target (name + secondary) for a list of budgets,
-// grouping by scopeType so each scope gets at most one findMany. Detail
-// view uses the equivalent per-budget path in GatewayBudgetService; list
-// needed its own implementation to avoid N queries per page.
-async function resolveScopeTargetsBatch(
-  prisma: import("~/generated/prisma/client").PrismaClient,
-  budgets: Array<{ scopeType: string; scopeId: string }>,
-  organizationId: string | null,
-): Promise<Map<string, BudgetListScopeTarget>> {
-  const ids: Record<string, Set<string>> = {
-    ORGANIZATION: new Set(),
-    TEAM: new Set(),
-    PROJECT: new Set(),
-    VIRTUAL_KEY: new Set(),
-    PRINCIPAL: new Set(),
-    GROUP: new Set(),
-    ATTRIBUTED_USER: new Set(),
-  };
-  for (const b of budgets) {
-    ids[b.scopeType]?.add(b.scopeId);
-  }
-  const [orgs, teams, projects, vks, users, groups] = await Promise.all([
-    ids.ORGANIZATION?.size
-      ? prisma.organization.findMany({
-          where: { id: { in: [...ids.ORGANIZATION!] } },
-          select: { id: true, name: true, slug: true },
-        })
-      : Promise.resolve([]),
-    ids.TEAM?.size
-      ? prisma.team.findMany({
-          where: { id: { in: [...ids.TEAM!] } },
-          select: { id: true, name: true, slug: true },
-        })
-      : Promise.resolve([]),
-    ids.PROJECT?.size
-      ? prisma.project.findMany({
-          where: { id: { in: [...ids.PROJECT!] } },
-          select: { id: true, name: true, slug: true },
-        })
-      : Promise.resolve([]),
-    ids.VIRTUAL_KEY?.size && organizationId
-      ? prisma.virtualKey.findMany({
-          where: {
-            id: { in: [...ids.VIRTUAL_KEY!] },
-            organizationId,
-          },
-          select: {
-            id: true,
-            name: true,
-            displayPrefix: true,
-            scopes: {
-              where: { scopeType: "PROJECT" },
-              select: { scopeId: true },
-              take: 1,
-            },
-          },
-        })
-      : Promise.resolve([]),
-    ids.PRINCIPAL?.size
-      ? prisma.user.findMany({
-          where: { id: { in: [...ids.PRINCIPAL!] } },
-          select: { id: true, name: true, email: true },
-        })
-      : Promise.resolve([]),
-    ids.GROUP?.size && organizationId
-      ? prisma.group.findMany({
-          // Same tenant pin as the VIRTUAL_KEY branch: a stray scopeId
-          // must not surface another organization's group name.
-          where: { id: { in: [...ids.GROUP!] }, organizationId },
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            _count: { select: { members: true } },
-          },
-        })
-      : Promise.resolve([]),
-  ]);
-  const out = new Map<string, BudgetListScopeTarget>();
-  for (const o of orgs) {
-    out.set(`ORGANIZATION:${o.id}`, {
-      kind: "ORGANIZATION",
-      id: o.id,
-      name: o.name,
-      secondary: o.slug,
-    });
-  }
-  for (const t of teams) {
-    out.set(`TEAM:${t.id}`, {
-      kind: "TEAM",
-      id: t.id,
-      name: t.name,
-      secondary: t.slug,
-    });
-  }
-  for (const p of projects) {
-    out.set(`PROJECT:${p.id}`, {
-      kind: "PROJECT",
-      id: p.id,
-      name: p.name,
-      secondary: p.slug,
-    });
-  }
-  // Derive the project slug (if any) from the first PROJECT-scope row
-  // on the VK — used only as a UI breadcrumb. Cheap inline lookup; the
-  // batch is bounded by `ids.VIRTUAL_KEY.size`.
-  const projectIdsForSlugs = vks
-    .map((vk) => vk.scopes[0]?.scopeId)
-    .filter((id): id is string => typeof id === "string");
-  const projectSlugById = new Map<string, string>(
-    projectIdsForSlugs.length
-      ? (
-          await prisma.project.findMany({
-            where: { id: { in: projectIdsForSlugs } },
-            select: { id: true, slug: true },
-          })
-        ).map((p) => [p.id, p.slug])
-      : [],
-  );
-  for (const vk of vks) {
-    out.set(`VIRTUAL_KEY:${vk.id}`, {
-      kind: "VIRTUAL_KEY",
-      id: vk.id,
-      name: vk.name,
-      secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
-      projectSlug: projectSlugById.get(vk.scopes[0]?.scopeId ?? "") ?? null,
-    });
-  }
-  for (const u of users) {
-    out.set(`PRINCIPAL:${u.id}`, {
-      kind: "PRINCIPAL",
-      id: u.id,
-      name: u.name ?? u.email ?? u.id,
-      secondary: u.email ?? null,
-    });
-  }
-  for (const g of groups) {
-    out.set(`GROUP:${g.id}`, {
-      kind: "GROUP",
-      id: g.id,
-      name: g.name,
-      secondary: g.slug,
-      memberCount: g._count.members,
-    });
-  }
-  // A per-person template anchors on a virtual key or a project, and the
-  // scopeId alone does not say which, so both are asked for and the key
-  // wins where an id somehow matches both.
-  const anchorIds = [...(ids.ATTRIBUTED_USER ?? [])];
-  if (anchorIds.length > 0 && organizationId) {
-    const [anchorKeys, anchorProjects] = await Promise.all([
-      prisma.virtualKey.findMany({
-        where: { id: { in: anchorIds }, organizationId },
-        select: { id: true, name: true, displayPrefix: true },
-      }),
-      prisma.project.findMany({
-        where: { id: { in: anchorIds }, team: { organizationId } },
-        select: { id: true, name: true, slug: true },
-      }),
-    ]);
-    for (const p of anchorProjects) {
-      out.set(`ATTRIBUTED_USER:${p.id}`, {
-        kind: "ATTRIBUTED_USER",
-        id: p.id,
-        name: p.name,
-        secondary: p.slug,
-      });
-    }
-    for (const vk of anchorKeys) {
-      out.set(`ATTRIBUTED_USER:${vk.id}`, {
-        kind: "ATTRIBUTED_USER",
-        id: vk.id,
-        name: vk.name,
-        secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
-      });
-    }
-  }
-  return out;
-}
 
 function toDto(b: GatewayBudgetWithSeats) {
   // Computed, not read off the row: the stored columns only move at create

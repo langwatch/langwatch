@@ -1,5 +1,5 @@
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
-import { ArrowLeft, ExternalLink, Search } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { MainMenuSections } from "~/components/MainMenu";
 import { PersonalSidebarLinks } from "~/components/PersonalSidebar";
@@ -9,7 +9,7 @@ import { SupportMenu } from "~/components/sidebar/SupportMenu";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { ThemeToggle } from "~/components/sidebar/ThemeToggle";
 import { UsageIndicator } from "~/components/sidebar/UsageIndicator";
-import { useRevealActiveEntryOnLoad } from "~/components/sidebar/useRevealActiveEntryOnLoad";
+import { useMenuScrollPosition } from "~/components/sidebar/useMenuScrollPosition";
 import { useCommandBar } from "~/features/command-bar";
 import { getCommandBarShortcut } from "~/features/command-bar/utils/platform";
 import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
@@ -27,6 +27,7 @@ import {
 import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
+import { useVisibleSectionNavItems } from "../useVisibleSectionNavItems";
 import { QUIET_SIDEBAR_CHIP } from "./quietChipStyle";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
@@ -116,7 +117,7 @@ function SidebarBottomBlock({
           showLabel={showExpanded}
         />
       )}
-      <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
+      <SupportMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
@@ -224,9 +225,10 @@ function SectionItemsNav({
   showExpanded: boolean;
 }) {
   const pathname = usePathname();
+  const visibleItems = useVisibleSectionNavItems(items);
   return (
     <>
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <SideMenuLink
           key={item.href}
           icon={item.icon}
@@ -238,10 +240,6 @@ function SectionItemsNav({
               : pathname === item.href
           }
           showLabel={showExpanded}
-          isExternal={item.isExternal}
-          rightElement={
-            item.isExternal ? <ExternalLink size={12} aria-hidden /> : undefined
-          }
         />
       ))}
     </>
@@ -259,12 +257,7 @@ function ProductSidebarBody({
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
   if (surface === "me") {
-    return (
-      <PersonalSidebarLinks
-        showExpanded={showExpanded}
-        shouldIncludeGovernSection={false}
-      />
-    );
+    return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
   if (surface === "gateway") {
     return (
@@ -276,13 +269,7 @@ function ProductSidebarBody({
       <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
     );
   }
-  return (
-    <MainMenuSections
-      showExpanded={showExpanded}
-      shouldIncludeGovernSection={false}
-      shouldIncludeOpsSection={false}
-    />
-  );
+  return <MainMenuSections showExpanded={showExpanded} />;
 }
 
 /**
@@ -290,17 +277,21 @@ function ProductSidebarBody({
  * Search, the surface's own pages, and the bottom block pinned under
  * them. Laid out at the expanded width whatever the column is showing,
  * so a collapsing column slides the same content out of view instead of
- * reflowing it.
+ * reflowing it. The mobile menu reuses it at the full viewport width.
  */
-function SidebarContent({
+export function SidebarContent({
   surface,
   showExpanded,
+  isFullWidth = false,
 }: {
   surface: SidebarSurface;
   showExpanded: boolean;
+  isFullWidth?: boolean;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
-  useRevealActiveEntryOnLoad(scrollRegionRef);
+  // Keyed by surface: each product's menu keeps its own place, and moving
+  // between products never restores the place of the menu left behind.
+  useMenuScrollPosition({ regionRef: scrollRegionRef, menuKey: surface });
 
   return (
     <VStack
@@ -309,7 +300,7 @@ function SidebarContent({
       gap={0}
       height="100%"
       align="start"
-      width={SHELL_SIDEBAR_WIDTH_EXPANDED}
+      width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
       {/* The way back out of Settings sits above the scroll region, so a

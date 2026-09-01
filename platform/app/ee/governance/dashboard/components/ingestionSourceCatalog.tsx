@@ -63,6 +63,25 @@ export interface SourceTypeOption {
   mode: SourceMode;
   blurb: string;
   icon: React.ReactNode;
+  /**
+   * True when this source's events are conversations that can be read in
+   * the trace explorer, so a trace destination is worth offering.
+   *
+   * Read `routesConversations` rather than this field — it enforces the
+   * push-mode exclusion the flag alone cannot. See ADR-088 Decision 8.
+   */
+  routesConversations?: boolean;
+  /**
+   * True when this source type may no longer be chosen for a new source,
+   * but rows already configured on it still exist and must keep rendering.
+   *
+   * Deprecating rather than deleting is deliberate. The completeness guard
+   * below requires every `SourceType` to appear here, and `SOURCE_TYPE_LABEL`
+   * is built from this list and read without a fallback on the inventory
+   * page — so removing an entry stops the build, and forcing it through
+   * would turn an existing source's name into a blank.
+   */
+  deprecated?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -105,8 +124,20 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Microsoft Copilot Studio (Purview)",
     mode: "pull",
     blurb:
-      "Polls Microsoft Purview Audit API for Copilot Studio activity. Needs an Azure AD app registration with `AuditLog.Read.All` permission.",
+      "Retired. This source polled Microsoft's directory audit, which records changes to the directory and has never contained a Copilot conversation.",
     icon: <Microsoft />,
+    // Kept so existing rows keep their label and the guards below still
+    // compile; filtered out of the picker by `gatedSourceTypeOptions`.
+    deprecated: true,
+  },
+  {
+    value: "copilot_studio_dataverse",
+    label: "Microsoft Copilot Studio",
+    mode: "pull",
+    blurb:
+      "Reads Copilot Studio conversations from your Power Platform environment. Needs an app registration with a client secret and a Dataverse role that can read the conversation transcript and bot tables — no directory permission of any kind.",
+    icon: <Microsoft />,
+    routesConversations: true,
   },
   {
     value: "openai_compliance",
@@ -114,6 +145,14 @@ export const SOURCE_TYPE_OPTIONS = [
     mode: "s3",
     blurb:
       "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
+    icon: <OpenAI />,
+  },
+  {
+    value: "openai_admin",
+    label: "OpenAI Admin",
+    mode: "pull",
+    blurb:
+      "Reads your OpenAI organization's daily spend with an Admin API key (sk-admin-...), broken down by project, line item, the person who spent it and the API key it was billed to. A regular project key is refused. Only ever create one per organization — a second source would count the same spend twice.",
     icon: <OpenAI />,
   },
   {
@@ -128,7 +167,7 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Anthropic Admin API (usage & cost)",
     mode: "pull",
     blurb:
-      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
     icon: <Anthropic />,
   },
   {
@@ -138,6 +177,7 @@ export const SOURCE_TYPE_OPTIONS = [
     blurb:
       "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
     icon: <Databricks />,
+    routesConversations: true,
   },
   {
     value: "s3_custom",
@@ -172,6 +212,66 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
   SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<SourceType, string>;
 
+export const PROTOCOL_LABEL: Record<SourceMode, string> = {
+  push: "OTel push",
+  pull: "API pull",
+  s3: "S3 pull",
+};
+
+export function modeForSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): SourceMode {
+  return (
+    SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull"
+  );
+}
+
+export function needsIngestSecret({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  const opt = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  if (!opt) return true;
+  return opt.mode === "push" || sourceType === "s3_custom";
+}
+
+// Compile-time guard: routing runs inside `writePulledEvents`
+// (`pullers/pullerWorker.ts:325`), which nothing on the push path ever calls.
+// A push-mode entry claiming `routesConversations` would put a picker in the
+// drawer that changes nothing a customer can observe, so it stops the build
+// here rather than shipping a dead control. Bracketed so the `never` case
+// does not go vacuously true.
+type PushTypeClaimingConversations = Extract<
+  (typeof SOURCE_TYPE_OPTIONS)[number],
+  { mode: "push"; routesConversations: true }
+>;
+const _noPushTypeRoutesConversations: [PushTypeClaimingConversations] extends [
+  never,
+]
+  ? true
+  : never = true;
+void _noPushTypeRoutesConversations;
+
+/**
+ * Whether a source of this type produces conversations that land in a trace
+ * destination — and therefore whether the drawers should offer a destination
+ * picker at all.
+ *
+ * Today the answer is Genie alone, because the worker routes only events
+ * whose action is `genie_query` (`pullers/genieTraceMapper.ts:239`). That gate
+ * lives in server code this bundle must not import, so the two are kept in
+ * step by declaration plus test rather than by a shared constant — see
+ * `__tests__/conversationRoutingSourceTypes.unit.test.ts`. An adapter that
+ * starts emitting conversations must flip its entry here in the same change.
+ */
+export function routesConversations(sourceType: SourceType): boolean {
+  const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  return option?.routesConversations === true;
+}
+
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
   locked: boolean;
@@ -190,10 +290,12 @@ export function gatedSourceTypeOptions({
 }: {
   isEnterprise: boolean;
 }): GatedSourceTypeOption[] {
-  return SOURCE_TYPE_OPTIONS.map((option) => ({
-    ...option,
-    locked: !isEnterprise && option.value !== "otel_generic",
-  }));
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated).map(
+    (option) => ({
+      ...option,
+      locked: !isEnterprise && option.value !== "otel_generic",
+    }),
+  );
 }
 
 /**
@@ -210,6 +312,7 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "claude_compliance",
   "anthropic_admin",
   "openai_compliance",
+  "openai_admin",
   "http_custom",
 ]);
 

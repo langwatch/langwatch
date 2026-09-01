@@ -1,0 +1,270 @@
+---
+title: Write Scenarios in Code
+sidebarTitle: Scenarios in code
+keywords: langwatch, agent testing, scenario sdk, python, typescript, setId, batchId, code-first
+description: Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner, and see every run in LangWatch.
+---
+
+<Tip>
+  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add scenario tests automatically.
+</Tip>
+
+The Scenario SDK is open source and runs inside your own test runner and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-testing/connect-your-agent).
+
+This guide will walk you through the basic setup required to run your first scenario and see the results in LangWatch.
+
+For advanced use cases, see the [`scenario` library documentation](https://github.com/langwatch/scenario).
+
+## 1. Installation
+
+Install the `scenario` library in your project:
+
+<Tabs>
+  <Tab title="Python">
+  ```bash
+  uv add langwatch-scenario
+  ```
+  </Tab>
+  <Tab title="TypeScript">
+  ```bash
+  npm install @langwatch/scenario
+  ```
+  </Tab>
+</Tabs>
+
+## 2. Configure Environment Variables
+
+Create a `.env` file in the root of your project:
+
+```bash title=".env"
+LANGWATCH_API_KEY="your-api-key"
+LANGWATCH_ENDPOINT="https://app.langwatch.ai"
+```
+
+You can find your `LANGWATCH_API_KEY` in your [LangWatch project settings](https://app.langwatch.ai/settings).
+
+## 3. Create a Basic Scenario
+
+Create an agent adapter that calls your agent, then run a scenario against it. For the integration patterns, see the [agent integration guide](https://langwatch.ai/scenario/agent-integration/).
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import pytest
+    import scenario
+    import litellm
+
+    # Configure the default model for simulations
+    scenario.configure(default_model="openai/gpt-5")
+
+    @pytest.mark.agent_test
+    @pytest.mark.asyncio
+    async def test_vegetarian_recipe_agent():
+        # 1. Create your agent adapter
+        class RecipeAgent(scenario.AgentAdapter):
+            async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+                return vegetarian_recipe_agent(input.messages)
+
+        # 2. Run the scenario
+        result = await scenario.run(
+            name="dinner recipe request",
+            description="""
+                It's saturday evening, the user is very hungry and tired,
+                but have no money to order out, so they are looking for a recipe.
+            """,
+            agents=[
+                RecipeAgent(),
+                scenario.UserSimulatorAgent(),
+                scenario.JudgeAgent(criteria=[
+                    "Agent should not ask more than two follow-up questions",
+                    "Agent should generate a recipe",
+                    "Recipe should include a list of ingredients",
+                    "Recipe should include step-by-step cooking instructions",
+                    "Recipe should be vegetarian and not include any sort of meat",
+                ])
+            ],
+        )
+
+        # 3. Assert the result
+        assert result.success
+
+    # Example agent implementation using litellm
+    @scenario.cache()
+    def vegetarian_recipe_agent(messages) -> scenario.AgentReturnTypes:
+        response = litellm.completion(
+            model="openai/gpt-5",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                        You are a vegetarian recipe agent.
+                        Given the user request, ask AT MOST ONE follow-up question,
+                        then provide a complete recipe. Keep your responses concise and focused.
+                    """,
+                },
+                *messages,
+            ],
+        )
+        return response.choices[0].message
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    // weather.test.ts
+    import { describe, it, expect } from "vitest";
+    import { openai } from "@ai-sdk/openai";
+    import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
+    import { generateText, tool } from "ai";
+    import { z } from "zod";
+
+    describe("Weather Agent", () => {
+      it("should get the weather for a city", async () => {
+        // 1. Define the tools your agent can use
+        const getCurrentWeather = tool({
+          description: "Get the current weather in a given city.",
+          parameters: z.object({
+            city: z.string().describe("The city to get the weather for."),
+          }),
+          execute: async ({ city }) => `The weather in ${city} is cloudy with a temperature of 24°C.`,
+        });
+
+        // 2. Create an adapter for your agent
+        const weatherAgent: AgentAdapter = {
+          role: AgentRole.AGENT,
+          call: async (input) => {
+            const response = await generateText({
+              model: openai("gpt-5"),
+              system: `You are a helpful assistant that may help the user with weather information.`,
+              messages: input.messages,
+              tools: { get_current_weather: getCurrentWeather },
+            });
+
+            if (response.toolCalls?.length) {
+              // For simplicity, we'll just return the arguments of the first tool call
+              const { toolName, args } = response.toolCalls[0];
+              return {
+                role: "tool",
+                content: [{ type: "tool-result", toolName, result: args }],
+              };
+            }
+
+            return response.text;
+          },
+        };
+
+        // 3. Define and run your scenario
+        const result = await scenario.run({
+          name: "Checking the weather",
+          description: "The user asks for the weather in a specific city, and the agent should use the weather tool to find it.",
+          agents: [
+            weatherAgent,
+            scenario.userSimulatorAgent({ model: openai("gpt-5") }),
+          ],
+          script: [
+            scenario.user("What's the weather like in Barcelona?"),
+            scenario.agent(),
+            // You can use inline assertions within your script
+            (state) => {
+              expect(state.hasToolCall("get_current_weather")).toBe(true);
+            },
+            scenario.succeed("Agent correctly used the weather tool."),
+          ],
+        });
+
+        // 4. Assert the final result
+        expect(result.success).toBe(true);
+      });
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+Run the test. The scenario run appears under **Agent Testing > Results** in your LangWatch project.
+
+## 4. Grouping Your Scenarios into Test Suites and Batches
+
+Set stable identifiers for your scenarios, test suites and batches, so LangWatch groups the runs the same way every time:
+
+- **`id`**: A unique and stable identifier for your scenario. Without it, the id comes from the `name`, and renaming the test starts a new history.
+- **`setId`**: The test suite of the scenario. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
+- **`batchId`**: Groups every scenario run together in one execution, for example one CI job. A CI variable such as `process.env.GITHUB_RUN_ID` is a good value.
+
+<Frame>
+<img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite on the Scenarios tab, with the scenarios of the setId and their last run" />
+</Frame>
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import os
+
+    result = await scenario.run(
+        id="vegetarian-recipe-scenario",
+        name="dinner recipe request",
+        description="Test that the agent can provide vegetarian recipes.",
+        set_id="recipe-test-suite",
+        batch_id=os.environ.get("GITHUB_RUN_ID", "local-run"),
+        agents=[
+            RecipeAgent(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(criteria=[
+                "Agent should generate a recipe",
+                "Recipe should be vegetarian",
+            ])
+        ]
+    )
+    ```
+
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = await scenario.run({
+        id: "weather-check-scenario",
+        name: "Checking the weather",
+        description: "Test that the agent can check weather using tools.",
+        setId: "weather-test-suite",
+        batchId: process.env.GITHUB_RUN_ID ?? "local-run",
+        agents: [
+            weatherAgent,
+            scenario.userSimulatorAgent({ model: openai("gpt-5") }),
+        ],
+        script: [
+            scenario.user("What's the weather like in Barcelona?"),
+            scenario.agent(),
+            (state) => {
+                expect(state.hasToolCall("get_current_weather")).toBe(true);
+            },
+            scenario.succeed("Agent correctly used the weather tool."),
+        ],
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## 5. Let the Judge Read Your Traces
+
+When your adapter calls an agent that runs as a separate service, the judge cannot see what happens inside it. Turn on trace fetching and the judge also reads the traces your agent reports to LangWatch, one per conversation turn, before its verdict:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    scenario.configure(
+        default_model="openai/gpt-5",
+        fetch_remote_traces=True,
+        trace_wait_timeout=60.0,  # seconds to wait for traces before the verdict
+    )
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = await scenario.run({
+      // ...
+      fetchRemoteTraces: true,
+      traceWaitTimeoutMs: 60_000,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-testing/linking-your-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.

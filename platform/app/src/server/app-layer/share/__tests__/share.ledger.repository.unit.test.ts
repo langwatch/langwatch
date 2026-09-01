@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "../../authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import type { ShareRepository } from "../repositories/share.repository";
@@ -104,15 +104,15 @@ function buildRepository({
   const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
     run({ grantUsage, shareLink: { update: compatMirror } }),
   );
-  const cutoverFindUnique = vi.fn().mockResolvedValue({ onEngine });
+  const cutoverFindUnique = vi
+    .fn()
+    .mockResolvedValue(onEngine ? { status: "finalized" } : null);
   const prisma = {
+    systemMigrationTenantState: { findUnique: cutoverFindUnique },
     project: {
       findUnique: vi
         .fn()
         .mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
-    },
-    authzCutoverProjection: {
-      findUnique: cutoverFindUnique,
     },
     grant: { findMany: grantFindMany },
     grantUsage: rootGrantUsage,
@@ -151,10 +151,10 @@ const createParams = {
 
 describe("LedgerShareRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
 
   describe("given the organization has not been cut over", () => {
@@ -347,7 +347,7 @@ describe("LedgerShareRepository", () => {
         expect(grantFindMany).not.toHaveBeenCalled();
       });
 
-      /** @scenario "A revocation never appends a fact for a link outside the caller's project" */
+      /** @scenario "A revocation never touches a resource outside the caller's project" */
       it("appends nothing for an id neither head anchors to the project", async () => {
         const { repository, legacy, writer } = buildRepository({
           onEngine: true,
@@ -366,7 +366,7 @@ describe("LedgerShareRepository", () => {
     });
 
     describe("when the routing gate is stale or failing", () => {
-      /** @scenario "Revocation routing never trusts a cached gate answer" */
+      /** @scenario "Revocation routing never trusts a cached answer" */
       it("routes a revoke on the uncached projection read, past a stale cached answer", async () => {
         const { repository, legacy, writer, cutoverFindUnique } =
           buildRepository({ onEngine: false });
@@ -380,7 +380,7 @@ describe("LedgerShareRepository", () => {
           maxViews: null,
         });
         expect(legacy.consumeView).toHaveBeenCalledTimes(1);
-        cutoverFindUnique.mockResolvedValue({ onEngine: true });
+        cutoverFindUnique.mockResolvedValue({ status: "finalized" });
 
         await repository.deleteById({ id: "share_1", projectId: PROJECT_ID });
 
@@ -433,6 +433,7 @@ describe("LedgerShareRepository", () => {
             scopeType: "RESOURCE",
             resourceKind: "TRACE",
             scopeId: TRACE_ID,
+            revokedAt: null,
           },
           select: { id: true },
         });
@@ -500,6 +501,7 @@ describe("LedgerShareRepository", () => {
             projectId: PROJECT_ID,
             scopeType: "RESOURCE",
             resourceKind: "TRACE",
+            revokedAt: null,
           },
           select: { id: true },
         });

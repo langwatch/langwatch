@@ -152,12 +152,18 @@ function makeRelay(
       conversationId: string;
       turnId: string;
     }) => Promise<string | null>;
+    refreshHandoffTtl?: (a: {
+      conversationId: string;
+      turnId: string;
+    }) => Promise<void>;
   } = {},
 ) {
   const buffer = fakeBuffer();
   const conversations = over.conversations ?? fakeConversations();
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
+  const refreshHandoffTtl =
+    over.refreshHandoffTtl ?? vi.fn(async () => undefined);
   const relay = new LangyTurnRelay({
     buffer,
     conversations,
@@ -165,12 +171,20 @@ function makeRelay(
     ...(over.readHandoffRunToken
       ? { readHandoffRunToken: over.readHandoffRunToken }
       : {}),
+    refreshHandoffTtl,
     resourceLinks,
     ...(over.resolveResourceUrl
       ? { resolveResourceUrl: over.resolveResourceUrl }
       : {}),
   });
-  return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
+  return {
+    relay,
+    buffer,
+    conversations,
+    reserveFrameNonce,
+    resourceLinks,
+    refreshHandoffTtl,
+  };
 }
 
 /** A real signed envelope for a payload object. */
@@ -211,6 +225,32 @@ describe("LangyTurnRelay", () => {
     it("routes a heartbeat to liveness with no content", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "heartbeat" }));
+      expect(buffer.heartbeat).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat keeps the turn's revival record alive" */
+    it("extends the turn's handoff on the same heartbeat", async () => {
+      const { relay, refreshHandoffTtl } = makeRelay();
+      await relay.handle(frame({ type: "heartbeat" }));
+      expect(refreshHandoffTtl).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    it("still counts the heartbeat when the handoff store refuses", async () => {
+      const refreshHandoffTtl = vi.fn(async () => {
+        throw new Error("redis unavailable");
+      });
+      const { relay, buffer } = makeRelay({ refreshHandoffTtl });
+
+      const out = await relay.handle(frame({ type: "heartbeat" }));
+
+      expect(out).toEqual({ status: "applied" });
       expect(buffer.heartbeat).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
@@ -618,6 +658,47 @@ describe("LangyTurnRelay", () => {
       // renders and records like any other shell call.
       expect(buffer.appendTool).toHaveBeenCalled();
       expect(conversations.recordToolCallCompleted).toHaveBeenCalled();
+    });
+
+    /** @scenario "A chained lookup-and-open compound resolves through the platform fallback" */
+    it("resolves a CHAINED lookup-and-open through the platform fallback when the link store is empty", async () => {
+      // The reported failure: "take me to the prompt playground" made the
+      // model run ONE compound call (`langwatch prompt list --format json &&
+      // langwatch navigate open prompt_x`). Compound stdout never seeds the
+      // link store (stdout provenance), so the store is EMPTY, and the old
+      // fallback resolved only scenariorun_ ids, so the navigate silently
+      // dropped for every other resource. The fallback table must answer.
+      const resolveResourceUrl = vi.fn(
+        async () => "https://app.langwatch.ai/acme/prompts?promptId=prompt_x",
+      );
+      const { relay, buffer } = makeRelay({ resolveResourceUrl });
+
+      const command =
+        "langwatch prompt list --format json && langwatch navigate open prompt_x";
+      for (const phase of [
+        { phase: "start" as const },
+        { phase: "end" as const, output: "ok" },
+      ]) {
+        await relay.handle(
+          frame({
+            type: "tool",
+            id: "call-prompt-chained",
+            name: "bash",
+            ...phase,
+            input: { command },
+          }),
+        );
+      }
+
+      expect(resolveResourceUrl).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        resourceId: "prompt_x",
+      });
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/prompts?promptId=prompt_x",
+      });
     });
 
     it("falls back to the platform's own verified lookup when the conversation never remembered the id", async () => {

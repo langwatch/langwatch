@@ -6,7 +6,6 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
 import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
-import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
@@ -105,7 +104,7 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
     .input(projectSchema.extend(dateRangeFields))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId },
@@ -131,7 +130,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -153,6 +152,28 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // The latest run result per scenario inside the window, for the
+  // last-result cells of the scenarios table. Separate from the scenario list read on
+  // purpose: the list renders instantly and these cells stream in.
+  getLastResultSummaries: protectedProcedure
+    .input(
+      projectSchema
+        .extend({
+          scenarioIds: z.array(z.string()).optional(),
+        })
+        .extend(dateRangeFields),
+    )
+    .permission("scenarios:view")
+    .query(async ({ input }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      return service.getLastResultSummaries({
+        projectId: input.projectId,
+        scenarioIds: input.scenarioIds,
+        ...dates,
+      });
+    }),
+
   // Cheap freshness probe for the run history views: returns only the latest
   // UpdatedAt across the project's runs in the window. Clients poll this tiny
   // response and invalidate getSuiteRunData only when the value advances,
@@ -163,7 +184,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string().optional() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
@@ -186,7 +207,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -218,7 +239,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
@@ -241,7 +262,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioRunId: z.string(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioRunId: input.scenarioRunId },
@@ -271,7 +292,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend({ scenarioSetId: z.string() })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
@@ -298,7 +319,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -329,7 +350,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         runTimestamps: z.record(z.string(), z.number()).optional(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -354,7 +375,7 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get summaries for external (SDK/CI) scenario sets
   getExternalSetSummaries: protectedProcedure
     .input(projectSchema.extend(dateRangeFields))
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         { projectId: input.projectId },
@@ -380,7 +401,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         })
         .extend(dateRangeFields),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       logger.debug(
         {
@@ -411,7 +432,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         tabId: z.string().min(1).max(200).optional(),
       }),
     )
-    .use(checkProjectPermission("scenarios:view"))
+    .permission("scenarios:view")
     .subscription(async function* (opts) {
       const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);

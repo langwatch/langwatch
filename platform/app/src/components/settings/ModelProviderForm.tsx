@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   findModelProviderById,
   isResolvableProviderId,
@@ -50,6 +51,7 @@ import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 // section on the model-providers settings page (DefaultModelsSection). See
 // specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ModelProviderRoutingSection } from "./ModelProviderRoutingSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
@@ -106,6 +108,7 @@ export const EditModelProviderForm = ({
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -535,6 +538,14 @@ export const EditModelProviderForm = ({
           actions={actions}
           provider={provider}
         />
+
+        {isLlmProvider && (
+          <ModelProviderRoutingSection
+            providerKey={provider.provider}
+            routingHandle={state.routingHandle}
+            onRoutingHandleChange={actions.setRoutingHandle}
+          />
+        )}
 
         {isLlmProvider && !isOAuthDeviceProvider && (
           <CustomModelInputSection

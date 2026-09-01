@@ -5,7 +5,6 @@ import { getApp } from "~/server/app-layer/app";
 import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { rateLimit } from "../../rateLimit";
-import { checkProjectPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 /**
@@ -46,7 +45,10 @@ export const emailSuppressionRouter = createTRPCRouter({
    */
   resolveUnsubscribeToken: publicProcedure
     .input(z.object({ token: z.string().min(1) }))
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "unsubscribe flows are gated by the single-purpose token in the link, not by a role",
+    })
     .query(async ({ input, ctx }) => {
       await enforceUnsubscribeRateLimit({
         ip: getClientIp(ctx.req),
@@ -74,7 +76,10 @@ export const emailSuppressionRouter = createTRPCRouter({
         scope: z.enum(["trigger", "project"]),
       }),
     )
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "unsubscribe flows are gated by the single-purpose token in the link, not by a role",
+    })
     .mutation(async ({ input, ctx }) => {
       await enforceUnsubscribeRateLimit({
         ip: getClientIp(ctx.req),
@@ -109,7 +114,7 @@ export const emailSuppressionRouter = createTRPCRouter({
    *  scope without a second round-trip. */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input, ctx }) => {
       const rows = await getApp().emailSuppressions.getAllEnriched({
         projectId: input.projectId,
@@ -142,7 +147,7 @@ export const emailSuppressionRouter = createTRPCRouter({
   /** Removing a suppression resumes delivery — a deliberate operator action. */
   remove: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("triggers:manage"))
+    .permission("triggers:manage")
     .mutation(async ({ input, ctx }) => {
       await getApp().emailSuppressions.remove({
         projectId: input.projectId,

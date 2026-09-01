@@ -23,23 +23,40 @@
  */
 import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { createLogger } from "@langwatch/observability";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import type { SourceType } from "../activity-monitor/ingestionSource.service";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import type {
+  ConversationRoutingProfile,
+  RoutingOrigin,
+} from "./conversationTraceAssembly";
+import {
+  COPILOT_ROUTING_PROFILE,
+  mapCopilotEventsToTraceRequest,
+} from "./copilotStudioTraceMapper";
+import {
+  GENIE_ROUTING_PROFILE,
+  mapGenieEventsToTraceRequest,
+} from "./genieTraceMapper";
 import {
   type NormalizedPullEvent,
+  type PullerAdapter,
   type PullResult,
   pullerAdapterRegistry,
   registerBuiltInPullers,
@@ -121,31 +138,20 @@ export interface PulledUsageDispatcher {
   ): Promise<void>;
 }
 
-export async function runIngestionPull(params: {
-  sourceId: string;
-  cursor: string | null;
-  pulledUsage?: PulledUsageDispatcher;
-}): Promise<{ nextCursor: string | null; eventCount: number }> {
-  registerBuiltInPullers();
+/**
+ * Answers what a source's `pullConfig` says to run, and refuses the run when it
+ * does not name a registered adapter or does not validate against one.
+ *
+ * Split out of `runIngestionPull` so the dispatcher reads as the sequence it
+ * documents — resolve, run, write — instead of as a guard chain wrapped around
+ * a single call.
+ */
+function resolvePullAdapter(params: {
+  ingestionSourceId: string;
+  pullConfig: Record<string, unknown>;
+}): { adapterId: string; adapter: PullerAdapter; validatedConfig: unknown } {
+  const { ingestionSourceId, pullConfig } = params;
 
-  const ingestionSourceId = params.sourceId;
-  logger.info({ ingestionSourceId }, "puller run start");
-
-  const source = await prisma.ingestionSource.findUnique({
-    where: { id: ingestionSourceId },
-  });
-  if (!source) {
-    throw new Error(`IngestionSource ${ingestionSourceId} not found`);
-  }
-  if (source.status !== "active" && source.status !== "awaiting_first_event") {
-    logger.info(
-      { ingestionSourceId, status: source.status },
-      "IngestionSource not active, skipping",
-    );
-    return { nextCursor: params.cursor, eventCount: 0 };
-  }
-
-  const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
   const adapterId = pullConfig.adapter;
   if (typeof adapterId !== "string") {
     logger.warn(
@@ -154,6 +160,7 @@ export async function runIngestionPull(params: {
     );
     throw new Error("IngestionSource has no pullConfig.adapter");
   }
+
   const adapter = pullerAdapterRegistry.get(adapterId);
   if (!adapter) {
     logger.error(
@@ -163,9 +170,12 @@ export async function runIngestionPull(params: {
     throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
   }
 
-  let validatedConfig: unknown;
   try {
-    validatedConfig = adapter.validateConfig(pullConfig);
+    return {
+      adapterId,
+      adapter,
+      validatedConfig: adapter.validateConfig(pullConfig),
+    };
   } catch (error) {
     logger.error(
       { ingestionSourceId, adapterId, error },
@@ -173,20 +183,39 @@ export async function runIngestionPull(params: {
     );
     throw error;
   }
+}
 
-  const credentials = decryptCredentials(pullConfig.credentials);
+/**
+ * Run the adapter once under the job deadline, reporting a throw rather than
+ * letting it pass silently. Rethrows: a run that did not finish leaves the
+ * durable cursor where it was, so the window is retried rather than skipped.
+ */
+async function runAdapterOnce(params: {
+  adapter: PullerAdapter;
+  adapterId: string;
+  ingestionSourceId: string;
+  organizationId: string;
+  cursor: string | null;
+  credentials: Record<string, string>;
+  validatedConfig: unknown;
+}): Promise<PullResult> {
+  const {
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId,
+    cursor,
+    credentials,
+    validatedConfig,
+  } = params;
 
-  let result: PullResult;
   try {
-    result = await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
+    return await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
       adapter.runOnce(
         {
-          cursor: params.cursor,
+          cursor,
           credentials,
-          context: {
-            organizationId: source.organizationId,
-            ingestionSourceId: source.id,
-          },
+          context: { organizationId, ingestionSourceId },
           deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
           signal,
         },
@@ -205,12 +234,117 @@ export async function runIngestionPull(params: {
     });
     throw error;
   }
+}
 
-  if (result.errorCount > 0) {
+/**
+ * Decide whether a run that reported errors still counts as progress, and fail
+ * it when it does not.
+ *
+ * `errorCount > 0` means two different things, and the cursor the adapter
+ * handed back is what tells them apart.
+ *
+ *   - The cursor MOVED: the adapter deliberately stepped past input it could
+ *     not read (s3_polling does this for a malformed line and for an object it
+ *     could not fetch at all). Failing the run here would throw away both the
+ *     events it did collect and the advance, so the next run would re-read the
+ *     same unreadable object and the source would never make progress again.
+ *     That is a partial success: write, persist, and say so loudly.
+ *   - The cursor is UNCHANGED: the adapter could not make progress at all
+ *     (http_polling, anthropic_admin and databricks_genie all return the
+ *     incoming cursor when their transport fails). Nothing was read, so the run
+ *     fails and the outbox retries the same window.
+ *
+ * A null cursor is never an advance. It is the "no cursor yet / drained"
+ * sentinel, so persisting it against a non-null incoming cursor would rewind
+ * the source to the beginning rather than move it forward.
+ */
+function assertRunMadeProgress(params: {
+  result: PullResult;
+  incomingCursor: string | null;
+  ingestionSourceId: string;
+  adapterId: string;
+}): void {
+  const { result, incomingCursor, ingestionSourceId, adapterId } = params;
+  if (result.errorCount === 0) return;
+
+  const cursorAdvanced =
+    result.cursor !== null && result.cursor !== incomingCursor;
+  if (!cursorAdvanced) {
     throw new Error(
       `Ingestion pull adapter reported ${result.errorCount} error(s)`,
     );
   }
+
+  logger.warn(
+    {
+      ingestionSourceId,
+      adapterId,
+      errorCount: result.errorCount,
+      eventCount: result.events.length,
+      fromCursor: incomingCursor,
+      toCursor: result.cursor,
+    },
+    "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
+  );
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
+}): Promise<{
+  nextCursor: string | null;
+  eventCount: number;
+  /**
+   * Items the adapter could not read on a run that still made progress. Zero on
+   * a clean run; a run that reported errors WITHOUT advancing its cursor throws
+   * instead of returning, so a nonzero value here always means partial success.
+   */
+  errorCount: number;
+}> {
+  registerBuiltInPullers();
+
+  const ingestionSourceId = params.sourceId;
+  logger.info({ ingestionSourceId }, "puller run start");
+
+  const source = await prisma.ingestionSource.findUnique({
+    where: { id: ingestionSourceId },
+  });
+  if (!source) {
+    throw new Error(`IngestionSource ${ingestionSourceId} not found`);
+  }
+  if (source.status !== "active" && source.status !== "awaiting_first_event") {
+    logger.info(
+      { ingestionSourceId, status: source.status },
+      "IngestionSource not active, skipping",
+    );
+    return { nextCursor: params.cursor, eventCount: 0, errorCount: 0 };
+  }
+
+  const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
+  const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
+    ingestionSourceId,
+    pullConfig,
+  });
+
+  const credentials = decryptCredentials(pullConfig.credentials);
+
+  const result = await runAdapterOnce({
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId: source.organizationId,
+    cursor: params.cursor,
+    credentials,
+    validatedConfig,
+  });
+
+  assertRunMadeProgress({
+    result,
+    incomingCursor: params.cursor,
+    ingestionSourceId,
+    adapterId,
+  });
 
   if (result.events.length > 0) {
     await writePulledEvents({
@@ -239,15 +373,21 @@ export async function runIngestionPull(params: {
     },
     "puller run done",
   );
-  return { nextCursor: result.cursor, eventCount: result.events.length };
+  return {
+    nextCursor: result.cursor,
+    eventCount: result.events.length,
+    errorCount: result.errorCount,
+  };
 }
 
-/** The IngestionSource fields the two write paths below actually read. */
+/** The IngestionSource fields the write paths below actually read. */
 type PullingSource = {
   id: string;
   sourceType: string;
   organizationId: string;
   teamId: string | null;
+  /** ADR-088 v7: trace destination for conversation routing. Null = don't route. */
+  traceProjectId: string | null;
 };
 
 /**
@@ -318,6 +458,189 @@ async function writePulledEvents({
       pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
     });
   }
+  await routeConversationsToTraceDestination({ events, source });
+}
+
+/**
+ * The source types that carry conversations, and what each contributes to
+ * the ones it routes. A type absent from here routes nothing — which is the
+ * honest answer for a source that pulls totals rather than conversations.
+ *
+ * The composer keeps its own list (`routesConversations` in
+ * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
+ * all. The two are deliberately separate: that one shapes a form, this one
+ * decides what reaches a customer's project.
+ */
+// A Map, not an object literal: `sourceType` is a free-form column read back
+// from the database, and indexing an object with it answers "constructor",
+// "toString" or "__proto__" with a truthy prototype member. That would pass
+// the guard below with a profile whose `conversationAction` is undefined —
+// which an event carrying no action then matches, routing a fabricated span
+// into a customer's project. A Map has no prototype keys to inherit.
+//
+// Keys are declared `SourceType` so a misspelled entry fails the build, but the
+// map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
+// database column: narrowing the lookup would only force a cast at the call.
+/**
+ * A source's profile travels with the mapper that reads its payloads. The two
+ * cannot be chosen independently: a profile names the action a source calls a
+ * conversation, and the mapper is what knows how to read the rows carrying
+ * that action. Pairing them here means adding a source is one entry rather
+ * than two that can disagree.
+ */
+interface ConversationRouting {
+  profile: ConversationRoutingProfile;
+  map: (args: {
+    events: NormalizedPullEvent[];
+    origin: RoutingOrigin;
+  }) => IExportTraceServiceRequest | null;
+}
+
+const CONVERSATION_ROUTING_BY_SOURCE_TYPE: ReadonlyMap<
+  string,
+  ConversationRouting
+> = new Map<SourceType, ConversationRouting>([
+  [
+    "databricks_genie",
+    { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest },
+  ],
+  [
+    "copilot_studio_dataverse",
+    {
+      profile: COPILOT_ROUTING_PROFILE,
+      map: mapCopilotEventsToTraceRequest,
+    },
+  ],
+]);
+
+/**
+ * The registry's only reader outside this module.
+ *
+ * Routing nothing is also what a missing action does, so a test that only
+ * watches behaviour cannot tell the prototype-key guard from the action one —
+ * it needs to read the lookup. It reads it through here rather than through
+ * the map itself: `ReadonlyMap` is a compile-time promise, so exporting the
+ * map would hand every module a registry one cast away from accepting a
+ * source type nobody wrote a conversation shape for. Which is the thing this
+ * whole path exists to refuse.
+ */
+export function conversationRoutingProfileFor(
+  sourceType: string,
+): ConversationRoutingProfile | undefined {
+  return CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(sourceType)?.profile;
+}
+
+/**
+ * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
+ * flow through the standard trace door into the source's chosen destination
+ * project. Aggregate pulls never route, and neither does a source with no
+ * entry in `CONVERSATION_ROUTING_BY_SOURCE_TYPE`; a source that has one routes the
+ * events its own profile names as conversations.
+ *
+ * Tenancy + redaction (Decision 13): the destination project id is the tenant,
+ * and the redaction level passed is the same `DEFAULT_PII_REDACTION_LEVEL`
+ * every receiver passes — the pipeline's own per-tenant policy lookup is the
+ * sole authority. This worker must never compute a level: at the default tier
+ * a caller-passed level has unchecked authority.
+ *
+ * A destination that has been archived or deleted since it was configured
+ * stops routing (skip + log) rather than failing the run — a stale column
+ * must not stall the audit pull forever. Any other routing failure throws:
+ * the audit rows are already durable on their replacing key and trace ids
+ * are deterministic, so the whole-window retry is a safe no-op re-send.
+ *
+ * That includes the failures the trace door *returns* instead of throwing.
+ * `handleOtlpTraceRequest` swallows per-span outcomes into counters, so a
+ * queue or Redis outage comes back as a resolved promise carrying
+ * `ingestionFailures`. Left unread, `writePulledEvents` completes, the cursor
+ * advances, and the conversation is lost with nothing to retry it — the audit
+ * row survives but the trace never existed. So a nonzero `ingestionFailures`
+ * throws, exactly like a thrown routing failure.
+ *
+ * Drops are the other half of `rejectedSpans` and deliberately do NOT throw:
+ * a span that fails `spanSchema` fails it identically on every retry, and a
+ * span past `SPAN_MAX_PAST_MS` is the 31-day door of Decision 11 doing its job
+ * (old messages are still fetched and audited; only their spans drop). Failing
+ * the run on those would stall the audit pull on the exact history the door
+ * exists to let through.
+ */
+export async function routeConversationsToTraceDestination({
+  events,
+  source,
+}: {
+  events: NormalizedPullEvent[];
+  source: PullingSource;
+}): Promise<void> {
+  if (!source.traceProjectId) return;
+
+  // A destination is an ordinary stored column: the write path checks the
+  // project is this org's and live, never that this kind of source carries
+  // conversations at all — only the composer declines to offer the picker.
+  // So the source type has to earn its way in here, and one we have no
+  // conversation shape for routes nothing rather than being guessed at.
+  const routing = CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(source.sourceType);
+  if (!routing) return;
+
+  const request = routing.map({
+    events,
+    origin: {
+      ingestionSourceId: source.id,
+      organizationId: source.organizationId,
+      sourceType: source.sourceType,
+      profile: routing.profile,
+    },
+  });
+  if (!request) return;
+
+  // Pull-time re-check of the write-time guard: the column is freely
+  // editable and the project can be archived or deleted underneath it.
+  const destination = await prisma.project.findFirst({
+    where: {
+      id: source.traceProjectId,
+      archivedAt: null,
+      team: { organizationId: source.organizationId },
+    },
+    select: { id: true },
+  });
+  if (!destination) {
+    logger.warn(
+      {
+        ingestionSourceId: source.id,
+        traceProjectId: source.traceProjectId,
+      },
+      "trace destination is archived, deleted, or not this org's — skipping conversation routing",
+    );
+    return;
+  }
+
+  const result = await getApp().traces.collection.handleOtlpTraceRequest(
+    destination.id,
+    request,
+    DEFAULT_PII_REDACTION_LEVEL,
+  );
+  const rejectedSpans = result?.rejectedSpans ?? 0;
+  const ingestionFailures = result?.ingestionFailures ?? 0;
+  if (ingestionFailures > 0) {
+    throw new Error(
+      // Quote ONLY the dispatch failures. This message is what the process
+      // manager persists on `recordRunFailed` and renders on the source detail
+      // page; `errorMessage` also carries drop reasons, which describe other
+      // spans and run to kilobytes of serialized schema errors.
+      `Trace door failed to dispatch ${ingestionFailures} span(s) for ingestion source ${source.id}` +
+        (result?.ingestionFailureMessage
+          ? `: ${result.ingestionFailureMessage}`
+          : ""),
+    );
+  }
+  logger.info(
+    {
+      ingestionSourceId: source.id,
+      traceProjectId: destination.id,
+      // Past the throw above, every rejection left is a permanent drop.
+      droppedSpans: rejectedSpans,
+    },
+    "routed pulled conversations to trace destination",
+  );
 }
 
 /**
@@ -339,7 +662,12 @@ async function pulledUsageCostEnabled(
 ): Promise<boolean> {
   return await featureFlagService.isEnabled(
     "release_pulled_usage_cost_enabled",
-    { distinctId: organizationId, organizationId },
+    {
+      distinctId: organizationId,
+      // Pulled usage is priced for a whole organization.
+      projectId: NOT_TARGETED,
+      organizationId,
+    },
   );
 }
 
