@@ -103,14 +103,26 @@ function confirmed({
   };
 }
 
+/**
+ * One pulled observation.
+ *
+ * `costNanoMinor` and `currencyCode` are both spelled out because the fold
+ * does not validate its events: a helper that omitted the money would hand it
+ * `undefined`, the cell's amount would be `NaN`, and its key would carry a
+ * null currency — while every assertion downstream still appeared to pass.
+ */
 function observed({
-  costNanoUsd,
+  costNanoMinor,
+  currencyCode = "USD",
+  costNanoUsd = null,
   observedAtMs,
   restatementKey = "bucket-hash",
   costStatus = "estimate",
   id = nanoid(),
 }: {
-  costNanoUsd: number;
+  costNanoMinor: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
   observedAtMs: number;
   restatementKey?: string;
   costStatus?: "exact" | "estimate";
@@ -135,6 +147,8 @@ function observed({
       tokensOutput: 200,
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
+      costNanoMinor,
+      currencyCode,
       costNanoUsd,
       rateVersion: "registry@2026-08-01",
       costBasis: "computed",
@@ -375,13 +389,13 @@ describe("governance cost rollup", () => {
     it("returns only the restated amount, and says what it was before", async () => {
       await foldThroughExecutor(
         observed({
-          costNanoUsd: 12_340_000_000,
+          costNanoMinor: 12_340_000_000,
           observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
         }),
       );
       await foldThroughExecutor(
         observed({
-          costNanoUsd: 9_000_000_000,
+          costNanoMinor: 9_000_000_000,
           observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
           costStatus: "exact",
         }),
@@ -456,13 +470,13 @@ describe("governance cost rollup", () => {
     it("totals only the surviving version, and keeps the two lanes apart", async () => {
       await foldThroughExecutor(
         observed({
-          costNanoUsd: 12_340_000_000,
+          costNanoMinor: 12_340_000_000,
           observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
         }),
       );
       await foldThroughExecutor(
         observed({
-          costNanoUsd: 9_000_000_000,
+          costNanoMinor: 9_000_000_000,
           observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
           costStatus: "exact",
         }),
