@@ -800,15 +800,19 @@ const AZURE_MANAGEMENT_HOST = "management.azure.com";
 /**
  * Whether a link is Azure Resource Manager itself and nowhere else.
  *
- * Exported for the tests that hold the spoofs out, so the shapes a reviewer
- * worries about are named somewhere a reader can find them.
- *
  * `hostname` rather than `host`: it excludes the port, which is compared
  * separately, and it is already lowercased and punycoded by the parser, so a
  * link differing from ARM's own only in letter case is still ARM. Anything
  * that will not parse is not a URL and is refused with everything else.
+ *
+ * The port, user and password comparisons are not decoration. A link can name
+ * the host ARM answers to and still reach somewhere else on it, or carry
+ * credentials in front of a host that does match, which a request would then
+ * send along with the bearer. Each of those shapes is held out by its own test
+ * through the page walk, so none of the four comparisons can be dropped
+ * without a test saying so.
  */
-export function isAzureResourceManagerUrl(value: string): boolean {
+function isAzureResourceManagerUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return (
