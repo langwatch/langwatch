@@ -17,7 +17,7 @@ import type {
   ChartFrameParams,
   ChartFrameTheme,
   ChartQueryError,
-  ChartQueryOverrides,
+  ChartQueryParamValue,
   ChartQueryResult,
   FrameToParentMessage,
   LwLogMessage,
@@ -25,12 +25,15 @@ import type {
 import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "./bridgeProtocol";
 
 /**
- * Runs one query for the frame. The parent supplies the SQL and maps any
- * failure to a {@link ChartQueryError} before rejecting — the bridge forwards
- * whatever it is given and never reads `error.message` itself.
+ * Runs one of the widget's declared queries for the frame, by name, with the
+ * frame's param values. The parent resolves the name to SQL, validates the
+ * params against that query's declared parameters, and maps any failure to a
+ * {@link ChartQueryError} before rejecting — the bridge forwards whatever it
+ * is given and never reads `error.message` itself.
  */
 export type ChartFrameExecuteQuery = (
-  overrides: ChartQueryOverrides,
+  queryName: string,
+  params: Readonly<Record<string, ChartQueryParamValue>>,
   signal: AbortSignal,
 ) => Promise<ChartQueryResult>;
 
@@ -95,13 +98,17 @@ export function createFrameBridge(
     onTeardown();
   };
 
-  const handleQuery = (requestId: number, overrides: ChartQueryOverrides) => {
+  const handleQuery = (
+    requestId: number,
+    queryName: string,
+    params: Readonly<Record<string, ChartQueryParamValue>>,
+  ) => {
     // One request at a time: a newer lw:query aborts the one in flight.
     abortActive();
     const abort = new AbortController();
     activeAbort = abort;
     activeRequestId = requestId;
-    executeQuery(overrides, abort.signal).then(
+    executeQuery(queryName, params, abort.signal).then(
       (result) => {
         // Stale replies (a newer request took over, or we tore down) drop.
         if (disposed || activeRequestId !== requestId || !port) return;
@@ -126,7 +133,7 @@ export function createFrameBridge(
         lastHeartbeatAt = Date.now();
         return;
       case "lw:query":
-        handleQuery(message.requestId, message.overrides ?? {});
+        handleQuery(message.requestId, message.queryName, message.params ?? {});
         return;
       case "lw:set-height":
         onHeightChange(message.px);

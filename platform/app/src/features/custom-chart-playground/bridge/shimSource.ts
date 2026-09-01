@@ -71,22 +71,16 @@ export function buildShimScript(): string {
   var LW = {
     params: undefined,
     theme: undefined,
-    query: function (overrides) {
+    query: function (name, params) {
       return ready.then(function () {
         return new Promise(function (resolve, reject) {
+          if (typeof name !== "string" || !name) {
+            reject({ code: "invalid_query_name", title: "Invalid query", message: "LW.query's first argument must be the query's name, a non-empty string." });
+            return;
+          }
           var requestId = nextRequestId++;
           pending[requestId] = { resolve: resolve, reject: reject };
-          var wire = {};
-          if (overrides && overrides.timeWindow) {
-            wire.timeWindow = {
-              start: Number(overrides.timeWindow.start),
-              end: Number(overrides.timeWindow.end)
-            };
-          }
-          if (overrides && overrides.granularitySeconds !== undefined) {
-            wire.granularitySeconds = Number(overrides.granularitySeconds);
-          }
-          post({ type: "lw:query", requestId: requestId, overrides: wire });
+          post({ type: "lw:query", requestId: requestId, queryName: name, params: params || {} });
         });
       });
     },

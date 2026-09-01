@@ -70,8 +70,8 @@ export function SandboxedChartFrame({
     if (!iframe) return;
     const bridge = createFrameBridge({
       iframe,
-      executeQuery: (overrides, signal) =>
-        executeQueryRef.current(overrides, signal),
+      executeQuery: (queryName, params, signal) =>
+        executeQueryRef.current(queryName, params, signal),
       params: initialParamsRef.current,
       theme,
       onLog: (entry) => onLogRef.current(entry),

@@ -31,7 +31,6 @@ interface PlaygroundWidgetGridProps {
   projectSlug: string;
   onWidgetDelete: (id: string) => void;
   onWidgetSizeChange: (id: string, size: SizeOption) => void;
-  onWidgetEdit: (id: string) => void;
   onWidgetSave: (
     input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
@@ -47,7 +46,6 @@ export function PlaygroundWidgetGrid({
   projectSlug,
   onWidgetDelete,
   onWidgetSizeChange,
-  onWidgetEdit,
   onWidgetSave,
   onWidgetsReorder,
   deletingWidgetId,
@@ -95,7 +93,6 @@ export function PlaygroundWidgetGrid({
               projectSlug={projectSlug}
               onDelete={() => onWidgetDelete(widget.id)}
               onSizeChange={(size) => onWidgetSizeChange(widget.id, size)}
-              onEdit={() => onWidgetEdit(widget.id)}
               onSave={onWidgetSave}
               isDeleting={deletingWidgetId === widget.id}
               isSaving={savingWidgetId === widget.id}

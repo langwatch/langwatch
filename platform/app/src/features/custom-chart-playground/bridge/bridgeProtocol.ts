@@ -20,13 +20,14 @@ export interface ChartFrameParams {
 export type ChartFrameTheme = "light" | "dark";
 
 /**
- * What the frame's `LW.query` may override. SQL is deliberately absent: the
- * statement always comes from the parent's SQL pane, never from the frame.
+ * A bound parameter's value, as the frame may supply it to `LW.query`.
+ * Matches `analytics.lwql.query`'s own `parameterValueSchema` minus `null` —
+ * a value the frame chooses to pass is always one of these three JS types,
+ * checked against the query's declared parameter types before anything
+ * forwards to lwql (see `PlaygroundQuery.parameters` in
+ * `~/server/analytics/playgroundWidgetDefinition`).
  */
-export interface ChartQueryOverrides {
-  readonly timeWindow?: { readonly start: number; readonly end: number };
-  readonly granularitySeconds?: number;
-}
+export type ChartQueryParamValue = string | number | boolean;
 
 /**
  * The reply payload, mirroring `LangWatchQLQueryResult`
@@ -94,7 +95,10 @@ export type ParentToFrameMessage =
 export interface LwQueryMessage {
   readonly type: "lw:query";
   readonly requestId: number;
-  readonly overrides: ChartQueryOverrides;
+  /** Which of the widget's declared queries to run. SQL never travels from
+   *  the frame — only the name and the bind values for its parameters. */
+  readonly queryName: string;
+  readonly params: Readonly<Record<string, ChartQueryParamValue>>;
 }
 
 export interface LwSetHeightMessage {

@@ -12,7 +12,6 @@
 
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { sizeOptions } from "~/components/analytics/reports/GraphCardMenu";
 import { toaster } from "~/components/ui/toaster";
@@ -21,7 +20,6 @@ import { api } from "~/utils/api";
 import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import type { PlaygroundWidget } from "./PlaygroundWidgetCard";
-import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
 import { PlaygroundWidgetGrid } from "./PlaygroundWidgetGrid";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "./presets";
 
@@ -68,8 +66,6 @@ export function CustomChartPlayground({
   projectSlug: string;
   warning?: string | undefined;
 }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-
   // Every widget hangs off the project's first dashboard (grid rows are a
   // dashboard fact), but the playground's kind keeps them off every other
   // dashboard's builder-only reads.
@@ -92,7 +88,6 @@ export function CustomChartPlayground({
     api.playgroundWidgets.batchUpdateLayouts.useMutation();
 
   const widgets = (widgetsQuery.data ?? []).map(toWidget);
-  const editingWidget = widgets.find((w) => w.id === editingId) ?? null;
 
   const handleNewWidget = () => {
     createWidget.mutate(
@@ -165,9 +160,9 @@ export function CustomChartPlayground({
     );
   };
 
-  // Shared by the drawer and by each card's own Code view, so both save paths
-  // are the same mutation and the same refetch. `onSuccess` lets the caller
-  // close itself only once the write landed.
+  // Shared by every card's Code and Queries tabs, so both save the same
+  // mutation and the same refetch. `onSuccess` lets the caller flip itself
+  // back to Chart only once the write landed.
   const handleSave = (
     input: { id: string; code: string; queries: PlaygroundWidget["queries"] },
     options?: { onSuccess?: () => void },
@@ -176,7 +171,6 @@ export function CustomChartPlayground({
       { projectId, ...input },
       {
         onSuccess: () => {
-          setEditingId(null);
           void widgetsQuery.refetch();
           options?.onSuccess?.();
         },
@@ -236,7 +230,6 @@ export function CustomChartPlayground({
           projectSlug={projectSlug}
           onWidgetDelete={handleDelete}
           onWidgetSizeChange={handleSizeChange}
-          onWidgetEdit={setEditingId}
           onWidgetSave={handleSave}
           onWidgetsReorder={handleReorder}
           deletingWidgetId={
@@ -247,13 +240,6 @@ export function CustomChartPlayground({
           }
         />
       )}
-
-      <PlaygroundWidgetEditDrawer
-        widget={editingWidget}
-        onClose={() => setEditingId(null)}
-        onSave={handleSave}
-        isSaving={updateWidget.isPending}
-      />
     </VStack>
   );
 }

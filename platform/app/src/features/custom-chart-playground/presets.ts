@@ -29,32 +29,46 @@ export const STARTER_WIDGET_QUERIES: PlaygroundQuery[] = [
 ];
 
 /**
- * A real Recharts component, so "+ New widget" proves the compile-and-mount
- * pipeline immediately rather than opening on a blank frame. Static data for
- * now — wiring a widget's `LW.query` calls to its declared queries is the
- * next step.
+ * A real Recharts component wired to the widget's own "main" query, so
+ * "+ New widget" proves the whole pipeline immediately: compile-and-mount,
+ * `LW.query(name, params)` dispatch, parent-side validation (this call
+ * passes no params, matching "main"'s zero declared parameters), and a real
+ * ClickHouse round trip rendering as a bar chart.
  */
-export const STARTER_WIDGET_CODE = `import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-const data = [
-  { name: "Mon", value: 12 },
-  { name: "Tue", value: 19 },
-  { name: "Wed", value: 7 },
-  { name: "Thu", value: 24 },
-  { name: "Fri", value: 15 },
-];
+export const STARTER_WIDGET_CODE = `import { useEffect, useState } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function Widget() {
+  const [rows, setRows] = useState([]);
+  const [status, setStatus] = useState("Loading…");
+
+  useEffect(function () {
+    LW.query("main", {}).then(
+      function (result) {
+        setStatus(result.rows.length + " rows · " + result.statistics.elapsedMs + "ms");
+        setRows(result.rows.map(function (row) {
+          return { bucket: String(row.bucket).slice(5, 16), events: Number(row.events) };
+        }));
+      },
+      function (err) {
+        setStatus(err.title + " [" + err.code + "]: " + err.message);
+      }
+    );
+  }, []);
+
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis allowDecimals={false} />
-        <Tooltip />
-        <Bar dataKey="value" fill="#f97316" />
-      </BarChart>
-    </ResponsiveContainer>
+    <div>
+      <div style={{ fontSize: "11px", color: "#666", marginBottom: 4 }}>{status}</div>
+      <ResponsiveContainer width="100%" height={230}>
+        <BarChart data={rows}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Bar dataKey="events" fill="#f97316" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 `;

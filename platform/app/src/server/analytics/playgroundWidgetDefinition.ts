@@ -36,8 +36,22 @@ const MAX_QUERIES_PER_WIDGET = 8;
 const MAX_QUERY_NAME_LENGTH = 64;
 const QUERY_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const MAX_PARAMETERS_PER_QUERY = 32;
+const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 /** Generous ceiling for a widget's source file — this is authored code, not data. */
 const MAX_CODE_LENGTH = 200_000;
+
+/**
+ * Bound automatically by the executor from the page's window/granularity —
+ * never an author-declared parameter. A query names one of these the same way
+ * the `lwql-charts` skill's SQL does; declaring a parameter under one of
+ * these names would silently never receive the value a caller passes, since
+ * the executor's own binding always wins.
+ */
+const RESERVED_PARAMETER_NAMES = new Set([
+  "period_start",
+  "period_end",
+  "period_granularity_seconds",
+]);
 
 /**
  * The JS types a bound parameter's value may take. Scalars only, matching
@@ -45,11 +59,43 @@ const MAX_CODE_LENGTH = 200_000;
  * useful if it describes something the query endpoint can actually bind.
  */
 const queryParameterTypeSchema = z.enum(["string", "number", "boolean"]);
+const queryParameterValueSchema = z.union([
+  z.string().max(MAX_PARAMETER_VALUE_LENGTH),
+  z.number().finite(),
+  z.boolean(),
+]);
 
-const queryParameterDeclarationSchema = z.object({
-  name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
-  type: queryParameterTypeSchema,
-});
+const queryParameterDeclarationSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1)
+      .max(MAX_QUERY_NAME_LENGTH)
+      .regex(QUERY_NAME_PATTERN)
+      .refine(
+        (name) => !RESERVED_PARAMETER_NAMES.has(name),
+        "Reserved for the page window — pick a different parameter name",
+      ),
+    type: queryParameterTypeSchema,
+    /**
+     * Fills the value a `LW.query` call omits for this parameter — the Run
+     * button's own source of a value when testing a query standalone, and a
+     * required parameter with no default is one the caller must always pass.
+     * Stored typed rather than as a string so a stray unit test of a default
+     * against a mistyped declaration is a schema violation, not a runtime one.
+     */
+    default: queryParameterValueSchema.optional(),
+  })
+  .superRefine((declaration, ctx) => {
+    if (declaration.default === undefined) return;
+    if (typeof declaration.default !== declaration.type) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["default"],
+        message: `default must be a ${declaration.type} to match this parameter's declared type`,
+      });
+    }
+  });
 
 export const playgroundQuerySchema = z.object({
   name: z
@@ -80,3 +126,120 @@ export type PlaygroundQuery = z.infer<typeof playgroundQuerySchema>;
 export type PlaygroundWidgetDefinition = z.infer<
   typeof playgroundWidgetDefinitionSchema
 >;
+
+/** A bound parameter's value, as `LW.query`'s caller may supply it. */
+export type PlaygroundQueryParamValue = string | number | boolean;
+
+/**
+ * What a rejected `LW.query(name, params)` carries back to the frame. Shaped
+ * to assign structurally into the bridge's own `ChartQueryError` (defined in
+ * `features/custom-chart-playground/bridge/bridgeProtocol.ts`) without this,
+ * a server module, importing that client one.
+ */
+export interface PlaygroundQueryParamError {
+  readonly code: string;
+  readonly title: string;
+  readonly message: string;
+}
+
+export type PlaygroundQueryParamValidation =
+  | {
+      readonly ok: true;
+      readonly params: Readonly<Record<string, PlaygroundQueryParamValue>>;
+    }
+  | { readonly ok: false; readonly error: PlaygroundQueryParamError };
+
+/**
+ * The validation gate `LW.query(name, params)` runs through before anything
+ * reaches `analytics.lwql.query`: every key the frame passed must be a
+ * declared parameter of the right JS type, and every declared parameter with
+ * no default must have been passed. Declaring zero parameters (`parameters`
+ * omitted) means a call may pass no params at all — an empty object is
+ * required, not merely allowed, so a typo'd key is caught immediately rather
+ * than binding nothing and failing later inside ClickHouse.
+ *
+ * Framework-free and synchronous on purpose: this same function backs both
+ * the live `LW.query` dispatch and the Queries tab's standalone "Run" button,
+ * so a query can never validate differently in one path than the other.
+ */
+export function validatePlaygroundQueryParams(
+  query: Pick<PlaygroundQuery, "parameters">,
+  params: Readonly<Record<string, unknown>>,
+): PlaygroundQueryParamValidation {
+  const declared = query.parameters ?? [];
+  const declaredNames = new Set(declared.map((p) => p.name));
+
+  const undeclared = Object.keys(params).filter(
+    (key) => !declaredNames.has(key),
+  );
+  if (undeclared.length > 0) {
+    const [first] = undeclared;
+    if (first && RESERVED_PARAMETER_NAMES.has(first)) {
+      return {
+        ok: false,
+        error: {
+          code: "playground_query_reserved_param",
+          title: "Reserved query parameter",
+          message: `"${first}" is bound automatically from the page's own window and granularity — a query never sets it, and LW.query must not pass it either.`,
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: "playground_query_undeclared_param",
+        title: "Unknown query parameter",
+        message: `This query does not declare a parameter named "${first}". Declared: ${
+          declared.length > 0
+            ? declared.map((p) => p.name).join(", ")
+            : "(none)"
+        }.`,
+      },
+    };
+  }
+
+  const validated: Record<string, PlaygroundQueryParamValue> = {};
+  for (const declaration of declared) {
+    const resolved = resolveDeclaredParam(
+      declaration,
+      params[declaration.name],
+    );
+    if (!resolved.ok) return resolved;
+    validated[declaration.name] = resolved.value;
+  }
+
+  return { ok: true, params: validated };
+}
+
+/** One declared parameter's value: from `params`, its default, or a rejection. */
+function resolveDeclaredParam(
+  declaration: PlaygroundQueryParameterDeclaration,
+  value: unknown,
+):
+  | { ok: true; value: PlaygroundQueryParamValue }
+  | { ok: false; error: PlaygroundQueryParamError } {
+  if (value === undefined) {
+    if (declaration.default !== undefined) {
+      return { ok: true, value: declaration.default };
+    }
+    return {
+      ok: false,
+      error: {
+        code: "playground_query_missing_param",
+        title: "Missing query parameter",
+        message: `"${declaration.name}" is required and has no default — pass a value for it.`,
+      },
+    };
+  }
+  if (typeof value !== declaration.type) {
+    return {
+      ok: false,
+      error: {
+        code: "playground_query_mistyped_param",
+        title: "Wrong query parameter type",
+        message: `"${declaration.name}" must be a ${declaration.type}, got ${typeof value}.`,
+      },
+    };
+  }
+  return { ok: true, value };
+}
