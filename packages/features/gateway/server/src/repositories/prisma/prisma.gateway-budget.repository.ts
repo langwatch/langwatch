@@ -269,9 +269,36 @@ export type BudgetCheckResult = {
   }>;
 };
 
+/**
+ * The client slice the whole budget chain binds to — its own writes plus the
+ * audit, change-feed, reach, resolution and scope-target repositories it
+ * builds.
+ *
+ * Stated here, where the generated client may be named, so the composition
+ * adapter can say what Gateway persistence needs without importing the
+ * generated declaration itself.
+ */
+export type GatewayBudgetDatabase = Pick<
+  PrismaClient,
+  | "$transaction"
+  | "auditLog"
+  | "gatewayBudget"
+  | "gatewayBudgetBucketBoundary"
+  | "gatewayChangeEvent"
+  | "group"
+  | "groupMembership"
+  | "modelProvider"
+  | "organization"
+  | "organizationUser"
+  | "team"
+  | "user"
+  | "virtualKey"
+  | "virtualKeyScope"
+>;
+
 export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: GatewayBudgetDatabase,
     private readonly changeEvents = new PrismaGatewayChangeEventsRepository(prisma),
     private readonly auditLog = new PrismaGatewayAuditRepository(prisma),
     private readonly scopeReach = PrismaGatewayBudgetScopeReachRepository.create(prisma),
@@ -281,7 +308,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   static create(
-    database: PrismaClient,
+    database: GatewayBudgetDatabase,
     chRepo?: GatewayBudgetSpendPort,
   ): PrismaGatewayBudgetRepository {
     return new PrismaGatewayBudgetRepository(

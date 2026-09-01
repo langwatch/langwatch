@@ -57,8 +57,11 @@ export const GATEWAY_AUDIT_TARGET_KINDS = [
 
 export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number];
 
+/** The client slice an audit row needs. */
+export type GatewayAuditDatabase = Pick<PrismaClient, "auditLog">;
+
 export class PrismaGatewayAuditRepository extends GatewayAuditPort {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: GatewayAuditDatabase) {
     super();
   }
 
@@ -82,7 +85,7 @@ export class PrismaGatewayAuditRepository extends GatewayAuditPort {
   }
 }
 
-export function createGatewayAuditPort(database: PrismaClient): GatewayAuditPort {
+export function createGatewayAuditPort(database: GatewayAuditDatabase): GatewayAuditPort {
   return new PrismaGatewayAuditRepository(database);
 }
 

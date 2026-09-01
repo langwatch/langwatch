@@ -10,13 +10,22 @@ import {
 import { type GatewayGuardrail, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { GatewayGuardrailRepository } from "../gateway-guardrail.repository";
 
+/**
+ * The client slice the guardrail catalogue binds to.
+ *
+ * Named here, where the generated client may be spoken of, so the
+ * composition adapter above can state what it needs without importing the
+ * generated declaration itself.
+ */
+export type GatewayGuardrailDatabase = Pick<PrismaClient, "gatewayGuardrail">;
+
 /** Private Prisma mapping for Gateway's project-scoped guardrail catalogue. */
 export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository {
-  static create(database: PrismaClient): PrismaGatewayGuardrailRepository {
+  static create(database: GatewayGuardrailDatabase): PrismaGatewayGuardrailRepository {
     return new PrismaGatewayGuardrailRepository(database);
   }
 
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: GatewayGuardrailDatabase) {
     super();
   }
 

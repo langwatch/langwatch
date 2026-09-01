@@ -1,11 +1,19 @@
 import type { GatewayKeyReachCandidate } from "../gateway-budget.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+/** The client slice the reach walk reads. */
+export type GatewayBudgetScopeReachDatabase = Pick<
+  PrismaClient,
+  "virtualKey" | "groupMembership"
+>;
+
 /** Gateway-owned active-key facts used by the budget reach policy. */
 export class PrismaGatewayBudgetScopeReachRepository {
-  private constructor(private readonly database: PrismaClient) {}
+  private constructor(private readonly database: GatewayBudgetScopeReachDatabase) {}
 
-  static create(database: PrismaClient): PrismaGatewayBudgetScopeReachRepository {
+  static create(
+    database: GatewayBudgetScopeReachDatabase,
+  ): PrismaGatewayBudgetScopeReachRepository {
     return new PrismaGatewayBudgetScopeReachRepository(database);
   }
 

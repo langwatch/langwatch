@@ -2135,6 +2135,28 @@ const presentations = {
     title: "This dataset's columns have changed",
     describe: () => "Reload to pick up the current columns, then make your change again.",
   },
+  department_not_found: {
+    title: "That department is gone",
+    describe: () =>
+      "It was removed, or it belongs to another organization. Reload the list and pick one that is still there.",
+  },
+  department_assignment_target_not_found: {
+    // `meta.target` says which of the three the caller picked, so the copy
+    // names it rather than saying "the thing you picked".
+    title: "That is no longer in this organization",
+    describe: (error) => {
+      const target = str(error, "target", "");
+      const subject =
+        target === "user"
+          ? "That person is"
+          : target === "team"
+            ? "That team is"
+            : target === "project"
+              ? "That project is"
+              : "What you picked is";
+      return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
+    },
+  },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
     // retrying changes nothing and there is no customer-side setting to fix.

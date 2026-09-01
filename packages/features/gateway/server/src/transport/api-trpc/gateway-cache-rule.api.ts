@@ -10,13 +10,11 @@
  * persistence this transport does not hold.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GatewayCacheRule } from "@langwatch/prisma-client/generated";
 import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+  GatewayCacheRuleNotFoundError,
+  type GatewayCacheRuleResource,
+} from "@langwatch/gateway-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GatewayApp } from "#app/gateway.app";
 
@@ -72,7 +70,11 @@ const actionSchema = z
 const organizationScopeSchema = z.object({ organizationId: z.string() });
 const cacheRuleIdSchema = z.object({ organizationId: z.string(), id: z.string() });
 
-function toDto(r: GatewayCacheRule) {
+/**
+ * The wire row, unchanged: `modeEnum` keeps its name because the browser and
+ * the CLI read it, even though the canonical resource calls the field `mode`.
+ */
+function toDto(r: GatewayCacheRuleResource) {
   return {
     id: r.id,
     organizationId: r.organizationId,
@@ -82,7 +84,7 @@ function toDto(r: GatewayCacheRule) {
     enabled: r.enabled,
     matchers: r.matchers,
     action: r.action,
-    modeEnum: r.modeEnum,
+    modeEnum: r.mode,
     archivedAt: r.archivedAt?.toISOString() ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -105,7 +107,7 @@ export class GatewayCacheRuleTrpcApi {
       list: policy("gatewayCacheRules:view")(procedure.input(organizationScopeSchema)).query(
         async ({ ctx, input }) => {
           await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const rows = await ctx.app.gateway.cacheRules.list(input.organizationId);
+          const rows = await ctx.app.gateway.budgetDecisions.cacheRuleList(input.organizationId);
           return rows.map(toDto);
         },
       ),
@@ -113,12 +115,12 @@ export class GatewayCacheRuleTrpcApi {
       get: policy("gatewayCacheRules:view")(procedure.input(cacheRuleIdSchema)).query(
         async ({ ctx, input }) => {
           await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const row = await ctx.app.gateway.cacheRules.get(input.id, input.organizationId);
+          const row = await ctx.app.gateway.budgetDecisions.tryCacheRuleGet({
+            id: input.id,
+            organizationId: input.organizationId,
+          });
           if (!row) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "cache rule not found",
-            });
+            throw new GatewayCacheRuleNotFoundError();
           }
           return toDto(row);
         },
@@ -138,7 +140,7 @@ export class GatewayCacheRuleTrpcApi {
         ),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-        const row = await ctx.app.gateway.cacheRules.create({
+        const row = await ctx.app.gateway.budgetDecisions.cacheRuleCreate({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description ?? null,
@@ -166,7 +168,7 @@ export class GatewayCacheRuleTrpcApi {
         ),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-        const row = await ctx.app.gateway.cacheRules.update({
+        const row = await ctx.app.gateway.budgetDecisions.cacheRuleUpdate({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -183,7 +185,7 @@ export class GatewayCacheRuleTrpcApi {
       archive: policy("gatewayCacheRules:delete")(procedure.input(cacheRuleIdSchema)).mutation(
         async ({ ctx, input }) => {
           await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const row = await ctx.app.gateway.cacheRules.archive({
+          const row = await ctx.app.gateway.budgetDecisions.cacheRuleArchive({
             id: input.id,
             organizationId: input.organizationId,
             actorUserId: ctx.actor().id,

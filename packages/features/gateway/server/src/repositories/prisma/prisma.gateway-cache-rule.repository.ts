@@ -20,10 +20,17 @@ import type { GatewayAuditPort } from "../../ports/gateway-audit.port";
 import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository";
 
+/**
+ * The client slice cache-rule persistence binds to, transaction included:
+ * a rule write, its change event and its audit row land together or not at
+ * all.
+ */
+export type GatewayCacheRuleDatabase = Pick<PrismaClient, "gatewayCacheRule" | "$transaction">;
+
 /** Private Prisma owner for Gateway cache-rule rows and their durable effects. */
 export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository {
   static create(input: {
-    database: PrismaClient;
+    database: GatewayCacheRuleDatabase;
     changes: GatewayChangeEventsPort;
     audit: GatewayAuditPort;
   }): PrismaGatewayCacheRuleRepository {
@@ -31,7 +38,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
   }
 
   private constructor(
-    private readonly database: PrismaClient,
+    private readonly database: GatewayCacheRuleDatabase,
     private readonly changes: GatewayChangeEventsPort,
     private readonly audit: GatewayAuditPort,
   ) {

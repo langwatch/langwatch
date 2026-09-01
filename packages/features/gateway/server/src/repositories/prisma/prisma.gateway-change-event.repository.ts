@@ -13,8 +13,11 @@ import {
   type GatewayPersistenceTransaction,
 } from "../../ports/gateway-change-events.port";
 
+/** The client slice the revision feed needs. */
+export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
+
 export class PrismaGatewayChangeEventsRepository extends GatewayChangeEventsPort {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: GatewayChangeEventDatabase) {
     super();
   }
 
@@ -86,7 +89,7 @@ export class PrismaGatewayChangeEventsRepository extends GatewayChangeEventsPort
 }
 
 export function createGatewayChangeEventsPort(
-  database: PrismaClient,
+  database: GatewayChangeEventDatabase,
 ): GatewayChangeEventsPort {
   return new PrismaGatewayChangeEventsRepository(database);
 }

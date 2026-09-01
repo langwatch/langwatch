@@ -152,6 +152,65 @@ describe("GatewayCacheRulePersistence", () => {
     expect(repository.created).toBeNull();
   });
 
+  describe("when the matcher or action is not the shape the gateway can evaluate", () => {
+    /**
+     * The three refusals the displaced App service hand-rolled as TRPCErrors.
+     * They are the canonical schema's now, and they still have to happen
+     * BEFORE persistence: a rule the Go side cannot evaluate is one the bundle
+     * ships and every request then skips silently.
+     */
+    it("refuses vk_tags that is not a list of strings", () => {
+      const repository = new MemoryCacheRuleRepository(null);
+      const service = GatewayCacheRulePersistence.create(repository);
+
+      expect(() =>
+        service.create({
+          organizationId: "org_01",
+          name: "bad-tags",
+          matchers: { vk_tags: "tier=enterprise" } as never,
+          action: { mode: "force" },
+          actorUserId: "usr_01",
+        }),
+      ).toThrow();
+
+      expect(repository.created).toBeNull();
+    });
+
+    it("refuses request_metadata that is not a flat key-value object", () => {
+      const repository = new MemoryCacheRuleRepository(null);
+      const service = GatewayCacheRulePersistence.create(repository);
+
+      expect(() =>
+        service.create({
+          organizationId: "org_01",
+          name: "bad-metadata",
+          matchers: { request_metadata: ["team=offsecops"] } as never,
+          action: { mode: "force" },
+          actorUserId: "usr_01",
+        }),
+      ).toThrow();
+
+      expect(repository.created).toBeNull();
+    });
+
+    it("refuses an action mode the gateway has no branch for", () => {
+      const repository = new MemoryCacheRuleRepository(null);
+      const service = GatewayCacheRulePersistence.create(repository);
+
+      expect(() =>
+        service.create({
+          organizationId: "org_01",
+          name: "bad-mode",
+          matchers: {},
+          action: { mode: "bypass" } as never,
+          actorUserId: "usr_01",
+        }),
+      ).toThrow();
+
+      expect(repository.created).toBeNull();
+    });
+  });
+
   it("does not update a missing or cross-organization rule", async () => {
     const repository = new MemoryCacheRuleRepository(existingRule);
     const service = GatewayCacheRulePersistence.create(repository);

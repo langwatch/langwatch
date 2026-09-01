@@ -10,7 +10,6 @@
  */
 import type {
   GatewayBudget,
-  GatewayCacheRule,
   ModelProvider,
   PrismaClient,
   VirtualKey,
@@ -21,12 +20,7 @@ import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-c
 import { modelProviders } from "@langwatch/model-provider-contract";
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
 import type { ProjectService } from "@langwatch/project-contract";
-import {
-  budgetPeriodFloorMs,
-  effectiveBudgetPeriod,
-  PrismaGatewayAdapter,
-} from "@langwatch/gateway-server";
-import { GatewayCacheRuleService } from "./cacheRule.service";
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-server";
 import { computeConfigETag } from "./configETag";
 import { withTierFallthrough } from "./modelTierFallthrough";
 import { declaredModelsForProvider } from "./providerModelCatalog";
@@ -37,6 +31,9 @@ import {
 import {
   parseVirtualKeyConfig,
   type GatewayBudgetResource,
+  type GatewayCacheRuleResource,
+  type GatewayConfigGuardrailAttachment,
+  type GatewayGuardrailBundleEntry,
   type GatewayMoney,
   type GatewayResolvedBudget,
   type GatewayService,
@@ -286,12 +283,15 @@ export class GatewayConfigMaterialiser {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly projects: ProjectService,
-    private readonly chRepo: GatewayBudgetSpendPort | null = null,
-    private readonly budgetDecisions: GatewayService = PrismaGatewayAdapter.create({
-      database: prisma,
-      projects,
-      budgetSpend: chRepo ?? undefined,
-    }).build(),
+    private readonly chRepo: GatewayBudgetSpendPort | null,
+    /**
+     * The process's own Gateway service. Required rather than defaulted:
+     * building one here meant the bundle read composed a second service per
+     * request, over the same tables the App already had a service for, and the
+     * default could not be completed once that service grew its guardrail and
+     * cache-rule collaborators.
+     */
+    private readonly budgetDecisions: GatewayService,
   ) {}
 
   /**
@@ -354,7 +354,6 @@ export class GatewayConfigMaterialiser {
       : null;
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
-    const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
     const { providers, exclusions } = await this.dispatchAndExclusions(
       vk,
@@ -362,11 +361,17 @@ export class GatewayConfigMaterialiser {
       config.providersAllowed,
     );
     const policySides = resolvePolicySideOfBundle(vk, config);
-    const guardrailSides = await this.resolveGuardrailSideOfBundle(
-      vk,
-      config,
-      traceProject,
-    );
+    // The cache-rule bundle, the project's guardrail catalogue and the key's
+    // surviving attachments come from the one Gateway service that owns those
+    // tables, rather than from a second copy of each query living here.
+    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
+      organizationId: vk.organizationId,
+      traceProjectId: traceProject?.id ?? null,
+      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
+        direction: attachment.direction,
+        guardrailIds: [...attachment.guardrailIds],
+      })),
+    });
 
     return {
       revision: vk.revision.toString(),
@@ -401,8 +406,8 @@ export class GatewayConfigMaterialiser {
       routing_mode: routingModeToWire(vk.routingMode),
       ...exclusions,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
-      guardrails: guardrailSides.guardrails,
-      guardrail_attachments: guardrailSides.attachments,
+      guardrails: bundle.guardrails.map(guardrailToWire),
+      guardrail_attachments: bundle.attachments.map(guardrailAttachmentToWire),
       policy_rules: policySides.policyRules,
       rate_limits: {
         rpm: config.rateLimits.rpm,
@@ -410,62 +415,11 @@ export class GatewayConfigMaterialiser {
         rpd: config.rateLimits.rpd,
       },
       budgets: budgets.map((resolved) => budgetToWire(resolved, spendByBudgetId)),
-      cache_rules: cacheRules.map(cacheRuleToWire),
+      cache_rules: bundle.cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
       expires_at: expiresAtWire(vk.expiresAt),
     };
-  }
-
-  private async applicableCacheRules(
-    organizationId: string,
-  ): Promise<GatewayCacheRule[]> {
-    return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
-  }
-
-  /**
-   * Project-scoped guardrails the gateway is allowed to invoke for this
-   * VK + the VK's attachment tuples. GatewayGuardrail is project-scoped
-   * so the flat catalog is fetched against the VK's resolved trace
-   * project. VKs without a trace project (ORG/TEAM-scoped without
-   * internal_governance fallback) cannot invoke any guardrail; both
-   * arrays come back empty in that case.
-   */
-  private async resolveGuardrailSideOfBundle(
-    vk: VirtualKeyWithScopes,
-    config: ReturnType<typeof parseVirtualKeyConfig>,
-    traceProject: { id: string; teamId: string } | null,
-  ): Promise<{
-    guardrails: GuardrailWire[];
-    attachments: GuardrailAttachmentWire[];
-  }> {
-    if (!traceProject) {
-      return { guardrails: [], attachments: [] };
-    }
-    const rows = await this.prisma.gatewayGuardrail.findMany({
-      where: { projectId: traceProject.id, archivedAt: null },
-      include: { evaluator: { select: { slug: true } } },
-    });
-    const guardrails: GuardrailWire[] = rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      evaluator_id: r.evaluatorId,
-      evaluator_slug: r.evaluator?.slug ?? null,
-      direction:
-        r.direction === "PRE" ? "pre" : r.direction === "POST" ? "post" : "stream_chunk",
-      failure_mode: r.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
-    }));
-    const guardrailIdSet = new Set(rows.map((r) => r.id));
-    // Drop attachment references to guardrails that no longer exist or
-    // belong to a different project; the gateway should never see a
-    // dangling id.
-    const attachments: GuardrailAttachmentWire[] = config.guardrailAttachments
-      .map((a) => ({
-        direction: a.direction,
-        guardrail_ids: a.guardrailIds.filter((id) => guardrailIdSet.has(id)),
-      }))
-      .filter((a) => a.guardrail_ids.length > 0);
-    return { guardrails, attachments };
   }
 
   /**
@@ -950,15 +904,30 @@ function budgetToWire(
 
 type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];
 
-function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
-  const matchers = rule.matchers as CacheRuleWire["matchers"];
-  const action = rule.action as CacheRuleWire["action"];
+function cacheRuleToWire(rule: GatewayCacheRuleResource): CacheRuleWire {
   return {
     id: rule.id,
     priority: rule.priority,
-    matchers,
-    action,
+    matchers: rule.matchers,
+    action: rule.action,
   };
+}
+
+function guardrailToWire(entry: GatewayGuardrailBundleEntry): GuardrailWire {
+  return {
+    id: entry.id,
+    name: entry.name,
+    evaluator_id: entry.evaluatorId,
+    evaluator_slug: entry.evaluatorSlug,
+    direction: entry.direction,
+    failure_mode: entry.failureMode,
+  };
+}
+
+function guardrailAttachmentToWire(
+  attachment: GatewayConfigGuardrailAttachment,
+): GuardrailAttachmentWire {
+  return { direction: attachment.direction, guardrail_ids: attachment.guardrailIds };
 }
 
 /**

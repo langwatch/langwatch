@@ -22,14 +22,3 @@ export async function resolveProviderLabels(args: {
   });
   return new Map(rows.map((r) => [r.id, r.name || r.provider]));
 }
-
-/**
- * The display fallback every caller wants: the resolved label, else the
- * raw key, else null when the budget has no filter.
- */
-export function providerLabelFor(
-  labels: Map<string, string>,
-  providerKey: string | null,
-): string | null {
-  return providerKey ? (labels.get(providerKey) ?? providerKey) : null;
-}

@@ -79,7 +79,12 @@ export type ResolvedBudget = {
   endUserId: string | null;
 };
 
-type PrismaLike = PrismaClient | Prisma.TransactionClient;
+/**
+ * The client slice budget resolution reads, which a transaction client
+ * satisfies as readily as the connection itself — the walk runs inside a
+ * spend write as often as outside one.
+ */
+type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virtualKeyScope">;
 
 /**
  * Which budgets a request is subject to.

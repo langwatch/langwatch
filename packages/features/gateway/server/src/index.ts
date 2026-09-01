@@ -1,5 +1,5 @@
 export { GatewayService } from "./services/gateway.service";
-export { PrismaGatewayAdapter } from "./adapters/gateway.adapter";
+export { PrismaGatewayAdapter, type GatewayPersistence } from "./adapters/prisma.gateway.adapter";
 export { GatewaySpendEventsService } from "./services/gateway-spend-events.service";
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter";
 export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service";
@@ -78,10 +78,6 @@ export {
   type GatewayActor,
   type GatewayAppDependencies,
   type GatewayApplicableBudgetTarget,
-  type GatewayCacheRuleAction,
-  type GatewayCacheRuleMatchers,
-  type GatewayCacheRuleOperations,
-  type GatewayGuardrailOperations,
   type GatewayVirtualKeyBudgetInput,
   type GatewayVirtualKeyOperations,
 } from "./app/gateway.app";

@@ -37,7 +37,10 @@ import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
-const projects = createTestApp().projects;
+const testApp = createTestApp();
+const projects = testApp.projects;
+/** The App's own Gateway service, as `gateway-internal` supplies it. */
+const gatewayService = testApp.gatewayStores.budgetDecisions;
 
 const ORG_ID = `org-rmm-${suffix}`;
 const TEAM_ID = `team-rmm-${suffix}`;
@@ -264,7 +267,7 @@ describe("keys that predate the routing choice keep falling back against real PG
       routingMode: "FALLBACK_ALL",
     });
 
-    const bundle = await new GatewayConfigMaterialiser(prisma, projects).materialise(
+    const bundle = await new GatewayConfigMaterialiser(prisma, projects, null, gatewayService).materialise(
       virtualKey,
     );
 
@@ -287,7 +290,7 @@ describe("keys that predate the routing choice keep falling back against real PG
 
     expect(virtualKey.routingMode).toBe("NONE");
 
-    const bundle = await new GatewayConfigMaterialiser(prisma, projects).materialise(
+    const bundle = await new GatewayConfigMaterialiser(prisma, projects, null, gatewayService).materialise(
       virtualKey,
     );
     expect(bundle.routing_mode).toBe("none");

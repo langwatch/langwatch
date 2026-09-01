@@ -265,6 +265,7 @@ describe.skipIf(!hasCredentialsSecret)(
           prisma,
           getApp().projects,
           null,
+          getApp().gatewayStores.budgetDecisions,
         ).materialise(vk!);
         return new Map(bundle.providers.map((slot) => [slot.id, slot.handle]));
       } finally {

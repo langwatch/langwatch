@@ -287,8 +287,6 @@ import { createGatewayVirtualKeysPort } from "@langwatch/gateway-server/composit
 import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
-import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
-import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
 import {
   assertActorCanManageAllScopes,
@@ -849,11 +847,9 @@ function composeLicensingApp(input: { prisma: PrismaClient }): LicensingApp {
 function composeGatewayApp(input: {
   prisma: PrismaClient;
   projects: AppDependencies["projects"];
-  evaluators: AppDependencies["evaluators"];
-  monitors: AppDependencies["monitors"];
   stores: AppDependencies["gateway"];
 }): AppDependencies["gatewayApp"] {
-  const { prisma, projects, evaluators, monitors, stores } = input;
+  const { prisma, projects, stores } = input;
   const virtualKeys = stores.virtualKeys;
   const usage = GatewayUsageService.create({
     projects,
@@ -876,8 +872,6 @@ function composeGatewayApp(input: {
     virtualKeySpend: stores.virtualKeySpend,
     spendEvents: stores.spendEvents,
     projects,
-    guardrails: GatewayGuardrailService.create(prisma, evaluators, monitors),
-    cacheRules: GatewayCacheRuleService.create(prisma),
     usage,
     idempotency: (receipt) => withIdempotency({ prisma, ...receipt }),
     // A deployment without the ClickHouse spend source answers
@@ -2920,8 +2914,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     gatewayApp: composeGatewayApp({
       prisma,
       projects,
-      evaluators,
-      monitors,
       stores: gatewayStores,
     }),
     licensingApp: composeLicensingApp({ prisma }),
@@ -3692,8 +3684,6 @@ export function createTestApp(
     gatewayApp: composeGatewayApp({
       prisma: testPrisma,
       projects: testProjects,
-      evaluators: testEvaluators,
-      monitors: testMonitors,
       stores: testGatewayStores,
     }),
     licensingApp: composeLicensingApp({ prisma: testPrisma }),

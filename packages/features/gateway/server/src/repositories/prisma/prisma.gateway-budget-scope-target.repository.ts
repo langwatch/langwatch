@@ -16,6 +16,12 @@ import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+/** The client slice scope-target expansion reads. */
+export type GatewayBudgetScopeTargetDatabase = Pick<
+  PrismaClient,
+  "group" | "organization" | "team" | "user" | "virtualKey"
+>;
+
 export type BudgetScopeTargetInfo = {
   kind: string;
   id: string;
@@ -29,7 +35,7 @@ export type BudgetScopeTargetInfo = {
 
 type AddTargetArgs = {
   out: Map<string, BudgetScopeTargetInfo>;
-  prisma: PrismaClient;
+  prisma: GatewayBudgetScopeTargetDatabase;
   idSet: Set<string>;
   organizationId?: string | null;
 };
@@ -226,7 +232,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
    * surface another tenant's name, key or member.
    */
   static async resolveScopeTargetsBatch(
-    prisma: PrismaClient,
+    prisma: GatewayBudgetScopeTargetDatabase,
     budgets: Array<{ scopeType: string; scopeId: string }>,
     organizationId: string | null,
     projects: ProjectIdentity[],
@@ -300,7 +306,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
   }
 
   static async listVirtualKeyProjectScopes(
-    prisma: PrismaClient,
+    prisma: GatewayBudgetScopeTargetDatabase,
     organizationId: string | null,
     virtualKeyIds: string[],
   ): Promise<GatewayVirtualKeyProjectScope[]> {

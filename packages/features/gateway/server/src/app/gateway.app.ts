@@ -54,12 +54,6 @@ import {
   type GuardrailAttachment,
   type VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
-import type {
-  GatewayCacheRule,
-  GatewayGuardrail,
-  GatewayGuardrailDirection,
-  GatewayGuardrailFailureMode,
-} from "@langwatch/prisma-client/generated";
 import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
 import type { z } from "zod";
 
@@ -172,81 +166,6 @@ export type GatewayVirtualKeyOperations = Readonly<{
   }): Promise<VirtualKeyWithScopes>;
 }>;
 
-/** The guardrail administration the process builds over its own persistence. */
-export type GatewayGuardrailOperations = Readonly<{
-  list(projectId: string): Promise<GatewayGuardrail[]>;
-  get(id: string, projectId: string): Promise<GatewayGuardrail | null>;
-  create(input: {
-    projectId: string;
-    name: string;
-    description: string | null;
-    evaluatorId: string;
-    direction: GatewayGuardrailDirection;
-    failureMode?: GatewayGuardrailFailureMode;
-    actorUserId: string;
-  }): Promise<GatewayGuardrail>;
-  update(input: {
-    id: string;
-    projectId: string;
-    name?: string;
-    description?: string | null;
-    evaluatorId?: string;
-    direction?: GatewayGuardrailDirection;
-    failureMode?: GatewayGuardrailFailureMode;
-    actorUserId: string;
-  }): Promise<GatewayGuardrail>;
-  archive(input: { id: string; projectId: string; actorUserId: string }): Promise<void>;
-}>;
-
-/** The matcher set a cache rule ANDs across, in the wire spelling it is stored in. */
-export interface GatewayCacheRuleMatchers {
-  vk_id?: string;
-  vk_tags?: string[];
-  vk_prefix?: string;
-  principal_id?: string;
-  model?: string;
-  request_metadata?: Record<string, string>;
-}
-
-/** What a matching cache rule does. */
-export interface GatewayCacheRuleAction {
-  mode: "respect" | "force" | "disable";
-  ttl?: number;
-  salt?: string;
-}
-
-/** The cache-rule administration the process builds over its own persistence. */
-export type GatewayCacheRuleOperations = Readonly<{
-  list(organizationId: string): Promise<GatewayCacheRule[]>;
-  get(id: string, organizationId: string): Promise<GatewayCacheRule | null>;
-  create(input: {
-    organizationId: string;
-    name: string;
-    description: string | null;
-    priority?: number;
-    enabled?: boolean;
-    matchers: GatewayCacheRuleMatchers;
-    action: GatewayCacheRuleAction;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-  update(input: {
-    id: string;
-    organizationId: string;
-    name?: string;
-    description?: string | null;
-    priority?: number;
-    enabled?: boolean;
-    matchers?: GatewayCacheRuleMatchers;
-    action?: GatewayCacheRuleAction;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-  archive(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-}>;
-
 /** A draft or existing key, as the applicable-budget resolver takes it. */
 export type GatewayApplicableBudgetTarget = Readonly<{
   organizationId: string;
@@ -270,7 +189,12 @@ export interface GatewayAppDependencies {
 
   /** The virtual-key read and write capability. */
   virtualKeys: GatewayVirtualKeyOperations;
-  /** The budget-and-cache-rule decision service. */
+  /**
+   * The one canonical Gateway service: budget decisions, and with them the
+   * cache-rule and guardrail catalogues it owns. The process used to build
+   * the latter two a second time, over its own copies of the same tables,
+   * and a rule written through one was invisible to the other.
+   */
   budgetDecisions: GatewayService;
   /**
    * The ClickHouse budget-spend source. Absent on a deployment without it,
@@ -284,10 +208,6 @@ export interface GatewayAppDependencies {
   spendEvents: GatewaySpendEventsService | undefined;
   /** Project reads: organization resolution and trace-destination facts. */
   projects: ProjectService;
-  /** Guardrail administration. */
-  guardrails: GatewayGuardrailOperations;
-  /** Cache-rule administration. */
-  cacheRules: GatewayCacheRuleOperations;
   /** The usage reader, already bound to the spend sources above. */
   usage: GatewayUsageService;
   /**
@@ -517,14 +437,6 @@ export class GatewayApp {
 
   get projects(): ProjectService {
     return this.dependencies.projects;
-  }
-
-  get guardrails(): GatewayGuardrailOperations {
-    return this.dependencies.guardrails;
-  }
-
-  get cacheRules(): GatewayCacheRuleOperations {
-    return this.dependencies.cacheRules;
   }
 
   get usage(): GatewayUsageService {

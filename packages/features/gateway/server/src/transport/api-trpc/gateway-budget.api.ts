@@ -30,8 +30,11 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { effectiveBudgetPeriod } from "../../adapters/gateway-period.adapter";
-import { providerLabelFor } from "../../repositories/prisma/prisma.gateway-provider-label.repository";
+import { GatewayProviderLabelAdapter } from "../../adapters/gateway-provider-label.adapter";
 import type { GatewayApp } from "#app/gateway.app";
+
+/** One stateless label resolver for every budget row this door renders. */
+const providerLabelAdapter = GatewayProviderLabelAdapter.create();
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GatewayBudgetTrpcContext = Readonly<{
@@ -124,7 +127,7 @@ export class GatewayBudgetTrpcApi {
             spendAvailable,
             unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
             scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-            providerLabel: providerLabelFor(providerLabels, b.providerKey),
+            providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
           })),
         };
       }),
@@ -151,7 +154,7 @@ export class GatewayBudgetTrpcApi {
             spendAvailable,
             unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
             scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-            providerLabel: providerLabelFor(providerLabels, b.providerKey),
+            providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
           })),
         };
       }),
@@ -172,7 +175,7 @@ export class GatewayBudgetTrpcApi {
             spendAvailable: detail.spendAvailable,
             unreachableByAnyKey: detail.unreachableByAnyKey,
             scopeTarget: detail.scopeTarget,
-            providerLabel: providerLabelFor(providerLabels, detail.budget.providerKey),
+            providerLabel: providerLabelAdapter.labelFor(providerLabels, detail.budget.providerKey),
             recentLedger: detail.recentLedger.map((l) => ({
               id: l.id,
               virtualKeyId: l.virtualKeyId,

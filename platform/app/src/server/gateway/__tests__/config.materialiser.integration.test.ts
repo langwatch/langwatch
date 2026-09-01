@@ -30,7 +30,6 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
 import { prisma } from "~/server/db";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -39,7 +38,6 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
-import { GatewayGuardrailService } from "../guardrail.service";
 import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 import { VirtualKeyRepository } from "@langwatch/gateway-server";
 
@@ -48,7 +46,13 @@ const testApp = createTestApp();
 // The SERVICE, not the app facade: `GatewayConfigMaterialiser` takes a
 // `ProjectService`, and `app.projects` is the narrower `ProjectApp`.
 const projects = testApp.projects.projectService;
-const monitors = testApp.monitors;
+/**
+ * The one Gateway service the App composed, which is what `gateway-internal`
+ * hands the materialiser in production. The guardrail catalogue and the
+ * cache-rule bundle live on it now, so a suite that built its own would be
+ * reading different tables than the route does.
+ */
+const gatewayService = testApp.gatewayStores.budgetDecisions;
 const ORG_ID = `org-mat-${suffix}`;
 const TEAM_ID = `team-mat-${suffix}`;
 const PROJECT_ID = `proj-mat-${suffix}`;
@@ -80,13 +84,6 @@ const VK_TAGSTORM_ID = `vk-mat-tagstorm-${suffix}`;
 // A VK on the routing policy whose allowlist names the policy-omitted
 // provider. Dispatch must still exclude it.
 const VK_POLICY_ALLOWLIST_ID = `vk-mat-policy-allow-${suffix}`;
-const evaluatorService = {
-  tryGetById: async ({ id, projectId }: { id: string; projectId: string }) =>
-    prisma.evaluator.findFirst({
-      where: { id, projectId, archivedAt: null },
-    }),
-} as unknown as EvaluatorService;
-
 describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   beforeAll(async () => {
     await startTestContainers();
@@ -531,7 +528,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises the bundle without runtime error", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       expect(bundle.vk_id).toBe(VK_ID);
       expect(bundle.status).toBe("active");
@@ -543,7 +540,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises the custom provider slot with its base_url and empty api_key", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       const slot = bundle.providers.find((p) => p.id === MP_CUSTOM_ID);
       expect(slot).toBeDefined();
@@ -555,7 +552,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises an openai provider slot with OPENAI_BASE_URL as its base_url", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       const slot = bundle.providers.find((p) => p.id === MP_OPENAI_BASE_ID);
       expect(slot).toBeDefined();
@@ -570,7 +567,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises an anthropic provider slot with ANTHROPIC_BASE_URL as its base_url", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_BASE_ID);
       expect(slot).toBeDefined();
@@ -588,7 +585,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises a keyless anthropic provider slot with its base_url and empty api_key", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_KEYLESS_ID);
       expect(slot).toBeDefined();
@@ -604,7 +601,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("materialises an anthropic provider slot without ANTHROPIC_BASE_URL with no base_url", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_PLAIN_ID);
       expect(slot).toBeDefined();
@@ -619,7 +616,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("lifts config.metadata.tags to the bundle's top-level vk_tags", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       expect(bundle.vk_tags).toEqual(["app=nexttrace", "team=offsecops"]);
     });
@@ -630,7 +627,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("bounds vk_tags for a stored config the drawer could never have written", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_TAGSTORM_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
 
       const bundle = await mat.materialise(vk!);
 
@@ -646,7 +643,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       expect(bundle.model_aliases).toEqual({ "gpt-5": "gpt-5-mini" });
       expect(bundle.policy_rules).toEqual({
@@ -660,7 +657,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("ships the project guardrail under bundle.guardrails", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       expect(bundle.guardrails).toHaveLength(1);
       const row = bundle.guardrails[0]!;
@@ -673,7 +670,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("filters dangling guardrail ids out of bundle.guardrail_attachments", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       // The VK's config carries two ids: a real one and a dangling one.
       // The materialiser must strip the dangling id before shipping.
@@ -690,7 +687,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("excludes safety-type providers (azure_safety) from the dispatch chain", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       // Naming the LLM provider that must survive, rather than just
       // asserting a non-empty list, keeps this from passing vacuously if
@@ -704,7 +701,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("returns empty model_aliases + normalized empty policy_rules", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       expect(bundle.model_aliases).toEqual({});
       expect(bundle.policy_rules).toEqual({
@@ -716,10 +713,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
   });
 
-  describe("when GatewayGuardrailService.create gates on AS_GUARDRAIL monitor", () => {
+  describe("when the guardrail catalogue gates on an AS_GUARDRAIL monitor", () => {
     it("accepts an evaluator with at least one enabled AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma, evaluatorService, monitors);
-      const row = await service.create({
+      const row = await gatewayService.guardrailCreate({
         projectId: PROJECT_ID,
         name: `Accept guardrail ${suffix}`,
         description: null,
@@ -734,9 +730,11 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
 
     it("rejects an evaluator with no AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma, evaluatorService, monitors);
+      // The code, not the prose: the refusal used to be a TRPCError whose
+      // message carried `evaluator_not_as_guardrail` as a parenthetical, and
+      // the drawer had to read the sentence to know what happened.
       await expect(
-        service.create({
+        gatewayService.guardrailCreate({
           projectId: PROJECT_ID,
           name: `Reject guardrail ${suffix}`,
           description: null,
@@ -744,7 +742,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           direction: "PRE",
           actorUserId: USER_ID,
         }),
-      ).rejects.toThrow(/evaluator_not_as_guardrail/);
+      ).rejects.toMatchObject({ code: "gateway_guardrail_evaluator_invalid" });
     });
   });
 
@@ -752,7 +750,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("returns empty guardrails + empty attachments (no project context)", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_PROJECT_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
       // No traceProject → no project to fetch guardrails from. Even
       // with a linked RP that contributes aliases, the guardrails
@@ -769,7 +767,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("excludes the policy-omitted provider from dispatch even though the allowlist names it", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_POLICY_ALLOWLIST_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
 
       const dispatchIds = bundle.providers.map((p) => p.id);
@@ -786,7 +784,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("names why each undispatchable provider was dropped, so the gateway can say the reason", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_POLICY_ALLOWLIST_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
 
       // Routing dropped the policy-omitted provider: scope-reachable and
@@ -815,7 +813,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     it("reports no provider exclusions and no routing policy name", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
-      const mat = new GatewayConfigMaterialiser(prisma, projects, null);
+      const mat = new GatewayConfigMaterialiser(prisma, projects, null, gatewayService);
       const bundle = await mat.materialise(vk!);
 
       // No allowlist and no routing policy: nothing is dropped, so there is no

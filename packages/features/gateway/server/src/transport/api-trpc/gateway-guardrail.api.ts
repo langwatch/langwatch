@@ -14,9 +14,9 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  GatewayGuardrailDirection,
-  GatewayGuardrailFailureMode,
-} from "@langwatch/prisma-client/generated";
+  gatewayGuardrailDirectionSchema,
+  gatewayGuardrailFailureModeSchema,
+} from "@langwatch/gateway-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GatewayApp } from "#app/gateway.app";
@@ -43,8 +43,8 @@ type GatewayGuardrailTrpcProcedures<
   policy(permission: AuthzPermission): ProcedureDecorator;
 }>;
 
-const directionSchema = z.nativeEnum(GatewayGuardrailDirection);
-const failureModeSchema = z.nativeEnum(GatewayGuardrailFailureMode);
+const directionSchema = gatewayGuardrailDirectionSchema;
+const failureModeSchema = gatewayGuardrailFailureModeSchema;
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const guardrailIdSchema = z.object({ projectId: z.string(), id: z.string() });
@@ -63,11 +63,15 @@ export class GatewayGuardrailTrpcApi {
 
     return trpc.router({
       list: policy("gatewayGuardrails:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => ctx.app.gateway.guardrails.list(input.projectId),
+        async ({ ctx, input }) => ctx.app.gateway.budgetDecisions.guardrailList(input.projectId),
       ),
 
       get: policy("gatewayGuardrails:view")(procedure.input(guardrailIdSchema)).query(
-        async ({ ctx, input }) => ctx.app.gateway.guardrails.get(input.id, input.projectId),
+        async ({ ctx, input }) =>
+          ctx.app.gateway.budgetDecisions.tryGuardrailGet({
+            id: input.id,
+            projectId: input.projectId,
+          }),
       ),
 
       create: policy("gatewayGuardrails:manage")(
@@ -82,7 +86,7 @@ export class GatewayGuardrailTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) =>
-        ctx.app.gateway.guardrails.create({
+        ctx.app.gateway.budgetDecisions.guardrailCreate({
           projectId: input.projectId,
           name: input.name,
           description: input.description ?? null,
@@ -106,7 +110,7 @@ export class GatewayGuardrailTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) =>
-        ctx.app.gateway.guardrails.update({
+        ctx.app.gateway.budgetDecisions.guardrailUpdate({
           id: input.id,
           projectId: input.projectId,
           name: input.name,
@@ -120,7 +124,7 @@ export class GatewayGuardrailTrpcApi {
 
       archive: policy("gatewayGuardrails:manage")(procedure.input(guardrailIdSchema)).mutation(
         async ({ ctx, input }) => {
-          await ctx.app.gateway.guardrails.archive({
+          await ctx.app.gateway.budgetDecisions.guardrailArchive({
             id: input.id,
             projectId: input.projectId,
             actorUserId: ctx.actor().id,
