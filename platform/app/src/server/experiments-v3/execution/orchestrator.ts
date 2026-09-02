@@ -2126,31 +2126,79 @@ interface ConnectedCellInput {
  * so it sends one user message under its own thread id and keeps no session:
  * what one row said can never reach another.
  */
-export async function* executeConnectedCell({
-  cell,
-  projectId,
-  agent,
-  datasetColumns = [],
-  loadedEvaluators,
-  resultMapperConfig,
-  isAborted,
-  dispatch = relayDispatch,
-  sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
-  now = () => Date.now(),
-}: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
+export async function* executeConnectedCell(
+  input: ConnectedCellInput,
+): AsyncGenerator<EvaluationV3Event> {
+  const { cell, projectId, agent } = input;
+  const now = input.now ?? (() => Date.now());
+  const traceId = cell.traceId ?? generateOtelTraceId();
+  const startedAt = now();
+
   yield {
     type: "cell_started",
     rowIndex: cell.rowIndex,
     targetId: cell.targetId,
   };
 
-  const traceId = cell.traceId ?? generateOtelTraceId();
-  const dispatchAgent = dispatchAgentOf(agent);
-  const startedAt = now();
+  const turn = await connectedTurn({ input: { ...input, now }, traceId, startedAt });
 
-  let outcome: CallOutcome;
+  if (!turn.ok) {
+    yield connectedFailureEvent({
+      cell,
+      projectId,
+      agentId: agent.id,
+      error: turn.error,
+      traceId,
+      duration: now() - startedAt,
+    });
+    return;
+  }
+
+  const output = connectedOutputText(turn.outcome.output);
+
+  yield {
+    type: "target_result",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+    output,
+    // The whole cell, not only the call that answered: a row that waited out
+    // a busy agent took that time too, and a run comparison reads it.
+    duration: now() - startedAt,
+    traceId,
+  };
+
+  yield* gradeConnectedAnswer({ input, output, traceId });
+}
+
+/**
+ * The one turn the row sends, retried while the agent is busy.
+ *
+ * The refusal comes back rather than being thrown, so the caller renders it
+ * as the cell's own failure instead of ending the run.
+ */
+const connectedTurn = async ({
+  input,
+  traceId,
+  startedAt,
+}: {
+  input: ConnectedCellInput;
+  traceId: string;
+  startedAt: number;
+}): Promise<
+  { ok: true; outcome: CallOutcome } | { ok: false; error: unknown }
+> => {
+  const {
+    cell,
+    projectId,
+    agent,
+    isAborted,
+    dispatch = relayDispatch,
+    sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now = () => Date.now(),
+  } = input;
+  const dispatchAgent = dispatchAgentOf(agent);
   try {
-    outcome = await dispatchWithBusyRetry({
+    const outcome = await dispatchWithBusyRetry({
       dispatch,
       sleep,
       now,
@@ -2165,31 +2213,35 @@ export async function* executeConnectedCell({
         traceId,
       }),
     });
+    return { ok: true, outcome };
   } catch (error) {
-    yield connectedFailureEvent({
-      cell,
-      projectId,
-      agentId: agent.id,
-      error,
-      traceId,
-      duration: now() - startedAt,
-    });
-    return;
+    return { ok: false, error };
   }
+};
 
-  const output = connectedOutputText(outcome.output);
-
-  yield {
-    type: "target_result",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-    output,
-    // The whole cell, not only the call that answered: a row that waited out
-    // a busy agent took that time too, and a run comparison reads it.
-    duration: now() - startedAt,
-    traceId,
-  };
-
+/**
+ * The evaluators of the column, over the answer the turn gave.
+ *
+ * They run through the same path a workflow target uses, so a connected
+ * column scores, costs and traces the way every other column does.
+ */
+async function* gradeConnectedAnswer({
+  input,
+  output,
+  traceId,
+}: {
+  input: ConnectedCellInput;
+  output: string;
+  traceId: string;
+}): AsyncGenerator<EvaluationV3Event> {
+  const {
+    cell,
+    projectId,
+    datasetColumns = [],
+    loadedEvaluators,
+    resultMapperConfig,
+    isAborted,
+  } = input;
   if (cell.evaluatorConfigs.length === 0) return;
 
   const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
