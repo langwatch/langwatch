@@ -131,6 +131,9 @@ type Unpublished = any;
 
 type UnpublishedQuery = { query: { input: Unpublished; output: Unpublished } };
 type UnpublishedMutation = { mutation: { input: Unpublished; output: Unpublished } };
+type UnpublishedSubscription = {
+  subscription: { input: Unpublished; output: Unpublished };
+};
 
 export type WorkflowApiMap = {
   workflow: {
@@ -139,7 +142,13 @@ export type WorkflowApiMap = {
 
     create: {
       mutation: {
-        input: { projectId: string; dsl: StudioWorkflow; commitMessage: string };
+        input: {
+          projectId: string;
+          dsl: StudioWorkflow;
+          commitMessage: string;
+          /** Publish on creation, so a workflow made for an evaluator can run at once. */
+          publish?: boolean;
+        };
         output: { workflow: { id: string } };
       };
     };
@@ -251,7 +260,8 @@ export type WorkflowApiMap = {
    * letter for letter so a studio query and the same query fired from a page
    * this application still serves land on ONE React Query cache entry.
    */
-  agents: { getById: UnpublishedQuery; update: UnpublishedMutation };
+  agents: { getAll: UnpublishedQuery; getById: UnpublishedQuery; update: UnpublishedMutation };
+  batchRecord: { getAllByexperimentSlug: UnpublishedQuery };
   analytics: { dataForFilter: UnpublishedQuery };
   annotationScore: { getAllActive: UnpublishedQuery };
   dataset: {
@@ -274,17 +284,46 @@ export type WorkflowApiMap = {
     availableCustomEvaluators: UnpublishedQuery;
     availableEvaluators: UnpublishedQuery;
     runEvaluation: UnpublishedMutation;
+    warmupLambda: UnpublishedMutation;
   };
   evaluators: {
     getAll: UnpublishedQuery;
     create: UnpublishedMutation;
+    delete: UnpublishedMutation;
     getById: UnpublishedQuery;
     update: UnpublishedMutation;
   };
+  /**
+   * THE EXPERIMENTS FAMILY'S OWN, and the reason this block is the longest.
+   * `@langwatch/experiment-web` serves five addresses out of this transport —
+   * the list, the read-only result view, the two workbench pages and the
+   * retired wizard's forward — and its screens answer to THIS host, because the
+   * studio slice moved `experiments-v3` into that package with
+   * `studio-host/*` already wired through it. Declaring the paths here is what
+   * keeps a workbench query and the same query fired from the studio on ONE
+   * React Query cache entry.
+   *
+   * `onExperimentUpdate` is a SUBSCRIPTION, and it is the first one this map
+   * declares: the workbench listens for a save that landed elsewhere (Langy's
+   * backend fallback, the API, another tab) and reloads a clean workbench
+   * silently. `ProcedureShape` carries the lane, so it is declared like any
+   * other procedure.
+   */
   experiments: {
+    copy: UnpublishedMutation;
+    deleteExperiment: UnpublishedMutation;
+    getAllForEvaluationsList: UnpublishedQuery;
+    getEvaluationsV3BySlug: UnpublishedQuery;
     getExperimentBatchEvaluationRun: UnpublishedQuery;
     getExperimentBatchEvaluationRuns: UnpublishedQuery;
     getExperimentBySlugOrId: UnpublishedQuery;
+    getExperimentDSPyRuns: UnpublishedQuery;
+    getExperimentDSPyStep: UnpublishedQuery;
+    getWorkbenchVersion: UnpublishedQuery;
+    listWorkbenchVersions: UnpublishedQuery;
+    onExperimentUpdate: UnpublishedSubscription;
+    restoreWorkbenchVersion: UnpublishedMutation;
+    saveEvaluationsV3: UnpublishedMutation;
   };
   featureFlag: { isEnabled: UnpublishedQuery };
   httpProxy: { execute: UnpublishedMutation };
@@ -295,7 +334,15 @@ export type WorkflowApiMap = {
     getResolvedDefault: UnpublishedQuery;
     listAllForProjectForFrontend: UnpublishedQuery;
   };
-  monitors: { isNameAvailable: UnpublishedMutation };
+  monitors: {
+    create: UnpublishedMutation;
+    delete: UnpublishedMutation;
+    getAllForProject: UnpublishedQuery;
+    getById: UnpublishedQuery;
+    getPerformanceForProject: UnpublishedQuery;
+    isNameAvailable: UnpublishedMutation;
+    update: UnpublishedMutation;
+  };
   ops: { getScope: UnpublishedQuery };
   project: {
     getFieldRedactionStatus: UnpublishedQuery;

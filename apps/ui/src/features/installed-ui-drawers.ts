@@ -28,16 +28,22 @@ import {
 
 import { warmChunk } from "../behavior/chunk-reload";
 import { agentDrawers } from "./agent";
+import { annotationScoresDrawers } from "./annotation-scores";
 import { datasetDrawers } from "./dataset";
 import { routeTraceDrawerForV2 } from "./drawers";
 import { evaluatorDrawers } from "./evaluator";
 import { promptDrawers } from "./prompt";
+import { workflowDrawers } from "./workflows";
+import { simulationsDrawers } from "./simulations";
 
 export const installedUiDrawers = {
   ...agentDrawers,
+  ...annotationScoresDrawers,
   ...datasetDrawers,
   ...evaluatorDrawers,
   ...promptDrawers,
+  ...simulationsDrawers,
+  ...workflowDrawers,
 } satisfies UiDrawerRegistry;
 
 /** Every drawer name this application answers. */

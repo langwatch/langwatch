@@ -13,12 +13,23 @@
 import { describe, expect, it } from "vitest";
 
 import { agentDrawers } from "../src/features/agent";
+import { annotationScoresDrawers } from "../src/features/annotation-scores";
 import { datasetDrawers } from "../src/features/dataset";
 import { evaluatorDrawers } from "../src/features/evaluator";
 import { installedUiDrawers } from "../src/features/installed-ui-drawers";
 import { promptDrawers } from "../src/features/prompt";
+import { simulationsDrawers } from "../src/features/simulations";
+import { workflowDrawers } from "../src/features/workflows";
 
-const perFeature = [agentDrawers, datasetDrawers, evaluatorDrawers, promptDrawers];
+const perFeature = [
+  agentDrawers,
+  annotationScoresDrawers,
+  datasetDrawers,
+  evaluatorDrawers,
+  promptDrawers,
+  simulationsDrawers,
+  workflowDrawers,
+];
 
 describe("the installed drawer registry", () => {
   describe("given every feature's own drawer map", () => {

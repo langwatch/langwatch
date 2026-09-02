@@ -8,6 +8,14 @@
   ],
   "type": "module",
   "exports": {
+    "./components/llmPromptConfigs/constants": {
+      "types": "./src/components/llmPromptConfigs/constants.ts",
+      "default": "./src/components/llmPromptConfigs/constants.ts"
+    },
+    "./components/llmPromptConfigs/LlmConfigField": {
+      "types": "./src/components/llmPromptConfigs/LlmConfigField.tsx",
+      "default": "./src/components/llmPromptConfigs/LlmConfigField.tsx"
+    },
     "./components/llmPromptConfigs/LLMConfigPopover": {
       "types": "./src/components/llmPromptConfigs/LLMConfigPopover.tsx",
       "default": "./src/components/llmPromptConfigs/LLMConfigPopover.tsx"
@@ -15,14 +23,6 @@
     "./components/llmPromptConfigs/LLMModelDisplay": {
       "types": "./src/components/llmPromptConfigs/LLMModelDisplay.tsx",
       "default": "./src/components/llmPromptConfigs/LLMModelDisplay.tsx"
-    },
-    "./components/llmPromptConfigs/LlmConfigField": {
-      "types": "./src/components/llmPromptConfigs/LlmConfigField.tsx",
-      "default": "./src/components/llmPromptConfigs/LlmConfigField.tsx"
-    },
-    "./components/llmPromptConfigs/constants": {
-      "types": "./src/components/llmPromptConfigs/constants.ts",
-      "default": "./src/components/llmPromptConfigs/constants.ts"
     },
     "./components/outputs/OutputsSection": {
       "types": "./src/components/outputs/OutputsSection.tsx",
@@ -32,6 +32,14 @@
       "types": "./src/components/prompts/PromptEditorDrawer.tsx",
       "default": "./src/components/prompts/PromptEditorDrawer.tsx"
     },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./prompts/hooks/useLatestPromptVersion": {
+      "types": "./src/prompts/hooks/useLatestPromptVersion.ts",
+      "default": "./src/prompts/hooks/useLatestPromptVersion.ts"
+    },
     "./prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground": {
       "types": "./src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts",
       "default": "./src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts"
@@ -39,10 +47,6 @@
     "./prompts/utils/llmPromptConfigUtils": {
       "types": "./src/prompts/utils/llmPromptConfigUtils.ts",
       "default": "./src/prompts/utils/llmPromptConfigUtils.ts"
-    },
-    "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
-      "default": "./src/ui/sections/drawers.ts"
     },
     "./screens/prompt-studio": {
       "types": "./src/screens/prompt-studio/index.ts",

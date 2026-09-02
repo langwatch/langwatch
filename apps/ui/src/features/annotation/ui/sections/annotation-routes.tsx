@@ -8,11 +8,18 @@
  * the screen is told rather than having to read the address back. The
  * automations family's tab-as-prop shape, applied to a list.
  *
- * THE FIFTH KEY IS NOT HERE. `pages/[project]/annotations/my-queue` stays in
- * `platform/app`'s own registry: the queue walker mounts the trace family's
- * conversation view, which no package publishes. The moved screens still link
- * to it as a plain address, and the loader merge leaves a key this registry
- * does not name to the host's, so the walker keeps answering.
+ * THE FIFTH KEY LANDED. `pages/[project]/annotations/my-queue` was recorded as
+ * staying behind because the queue walker mounts the trace family's
+ * conversation view, "which no package publishes". The traces family moved that
+ * tree into `@langwatch/trace-web` afterwards, so the walker moved with it — and
+ * `platform/app`'s `AnnotationsLayout` and `useAnnotationQueues`, which were
+ * alive only for this one page, are deleted rather than moved.
+ *
+ * The walker takes the same host as the other four and mounts the TRACE host
+ * itself, inside the package: `ConversationView` and `useConversationTurns` ask
+ * `@langwatch/trace-web`'s port for the project their turns belong to, and
+ * answering that from the annotation host keeps this application mounting one
+ * host per page.
  *
  * Each page is wrapped twice, and the order matters. The host provider is
  * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
@@ -45,6 +52,7 @@ import {
   annotationScreens,
   type AnnotationView,
 } from "@langwatch/annotation-web/screens/annotations";
+import { myQueueScreens } from "@langwatch/annotation-web/screens/my-queue";
 import type { ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import {
@@ -76,9 +84,22 @@ function annotationPage(view: AnnotationView, permission?: string): UiPageLoader
   };
 }
 
+/**
+ * The walker takes no guard, which is `platform/app`'s own policy for it: the
+ * page was wrapped in nothing, and every read behind it is the reviewer's own
+ * queue work.
+ */
+const myQueuePage: UiPageLoader = async () => {
+  const module = await myQueueScreens.myQueue();
+  const guarded = withUiPageGuard({ fallbacks: FALLBACKS })(module.default);
+  guarded.displayName = "AnnotationQueueWalker";
+  return { default: withAnnotationHost(guarded) };
+};
+
 export const annotationPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/annotations": annotationPage("inbox", ANNOTATION_PAGE_PERMISSION),
   "pages/[project]/annotations/me": annotationPage("mine"),
   "pages/[project]/annotations/all": annotationPage("all"),
   "pages/[project]/annotations/[slug]": annotationPage("queue"),
+  "pages/[project]/annotations/my-queue": myQueuePage,
 };

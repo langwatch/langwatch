@@ -14,9 +14,17 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./screens/annotation-scores": {
+      "types": "./src/screens/annotation-scores/index.ts",
+      "default": "./src/screens/annotation-scores/index.ts"
+    },
     "./screens/annotations": {
       "types": "./src/screens/annotations/index.ts",
       "default": "./src/screens/annotations/index.ts"
+    },
+    "./screens/my-queue": {
+      "types": "./src/screens/my-queue/index.ts",
+      "default": "./src/screens/my-queue/index.ts"
     }
   },
   "scripts": {
@@ -29,9 +37,12 @@
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
     "date-fns": "^4.1.0",
     "diff": "^9.0.0",
     "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
     "react": "^19.2.7",
     "zod": "^4.4.3"
   },

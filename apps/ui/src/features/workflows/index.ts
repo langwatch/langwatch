@@ -10,6 +10,7 @@
  */
 
 import { workflowApi } from "@langwatch/workflow-web/screens/workflows";
+import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
 import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
 import { workflowPageLoaders } from "./ui/sections/workflows-routes";
 
@@ -17,5 +18,45 @@ export const workflowApiBinding: UiFeatureApiBinding = uiFeatureApi({
   name: "@langwatch/workflow-web",
   api: workflowApi,
 });
+
+/**
+ * The drawers mounted in the STUDIO host, by the name the address uses.
+ *
+ * SIX OF THEM AND ONLY ONE IS THIS FAMILY'S COMPONENT: three are published by
+ * `@langwatch/evaluator-web`, two by `@langwatch/dataset-web` and one by
+ * `@langwatch/prompt-web`. What they share is the host they read — every one
+ * came out of `platform/app` with the studio slice, already wired to
+ * `@langwatch/workflow-web/studio-host/*` — and a drawer is mounted where its
+ * host is. See `ui/sections/studio-host-drawers` for the whole argument.
+ *
+ * Lazy, like every page loader here, so six editors and a CSV parser stay out
+ * of the bundle until a reader opens one.
+ */
+export const workflowDrawers: UiDrawerRegistry = {
+  addOrEditDataset: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "AddOrEditDatasetDrawer",
+  }),
+  uploadCSV: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "UploadCSVDrawer",
+  }),
+  codeEvaluatorEditor: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "CodeEvaluatorEditorDrawer",
+  }),
+  evaluatorCategorySelector: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "EvaluatorCategorySelectorDrawer",
+  }),
+  evaluatorEditor: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "EvaluatorEditorDrawer",
+  }),
+  promptEditor: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "PromptEditorDrawer",
+  }),
+};
 
 export { workflowPageLoaders };

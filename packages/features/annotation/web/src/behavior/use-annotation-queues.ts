@@ -39,6 +39,7 @@ export function useAnnotationQueues({
   selectedAnnotations = "pending",
   queueId,
   showQueueAndUser = false,
+  allQueueItems = false,
   pageOffset,
   pageSize,
   startDate,
@@ -52,6 +53,12 @@ export function useAnnotationQueues({
   queueId?: string;
   /** Widens it from the reviewer's own items to every queue they are on. */
   showQueueAndUser?: boolean;
+  /**
+   * Takes the paging off. The QUEUE WALKER's reading: it steps through the
+   * whole sitting rather than a page of it, so a page boundary would end the
+   * walk early.
+   */
+  allQueueItems?: boolean;
   pageOffset: number;
   pageSize: number;
   /** Narrows the read to items queued inside this range. */
@@ -68,7 +75,7 @@ export function useAnnotationQueues({
       pageOffset,
       queueId: queueId ?? "",
       showQueueAndUser,
-      allQueueItems: false,
+      allQueueItems,
       ...dateRangeInput({ startDate, endDate }),
     },
     { enabled: !!projectId && enabled, refetchOnWindowFocus: false },

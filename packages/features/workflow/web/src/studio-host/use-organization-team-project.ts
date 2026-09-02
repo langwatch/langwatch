@@ -25,7 +25,7 @@
 
 import { useMemo } from "react";
 
-import { useWorkflowHost } from "../model/workflow-host";
+import { useWorkflowHost, type WorkflowCopyTarget } from "../model/workflow-host";
 import type { Project } from "../model/prisma-types";
 import { api } from "./api";
 
@@ -50,6 +50,16 @@ export type StudioScopeReading = {
   projectId: string | undefined;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
+  /**
+   * Every project the reader may replicate into, already derived by the host.
+   *
+   * `platform/app` derived this inside each replicate dialog, by walking the
+   * organization graph and asking `~/server/api/rbac` about the reader's team
+   * membership — a server module imported into a browser component. The
+   * composing application answers it now, from `@langwatch/authz-contract`, and
+   * the dialogs read the answer.
+   */
+  copyTargets: readonly WorkflowCopyTarget[];
   // oxlint-disable-next-line no-explicit-any
   modelProviders: any;
   /** False while the composing application is still resolving the scope. */
@@ -59,7 +69,17 @@ export type StudioScopeReading = {
 };
 
 export function useOrganizationTeamProject(
-  _options: { redirectToOnboarding?: boolean } = {},
+  /**
+   * Accepted and ignored, all of it. Both bouncers — "no organization" and "no
+   * project" — are the application's decision about its own route table, and a
+   * screen that navigates on a scope it could not resolve is how a page bounces
+   * a signed-in reader out of the address they asked for.
+   */
+  _options: {
+    redirectToOnboarding?: boolean;
+    redirectToProjectOnboarding?: boolean;
+    keepFetching?: boolean;
+  } = {},
 ): StudioScopeReading {
   const host = useWorkflowHost();
   const scope = host.scope();
@@ -106,6 +126,7 @@ export function useOrganizationTeamProject(
       hasPermission: (permission: string) => host.hasPermission(permission),
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
+      copyTargets: host.copyTargets(),
       // oxlint-disable-next-line no-explicit-any
       modelProviders: modelProviders.data as any,
       isResolved: scope.isResolved ?? !!scope.projectId,

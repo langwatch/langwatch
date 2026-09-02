@@ -26,7 +26,23 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { uiCopyTargets } from "../../../../model/ui-copy-targets";
 import { UiWorkflowHost, WORKFLOW_COPY_PERMISSION } from "../../behavior/workflows-host.adapter";
 
-function WorkflowHost({ children }: { children: ReactNode }) {
+function WorkflowHost({
+  children,
+  copyPermission = WORKFLOW_COPY_PERMISSION,
+}: {
+  children: ReactNode;
+  /**
+   * The grant the replicate picker asks about, per family.
+   *
+   * Workflows ask `workflows:create`, because replicating writes a new workflow
+   * into the target project. The EXPERIMENTS family mounts this same host — its
+   * closure answers to `@langwatch/workflow-web/studio-host/*`, so a second port
+   * would have split the tRPC cache — and its replicate dialog has always asked
+   * `evaluations:manage`. One derivation, told which question to ask, rather
+   * than two hosts over one page.
+   */
+  copyPermission?: string;
+}) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
 
@@ -80,9 +96,9 @@ function WorkflowHost({ children }: { children: ReactNode }) {
       uiCopyTargets({
         organizations: organizations.data ?? [],
         userId: session.currentUser()?.id,
-        permission: WORKFLOW_COPY_PERMISSION,
+        permission: copyPermission,
       }),
-    [organizations.data, session],
+    [organizations.data, session, copyPermission],
   );
 
   const reading = route.reading();
@@ -121,10 +137,24 @@ function WorkflowHost({ children }: { children: ReactNode }) {
   return <WorkflowHostProvider value={host}>{children}</WorkflowHostProvider>;
 }
 
-/** Wraps a Workflows screen in the host its package asks for. */
-export function withWorkflowHost<P extends object>(Screen: ComponentType<P>): ComponentType<P> {
+/**
+ * Wraps a screen in the workflow host its package asks for.
+ *
+ * NOT ONLY THE WORKFLOWS FAMILY'S. The experiments family and the legacy
+ * online-evaluation edit form both moved with the studio slice, so their whole
+ * closure — `experiments-v3`'s hooks, `CheckConfigForm` and everything under it
+ * — reads `@langwatch/workflow-web/studio-host/*` for the project, the
+ * transport, the router, the toasts and the errors. Mounting this host over
+ * their screens is what makes those readings answer; mounting a second port of
+ * their own would have split the tRPC cache and left `useTargetName` asking a
+ * host nothing had mounted.
+ */
+export function withWorkflowHost<P extends object>(
+  Screen: ComponentType<P>,
+  options: { copyPermission?: string } = {},
+): ComponentType<P> {
   const Mounted = (props: P) => (
-    <WorkflowHost>
+    <WorkflowHost {...(options.copyPermission ? { copyPermission: options.copyPermission } : {})}>
       <Screen {...props} />
     </WorkflowHost>
   );

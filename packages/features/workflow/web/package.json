@@ -42,6 +42,10 @@
       "types": "./src/components/HoverableBigText.tsx",
       "default": "./src/components/HoverableBigText.tsx"
     },
+    "./components/Markdown": {
+      "types": "./src/components/Markdown.tsx",
+      "default": "./src/components/Markdown.tsx"
+    },
     "./components/OverflownText": {
       "types": "./src/components/OverflownText.tsx",
       "default": "./src/components/OverflownText.tsx"
@@ -50,6 +54,10 @@
       "types": "./src/components/VerticalFormControl.tsx",
       "default": "./src/components/VerticalFormControl.tsx"
     },
+    "./components/blocks/CodeBlockEditor": {
+      "types": "./src/components/blocks/CodeBlockEditor.tsx",
+      "default": "./src/components/blocks/CodeBlockEditor.tsx"
+    },
     "./components/code/RenderCode": {
       "types": "./src/components/code/RenderCode.tsx",
       "default": "./src/components/code/RenderCode.tsx"
@@ -57,6 +65,22 @@
     "./components/code/langwatchEndpointEnv": {
       "types": "./src/components/code/langwatchEndpointEnv.ts",
       "default": "./src/components/code/langwatchEndpointEnv.ts"
+    },
+    "./components/run-via-api/DataSourcePicker": {
+      "types": "./src/components/run-via-api/DataSourcePicker.tsx",
+      "default": "./src/components/run-via-api/DataSourcePicker.tsx"
+    },
+    "./components/run-via-api/runSnippets": {
+      "types": "./src/components/run-via-api/runSnippets.ts",
+      "default": "./src/components/run-via-api/runSnippets.ts"
+    },
+    "./components/run-via-api/useRunViaApiTabs": {
+      "types": "./src/components/run-via-api/useRunViaApiTabs.ts",
+      "default": "./src/components/run-via-api/useRunViaApiTabs.ts"
+    },
+    "./components/ui/IsolatedErrorBoundary": {
+      "types": "./src/components/ui/IsolatedErrorBoundary.tsx",
+      "default": "./src/components/ui/IsolatedErrorBoundary.tsx"
     },
     "./components/ui/PropertySectionTitle": {
       "types": "./src/components/ui/PropertySectionTitle.tsx",
@@ -90,6 +114,10 @@
       "types": "./src/hooks/useDejaViewLink.ts",
       "default": "./src/hooks/useDejaViewLink.ts"
     },
+    "./hooks/useEscapeKey": {
+      "types": "./src/hooks/useEscapeKey.ts",
+      "default": "./src/hooks/useEscapeKey.ts"
+    },
     "./hooks/useFeatureFlag": {
       "types": "./src/hooks/useFeatureFlag.ts",
       "default": "./src/hooks/useFeatureFlag.ts"
@@ -106,6 +134,10 @@
       "types": "./src/model/prisma-types.ts",
       "default": "./src/model/prisma-types.ts"
     },
+    "./model/workflow-host": {
+      "types": "./src/model/workflow-host.ts",
+      "default": "./src/model/workflow-host.ts"
+    },
     "./optimization_studio/components/AddModelProviderKey": {
       "types": "./src/optimization_studio/components/AddModelProviderKey.tsx",
       "default": "./src/optimization_studio/components/AddModelProviderKey.tsx"
@@ -121,6 +153,14 @@
     "./optimization_studio/components/code/workflow-code-editor.transport": {
       "types": "./src/optimization_studio/components/code/workflow-code-editor.transport.tsx",
       "default": "./src/optimization_studio/components/code/workflow-code-editor.transport.tsx"
+    },
+    "./optimization_studio/components/properties/modals/EmojiPickerModal": {
+      "types": "./src/optimization_studio/components/properties/modals/EmojiPickerModal.tsx",
+      "default": "./src/optimization_studio/components/properties/modals/EmojiPickerModal.tsx"
+    },
+    "./optimization_studio/utils/executionStateError": {
+      "types": "./src/optimization_studio/utils/executionStateError.ts",
+      "default": "./src/optimization_studio/utils/executionStateError.ts"
     },
     "./screens/studio": {
       "types": "./src/screens/studio/index.ts",
@@ -170,6 +210,14 @@
       "types": "./src/types.ts",
       "default": "./src/types.ts"
     },
+    "./ui/elements/loading-screen": {
+      "types": "./src/ui/elements/loading-screen.tsx",
+      "default": "./src/ui/elements/loading-screen.tsx"
+    },
+    "./ui/elements/no-data-info-block": {
+      "types": "./src/ui/elements/no-data-info-block.tsx",
+      "default": "./src/ui/elements/no-data-info-block.tsx"
+    },
     "./utils/compat/next-dynamic": {
       "types": "./src/utils/compat/next-dynamic.ts",
       "default": "./src/utils/compat/next-dynamic.ts"
@@ -185,6 +233,10 @@
     "./utils/constants": {
       "types": "./src/utils/constants.ts",
       "default": "./src/utils/constants.ts"
+    },
+    "./utils/crispBubblePolicy": {
+      "types": "./src/utils/crispBubblePolicy.ts",
+      "default": "./src/utils/crispBubblePolicy.ts"
     },
     "./utils/formatMoney": {
       "types": "./src/utils/formatMoney.ts",
@@ -202,13 +254,25 @@
       "types": "./src/utils/slugify.ts",
       "default": "./src/utils/slugify.ts"
     },
+    "./utils/sse/fetchSSE": {
+      "types": "./src/utils/sse/fetchSSE.ts",
+      "default": "./src/utils/sse/fetchSSE.ts"
+    },
     "./utils/stringCasing": {
       "types": "./src/utils/stringCasing.ts",
       "default": "./src/utils/stringCasing.ts"
     },
+    "./utils/trpcError": {
+      "types": "./src/utils/trpcError.ts",
+      "default": "./src/utils/trpcError.ts"
+    },
     "./utils/types": {
       "types": "./src/utils/types.ts",
       "default": "./src/utils/types.ts"
+    },
+    "./utils/workflow-api": {
+      "types": "./src/utils/workflow-api.tsx",
+      "default": "./src/utils/workflow-api.tsx"
     },
     "./utils/zodSalvage": {
       "types": "./src/utils/zodSalvage.ts",
@@ -241,6 +305,7 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "^4.7.0",

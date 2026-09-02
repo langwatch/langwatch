@@ -32,6 +32,12 @@ export type AnnotationTrace = {
   };
   input?: { value: string } | null;
   output?: { value: string } | null;
+  /**
+   * The thread the trace belongs to, which the QUEUE WALKER reads to know which
+   * conversation to render around the item. The list never touches it, so it is
+   * optional here rather than a widening of what a row is.
+   */
+  metadata?: { thread_id?: string | null } | null;
 };
 
 const scoreAnswerSchema = z.object({

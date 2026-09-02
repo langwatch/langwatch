@@ -152,6 +152,21 @@ export type AnnotationApiMap = {
       };
     };
 
+    /**
+     * Marks the item the reviewer just finished as done.
+     *
+     * The QUEUE WALKER's write, which is why it arrives with that key: the
+     * walker records an item as done at the moment the sitting ends, not when
+     * the button was pressed, so a reviewer who backs out lands on an item that
+     * is still theirs.
+     */
+    markQueueItemDone: {
+      mutation: {
+        input: ProjectScope & { queueItemId: string };
+        output: { id: string } | null;
+      };
+    };
+
     /** Takes queue items out of the reviewer's queue for good. */
     deleteQueueItems: {
       mutation: {
@@ -184,6 +199,21 @@ export type AnnotationApiMap = {
   };
 
   traces: {
+    /**
+     * One trace, whole.
+     *
+     * The walker's fallback read: a thread older than the conversation's
+     * ninety-day window answers with no turns, and the item's own trace is
+     * handed to the conversation view as its single turn instead.
+     */
+    getById: {
+      query: {
+        input: ProjectScope & { traceId: string };
+        // oxlint-disable-next-line no-explicit-any
+        output: any;
+      };
+    };
+
     /**
      * The traces behind a set of annotations, for the input/output columns and
      * the export.
@@ -289,3 +319,24 @@ export type AnnotationApiMap = {
  * shell can mount `annotationApi.Provider`.
  */
 export const annotationApi = createFeatureApi<AnnotationApiMap>();
+
+/**
+ * The name the queue walker's 810 lines already spell.
+ *
+ * `platform/app`'s modules wrote `api.annotation.x.useQuery(...)`, and keeping
+ * the name is what let that screen and its two suites travel without an edit.
+ */
+export { annotationApi as api };
+
+/** What each procedure in the map answers, read off the map structurally. */
+export type RouterOutputs = {
+  [K in keyof AnnotationApiMap]: OutputsOf<AnnotationApiMap[K]>;
+};
+
+type OutputsOf<TNode> = TNode extends { query: { output: infer TOut } }
+  ? TOut
+  : TNode extends { mutation: { output: infer TOut } }
+    ? TOut
+    : TNode extends { subscription: { output: infer TOut } }
+      ? TOut
+      : { [K in keyof TNode]: OutputsOf<TNode[K]> };

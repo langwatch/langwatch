@@ -18,6 +18,10 @@
       "types": "./src/components/checks/DynamicZodForm.tsx",
       "default": "./src/components/checks/DynamicZodForm.tsx"
     },
+    "./components/evaluations/EvaluatorTracesMapping": {
+      "types": "./src/components/evaluations/EvaluatorTracesMapping.tsx",
+      "default": "./src/components/evaluations/EvaluatorTracesMapping.tsx"
+    },
     "./components/evaluators/EvaluatorEditorContent": {
       "types": "./src/components/evaluators/EvaluatorEditorContent.tsx",
       "default": "./src/components/evaluators/EvaluatorEditorContent.tsx"
@@ -30,13 +34,21 @@
       "types": "./src/components/shared/EvaluatorResultChip.tsx",
       "default": "./src/components/shared/EvaluatorResultChip.tsx"
     },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./editor-drawers": {
+      "types": "./src/ui/sections/editor-drawers.ts",
+      "default": "./src/ui/sections/editor-drawers.ts"
+    },
     "./hooks/useAvailableEvaluators": {
       "types": "./src/hooks/useAvailableEvaluators.ts",
       "default": "./src/hooks/useAvailableEvaluators.ts"
     },
-    "./drawers": {
-      "types": "./src/ui/sections/drawers.ts",
-      "default": "./src/ui/sections/drawers.ts"
+    "./screens/evaluation-edit": {
+      "types": "./src/screens/evaluation-edit/index.ts",
+      "default": "./src/screens/evaluation-edit/index.ts"
     },
     "./screens/evaluators": {
       "types": "./src/screens/evaluators/index.ts",
@@ -45,6 +57,10 @@
     "./server/evaluations/types": {
       "types": "./src/server/evaluations/types.ts",
       "default": "./src/server/evaluations/types.ts"
+    },
+    "./utils/evaluationResults": {
+      "types": "./src/utils/evaluationResults.ts",
+      "default": "./src/utils/evaluationResults.ts"
     }
   },
   "scripts": {
@@ -65,8 +81,8 @@
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@xyflow/react": "^12.11.1",
@@ -74,6 +90,7 @@
     "langwatch": "workspace:*",
     "lodash-es": "^4.18.1",
     "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
     "numeral": "^2.0.6",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.80.0",
