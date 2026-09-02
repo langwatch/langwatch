@@ -1155,12 +1155,123 @@ a production caller. Zero platform edits. `apps/worker` gained `@langwatch/evalu
 `@langwatch/evaluation-server` (filtered install). Deployment impact: none until the conversion.
 
 **What remains in the step-(g) census:** the conversion itself — the 21-field trace bundle, the 28 byte-frozen
-keys, mounting the ten staged compositions, and the three named absences that must be closed first: the
+keys, mounting the ten staged compositions, and the two named absences still open: the
 product-analytics sink (`WorkerLoggedProductAnalyticsAdapter` logs `first_trace_integrated` instead of
-delivering it), the customer-supplied webhook transport for automation's graph half, and the
-`RedisTenantBroadcastAdapter`'s three producers. The collector edge (`langwatch_edge_spool_fail_open_total`,
-`langwatch_edge_media_extract_fail_open_total`, `edge-media-extraction`'s use of the drop catalog) stays
-excluded by name: it is apps/api's conversion, not the worker's.
+delivering it) and the `RedisTenantBroadcastAdapter`'s three producers. The third — the customer-supplied
+webhook transport for automation's graph half — is CLOSED (below). The collector edge
+(`langwatch_edge_spool_fail_open_total`, `langwatch_edge_media_extract_fail_open_total`,
+`edge-media-extraction`'s use of the drop catalog) stays excluded by name: it is apps/api's conversion, not
+the worker's.
+
+**Named absence closed (uncommitted at time of writing): the customer-supplied webhook transport.**
+`WebhookDeliveryTransport` — declared by `@langwatch/automation-server`, consumed by
+`WorkerAutomationNotificationDeliveryAdapter`, injected as the optional `webhookTransport` in
+`apps/worker/src/app/worker-automation-graph.composition.ts` — is now satisfied by a real composition, and the
+graph vertical DEFAULTS to it instead of refusing webhook alerts by name.
+
+HOME: a new shared non-feature package, `@langwatch/egress` (`packages/egress`), NOT a feature server.
+The decision is forced rather than preferred. This fence has three eventual consumers — the graph-alert
+transport composed in `apps/worker` (OSS), the Enterprise webhook endpoints conversion in
+`packages/enterprise/features/webhook/server`, and the Slack Web API transport, which already stands on
+`sendHttpDestination` + `webhookUrlValidator` in the application. `architecture-lint`'s `cross-feature` policy
+forbids a feature server package from depending on another feature's server package, so ANY feature home
+(notification-server beside the mail capability, automation-server itself) is unreachable by the Enterprise
+webhook server. A non-feature package under `packages/` is classified by nothing in `discoverClassifiedPackages`,
+so it is reachable by all three and subject to no layout grammar; it follows the grammar anyway where a concept
+really is one (`ports/*.port.ts` with an abstract class, `adapters/in-memory.*.adapter.ts`,
+`services/*.service.ts`). The name is the ledger's own words for it — "shared egress policy rather than an
+automation asset" — and covers the whole stack rather than one consumer: the address policy, the IP-pinned
+fetch, and the webhook sender that stands on both. `@langwatch/ssrf` was NOT extended: it is a dependency-free
+classification table shared byte-for-byte with `pkg/ssrf` in Go and held to one conformance corpus, and putting
+undici, DNS and an HMAC signer in it would end that.
+
+HARVESTED (1,526 application lines into 1,653 package lines across twelve modules, plus 1,226 lines of test):
+`ssrfProtection.ts` (710) split into `ssrf/url-validator.ts` (the admission decision + DNS resolution) and
+`ssrf/fenced-fetch.ts` (the IP-pinned fetch, redirect ladder and connection-error formatters);
+`ssrfConstants.ts` (72) → `ssrf/blocked-hosts.ts`; `urlPolicy.ts` (128) → `webhook/url-policy.ts`;
+`signature.ts` (123) → `webhook/signature.ts`; `dispatchBudget.ts` (48) → `webhook/dispatch-budget.ts` +
+`ports/webhook-dispatch-rate-limiter.port.ts` + `adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts`
+(the in-memory branch of the application's `rateLimit.ts`, fixed-window approximation and sweep included);
+`httpDestination.ts` (203) → `webhook/http-destination.ts`; `sendWebhook.ts` (242) split into
+`webhook/delivery-classification.ts` (the pure status verdict and the header names) and
+`services/webhook-egress.service.ts` (the composed sender).
+
+LEFT BEHIND FOR THE ENTERPRISE WEBHOOK CONVERSION, proved by reading consumers rather than assumed: the whole
+of `destinations/` (`sqsWebhookDestination.ts` 491, `sqsQueueUrl.ts` 95, `types.ts` 80,
+`httpWebhookDestination.ts` 65, `index.ts` 41 = 772 lines), `deliveryLog.ts` (58) and
+`enterpriseWebhookEndpointService.ts` (56). Every one of them is reached only from
+`~/runtime/app/features/webhooks` and names `PrismaClient`, `WebhookEndpointDelivery` or the AWS SDK;
+`WebhookDeliveryTransport` reaches none of them. `httpWebhookDestination` is the only file in that set that
+touches this slice, and only as a CALLER of `sendWebhook` — so the Enterprise conversion imports the packaged
+sender rather than carrying a second one. THE SLACK TRANSPORT WAS NOT REWIRED: `WorkerSlackWebApiTransportAdapter`
+is a plain fetch to two compiled-in `slack.com` constants with nothing customer-supplied in it, and the
+application's `slackWebApi.ts` standing on the same fence is worth converging on WHEN Slack converts, not now.
+
+FOUR DELIBERATE DIFFERENCES FROM THE FROZEN TWIN, all of them a package refusing to guess where the application
+reads an environment variable at module scope. (1) `validateUrl` is REQUIRED on `sendHttpDestination`; the
+application's is optional and falls back to a module-level validator built from `BLOCK_LOCAL_HTTP_CALLS`, which
+a package has no way to build and no business defaulting. (2) The TLS answer is a required argument; the
+application derives `rejectUnauthorized` from `IS_SAAS` at module load, and `apps/worker` passes
+`config.deployment.saas`, the App's own reading of the same variable, so an on-prem receiver with a self-signed
+certificate stays reachable from both graphs. (3) The dispatch counter is a port; the application reaches for
+its app's Redis. (4) A redirect that the caller asked to FOLLOW without supplying a policy to re-judge the hop
+is refused rather than taken — fail-closed, where the application re-judges through the weaker env-default
+validator. The webhook path never reaches (4): it passes `followRedirects: false`, which is exactly why the
+application refuses redirects on this channel in the first place.
+
+PINS, all literals in the package's own tests rather than reads of the application's source. Admission: https
+only, the default port only, a real host, never credentials — under BOTH escape-hatch states, because which
+rules the hatch relaxes is the part that drifts. Addresses: ten IPv4 literals across loopback, RFC 1918, CGNAT,
+TEST-NET, benchmarking, multicast and reserved; four IPv6; three metadata hosts by name plus five cloud-internal
+suffixes; a hostname resolving into a private range; an allowlist that never reaches metadata. Redirects:
+refused with the address the `Location` named never contacted, observed against a real local server through the
+real fence. Budget: `webhook-dispatch:<scope>`, 3600 seconds, 1000 per hour, counted once per attempt, skipped
+for a test fire, and `langwatch:ratelimit:` as the Redis key prefix both graphs share. Wire: `Content-Type:
+application/json`, `X-LangWatch-Event-Id` by default with `X-LangWatch-Delivery-Id` for the batch channel,
+`X-LangWatch-Delivery-Attempt`, `X-LangWatch-Test-Fire`, the reserved-header strip and the unresolved
+`__kept__` marker never leaving the process. Budgets: 10,000 ms request deadline carried as both an
+`AbortSignal` and socket-level bounds, 64 KiB response cap with the transfer torn down rather than drained, 200
+characters per captured response header and 32 of them, 300 characters of the receiver's answer in an error.
+Classification: 2xx success, 5xx/429/408 retryable carrying the receiver's `Retry-After`, everything else
+terminal carrying none. SIGNATURE: pinned against `specs/webhooks/signature-vectors.json` directly — all five
+signing vectors reproduced byte for byte and all twenty-one verification vectors answered — which is the
+strongest pin in the slice, because that file is generated from the application's signer and is already what
+the TypeScript and Python SDKs verify against.
+
+TWO FAITHFUL-TWIN FINDINGS, recorded rather than silently hardened. (a) `new URL(...).hostname` keeps IPv6 in
+brackets and `isIP` rejects the bracketed form, so a v6 literal never reaches the address classifier: the strict
+policy refuses it as an unresolvable NAME (retryable) instead of a private address (terminal), and
+`[fd00:ec2::254]` matches nothing on the metadata host list. The webhook layer closes it — `privateIpLiteral`
+strips the brackets and refuses terminally before a send — so every customer-supplied destination is safe; a
+caller that relaxes the address policy AND skips the webhook layer would not be, and nothing does that. Both
+halves are pinned. (b) A graph-alert webhook automation cannot dispatch AT ALL today, in either graph:
+`WebhookProviderAdapter.parseStored` uses a `.strict()` schema listing only the webhook keys, while the upsert
+stores `{...webhookActionParams, ...graphAlert}` — so `threshold`, `operator`, `timePeriod` and `seriesName` ride
+along and `GraphAlertDispatchService.sendWebhook` throws a `ZodError` before the transport is reached. Observed,
+not inferred. It is `@langwatch/automation-server`'s bug, it predates this slice, the channel ships dark behind
+a feature flag, and fixing it is not this slice's; it is why the capability test drives the delivery PORT rather
+than a firing automation.
+
+TWENTY-FOUR SABOTAGES, each red then restored, at least one per rule and every one driven through the port or
+the staged composition: loopback admitted, private range admitted, metadata host admitted, cloud-internal domain
+admitted, redirect followed, an unjudgeable redirect followed (the fail-closed rule), the dispatch cap removed,
+the cap ceiling raised, the cap key drifted, the signature omitted, the signature over the wrong bytes, the
+rotation window collapsed to one secret, the replay window widened, the verifier accepting anything, the
+response cap removed, the request deadline dropped, a fence refusal reported as retryable, reserved customer
+headers sent, the `__kept__` marker sent on the wire, a 3xx classified as delivered, the worker composing the
+wrong TLS answer, the worker composing no shared counter, the graph composing no webhook transport, and the
+delivery adapter ignoring the transport it was given. Two of them (the TLS answer, the graph's default wiring)
+were GREEN on the first pass and are the reason two composition assertions exist at all.
+
+NOT MOUNTED: `apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, the
+application still owns webhook dispatch, `tryCreateWorkerAutomationGraphComposition` still has no production
+caller, and `createWorkerWebhookTransport` is reached only from it and from tests. Zero platform edits.
+`apps/worker` gained `@langwatch/egress` (filtered install; 34 lines of lockfile are this slice's, the rest of
+the hunk is another agent's uncommitted `apps/ui` and `analytics/web` manifests that the workspace install
+recorded). DEPLOYMENT IMPACT: NONE, and no new configuration leaves — the transport composes from
+`deployment.saas` (`IS_SAAS`) and the Redis the process already opens. `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`
+deliberately did NOT come across: the automations channel never passes the escape hatch, only the Enterprise
+endpoints platform does, so it belongs to that conversion.
 
 
 ## How to execute the plan

@@ -6,10 +6,11 @@ import {
   OneProject,
 } from "@langwatch/automation-server/testing";
 import type { SlackApiTransport } from "@langwatch/automation-server";
+import { WebhookEgressService } from "@langwatch/egress";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import type { ProjectService } from "@langwatch/project-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import { tryCreateWorkerAutomationGraphComposition } from "../worker-automation-graph.composition";
 
@@ -97,7 +98,49 @@ function slackBotTriggerRow(key: string) {
   });
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("tryCreateWorkerAutomationGraphComposition", () => {
+  describe("given no webhook transport was supplied", () => {
+    /**
+     * Spec: packages/egress/specs/webhook-egress.feature
+     *
+     * The vertical no longer composes with a hole where the customer-supplied
+     * destination goes. Observed at the seam rather than by firing an
+     * automation, because the strict fence refuses every address a test could
+     * stand a receiver on — which is the point of it.
+     */
+    /** @scenario "The delivery port stops refusing webhook automations by name" */
+    it("builds this process's own fenced sender rather than leaving the channel absent", () => {
+      const created = vi.spyOn(WebhookEgressService, "create");
+
+      composeGraph();
+
+      expect(created).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "The delivery port stops refusing webhook automations by name" */
+    it("leaves a supplied transport alone, so a test can observe a dispatch", () => {
+      const created = vi.spyOn(WebhookEgressService, "create");
+
+      tryCreateWorkerAutomationGraphComposition({
+        config: resolveWorkerConfig(ENVIRONMENT),
+        prisma: createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] }).prisma as never,
+        mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
+        dependencies: {
+          projects: new OneProject() as unknown as ProjectService,
+          analytics: new BreachingAnalytics() as unknown as AnalyticsService,
+        },
+        webhookTransport: {
+          send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
+          assertDelivered: () => undefined,
+        },
+      });
+
+      expect(created).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a deployment that named its own host", () => {
     /** @scenario "The vertical composes from a database and transports alone" */
     it("builds the graph-alert vertical this process can answer with", () => {

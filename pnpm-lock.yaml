@@ -445,6 +445,9 @@ importers:
       '@langwatch/agent-web':
         specifier: workspace:*
         version: link:../../packages/features/agent/web
+      '@langwatch/analytics-web':
+        specifier: workspace:*
+        version: link:../../packages/features/analytics/web
       '@langwatch/annotation-web':
         specifier: workspace:*
         version: link:../../packages/features/annotation/web
@@ -617,6 +620,9 @@ importers:
       '@langwatch/data-privacy-server':
         specifier: workspace:*
         version: link:../../packages/features/data-privacy/server
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../packages/egress
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/billing/contract
@@ -1041,6 +1047,34 @@ importers:
       vite:
         specifier: ^8.1.2
         version: 8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/egress:
+    dependencies:
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../features/automation/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../eventing
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@langwatch/ssrf':
+        specifier: workspace:*
+        version: link:../ssrf
+      undici:
+        specifier: '>=8.9.0 <9'
+        version: 8.10.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
       vitest:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -2241,12 +2275,18 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../../platform-api-client
@@ -2262,6 +2302,9 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+      chakra-react-select:
+        specifier: ^6.1.3
+        version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       date-fns:
         specifier: ^4.1.0
         version: 4.4.0
@@ -2289,12 +2332,18 @@ importers:
       react-feather:
         specifier: ^2.0.10
         version: 2.0.10(react@19.2.8)
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.8)
       react-icons:
         specifier: ^5.7.0
         version: 5.7.0(react@19.2.8)
       recharts:
         specifier: ^3.9.1
         version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
+      shiki:
+        specifier: ^4.3.0
+        version: 4.3.0
       usehooks-ts:
         specifier: ^3.1.1
         version: 3.1.1(react@19.2.8)
@@ -2338,9 +2387,15 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.4(@types/react@19.2.18)
+      '@vitest/browser-playwright':
+        specifier: ^4.1.9
+        version: 4.1.10(bufferutil@4.1.0)(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(playwright@1.61.1)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.10)
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)

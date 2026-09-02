@@ -45,6 +45,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-privacy-server": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",

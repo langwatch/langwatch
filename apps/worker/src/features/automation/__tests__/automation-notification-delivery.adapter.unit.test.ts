@@ -1,5 +1,9 @@
+import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
+import { DispatchError } from "@langwatch/eventing";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { describe, expect, it } from "vitest";
+import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition";
+import { resolveWorkerConfig } from "../../../platform/config/worker.config";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter";
 
 /**
@@ -50,13 +54,16 @@ class RecordingLogger {
   debug(): void {}
 }
 
-function composeDelivery(over: { logger?: RecordingLogger } = {}) {
+function composeDelivery(
+  over: { logger?: RecordingLogger; webhookTransport?: WebhookDeliveryTransport } = {},
+) {
   const mailer = new RecordingMailer();
   const logger = over.logger ?? new RecordingLogger();
   const adapter = WorkerAutomationNotificationDeliveryAdapter.create({
     mailer,
     baseHost: BASE_HOST,
     unsubscribeSigningSecret: SIGNING_KEY,
+    ...(over.webhookTransport ? { webhookTransport: over.webhookTransport } : {}),
     logger: logger as never,
   });
 
@@ -174,6 +181,43 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
 
       await expect(adapter.sendLegacyEmail()).rejects.toThrow(/graph-alert half/);
       await expect(adapter.sendLegacySlackWebhook()).rejects.toThrow(/graph-alert half/);
+    });
+  });
+
+  describe("given a composed alert delivery adapter with this process's own webhook transport", () => {
+    /**
+     * Spec: packages/egress/specs/webhook-egress.feature
+     *
+     * The named absence closing, observed at the port the graph actually calls:
+     * the refusal a webhook alert meets is now the fence's judgement of the
+     * ADDRESS, not the adapter's report that this process owns no sender.
+     */
+    /** @scenario "The delivery port stops refusing webhook automations by name" */
+    it("dispatches into the packaged fence instead of refusing for want of a sender", async () => {
+      const { adapter } = composeDelivery({
+        webhookTransport: createWorkerWebhookTransport({
+          config: resolveWorkerConfig({
+            BASE_HOST,
+            EMAIL_DEFAULT_FROM: "LangWatch <contact@langwatch.ai>",
+          }),
+        }),
+      });
+
+      const error = (await adapter
+        .sendWebhook({
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          eventId: "evt_1",
+          url: "https://10.0.0.5/hook",
+          body: "{}",
+          triggerName: "Error rate",
+        })
+        .catch((err: unknown) => err)) as DispatchError;
+
+      expect(error).toBeInstanceOf(DispatchError);
+      expect(error.retryable).toBe(false);
+      expect(error.message).toMatch(/private or loopback/i);
+      expect(error.message).not.toMatch(/no outbound webhook sender/);
     });
   });
 });

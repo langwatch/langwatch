@@ -19,6 +19,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automation/automation-notification-delivery.adapter";
 import type { WorkerMailComposition } from "./worker-mail.composition";
+import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition";
 import type { WorkerConfig } from "../platform/config/worker.config";
 
 /**
@@ -57,8 +58,11 @@ export type WorkerAutomationGraphCompositionOptions = Readonly<{
   /**
    * An SSRF-fenced outbound sender for customer-supplied webhook URLs.
    *
-   * Absent until outbound egress policy is packaged. Without one, webhook
-   * automations refuse BY NAME at dispatch rather than silently succeeding —
+   * Defaulted to the one this process composes from `@langwatch/egress` and its
+   * own Redis, so a webhook automation leaves here through the same fence the
+   * application sends through. It stays a parameter because a test wants to
+   * observe the request without making one, and because the delivery adapter
+   * still has to refuse BY NAME in a process that composes no sender at all —
    * see `WorkerAutomationNotificationDeliveryAdapter`.
    */
   webhookTransport?: WebhookDeliveryTransport;
@@ -107,7 +111,12 @@ export function tryCreateWorkerAutomationGraphComposition(
       ...(config.mail.unsubscribeSigningSecret === undefined
         ? {}
         : { unsubscribeSigningSecret: config.mail.unsubscribeSigningSecret }),
-      ...(options.webhookTransport ? { webhookTransport: options.webhookTransport } : {}),
+      webhookTransport:
+        options.webhookTransport ??
+        createWorkerWebhookTransport({
+          config,
+          ...(options.redis === undefined ? {} : { redis: options.redis }),
+        }),
       ...(options.slackApiTransport ? { slackApiTransport: options.slackApiTransport } : {}),
       logger,
     }),
