@@ -66,16 +66,16 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../../model/experiments-v3/types";
 import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion";
-import { isRowEmpty } from "../../../model/experiments-v3/empty-row-detection";
+import { isRowEmpty } from "@langwatch/experiment-contract";
 import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks";
-import { isCellInExecution } from "../../../model/experiments-v3/execution-scope";
+import { isCellInExecution } from "@langwatch/experiment-contract";
 import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters";
 import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
 } from "../../../model/experiments-v3/http-agent-utils";
 import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation";
-import { toComparisonConfig } from "../../../model/experiments-v3/normalize-comparison";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks";
 import {
   type PromptOutputField,

@@ -1,10 +1,9 @@
-import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import type {
   EvaluatorConfig,
   LocalPromptConfig,
   TargetConfig,
-} from "~/experiments-v3/types";
+} from "@langwatch/experiment-contract";
 import {
   type Code,
   type Entry,
@@ -14,6 +13,8 @@ import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
   type Signature,
+  type StudioEdge,
+  type StudioNode,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
@@ -41,7 +42,7 @@ import type {
   ExecutionCell,
   WorkflowBuilderInput,
   WorkflowBuilderOutput,
-} from "./types";
+} from "@langwatch/experiment-contract";
 
 // ============================================================================
 // Main Workflow Builder
@@ -148,7 +149,7 @@ const datasetEdge = ({
   inputField: string;
   columnName: string;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
-}): Edge => {
+}): StudioEdge => {
   const columnId =
     datasetColumns.find((column) => column.name === columnName)?.id ?? columnName;
   return {
@@ -189,7 +190,7 @@ export const buildEvaluatorCellWorkflow = ({
   );
 
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
-  const edges: Edge[] = evaluatorConfigs.flatMap((evaluator) => {
+  const edges: StudioEdge[] = evaluatorConfigs.flatMap((evaluator) => {
     const evaluatorNodeId = evaluatorNodeIds[evaluator.id];
     if (!evaluatorNodeId) return [];
     const mappings = datasetId
@@ -238,7 +239,7 @@ export const buildEvaluatorCellWorkflow = ({
 const buildEntryNode = (
   columns: Array<{ id: string; name: string; type: string }>,
   datasetEntry: Record<string, unknown>,
-): Node<Entry> => {
+): StudioNode<Entry> => {
   const outputs: Field[] = columns.map((col) => ({
     identifier: col.id,
     type: columnTypeToFieldType(col.type),
@@ -297,7 +298,7 @@ const buildTargetNode = (
   cell: ExecutionCell,
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): {
-  targetNode: Node<Signature | Code | HttpNodeData | Evaluator>;
+  targetNode: StudioNode<Signature | Code | HttpNodeData | Evaluator>;
   targetNodeId: string;
 } => {
   const targetNodeId = targetConfig.id;
@@ -407,7 +408,7 @@ export const buildEvaluatorTargetNode = (
   targetConfig: TargetConfig,
   cell: ExecutionCell,
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
-): Node<Evaluator> => {
+): StudioNode<Evaluator> => {
   // Get settings: prefer local config if available, otherwise use DB settings
   const dbEvaluator = targetConfig.targetEvaluatorId
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
@@ -477,7 +478,7 @@ export const buildSignatureNodeFromPrompt = ({
   prompt: VersionedPrompt;
   targetConfig: TargetConfig;
   cell: ExecutionCell;
-}): Node<Signature> => {
+}): StudioNode<Signature> => {
   const inputs = (prompt.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],
@@ -634,7 +635,7 @@ export const buildSignatureNodeFromLocalConfig = ({
   cell: ExecutionCell;
   /** The saved prompt this draft started from, if any. */
   basePrompt?: VersionedPrompt;
-}): Node<Signature> => {
+}): StudioNode<Signature> => {
   const inputs = localConfig.inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type as Field["type"],
@@ -731,7 +732,7 @@ export const buildSignatureNodeFromAgent = (
   agent: TypedAgent,
   targetConfig: TargetConfig,
   cell: ExecutionCell,
-): Node<Signature> => {
+): StudioNode<Signature> => {
   const config = agent.config;
 
   // Get inputs with value mappings applied
@@ -835,7 +836,7 @@ export const buildCodeNodeFromAgent = (
   agent: TypedAgent,
   targetConfig: TargetConfig,
   cell: ExecutionCell,
-): Node<Code> => {
+): StudioNode<Code> => {
   const config = agent.config;
 
   // Get inputs with value mappings applied
@@ -882,7 +883,7 @@ export const buildHttpNodeFromAgent = (
   agent: TypedAgent,
   targetConfig: TargetConfig,
   cell: ExecutionCell,
-): Node<HttpNodeData> => {
+): StudioNode<HttpNodeData> => {
   // The agent.type === "http" check is done before calling this function,
   // so we can safely cast the config to HttpComponentConfig
   const config = agent.config as HttpComponentConfig;
@@ -944,10 +945,10 @@ const buildEvaluatorNodes = (
   cell: ExecutionCell,
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): {
-  evaluatorNodes: Array<Node<Evaluator>>;
+  evaluatorNodes: Array<StudioNode<Evaluator>>;
   evaluatorNodeIds: Record<string, string>;
 } => {
-  const evaluatorNodes: Array<Node<Evaluator>> = [];
+  const evaluatorNodes: Array<StudioNode<Evaluator>> = [];
   const evaluatorNodeIds: Record<string, string> = {};
 
   evaluatorConfigs.forEach((evaluator, index) => {
@@ -996,7 +997,7 @@ export const buildEvaluatorNode = (
   settings: Record<string, unknown> = {},
   dbEvaluatorId?: string,
   name?: string,
-): Node<Evaluator> => {
+): StudioNode<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
@@ -1057,8 +1058,8 @@ const buildEdges = (
   evaluatorNodeIds: Record<string, string>,
   cell: ExecutionCell,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
-): Edge[] => {
-  const edges: Edge[] = [];
+): StudioEdge[] => {
+  const edges: StudioEdge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
   // Build edges from entry to target based on target mappings

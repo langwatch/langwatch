@@ -64,12 +64,12 @@ export {
 export { ExperimentRunStateStoreAdapter } from "./adapters/experiment-run-state-store.adapter";
 
 /**
- * The workbench run loop's own pieces, moved out of the retired application.
+ * The workbench run loop, moved WHOLE out of the retired application.
  *
- * Only the part of `server/experiments-v3/**` that could cross: the rest of
- * the loop reaches shared execution model that lives in `@langwatch/
- * experiment-web` behind an exports map that publishes no framework-free
- * subpath for it. See the plan's ledger entry for the exact set.
+ * The shared execution model it folds over now lives in
+ * `@langwatch/experiment-contract`, which both the browser that composes a run
+ * and the server that executes it may import — so the loop needed no copy of
+ * what a cell is.
  */
 export { EvaluatorNoInputsResolvedError } from "./experiment-execution.errors";
 export { createSemaphore } from "./processes/experiment-run-semaphore.process";
@@ -80,3 +80,80 @@ export {
 export { getRunUrl } from "./adapters/experiment-run-url.adapter";
 export { ExperimentRunAbortPort } from "./ports/experiment-run-abort.port";
 export { RedisExperimentRunAbortAdapter } from "./adapters/redis.experiment-run-abort.adapter";
+
+export { ExperimentEvaluationReportingPort } from "./ports/experiment-evaluation-reporting.port";
+export { ExperimentModelCostPort } from "./ports/experiment-model-cost.port";
+export {
+  ExperimentRunProgressPort,
+  type ExperimentRunProgressFailure,
+  type ExperimentRunProgressState,
+  type ExperimentRunProgressSummary,
+} from "./ports/experiment-run-progress.port";
+export { ExperimentRunErrorReportingPort } from "./ports/experiment-run-error-reporting.port";
+export { ExperimentSandboxCredentialPort } from "./ports/experiment-sandbox-credential.port";
+export { ExperimentStudioDispatchPort } from "./ports/experiment-studio-dispatch.port";
+export { ExperimentTargetEntityNamesPort } from "./ports/experiment-target-entity-names.port";
+export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port";
+export { RedisExperimentRunProgressAdapter } from "./adapters/redis.experiment-run-progress.adapter";
+
+export {
+  countScopedCells,
+  executeCell,
+  executeWorkflowCell,
+  priceMetrics,
+  requestAbort,
+  resolveScopedRowIndices,
+  runOrchestrator,
+  type ExperimentRunPorts,
+  type OrchestratorInput,
+} from "./services/experiment-run-orchestrator.service";
+export {
+  startPollingRun,
+  type RunResultsPersistence,
+  type StartPollingRunInput,
+} from "./services/experiment-polling-run.service";
+export {
+  buildStateFromWorkbench,
+  planSavedRunCarryOver,
+  planSavedRunSeeding,
+  prepareSavedStateExecution,
+  type SavedStateExecution,
+  type SavedStateExecutionRefusal,
+} from "./services/experiment-saved-state-execution.service";
+export {
+  applyParametersToRows,
+  loadDataset,
+  loadExecutionData,
+  promptLoadKey,
+  workflowLoadKey,
+  type ExecutionDataInputs,
+  type ExecutionDataServices,
+  type LoadedDataset,
+  type LoadedExecutionData,
+  type LoadedWorkflow,
+} from "./services/experiment-execution-data.service";
+export {
+  createRunStateMirror,
+  type RunStateMirror,
+} from "./services/experiment-run-state-mirror.service";
+export { resolveWorkbenchTargetNames } from "./services/experiment-workbench-target-names.service";
+export {
+  EvaluationInputError,
+  NoCommittedVersionError,
+  WorkflowEvaluationService,
+  WorkflowNotFoundError,
+  type WorkflowEvaluationDependencies,
+  type WorkflowEvaluationOutcome,
+  type WorkflowEvaluationParameters,
+} from "./services/experiment-workflow-evaluation.service";
+export {
+  extractTargetOutput,
+  mapNlpEvent,
+  mapThrownErrorEvent,
+  mapWorkflowEvaluatorResult,
+  type ResultMapperConfig,
+} from "./processes/experiment-result-mapping.process";
+export {
+  buildCellWorkflow,
+  buildEvaluatorCellWorkflow,
+} from "./processes/experiment-cell-workflow.process";

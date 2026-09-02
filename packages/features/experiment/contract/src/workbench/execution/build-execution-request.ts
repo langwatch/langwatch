@@ -1,4 +1,4 @@
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { carriedOverCells } from "./run-results";
 import type {
   CarriedOverCell,
@@ -10,7 +10,7 @@ import type {
   EvaluationResults,
   EvaluatorConfig,
   TargetConfig,
-} from "../types";
+} from "../../experiment-workbench";
 import { type CellId, computeExecutionCells } from "../execution-scope";
 import { toComparisonConfig } from "../normalize-comparison";
 

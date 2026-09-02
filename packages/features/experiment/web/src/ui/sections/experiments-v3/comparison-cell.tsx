@@ -22,7 +22,7 @@ import {
 import {
   labelNamesVariant,
   resolveVerdictLabel,
-} from "../../../model/experiments-v3/normalize-comparison";
+} from "@langwatch/experiment-contract";
 
 /**
  * How long a clicked winner's column stays highlighted before it

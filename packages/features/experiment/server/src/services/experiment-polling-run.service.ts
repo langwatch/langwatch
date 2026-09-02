@@ -10,33 +10,33 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  InvalidExperimentConfigurationError,
-  StaleWorkbenchStateError,
-  type ExperimentService,
-  type WorkbenchActor,
-} from "@langwatch/experiment-contract";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { countScopedCells, type OrchestratorInput, runOrchestrator } from "./orchestrator";
-import { mapThrownErrorEvent } from "./resultMapper";
-import {
   applyRunEvent,
   emptyRunResultsDraft,
+  generateHumanReadableId,
+  InvalidExperimentConfigurationError,
   mergeRunResults,
   planRunMerge,
-  type RunResultsDraft,
   runResultsAreEmpty,
-} from "./runResults";
-import { runStateManager } from "./runStateManager";
-import { getRunUrl } from "./runUrl";
-import {
+  StaleWorkbenchStateError,
+  UNNAMED_FAILURE,
   type EvaluationV3Event,
   type ExecutionScope,
   type ExecutionSummary,
-  UNNAMED_FAILURE,
-} from "./types";
+  type ExperimentService,
+  type RunResultsDraft,
+  type WorkbenchActor,
+} from "@langwatch/experiment-contract";
+import { getRunUrl } from "../adapters/experiment-run-url.adapter";
+import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
+import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process";
+import {
+  countScopedCells,
+  type OrchestratorInput,
+  runOrchestrator,
+} from "./experiment-run-orchestrator.service";
 
-const logger = createLogger("langwatch:experiments-v3:runner");
+const logger = createLogger("langwatch:experiment:polling-run");
 
 /**
  * Where a completed run writes its cells so an open page can show them.
@@ -57,6 +57,15 @@ export type StartPollingRunInput = Omit<OrchestratorInput, "runId" | "scope" | "
   experimentId: string;
   projectSlug: string;
   experimentSlug: string;
+  /** The deployment's public base URL, for the shareable results link. */
+  baseUrl: string;
+  /** Where the run's progress is written so a poll on another process finds it. */
+  progress: ExperimentRunProgressPort;
+  /**
+   * Where an unexpected failure is reported beyond the log line. Optional: a
+   * deployment that composes none loses nothing the customer can see.
+   */
+  errorReporting?: ExperimentRunErrorReportingPort;
   /** Defaults to a full run when omitted. */
   scope?: ExecutionScope;
   /**
@@ -82,6 +91,7 @@ const persistRunResults = async ({
   runId,
   scope,
   draft,
+  errorReporting,
   isRetry = false,
 }: {
   persistence: RunResultsPersistence;
@@ -90,6 +100,7 @@ const persistRunResults = async ({
   runId: string;
   scope: ExecutionScope;
   draft: RunResultsDraft;
+  errorReporting?: ExperimentRunErrorReportingPort;
   isRetry?: boolean;
 }): Promise<void> => {
   if (runResultsAreEmpty(draft)) {
@@ -141,6 +152,7 @@ const persistRunResults = async ({
         runId,
         scope,
         draft,
+        errorReporting,
         isRetry: true,
       });
       return;
@@ -150,7 +162,7 @@ const persistRunResults = async ({
       { error, runId, experimentId, projectId },
       "Failed to write the run results into the workbench state",
     );
-    captureException(toError(error), {
+    errorReporting?.captureException(error, {
       extra: { runId, experimentId, projectId },
     });
   }
@@ -159,7 +171,13 @@ const persistRunResults = async ({
 /** Everything the orchestrator itself takes, minus what the runner decides. */
 type RunnerOrchestratorInput = Omit<
   StartPollingRunInput,
-  "projectSlug" | "experimentSlug" | "scope" | "persistResults"
+  | "projectSlug"
+  | "experimentSlug"
+  | "scope"
+  | "persistResults"
+  | "baseUrl"
+  | "progress"
+  | "errorReporting"
 >;
 
 /**
@@ -176,21 +194,25 @@ const reportFailedRun = async ({
   runId,
   experimentSlug,
   projectId,
+  progress,
+  errorReporting,
 }: {
   error: unknown;
   runId: string;
   experimentSlug: string;
   projectId: string;
+  progress: ExperimentRunProgressPort;
+  errorReporting?: ExperimentRunErrorReportingPort;
 }): Promise<void> => {
   const failure = mapThrownErrorEvent({ error });
   const code = failure.type === "error" ? failure.message : UNNAMED_FAILURE;
   const traceId = failure.type === "error" ? failure.traceId : undefined;
 
   logger.error({ error, runId, traceId, experimentSlug, projectId }, "Execution error");
-  captureException(toError(error), {
+  errorReporting?.captureException(error, {
     extra: { runId, experimentSlug, projectId },
   });
-  await runStateManager.failRun(runId, {
+  await progress.failRun(runId, {
     code,
     domainError: failure.type === "error" ? failure.domainError : undefined,
     traceId,
@@ -209,6 +231,8 @@ const runExecution = async ({
   runUrl,
   experimentSlug,
   persistResults,
+  progress,
+  errorReporting,
 }: {
   orchestratorInput: RunnerOrchestratorInput;
   scope: ExecutionScope;
@@ -216,6 +240,8 @@ const runExecution = async ({
   runUrl: string;
   experimentSlug: string;
   persistResults?: RunResultsPersistence;
+  progress: ExperimentRunProgressPort;
+  errorReporting?: ExperimentRunErrorReportingPort;
 }): Promise<void> => {
   const draft = emptyRunResultsDraft();
 
@@ -240,17 +266,18 @@ const runExecution = async ({
       runId,
       scope,
       draft,
+      errorReporting,
     });
   };
 
   const finishRun = async (summary: ExecutionSummary) => {
     await writeCellsBack("finished");
-    await runStateManager.completeRun(runId, { ...summary, runUrl });
+    await progress.completeRun(runId, { ...summary, runUrl });
   };
 
   const stopRun = async () => {
     await writeCellsBack("stopped");
-    await runStateManager.stopRun(runId);
+    await progress.stopRun(runId);
   };
 
   try {
@@ -262,7 +289,7 @@ const runExecution = async ({
 
     for await (const rawEvent of orchestrator) {
       const event = rawEvent as EvaluationV3Event;
-      await runStateManager.addEvent(runId, event);
+      await progress.addEvent(runId, event);
       if (persistResults) applyRunEvent({ draft, event });
 
       if (event.type === "done") {
@@ -281,6 +308,8 @@ const runExecution = async ({
       runId,
       experimentSlug,
       projectId: orchestratorInput.projectId,
+      progress,
+      errorReporting,
     });
   }
 };
@@ -293,7 +322,16 @@ const runExecution = async ({
 export const startPollingRun = async (
   input: StartPollingRunInput,
 ): Promise<{ runId: string; runUrl: string; total: number }> => {
-  const { projectSlug, experimentSlug, scope, persistResults, ...orchestratorInput } = input;
+  const {
+    projectSlug,
+    experimentSlug,
+    scope,
+    persistResults,
+    baseUrl,
+    progress,
+    errorReporting,
+    ...orchestratorInput
+  } = input;
   const effectiveScope: ExecutionScope = scope ?? { type: "full" };
   const totalCells = countScopedCells({
     state: orchestratorInput.state,
@@ -304,9 +342,9 @@ export const startPollingRun = async (
       : {}),
   });
   const runId = generateHumanReadableId();
-  const runUrl = getRunUrl(projectSlug, experimentSlug, runId);
+  const runUrl = getRunUrl({ baseUrl, projectSlug, experimentSlug, runId });
 
-  await runStateManager.createRun({
+  await progress.createRun({
     runId,
     projectId: orchestratorInput.projectId,
     experimentId: orchestratorInput.experimentId,
@@ -326,6 +364,8 @@ export const startPollingRun = async (
     runUrl,
     experimentSlug,
     persistResults,
+    progress,
+    errorReporting,
   }).catch((error: unknown) => {
     logger.error(
       {
@@ -336,7 +376,7 @@ export const startPollingRun = async (
       },
       "Run execution could not record its own failure",
     );
-    captureException(toError(error), {
+    errorReporting?.captureException(error, {
       extra: {
         runId,
         experimentSlug,

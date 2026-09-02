@@ -6,16 +6,18 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Agent } from "@langwatch/agent-contract";
+import type { Agent, AgentService } from "@langwatch/agent-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
-import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
-import { AgentsFeature } from "~/runtime/app/features/agents";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import {
+  parseStudioWorkflow,
+  transposeColumnsFirstToRowsFirstWithId,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import type { PromptService, VersionedPrompt } from "@langwatch/prompt-contract";
+import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
 
-const logger = createLogger("langwatch:experiments-v3:dataLoader");
+const logger = createLogger("langwatch:experiment:execution-data");
 
 // Column types that store JSON and need parsing
 const JSON_COLUMN_TYPES = [
@@ -108,6 +110,7 @@ type DatasetInput = {
 export const loadDataset = async (
   dataset: DatasetInput,
   projectId: string,
+  datasets: DatasetService,
 ): Promise<LoadedDataset | { error: string; status: number }> => {
   let rows: Array<Record<string, unknown>>;
   let columns: Array<{ id: string; name: string; type: string }>;
@@ -133,7 +136,7 @@ export const loadDataset = async (
     // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
     // dataset throws DatasetNotReadyError here — it must NOT be silently treated
     // as empty. The throw propagates as a clear run error; do not swallow it.
-    const loadedDataset = await getApp().dataset.getDatasetWithRecords({
+    const loadedDataset = await datasets.getDatasetWithRecords({
       slugOrId: dataset.datasetId,
       projectId,
       entrySelection: "all",
@@ -323,8 +326,20 @@ export type ExecutionDataInputs = {
   parameters?: Record<string, string | number | boolean>;
 };
 
-/** Canonical feature services used only for the resources this load needs. */
+/**
+ * Canonical feature services this load reads through.
+ *
+ * The retired application reached four of these off a process singleton and
+ * built a fifth (an Agents feature over the module-global Prisma client) inside
+ * the loop. They are injected now, so a run and the read path that names its
+ * columns go through the same graph.
+ */
 export type ExecutionDataServices = {
+  datasets: DatasetService;
+  prompts: PromptService;
+  agents: AgentService;
+  /** The committed studio DSL a workflow target runs, once per dataset row. */
+  workflows: ExperimentWorkflowDslPort;
   evaluators?: EvaluatorService;
 };
 
@@ -333,8 +348,8 @@ export const loadExecutionData = async (
   dataset: DatasetInput,
   targets: TargetForLoading[],
   evaluators: EvaluatorForLoading[],
+  services: ExecutionDataServices,
   inputs?: ExecutionDataInputs,
-  services: ExecutionDataServices = {},
 ): Promise<LoadedExecutionData | { error: string; status: number }> => {
   // Resolve the base rows + columns: inline data, a saved dataset id, or the
   // attached dataset reference, in that precedence.
@@ -342,7 +357,7 @@ export const loadExecutionData = async (
   if (inputs?.data) {
     baseDataset = rowsFromInlineData(inputs.data);
   } else if (inputs?.datasetId) {
-    const loadedDataset = await getApp().dataset.getDatasetWithRecords({
+    const loadedDataset = await services.datasets.getDatasetWithRecords({
       slugOrId: inputs.datasetId,
       projectId,
       entrySelection: "all",
@@ -367,7 +382,7 @@ export const loadExecutionData = async (
       columns,
     };
   } else {
-    const datasetResult = await loadDataset(dataset, projectId);
+    const datasetResult = await loadDataset(dataset, projectId, services.datasets);
     if ("error" in datasetResult) {
       return datasetResult;
     }
@@ -384,13 +399,13 @@ export const loadExecutionData = async (
 
   // Load prompts for prompt targets
   const loadedPrompts = new Map<string, VersionedPrompt>();
-  const promptService = getApp().prompts;
+  const promptService = services.prompts;
 
   for (const target of targets) {
     if (target.type === "prompt" && target.promptId) {
       if (loadedPrompts.has(promptLoadKey(target))) continue;
       try {
-        const prompt = await promptService.tryGetByIdOrHandle({
+        const prompt = await promptService.tryGetPromptByIdOrHandle({
           idOrHandle: target.promptId,
           projectId,
           version: target.promptVersionNumber ?? undefined,
@@ -428,7 +443,7 @@ export const loadExecutionData = async (
 
   // Load agents for agent targets
   const loadedAgents = new Map<string, Agent>();
-  const agentService = AgentsFeature.create({ prisma, session: null });
+  const agentService = services.agents;
 
   for (const target of targets) {
     if (target.type === "agent" && target.dbAgentId) {
@@ -457,8 +472,9 @@ export const loadExecutionData = async (
     workflowId: string;
     workflowVersionId?: string;
   }): Promise<LoadedWorkflow | { error: string; status: number }> => {
-    const workflow = await prisma.workflow.findUnique({
-      where: { id: workflowId, projectId },
+    const workflow = await services.workflows.tryFindWorkflow({
+      projectId,
+      workflowId,
     });
     if (!workflow) {
       return { error: `Workflow "${workflowId}" not found`, status: 404 };
@@ -472,10 +488,12 @@ export const loadExecutionData = async (
       };
     }
 
-    const version = await prisma.workflowVersion.findUnique({
-      where: { id: versionId, projectId, workflowId },
+    const dsl = await services.workflows.tryFindVersionDsl({
+      projectId,
+      workflowId,
+      versionId,
     });
-    if (!version) {
+    if (!dsl) {
       return {
         error: `Workflow version "${versionId}" not found`,
         status: 404,
@@ -486,7 +504,7 @@ export const loadExecutionData = async (
       id: workflow.id,
       name: workflow.name,
       versionId,
-      dsl: parseStudioWorkflow(version.dsl),
+      dsl: parseStudioWorkflow(dsl),
     };
   };
 

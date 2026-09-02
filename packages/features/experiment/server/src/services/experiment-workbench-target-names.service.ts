@@ -1,11 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { TargetConfig } from "~/experiments-v3/types";
-import { pickTargetName } from "~/experiments-v3/utils/targetDisplayName";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { prisma as defaultPrisma } from "~/server/db";
+import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
+import type { ExperimentTargetEntityNamesPort } from "../ports/experiment-target-entity-names.port";
 
-const logger = createLogger("langwatch:experiments-v3:target-names");
+const logger = createLogger("langwatch:experiment:workbench-target-names");
 
 /**
  * What each column of a saved workbench is called, keyed by target id.
@@ -24,7 +22,7 @@ export const resolveWorkbenchTargetNames = async ({
   projectId,
   targets,
   prompts: promptService,
-  prisma = defaultPrisma,
+  entities,
 }: {
   projectId: string;
   targets: TargetConfig[];
@@ -36,26 +34,19 @@ export const resolveWorkbenchTargetNames = async ({
    * here went through a different graph than the one the run itself used.
    */
   prompts: PromptService;
-  prisma?: PrismaClient;
+  /** Agent and evaluator names, which are rows this feature does not own. */
+  entities: ExperimentTargetEntityNamesPort;
 }): Promise<Record<string, string>> => {
   try {
     const [prompts, agents, evaluators] = await Promise.all([
       loadPrompts({ projectId, targets, promptService }),
       loadNamedRows({
         ids: idsOf(targets, "agent", (target) => target.dbAgentId),
-        find: (ids) =>
-          prisma.agent.findMany({
-            where: { projectId, id: { in: ids } },
-            select: { id: true, name: true },
-          }),
+        find: (ids) => entities.findAgentNames({ projectId, ids }),
       }),
       loadNamedRows({
         ids: idsOf(targets, "evaluator", (target) => target.targetEvaluatorId),
-        find: (ids) =>
-          prisma.evaluator.findMany({
-            where: { projectId, id: { in: ids } },
-            select: { id: true, name: true },
-          }),
+        find: (ids) => entities.findEvaluatorNames({ projectId, ids }),
       }),
     ]);
 
@@ -94,11 +85,13 @@ const loadNamedRows = async ({
   find,
 }: {
   ids: string[];
-  find: (ids: string[]) => Promise<{ id: string; name: string }[]>;
+  find: (ids: string[]) => Promise<Record<string, string>>;
 }): Promise<Map<string, { name: string }>> => {
   if (ids.length === 0) return new Map();
-  const rows = await find(ids);
-  return new Map(rows.map((row) => [row.id, row]));
+  const names = await find(ids);
+  return new Map(
+    Object.entries(names).map(([id, name]) => [id, { name }]),
+  );
 };
 
 /**

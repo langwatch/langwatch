@@ -3,21 +3,21 @@ import type {
   EvaluatorConfig,
   LocalPromptConfig,
   TargetConfig,
-} from "~/experiments-v3/types";
+} from "@langwatch/experiment-contract";
 import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExecutionCell, WorkflowBuilderInput } from "../types";
+import type { ExecutionCell, WorkflowBuilderInput } from "@langwatch/experiment-contract";
 import {
   buildCellWorkflow,
   buildCodeNodeFromAgent,
   buildEvaluatorNode,
   buildSignatureNodeFromLocalConfig,
   buildSignatureNodeFromPrompt,
-} from "../workflowBuilder";
+} from "../experiment-cell-workflow.process";
 
 describe("WorkflowBuilder", () => {
   const createBasicLocalPromptConfig = (): LocalPromptConfig => ({

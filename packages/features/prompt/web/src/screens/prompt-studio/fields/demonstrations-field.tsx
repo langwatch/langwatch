@@ -5,7 +5,7 @@ import { DatasetPreview } from "./dataset-preview";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VerticalFormControl } from "../../../ui/elements/vertical-form-control";
 import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 
 /**
  * The few-shot examples a prompt carries, shown read-only.

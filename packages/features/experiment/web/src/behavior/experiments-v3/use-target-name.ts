@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import type { TargetConfig } from "../../model/experiments-v3/types";
-import { type NamedEntity, pickTargetName } from "../../model/experiments-v3/target-display-name";
+import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
 
 /**
  * Hook to fetch the display name for a target from the database.

@@ -4,20 +4,20 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   type EvaluationV3Event,
   type ExecutionScope,
   UNNAMED_FAILURE,
-} from "../../model/experiments-v3/execution/types";
+} from "@langwatch/experiment-contract";
 import { fetchSSE } from "@langwatch/workflow-web/utils/sse/fetchSSE";
-import { buildExecutionRequest } from "../../model/experiments-v3/execution/build-execution-request";
+import { buildExecutionRequest } from "@langwatch/experiment-contract";
 import {
   applyEvaluatorResult,
   applyTargetError,
   applyTargetOutput,
 } from "../../model/experiments-v3/execution/results-fold";
-import { createExecutionCellSet } from "../../model/experiments-v3/execution-scope";
+import { createExecutionCellSet } from "@langwatch/experiment-contract";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 // ============================================================================

@@ -11,28 +11,34 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
-import type {
-  ComparisonEvaluatorConfig,
-  EvaluationsV3State,
-  EvaluatorConfig,
-  FieldMapping,
-  TargetConfig,
-} from "~/experiments-v3/types";
 import {
+  type CarriedOverCell,
   COMPARISON_EVALUATOR_TYPE,
+  comparisonDependencies,
+  type ComparisonEvaluatorConfig,
+  disambiguateNames,
+  type ESBatchEvaluationTarget,
+  type EvaluationsV3State,
+  type EvaluationV3Event,
+  type EvaluatorConfig,
+  type ExecutionCell,
+  type ExecutionScope,
+  type ExecutionSummary,
+  type ExperimentService,
+  type FieldMapping,
+  generateHumanReadableId,
   isComparisonEvaluator,
   isGoldenFieldSatisfied,
+  isRowEmpty,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "~/experiments-v3/types";
-import { comparisonDependencies } from "~/experiments-v3/execution/buildExecutionRequest";
-import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
-import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
-import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
+  type RecordEvaluatorResultCommandData,
+  type RecordTargetResultCommandData,
+  type TargetConfig,
+  toComparisonConfig,
+  UNNAMED_FAILURE,
+} from "@langwatch/experiment-contract";
 import {
   nodeErrorToDomainError,
   type ExecutionState,
@@ -42,51 +48,71 @@ import {
   type WorkflowService,
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import type {
-  RecordEvaluatorResultCommandData,
-  RecordTargetResultCommandData,
-  ESBatchEvaluationTarget,
-} from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { estimateCost, getMatchingLLMModelCost } from "~/server/tracer/collector/cost";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { generateOtelTraceId } from "~/utils/trace";
-import { abortManager } from "./abortManager";
-import {
-  type LoadedWorkflow,
-  promptLoadKey,
-  workflowLoadKey,
-} from "./dataLoader";
-import { EvaluatorNoInputsResolvedError } from "./errors";
-import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
+import { generateOtelTraceId } from "@langwatch/trace-contract";
+import { EvaluatorNoInputsResolvedError } from "../experiment-execution.errors";
+import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port";
+import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
+import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port";
+import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port";
+import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port";
+import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process";
+import { buildCellWorkflow, buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process";
 import {
   extractTargetOutput,
   mapNlpEvent,
   mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
-} from "./resultMapper";
-import { createSemaphore } from "./semaphore";
+} from "../processes/experiment-result-mapping.process";
+import { createSemaphore } from "../processes/experiment-run-semaphore.process";
 import {
-  type CarriedOverCell,
-  type EvaluationV3Event,
-  type ExecutionCell,
-  type ExecutionScope,
-  type ExecutionSummary,
-  UNNAMED_FAILURE,
-} from "./types";
-import { buildCellWorkflow, buildEvaluatorCellWorkflow } from "./workflowBuilder";
+  type LoadedWorkflow,
+  promptLoadKey,
+  workflowLoadKey,
+} from "./experiment-execution-data.service";
 
-const logger = createLogger("experiments-v3:orchestrator");
+/**
+ * The KSUID resource prefix an evaluation row is minted under.
+ *
+ * Stated rather than imported: the retired application's `KSUID_RESOURCES`
+ * table is a fact of the deployment's stored ids, not of this feature, and a
+ * package that imported the whole table would depend on every other feature's
+ * prefixes to mint one of its own. The value is fixed by the rows already in
+ * ClickHouse and cannot change.
+ */
+const EVALUATION_KSUID_RESOURCE = "eval";
+
+const logger = createLogger("langwatch:experiment:run-orchestrator");
+
+/**
+ * Everything the run loop reaches outside itself.
+ *
+ * The retired application threaded an NLP runtime and a `ModelProviderService`
+ * through nine signatures to reach one dispatch function, and read four more
+ * collaborators off a process singleton mid-loop. They are one injected bag
+ * now, so the process that composes a run states in one place what a run can
+ * touch.
+ */
+export type ExperimentRunPorts = {
+  /** The studio engine each cell is dispatched to. */
+  studio: ExperimentStudioDispatchPort;
+  /** The deployment's price table, for cells the engine reports untariffed. */
+  cost: ExperimentModelCostPort;
+  /** The stop signal and the owner record this run's abort is authorized against. */
+  abort: ExperimentRunAbortPort;
+  /** The Eventing command surface a run's results are dispatched through. */
+  experiments: ExperimentService;
+  /** Where a cell's evaluator result is reported as an evaluation. */
+  evaluationReporting: ExperimentEvaluationReportingPort;
+  /** The scoped key a run lends to the code it executes. */
+  sandboxCredentials: ExperimentSandboxCredentialPort;
+};
 
 /**
  * Input data required to run the orchestrator.
@@ -101,8 +127,7 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
-  modelProviders: ModelProviderService;
-  nlpLambda: NlpLambdaRuntime;
+  ports: ExperimentRunPorts;
   workflows: WorkflowService;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
@@ -1180,6 +1205,7 @@ export const generateComparisonCells = ({
  * Returns undefined when there is no model, no tokens, or no known rate.
  */
 export const priceMetrics = async (
+  cost: ExperimentModelCostPort,
   projectId: string,
   metrics: ExecutionState["metrics"] | undefined,
 ): Promise<number | undefined> => {
@@ -1187,9 +1213,12 @@ export const priceMetrics = async (
   const inputTokens = metrics.prompt_tokens ?? 0;
   const outputTokens = metrics.completion_tokens ?? 0;
   if (inputTokens === 0 && outputTokens === 0) return undefined;
-  const llmModelCost = await getMatchingLLMModelCost(projectId, metrics.model);
-  if (!llmModelCost) return undefined;
-  return estimateCost({ llmModelCost, inputTokens, outputTokens });
+  return cost.tryPriceTokens({
+    projectId,
+    model: metrics.model,
+    inputTokens,
+    outputTokens,
+  });
 };
 
 /** What every evaluator of a cell is dispatched against. */
@@ -1201,8 +1230,7 @@ type CellEvaluatorContext = {
   traceId: string;
   targetNodes: Set<string>;
   config: ResultMapperConfig;
-  modelProviders: ModelProviderService;
-  nlpLambda: NlpLambdaRuntime;
+  ports: ExperimentRunPorts;
   workflows: WorkflowService;
   isAborted?: () => Promise<boolean>;
 };
@@ -1224,8 +1252,7 @@ async function* runOneCellEvaluator({
   traceId,
   targetNodes,
   config,
-  modelProviders,
-  nlpLambda,
+  ports,
   workflows,
   isAborted,
 }: CellEvaluatorContext & {
@@ -1269,11 +1296,9 @@ async function* runOneCellEvaluator({
   };
 
   const evaluatorEvents: StudioServerEvent[] = [];
-  await studioBackendPostEvent({
+  await ports.studio.postEvent({
     projectId,
-    nlpLambda,
-    modelProviders,
-    message: await workflows.enrichStudioEvent({
+    event: await workflows.enrichStudioEvent({
       event: evaluatorEvent,
       projectId,
     }),
@@ -1393,31 +1418,22 @@ function runExecutesCode({
  * run. A run that cannot get one still runs, and every row does its own work.
  */
 async function mintRunSandboxApiKey({
+  sandboxCredentials,
   projectId,
   loadedAgents,
   loadedWorkflows,
 }: {
+  sandboxCredentials: ExperimentSandboxCredentialPort;
   projectId: string;
   loadedAgents: Map<string, TypedAgent>;
   loadedWorkflows?: Map<string, LoadedWorkflow>;
 }): Promise<string | undefined> {
   if (!runExecutesCode({ loadedAgents, loadedWorkflows })) return undefined;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  const organizationId = project?.team?.organizationId;
-  if (!organizationId) return undefined;
-
-  // The application's own service seam. Minting here has no signed-in member
-  // to authorize — a run mints for itself — so this goes to the service rather
-  // than to a management operation that would ask who `by` is.
-  return tryMintAgentSandboxApiKey({
-    apiKeys: getApp().apiKeys.apiKeyService,
-    projectId,
-    organizationId,
-  });
+  // Minting here has no signed-in member to authorize — a run mints for itself
+  // — so the port answers with the key or with nothing, and the caller injects
+  // nothing when it gets nothing.
+  return sandboxCredentials.tryMintRunKey({ projectId });
 }
 
 /**
@@ -1454,7 +1470,7 @@ function withSandboxApiKey(
 export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
-  nlpLambda: NlpLambdaRuntime,
+  ports: ExperimentRunPorts,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
   loadedData: {
     prompt?: VersionedPrompt;
@@ -1463,7 +1479,6 @@ export async function* executeCell(
     /** The run's agent cache credential, when it minted one. */
     sandboxApiKey?: string;
   },
-  modelProviders: ModelProviderService,
   workflows: WorkflowService,
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
@@ -1567,11 +1582,9 @@ export async function* executeCell(
       // Execute target and collect events
       const targetEvents: StudioServerEvent[] = [];
 
-      await studioBackendPostEvent({
+      await ports.studio.postEvent({
         projectId,
-        nlpLambda,
-        modelProviders,
-        message: enrichedEvent,
+        event: enrichedEvent,
         isAborted,
         onEvent: (serverEvent) => {
           targetEvents.push(serverEvent);
@@ -1611,6 +1624,7 @@ export async function* executeCell(
           event.type === "component_state_change"
         ) {
           const cost = await priceMetrics(
+            ports.cost,
             projectId,
             event.payload.execution_state?.metrics,
           );
@@ -1640,8 +1654,7 @@ export async function* executeCell(
         traceId,
         targetNodes,
         config: cellConfig,
-        modelProviders,
-        nlpLambda,
+        ports,
         workflows,
         isAborted,
       });
@@ -1676,8 +1689,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators,
   resultMapperConfig,
   isAborted,
-  modelProviders,
-  nlpLambda,
+  ports,
   workflows,
 }: {
   cell: ExecutionCell;
@@ -1687,8 +1699,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
-  modelProviders: ModelProviderService;
-  nlpLambda: NlpLambdaRuntime;
+  ports: ExperimentRunPorts;
   workflows: WorkflowService;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
@@ -1732,11 +1743,9 @@ export async function* executeWorkflowCell({
     });
 
     const events: StudioServerEvent[] = [];
-    await studioBackendPostEvent({
+    await ports.studio.postEvent({
       projectId,
-      nlpLambda,
-      modelProviders,
-      message: enrichedEvent,
+      event: enrichedEvent,
       isAborted,
       onEvent: (serverEvent) => {
         events.push(serverEvent);
@@ -1804,7 +1813,7 @@ export async function* executeWorkflowCell({
       } else {
         // LLM nodes report tokens but no cost (the engine has no price table),
         // so price them at the canonical model rate, same as executeCell.
-        const cost = await priceMetrics(projectId, execution_state.metrics);
+        const cost = await priceMetrics(ports.cost, projectId, execution_state.metrics);
         if (cost != null) {
           totalCost += cost;
           sawCost = true;
@@ -1886,8 +1895,7 @@ export async function* executeWorkflowCell({
         traceId: finalTraceId,
         targetNodes: new Set([cell.targetId]),
         config: resultMapperConfig ?? {},
-        modelProviders,
-        nlpLambda,
+        ports,
         workflows,
         isAborted,
       });
@@ -2697,7 +2705,7 @@ const recordCarriedOverBoard = async ({
   datasetRows: Array<Record<string, unknown>>;
   state: EvaluationsV3State;
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
-  commands: ReturnType<typeof getApp>["experiments"];
+  commands: ExperimentService;
 }): Promise<void> => {
   if (cells.length === 0) return;
 
@@ -2778,8 +2786,7 @@ export async function* runOrchestrator(
     concurrency: requestedConcurrency,
     seedTargetOutputs,
     carriedOverCells,
-    modelProviders,
-    nlpLambda,
+    ports,
     workflows,
   } = input;
 
@@ -2810,10 +2817,10 @@ export async function* runOrchestrator(
   // Set running flag + record the owner, which is what abort authorizes
   // against. Set here rather than by the caller, so every dispatch path has it
   // from the first frame.
-  await abortManager.setRunning(runId, projectId);
+  await ports.abort.setRunning({ runId, projectId });
 
   // The canonical Experiment service owns the Eventing command dispatch.
-  const commands = getApp().experiments;
+  const commands = ports.experiments;
 
   // Track CH dispatch failures for observability
   let chDispatchFailures = 0;
@@ -2881,6 +2888,7 @@ export async function* runOrchestrator(
   // actually runs Python. Undefined when nothing does, or when the mint
   // failed, and the engine then injects nothing.
   const sandboxApiKey = await mintRunSandboxApiKey({
+    sandboxCredentials: ports.sandboxCredentials,
     projectId,
     loadedAgents,
     loadedWorkflows,
@@ -2902,7 +2910,7 @@ export async function* runOrchestrator(
     } catch (err) {
       chDispatchFailures++;
       logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
-      await abortManager.clearRunning(runId);
+      await ports.abort.clearRunning(runId);
       throw err;
     }
 
@@ -2975,10 +2983,9 @@ export async function* runOrchestrator(
         ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
         : null;
       const traceId = cellTraceIds.get(`${event.rowIndex}:${event.targetId}`);
-      const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+      const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
       try {
-        const app = getApp();
-        await app.evaluations.reportEvaluation({
+        await ports.evaluationReporting.reportEvaluation({
           tenantId: projectId,
           evaluationId,
           evaluatorId: event.evaluatorId,
@@ -3138,7 +3145,7 @@ export async function* runOrchestrator(
       // Process cells in parallel with rate limiting
       for (const cell of cells) {
         // Check abort flag before starting new cells
-        if (await abortManager.isAborted(runId)) {
+        if (await ports.abort.isAborted(runId)) {
           logger.info({ runId }, "Execution aborted by user");
           aborted = true;
           break;
@@ -3151,7 +3158,7 @@ export async function* runOrchestrator(
         const cellPromise = (async () => {
           try {
             // Double-check abort flag after acquiring semaphore
-            if (await abortManager.isAborted(runId)) {
+            if (await ports.abort.isAborted(runId)) {
               return;
             }
 
@@ -3168,7 +3175,7 @@ export async function* runOrchestrator(
             };
 
             // Create abort checker bound to this run
-            const checkAbort = () => abortManager.isAborted(runId);
+            const checkAbort = () => ports.abort.isAborted(runId);
 
             // Pick the executor: a workflow target — or an agent target that
             // wraps a Studio workflow (agent.type === "workflow") — runs the
@@ -3190,17 +3197,15 @@ export async function* runOrchestrator(
                   loadedEvaluators,
                   resultMapperConfig,
                   isAborted: checkAbort,
-                  modelProviders,
-                  nlpLambda,
+                  ports,
                   workflows,
                 })
               : executeCell(
                   cell,
                   projectId,
-                  nlpLambda,
+                  ports,
                   datasetColumns,
                   loadedData,
-                  modelProviders,
                   workflows,
                   resultMapperConfig,
                   checkAbort,
@@ -3211,7 +3216,7 @@ export async function* runOrchestrator(
             let cellAborted = false;
             for await (const event of cellEvents) {
               // Check abort during cell processing
-              if (await abortManager.isAborted(runId)) {
+              if (await ports.abort.isAborted(runId)) {
                 cellAborted = true;
                 break;
               }
@@ -3321,7 +3326,7 @@ export async function* runOrchestrator(
         for (const reason of skipReasons) {
           // Respect user-triggered abort mid-loop; otherwise a long skip-reason
           // burst would keep writing to CH after the run was meant to stop.
-          if (await abortManager.isAborted(runId)) {
+          if (await ports.abort.isAborted(runId)) {
             aborted = true;
             break;
           }
@@ -3396,7 +3401,7 @@ export async function* runOrchestrator(
           );
 
           for (const cell of phase2Cells) {
-            if (await abortManager.isAborted(runId)) {
+            if (await ports.abort.isAborted(runId)) {
               aborted = true;
               break;
             }
@@ -3404,7 +3409,7 @@ export async function* runOrchestrator(
 
             const cellPromise = (async () => {
               try {
-                if (await abortManager.isAborted(runId)) return;
+                if (await ports.abort.isAborted(runId)) return;
 
                 const loadedData = {
                   ...getLoadedDataForTarget(
@@ -3416,21 +3421,20 @@ export async function* runOrchestrator(
                   sandboxApiKey,
                 };
 
-                const checkAbort = () => abortManager.isAborted(runId);
+                const checkAbort = () => ports.abort.isAborted(runId);
 
                 let cellFailed = false;
                 for await (const event of executeCell(
                   cell,
                   projectId,
-                  nlpLambda,
+                  ports,
                   datasetColumns,
                   loadedData,
-                  modelProviders,
                   workflows,
                   resultMapperConfig,
                   checkAbort,
                 )) {
-                  if (await abortManager.isAborted(runId)) break;
+                  if (await ports.abort.isAborted(runId)) break;
                   pushEvent(event);
                   await processEventForStorage(event);
                   if (event.type === "error") cellFailed = true;
@@ -3484,8 +3488,8 @@ export async function* runOrchestrator(
     await processingPromise;
   } finally {
     // Clear running flag
-    await abortManager.clearRunning(runId);
-    await abortManager.clearAbort(runId);
+    await ports.abort.clearRunning(runId);
+    await ports.abort.clearAbort(runId);
 
     const finishedAt = Date.now();
 
@@ -3578,7 +3582,8 @@ const getLoadedDataForTarget = (
     if (agent) {
       // A workflow-type agent has no code of its own — it wraps a Studio
       // workflow, resolved by dataLoader and cached under the linked
-      // workflow's own id (see loadPublishedWorkflow in dataLoader.ts).
+      // workflow's own id (see loadPublishedWorkflow in
+      // experiment-execution-data.service.ts).
       if (agent.type === "workflow") {
         const linkedWorkflowId =
           agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
@@ -3605,6 +3610,12 @@ const getLoadedDataForTarget = (
 /**
  * Requests abort of a running execution.
  */
-export const requestAbort = async (runId: string): Promise<void> => {
-  await abortManager.requestAbort(runId);
+export const requestAbort = async ({
+  abort,
+  runId,
+}: {
+  abort: ExperimentRunAbortPort;
+  runId: string;
+}): Promise<void> => {
+  await abort.requestAbort(runId);
 };

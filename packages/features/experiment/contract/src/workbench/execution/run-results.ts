@@ -3,13 +3,14 @@
  *
  * A run started with no browser attached streams the same orchestrator events
  * a browser run does, so the fold here mirrors the browser's SSE handler
- * (`experiments-v3/hooks/use-execute-evaluation.ts`) event for event. The merge
+ * (`@langwatch/experiment-web`'s `behavior/experiments-v3/use-execute-evaluation.ts`)
+ * event for event. The merge
  * mirrors what that handler does to the store before a scoped run: the cells
  * the run covers are cleared and refilled, every other cell stays as it was.
  */
 
-import type { TargetRowMetadata } from "../types";
-import type { PersistedResults } from "../types/persistence";
+import type { TargetRowMetadata } from "../../experiment-workbench";
+import type { PersistedResults } from "../../experiment-workbench-persistence";
 import {
   type CarriedOverCell,
   type EvaluationV3Event,

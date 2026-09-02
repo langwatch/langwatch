@@ -9,8 +9,8 @@ import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-op
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name";
 import { computeComparisonAggregate } from "../../../model/experiments-v3/compute-aggregates";
 import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation";
-import { toComparisonConfig } from "../../../model/experiments-v3/normalize-comparison";
-import { disambiguateNames } from "../../../model/experiments-v3/variant-disambiguation";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
+import { disambiguateNames } from "@langwatch/experiment-contract";
 import { ComparisonScoreboard } from "../../elements/experiments-v3/TargetSection/comparison-scoreboard";
 
 // Matches the pulse used for the equivalent per-target alert

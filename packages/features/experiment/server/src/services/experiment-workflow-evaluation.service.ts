@@ -3,20 +3,47 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type EvaluationsV3State,
+  extractPersistedState,
+  type ExperimentService,
+  type FindOrCreateWorkflowExperimentInput,
   type TargetConfig,
-} from "~/experiments-v3/types";
-import { extractPersistedState } from "~/experiments-v3/types/persistence";
-import type { PrismaClient } from "~/generated/prisma/client";
-import type { ExperimentService } from "@langwatch/experiment-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
-import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
-import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
-import type { WorkflowEvaluationOutcome } from "@langwatch/platform-api";
+} from "@langwatch/experiment-contract";
+import type {
+  Entry,
+  Field,
+  StudioWorkflow as WorkflowDSL,
+  WorkflowService,
+} from "@langwatch/workflow-contract";
+import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
+import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
+import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
+import type { ExecutionDataServices } from "./experiment-execution-data.service";
+import { loadExecutionData } from "./experiment-execution-data.service";
+import { startPollingRun } from "./experiment-polling-run.service";
 
 export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
+
+/**
+ * What an evaluation trigger answers with.
+ *
+ * Restated structurally rather than imported: the Workflow REST family owns the
+ * same shape as the contract of its own trigger, and a core feature server may
+ * not depend on another feature's server. A refusal is a value rather than an
+ * exception on purpose — the three ways a trigger can be refused are named by
+ * this module's own error classes just below, and the mapping stays beside them
+ * rather than in a catch that recognises classes by identity across a package
+ * boundary.
+ */
+export type WorkflowEvaluationOutcome =
+  | Readonly<{
+      ok: true;
+      runId: string;
+      runUrl: string;
+      workflowVersionId: string;
+      version: string;
+    }>
+  | Readonly<{ ok: false; status: 400 | 404; error: string }>;
 
 export class WorkflowNotFoundError extends Error {
   constructor(workflowId: string) {
@@ -54,32 +81,32 @@ const WORKFLOW_DATASET_ID = "workflow-dataset";
  * id and a results URL. This is the single backend execution path, shared with
  * the evaluations-v3 run API.
  */
+export type WorkflowEvaluationDependencies = {
+  experiments: ExperimentService;
+  /** The workflow rows and versions this run reads, which it does not own. */
+  workflowSource: ExperimentWorkflowDslPort;
+  /** Everything the run loop reaches outside itself. */
+  ports: ExperimentRunPorts;
+  workflows: WorkflowService;
+  /** The datasets, prompts, agents and evaluators the load reads through. */
+  services: ExecutionDataServices;
+  /** Where the run's progress is written so a poll on another process finds it. */
+  progress: ExperimentRunProgressPort;
+  /** The deployment's public base URL, for the shareable results link. */
+  baseUrl: string;
+  defaultConcurrency: number;
+  errorReporting?: ExperimentRunErrorReportingPort;
+};
+
 export class WorkflowEvaluationService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly experiments: ExperimentService,
-    private readonly modelProviders: ModelProviderService,
-    private readonly nlpLambda: NlpLambdaRuntime,
-    private readonly workflows: WorkflowService,
-    private readonly defaultConcurrency: number,
+  private constructor(
+    private readonly dependencies: WorkflowEvaluationDependencies,
   ) {}
 
   static create(
-    prisma: PrismaClient,
-    experiments: ExperimentService,
-    modelProviders: ModelProviderService,
-    nlpLambda: NlpLambdaRuntime,
-    workflows: WorkflowService,
-    defaultConcurrency: number,
+    dependencies: WorkflowEvaluationDependencies,
   ): WorkflowEvaluationService {
-    return new WorkflowEvaluationService(
-      prisma,
-      experiments,
-      modelProviders,
-      nlpLambda,
-      workflows,
-      defaultConcurrency,
-    );
+    return new WorkflowEvaluationService(dependencies);
   }
 
   /**
@@ -144,27 +171,19 @@ export class WorkflowEvaluationService {
     workflowVersionId: string;
     version: string;
   }> {
-    const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, projectId, archivedAt: null },
+    const workflow = await this.dependencies.workflowSource.tryFindEvaluableWorkflow({
+      projectId,
+      workflowId,
     });
     if (!workflow) {
       throw new WorkflowNotFoundError(workflowId);
     }
 
-    const version = versionId
-      ? await this.prisma.workflowVersion.findFirst({
-          where: { id: versionId, workflowId, projectId },
-        })
-      : // Latest manual commit wins; fall back to the latest autosave so
-        // a workflow that was only ever autosaved is still evaluable.
-        ((await this.prisma.workflowVersion.findFirst({
-          where: { workflowId, projectId, autoSaved: false },
-          orderBy: { createdAt: "desc" },
-        })) ??
-        (await this.prisma.workflowVersion.findFirst({
-          where: { workflowId, projectId },
-          orderBy: { createdAt: "desc" },
-        })));
+    const version = await this.dependencies.workflowSource.tryFindEvaluableVersion({
+      projectId,
+      workflowId,
+      ...(versionId ? { versionId } : {}),
+    });
     if (!version) {
       throw new NoCommittedVersionError();
     }
@@ -239,11 +258,14 @@ export class WorkflowEvaluationService {
       }
     }
 
-    const dataResult = await loadExecutionData(projectId, datasetRef, [target], [], {
-      data,
-      datasetId: resolvedDatasetId,
-      parameters,
-    });
+    const dataResult = await loadExecutionData(
+      projectId,
+      datasetRef,
+      [target],
+      [],
+      this.dependencies.services,
+      { data, datasetId: resolvedDatasetId, parameters },
+    );
     if ("error" in dataResult) {
       throw new EvaluationInputError(dataResult.error, dataResult.status);
     }
@@ -293,11 +315,16 @@ export class WorkflowEvaluationService {
       ui: createInitialUIState(),
     };
 
-    const experiment = await this.experiments.findOrCreateForWorkflow({
+    const experiment = await this.dependencies.experiments.findOrCreateForWorkflow({
       projectId,
       workflowId: workflow.id,
       name: workflow.name,
-      workbenchState: extractPersistedState(state),
+      // The same cast the feature's own transport makes: the persisted state is
+      // JSON by construction, and `z.json()` does not accept a structural type
+      // whose optional keys may be `undefined`.
+      workbenchState: extractPersistedState(
+        state,
+      ) as FindOrCreateWorkflowExperimentInput["workbenchState"],
     });
 
     const { runId, runUrl } = await startPollingRun({
@@ -311,12 +338,16 @@ export class WorkflowEvaluationService {
       datasetColumns,
       loadedPrompts,
       loadedAgents,
-      modelProviders: this.modelProviders,
-      nlpLambda: this.nlpLambda,
-      workflows: this.workflows,
+      ports: this.dependencies.ports,
+      workflows: this.dependencies.workflows,
       loadedEvaluators,
       loadedWorkflows,
-      defaultConcurrency: this.defaultConcurrency,
+      defaultConcurrency: this.dependencies.defaultConcurrency,
+      baseUrl: this.dependencies.baseUrl,
+      progress: this.dependencies.progress,
+      ...(this.dependencies.errorReporting
+        ? { errorReporting: this.dependencies.errorReporting }
+        : {}),
     });
 
     return {

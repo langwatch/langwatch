@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Field } from "@langwatch/workflow-contract";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   datasetColumnTypeToFieldType,
   datasetColumnsToFields,
@@ -7,7 +8,6 @@ import {
   fieldsToDatasetColumns,
   inMemoryDatasetToNodeDataset,
   trainTestSplit,
-  transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
   tryToMapPreviousColumnsToNewColumns,
 } from "../model/studio-dataset.utils";

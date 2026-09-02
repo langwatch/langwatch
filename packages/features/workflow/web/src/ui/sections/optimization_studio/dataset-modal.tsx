@@ -33,10 +33,10 @@ import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "../../elements/dialog";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, Entry } from "@langwatch/workflow-contract";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   datasetColumnsToFields,
   inMemoryDatasetToNodeDataset,
-  transposeColumnsFirstToRowsFirstWithId,
 } from "@langwatch/workflow-web";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [

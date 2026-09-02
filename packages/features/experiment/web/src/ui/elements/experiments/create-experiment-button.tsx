@@ -8,7 +8,7 @@ import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import { generateHumanReadableId } from "../../../model/human-readable-id";
+import { generateHumanReadableId } from "@langwatch/experiment-contract";
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";

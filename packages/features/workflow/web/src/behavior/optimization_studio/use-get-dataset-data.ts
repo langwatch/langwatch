@@ -7,10 +7,8 @@ import type { AppRouter } from "../studio-host/api";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { api } from "../studio-host/api";
 import type { Entry } from "@langwatch/workflow-contract";
-import {
-  datasetDatabaseRecordsToInMemoryDataset,
-  transposeColumnsFirstToRowsFirstWithId,
-} from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
+import { datasetDatabaseRecordsToInMemoryDataset } from "@langwatch/workflow-web";
 
 export const useGetDatasetData = ({
   dataset,

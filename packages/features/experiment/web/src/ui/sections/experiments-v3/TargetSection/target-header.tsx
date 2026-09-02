@@ -21,7 +21,7 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { useLatestPromptVersion } from "@langwatch/prompt-web/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants";
@@ -36,11 +36,11 @@ import {
   computeComparisonTargetAggregate,
   computeTargetAggregates,
 } from "../../../../model/experiments-v3/compute-aggregates";
-import { isRowEmpty } from "../../../../model/experiments-v3/empty-row-detection";
-import { countCellsForTarget } from "../../../../model/experiments-v3/execution-scope";
+import { isRowEmpty } from "@langwatch/experiment-contract";
+import { countCellsForTarget } from "@langwatch/experiment-contract";
 import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation";
-import { toComparisonConfig } from "../../../../model/experiments-v3/normalize-comparison";
-import { disambiguateNames } from "../../../../model/experiments-v3/variant-disambiguation";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
+import { disambiguateNames } from "@langwatch/experiment-contract";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard";
 import { TargetSummary } from "./target-summary";
 

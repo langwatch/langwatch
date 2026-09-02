@@ -6,7 +6,7 @@ import {
   evaluatorConfigSchema,
   type TargetConfig,
   targetConfigSchema,
-} from "../types";
+} from "../../experiment-workbench";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 

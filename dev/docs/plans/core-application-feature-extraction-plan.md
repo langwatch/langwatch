@@ -4320,6 +4320,172 @@ package were added; filtered installs linked what this lane needed, and `C-01` o
 the lockfile reconciliation.
 
 
+## Experiments-v3 finished: the workbench model and the run loop, 2026-09-02
+
+**The eight framework-free workbench model files MOVED into
+`@langwatch/experiment-contract`**, which is what the previous lane was waiting
+on. `packages/features/experiment/web/src/model/experiments-v3/` gave up
+`execution/types.ts` (510), `execution/run-results.ts` (506),
+`execution/build-execution-request.ts` (419), `execution-scope.ts` (212),
+`normalize-comparison.ts` (195), `empty-row-detection.ts` (67),
+`target-display-name.ts` (44) and `variant-disambiguation.ts` (31) — 1,984
+lines — to `contract/src/workbench/`, keeping the `execution/` shape, plus the
+two suites that covered them (`empty-row-detection`, `execution-scope`: 51
+tests). Their `../types` and `../types/persistence` imports resolved to the
+contract already (both web modules are one-line re-exports of it), so they now
+name `../../experiment-workbench` and `../../experiment-workbench-persistence`
+directly. `src/index.ts` re-exports all eight; no export name collided with the
+219 the contract already had. Eighteen experiment-web modules repointed to
+`@langwatch/experiment-contract`. **No subpath export was added to
+`experiment-web`** — its exports map is what `ui-web-public-entry` counts, so
+publishing the model would have raised the very count the lane is gated on.
+`create-experiment-button.tsx`'s `human-readable-id.ts` travelled with them: a
+run's id generator is a contract between the browser that names a run and the
+server that starts one. (`prompt-web` keeps its own copy of that file, a
+duplicate this lane did not touch.)
+
+**`transposeColumnsFirstToRowsFirstWithId` moved to
+`@langwatch/workflow-contract`** (`src/dataset-transposition.ts`, `nanoid`
+added), and six importers across prompt-web, workflow-web and experiment-web
+repointed. Only the function moved, not the whole
+`workflow-web/src/model/studio-dataset.utils.ts`: the other eleven exports of
+that file are equally framework-free and belong in the contract too, but
+`inMemoryDatasetToNodeDataset`, `trainTestSplit`, `datasetColumnTypeToFieldType`
+and friends have ~40 call sites in five packages, none of them under this lane's
+gates. Recorded as the next slice rather than done badly here.
+
+**`generateOtelTraceId` / `generateOtelSpanId` moved to
+`@langwatch/trace-contract`** (`src/trace-otel-ids.ts`) out of
+`trace-web/src/model/trace.ts`, which keeps `getSpanNameOrModel` and its
+`./utils/trace` export. The run loop needs OTel ids on the server and a core
+feature server may not import another feature's web package; restating twenty
+lines of the OTel id format would have been the third copy.
+
+**`platform/app/src/server/experiments-v3/**` moved WHOLE into
+`@langwatch/experiment-server`** — the eleven remaining modules and both
+suites, 8,605 lines, zero insertions in `platform/app`. The subtree is gone, and
+`platform/app/src/server/workflows/` fell empty behind
+`workflowEvaluation.service.ts`.
+
+| Was | Is |
+| --- | --- |
+| `experiments-v3/execution/orchestrator.ts` (3,610) | `services/experiment-run-orchestrator.service.ts` |
+| `experiments-v3/execution/experimentRunner.ts` (349) | `services/experiment-polling-run.service.ts` |
+| `experiments-v3/execution/savedStateExecution.ts` (221) | `services/experiment-saved-state-execution.service.ts` |
+| `experiments-v3/execution/dataLoader.ts` (571) | `services/experiment-execution-data.service.ts` |
+| `experiments-v3/execution/runStateMirror.ts` (119) | `services/experiment-run-state-mirror.service.ts` |
+| `experiments-v3/workbenchTargetNames.ts` (150) | `services/experiment-workbench-target-names.service.ts` |
+| `server/workflows/workflowEvaluation.service.ts` (329) | `services/experiment-workflow-evaluation.service.ts` |
+| `experiments-v3/execution/resultMapper.ts` (593) | `processes/experiment-result-mapping.process.ts` |
+| `experiments-v3/execution/workflowBuilder.ts` (1,188) | `processes/experiment-cell-workflow.process.ts` |
+| its two suites (1,535) | `processes/__tests__/experiment-cell-workflow.{unit,integration}.test.ts` |
+| `experiments-v3/execution/runStateManager.ts` (269) | `ports/experiment-run-progress.port.ts` + `adapters/redis.experiment-run-progress.adapter.ts` |
+
+**Nine ports, each a seam the move exposed.** `ExperimentStudioDispatchPort`
+replaces `studioBackendPostEvent` **and** the `nlpLambda: NlpLambdaRuntime` and
+`modelProviders: ModelProviderService` that were threaded through nine
+signatures to reach it and used for nothing else — the engine's dialer, its
+runtime and its parameter strip are facts of the process, not of the run.
+`ExperimentModelCostPort` fronts `estimateCost` / `getMatchingLLMModelCost`,
+because a deployment prices a model in its own rate table.
+`ExperimentSandboxCredentialPort` folds the project's organization lookup and
+`tryMintAgentSandboxApiKey` into one question, since a run mints for itself and
+has no member to authorize. `ExperimentEvaluationReportingPort` replaces
+`getApp().evaluations.reportEvaluation`. `ExperimentWorkflowDslPort` carries the
+four Postgres reads the run makes against Workflow's own rows — the workflow, a
+version's DSL, and the archived-excluding pair the evaluate trigger uses — kept
+as four narrow reads so the run still distinguishes "no such workflow" from
+"nothing committed to evaluate". `ExperimentTargetEntityNamesPort` replaces the
+agent and evaluator `findMany` in the column-name resolver.
+`ExperimentRunProgressPort` + `RedisExperimentRunProgressAdapter` replace the
+`runStateManager` singleton and its `tryGetApp()?.redis`.
+`ExperimentRunErrorReportingPort` replaces the PostHog capture and is optional,
+because nothing downstream reads the report. `ExperimentRunAbortPort` and
+`ExperimentService` already existed; `abortManager` and `getApp().experiments`
+are now those.
+
+The six of them a run needs at once are one injected bag,
+`ExperimentRunPorts`, on `OrchestratorInput` — so the process that composes a
+run states in one place what a run may touch, instead of nine signatures each
+carrying two of them.
+
+**Judgment calls.** `loadExecutionData`'s `services` argument became required
+and moved ahead of the optional `inputs`, because a required parameter cannot
+follow an optional one; it now carries `datasets`, `prompts`, `agents` and
+`workflows` alongside the `evaluators` it already had, all of them contract
+services, so the read path that names a workbench's columns and the run that
+executes it go through the same graph rather than two. `AgentsFeature.create({
+prisma })` inside the load loop is gone the same way. `WorkflowEvaluationService`
+takes one named dependencies object instead of six positional arguments.
+`requestAbort(runId)` is `requestAbort({ abort, runId })`.
+`runStateManager.getRunState` is `tryGetRunState` (fallible-result-naming).
+`@xyflow/react`'s `Node`/`Edge` in the cell-workflow builder became the
+contract's own `StudioNode`/`StudioEdge`, which exist for exactly this reason —
+a server package should not carry a browser graph runtime even as a type.
+`WorkflowEvaluationOutcome` was restated structurally rather than imported from
+`@langwatch/platform-api` (which is `apps/api`) or from
+`@langwatch/workflow-server` (another feature's server).
+`EvaluatorExecutionError` now comes from `@langwatch/evaluation-contract`, where
+it had already moved; the platform path it named had been dangling.
+`KSUID_RESOURCES.EVALUATION` is stated as `"eval"` beside its one use, the same
+way `trace-server` states its own — importing a whole deployment-wide prefix
+table to mint one id would make this package depend on every other feature's
+prefixes.
+
+**Behaviour recorded rather than preserved: a process with no Redis.**
+`runStateManager` read `tryGetApp()?.redis` before every write and skipped
+silently when there was none, so a deployment without Redis served
+`GET /runs/:runId` a 404 for every run it had started. The port is required now,
+so that skip is a composition choice: a process that composes no progress store
+cannot mount the polling run loop at all. That is the same fact, said out loud.
+
+**What the execution fold must compose.** `apps/api` was not touched. To mount
+the run loop it needs, per process: `ExperimentRunPorts` — a
+`WorkflowStudioDispatchService` (`@langwatch/workflow-server` already owns the
+protocol half of `studioBackendPostEvent`) behind
+`ExperimentStudioDispatchPort`; the tracer's cost catalogue behind
+`ExperimentModelCostPort`; `RedisExperimentRunAbortAdapter`; the process's
+`ExperimentService`; the Evaluation application's `reportEvaluation` behind
+`ExperimentEvaluationReportingPort`; and the API-key service plus the project's
+organization behind `ExperimentSandboxCredentialPort`. Beside them:
+`RedisExperimentRunProgressAdapter`, an `ExperimentWorkflowDslPort` and an
+`ExperimentTargetEntityNamesPort` over Postgres, an `ExecutionDataServices` bag
+(`DatasetService`, `PromptService`, `AgentService`, `EvaluatorService`), the
+public `baseUrl` for `getRunUrl`, and optionally an
+`ExperimentRunErrorReportingPort`. None of that is a new environment leaf:
+`LANGWATCH_NLP_SERVICE` and the base URL reach it through the services the fold
+already builds.
+
+**Gates.** experiment-contract 4 files/14 tests to 6/65, `tsc --noEmit` clean;
+experiment-server 18/5,188 to 20/5,246 (5,243 passed, 3 pre-existing skips),
+clean; experiment-web 629 to 578 — the 51 that left are the two suites now in
+the contract, and 578 + 51 = 629 exactly; workflow-web 318, workflow-contract 80,
+scenario-web 421, trace-web 1,817, trace-contract 322, prompt-web 643, all at
+baseline. architecture-lint: experiment-web 208 findings to **204** (the gate is
+that it must not rise; `ui-screen-closure` fell 189 to 185), experiment-contract
+0, workflow-contract 0, scenario-web and `apps/ui` unchanged at 137 and 86.
+experiment-server 10 to 13: three `service-quality` ceilings on the orchestrator
+(3,610 lines), the data loader (571) and the workflow-evaluation trigger — the
+cleanup backlog, named rather than dodged by filing a 3,610-line run loop under
+`processes/`. `git diff --numstat -- platform/app` zero insertions on every row.
+
+`apps/ui` is red at 2 files / 2 tests (`chrome-drawer.integration.test.tsx`,
+`gateway-routes.unit.test.ts`) and no file under `apps/ui` was edited here; a
+concurrent lane renamed `apps/ui/src/main.tsx` to `ui.entrypoint.tsx` mid-run.
+The annotation and trace-contract type errors that show up in every web
+package's typecheck are another lane's in-flight edit
+(`annotation.record.ts` declares `AnnotationUser` twice; `trace-mapping.ts` and
+`trace-list.repository.ts` are untracked). The four `TS7006` in
+`workflow-web/src/ui/sections/optimization_studio/history.tsx` and
+`use-component-version.tsx` predate this lane and are untouched by it.
+
+**Nothing remains under `platform/app/src/server/experiments-v3`.** The
+sixteen `global-app-access-baseline` entries the run now reports against
+`runStateManager.ts`, `dataLoader.ts` and `orchestrator.ts` are stale baseline
+rows for deleted files, the same residue every previous lane left; the baseline
+only shrinks, and trimming it is a shared-file edit better done in one pass at
+the end.
+
 ## Progress accounting
 
 Only committed deletions count. After each migration commit, record the hash in

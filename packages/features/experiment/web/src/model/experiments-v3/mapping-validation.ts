@@ -12,7 +12,7 @@ import {
 import type { EvaluatorConfig, TargetConfig } from "./types";
 import { isGoldenFieldSatisfied } from "./types";
 import { extractVariablesFromBodyTemplate } from "./http-agent-utils";
-import { toComparisonConfig } from "./normalize-comparison";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 
 // ============================================================================
 // Types

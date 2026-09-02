@@ -41,7 +41,7 @@ import {
 import {
   normalizeEvaluators,
   normalizeTargets,
-} from "../../model/experiments-v3/normalize-comparison";
+} from "@langwatch/experiment-contract";
 
 // ============================================================================
 // Helper Functions

@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
-import type { ExecutionScope } from "../../../model/experiments-v3/execution/types";
+import type { ExecutionScope } from "@langwatch/experiment-contract";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation";
 
 type ExecutionControlsProps = {

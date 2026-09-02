@@ -304,6 +304,7 @@
     "@langwatch/platform-api-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

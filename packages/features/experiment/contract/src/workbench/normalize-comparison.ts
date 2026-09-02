@@ -1,4 +1,4 @@
-import { resolveExperimentVerdictLabel } from "@langwatch/experiment-contract";
+import { resolveExperimentVerdictLabel } from "../experiment-comparison";
 import {
   COMPARISON_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
@@ -6,7 +6,7 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type PairwiseEvaluatorConfig,
   type TargetConfig,
-} from "./types";
+} from "../experiment-workbench";
 
 export { resolveExperimentVerdictLabel as resolveVerdictLabel };
 

@@ -24,7 +24,7 @@ import { useTargetName, useTargetNames } from "../../../../behavior/experiments-
 import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types";
 import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns";
-import { disambiguateNames } from "../../../../model/experiments-v3/variant-disambiguation";
+import { disambiguateNames } from "@langwatch/experiment-contract";
 
 type Metric = "cost" | "duration";
 type VariantOutputOption = {

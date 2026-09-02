@@ -8,8 +8,8 @@ import type {
   EvaluationResults,
 } from "../types";
 import { computeTargetAggregates } from "../compute-aggregates";
-import { toComparisonConfig } from "../normalize-comparison";
-import { disambiguateNames } from "../variant-disambiguation";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
+import { disambiguateNames } from "@langwatch/experiment-contract";
 import type { WorkbenchState } from "./transforms";
 
 /**

@@ -381,14 +381,14 @@ describe("PromptTabbedSection Store Integration", () => {
 
   describe("demonstrations tab logic", () => {
     it("demonstrates transposeColumnsFirstToRowsFirstWithId returns empty for no data", async () => {
-      const { transposeColumnsFirstToRowsFirstWithId } = await import("@langwatch/workflow-web");
+      const { transposeColumnsFirstToRowsFirstWithId } = await import("@langwatch/workflow-contract");
 
       const result = transposeColumnsFirstToRowsFirstWithId({});
       expect(result).toEqual([]);
     });
 
     it("demonstrates transposeColumnsFirstToRowsFirstWithId returns rows for data", async () => {
-      const { transposeColumnsFirstToRowsFirstWithId } = await import("@langwatch/workflow-web");
+      const { transposeColumnsFirstToRowsFirstWithId } = await import("@langwatch/workflow-contract");
 
       const records = {
         input: ["hello", "world"],

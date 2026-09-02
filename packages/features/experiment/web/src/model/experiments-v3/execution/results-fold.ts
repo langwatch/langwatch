@@ -2,7 +2,7 @@ import type { SerializedHandledError } from "@langwatch/handled-error";
 import {
   type EvaluationV3Event,
   UNNAMED_FAILURE,
-} from "./types";
+} from "@langwatch/experiment-contract";
 import type { EvaluationResults, TargetRowMetadata } from "../types";
 
 /**
@@ -205,7 +205,8 @@ const defaultCellErrorDescriber: CellErrorDescriber = (event) =>
 /**
  * The evaluator row an `error` frame writes when it names an evaluator.
  *
- * Mirrors the backend fold (`server/experiments-v3/execution/run-results.ts`),
+ * Mirrors the backend fold (`@langwatch/experiment-contract`'s
+ * `workbench/execution/run-results.ts`),
  * so a browser run and a polled run leave the same cell behind.
  */
 const evaluatorErrorRow = ({

@@ -2,7 +2,9 @@
  * Utilities for determining which cells will be executed based on execution scope.
  * This is the single source of truth for execution cell calculation on the frontend.
  *
- * The same logic exists on the backend in orchestrator.ts - these must stay in sync.
+ * The run loop (`@langwatch/experiment-server`'s
+ * `services/experiment-run-orchestrator.service.ts`) computes the same cells,
+ * and the two must stay in sync.
  */
 
 import type { ExecutionScope } from "./execution/types";

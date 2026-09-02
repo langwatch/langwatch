@@ -4,7 +4,7 @@ import {
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/workflow-web/studio-host/errors";
-import { UNNAMED_FAILURE } from "./execution/types";
+import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 
 /**
  * What a failed cell says, plus the engine's own words for whoever asks.

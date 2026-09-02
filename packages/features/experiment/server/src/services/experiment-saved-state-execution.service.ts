@@ -1,25 +1,27 @@
 import type { z } from "zod";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   type BoardResults,
+  type CarriedOverCell,
+  type CellId,
+  createInitialUIState,
+  type EvaluationsV3State,
+  type ExecutionScope,
+  ExperimentNotFoundError,
+  type ExperimentService,
+  InvalidExperimentConfigurationError,
+  persistedEvaluationsV3StateSchema,
   planBoardCarryOver,
   planComparisonSeeding,
   type SeedableResults,
   type SeedTargetOutputs,
-} from "~/experiments-v3/execution/buildExecutionRequest";
-import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { createInitialUIState } from "~/experiments-v3/types";
-import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
-import type { CellId } from "~/experiments-v3/utils/executionScope";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import {
-  ExperimentNotFoundError,
-  type ExperimentService,
-  InvalidExperimentConfigurationError,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { type ExecutionDataInputs, loadExecutionData } from "./dataLoader";
-import type { CarriedOverCell, ExecutionScope } from "./types";
+import {
+  type ExecutionDataInputs,
+  type ExecutionDataServices,
+  loadExecutionData,
+} from "./experiment-execution-data.service";
 
 type LoadedExecutionData = Extract<
   Awaited<ReturnType<typeof loadExecutionData>>,
@@ -178,13 +180,14 @@ async function readSavedWorkbench({
  */
 export async function prepareSavedStateExecution({
   experiments,
-  evaluators,
+  services,
   projectId,
   slug,
   runInputs,
 }: {
   experiments: ExperimentService;
-  evaluators: EvaluatorService;
+  /** The datasets, prompts, agents, workflows and evaluators the load reads. */
+  services: ExecutionDataServices;
   projectId: string;
   slug: string;
   runInputs?: ExecutionDataInputs;
@@ -200,8 +203,8 @@ export async function prepareSavedStateExecution({
     dataset,
     workbenchState.targets,
     workbenchState.evaluators,
+    services,
     runInputs ?? {},
-    { evaluators },
   );
   if ("error" in dataResult) {
     return { error: dataResult.error, status: dataResult.status };

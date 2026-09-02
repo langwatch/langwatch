@@ -1,4 +1,4 @@
-import type { TargetConfig } from "./types";
+import type { TargetConfig } from "../experiment-workbench";
 
 /** What a name lookup yields, whichever entity it fetched. */
 export type NamedEntity = { name?: string | null; handle?: string | null };

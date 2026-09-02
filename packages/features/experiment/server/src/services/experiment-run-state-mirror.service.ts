@@ -13,11 +13,10 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { runStateManager } from "./runStateManager";
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
 
-const logger = createLogger("langwatch:experiments-v3:run-state-mirror");
-
-import type { EvaluationV3Event } from "./types";
+const logger = createLogger("langwatch:experiment:run-state-mirror");
 
 /** What a caller feeds one run's stream into. */
 export interface RunStateMirror {
@@ -41,10 +40,13 @@ export const createRunStateMirror = ({
   projectId,
   experimentId,
   experimentSlug,
+  progress,
 }: {
   projectId: string;
   experimentId?: string;
   experimentSlug: string;
+  /** Where the frames are mirrored so a poll on another process finds them. */
+  progress: ExperimentRunProgressPort;
 }): RunStateMirror => {
   let runId: string | undefined;
   let ended = false;
@@ -76,13 +78,13 @@ export const createRunStateMirror = ({
     if (event.type === "done") {
       ended = true;
       await mirrored("completeRun", () =>
-        runStateManager.completeRun(id, event.summary),
+        progress.completeRun(id, event.summary),
       );
       return;
     }
     if (event.type === "stopped") {
       ended = true;
-      await mirrored("stopRun", () => runStateManager.stopRun(id));
+      await mirrored("stopRun", () => progress.stopRun(id));
     }
   };
 
@@ -91,7 +93,7 @@ export const createRunStateMirror = ({
       if (event.type === "execution_started") {
         runId = event.runId;
         await mirrored("createRun", () =>
-          runStateManager.createRun({
+          progress.createRun({
             runId: event.runId,
             projectId,
             experimentId,
@@ -103,7 +105,7 @@ export const createRunStateMirror = ({
       }
       const id = runId;
       if (!id) return;
-      await mirrored("addEvent", () => runStateManager.addEvent(id, event));
+      await mirrored("addEvent", () => progress.addEvent(id, event));
       await recordEnd(event);
     },
     async fail(failure: {
@@ -113,7 +115,7 @@ export const createRunStateMirror = ({
     }): Promise<void> {
       const id = runId;
       if (!id || ended) return;
-      await mirrored("failRun", () => runStateManager.failRun(id, failure));
+      await mirrored("failRun", () => progress.failRun(id, failure));
     },
   };
 };

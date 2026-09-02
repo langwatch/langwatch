@@ -28,7 +28,7 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../model/experiments-v3/field-mapping-converters";
-import { toComparisonConfig } from "../../model/experiments-v3/normalize-comparison";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 /**

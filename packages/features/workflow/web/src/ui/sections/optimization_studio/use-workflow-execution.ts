@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../../behavior/studio-host/toaster";
-import { generateOtelTraceId } from "@langwatch/trace-web/utils/trace";
+import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event";

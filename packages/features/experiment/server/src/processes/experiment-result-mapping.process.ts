@@ -16,13 +16,13 @@ import {
   nodeErrorToDomainError,
   type StudioServerEvent,
 } from "@langwatch/workflow-contract";
-import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
+import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   type EvaluationV3EvaluatorResult,
   type EvaluationV3Event,
   UNNAMED_FAILURE,
-} from "./types";
+} from "@langwatch/experiment-contract";
 
 /**
  * Configuration for result mapping.

@@ -6,7 +6,7 @@ import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Variable, VariablesSection } from "../../../../surfaces/variables";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { RuntimeParametersField } from "../../fields/runtime-parameters-field";
 import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form";
 import type { LlmConfigInputType } from "@langwatch/prompt-contract";

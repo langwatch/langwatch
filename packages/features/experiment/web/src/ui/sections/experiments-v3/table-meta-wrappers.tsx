@@ -7,7 +7,7 @@ import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../../../model/experiments-v3/types";
-import { toComparisonConfig } from "../../../model/experiments-v3/normalize-comparison";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { ComparisonCell } from "./comparison-cell";
 import { TargetCellContent } from "./TargetSection/target-cell";
 import { TargetHeader } from "./TargetSection/target-header";
