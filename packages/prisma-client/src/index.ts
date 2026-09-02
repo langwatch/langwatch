@@ -44,3 +44,10 @@ export {
   isUniqueConstraintError,
   uniqueConstraintTargets,
 } from "./prisma-error-codes";
+export {
+  reportQueryDuration,
+  resetSlowQueryThrottle,
+  resolveSlowQueryBudgetMs,
+  safeArgKeys,
+  withQueryTiming,
+} from "./slow-query-warning";

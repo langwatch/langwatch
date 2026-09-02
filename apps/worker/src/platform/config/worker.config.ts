@@ -2,6 +2,7 @@ import {
   Config,
   environmentBooleanSchema,
   environmentOneOrTrueSchema,
+  parseDataplaneS3RoutingTable,
   resolveTelemetryConfiguration,
   RuntimeConfig,
   type ConfigValue,
@@ -1186,61 +1187,25 @@ function resolveWorkerShutdownConfig(input: {
   return { processDeadlineMs: queueDrainMs + APP_CLOSE_SLACK_MS + PROCESS_CLOSE_SLACK_MS };
 }
 
-const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
-
-const dataplaneS3ConfigSchema = z.object({
-  endpoint: z.string().min(1),
-  bucket: z.string().min(1),
-  accessKeyId: z.string().min(1),
-  secretAccessKey: z.string().min(1),
-});
-
 /**
  * The per-organization S3 routes this deployment declares.
  *
- * Read straight off the source, like the feature-flag overrides above, because
- * the variable NAMES carry the organization id and the declarative projection
- * can only name variables it knows in advance.
+ * Parsed by the shared helper rather than by a second reader here: the
+ * variable NAMES carry the organization id and the declarative projection can
+ * only name variables it knows in advance, so a worker that split
+ * `<label>__<organizationId>` differently from the API would write a
+ * customer's objects where that customer cannot read them.
  *
- * A malformed entry is skipped rather than failing the boot, matching the
- * application byte for byte: one customer's bad JSON must not stop the process
- * that serves everyone else. A DUPLICATE organization id does fail, also
- * matching, because two routes for one tenant is a question this process
- * cannot answer and answering it wrong writes their data somewhere they cannot
- * read it.
+ * A malformed entry is skipped; a duplicate organization id is raised by the
+ * helper, because two routes for one tenant is a question this process cannot
+ * answer. The skipped list is dropped rather than logged because this
+ * projection is pure — it runs before the process has a logger, and the API
+ * reads the same variables and names them.
  */
 export function resolveWorkerDataplaneS3Config(
   source: Readonly<Record<string, unknown>>,
 ): ReadonlyMap<string, WorkerDataplaneS3Config> {
-  const routes = new Map<string, WorkerDataplaneS3Config>();
-
-  for (const [key, raw] of Object.entries(source)) {
-    if (!key.startsWith(DATAPLANE_S3_ENV_PREFIX) || typeof raw !== "string" || !raw) continue;
-
-    const suffix = key.slice(DATAPLANE_S3_ENV_PREFIX.length);
-    const separator = suffix.lastIndexOf("__");
-    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
-    if (!organizationId) continue;
-
-    let decoded: unknown;
-    try {
-      decoded = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-
-    const parsed = dataplaneS3ConfigSchema.safeParse(decoded);
-    if (!parsed.success) continue;
-
-    if (routes.has(organizationId)) {
-      throw new Error(
-        `Duplicate private S3 config for organization "${organizationId}": "${key}" conflicts with an earlier definition.`,
-      );
-    }
-    routes.set(organizationId, parsed.data);
-  }
-
-  return routes;
+  return parseDataplaneS3RoutingTable(source).routes;
 }
 
 /**

@@ -31,6 +31,8 @@
     "start": "tsx --env-file-if-exists=../../.env src/api.entrypoint.ts",
     "dev": "tsx watch --env-file-if-exists=../../.env src/api.entrypoint.ts",
     "task:clickhouse-migrate": "tsx --env-file-if-exists=../../.env src/tasks/clickhouse-migrate/clickhouse-migrate.entrypoint.ts",
+    "task:lwql-provision": "tsx --env-file-if-exists=../../.env src/tasks/lwql-provision/lwql-provision.entrypoint.ts",
+    "task:model-provider-migrate": "tsx --env-file-if-exists=../../.env src/tasks/model-provider-migrate/model-provider-migrate.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
@@ -70,6 +72,8 @@
     "@langwatch/enterprise-api": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-billing-server": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-governance-server": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-server": "workspace:*",
@@ -133,6 +137,7 @@
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
+    "@langwatch/ui": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
@@ -148,10 +153,13 @@
     "prom-client": "^15.1.3",
     "superjson": "^2.2.6",
     "tsx": "^4.22.4",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
     "@opentelemetry/otlp-transformer": "0.55.0",
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/sdk-trace-web": "2.10.0",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^26.0.1",
     "typescript": "^7.0.2",

@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
     "lodash-es": "^4.18.1",

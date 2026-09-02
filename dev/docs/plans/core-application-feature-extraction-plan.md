@@ -7299,3 +7299,191 @@ deleted. It was dropped; the other six blocks moved whole into
   `api-key/`, `auth/`, `scopes/`, `agents/`, `webhooks/`, `evaluations/` or
   `langevals/`.
 
+
+## The tRPC infrastructure remainder, the loose server files and the task tail, 2026-09-03
+
+The lane that closes `server/api/**`, the sixteen loose `server/*.ts` files, the
+twelve small `server/<dir>/` buckets, the four surviving `src/tasks` entries and
+what the census left of `src/{pages,types,factories,stores,prompts,shared,styles}`.
+
+**`server/api/**` is gone.** Two files were left when the lane resumed. The
+`gatewayBudgets.principal-cascade` integration suite — five PRINCIPAL-scope
+budget cases against real Postgres — became
+`packages/features/gateway/server/src/services/__tests__/gateway-budget.principal-cascade.integration.test.ts`,
+composed the way the package's own Postgres suites compose (`PrismaConnectionService`
+over a `DATABASE_URL`, `describe.skipIf` when there is none) and built through
+`PrismaGatewayAdapter` rather than the `GatewayService.create(prisma)` signature
+the platform copy still called, which four collaborators ago stopped existing.
+Its one live Project read needed `TestProjectService.tryGetWithTeam` to carry the
+contract's parameter; the fake declared it with none, so an override could not
+answer it. `openapi-response-required.ts` stays, because it is
+`generateOpenAPISpec`'s private helper and that file cannot move yet (below).
+
+**The loose files, by what they turned out to be.**
+
+| File | Outcome |
+| --- | --- |
+| `server/dataplane-s3.ts` (+ its 250-line suite) | **twin, deleted.** Both applications already parse `DATAPLANE_S3__*` themselves, and both parsed it by hand. `parseDataplaneS3RoutingTable` is now `@langwatch/config`'s, with the env-parsing half of the platform suite rewritten against an explicit source; `api.config.ts` and `worker.config.ts` each call it. |
+| `server/storage.ts` | **twin, deleted.** `StorageService` had no importer left, `createS3Client` only `server/s3`, and `resolveS3ClientTarget` only `runtime/app/**`. Both applications compose the packaged `StoredObjectStorageRuntime`/`StoredObjectProjectS3ConfigPort` graph for the same job. |
+| `server/static-handler.ts`, `server/asset-base.ts` (+ both suites) | **moved to `apps/api/src/app-static/`.** The chart expects the app image to serve the SPA: `app.assetBase` defaults to `""`, documented as "serves them same-origin straight from the pod", and renders `LANGWATCH_ASSET_BASE` only when set. Deleting them would have deleted the self-host serving path. 42 tests green in their new home. |
+| `server/dbSlowQueryWarning.ts` (+ suite) | **moved to `@langwatch/prisma-client`** as `slow-query-warning.ts`. The package forbids ambient environment reads (`import-side-effects.test.ts` reads its own sources), so `resolveSlowQueryBudgetMs` now takes the bag and `reportQueryDuration` defaults to the package constant — a composition root resolves `POSTGRES_SLOW_QUERY_MS` and hands the budget down. |
+| `server/auth.ts` | **twin, deleted.** `apps/api/src/app/api-auth.composition.ts` and `api-handler-managed-session.ts` already resolve a verified Better Auth session through `auth.tryResolveBrowserSession`, which is the whole of what `getServerAuthSession` did. |
+| `server/rateLimit.ts` | **twin, deleted.** `apps/api/src/platform/infrastructure/api-rate-limit.infrastructure.ts` is the same fixed-window counter — same Redis `incr`/`expire`/`ttl`, same in-memory fallback with the same sweep — without the inline `import()` of the app global. |
+| `server/metrics.ts` | **left whole, and this is the lane's largest recorded absence.** See below. |
+
+**`server/metrics.ts` cannot be distributed yet.** Of the 76 series it declares,
+49 already have owners — the whole `es_*` family is `@langwatch/eventing`'s
+`metrics.ts`, and the stored-object, authz, job and Langy families are declared
+in feature packages. The other 27 (`automation_*` ×5, `evaluation_*` ×2,
+`ingestion_pull_*`, `topic_clustering_page_*`, `process_manager_retention_*`,
+`langwatch_edge_*`, `langwatch_langy_{blocks,dispatch,rate_limit,turns}_total`,
+`payload_size_bytes`, `event_loop_lag_milliseconds`, `worker_restarts`,
+`coding_agent_session_list_read_duration_milliseconds`, `job_processing_duration_milliseconds`)
+have no owner — and every site that increments them is inside `runtime/**` or
+`server/app-layer/**`, which no lane may touch and which the migration has not
+moved. Moving the declarations alone would publish series nothing writes, which
+is worse than leaving them: a dashboard panel that is flat because the metric is
+inert reads exactly like a system that is idle. `worker_restarts` is already in
+that state — nothing outside the file increments it.
+
+**The twelve small buckets.**
+
+- **`server/shutdown/**` (7 files) — twin, deleted.** Both applications own their
+  own drain (`api-process.lifecycle.ts`, `worker.executable.ts`), and
+  `shutdown/telemetry.ts`'s flush registry is `ProcessObservabilityOptions.flushers`.
+- **`server/websockets/**` (4 files) — dead, deleted.** It binds `appRouter` and
+  `createTRPCContext` from `server/api/`, both gone. **Named absence:** no
+  process serves `/api/trpc-ws`; `apps/api` serves subscriptions over
+  `GET /api/sse/*` on the same root instead, and `apps/ui/vite.config.ts` still
+  proxies the dead path.
+- **`server/context/**` (4 files) — twin, deleted.** A banned compatibility
+  re-export of `@langwatch/observability/context` plus two three-line context
+  builders that `packages/api`'s `rest/middleware.ts` and
+  `trpc/trpc-runtime-policy.ts` already do for themselves.
+- **`server/s3/**` (2 files) — deleted.** Reached only from
+  `server/langevals/stagedFetch.ts`, itself reached only from
+  `runtime/app/features/topic.ts`. **Named absence:** `langevals` and
+  `services/nlpgo/adapters/httpapi/staged_payload.go` still accept
+  `X-Payload-S3-URL`, and no TypeScript process composed by `apps/api` or
+  `apps/worker` produces one any more — the last writer was the Lambda-invoke
+  path in platform's dead preset graph.
+- **`server/event-sourcing/**` (2 files) — residue, deleted.** Only two tests
+  remained; their pipeline had already left in an earlier commit and exists
+  nowhere in `apps/**` or `packages/**`. **Recorded coverage loss:** the
+  one-price-three-consumers agreement across a model-catalog change, and the
+  transient-commit rule that every message key is a pure function of its event.
+- **`server/profiling/**` — moved to `@langwatch/observability/node`** as
+  `profiling.ts` (+ 21 tests). `require` became `createRequire(import.meta.url)`
+  because the package is ESM; the deferral is the point of the module, so an
+  inline `import()` was not an option. **Named absence:** neither application
+  parses a Pyroscope endpoint leaf yet, so nothing composes it as a flusher.
+- **`server/ops/**` (3 files) — moved to `@langwatch/ops-server`** as
+  `services/ops-clickhouse-explain.{core,service}.ts`. The service's repository
+  import pointed at an `app-layer` file that no longer exists; the package
+  already declares `OpsExplainClickHouseRepository` beside its resolver port, so
+  the service now names that.
+- **`server/analytics/**` (4 files) — split three ways.** `chartKinds.ts` →
+  `@langwatch/analytics-contract` (`analytics.chart-kind.ts`), which is the one
+  place above both the chart builder and the workbench. `lwqlKeyMap.repository.ts`
+  and `lwql-key-map.service.ts` → `@langwatch/analytics-server` beside the
+  provisioning they share a table with; the service took two arguments on the
+  way — the source database (a package must not parse the deployment's
+  connection string) and an `LwqlKeyMapErrorSinkPort` in place of
+  `captureException`. The ClickHouse `memory-safety` suite → `@langwatch/trace-server`,
+  where the source it reads now lives; it had been dead by `ENOENT` since
+  `server/traces/clickhouse-trace.service.ts` moved, and one assertion named the
+  old App-shaped client access (`clickhouse.resolveClient(`) rather than the
+  repository's own (`this.resolveClient(`). 8 tests, alive again.
+- **`server/middleware/**` (2 files) — moved to `@langwatch/langy-server`** as
+  `services/langy-github-pr-quota.service.ts`. `tryGetApp()?.redis` became a
+  `LangyGithubPrCounterPort` threaded through all five functions, and the suite
+  dropped its module-mock-and-reload dance for the port. 12 tests green.
+- **`server/repositories/organization.repository.ts` — superseded, deleted.**
+  Two of its four methods are answered by the packaged organization service and
+  `ProjectService.listIdsByOrganization`; the other two are the Stripe reads the
+  identity slice already recorded as deliberately dropped.
+- **`server/schemas/sign-up-data.schema.ts` — deleted.** Its `ATTRIBUTION_FIELDS`
+  source is now `@langwatch/onboarding-web`, the payload is already declared as
+  `SignupData` in `@langwatch/enterprise-billing-contract`, and nothing in
+  `apps/**` or `packages/**` parses through the zod copy.
+- **`server/health-probes/**` — already empty when the lane resumed.**
+
+**The task tail.** `migrateCustomModels` and `migrateModelProviderKeys` split
+the way the grammar wants: both row conversions became
+`@langwatch/model-provider-server`'s `services/model-provider-legacy-migration.service.ts`
+(pure, with the credential half taking the existing `ModelProviderCredentialCipherPort`
+rather than platform's `encrypt`, because the ciphertext is a wire format), and
+the walk over the table became `apps/api/src/tasks/model-provider-migrate/`
+behind `task:model-provider-migrate <custom-models|credentials>`. 13 tests moved
+with the conversions. `provisionLwql` moved whole to
+`apps/api/src/tasks/lwql-provision/` behind `task:lwql-provision`: the eleven
+`productionProvisioning`/`provisioning` symbols it needed are now exported from
+`@langwatch/analytics-server`'s barrel, `LWQL_KEY_MAP_INSERT_SETTINGS` came with
+the key-map repository, `parseConnectionUrl` was already in the same app's
+ClickHouse migrate task, and the global `prisma` became an injected
+`LwqlProvisioningDatabase` naming exactly the two operations it performs.
+
+**`generateOpenAPISpec.ts` still cannot move, and the reason changed.** Twelve
+of its fifteen inputs have left `platform/app` — SCIM routes, the RBAC
+vocabulary, `appRestSecurity`, the analytics REST app, the analytics-SQL app,
+the current spec JSON, the organization REST app, `tracesMapping`, the
+evaluations-legacy and experiments-v3 apps, the prompts REST app and the traces
+app. Three have not: `app/api/middleware/enterprise-gate`, `server/routes/misc`
+and `runtime/app/features/secret`, each in another lane's hands or off-limits.
+Moving the generator now would add fifteen import rewrites of which three cannot
+resolve, reddening `apps/api`'s typecheck for every concurrent lane. It moves
+when those three land. `src/runtime/task/legacy-platform-task.executor.ts`,
+`scripts/run-task.sh` and `scripts/generate-task-registry.mjs` therefore survive
+for exactly one task. `src/tasks.generated.ts` is stale (it still lists eight
+deleted modules) and stays stale, because regenerating it is an insertion into a
+deletes-only tree and `start:prepare:files` rewrites it anyway.
+
+**What the census left of `src/`.** `factories/project.factory.ts` deleted (its
+only consumer is a `runtime/app/features/__tests__` file).
+`pages/[project]/__tests__/evaluations.lite-member.integration.test.tsx` deleted —
+it lazily imports a page that is gone and mocks fifteen `~/components/**` and
+`~/hooks/**` modules from a directory the census emptied. **Recorded coverage
+loss:** the lite-member permission visibility on the Experiments page; `apps/ui`
+owns that surface (`features/evaluations/ui/sections/evaluation-routes.tsx`) and
+carries no equivalent test. `styles/{globals,markdown}.scss` moved to
+`apps/ui/src/styles/`, unimported for now: two package modules
+(`workflow/web`'s Crisp policy, `design-system`'s config) name `globals.scss` in
+their own comments as the place a rule and the Inter import live, so deleting it
+would have lost both; the import lands with `index.html` and `public/**`, which
+the census assigns to the UI lane. **Left in place, with cause:**
+`pages/api/collector.stress.test.ts` (collected only by `vitest.stress.config.ts`,
+and it moves with the harness), `types/next-stubs.ts` (named type-only by
+`server/api-router.ts`, the REST lane's file), and the nine repository-wide
+guards in `src/__tests__/**` — their home under `dev/scripts` or `tools/` has no
+TypeScript test runner, and root `pnpm test:unit` still resolves to
+`@langwatch/web`, so moving them now would take them out of CI rather than into
+it. Empty directories left by the census were removed (`prompts/`, `stores/`,
+`shared/`, `server/queues/`, `runtime/ui/` and eleven more).
+
+**Judgement calls recorded.** The worker's `DATAPLANE_S3__*` reader drops the
+skipped-variable list rather than logging it, because `worker.config.ts` is a
+pure projection with no logger and the API reads the same variables and names
+them; `TestProjectService.tryGetWithTeam` was widened to the contract's
+signature rather than bypassed with a cast; the `memory-safety` assertion was
+re-pointed at `this.resolveClient(` and paired with a `createClient(` prohibition
+rather than deleted, because the invariant it guards (no bare driver client
+skipping the query-default policy) survived the move even though its spelling
+did not; and `LwqlKeyMapService`'s error sink defaults to silence rather than
+refusing, because the row is repaired by the scheduled backfill either way and a
+refusal would fail project creation over a report.
+
+**Gates.** `tsc --noEmit` clean: `@langwatch/api`, `@langwatch/config`,
+`@langwatch/prisma-client`, `@langwatch/observability`,
+`@langwatch/analytics-contract`, `@langwatch/analytics-server`,
+`@langwatch/gateway-server`, `@langwatch/ops-server`, `@langwatch/langy-server`,
+`@langwatch/model-provider-server`, `@langwatch/worker`. Vitest: api 359,
+config 38, prisma-client 101, observability 188, analytics-contract 5,
+analytics-server 654, gateway-server 289 (+5 skipped, the moved Postgres suite),
+ops-server 341, langy-server 495, model-provider-server 189, trace-server 2344,
+worker 438 — all green. `apps/api` typecheck reports three errors, all in
+`app-trpc/__tests__/app-trpc.features.unit.test.ts`, a file this lane does not
+touch; its suite is 769/770 with the one failure the tenant-data lane already
+recorded above (the topic-clustering refusal reading "An unknown error
+occurred"). `@langwatch/trace-server`'s four typecheck errors are the same two
+untracked `trace-read-mappers.*` files that lane recorded. `git diff --numstat
+-- platform/app`: **0 insertions** on every row.

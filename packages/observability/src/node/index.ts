@@ -9,6 +9,13 @@ export {
 
 export { createAuthoritativeOtlpConfiguration } from "./otlp-configuration";
 export {
+  normaliseTagKey,
+  startProfiling,
+  tagsFromResourceAttributes,
+  type ProfilingOptions,
+  type StartedProfiler,
+} from "./profiling";
+export {
   otlpMetricsExportOptionsFrom,
   startOtlpMetricsExport,
   type OtlpMetricsExportOptions,

@@ -1,0 +1,321 @@
+import fs, { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { createServer, request as httpRequest, type Server } from "http";
+import type { AddressInfo } from "net";
+import { tmpdir } from "os";
+import { join } from "path";
+import { Readable } from "stream";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { readPublicAppConfig, type PublicAppConfig } from "@langwatch/ui/public-config";
+import { serveStaticOrFallback } from "../app-static.handler";
+
+const publicConfig: PublicAppConfig = {
+  appBaseUrl: "https://app.example.com",
+  gatewayBaseUrl: "https://gateway.example.com",
+  deployment: "self-hosted",
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 1 },
+  capabilities: { email: false, nlp: false, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
+};
+
+function rawRequest(
+  port: number,
+  rawPath: string,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { host: "127.0.0.1", port, method: "GET", path: rawPath },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString("utf8"),
+          }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+describe("serveStaticOrFallback", () => {
+  let clientDistDir: string;
+  let server: Server;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    clientDistDir = mkdtempSync(join(tmpdir(), "static-handler-test-"));
+    mkdirSync(join(clientDistDir, "assets"), { recursive: true });
+    writeFileSync(
+      join(clientDistDir, "assets", "index-abc123.js"),
+      "console.log('hello from index-abc123');\n",
+    );
+    writeFileSync(
+      join(clientDistDir, "assets", "main-deadbeef.css"),
+      "body { color: red; }\n",
+    );
+    writeFileSync(
+      join(clientDistDir, "index.html"),
+      '<!doctype html><html><head><script type="module" ' +
+        'src="/assets/index-abc123.js"></script></head>' +
+        "<body><div id=root></div></body></html>",
+    );
+
+    server = createServer((req, res) => {
+      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+      const handled = serveStaticOrFallback({
+        res,
+        pathname,
+        clientDistDir,
+        publicConfig,
+      });
+      if (!handled) {
+        res.statusCode = 404;
+        res.end("Not Found");
+      }
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const addr = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    rmSync(clientDistDir, { recursive: true, force: true });
+  });
+
+  describe("when an existing /assets/ file is requested", () => {
+    it("returns 200 with correct MIME and immutable cache header", async () => {
+      const res = await fetch(`${baseUrl}/assets/index-abc123.js`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/javascript");
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=31536000, immutable",
+      );
+      expect(await res.text()).toContain("hello from index-abc123");
+    });
+
+    it("serves CSS with correct MIME", async () => {
+      const res = await fetch(`${baseUrl}/assets/main-deadbeef.css`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/css");
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=31536000, immutable",
+      );
+    });
+  });
+
+  describe("when a missing /assets/ file is requested", () => {
+    it("returns 404, not the SPA index.html", async () => {
+      const res = await fetch(`${baseUrl}/assets/does-not-exist-xyz.js`);
+      expect(res.status).toBe(404);
+      const body = await res.text();
+      expect(body).not.toContain("<!doctype html>");
+      expect(body).not.toContain("<div id=root>");
+    });
+
+    it("sets a no-store Cache-Control so CDNs do not poison the URL", async () => {
+      const res = await fetch(`${baseUrl}/assets/missing-chunk.js`);
+      expect(res.status).toBe(404);
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
+
+    it("returns 404 even when Accept includes text/html", async () => {
+      const res = await fetch(`${baseUrl}/assets/foo-stale.js`, {
+        headers: { Accept: "text/html,application/xhtml+xml,*/*" },
+      });
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain("<!doctype html>");
+    });
+  });
+
+  describe("when a non-asset route is requested", () => {
+    it("returns the SPA index.html as text/html", async () => {
+      const res = await fetch(`${baseUrl}/projects/foo/traces`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html");
+      expect(await res.text()).toContain("<div id=root>");
+    });
+
+    it("returns 200 + index.html for the root path", async () => {
+      const res = await fetch(`${baseUrl}/`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html");
+    });
+
+    it("injects the allow-listed public config into the HTML response", async () => {
+      const res = await fetch(`${baseUrl}/`);
+      const body = await res.text();
+      expect(body).toContain('name="langwatch-public-config"');
+      expect(body).not.toContain("https://app.example.com");
+      const content = body.match(
+        /<meta name="langwatch-public-config" content="([A-Za-z0-9_-]+)">/,
+      )?.[1];
+      expect(
+        readPublicAppConfig({
+          querySelector: () =>
+            content ? ({ getAttribute: () => content } as unknown as Element) : null,
+        }),
+      ).toEqual(publicConfig);
+    });
+
+    it("serves the SPA shell with a revalidate Cache-Control so reloads pick up new chunks", async () => {
+      const res = await fetch(`${baseUrl}/projects/foo/traces`);
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
+  });
+
+  describe("when index.html is requested directly", () => {
+    /** @scenario The HTML shell is served with a revalidate cache so reloads pick up new hashes */
+    it("serves it with a revalidate Cache-Control, not immutable", async () => {
+      const res = await fetch(`${baseUrl}/index.html`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html");
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
+  });
+
+  describe("given the runtime asset base is served into the shell", () => {
+    const original = process.env.LANGWATCH_ASSET_BASE;
+    afterAll(() => {
+      if (original === undefined) delete process.env.LANGWATCH_ASSET_BASE;
+      else process.env.LANGWATCH_ASSET_BASE = original;
+    });
+
+    describe("when no asset base is configured (self-host default)", () => {
+      beforeAll(() => {
+        delete process.env.LANGWATCH_ASSET_BASE;
+      });
+
+      /** @scenario The resolver is injected even when serving same-origin */
+      it("defines the resolver and leaves entry refs same-origin", async () => {
+        const res = await fetch(`${baseUrl}/projects/foo/traces`);
+        const body = await res.text();
+        expect(body).toContain("window.__lwAssetUrl");
+        expect(body).toContain('src="/assets/index-abc123.js"');
+      });
+    });
+
+    describe("when a CDN asset base is configured (SaaS)", () => {
+      beforeAll(() => {
+        process.env.LANGWATCH_ASSET_BASE = "https://cdn.langwatch.ai/abc123/";
+      });
+
+      /** @scenario Entry script and preload links are rewritten to the CDN base */
+      it("rewrites the entry ref to the CDN and points the resolver at it", async () => {
+        const res = await fetch(`${baseUrl}/projects/foo/traces`);
+        const body = await res.text();
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+        expect(body).not.toContain('src="/assets/index-abc123.js"');
+        expect(body).toContain("https://cdn.langwatch.ai/abc123/");
+      });
+
+      it("rewrites a directly requested /index.html too", async () => {
+        const res = await fetch(`${baseUrl}/index.html`);
+        const body = await res.text();
+        expect(res.headers.get("content-type")).toBe("text/html");
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+      });
+
+      it("rewrites the root path via the index.html fall-through", async () => {
+        // `/` reaches the shell through a different branch (tryServeFile on the
+        // dist dir returns false → tryServeHtml(index.html)) than the routes above.
+        const res = await fetch(`${baseUrl}/`);
+        const body = await res.text();
+        expect(res.status).toBe(200);
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+      });
+    });
+  });
+
+  describe("when an asset path attempts traversal", () => {
+    it("returns 400 before touching the filesystem", async () => {
+      const port = (server.address() as AddressInfo).port;
+      const res = await rawRequest(port, "/assets/../../etc/passwd");
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("given an asset that existed at deploy time", () => {
+    const ephemeralName = "ephemeral-abc123.js";
+    let ephemeralPath: string;
+
+    beforeAll(() => {
+      ephemeralPath = join(clientDistDir, "assets", ephemeralName);
+      writeFileSync(ephemeralPath, "console.log('ephemeral');\n");
+    });
+
+    it("serves the file normally", async () => {
+      const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("ephemeral");
+    });
+
+    describe("when the file is deleted mid-deploy before the next request", () => {
+      beforeAll(() => {
+        unlinkSync(ephemeralPath);
+      });
+
+      it("returns 404 — openSync fails cleanly, no crash", async () => {
+        const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
+        expect(res.status).toBe(404);
+      });
+    });
+  });
+
+  describe("given a file whose read stream errors after it opens", () => {
+    describe("when the stream emits 'error' before any bytes are sent", () => {
+      it("responds 500 without crashing the server", async () => {
+        // The atomic openSync+fd design makes a mid-stream error all but
+        // impossible from a deleted file (the held fd keeps the inode alive),
+        // but pipeWithErrorHandling still guards every other I/O error (EIO
+        // etc). Force one to prove it becomes a clean 500 rather than an
+        // unhandled 'error' that would crash the process.
+        const spy = vi.spyOn(fs, "createReadStream").mockImplementationOnce(((
+          _path: fs.PathLike,
+          options?: unknown,
+        ) => {
+          // Release the real fd the handler opened so the test leaks nothing.
+          const fd = (options as { fd?: number } | undefined)?.fd;
+          if (typeof fd === "number") {
+            try {
+              fs.closeSync(fd);
+            } catch {
+              // already closed
+            }
+          }
+          const stream = new Readable({ read() {} });
+          // Emit after the handler attaches its 'error' listener and pipes.
+          queueMicrotask(() => stream.emit("error", new Error("forced stream error")));
+          return stream as unknown as ReturnType<typeof fs.createReadStream>;
+        }) as typeof fs.createReadStream);
+
+        const res = await fetch(`${baseUrl}/assets/index-abc123.js`);
+
+        expect(res.status).toBe(500);
+        expect(await res.text()).toContain("Internal Server Error");
+        spy.mockRestore();
+      });
+    });
+  });
+});

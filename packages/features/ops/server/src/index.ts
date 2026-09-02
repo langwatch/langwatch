@@ -190,3 +190,22 @@ export {
   type BugReportRestCredentialReader,
   type BugReportRestPorts,
 } from "./transport/api-rest/bug-report.api";
+
+// The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the
+// decision about which client an EXPLAIN is allowed to reach.
+export {
+  ALLOWED_EXPLAIN_TYPES,
+  buildExplainQuery,
+  CLICKHOUSE_GUARDRAILS,
+  explainBodySchema,
+  type ExplainType,
+  OpsClickHouseRuntime,
+  type ParseResult,
+  parseOpsConnection,
+  redactQueryForAudit,
+  stripCommentsAndStrings,
+} from "./services/ops-clickhouse-explain.core";
+export {
+  type OpsExplainOutcome,
+  OpsExplainService,
+} from "./services/ops-clickhouse-explain.service";

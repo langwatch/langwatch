@@ -102,3 +102,36 @@ export {
   type LangWatchQLRestPorts,
 } from "./transport/api-rest/langwatch-ql.api";
 export type { SavedWorkbenchChartRestService } from "./transport/api-rest/langwatch-ql-route-guards";
+
+// The LangWatchQL key map: the row a project's access is granted by, written at
+// project creation by the repository below and repaired by the deploy backfill.
+export {
+  LWQL_KEY_MAP_INSERT_SETTINGS,
+  LwqlKeyMapClickHouseRepository,
+  type LwqlKeyMapRepository,
+  NullLwqlKeyMapRepository,
+} from "./repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
+export {
+  LwqlKeyMapErrorSinkPort,
+  LwqlKeyMapService,
+} from "./services/langwatch-ql-key-map.service";
+
+// The production provisioning statements and names the deploy task runs. Kept
+// beside the runtime reader deliberately: the views a query reads and the
+// statements that create them are one description of the same objects.
+export {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
+} from "./langwatch-ql/provisioning";
+export {
+  type LwqlKeyMapBackfillPlan,
+  type LwqlKeyMapRow,
+  lwqlKeyMapTableQualifiedName,
+  lwqlPostgresSchemaFromDatabaseUrl,
+  planLwqlKeyMapBackfill,
+  productionClickHouseObjectStatements,
+  productionLangWatchQLNames,
+  productionPostgresApprovedViewStatements,
+  productionPostgresReaderGrantStatements,
+  withTenancyOptOut,
+} from "./langwatch-ql/productionProvisioning";

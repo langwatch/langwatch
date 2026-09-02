@@ -45,6 +45,7 @@
   "devDependencies": {
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@pyroscope/nodejs": "0.6.2",
     "@types/node": "^26.0.1",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",

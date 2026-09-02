@@ -584,6 +584,13 @@ export function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): numb
 }
 
 export {
+  DATAPLANE_S3_ENV_PREFIX,
+  type DataplaneS3Route,
+  type DataplaneS3RoutingTable,
+  parseDataplaneS3RoutingTable,
+  type SkippedDataplaneS3Route,
+} from "./dataplane-s3";
+export {
   getZodIssueMessage,
   mapZodIssuesToLogContext,
   parseZodFieldErrors,
