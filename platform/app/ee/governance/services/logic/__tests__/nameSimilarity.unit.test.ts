@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  comparableName,
   isWorthScoring,
   nameSimilarity,
   nameTokens,
@@ -53,6 +54,55 @@ describe("Feature: deciding which name pairs are worth comparing", () => {
     it("ignores initials, which are shared by unrelated people", () => {
       expect(nameTokens("M. J. Silva")).toEqual(new Set(["silva"]));
       expect(isWorthScoring("M. J. Adams", "R. J. Bakker")).toBe(false);
+    });
+  });
+
+  // The shape the real repositories actually produce. `displayText` is an
+  // address for two of the three providers, and a member with no display name
+  // comes back from the account repository as their address, so "both sides are
+  // addresses" is the common case rather than the exotic one.
+  describe("given a name that is really a mail address", () => {
+    /** @scenario "An address is compared by the part that names the person" */
+    it("compares the local part, so an address and a display name can match at all", () => {
+      // Before the domain was stripped this pair was rejected outright: 20
+      // characters against 11 is outside the length band, so an engine fed
+      // addresses on one side produced nothing whatsoever.
+      expect(isWorthScoring("maria.silva@acme.com", "Maria Silva")).toBe(true);
+      expect(nameSimilarity("maria.silva@acme.com", "Maria Silva")).toBe(1);
+    });
+
+    /** @scenario "Two addresses on one company domain are not alike for sharing it" */
+    it("does not let a shared domain admit two unrelated colleagues", () => {
+      // Everybody in an organization shares the domain, so a domain left in the
+      // text is a token every pair has in common — a prefilter that admits
+      // everything, and the padding inflates every score it then computes.
+      expect(
+        isWorthScoring("maria.silva@acme.com", "jonas.bakker@acme.com"),
+      ).toBe(false);
+      expect(
+        nameSimilarity("maria.silva@acme.com", "jonas.bakker@acme.com"),
+      ).toBeNull();
+    });
+
+    it("keeps two colleagues who share only a first name below the bar", () => {
+      const score = nameSimilarity(
+        "maria.silva@acme.com",
+        "maria.bakker@acme.com",
+      );
+      expect(score).not.toBeNull();
+      expect(score).toBeLessThan(SUGGESTION_THRESHOLD);
+    });
+
+    it("treats one person's two addresses as the same person", () => {
+      expect(
+        nameSimilarity("maria.silva@acme.com", "maria.silva@other.example"),
+      ).toBe(1);
+    });
+
+    it("leaves a text that merely starts with @ something to compare", () => {
+      // Cutting at the last @ would leave the empty string, and a pair of empty
+      // strings scores as identical — every handle matching every other one.
+      expect(comparableName("@mariasilva")).toBe("mariasilva");
     });
   });
 });

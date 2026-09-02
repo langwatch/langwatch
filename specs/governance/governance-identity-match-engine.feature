@@ -120,6 +120,26 @@ Feature: Deciding which provider-named person is which LangWatch account
     When the suggestion job runs
     Then the pair is discarded before any comparison is made
 
+  # Providers hand us an address where a name belongs, and so does our own
+  # account table when a member never set a display name. Comparing the whole
+  # string breaks the pass in both directions at once: an address against a name
+  # is rejected by the length band so nothing is ever suggested, and an address
+  # against an address shares the company domain so everything is.
+  @unit
+  Scenario: An address is compared by the part that names the person
+    Given a provider-named person whose display text is a mail address
+    And an account holder whose display name is the same person's name
+    When the suggestion job runs
+    Then the two are compared by the part of the address that names the person
+    And a suggestion is stored for a person to confirm
+
+  @unit
+  Scenario: Two addresses on one company domain are not alike for sharing it
+    Given two people whose display texts are addresses on the same company domain
+    And their names have no word in common
+    When the suggestion job runs
+    Then the pair is discarded before any comparison is made
+
   @unit
   Scenario: A weak resemblance is not worth showing anybody
     Given a provider-named person whose name barely resembles an account holder's
