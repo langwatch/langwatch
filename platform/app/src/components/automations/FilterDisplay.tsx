@@ -54,7 +54,10 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
 
 const FilterValue = ({ children }: { children: React.ReactNode }) => {
   return (
-    <Box padding={1} borderRightRadius="md">
+    // minWidth 0 opts out of the flex child's min-width: auto, so a long
+    // unbreakable value (a monitor id) clamps inside the chip instead of
+    // widening it past its border.
+    <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
       <HoverableBigText lineClamp={1} expandable={false}>
         {children}
       </HoverableBigText>
