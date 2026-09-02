@@ -89,3 +89,19 @@ export {
   type WorkflowEvaluationTrigger,
   type WorkflowRestPorts,
 } from "./transport/api-rest/workflow.api";
+export {
+  createWorkflowStudioRestApp,
+  type WorkflowStudioRestDispatch,
+  type WorkflowStudioRestPorts,
+  type WorkflowStudioRestSession,
+} from "./transport/api-rest/workflow-studio.api";
+export {
+  WORKFLOW_CODE_COMPLETION_FEATURE_KEY,
+  WorkflowCodeCompletionAdapter,
+  type WorkflowModelResolverPort,
+} from "./adapters/workflow-code-completion.adapter";
+export {
+  createWorkflowRunRestApp,
+  type WorkflowRunRestCredential,
+  type WorkflowRunRestPorts,
+} from "./transport/api-rest/workflow-run.api";

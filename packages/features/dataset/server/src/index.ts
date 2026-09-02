@@ -77,3 +77,9 @@ export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service
 export * from "./services/presigned-upload";
 export * from "./services/sanitize";
 export * from "./services/errors";
+export {
+  DATASET_GENERATE_FEATURE_KEY,
+  createDatasetGenerateRestApp,
+  type DatasetGenerateRestPorts,
+  type DatasetGenerateRestSession,
+} from "./transport/api-rest/dataset-generate.api";

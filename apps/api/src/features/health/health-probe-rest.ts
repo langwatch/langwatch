@@ -1,47 +1,86 @@
 /**
- * Hono routes for health-check sub-endpoints.
+ * The five subsystem health probes:
+ * `GET /api/health/{collector,evaluations,processor,triggers,workflows}`.
  *
- * Replaces:
- * - GET /api/health/collector   (sends canary traces via REST + OTLP)
- * - GET /api/health/evaluations (runs a sample PII evaluation)
- * - GET /api/health/processor   (sends canary traces + polls until processed)
- * - GET /api/health/triggers    (checks a trigger fired within the last hour)
- * - GET /api/health/workflows   (runs a sample workflow)
+ * Each one sends a CANARY through the deployment's own public boundary and
+ * reports what came back, which is why every probe here dials an absolute URL
+ * rather than calling a service: what is under test is the round trip a
+ * customer's SDK makes, not a function this process can call directly. The
+ * deployment's public origin is therefore a required port, and a process that
+ * declared none serves no probes at all — a probe that cannot name the surface
+ * it is probing would answer about nothing.
  *
- * NOTE: The simple GET /api/health (204) is already handled in health.ts.
+ * They are `publicEndpoint` and resolve a PROJECT KEY in-handler, which is the
+ * shape an external monitor needs: no session, no per-route permission, one
+ * token that names the project the canary is written into. The two 401 bodies
+ * are transcribed as sent.
+ *
+ * The bare `GET /api/health` (204) is not here — it is the process's own
+ * lifecycle surface, and it answers whether this pod is alive rather than
+ * whether the product is working.
+ *
+ * @see specs/ops/health-probe-failures.feature
  */
-
+import { publicEndpoint } from "@langwatch/api";
+import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import type {
-  ESpanKind,
-  IExportTraceServiceRequest,
-} from "@opentelemetry/otlp-transformer";
+import type { ESpanKind, IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import crypto from "crypto";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
-import { env } from "~/env.mjs";
-import { createServiceApp } from "~/server/api/security";
-import { publicEndpoint } from "@langwatch/platform-api/app-rest";
-import { prisma } from "~/server/db";
-import { sendCanary } from "~/server/health-probes/canary.service";
 import type { CollectorRESTParams } from "@langwatch/trace-contract";
-import type { DeepPartial } from "~/utils/types";
 
 const logger = createLogger("langwatch:health-checks");
 
-const secured = createServiceApp({ basePath: "/api/health" });
+/**
+ * Every key of an object tree made optional, recursively.
+ *
+ * Restated beside its one use rather than imported: the OTLP export request is
+ * built by hand here with only the fields a canary needs, and the shared
+ * utility module that used to declare this was deleted with the tree it lived
+ * in.
+ */
+type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+/** One project, as a probe's key resolves to it. */
+export type HealthProbeProject = Readonly<{ id: string }>;
+
+/** What the five probes reach that they do not own. */
+export interface HealthProbeRestPorts {
+  /**
+   * Resolves a raw project API key to its project, or nothing.
+   *
+   * A key read rather than the process's credential port: these probes predate
+   * scoped keys and check no permission at all, and routing them onto a
+   * ceiling check would refuse the monitor keys already deployed against them.
+   */
+  resolveProjectByApiKey(token: string): Promise<HealthProbeProject | null>;
+  /** The deployment's public origin, which every canary is posted back through. */
+  publicBaseUrl: string;
+  /** The automation application the trigger probe reads a recent fire from. */
+  automation(): Readonly<{
+    tryGetById(input: { triggerId: string; projectId: string }): Promise<unknown | null>;
+    getRecentFires(input: {
+      projectId: string;
+      triggerId: string;
+      limit: number;
+    }): Promise<ReadonlyArray<{ createdAt: Date }>>;
+  }>;
+  /** Whether the project has the workflow the workflow probe was pointed at. */
+  workflowExists(input: { workflowId: string; projectId: string }): Promise<boolean>;
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ── shared auth helper ───────────────────────────────────────────────
 
-async function authenticateProject(c: {
-  req: { header: (name: string) => string | undefined };
-}) {
+async function authenticateProject(
+  c: Pick<Context, "req">,
+  ports: HealthProbeRestPorts,
+): Promise<{ error: string; status: 401 } | { project: HealthProbeProject; authToken: string }> {
   const xAuthToken = c.req.header("x-auth-token");
   const authHeader = c.req.header("authorization");
-  const authToken =
-    xAuthToken ?? (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+  const authToken = xAuthToken ?? (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
     return {
@@ -51,10 +90,7 @@ async function authenticateProject(c: {
     };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
-  });
+  const project = await ports.resolveProjectByApiKey(authToken);
 
   if (!project) {
     return { error: "Invalid auth token.", status: 401 as const };
@@ -65,8 +101,8 @@ async function authenticateProject(c: {
 
 // ── GET /collector ───────────────────────────────────────────────────
 
-secured.access(publicEndpoint("subsystem health probe")).get("/collector", async (c) => {
-  const auth = await authenticateProject(c);
+async function collectorProbe(c: Context, ports: HealthProbeRestPorts): Promise<Response> {
+  const auth = await authenticateProject(c, ports);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
   }
@@ -102,14 +138,12 @@ secured.access(publicEndpoint("subsystem health probe")).get("/collector", async
             scope: { name: "opentelemetry.langwatch.health_check" },
             spans: [
               {
-                traceId: Buffer.from(
-                  crypto.randomBytes(16).toString("hex"),
-                  "hex",
-                ).toString("base64"),
-                spanId: Buffer.from(
-                  crypto.randomBytes(8).toString("hex"),
-                  "hex",
-                ).toString("base64"),
+                traceId: Buffer.from(crypto.randomBytes(16).toString("hex"), "hex").toString(
+                  "base64",
+                ),
+                spanId: Buffer.from(crypto.randomBytes(8).toString("hex"), "hex").toString(
+                  "base64",
+                ),
                 name: "Health check",
                 kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
                 startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
@@ -138,7 +172,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/collector", async
   };
 
   const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
-    fetch(`${env.BASE_HOST}/api/collector`, {
+    fetch(`${ports.publicBaseUrl}/api/collector`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
@@ -146,7 +180,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/collector", async
       },
       body: JSON.stringify(restParams),
     }),
-    fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
+    fetch(`${ports.publicBaseUrl}/api/otel/v1/traces`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
@@ -157,17 +191,11 @@ secured.access(publicEndpoint("subsystem health probe")).get("/collector", async
   ]);
 
   if (!restCollectorResponse.ok) {
-    return c.json(
-      { message: "Failed to send trace to LangWatch using REST" },
-      { status: 500 },
-    );
+    return c.json({ message: "Failed to send trace to LangWatch using REST" }, { status: 500 });
   }
 
   if (!otelCollectorResponse.ok) {
-    return c.json(
-      { message: "Failed to send trace to LangWatch using OTLP" },
-      { status: 500 },
-    );
+    return c.json({ message: "Failed to send trace to LangWatch using OTLP" }, { status: 500 });
   }
 
   const otelBody = await otelCollectorResponse.json();
@@ -175,69 +203,67 @@ secured.access(publicEndpoint("subsystem health probe")).get("/collector", async
     status: otelCollectorResponse.status,
     body: otelBody,
   });
-});
+}
 
 // ── GET /evaluations ─────────────────────────────────────────────────
 
-secured
-  .access(publicEndpoint("subsystem health probe"))
-  .get("/evaluations", async (c) => {
-    const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
-    }
-    const { authToken } = auth;
+async function evaluationsProbe(c: Context, ports: HealthProbeRestPorts): Promise<Response> {
+  const auth = await authenticateProject(c, ports);
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, { status: auth.status });
+  }
+  const { authToken } = auth;
 
-    let response: Response | null = null;
-    let attempts = 0;
-    const maxAttempts = 3;
-    while (attempts < maxAttempts) {
-      response = await fetch(
-        `${env.BASE_HOST}/api/evaluations/presidio/pii_detection/evaluate`,
-        {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": authToken,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            data: {
-              input: "Hello, my name is John Canary and my email is canary@langwatch.ai.",
-            },
-            settings: {
-              entities: {
-                email_address: true,
-                person: true,
-              },
-            },
-          }),
+  let response: Response | null = null;
+  let attempts = 0;
+  const maxAttempts = 3;
+  while (attempts < maxAttempts) {
+    response = await fetch(
+      `${ports.publicBaseUrl}/api/evaluations/presidio/pii_detection/evaluate`,
+      {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": authToken,
+          "Content-Type": "application/json",
         },
-      );
-      if (response.ok) {
-        break;
-      } else if (attempts < maxAttempts - 1) {
-        await sleep(1000);
-        attempts++;
-      } else {
-        return c.json(
-          {
-            message: `Failed to run sample evaluation: ${await response.text()}`,
+        body: JSON.stringify({
+          data: {
+            input: "Hello, my name is John Canary and my email is canary@langwatch.ai.",
           },
-          { status: 500 },
-        );
-      }
+          settings: {
+            entities: {
+              email_address: true,
+              person: true,
+            },
+          },
+        }),
+      },
+    );
+    if (response.ok) {
+      break;
+    } else if (attempts < maxAttempts - 1) {
+      await sleep(1000);
+      attempts++;
+    } else {
+      return c.json(
+        {
+          message: `Failed to run sample evaluation: ${await response.text()}`,
+        },
+        { status: 500 },
+      );
     }
+  }
 
-    return c.json({
-      status: response?.status,
-      body: await response?.json(),
-    });
+  return c.json({
+    status: response?.status,
+    body: await response?.json(),
   });
+}
 
 // ── GET /processor ───────────────────────────────────────────────────
 
-secured.access(publicEndpoint("subsystem health probe")).get("/processor", async (c) => {
-  const auth = await authenticateProject(c);
+async function processorProbe(c: Context, ports: HealthProbeRestPorts): Promise<Response> {
+  const auth = await authenticateProject(c, ports);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
   }
@@ -276,10 +302,9 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
             spans: [
               {
                 traceId: otelTraceIdBase64,
-                spanId: Buffer.from(
-                  crypto.randomBytes(8).toString("hex"),
-                  "hex",
-                ).toString("base64"),
+                spanId: Buffer.from(crypto.randomBytes(8).toString("hex"), "hex").toString(
+                  "base64",
+                ),
                 name: "Health check",
                 kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
                 startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
@@ -318,7 +343,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
   );
 
   const [restCollectorResponse, otelResponse] = await Promise.all([
-    fetch(`${env.BASE_HOST}/api/collector`, {
+    fetch(`${ports.publicBaseUrl}/api/collector`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
@@ -326,7 +351,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
       },
       body: JSON.stringify(restParams),
     }),
-    fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
+    fetch(`${ports.publicBaseUrl}/api/otel/v1/traces`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
@@ -349,17 +374,11 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
   );
 
   if (!restCollectorResponse.ok) {
-    return c.json(
-      { message: "Failed to send trace to LangWatch using REST" },
-      { status: 500 },
-    );
+    return c.json({ message: "Failed to send trace to LangWatch using REST" }, { status: 500 });
   }
 
   if (!otelResponse.ok) {
-    return c.json(
-      { message: "Failed to send trace to LangWatch using OTLP" },
-      { status: 500 },
-    );
+    return c.json({ message: "Failed to send trace to LangWatch using OTLP" }, { status: 500 });
   }
 
   const otelBody = await otelResponse.json();
@@ -378,7 +397,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
       try {
         const fetchStart = Date.now();
         const traceResponse = await fetch(
-          `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
+          `${ports.publicBaseUrl}/api/traces/${encodeURIComponent(traceId)}`,
           {
             headers: { "X-Auth-Token": authToken },
           },
@@ -444,21 +463,18 @@ secured.access(publicEndpoint("subsystem health probe")).get("/processor", async
   }
 
   const totalMs = Date.now() - t0;
-  logger.info(
-    { restTraceId, otelTraceId: otelTraceIdBase64, totalMs },
-    "Healthcheck passed",
-  );
+  logger.info({ restTraceId, otelTraceId: otelTraceIdBase64, totalMs }, "Healthcheck passed");
 
   return c.json({
     status: otelResponse.status,
     body: otelBody,
   });
-});
+}
 
 // ── GET /triggers ────────────────────────────────────────────────────
 
-secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async (c) => {
-  const auth = await authenticateProject(c);
+async function triggersProbe(c: Context, ports: HealthProbeRestPorts): Promise<Response> {
+  const auth = await authenticateProject(c, ports);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
   }
@@ -466,7 +482,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async 
 
   const triggerId = c.req.query("triggerId") ?? "";
 
-  const trigger = await c.app.automation.tryGetById({
+  const trigger = await ports.automation().tryGetById({
     triggerId,
     projectId: project.id,
   });
@@ -475,7 +491,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async 
     return c.json({ message: "Trigger not found." }, { status: 404 });
   }
 
-  const [lastTriggerSent] = await c.app.automation.getRecentFires({
+  const [lastTriggerSent] = await ports.automation().getRecentFires({
     projectId: project.id,
     triggerId,
     limit: 1,
@@ -487,10 +503,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async 
 
   const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
   if (lastTriggerSent.createdAt < oneHourAgo) {
-    return c.json(
-      { message: "Trigger not triggered within the last hour." },
-      { status: 404 },
-    );
+    return c.json({ message: "Trigger not triggered within the last hour." }, { status: 404 });
   }
 
   return c.json({
@@ -499,12 +512,12 @@ secured.access(publicEndpoint("subsystem health probe")).get("/triggers", async 
       message: "Trigger triggered within the last hour.",
     },
   });
-});
+}
 
 // ── GET /workflows ───────────────────────────────────────────────────
 
-secured.access(publicEndpoint("subsystem health probe")).get("/workflows", async (c) => {
-  const auth = await authenticateProject(c);
+async function workflowsProbe(c: Context, ports: HealthProbeRestPorts): Promise<Response> {
+  const auth = await authenticateProject(c, ports);
   if ("error" in auth) {
     return c.json({ message: auth.error }, { status: auth.status });
   }
@@ -512,11 +525,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/workflows", async
 
   const workflowId = c.req.query("workflowId") ?? "";
 
-  const workflow = await prisma.workflow.findUnique({
-    where: { id: workflowId, projectId: project.id },
-  });
-
-  if (!workflow) {
+  if (!(await ports.workflowExists({ workflowId, projectId: project.id }))) {
     return c.json({ message: "Workflow not found." }, { status: 404 });
   }
 
@@ -524,7 +533,7 @@ secured.access(publicEndpoint("subsystem health probe")).get("/workflows", async
   let attempts = 0;
   const maxAttempts = 3;
   while (attempts < maxAttempts) {
-    response = await fetch(`${env.BASE_HOST}/api/workflows/${workflow.id}/run`, {
+    response = await fetch(`${ports.publicBaseUrl}/api/workflows/${workflowId}/run`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
@@ -551,6 +560,22 @@ secured.access(publicEndpoint("subsystem health probe")).get("/workflows", async
     status: response?.status,
     body: await response?.json(),
   });
-});
+}
 
-export const app = secured.hono;
+/** `/api/health/*`, bound to one process. */
+export function createHealthProbeRestApp(options: {
+  security: AppRestSecurity;
+  ports: HealthProbeRestPorts;
+}): MountableRestApp {
+  const { security, ports } = options;
+  const secured = security.createServiceApp({ basePath: "/api/health" });
+  const probe = publicEndpoint("subsystem health probe");
+
+  secured.access(probe).get("/collector", (c) => collectorProbe(c, ports));
+  secured.access(probe).get("/evaluations", (c) => evaluationsProbe(c, ports));
+  secured.access(probe).get("/processor", (c) => processorProbe(c, ports));
+  secured.access(probe).get("/triggers", (c) => triggersProbe(c, ports));
+  secured.access(probe).get("/workflows", (c) => workflowsProbe(c, ports));
+
+  return secured.hono;
+}

@@ -121,3 +121,13 @@ export {
   type TranslateTrpcContext,
   type TranslateTrpcPorts,
 } from "./transport/api-trpc/translate.api";
+export {
+  createPlaygroundRestApp,
+  type PlaygroundRestPorts,
+  type PlaygroundRestSession,
+} from "./transport/api-rest/playground.api";
+
+export {
+  migrateCustomModelsRow,
+  migrateModelProviderKeysRow,
+} from "./services/model-provider-legacy-migration.service";

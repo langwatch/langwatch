@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { SimulationService } from "@langwatch/scenario-contract";
 
-// Partial: the subject now arrives through `@langwatch/platform-api`, whose
-// tRPC spine calls `createWarnThrottle` at module scope. A whole-module
-// replacement takes that export away and the file fails to collect before a
-// single case runs. Only the logger is stubbed.
+// Partial: a whole-module replacement of the observability package takes away
+// exports the transport reads at module scope, and the file then fails to
+// collect before a single case runs. Only the logger is stubbed.
 vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
@@ -15,7 +14,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
-import { archiveScenarioSetRuns } from "@langwatch/platform-api";
+import { archiveScenarioSetRuns } from "../scenario-event.api";
 
 describe("archiveScenarioSetRuns()", () => {
   let mockGetRunIdsForSet: Mock;

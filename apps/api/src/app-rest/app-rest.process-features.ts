@@ -62,7 +62,10 @@ import type { PromptRestService } from "@langwatch/prompt-server";
 
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { OrganizationRestService } from "@langwatch/organization-server";
+import type {
+  OrganizationRestInviteService,
+  OrganizationRestService,
+} from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
 
@@ -210,6 +213,13 @@ export type ApiProcessRestServices = Readonly<{
         shares: () => ShareService;
         projects: () => ProjectService;
         audit: AppRestManagementAuditPort;
+        /**
+         * The invitation half, where the process composed one. Absent, the
+         * three invitation routes refuse by name rather than listing nothing.
+         */
+        invites?: (() => OrganizationRestInviteService) | undefined;
+        /** The acceptance link an invite carries, from the same service. */
+        buildInviteAcceptUrl?: ((inviteCode: string) => string) | undefined;
       }>
     | undefined;
   /**

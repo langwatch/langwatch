@@ -121,7 +121,19 @@ const databaseMocks = vi.hoisted(() => {
     },
   );
   const client = new Proxy(
-    { projectSecret: { findMany } },
+    {
+      projectSecret: { findMany },
+      // The raw-query surface, as FUNCTIONS rather than the empty delegate the
+      // trap below answers every other key with. The durable process store the
+      // webhook replay appends an envelope through refuses a client that does
+      // not carry it — a client without `$transaction` cannot commit a buffer
+      // and its outbox rows together, which is the whole guarantee — so a
+      // double missing it fails the composition rather than the read.
+      $executeRaw: async (): Promise<number> => 0,
+      $queryRaw: async (): Promise<unknown[]> => [],
+      $transaction: async (run: unknown): Promise<unknown> =>
+        typeof run === "function" ? await run(client) : [],
+    },
     {
       get: (target: Record<string, unknown>, key: string) =>
         key in target ? target[key] : emptyDelegate,

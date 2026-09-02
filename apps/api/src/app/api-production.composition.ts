@@ -126,6 +126,10 @@ import {
   type ApiViewerProtectionsPort,
 } from "./api-trpc-collaborators.org-group.composition";
 import {
+  composeApiOrganizationInvites,
+  type ApiOrganizationInvites,
+} from "./api-organization-invites.composition";
+import {
   composeApiGatewayGroupCollaborators,
   withApiGatewayGroupCollaborators,
   type ApiGatewayGroupCollaborators,
@@ -515,6 +519,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedProductInfra: ApiProductInfraCollaborators | undefined;
   private composedAgentGroup: ApiAgentGroupCollaborators | undefined;
   private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
+  /**
+   * The process's ONE invitation service, or none.
+   *
+   * Held rather than composed per door because both doors administer the same
+   * invitations: `organization.*` creates and lists them over tRPC, and
+   * `/api/organization/{id}/invites` does the same over the management REST
+   * family. Two services would be two seat censuses, two throttle keys and two
+   * acceptance links for one invitation.
+   */
+  private composedOrganizationInvites: ApiOrganizationInvites | undefined;
+  private resolvedOrganizationInvites = false;
   private composedGatewayGroup: ApiGatewayGroupCollaborators | undefined;
   /**
    * The process's ONE `Idempotency-Key` receipt ledger, or none.
@@ -676,6 +691,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // rather than to look at what it recorded. It folds on rather than seeding,
     // because it needs the tenancy graph that the seed above does not.
     this.composedProductGroup = this.composeProductGroup(options, authz);
+    // The invitation half, composed here rather than inside the org-group half
+    // because BOTH doors need it: `organization.*` administers invitations over
+    // tRPC and `/api/organization/{id}/invites` over REST, and the REST doors
+    // are composed further down. Everything it stands on — the grant ledger,
+    // the role service, the plan provider and this process's connection — is
+    // open by this line.
+    this.resolveOrganizationInvites(options);
     // The agent half: the test cases and conversations an agent is written,
     // watched and driven through. It composes LAST because it reads what every
     // other half opened — this process's ClickHouse, the queue's Redis, the
@@ -1244,6 +1266,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             },
           }
         : undefined;
+    // The SAME invitation service `organization.*` administers over tRPC, so a
+    // provisioning tool that creates an invitation here and an administrator
+    // who lists them in the app see one set of invitations with one acceptance
+    // link each. Absent, the three invitation routes keep refusing by name.
+    const organizationInvites = this.composedOrganizationInvites;
     const organizationManagement =
       organizationRest && shares && plans && projects
         ? {
@@ -1253,6 +1280,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             shares: () => shares,
             projects: () => projects,
             audit: this.composeManagementAudit(),
+            ...(organizationInvites
+              ? {
+                  invites: () => organizationInvites.rest,
+                  buildInviteAcceptUrl: (inviteCode: string) =>
+                    organizationInvites.buildInviteAcceptUrl(inviteCode),
+                }
+              : {}),
           }
         : undefined;
     // The public trace doors, over the SAME read stack the explorer and the
@@ -2464,9 +2498,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // coding-agent session is a projection in that instance, and a second
       // connection would be a second pool.
       codingAgentClickHouse: this.resolveCodingAgentClickHouse(),
-      ...(this.options.organizationInvites
-        ? { invites: this.options.organizationInvites }
-        : {}),
+      // Injected wins; otherwise the half this process composed over its own
+      // graph. Passed rather than left to this half's own fold because the
+      // management REST family administers the same invitations, and one
+      // service is what keeps the two doors from disagreeing about them.
+      ...(() => {
+        const invites =
+          this.options.organizationInvites ?? this.resolveOrganizationInvites(options)?.trpc;
+        return invites ? { invites } : {};
+      })(),
       ...(this.options.viewerProtections
         ? { viewerProtections: this.options.viewerProtections }
         : {}),
@@ -2634,6 +2674,48 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * would be two answers to "which plan is this organization on", which is the
    * disagreement a customer sees as a banner contradicting the usage panel.
    */
+  /**
+   * The invitation half, composed once over this process's own graph.
+   *
+   * It was an injected port with a refusing default, because `InviteService`
+   * lived in the retired platform application and reached four verticals that
+   * had not moved. All four have moved, and each arrived as something this
+   * process already holds: the seat census is `@langwatch/entitlement-server`'s
+   * usage-membership repository — the SAME reading the usage panel shows — the
+   * plan is the one every allowance banner reads, the roles are the ones
+   * `role.*` mounts, and the grant ledger is the one every other membership
+   * write goes through. A host that injects its own service still wins.
+   *
+   * Absent only when this process composed no database, no grant ledger or no
+   * role service, and then both doors refuse by name rather than answering an
+   * empty invitation list — the one answer an administrator acts on by
+   * inviting the same person twice.
+   */
+  private resolveOrganizationInvites(
+    options: ApiRuntimeCompositionOptions,
+  ): ApiOrganizationInvites | undefined {
+    if (this.resolvedOrganizationInvites) return this.composedOrganizationInvites;
+    this.resolvedOrganizationInvites = true;
+
+    const database = this.composedDatabase?.connection;
+    const grants = this.composedAuthz?.grants;
+    const roles = this.composedProductGroup?.roles;
+    if (!database || !grants || !roles) return undefined;
+
+    this.composedOrganizationInvites = composeApiOrganizationInvites({
+      prisma: database.client,
+      grants,
+      roles,
+      // The SAME plan provider the usage panel and every allowance banner
+      // read: a seat refused here and a seat counted there must be one number.
+      plans: this.resolvePlanProvider(options),
+      // The process's ONE counter, so a caller cannot get two invite budgets.
+      rateLimit: (input) => this.rateLimiter.consume(input),
+      baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "",
+    });
+    return this.composedOrganizationInvites;
+  }
+
   private resolvePlanProvider(options: ApiRuntimeCompositionOptions): PlanProvider {
     if (this.composedPlanProvider) return this.composedPlanProvider;
     this.composedPlanProvider = composeApiPlanProvider({

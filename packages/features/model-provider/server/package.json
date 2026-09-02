@@ -24,6 +24,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.79",
     "@ai-sdk/openai-compatible": "^2.0.55",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

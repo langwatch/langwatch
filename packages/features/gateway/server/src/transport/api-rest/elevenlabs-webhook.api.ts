@@ -12,8 +12,10 @@
  * behind a VPN. Verification stays here because the per-tenant secret is in
  * this database.
  *
- * The route stays mounted and unchanged. It is the relay's target, and a
- * deployment that already points ElevenLabs at it keeps working.
+ * The route is unchanged by the move. It is the relay's target, and a
+ * deployment that already points ElevenLabs at it keeps working — which is
+ * why the whole HMAC, its tolerance window and every acknowledgement below
+ * are transcribed rather than reshaped.
  *
  * A brokered ElevenLabs conversation reports nothing over its socket. Cost
  * and duration arrive afterwards, on this webhook, and it is the only path by
@@ -41,17 +43,22 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature.
  */
 
+import { publicEndpoint } from "@langwatch/api";
+import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import { z } from "zod";
-import { createServiceApp } from "~/server/api/security";
-import { publicEndpoint } from "@langwatch/platform-api/app-rest";
-import { getElevenLabsWebhookSecret } from "~/server/gateway/elevenLabsCredential.service";
+
+import {
+  getElevenLabsWebhookSecret,
+  type ElevenLabsCredentialCollaborators,
+} from "../../services/gateway-elevenlabs-credential.service";
 import {
   closeAndConfirmRealtimeSession,
   matchRealtimeSession,
-} from "~/server/gateway/realtimeSession.service";
+  type GatewayRealtimeSessionCollaborators,
+} from "../../services/gateway-realtime-session.service";
 
 const logger = createLogger("langwatch:api:elevenlabs");
 
@@ -60,8 +67,6 @@ const WEBHOOK_PUBLIC_REASON =
   "target, so public by protocol; every payload is verified in-handler by " +
   "its ElevenLabs-Signature HMAC against the secret stored on the provider " +
   "row the path names.";
-
-const secured = createServiceApp({ basePath: "/api" });
 
 /**
  * How far out of date a delivery's own timestamp may be.
@@ -176,12 +181,26 @@ function echoedSessionId(payload: z.infer<typeof postCallSchema>): string | unde
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-async function handleElevenLabsWebhook(c: Context): Promise<Response> {
+/** Everything the delivery reaches that it does not own. */
+export type ElevenLabsWebhookRestPorts = Readonly<{
+  /** Reads the per-tenant webhook secret off the provider row the path names. */
+  credentials: ElevenLabsCredentialCollaborators;
+  /** Matches the report to its open session and confirms that session's spend. */
+  sessions: GatewayRealtimeSessionCollaborators;
+}>;
+
+async function handleElevenLabsWebhook(
+  c: Context,
+  ports: ElevenLabsWebhookRestPorts,
+): Promise<Response> {
   // Typed as optional because the generic Context does not know this route's
   // parameters. An empty id resolves no provider, so it answers 404 with the
   // rest of them.
   const modelProviderId = c.req.param("modelProviderId") ?? "";
-  const configured = await getElevenLabsWebhookSecret({ modelProviderId });
+  const configured = await getElevenLabsWebhookSecret({
+    modelProviderId,
+    collaborators: ports.credentials,
+  });
   if (!configured) {
     // 404 rather than 401: an id with no webhook configured must look the
     // same as an id that does not exist, or the ids are enumerable.
@@ -226,6 +245,7 @@ async function handleElevenLabsWebhook(c: Context): Promise<Response> {
       payload,
       modelProviderId,
       organizationId: configured.organizationId,
+      sessions: ports.sessions,
     });
   } catch (err) {
     logger.warn(
@@ -241,6 +261,7 @@ async function applyPostCallReport(params: {
   payload: z.infer<typeof postCallSchema>;
   modelProviderId: string;
   organizationId: string;
+  sessions: GatewayRealtimeSessionCollaborators;
 }): Promise<void> {
   const data = params.payload.data;
 
@@ -274,6 +295,7 @@ async function applyPostCallReport(params: {
     vendorConversationId: data?.conversation_id,
     echoedSessionId: echoedSessionId(params.payload),
     callStartedAt: startedAtSecs ? new Date(startedAtSecs * 1000) : undefined,
+    collaborators: params.sessions,
   });
   if (!session) return;
 
@@ -292,11 +314,20 @@ async function applyPostCallReport(params: {
     vendorCostRaw: data?.metadata ?? null,
     durationMs: durationSecs * 1000,
     reason: "post-call report",
+    collaborators: params.sessions,
   });
 }
 
-secured
-  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-  .post("/elevenlabs/webhook/:modelProviderId", handleElevenLabsWebhook);
-
-export const app = secured.hono;
+/** `/api/elevenlabs/webhook/:modelProviderId`, bound to one process. */
+export function createElevenLabsWebhookRestApp(options: {
+  security: AppRestSecurity;
+  ports: ElevenLabsWebhookRestPorts;
+}): MountableRestApp {
+  const secured = options.security.createServiceApp({ basePath: "/api" });
+  secured
+    .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
+    .post("/elevenlabs/webhook/:modelProviderId", (c) =>
+      handleElevenLabsWebhook(c, options.ports),
+    );
+  return secured.hono;
+}

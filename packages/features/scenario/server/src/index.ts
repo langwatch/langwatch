@@ -126,3 +126,14 @@ export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
 } from "./services/scenario-run-export-error.service";
+export {
+  SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
+  SCENARIO_GENERATE_FEATURE_KEY,
+  createScenarioGenerateRestApp,
+  type ScenarioGenerateRestPorts,
+  type ScenarioGenerateRestSession,
+} from "./transport/api-rest/scenario-generate.api";
+export {
+  isAbortLikeError,
+  nlpgoHandledErrorFrom,
+} from "./transport/api-rest/scenario-generate.nlpgo-error";

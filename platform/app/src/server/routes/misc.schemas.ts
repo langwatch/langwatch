@@ -82,21 +82,3 @@ export const analyticsTimeseriesResponseSchema = z.object({
     .array(z.record(z.string(), z.unknown()))
     .describe("The same range shifted back by its own length, for comparison"),
 });
-
-/**
- * What a synchronous workflow run answers with.
- *
- * `result` is the workflow's own output, keyed by its output field names, so
- * it is different for every workflow and cannot be narrowed here. `status` is
- * the execution state the engine finished in.
- */
-export const workflowRunResponseSchema = z.object({
-  status: z
-    .enum(["idle", "waiting", "running", "success", "error", "skipped"])
-    .describe("Execution state the run finished in"),
-  result: z
-    .record(z.string(), z.unknown())
-    .nullable()
-    .optional()
-    .describe("The workflow's output fields, named as the workflow names them"),
-});

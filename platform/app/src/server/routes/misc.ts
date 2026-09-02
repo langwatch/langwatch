@@ -5,7 +5,6 @@
  * - src/pages/api/analytics.ts
  * - src/pages/api/demo/hotel_bot.ts
  * - src/pages/api/dspy/log_steps.ts
- * - src/pages/api/experiment/init.ts
  * - src/pages/api/mcp/authorize.ts
  * - src/pages/api/optimization/[...params].ts
  * - src/pages/api/track_event.ts
@@ -73,12 +72,6 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
-import {
-  WorkflowNotFoundError,
-  WorkflowNotPublishedError,
-  WorkflowVersionNotFoundError,
-} from "@langwatch/workflow-contract";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -86,9 +79,6 @@ import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { bodyLimit } from "./_lib/body-limit";
 import {
-  experimentInitBadRequestSchema,
-  experimentInitForbiddenSchema,
-  experimentInitResponseSchema,
   handledErrorEnvelopeSchema,
 } from "@langwatch/platform-api";
 import {
@@ -96,7 +86,6 @@ import {
   analyticsTimeseriesResponseSchema,
   legacySentenceErrorSchema,
   requestBodySchema,
-  workflowRunResponseSchema,
 } from "./misc.schemas";
 
 /**
@@ -115,9 +104,6 @@ const logger = createLogger("langwatch:misc");
 const authMiddleware = createUnifiedAuthMiddleware({});
 const requireAnalyticsView = requireApiKeyPermission({
   permission: "analytics:view",
-});
-const requireWorkflowsManage = requireApiKeyPermission({
-  permission: "workflows:manage",
 });
 // DSPy step logging + experiment bootstrapping are experiment writes, gated on
 // the dedicated experiments permission rather than the workflow studio's.
@@ -150,11 +136,6 @@ const analyticsViewAuth = handlerManagedAuth({
 const experimentsManageAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["experiments:manage"],
-  credential: "apiKey",
-});
-const workflowsManageAuth = handlerManagedAuth({
-  reason: IN_ROUTE_REASON,
-  permissions: ["workflows:manage"],
   credential: "apiKey",
 });
 const tracesCreateAuth = handlerManagedAuth({
@@ -529,182 +510,6 @@ secured.access(experimentsManageAuth).post(
   },
 );
 
-// =============================================
-// POST /api/experiment/init
-// =============================================
-const dspyInitParamsSchema = z
-  .object({
-    experiment_id: z.string().optional().nullable(),
-    experiment_slug: z.string().optional().nullable(),
-    experiment_type: z.enum(["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"]),
-    experiment_name: z.string().optional(),
-    workflowId: z.string().optional(),
-  })
-  .refine((data) => {
-    if (!data.experiment_id && !data.experiment_slug) return false;
-    return true;
-  });
-
-secured.access(experimentsManageAuth).post(
-  "/experiment/init",
-  describeRoute({
-    summary: "Create an experiment",
-    description:
-      "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.",
-    tags: ["Experiments"],
-    // Declared by hand rather than through zValidator: this handler parses and
-    // validates the body itself and answers its own sentence on a bad one, so
-    // there is no validator schema for the generator to read. `experiment_slug`
-    // and `experiment_id` are individually optional and jointly required, which
-    // `oneOf` states and a required-list cannot.
-    requestBody: {
-      required: true,
-      content: {
-        "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              experiment_slug: {
-                type: "string",
-                description:
-                  "Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together.",
-              },
-              experiment_id: {
-                type: "string",
-                description: "Existing experiment id, as an alternative to the slug",
-              },
-              experiment_type: {
-                type: "string",
-                enum: ["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"],
-                description:
-                  "BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs",
-              },
-              experiment_name: {
-                type: "string",
-                description: "Display name, used only when the experiment is created",
-              },
-              workflowId: {
-                type: "string",
-                description: "Optimization Studio workflow this experiment belongs to",
-              },
-            },
-            required: ["experiment_type"],
-            // `anyOf`, not `oneOf`: the handler's refine only asks that at
-            // least one identifier is present, and sending both is accepted.
-            // `oneOf` would document exactly-one and reject a valid body.
-            anyOf: [{ required: ["experiment_slug"] }, { required: ["experiment_id"] }],
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: "The experiment, created or already existing",
-        content: {
-          "application/json": {
-            schema: resolver(experimentInitResponseSchema),
-          },
-        },
-      },
-      400: {
-        description:
-          "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
-        content: {
-          "application/json": {
-            schema: resolver(experimentInitBadRequestSchema),
-          },
-        },
-      },
-      401: {
-        description: "Missing or invalid API key",
-        content: {
-          "application/json": {
-            schema: resolver(z.object({ message: z.string() })),
-          },
-        },
-      },
-      403: {
-        description:
-          "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
-        content: {
-          "application/json": {
-            schema: resolver(experimentInitForbiddenSchema),
-          },
-        },
-      },
-    },
-  }),
-  authMiddleware,
-  requireExperimentsManage,
-  async (c) => {
-    const project = c.get("project");
-
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
-
-    let params: z.infer<typeof dspyInitParamsSchema>;
-    try {
-      params = dspyInitParamsSchema.parse(body);
-    } catch (error) {
-      logger.error({ error, body, projectId: project.id }, "invalid init data received");
-      captureException(toError(error), { extra: { projectId: project.id } });
-      return c.json({ error: zodErrorMessage(error) }, 400);
-    }
-
-    let experiment;
-    try {
-      experiment = await findOrCreateExperiment({
-        experiments: c.app.experiments.experimentService,
-        project,
-        // The body accepts either identifier and this handler used to forward
-        // only the slug, so an id-only request passed validation and then hit
-        // "Either experiment_id or experiment_slug is required" as a 500.
-        // Every other caller of this function forwards both.
-        experiment_id: params.experiment_id,
-        experiment_slug: params.experiment_slug,
-        experiment_type: params.experiment_type as ExperimentType,
-        experiment_name: params.experiment_name,
-        workflowId: params.workflowId,
-      });
-    } catch (error) {
-      if (error instanceof LimitExceededError) {
-        let message = error.message;
-        try {
-          const organizationId = await resolveOrganizationId(project.teamId);
-          if (organizationId) {
-            message = await buildResourceLimitMessage({
-              organizationId,
-              limitType: error.limitType,
-              max: error.max,
-            });
-          }
-        } catch {
-          logger.warn({ projectId: project.id }, "Failed to build resource limit message");
-        }
-        return c.json(
-          {
-            error: error.code,
-            message,
-            limitType: error.limitType,
-            current: error.current,
-            max: error.max,
-          },
-          403,
-        );
-      }
-      throw error;
-    }
-
-    return c.json({
-      path: `/${project.slug}/experiments/${experiment.slug}`,
-      slug: experiment.slug,
-    });
-  },
-);
 
 // =============================================
 // POST /api/mcp/authorize
@@ -909,92 +714,6 @@ secured
 
     return c.json({ redirect: redirectUrl.toString() });
   });
-
-/**
- * What every synchronous workflow-run route documents.
- *
- * The three of them delegate to one handler, so they answer the same shapes;
- * only the path parameters and the wording differ, and those are spread in at
- * each registration.
- */
-const workflowRunResponses = {
-  200: {
-    description: "The workflow finished; `result` holds its output fields",
-    content: {
-      "application/json": { schema: resolver(workflowRunResponseSchema) },
-    },
-  },
-  400: {
-    description: "The request was not sent as application/json, or the body was not valid JSON",
-    content: {
-      "application/json": {
-        schema: resolver(z.object({ message: z.string() })),
-      },
-    },
-  },
-  401: {
-    description: "Missing or invalid API key",
-    content: {
-      "application/json": {
-        schema: resolver(z.object({ message: z.string() })),
-      },
-    },
-  },
-  403: {
-    description: "The API key lacks workflows:manage",
-    content: {
-      "application/json": { schema: resolver(handledErrorEnvelopeSchema) },
-    },
-  },
-  404: {
-    description: "No such workflow, or it has never been published",
-    content: {
-      "application/json": { schema: resolver(handledErrorEnvelopeSchema) },
-    },
-  },
-} as const;
-
-/**
- * A workflow run takes the workflow's own entry fields as its body, so there is
- * no fixed set of properties to name: open the object and say where the names
- * come from.
- */
-const workflowRunRequestBody = {
-  required: true,
-  content: {
-    "application/json": {
-      schema: {
-        type: "object" as const,
-        additionalProperties: true,
-        description: "The workflow's input fields, named as the workflow's entry node names them",
-      },
-    },
-  },
-};
-
-// =============================================
-// POST /api/optimization/:workflowId/:versionId  (deprecated)
-// =============================================
-secured.access(workflowsManageAuth).post(
-  "/optimization/:workflowId/:versionId",
-  describeRoute({
-    summary: "Run a workflow version (legacy path)",
-    description:
-      "Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it.",
-    tags: ["Workflows"],
-    requestBody: workflowRunRequestBody,
-    responses: workflowRunResponses,
-  }),
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    // Delegates to the same handler as POST /workflows/:workflowId/:versionId/run
-    // (below) — this route used to duplicate that logic with its own
-    // catch-and-flatten-to-500, which had drifted to disagree with the
-    // canonical route on the status code for identical failures.
-    return handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId"));
-  },
-);
 
 // =============================================
 // POST /api/track_event
@@ -1353,96 +1072,6 @@ secured.access(triggersManageAuth).post(
     }
   },
 );
-
-// =============================================
-// POST /api/workflows/:workflowId/run
-// POST /api/workflows/:workflowId/:versionId/run
-// =============================================
-secured.access(workflowsManageAuth).post(
-  "/workflows/:workflowId/run",
-  describeRoute({
-    summary: "Run a workflow",
-    description:
-      "Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path.",
-    tags: ["Workflows"],
-    requestBody: workflowRunRequestBody,
-    responses: workflowRunResponses,
-  }),
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
-  },
-);
-
-secured.access(workflowsManageAuth).post(
-  "/workflows/:workflowId/:versionId/run",
-  describeRoute({
-    summary: "Run a specific workflow version",
-    description:
-      "Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited.",
-    tags: ["Workflows"],
-    requestBody: workflowRunRequestBody,
-    responses: workflowRunResponses,
-  }),
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId"));
-  },
-);
-
-async function handleWorkflowRun(
-  c: Context<{ Variables: UnifiedAuthVariables }>,
-  workflowId: string,
-  versionId: string | undefined,
-) {
-  const contentType = c.req.header("content-type");
-  if (!contentType?.includes("application/json")) {
-    return c.json({ message: "Invalid body, expecting json" }, 400);
-  }
-
-  const project = c.get("project");
-
-  let body: Record<string, unknown>;
-  try {
-    body = await c.req.json<Record<string, unknown>>();
-  } catch {
-    return c.json({ message: "Invalid body" }, 400);
-  }
-
-  // Let errors propagate to the app's onError(handleError) middleware — it
-  // already knows how to map HandledError subclasses (e.g. runWorkflow's
-  // NotFoundError/ValidationError) to the right status code. Catching here
-  // and hard-coding 500 was masking those as raw 500s regardless of type.
-  let result: unknown;
-  try {
-    result = await c.app.workflows.workflowService.run({
-      workflowId,
-      projectId: project.id,
-      inputs: body,
-      versionId,
-    });
-  } catch (error) {
-    if (error instanceof WorkflowNotFoundError) {
-      throw new NotFoundError("workflow_not_found", "Workflow", workflowId);
-    }
-    if (error instanceof WorkflowNotPublishedError) {
-      throw new ValidationError("Workflow not published", {
-        meta: { workflowId },
-      });
-    }
-    if (error instanceof WorkflowVersionNotFoundError) {
-      throw new NotFoundError(
-        "published_workflow_version_not_found",
-        "Published workflow version",
-        error.versionId,
-      );
-    }
-    throw error;
-  }
-  return c.json(result);
-}
 
 // =============================================
 // POST /api/webhooks/stripe

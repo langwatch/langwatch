@@ -157,3 +157,22 @@ export {
   buildCellWorkflow,
   buildEvaluatorCellWorkflow,
 } from "./processes/experiment-cell-workflow.process";
+export {
+  ExperimentRunLoopUnavailableError,
+  createExperimentV3LegacyAliasRestApp,
+  createExperimentV3RestApp,
+  type ExperimentV3RestCredential,
+  type ExperimentV3RestPorts,
+  type ExperimentV3RestSession,
+  type ExperimentV3RunLoop,
+  type ExperimentV3StartRunInput,
+} from "./transport/api-rest/experiment-v3.api";
+export {
+  ExperimentFindOrCreateService,
+  type ExperimentFindOrCreateInput,
+} from "./services/experiment-find-or-create.service";
+export {
+  createExperimentInitRestApp,
+  type ExperimentInitRestCredential,
+  type ExperimentInitRestPorts,
+} from "./transport/api-rest/experiment-init.api";

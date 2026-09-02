@@ -2558,13 +2558,13 @@ dispatches through is not in `apps/api`'s composed graph.
 | GET | `/llms.txt` (+ `/`) | pub | 200 `text/plain` index | same | no | **moved** |
 | GET | `/api/health` | pub | 204, empty | — | no | **moved** (already served by `ApiProcessLifecycleRoutes`) |
 | HEAD | `/api/health` | pub | 204, empty | — | no | **moved** (same) |
-| GET | `/api/health/collector` | pub + in-handler project key | 200 `{status, body}`; 401 `{message}`; 500 `{message}` | — | no | blocked: canary probe, `env.BASE_HOST`, raw `prisma.project.findUnique({apiKey})` |
-| GET | `/api/health/evaluations` | pub + in-handler key | 200 `{status, body}`; 500 after 3 retries | — | no | blocked: same |
-| GET | `/api/health/processor` | pub + in-handler key | 200 `{status, body}` after ≤60s poll | — | no | blocked: same |
-| GET | `/api/health/triggers` | pub + in-handler key | 200 `{status, body:{message}}`; 404 ×3 shapes | — | no | blocked: `automation` |
-| GET | `/api/health/workflows` | pub + in-handler key | 200 `{status, body}`; 404; 500 | — | no | blocked: workflow run |
-| GET,POST | `/api/cron/old_lambdas_cleanup` | int (builder `verifySecret` + in-handler recheck) | 200 `{message}`; 401 empty; 500 `{message, error}` | — | no | blocked: `nlpLambda` |
-| GET,POST | `/api/cron/seed_demo` | int (same) | 200/500 `{report}`; 401 empty | — | no | blocked: `scripts/dogfood/governance/seed-demo` |
+| GET | `/api/health/collector` | pub + in-handler project key | 200 `{status, body}`; 401 `{message}`; 500 `{message}` | — | no | **moved** → `apps/api/src/features/health/`; the key resolves through the process's ONE API-key service, narrowed to the deprecated project key |
+| GET | `/api/health/evaluations` | pub + in-handler key | 200 `{status, body}`; 500 after 3 retries | — | no | **moved**; same |
+| GET | `/api/health/processor` | pub + in-handler key | 200 `{status, body}` after ≤60s poll | — | no | **moved**; same |
+| GET | `/api/health/triggers` | pub + in-handler key | 200 `{status, body:{message}}`; 404 ×3 shapes | — | no | **moved**; over the org group's own automation application |
+| GET | `/api/health/workflows` | pub + in-handler key | 200 `{status, body}`; 404; 500 | — | no | **moved**; over the execution half's workflow read |
+| GET,POST | `/api/cron/old_lambdas_cleanup` | int (builder `verifySecret` + in-handler recheck) | 200 `{message}`; 401 empty; 500 `{message, error}` | — | no | **DELETED, not moved** — `src/tasks/cleanupOldLambdas.ts` was already deleted as unreached, so the route had nothing left to call |
+| GET,POST | `/api/cron/seed_demo` | int (same) | 200/500 `{report}`; 401 empty | — | no | **DELETED, not moved** — its runner is `scripts/dogfood/**`, a tree with no exit owner, and the CLI entry is the same code path; the SaaS CronJob repoints at it |
 | POST | `/api/ops/clickhouse/explain` | hma([], internal) — Bearer `LANGWATCH_OPS_API_KEY`, constant-time | 200 `{type, rows}`; 400 ×3; 401; 502; 503 ×2 | — | no | blocked: `opsExplain.service`, `ops/explain-core` |
 | POST,DELETE | `/api/admin/impersonate` | hma([], session) — `ops.isAdmin` | 200 `{message}`; raises `AdminSurfaceHiddenError` / `AdminSessionExpiredError` / `ValidationError` | — | no | moved to `@langwatch/ops-server`; **not mounted** — the API process's session port answers no `impersonator` |
 | POST | `/api/admin/:resource` | hma([], session) | 200 operation result; 400 malformed body; `ValidationError` unknown resource | body `resource` wins over path param | no | moved to `@langwatch/ops-server`; not mounted, same reason |
@@ -2620,44 +2620,48 @@ dispatches through is not in `apps/api`'s composed graph.
 
 | Method | Path | Auth | Response | Ordering | OpenAPI | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/experiments/execute` | hma(evaluations:manage, session) | SSE orchestrator stream; 401/403 `{error}` | **whole v3 family before the packaged experiments family** | `describeRoute({hide:true})` | blocked: `experiments-v3/execution/*`, `nlpLambda` |
-| POST | `/api/experiments/abort` | hma(evaluations:manage, session) | 200 `{success, runId, message}`; 400/401/403; 404 raised | same | no | blocked: same |
-| POST | `/api/experiments/:slug/run` | hma(evaluations:create, apiKey) | 200 `{runId, status, total, runUrl}` or SSE; 400; 401/404 handled envelope | literal `/runs` siblings must not be swallowed by `:slug` | yes — "Run an experiment" | blocked: same |
-| GET | `/api/experiments/runs` | hma(evaluations:view, apiKey) | 200 `{experimentId, experimentSlug, runs, pagination}`; 400; 401/404 | same | yes — "List runs of an experiment" | blocked: `ExperimentApp` reads exist; execution does not |
-| GET | `/api/experiments/runs/:runId` | hma(evaluations:view, apiKey) | 200 run status; 401/404 | same | yes — "Poll a run" | blocked: same |
-| GET | `/api/experiments/runs/:runId/results` | hma(evaluations:view, apiKey) | 200 results; 401/404 | same | yes — "Read run results" | blocked: same |
-| GET | `/api/experiments/:slug/workbench-state` | hma(experiments:view, apiKey) | 200 state or version probe; 400/401/404 | same | yes — "Read an experiment's setup" | blocked: same |
-| PUT | `/api/experiments/:slug/workbench-state` | hma(experiments:update, apiKey) | 200 `{version}`; 400/401/404/409 | same | yes — "Save an experiment's setup" | blocked: same |
-| GET | `/api/experiments/:slug/versions` | hma(experiments:view, apiKey) | 200 `{versions, nextCursor}`; 400/401/404 | same | yes — "List an experiment's versions" | blocked: same |
-| POST | `/api/experiments/:slug/versions/:version/restore` | hma(experiments:update, apiKey) | 200 `{version}`; 400/401/404/409 | same | yes — "Restore an experiment version" | blocked: same |
-| ALL | `/api/evaluations/v3/*` | none of its own — rewrites and re-dispatches into the family above | whatever the target answers | must mount after the family it forwards to | no | blocked: same |
+| POST | `/api/experiments/execute` | hma(evaluations:manage, session) | SSE orchestrator stream; 401/403 `{error}` | **whole v3 family before the packaged experiments family** | `describeRoute({hide:true})` | **moved** → `@langwatch/experiment-server` `experiment-v3.api.ts`; mounted where this process holds a session and the execution half |
+| POST | `/api/experiments/abort` | hma(evaluations:manage, session) | 200 `{success, runId, message}`; 400/401/403; 404 raised | same | no | **moved**; same |
+| POST | `/api/experiments/:slug/run` | hma(evaluations:create, apiKey) | 200 `{runId, status, total, runUrl}` or SSE; 400; 401/404 handled envelope | literal `/runs` siblings must not be swallowed by `:slug` | yes — "Run an experiment" | **moved**; refuses `service_unavailable` by name where no run loop is composed |
+| GET | `/api/experiments/runs` | hma(evaluations:view, apiKey) | 200 `{experimentId, experimentSlug, runs, pagination}`; 400; 401/404 | same | yes — "List runs of an experiment" | **moved**; same run-loop condition |
+| GET | `/api/experiments/runs/:runId` | hma(evaluations:view, apiKey) | 200 run status; 401/404 | same | yes — "Poll a run" | **moved**; same |
+| GET | `/api/experiments/runs/:runId/results` | hma(evaluations:view, apiKey) | 200 results; 401/404 | same | yes — "Read run results" | **moved**; same |
+| GET | `/api/experiments/:slug/workbench-state` | hma(experiments:view, apiKey) | 200 state or version probe; 400/401/404 | same | yes — "Read an experiment's setup" | **moved**; answers regardless of the run loop |
+| PUT | `/api/experiments/:slug/workbench-state` | hma(experiments:update, apiKey) | 200 `{version}`; 400/401/404/409 | same | yes — "Save an experiment's setup" | **moved**; same |
+| GET | `/api/experiments/:slug/versions` | hma(experiments:view, apiKey) | 200 `{versions, nextCursor}`; 400/401/404 | same | yes — "List an experiment's versions" | **moved**; same |
+| POST | `/api/experiments/:slug/versions/:version/restore` | hma(experiments:update, apiKey) | 200 `{version}`; 400/401/404/409 | same | yes — "Restore an experiment version" | **moved**; same |
+| ALL | `/api/evaluations/v3/*` | none of its own — rewrites and re-dispatches into the family above | whatever the target answers | must mount after the family it forwards to | no | **moved**; the mount returns both apps in registration order, so the alias cannot be served without its target |
 | GET | `/api/evaluations/list` | pub | 200 `{evaluators}` (module-cached catalogue) | — | yes — "List the built-in evaluators", `security: []` | **moved** → `@langwatch/evaluation-server`; the catalogue is compiled in, so it needs nothing |
-| POST | `/api/evaluations/batch/log_results` | hma(evaluations:manage, apiKey) | 200 `{message:"ok"}`; 400 ×4; 401; 403; 500 | 20 MB cap | yes — "Report batch evaluation results" | moved with the family; **not mounted** — the find-or-create-experiment rule is still `pages/api/experiment/init`'s |
+| POST | `/api/evaluations/batch/log_results` | hma(evaluations:manage, apiKey) | 200 `{message:"ok"}`; 400 ×4; 401; 403; 500 | 20 MB cap | yes — "Report batch evaluation results" | **moved and now MOUNTED** — the find-or-create rule is `ExperimentFindOrCreateService`, and this door is handed the SAME instance `/api/experiment/init` resolves through |
 | POST | `/api/evaluations/:evaluator/evaluate` | hma(evaluations:manage, apiKey) | 200 evaluate result; 400/401/403/404 | 30 MB cap | yes — "Run an evaluator" | moved with the family; **not mounted** — no evaluator runtime on this process |
 | POST | `/api/evaluations/:evaluator/:subpath/evaluate` | hma(evaluations:manage, apiKey) | same | 30 MB cap | yes — "Run a namespaced evaluator" | moved with the family; not mounted, same reason |
 | POST | `/api/guardrails/:evaluator/evaluate` | hma(evaluations:manage, apiKey) | same, guardrail mode (`passed` always set) | 30 MB cap | yes — "Run an evaluator as a guardrail" | moved with the family; not mounted, same reason |
 | POST | `/api/dataset/evaluate` | hma(evaluations:manage, apiKey) | 200 result; 400 ×3; 401; 403; 404; 413 plain text | 30 MB cap | yes — "Evaluate a dataset" | moved with the family; not mounted, same reason |
-| POST | `/api/dataset/generate` | hma(datasets:manage, session) | 200 UI-message stream; 400/401/403 `{error}` | **before the dataset family's `/:slugOrId`** | no | blocked: `modelProviders`, `managedProviders` |
-| POST | `/api/scenario/generate` | hma(scenarios:manage, session) | 200 `{scenario}`; 400/401/403; 400 `{error, domainError}`; 504; 500 | — | no | blocked: same, plus nlpgo |
-| POST | `/api/workflows/code-completion` | hma(workflows:manage, session) | 200 completion; 400/401/403/500 `{error}` | — | no | blocked: `modelProviders` |
-| POST | `/api/workflows/post_event` | hma(workflows:manage, session) | SSE studio events; 400/401/403; 410 `optimize_disabled`; 422; 425; 500 | — | no | blocked: `nlpLambda`, studio backend |
-| POST | `/api/playground` | hma(playground:manage, session) | 200 streamed text; 400/401/403 `{error}` | — | no | blocked: nlpgo proxy |
+| POST | `/api/dataset/generate` | hma(datasets:manage, session) | 200 UI-message stream; 400/401/403 `{error}` | **before the dataset family's `/:slugOrId`** | no | **moved** → `@langwatch/dataset-server`; mounted where this process holds a session and a model gateway |
+| POST | `/api/scenario/generate` | hma(scenarios:manage, session) | 200 `{scenario}`; 400/401/403; 400 `{error, domainError}`; 504; 500 | — | no | **moved** → `@langwatch/scenario-server`; same condition |
+| POST | `/api/workflows/code-completion` | hma(workflows:manage, session) | 200 completion; 400/401/403/500 `{error}` | — | no | **moved** → `@langwatch/workflow-server` `workflow-studio.api.ts` |
+| POST | `/api/workflows/post_event` | hma(workflows:manage, session) | SSE studio events; 400/401/403; 410 `optimize_disabled`; 422; 425; 500 | — | no | **moved**; one app with the completion door, so the family needs both the workflow application and the studio dispatch |
+| POST | `/api/playground` | hma(playground:manage, session) | 200 streamed text; 400/401/403 `{error}` | — | no | **moved** → `@langwatch/model-provider-server`; mounted where this deployment named an execution proxy |
 
-###### `misc.ts` — the thirteen that never got a home
+###### `misc.ts` — the thirteen, of which nine are still there
+
+Four left in REST wave 3d: `POST /api/experiment/init` and the three
+synchronous workflow-run URLs. The nine below are five unrelated verticals and
+move with their own owners, not with a route file.
 
 | Method | Path | Auth | Response | Ordering | OpenAPI | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/analytics` | hma(analytics:view, apiKey) | 200 timeseries; 400 `{message}` / `{error}` / `{code, message}` | — | yes — "Query analytics timeseries (legacy path)" | blocked: `analytics` composed, but the legacy input schema lives in `server/analytics/registry` |
+| POST | `/api/analytics` | hma(analytics:view, apiKey) | 200 timeseries; 400 `{message}` / `{error}` / `{code, message}` | — | yes — "Query analytics timeseries (legacy path)" | blocked: it is the analytics family's second path and its 400 bodies differ from that family's own; belongs with whoever owns `createAnalyticsRestApp` |
 | POST | `/api/demo/hotel_bot` | hma([], apiKey) | 200 `{message, ragResponse?}`; 401; 500 | forwards its own token to `/api/collector` | no | blocked: collector |
-| POST | `/api/dspy/log_steps` | hma(experiments:manage, apiKey) | 200 `{message:"ok"}`; 400 ×3; 401; 403; 500 | 20 MB cap | yes — "Report DSPy optimizer steps" | blocked: `experiments.experimentService` |
-| POST | `/api/experiment/init` | hma(experiments:manage, apiKey) | 200 `{path, slug}`; 400; 401; 403 `{error, limitType, current, max}` | — | yes — "Create an experiment" | blocked: `pages/api/experiment/init`, licence limits |
+| POST | `/api/dspy/log_steps` | hma(experiments:manage, apiKey) | 200 `{message:"ok"}`; 400 ×3; 401; 403; 500 | 20 MB cap | yes — "Report DSPy optimizer steps" | blocked: the per-project MODEL-COST catalogue its LLM-call enrichment reads. `getLLMModelCosts`/`matchModelCostWithFallbacks` are gone and `ModelCostCatalogService` is not composed here; a step whose costs are all null reads as a free run |
+| POST | `/api/experiment/init` | hma(experiments:manage, apiKey) | 200 `{path, slug}`; 400; 401; 403 `{error, limitType, current, max}` | — | yes — "Create an experiment" | **moved** → `@langwatch/experiment-server` `experiment-init.api.ts`; the 403 limit branch is transcribed on the CODE but unreachable — no licence enforcement is composed here |
 | POST | `/api/mcp/authorize` | hma([], session) | 200 `{redirect}`; 400 ×3; 401; 403; 500 | **demo-project check before the RoleBinding probe** — a demo project grants global `project:view` and must never reach it | no | blocked: `mcp/oauthClientRegistry`, `redis` |
-| POST | `/api/optimization/:workflowId/:versionId` | hma(workflows:manage, apiKey) | shared with the workflow run below | delegates to the same handler so the two cannot drift | yes — "Run a workflow version (legacy path)" | blocked: workflow run |
+| POST | `/api/optimization/:workflowId/:versionId` | hma(workflows:manage, apiKey) | shared with the workflow run below | delegates to the same handler so the two cannot drift | yes — "Run a workflow version (legacy path)" | **moved** → `@langwatch/workflow-server` `workflow-run.api.ts` |
 | POST | `/api/track_event` | hma(traces:create, apiKey) | 200 `{message:"Event tracked"}`; 400 ×2; 401; 403 | shares `track-event.service` with `/api/events/track` | yes — "Track an event (legacy path)" | blocked: trace pipeline |
 | POST | `/api/track_usage` | pub | 200 `{message}`; 400; 429 + `Retry-After` | global → per-IP before the body parse, per-instance after | no | blocked: `posthog`, `rateLimit` |
 | POST | `/api/trigger/slack` | hma(triggers:manage, apiKey) | 200 `{message}`; 400 `{message, errors?}`; 401; 403; 500 | superseded by `/api/triggers` | yes — "Create a Slack alert trigger" | blocked: `automation` |
-| POST | `/api/workflows/:workflowId/run` | hma(workflows:manage, apiKey) | 200 run result; 400/401/403/404 | — | yes — "Run a workflow" | blocked: workflow run |
-| POST | `/api/workflows/:workflowId/:versionId/run` | hma(workflows:manage, apiKey) | same | canonical target of the legacy alias above | yes — "Run a specific workflow version" | blocked: same |
+| POST | `/api/workflows/:workflowId/run` | hma(workflows:manage, apiKey) | 200 run result; 400/401/403/404 | — | yes — "Run a workflow" | **moved**; three URLs, one handler |
+| POST | `/api/workflows/:workflowId/:versionId/run` | hma(workflows:manage, apiKey) | same | canonical target of the legacy alias above | yes — "Run a specific workflow version" | **moved**; same |
 | POST | `/api/webhooks/stripe` | int (signature verified in-handler) | 200 `{received}`; 404 `{error}` off SaaS; 400 text ×2 | — | no | blocked: `stripeClient` |
 | GET | `/api/image-proxy` | pub | 200 image bytes; 400 ×2; 500; upstream status passthrough | SSRF guard | no | blocked: `ssrfProtection` |
 
@@ -2701,17 +2705,17 @@ dispatches through is not in `apps/api`'s composed graph.
 | GET | `/api/internal/gateway/changes` | int | 200 `{current_revision, changes}`; 204 + `X-LangWatch-Revision`; 400 | short long-poll, 2s sleeps, ~10-25s cap | no | **moved** |
 | POST | `/api/internal/gateway/guardrail/check` | int | 200 verdict; 400; 503 `guardrail_evaluation_unavailable` | — | no | **moved**, refusing where no evaluator runtime is composed |
 | GET | `/api/internal/gateway/budget-bucket-spend` | int | 200 `{spent_micro_usd, bucket}`; 400/404 | — | no | **moved** |
-| POST | `/api/internal/gateway/spend-commands` | int | 200 `{accepted, rejected}`; 400; 503 `spend_pipeline_disabled` | at-least-once, per-record acceptance | no | **moved**, refusing until `apps/api` registers the gateway-spend producer |
-| POST | `/api/internal/gateway/realtime-sessions` | int | 200 `{session_id, status:"OPEN"}`; 400; 429; 503 `realtime_sessions_unavailable` | the gateway must call this **before** minting | no | **moved**, refusing until the spend confirmation path is composed |
-| PATCH | `/api/internal/gateway/realtime-sessions/:session_id` | int | 200 `{session_id, updated}`; 400/404; 503 | — | no | **moved**, same |
-| POST | `/api/internal/gateway/realtime-sessions/:session_id/usage` | int | 200 `{session_id, status:"CLOSED"}`; 400/404; 503 | — | no | **moved**, same |
+| POST | `/api/internal/gateway/spend-commands` | int | 200 `{accepted, rejected}`; 400; 503 `spend_pipeline_disabled` | at-least-once, per-record acceptance | no | **moved and serving** — `apps/api` registers the gateway-spend pipeline producer-only; the 503 is now only a process with no queue |
+| POST | `/api/internal/gateway/realtime-sessions` | int | 200 `{session_id, status:"OPEN"}`; 400; 429; 503 `realtime_sessions_unavailable` | the gateway must call this **before** minting | no | **moved and serving**, over that same registration's `confirmSpend`; the settlement span is the one remaining absence (money lands, the trace carries no cost line) |
+| PATCH | `/api/internal/gateway/realtime-sessions/:session_id` | int | 200 `{session_id, updated}`; 400/404; 503 | — | no | **moved and serving**, same |
+| POST | `/api/internal/gateway/realtime-sessions/:session_id/usage` | int | 200 `{session_id, status:"CLOSED"}`; 400/404; 503 | — | no | **moved and serving**, same |
 | GET | `/api/internal/gateway/bootstrap` | int | 501 `{error:{code:"not_implemented"}}` | — | no | **moved** (still the 501 stub it always was) |
 | GET | `/api/github/install` | hma(organization:manage, session) | 302 to GitHub; 400/401/403 ×2/503 | membership check **first**, then the permission probe | no | **moved** → `@langwatch/github-server`; mounted only where a host supplied the Better Auth transport |
 | GET | `/api/github/setup` | pub (protocol-mandated; HMAC state verified in-handler) | 200 popup HTML or 302; 400/401/403/502 | state → session rebind → nonce → membership → permission, in that order | no | **moved**, same family |
 | POST | `/api/github/webhook` | pub (`X-Hub-Signature-256` verified in-handler) | 200 `{received}` for everything acknowledged; 400/401/404 | HMAC over the **raw** body before any parse | no | **moved**, same family |
 | GET | `/api/github-langy/setup` | pub | alias of `/api/github/setup` | kept until a deprecation path exists | no | **moved**, same family |
 | POST | `/api/github-langy/webhook` | pub | alias of `/api/github/webhook` | same | no | **moved**, same family |
-| POST | `/api/elevenlabs/webhook/:modelProviderId` | pub (`ElevenLabs-Signature` HMAC, per-tenant secret) | 200 `{received}`; 400/401/404 | 404 for an unknown provider id doubles as anti-enumeration | no | blocked: `elevenLabsCredential.service` |
+| POST | `/api/elevenlabs/webhook/:modelProviderId` | pub (`ElevenLabs-Signature` HMAC, per-tenant secret) | 200 `{received}`; 400/401/404 | 404 for an unknown provider id doubles as anti-enumeration | no | moved → `@langwatch/gateway-server` `elevenlabs-webhook.api.ts`; **not mounted** — it settles through the same `GatewayRealtimeSessionCollaborators` bag `composeApiGatewayInternalRest` builds privately so ONE rating adapter prices both paths; publishing that bag is the gateway composition's own seam |
 | POST | `/api/webhooks/auth0-scim` | int | 200 `{received}`; 400/401/404 | — | no | moved → `@langwatch/enterprise-scim-server`; not mounted, same reason |
 
 ###### Transports and the packaged families still mounted from platform
@@ -2779,14 +2783,23 @@ Landed:
   asserts the producer received the command, with the two encodings agreeing on
   the trace id.
 
-61 of the 156 rows are serving from `apps/api` — the 17 the OTLP/export/webhook
+**Measured over the tables above at the wave-3d checkpoint: 145 routes, of
+which 115 serve from `apps/api`, 15 are moved but deliberately unmounted, 11
+are still blocked and 4 are deleted rather than moved.** The header's 156 is
+the count before this programme's concurrent lanes started deleting rows;
+re-derive from the tables rather than from either number in prose.
+
+The 61 recorded at the wave-3c checkpoint were the 17 the OTLP/export/webhook
 slice left, the 34 product REST wave 3b moved (1 analytics timeseries,
 9 governed SQL, 13 prompts, 10 organization management — 7 answering, 3
 refusing by name — and the bulk run export), and the 10 the trace and
 evaluation verticals moved: 3 of the 4 v1 trace reads, all 5 deprecated
-`/api/trace/*` endpoints, the SDK collector and the evaluator catalogue. The
-concurrent auth/Langy/GitHub and authoring/workbench lanes move the count
-further in the same working tree.
+`/api/trace/*` endpoints, the SDK collector and the evaluator catalogue.
+REST wave 3d adds 26: the 5 subsystem health probes, the workbench's 10 doors
+plus its `/api/evaluations/v3` alias, the 4 authoring doors and the playground,
+the 3 synchronous workflow-run URLs, `POST /api/experiment/init`, and the batch
+result log that door unblocks. The concurrent auth/Langy/GitHub, governance,
+gateway and leftovers lanes account for the rest in the same working tree.
 
 ##### Decisions recorded while moving
 
@@ -6027,39 +6040,27 @@ nothing.
 
 ### Named absences remaining
 
-**`webhookEvents` and `webhookDelivery` on the spend family.** Only the replay
-route reads them, and both are `undefined` in the port's own supported shape.
-`webhookEndpoints` is required, so it is bound to a registry that REFUSES by
-name rather than answering `null` — a null reads as "no such endpoint", which
-tells a customer their endpoint was deleted when the truth is that this
-deployment cannot deliver at all. The other three routes answer normally, so a
-reconciliation client can still pull its spend. Closing it needs
-`WebhookEndpointAdapter`, `WebhookEventsService` and `WebhookDeliveryService`
-composed on `apps/api`, which needs the endpoint cipher, a ClickHouse events
-repository and the transactional process store the delivery process manager
-runs on — a slice of its own, and the same graph
-`ApiEnterpriseApplicationPort.governance` already names.
+Three of the five below were closed by the follow-on slice recorded under
+"The gateway spend producer and the webhook platform" further down. What
+remains is stated here in its final form.
 
-**The gateway-spend PRODUCER registration is not made.** `/spend-commands`
-mounts and refuses `spend_pipeline_disabled`. The senders arrive as a port
-(`spendCommands`) and the composition passes nothing today; the registration
-itself belongs beside the other producer-only ones in
-`api-agent-pipelines.composition.ts` and needs this process's Eventing runtime,
-which the composition holds but whose gateway-spend definitions
-(`EventingGatewaySpendAdapter`) carry a ClickHouse fold and a settlement
-connection that a producer must be registered WITHOUT. Recorded rather than
-half-wired: a producer registered over a graph that also mounted the fold would
-have this process draining the worker's queue.
+**`runEvaluation` has left `platform/app/src/server/evaluations/`** — the
+evaluations lane deleted it — and no evaluator RUNTIME is composed on
+`apps/api`, so `/guardrail/check` still refuses
+`guardrail_evaluation_unavailable`. It is the SAME absence the legacy
+evaluation REST family already records (`evaluations-legacy-rest.mount.ts`
+leaves four of its six routes unregistered) and the SAME one the execution
+half records as `runEvaluationForTrace`. The port takes the runner rather than
+the vertical, so binding it is one line in `composeGatewayInternalRest` once a
+process composes an `EvaluatorRunner` — and it is deliberately NOT satisfied by
+`evaluations.runEvaluation`'s trace scorer, which takes a trace and a monitor
+where the guardrail takes an evaluator type and an input/output pair.
 
-**`runEvaluation` is still `platform/app/src/server/evaluations/`**, so
-`/guardrail/check` refuses `guardrail_evaluation_unavailable` on `apps/api`
-today. The port takes the runner rather than the vertical, so binding it is one
-line in the composition once the evaluations lane lands the service — the shape
-`GatewayGuardrailEvaluationService` already declared (`EvaluatorRunner`).
-
-**`realtimeSessions` is unbound** for the same reason on the money side: the
-collaborator bag wants a `GatewaySpendConfirmationPort`, which is the producer
-registration above.
+**The realtime settlement writes no span.** `spanIngestion` is optional on
+`GatewayRealtimeSessionCollaborators` and unbound: the money lands and the
+voice call simply carries no cost line on its trace, which is the degradation
+the port itself documents. Binding it needs the normalized-span seam the OTLP
+receiver composes, and that seam is the trace lane's to publish.
 
 **Codex refresh is bound** where this process composed a model-provider
 service, and refuses 503 `codex_refresh_unavailable` where it did not — a new
@@ -6115,6 +6116,145 @@ deletions across the tree.
 `gatewaySpendRestPorts`/`gatewaySpendBillingGate` pair beside it still feeds the
 retired application's own `createAppRestFeatures` call and is that lane's to
 delete.
+
+
+## The gateway spend producer and the webhook platform, 2026-09-03
+
+The slice above left four gateway routes mounted and refusing, and a fifth
+answering a customer that their webhook endpoint could not be found. All four
+now serve, and the fifth reaches the real endpoint registry. Nothing moved out
+of `platform/app` this pass — every module was already in a package — so this
+is composition alone.
+
+### What was composed
+
+| Seam | Built by | Closes |
+| --- | --- | --- |
+| `createGatewaySpendProducerPipeline` (gateway-server, 100) | `apps/api/src/app/api-gateway-spend-pipeline.composition.ts` | `/spend-commands`, and the three `/realtime-sessions` routes through it |
+| `composeApiGatewayWebhooks` | `apps/api/src/app/api-gateway-webhooks.composition.ts` | the spend family's replay route |
+
+### The producer registration
+
+`EventingGatewaySpendAdapter` already took its three process managers as
+OPTIONS, so the producer variant is the definition with none of them passed
+and a refusing spend ledger in the fold's seat — the same shape
+`createTraceProcessingProducerPipeline` has, for the same reason. What matters
+is which half is load-bearing: the runtime's `processManagerMode:
+"producer-only"` would decline a declared manager by name, but a definition
+that declares NONE cannot be registered wrongly by a process that forgot to set
+the mode, and the two managers in question write a customer's budgets and ship
+their webhooks. A unit test reads `processManagers.size` off the real
+definition rather than trusting the composition to keep passing nothing.
+
+`settleSpend` is registered and deliberately NOT published. It is the
+settlement sweeper's own command, sent by the process manager that resolves an
+admission whose confirmation never arrived; a producer offering it would be
+publishing a write no door on this tier has a reason to make. The three the
+door does dispatch come from a named list rather than from handing the
+registration's whole `commands` object over, so a command the pipeline gains
+later cannot silently become a write the data plane can trigger.
+
+**It sits in its own module rather than in
+`api-agent-pipelines.composition.ts`, against what the previous record
+predicted.** That file is the three AGENT-side pipelines a customer's action
+writes on; spend is money the data plane reports. The precedent followed
+instead is `api-trace-ingest.composition.ts`, which holds the OTLP receiver's
+own producer registration beside the door that produces on it. Two doors read
+this one — `/spend-commands` and the voice settlement — so the registration is
+held on the composition (`composedGatewaySpendPipeline`) and handed to both:
+two registrations of one pipeline in one process would be two producers writing
+one routing key with two dispatchers behind them.
+
+**`realtimeSessions` is built inside
+`api-gateway-internal-rest.composition.ts` rather than handed in**, and only
+`spendConfirmation` crosses the seam. The collaborator bag also wants the
+connection and the rating seam, and both are already that module's own — a bag
+assembled outside would give the voice settlement a second
+`ModelCatalogGatewaySpendRatingAdapter`, which is two answers to what one
+minute of audio cost.
+
+### The webhook platform
+
+`composeApiGatewayWebhooks` builds the endpoint registry, the emitted-envelope
+log and the delivery service from the same three classes the worker's own
+`worker-gateway-spend.composition.ts` builds them from. The replay path writes
+into the delivery process's OUTBOX and commits; the worker is what freezes,
+signs and ships the batch. So the delivery service is given the process store
+and the registry, and REFUSES BY NAME on the three collaborators only its
+executors reach — the last-hop transport, the entitlement read that gates live
+delivery, and the receipt-expiry sweep. Binding real ones would describe a
+process that could run those executors, and this one registers pipelines
+producer-only and holds no process runtime.
+
+Two decisions inside it:
+
+- **`WebhookEndpointAdapter` is created with no `configuration` and no
+  `pruneDeliveries`.** Both are the WRITE side's — destination validation on
+  create, and the maintenance sweep — and this process only reads an endpoint.
+  Passing a `WebhookEndpointConfiguration` assembled from defaults would have
+  been a second, quieter answer to "may an endpoint deliver to a local URL"
+  than the one the deployment actually configured.
+- **The three services are reached through `@langwatch/enterprise-api/webhooks`,
+  which grew from two exports to nine.** The subpath's whole reason stands
+  unchanged: `apps/api` names the Enterprise COMPOSITION package and the index
+  would pull the governance and SCIM graphs into its program. Adding
+  `@langwatch/enterprise-webhook-server` to `apps/api`'s manifest was the
+  alternative and was rejected for that reason — no manifest changed this pass,
+  and no install was needed.
+
+### Configuration and coverage
+
+No new configuration. The three leaves the previous slice added
+(`LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET`,
+`LW_SPEND_SETTLEMENT_GRACE_MS`) were never added to
+`api.config.unit.test.ts`'s exhaustive `toEqual`, which had been red at HEAD
+for that reason plus five other lanes' leaves; all eight scalars are now
+declared there. The `storedObjects.azure` block still missing from it is the
+stored-object lane's in-flight leaf.
+
+`api-production.composition.unit.test.ts`'s Prisma double gained `$executeRaw`,
+`$queryRaw` and `$transaction` as FUNCTIONS. The durable process store refuses a
+client that does not carry them — a client without `$transaction` cannot commit
+a buffer and its outbox rows together, which is the whole guarantee — so the
+double's catch-all delegate made the composition throw rather than the read.
+
+Three suites, sixteen cases:
+
+- `api-gateway-internal-rest.integration.test.ts` (+2): a signed batch is
+  accepted, mapped and dispatched through the BATCHED sender with a
+  `cost_nano_usd` the wire never carried, which is the only place that figure
+  could have come from; and a process with no registration answers 503
+  `spend_pipeline_disabled` verbatim.
+- `api-gateway-spend-pipeline.unit.test.ts` (5): the real definition, its four
+  commands, `processManagers.size === 0`, the three published senders, the
+  confirmation, and the boot-time failure for an incomplete registration.
+- `api-gateway-webhooks.unit.test.ts` (5): the trio composes together, the log
+  alone degrades without ClickHouse, no cipher means no platform, and the spend
+  family's ports read these rather than the refusing registry.
+
+### Gates
+
+`packages/api`: `tsc --noEmit` **0 errors** (it had six, all in this lane's
+`idempotency-ledger.unit.test.ts`, where `.catch()` widened the awaited value to
+"the outcome OR the error" — replaced by a `refusalFrom` helper that also
+asserts the run rejected at all); `vitest run` **29 files / 359 tests, all
+passing**.
+`packages/features/gateway/server`: `tsc --noEmit` **0 errors**; `vitest run`
+**37 passed / 1 skipped, 289 passed / 5 skipped**.
+`packages/enterprise/features/webhook/server`: `tsc --noEmit` **0 errors**;
+`vitest run` **9 files / 90 tests, all passing**.
+`packages/enterprise/composition/api`: `tsc --noEmit` **0 errors**.
+`apps/api`: `tsc -p tsconfig.json --noEmit` — **0 errors in this lane's files**;
+the four in the tree are two other lanes' in-flight packages
+(`experiment/server` naming `slugify` and `@langwatch/config`, which are not
+linked, and `stored-object/server`'s Azure driver passing a `Uint8Array` to
+`fetch`). `tsc -p tsconfig.test.json --noEmit` — **0 errors in this lane's
+files**; the three that remain are `app-trpc.features.unit.test.ts`'s context
+drift, already recorded. `vitest run` — **768 tests, 4 failing, none in this
+lane's files**: two are `api.config.unit.test.ts`'s Azure block above, one is
+the org-group half's clustering scheduler, one is the organization-invitations
+door.
+`git diff --numstat -- platform/app`: **0 insertions on every row**, 144 rows.
 
 
 ## REST wave 3c: the trace and evaluation verticals, 2026-09-02
@@ -6594,3 +6734,292 @@ only the golden path:
 stays. It exercises the app-layer's ingestion-template service rather than the
 route, names neither receiver, and `server/app-layer/**` is off this lane's
 map.
+
+
+## REST wave 3d: the authoring doors, the workbench and the SDK's experiment, 2026-09-03
+
+**Eight route files left `platform/app/src/server/routes/` and twenty-six
+routes are serving from `apps/api`.** Six of the eight moved into the package
+that owns them keeping their shape, one moved into `apps/api` itself because
+what it probes is the process, and one was DELETED rather than moved. A ninth
+family — the SDK's `POST /api/experiment/init` — came out of `misc.ts`, and
+taking it out is what unblocked the batch result log wave 3c had to leave
+unmounted.
+
+### Route family → mount
+
+| Family | Routes | Moved to | Mounted in `apps/api` |
+| --- | --- | --- | --- |
+| `POST /api/workflows/{code-completion,post_event}` | 2 | `@langwatch/workflow-server` `transport/api-rest/workflow-studio.api.ts` | **yes** — `features/workflow/workflow-studio-rest.mount.ts` |
+| `POST /api/workflows/:workflowId/run`, `.../:versionId/run`, `POST /api/optimization/:workflowId/:versionId` | 3 | `.../workflow-run.api.ts` | **yes** — `features/workflow/workflow-run-rest.mount.ts` |
+| `/api/experiments/*` (the workbench's ten doors) | 10 | `@langwatch/experiment-server` `transport/api-rest/experiment-v3.api.ts` | **yes** — `features/experiment/experiment-v3-rest.mount.ts` |
+| `ALL /api/evaluations/v3/*` (the alias) | 1 | same file | **yes** — returned by the same mount, in registration order |
+| `POST /api/experiment/init` | 1 | `.../experiment-init.api.ts` | **yes** — `features/experiment/experiment-init-rest.mount.ts` |
+| `POST /api/evaluations/batch/log_results` | 1 | already moved in wave 3c | **yes, now** — the port group the init door's service supplies |
+| `POST /api/scenario/generate` | 1 | `@langwatch/scenario-server` `transport/api-rest/scenario-generate.api.ts` | **yes** — `features/scenario/scenario-generate-rest.mount.ts` |
+| `POST /api/dataset/generate` | 1 | `@langwatch/dataset-server` `transport/api-rest/dataset-generate.api.ts` | **yes** — `features/dataset/dataset-generate-rest.mount.ts` |
+| `POST /api/playground` | 1 | `@langwatch/model-provider-server` `transport/api-rest/playground.api.ts` | **yes** — `features/model-provider/playground-rest.mount.ts` |
+| `GET /api/health/{collector,evaluations,processor,triggers,workflows}` | 5 | `apps/api/src/features/health/` | **yes** — the probes test THIS process's boundary, so they are the process's |
+| `POST /api/elevenlabs/webhook/:modelProviderId` | 1 | `@langwatch/gateway-server` `transport/api-rest/elevenlabs-webhook.api.ts` | no — named absence |
+| `GET\|POST /api/cron/{old_lambdas_cleanup,seed_demo}` | 4 | **deleted, not moved** | n/a |
+
+### What moved
+
+- `routes/experiments-v3.ts` (1,424 lines) → `experiment-v3.api.ts` (1,466).
+  The biggest single file in the wave, and the split it forced is the one worth
+  recording: TWO credential classes on one base path. `/execute` and `/abort`
+  are a browser session; the other eight are an SDK key answering the handled
+  ceiling payload a CI job branches on. Both arrive as ports so the process
+  resolves a person and a key exactly once however many families ask.
+- `routes/workflows.ts` (279) → `workflow-studio.api.ts` (282), plus
+  `workflow-code-completion.adapter.ts` (62) for the model call the completion
+  door makes.
+- The three synchronous run URLs came out of `misc.ts` (191 lines) into
+  `workflow-run.api.ts` (256). ONE handler for all three: the legacy
+  `/api/optimization/...` path carried its own copy of the run with its own
+  catch-and-flatten-to-500, and the two had already drifted to disagree about
+  the status for identical failures.
+- `routes/scenario-generate.ts` (193) → `scenario-generate.api.ts` (211) plus
+  `scenario-generate.nlpgo-error.ts` (92); `routes/dataset-generate.ts` (109)
+  and `app/api/dataset/generate/tools.ts` → `dataset-generate.{api,tools}.ts`
+  (137 + 47); `routes/playground.ts` (139) → `playground.api.ts` (162).
+- `routes/health-checks.ts` (556) and `server/health-probes/canary.service.ts`
+  → `apps/api/src/features/health/{health-probe-rest,health-canary.service}.ts`
+  (581 + 126). These did NOT go to a feature package on purpose: every probe
+  sends a canary back through this deployment's own public boundary and reads
+  what came out the other side, so what they describe is the PROCESS, not a
+  feature. That is also why the family is absent where no public origin is
+  declared — five endpoints answering 500 to an alerting rule is worse than a
+  404 a monitor notices.
+- `routes/elevenlabs.ts` (302) → `elevenlabs-webhook.api.ts` (333), unmounted.
+- **`POST /api/experiment/init` and its rule.** The handler moved to
+  `experiment-init.api.ts` (256) and `findOrCreateExperiment` — the last
+  production code in `platform/app/src/pages/api/experiment/init.ts`, now
+  DELETED — became `ExperimentFindOrCreateService` (126) in
+  `@langwatch/experiment-server`. That is the whole unblock: wave 3c left the
+  batch result log unmounted because the rule "lives in
+  `platform/app/src/pages/api/experiment/init.ts` … it joins the moment that
+  rule has a home a server package can import". It has one.
+- `routes/_lib/internal-secret.ts` and its suite DELETED: the cron, gateway
+  internal and ingest routes were its only three consumers and all three are
+  gone.
+- Nine platform route suites went with the routes they drove
+  (`experiments-results-archived`, `experiments-route-auth`,
+  `playground-proxy.integration`, `scenario-generate.unit`,
+  `cron-seed-demo.unit`, `files/permissionDenial.unit`,
+  `scenario-events/delete-scenario-events.unit`, `_lib/internal-secret.unit`,
+  and `inventoryBouncerExemption.unit`). Every one mocked a platform module
+  path, so none survives a move that turns those reaches into ports; the
+  families are covered instead by the five suites below, which drive the REAL
+  Hono apps.
+
+### What the API process grew
+
+- **`composeApiAuthoringRest` — the four doors a person reaches while authoring
+  something, composed as one.** The Studio's completion and run dispatch, the
+  playground, the dataset row generator and the scenario author-assist share
+  one fact: every one is `handlerManagedAuth({ credential: "session" })` and
+  answers a bare `{ error }` the browser reads. A process with no
+  browser-session transport mounts NONE of them rather than four doors that
+  refuse everybody, and each door's own second condition (a model gateway, the
+  workflow application, the execution proxy's address) is named in the log at
+  boot by `LoggedApiAuthoringRestAbsence`.
+- **`composeApiExperimentFindOrCreate` — ONE construction, two doors.** The
+  create-or-take call and the batch result log are handed the same
+  `ExperimentFindOrCreateService` instance. An SDK whose `experiment_slug`
+  resolved one way through `/api/experiment/init` and another way through
+  `/api/evaluations/batch/log_results` would silently write its results against
+  a second experiment, and nothing downstream could tell the two apart. The
+  integration suite drives both doors with one slug and asserts exactly one
+  creation.
+- **`ApiExperimentRunOptions` / `composeApiExperimentRun`** (landed in
+  `9d55b657d3`) is what the workbench's four run doors bind to, and its absence
+  is answered INSIDE the family: a deployment with no progress store gets a 503
+  naming the capability on those four while the four workbench doors keep
+  reading and writing a saved setup. Mounting nothing would have taken the
+  saved setup away from a deployment that can serve it perfectly well.
+
+### Named absences
+
+- **`POST /api/elevenlabs/webhook/:modelProviderId` is moved but NOT mounted.**
+  The webhook settles a brokered voice session through the same
+  `GatewayRealtimeSessionCollaborators` bag the gateway's own `book-session`
+  route uses, and that bag is constructed PRIVATELY inside
+  `composeApiGatewayInternalRest` — deliberately, so one rating adapter prices
+  both paths and "two adapters would be two answers to what one minute of audio
+  cost". Building a second bag at this mount is the one thing that composition
+  rules out by name, so the door waits on the gateway composition publishing
+  its own. Cost of the wait is latency, not money: the reconciliation worker
+  asks the vendor for the same numbers on a schedule, and an unmatched call
+  settles cost-unknown at the grace.
+- **`GET|POST /api/cron/*` is DELETED, not moved.** Two routes, two different
+  reasons. `old_lambdas_cleanup` called `src/tasks/cleanupOldLambdas.ts`, which
+  the task lane already deleted as unreached — no chart, workflow, Makefile
+  target or dev script named it — so the route had nothing left to call.
+  `seed_demo` runs `scripts/dogfood/governance/seed-demo`, a tree with no exit
+  owner, and it already has a CLI entry that is the SAME code path
+  (`pnpm tsx scripts/dogfood/governance/seed-demo.ts --execute`). **Action for
+  whoever owns the SaaS chart:** the langwatch-saas Kubernetes CronJob that
+  curls this route with `CRON_API_KEY` must be repointed at that CLI or
+  retired; nothing else calls either route.
+- **`POST /api/dspy/log_steps` stays in `misc.ts`.** Its LLM-call enrichment
+  reads the deployment's per-project MODEL-COST catalogue through
+  `getLLMModelCosts` and `matchModelCostWithFallbacks`, and both platform
+  modules are already deleted by the model-provider and trace lanes. The
+  packaged replacements in `@langwatch/model-provider-contract` are
+  `matchModelCost`/`estimateCost` — the arithmetic without the per-project
+  custom-cost read — and `ModelCostCatalogService` is not composed on this
+  process. A DSPy step recorded with every `cost` null is a step an optimizer
+  dashboard renders as a free run, which is a wrong fact rather than a missing
+  one. It moves with whoever composes the cost catalogue here.
+- **`POST /api/analytics` (the legacy timeseries path) stays.** It is the
+  analytics family's SECOND path, and its refusals are not that family's: it
+  answers `{ error: <rendered zod sentence> }` at 400 and converts a
+  `TRPCError` BAD_REQUEST into `{ code, message }`, where the mounted
+  `/api/analytics/timeseries` answers the family's own. Registering it as an
+  alias would change a wire two doors currently answer differently, so it
+  belongs with whoever owns `createAnalyticsRestApp` rather than with a route
+  file's last tenant.
+- **The plan's experiment LIMIT is not enforced on `/api/experiment/init`.**
+  The route this replaces caught the licence layer's `LimitExceededError` and
+  re-rendered its sentence from the organization's own allowance before
+  answering 403. `apps/api` composes no licence enforcement, so nothing on this
+  path raises it and the branch is unreachable today. It is transcribed anyway,
+  matched on the handled CODE, so the flat body an SDK's limit handling reads
+  (`{error, message, limitType, current, max}`) is already correct the moment
+  enforcement composes here — what it does not do is the message enrichment,
+  which needs the licence layer's own builder.
+- **`routes/ops.ts` stays put, by the ruling already recorded.**
+  `POST /api/ops/clickhouse/explain` is cross-tenant BY DESIGN and wants the
+  separate `CLICKHOUSE_OPS_URL` readonly identity;
+  `ApiClickHouseInfrastructure` hands out only a tenant-keyed `resolveClient`
+  precisely so a caller cannot read one organization's data on another's
+  endpoint. Widening that seam is a decision about the safety property, not a
+  move.
+- **`app/api/{agent-cache,agents,copilotkit,dataset,middleware,shared,simulation-runs}`
+  stay.** Every one of them is a PORT the platform router still passes into
+  `createAppRestFeatures`, and that call is still there. They are unreachable
+  the moment the packaged families are mounted from `apps/api`, and not one
+  moment before.
+
+### Judgment calls recorded
+
+- **The slug rule is transcribed into `@langwatch/experiment-server`, not
+  imported.** `~/utils/slugify` pre-replaces `:`, `?`, `&` and `_` with `-`
+  before slugify runs and defaults the options to
+  `{ lower: true, strict: true, replacement: "-" }`. Both halves are
+  load-bearing — without the pre-replacement `my_batch_run` slugs to
+  `mybatchrun`, a different URL for the same name — and the only two surviving
+  copies of that module are BROWSER modules (`@langwatch/workflow-web`,
+  `@langwatch/trace-web`), which a server package may not value-import. The
+  four characters and the three options are pinned by literal in the service's
+  own test, which is the precedent `EvaluationNameAutoslugService` set for
+  exactly this reason. Wave 3c named this as the blocker ("a third copy of the
+  deployment's `slugify`"); a copy pinned by test in the package that owns the
+  rule is what makes it one rule again rather than three.
+- **`/api/experiment/init` gets its own mount rather than joining the
+  workbench's.** They share the `/api/experiment*` prefix but not the
+  credential class: the workbench doors take the RICH credential (a run link is
+  built from the project's slug, a workbench write is attributed to the person
+  the key was minted for), and this one is an SDK's project key wanting an id
+  and a slug. Two mounts, one service.
+- **The health probes narrow the credential AFTER resolving it.** The probe key
+  resolves through the process's ONE API-key service — so there is one answer
+  to "whose key is this" — and is then narrowed to the deprecated project key,
+  which is the only class these routes have ever accepted. Reading the column
+  directly would have been a second resolution; skipping the narrowing would
+  have widened the door.
+- **The Studio's two doors travel together and the playground does not.** The
+  completion and the run dispatch are one Hono app on one base path, so a
+  process holding a gateway but no workflow application would publish half of
+  it. The playground is its own app with its own second condition (the
+  execution proxy's address), and it is absent on its own: a playground with no
+  proxy to dial fails AFTER the customer has been shown a streaming response,
+  which is the one failure they cannot tell from a bad answer.
+- **`slugify` and `@langwatch/config` were added to
+  `@langwatch/experiment-server`.** The first for the rule above; the second
+  for `zodErrorMessage`, which is what the moved route answered its 400 with —
+  not `fromZodError`, which is what the retired Next.js twin used. The two
+  render differently and the sentence is the wire.
+- **The batch log's three collaborators travel together.** The find-or-create
+  service, the run-history writer and the verdict command are ONE write: the
+  rows are addressed by the experiment the first resolved and scored by the
+  command the third sends. A door holding two of the three would answer 200 to
+  results that land nowhere a customer can read them back.
+
+### Coverage
+
+Five suites drive the real Hono apps over fakes at every port (54 tests):
+
+- `app-rest/__tests__/api-rest.authoring-families.integration.test.ts` (11) —
+  the run dispatch preparing an event through the workflow application and
+  streaming the engine's events, the 410 `optimize_disabled` refusal reached
+  without the engine, the 403 before the application is read, the completion
+  door's 400 with no model resolved and its 401 in the family's own body, the
+  dataset generator resolving its feature key, the scenario assist's 400 before
+  the permission probe and its fast 504 envelope, the playground refusing a
+  provider the project switched off rather than streaming from another, and —
+  the one that pins the composition — a process with no session transport
+  serving NONE of the four rather than four that refuse everybody.
+- `features/experiment/__tests__/experiment-v3-rest.integration.test.ts` (10).
+- `features/experiment/__tests__/experiment-init-rest.integration.test.ts` (5)
+  — the create with the app path built from the project's slug, ONE experiment
+  across the init door and the batch log driven with one slug, the validation
+  sentence with nothing read, the bare `{message}` on a body that is not JSON,
+  and the ceiling refusal answered as sent.
+- `features/workflow/__tests__/workflow-run-rest.integration.test.ts` (14) —
+  all three URLs through one handler, and the three named refusals keeping
+  their own codes rather than collapsing into one.
+- `features/health/__tests__/health-probe-rest.integration.test.ts` (6) +
+  `health-canary.service.unit.test.ts` (8) — the accepted header spellings
+  named before anything resolves, an invalid token told apart from a missing
+  one, an absent trigger told apart from one that has simply not fired, and a
+  deployment with no public origin serving no probes at all.
+- `packages/features/experiment/server/src/services/__tests__/experiment-find-or-create.service.unit.test.ts`
+  (5) — the four pre-replaced characters, the existing slug TAKEN BACK rather
+  than duplicated, an id-only request served, neither identifier refused, and a
+  rename preserving the slug already in the customer's URLs.
+
+### Gates
+
+- `apps/api` `tsc --noEmit`: CLEAN.
+  `tsc --noEmit -p tsconfig.test.json`: 4 errors in 2 files, none in this
+  lane's — 3 in `app-trpc/__tests__/app-trpc.features.unit.test.ts` (the tRPC
+  lane's namespace list) and 1 in
+  `app/__tests__/api-gateway-internal-rest.integration.test.ts` (the gateway
+  lane's in-flight realtime-session work).
+- `apps/api` vitest over this lane's paths: 8 files / 54 tests, all green.
+  Whole suite: 88 files / 765 tests, 762 pass; the 3 failures are two other
+  lanes' — 1 in `api-trpc-collaborators.org-group.integration.test.ts` (a tRPC
+  error-formatter change swallowing a refusal sentence) and 2 in
+  `api.config.unit.test.ts` (the auth lane's new `browserSession` leaf). None
+  is an assertion in a file this lane touched.
+- `@langwatch/experiment-server`: `tsc` clean; 5,248 tests pass.
+  `@langwatch/evaluation-server`: `tsc` clean; 214 pass.
+  `@langwatch/workflow-server` 57, `@langwatch/dataset-server` 117,
+  `@langwatch/model-provider-server` 176 — all green and `tsc` clean.
+  `@langwatch/scenario-server` 823 pass with the two Redis-dependent files
+  failing to load, which is the recorded baseline.
+- `git diff --numstat -- platform/app`: **0 insertions** on every row.
+- `api-router.ts` stands at 251 lines, down from 408 at `3aedccbb74`. Thirty-two
+  of the fall are this lane's: eleven import lines (cron, dataset-generate,
+  elevenlabs, health-checks, playground, scenario-generate, workflows, and the
+  four-line statement that took experiments-v3 and its alias together), the
+  nine `api.route` lines those mounted, and the twelve-line comment explaining
+  why the v3 family had to be registered before the packaged experiments one —
+  an ordering the process's own feature array now states in code. The rest of
+  the fall is the five concurrent lanes', removed from the same file in the
+  same working tree. What remains mounted from platform is
+  `createAppRestFeatures`, `miscApp` and `opsApp`, so the file STAYS: it is
+  three mounts from deletable and not one of the three is this lane's.
+
+### Not moved this slice, and why
+
+`misc.ts` keeps nine routes across five unrelated verticals — the legacy
+analytics path, the demo hotel bot, the DSPy step log, the MCP OAuth authorize
+step, the two tracked-event doors, the Slack trigger, the Stripe webhook and
+the image proxy. Each waits on a different owner, and three of them
+(`track_event`, `track_usage`, `webhooks/stripe`) reach `server/app-layer/**`,
+which no lane in this wave may touch. `ops.ts` stays by the recorded ruling.
+The seven surviving `app/api/**` directories are ports of the platform
+`createAppRestFeatures` call and are unreachable only once that call is.
