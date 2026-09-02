@@ -13,7 +13,7 @@ A guardrail has three parts:
 | Part | Values |
 |---|---|
 | Evaluator | Any evaluator of the project that has an enabled monitor set to run as a guardrail. |
-| Direction | Request, Response or Stream chunk. |
+| Direction | **Pre (request)**, **Post (response)** or **Stream chunk**. |
 | Failure mode | Fail closed (default) or fail open. Decides what happens when the evaluator cannot run. |
 
 A virtual key attaches guardrails per direction. The gateway evaluates them on every request through that key.
@@ -55,7 +55,7 @@ Content-Type: application/json
 }
 ```
 
-The message is the evaluator's own details when it returns any, otherwise `<guardrail name> did not pass`. Read the exact wire shape and the other codes on [API Reference, Errors](/ai-gateway/api/errors).
+The message is the evaluator's own reason when it returns one, otherwise `<guardrail name> did not pass`. An evaluator's reason can quote the input that failed, so the message can contain the prompt text. The response also carries `X-LangWatch-Handled-Error: guardrail_blocked`; there is no other guardrail header, and an allowed request carries no header that says a guardrail ran. Read the exact wire shape and the other codes on [API Reference, Errors](/ai-gateway/api/errors).
 
 ## Requests that skip guardrails
 
@@ -70,10 +70,20 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
   <Step title="Create the guardrail">
     Open **AI Gateway, Guardrails** in the sidebar (`/gateway/guardrails`). Click **New guardrail**, pick the evaluator, the direction and the failure mode.
 
-    {/* screenshot: guardrails-list.png, the Guardrails page with one request guardrail and one response guardrail */}
+    <Frame caption="The New guardrail drawer. The evaluator list holds only the evaluators marked as guardrails in the previous step.">
+  <img src="/images/ai-gateway/guardrail-drawer.png" alt="The New guardrail drawer with the name, evaluator, direction and failure mode fields" />
+</Frame>
+
+    <Frame caption="The Guardrails list: one guardrail on the request, one on the response.">
+  <img src="/images/ai-gateway/guardrails-list.png" alt="The Guardrails list with the Name, Direction, Evaluator and Failure mode columns" />
+</Frame>
   </Step>
   <Step title="Attach it to a virtual key">
-    Open the key under **AI Gateway, Virtual Keys** and tick the guardrail under the direction you want. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request** or **Post-response** and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+
+    <Frame caption="The Guardrails section of a key's detail page, with the request guardrail ticked.">
+  <img src="/images/ai-gateway/vk-guardrails-attach.png" alt="The Guardrails section of a virtual key detail page with Pre-request and Post-response groups and the Save guardrails button" />
+</Frame>
   </Step>
   <Step title="Verify">
     Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.

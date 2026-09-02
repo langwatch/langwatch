@@ -2113,7 +2113,7 @@ Only a Gemini or a Vertex credential. The body and the path are Google's own, so
 
 | Part of the request | What the gateway does |
 |---|---|
-| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside them: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
+| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside the routing policy or its restrictions: `403 policy_violation` with the message `model "<model>" is not in allowlist`. Outside the key's provider access: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
 | Body | Forwarded as written. No parameter policy applies, and `drop_tuning_params` is not read. |
 | Query string | Forwarded as written. |
 | `Authorization`, `x-api-key`, `x-goog-api-key` | Removed. The gateway adds the provider's own key. |
@@ -2145,7 +2145,8 @@ A failure after the stream opened ends it with an `event: error` frame; see [Err
 |---|---|---|
 | `model_provider_not_bound` | 400 | The key has no Gemini and no Vertex credential. |
 | `missing_model` | 400 | The path carries no `/models/{model}` segment. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+| `policy_violation` | 403 | The model is outside the routing policy or one of its restrictions. Same shape as on every other route. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist or provider access. |
 
 Google's own errors are forwarded with Google's status, body and headers, under `X-LangWatch-Provider`. The full table is on [Errors](/ai-gateway/api/errors).
 
@@ -5437,7 +5438,9 @@ You need:
 
 Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name. Virtual keys then point at the policy.
 
-{/* screenshot: admin-setup-routing-policy.png, the routing policy drawer with the provider chain in order and the model tiers set */}
+<Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
+  <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
+</Frame>
 
 **Also check:** [Routing policies](/ai-gateway/governance/routing-policies) for the sections of a policy and the permissions to manage one.
 
@@ -5859,9 +5862,15 @@ A policy holds:
 | Model name mapping | Rewrites of the model name a client sends before the request reaches a provider. |
 | Restrictions | Regex refuse and allow-only lists for tools, MCP servers, web addresses and models. See [Policy rules](/ai-gateway/policy-rules). |
 
-Manage policies under **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`). Creating, editing and deleting need the `routingPolicies:manage` permission; viewing needs `routingPolicies:view`.
+Manage policies under **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`). The page groups policies by scope: organization, teams, projects. A project policy wins over a team policy, which wins over the organization policy. Creating, editing and deleting need the `routingPolicies:manage` permission; viewing needs `routingPolicies:view`.
 
-{/* screenshot: routing-policy-editor.png, the routing policy drawer showing the providers list, the model tiers with the default model, and the Restrictions accordion */}
+<Frame caption="The Routing Policies page: an organization policy marked as the default and a project policy.">
+  <img src="/images/ai-gateway/routing-policies-list.png" alt="The Routing Policies page with the Organization, Teams and Projects groups" />
+</Frame>
+
+<Frame caption="The policy drawer: where it applies, the providers in order, and the three model tiers.">
+  <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the name, scope, ordered providers and model tiers" />
+</Frame>
 
 ## Model tiers
 
@@ -5882,7 +5891,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -d '{"model": "fast", "messages": [{"role": "user", "content": "Summarize this ticket."}]}'
 ```
 
-The response reports the model that served the request in `model`. `GET /v1/models` on the key lists the tiers next to the models, so model pickers show them.
+The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier as a model of its own, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. Model ids in that list carry no provider prefix.
 
 Tiers and name mappings are the same mechanism on the wire: an alias the gateway looks up by exact name. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -5894,11 +5903,13 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model that resolves to a provider the policy does not include is refused with `400 model_not_allowed`, and the message names the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `403 policy_violation`. The message names the model, not the policy:
 
+```json
+{"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}
 ```
-The "anthropic" provider is not available on this key: its routing policy "Developer default" does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.
-```
+
+The key's own provider access can still list that provider; the policy is what refuses it.
 
 See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers the move to the next provider.
 
@@ -5909,10 +5920,14 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
     Click **New policy**, pick where it applies, add the providers in the order you want, set the tiers and the default model.
   </Step>
   <Step title="Point the key at it">
-    Open the key under **AI Gateway, Virtual Keys**. Under **Routing**, pick the policy. The other two choices, **Default: no fallback** and **Fall back to all eligible providers**, are the key's own routing when it uses no policy.
+    Open the key under **AI Gateway, Virtual Keys** and click **Edit**. The **Routing** section is a list of choices: **Default: no fallback**, **Fall back to all eligible providers**, then one row per policy the key can reach. Pick the policy and save. The first two choices are the key's own routing when it uses no policy.
+
+    <Frame caption="The Routing section of the edit drawer, with the organization policy selected.">
+  <img src="/images/ai-gateway/vk-routing-section.png" alt="The Edit virtual key drawer showing Provider access and the Routing choices" />
+</Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `400 model_not_allowed`.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `403` and `"code": "policy_violation"`.
   </Step>
 </Steps>
 
@@ -5943,7 +5958,7 @@ A guardrail has three parts:
 | Part | Values |
 |---|---|
 | Evaluator | Any evaluator of the project that has an enabled monitor set to run as a guardrail. |
-| Direction | Request, Response or Stream chunk. |
+| Direction | **Pre (request)**, **Post (response)** or **Stream chunk**. |
 | Failure mode | Fail closed (default) or fail open. Decides what happens when the evaluator cannot run. |
 
 A virtual key attaches guardrails per direction. The gateway evaluates them on every request through that key.
@@ -5985,7 +6000,7 @@ Content-Type: application/json
 }
 ```
 
-The message is the evaluator's own details when it returns any, otherwise `<guardrail name> did not pass`. Read the exact wire shape and the other codes on [API Reference, Errors](/ai-gateway/api/errors).
+The message is the evaluator's own reason when it returns one, otherwise `<guardrail name> did not pass`. An evaluator's reason can quote the input that failed, so the message can contain the prompt text. The response also carries `X-LangWatch-Handled-Error: guardrail_blocked`; there is no other guardrail header, and an allowed request carries no header that says a guardrail ran. Read the exact wire shape and the other codes on [API Reference, Errors](/ai-gateway/api/errors).
 
 ## Requests that skip guardrails
 
@@ -6000,10 +6015,20 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
   <Step title="Create the guardrail">
     Open **AI Gateway, Guardrails** in the sidebar (`/gateway/guardrails`). Click **New guardrail**, pick the evaluator, the direction and the failure mode.
 
-    {/* screenshot: guardrails-list.png, the Guardrails page with one request guardrail and one response guardrail */}
+    <Frame caption="The New guardrail drawer. The evaluator list holds only the evaluators marked as guardrails in the previous step.">
+  <img src="/images/ai-gateway/guardrail-drawer.png" alt="The New guardrail drawer with the name, evaluator, direction and failure mode fields" />
+</Frame>
+
+    <Frame caption="The Guardrails list: one guardrail on the request, one on the response.">
+  <img src="/images/ai-gateway/guardrails-list.png" alt="The Guardrails list with the Name, Direction, Evaluator and Failure mode columns" />
+</Frame>
   </Step>
   <Step title="Attach it to a virtual key">
-    Open the key under **AI Gateway, Virtual Keys** and tick the guardrail under the direction you want. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request** or **Post-response** and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+
+    <Frame caption="The Guardrails section of a key's detail page, with the request guardrail ticked.">
+  <img src="/images/ai-gateway/vk-guardrails-attach.png" alt="The Guardrails section of a virtual key detail page with Pre-request and Post-response groups and the Save guardrails button" />
+</Frame>
   </Step>
   <Step title="Verify">
     Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.
@@ -6807,12 +6832,12 @@ HTTP/1.1 403 Forbidden
     "type": "policy_violation",
     "code": "policy_violation",
     "message": "tool \"run_shell_command\" is blocked by policy",
-    "trace_id": "..."
+    "fault": "customer"
   }
 }
 ```
 
-The message names the target and the value: `is blocked by policy` for a refuse hit, `is not in allowlist` for an allow-only miss.
+The message names the target and the value: `is blocked by policy` for a refuse hit, `is not in allowlist` for an allow-only miss. The response carries `X-LangWatch-Handled-Error: policy_violation`. There is no `meta` block and no header that names the policy or the pattern.
 
 ## Set up rules
 
@@ -6822,6 +6847,10 @@ The message names the target and the value: `is blocked by policy` for a refuse 
   </Step>
   <Step title="Fill the Restrictions section">
     Expand **Restrictions**. For each target, enter one pattern per line under **Refuse**, or under **Allow only**. Leave **Allow only** blank to allow anything that is not refused.
+
+    <Frame caption="The Restrictions section: a refuse pattern on tools and an allow-only list on models.">
+      <img src="/images/ai-gateway/routing-policy-restrictions.png" alt="The Restrictions section of the routing policy drawer with Refuse and Allow only boxes for tools, MCP servers, web addresses and models" />
+    </Frame>
   </Step>
   <Step title="Verify">
     Send a request that names a refused tool through a key on that policy and check the response for `403` and `"code": "policy_violation"`.
@@ -7165,7 +7194,7 @@ The chain for a request is built from three things:
 
 ## Routing settings on a key
 
-Open the key under **AI Gateway, Virtual Keys**. The **Routing** section has three choices:
+Open the key under **AI Gateway, Virtual Keys** and click **Edit**. The **Routing** section lists two fixed choices, then one row per routing policy the key can reach:
 
 | Choice | Chain |
 |---|---|
@@ -7219,7 +7248,8 @@ The window, the threshold and the open duration are gateway settings: `LW_GATEWA
 
 | Code | Status | Cause |
 |---|---|---|
-| `model_not_allowed` | 400 | The model resolves to a provider the routing policy or the key's provider access dropped. The message names the policy. |
+| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list, or a restriction on the policy refuses it. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
+| `model_not_allowed` | 400 | The model resolves to a provider the key's provider access excludes. |
 | `no_provider_configured` | 400 | The key reaches no provider at all. |
 | `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
 

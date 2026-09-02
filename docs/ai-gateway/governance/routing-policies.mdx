@@ -18,9 +18,15 @@ A policy holds:
 | Model name mapping | Rewrites of the model name a client sends before the request reaches a provider. |
 | Restrictions | Regex refuse and allow-only lists for tools, MCP servers, web addresses and models. See [Policy rules](/ai-gateway/policy-rules). |
 
-Manage policies under **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`). Creating, editing and deleting need the `routingPolicies:manage` permission; viewing needs `routingPolicies:view`.
+Manage policies under **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`). The page groups policies by scope: organization, teams, projects. A project policy wins over a team policy, which wins over the organization policy. Creating, editing and deleting need the `routingPolicies:manage` permission; viewing needs `routingPolicies:view`.
 
-{/* screenshot: routing-policy-editor.png, the routing policy drawer showing the providers list, the model tiers with the default model, and the Restrictions accordion */}
+<Frame caption="The Routing Policies page: an organization policy marked as the default and a project policy.">
+  <img src="/images/ai-gateway/routing-policies-list.png" alt="The Routing Policies page with the Organization, Teams and Projects groups" />
+</Frame>
+
+<Frame caption="The policy drawer: where it applies, the providers in order, and the three model tiers.">
+  <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the name, scope, ordered providers and model tiers" />
+</Frame>
 
 ## Model tiers
 
@@ -41,7 +47,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -d '{"model": "fast", "messages": [{"role": "user", "content": "Summarize this ticket."}]}'
 ```
 
-The response reports the model that served the request in `model`. `GET /v1/models` on the key lists the tiers next to the models, so model pickers show them.
+The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier as a model of its own, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. Model ids in that list carry no provider prefix.
 
 Tiers and name mappings are the same mechanism on the wire: an alias the gateway looks up by exact name. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -53,11 +59,13 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model that resolves to a provider the policy does not include is refused with `400 model_not_allowed`, and the message names the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `403 policy_violation`. The message names the model, not the policy:
 
+```json
+{"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}
 ```
-The "anthropic" provider is not available on this key: its routing policy "Developer default" does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.
-```
+
+The key's own provider access can still list that provider; the policy is what refuses it.
 
 See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers the move to the next provider.
 
@@ -68,10 +76,14 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
     Click **New policy**, pick where it applies, add the providers in the order you want, set the tiers and the default model.
   </Step>
   <Step title="Point the key at it">
-    Open the key under **AI Gateway, Virtual Keys**. Under **Routing**, pick the policy. The other two choices, **Default: no fallback** and **Fall back to all eligible providers**, are the key's own routing when it uses no policy.
+    Open the key under **AI Gateway, Virtual Keys** and click **Edit**. The **Routing** section is a list of choices: **Default: no fallback**, **Fall back to all eligible providers**, then one row per policy the key can reach. Pick the policy and save. The first two choices are the key's own routing when it uses no policy.
+
+    <Frame caption="The Routing section of the edit drawer, with the organization policy selected.">
+  <img src="/images/ai-gateway/vk-routing-section.png" alt="The Edit virtual key drawer showing Provider access and the Routing choices" />
+</Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `400 model_not_allowed`.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `403` and `"code": "policy_violation"`.
   </Step>
 </Steps>
 

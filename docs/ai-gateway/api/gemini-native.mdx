@@ -43,7 +43,7 @@ Only a Gemini or a Vertex credential. The body and the path are Google's own, so
 
 | Part of the request | What the gateway does |
 |---|---|
-| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside them: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
+| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside the routing policy or its restrictions: `403 policy_violation` with the message `model "<model>" is not in allowlist`. Outside the key's provider access: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
 | Body | Forwarded as written. No parameter policy applies, and `drop_tuning_params` is not read. |
 | Query string | Forwarded as written. |
 | `Authorization`, `x-api-key`, `x-goog-api-key` | Removed. The gateway adds the provider's own key. |
@@ -75,7 +75,8 @@ A failure after the stream opened ends it with an `event: error` frame; see [Err
 |---|---|---|
 | `model_provider_not_bound` | 400 | The key has no Gemini and no Vertex credential. |
 | `missing_model` | 400 | The path carries no `/models/{model}` segment. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+| `policy_violation` | 403 | The model is outside the routing policy or one of its restrictions. Same shape as on every other route. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist or provider access. |
 
 Google's own errors are forwarded with Google's status, body and headers, under `X-LangWatch-Provider`. The full table is on [Errors](/ai-gateway/api/errors).
 

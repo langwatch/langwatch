@@ -40,12 +40,12 @@ HTTP/1.1 403 Forbidden
     "type": "policy_violation",
     "code": "policy_violation",
     "message": "tool \"run_shell_command\" is blocked by policy",
-    "trace_id": "..."
+    "fault": "customer"
   }
 }
 ```
 
-The message names the target and the value: `is blocked by policy` for a refuse hit, `is not in allowlist` for an allow-only miss.
+The message names the target and the value: `is blocked by policy` for a refuse hit, `is not in allowlist` for an allow-only miss. The response carries `X-LangWatch-Handled-Error: policy_violation`. There is no `meta` block and no header that names the policy or the pattern.
 
 ## Set up rules
 
@@ -55,6 +55,10 @@ The message names the target and the value: `is blocked by policy` for a refuse 
   </Step>
   <Step title="Fill the Restrictions section">
     Expand **Restrictions**. For each target, enter one pattern per line under **Refuse**, or under **Allow only**. Leave **Allow only** blank to allow anything that is not refused.
+
+    <Frame caption="The Restrictions section: a refuse pattern on tools and an allow-only list on models.">
+      <img src="/images/ai-gateway/routing-policy-restrictions.png" alt="The Restrictions section of the routing policy drawer with Refuse and Allow only boxes for tools, MCP servers, web addresses and models" />
+    </Frame>
   </Step>
   <Step title="Verify">
     Send a request that names a refused tool through a key on that policy and check the response for `403` and `"code": "policy_violation"`.
