@@ -175,6 +175,41 @@ export const playgroundWidgetsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  assignDashboard: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        id: z.string(),
+        dashboardId: z.string(),
+      }),
+    )
+    .permission("analytics:update")
+    .mutation(async ({ ctx, input }) => {
+      // Next free row on the TARGET dashboard across every kind, so the pinned
+      // widget lands below existing cards instead of overlapping. gridRow is
+      // shared between the playground grid and the dashboard grid (prototype
+      // coupling, accepted).
+      const last = await ctx.prisma.customGraph.findFirst({
+        where: { projectId: input.projectId, dashboardId: input.dashboardId },
+        orderBy: { gridRow: "desc" },
+        select: { gridRow: true },
+      });
+      await ctx.prisma.customGraph.updateMany({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+        },
+        data: {
+          dashboardId: input.dashboardId,
+          gridColumn: 0,
+          gridRow: last ? last.gridRow + 1 : 0,
+          // colSpan/rowSpan intentionally untouched — keep the widget's size.
+        },
+      });
+      return { success: true };
+    }),
+
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("analytics:delete")

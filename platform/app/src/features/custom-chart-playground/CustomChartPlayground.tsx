@@ -80,12 +80,18 @@ export function CustomChartPlayground({
     { enabled: projectId.length > 0 },
   );
 
+  const dashboardsList = api.dashboards.getAll.useQuery(
+    { projectId },
+    { enabled: projectId.length > 0 },
+  );
+
   const createWidget = api.playgroundWidgets.create.useMutation();
   const updateWidget = api.playgroundWidgets.update.useMutation();
   const deleteWidget = api.playgroundWidgets.delete.useMutation();
   const updateLayout = api.playgroundWidgets.updateLayout.useMutation();
   const batchUpdateLayouts =
     api.playgroundWidgets.batchUpdateLayouts.useMutation();
+  const assignDashboard = api.playgroundWidgets.assignDashboard.useMutation();
 
   const widgets = (widgetsQuery.data ?? []).map(toWidget);
 
@@ -111,6 +117,23 @@ export function CustomChartPlayground({
       {
         onSuccess: () => void widgetsQuery.refetch(),
         onError: () => showError("Error deleting widget"),
+      },
+    );
+  };
+
+  const handlePin = (id: string, dashboardId: string, dashboardName: string) => {
+    assignDashboard.mutate(
+      { projectId, id, dashboardId },
+      {
+        onSuccess: () => {
+          void widgetsQuery.refetch();
+          toaster.create({
+            title: `Added to “${dashboardName}”`,
+            type: "success",
+            duration: 3000,
+          });
+        },
+        onError: () => showError("Error adding widget to dashboard"),
       },
     );
   };
@@ -228,9 +251,14 @@ export function CustomChartPlayground({
           widgets={widgets}
           projectId={projectId}
           projectSlug={projectSlug}
+          dashboards={(dashboardsList.data ?? []).map((d) => ({
+            id: d.id,
+            name: d.name,
+          }))}
           onWidgetDelete={handleDelete}
           onWidgetSizeChange={handleSizeChange}
           onWidgetSave={handleSave}
+          onWidgetPin={handlePin}
           onWidgetsReorder={handleReorder}
           deletingWidgetId={
             deleteWidget.isPending ? (deleteWidget.variables?.id ?? null) : null

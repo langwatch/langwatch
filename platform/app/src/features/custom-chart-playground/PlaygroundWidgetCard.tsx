@@ -16,14 +16,15 @@
  * every keystroke would be exactly as janky as it sounds.
  */
 
-import { Box, Card, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Box, Button, Card, HStack, IconButton, Text } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Clock, Compass, GripVertical, Pin } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { GraphCardMenu } from "~/components/analytics/reports/GraphCardMenu";
 import { useColorMode } from "~/components/ui/color-mode";
+import { Menu } from "~/components/ui/menu";
 import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
 
 import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
@@ -62,16 +63,33 @@ function queriesEqual(a: PlaygroundQuery[], b: PlaygroundQuery[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Session time-range chip options — unpersisted, pure React state. */
+const RANGE_MS = {
+  "1h": 3_600_000,
+  "24h": 86_400_000,
+  "7d": 604_800_000,
+  "30d": 2_592_000_000,
+} as const;
+type RangeKey = keyof typeof RANGE_MS;
+const RANGE_LABEL: Record<RangeKey, string> = {
+  "1h": "Last 1h",
+  "24h": "Last 24h",
+  "7d": "Last 7d",
+  "30d": "Last 30d",
+};
+
 interface PlaygroundWidgetCardProps {
   widget: PlaygroundWidget;
   projectId: string;
   projectSlug: string;
+  dashboards: { id: string; name: string }[];
   onDelete: () => void;
   onSizeChange: (size: SizeOption) => void;
   onSave: (
     input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
+  onPin: (dashboardId: string, dashboardName: string) => void;
   isDeleting: boolean;
   isSaving: boolean;
 }
@@ -80,9 +98,11 @@ export function PlaygroundWidgetCard({
   widget,
   projectId,
   projectSlug,
+  dashboards,
   onDelete,
   onSizeChange,
   onSave,
+  onPin,
   isDeleting,
   isSaving,
 }: PlaygroundWidgetCardProps) {
@@ -97,8 +117,17 @@ export function PlaygroundWidgetCard({
   } = useSortable({ id: widget.id });
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
   const [draftCode, setDraftCode] = useState(widget.code);
   const [draftQueries, setDraftQueries] = useState(widget.queries);
+
+  const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
+  // Memo on rangeKey only — a fresh {start, end} identity every render would
+  // loop the executor's refetch.
+  const timeWindow = useMemo(() => {
+    const end = Date.now();
+    return { start: end - RANGE_MS[rangeKey], end };
+  }, [rangeKey]);
 
   // Reseed the drafts whenever the persisted record changes underneath them:
   // a save from this card, or a refetch.
@@ -120,7 +149,7 @@ export function PlaygroundWidgetCard({
   }, [draftCode, draftQueries]);
 
   const { executeQuery, runStandalone, params, lastRuns } =
-    usePlaygroundWidgetExecutor(projectId, previewQueries);
+    usePlaygroundWidgetExecutor(projectId, previewQueries, { timeWindow });
   const onNavigate = usePlaygroundChartNavigate(projectSlug);
 
   const isDirty =
@@ -131,6 +160,16 @@ export function PlaygroundWidgetCard({
       { id: widget.id, code: draftCode, queries: draftQueries },
       { onSuccess: () => setIsDrawerOpen(false) },
     );
+  };
+
+  const openCodeTab = () => {
+    setDrawerTab("code");
+    setIsDrawerOpen(true);
+  };
+
+  const openQueriesTab = () => {
+    setDrawerTab("queries");
+    setIsDrawerOpen(true);
   };
 
   // Reverts the draft AND closes — covers Cancel, the drawer's own close
@@ -181,12 +220,71 @@ export function PlaygroundWidgetCard({
             >
               {widget.name}
             </Text>
+
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="ghost" size="xs">
+                  <Clock /> {RANGE_LABEL[rangeKey]}
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                {(Object.keys(RANGE_MS) as RangeKey[]).map((key) => (
+                  <Menu.Item
+                    key={key}
+                    value={key}
+                    onClick={() => setRangeKey(key)}
+                  >
+                    {RANGE_LABEL[key]}
+                    {key === rangeKey && " ✓"}
+                  </Menu.Item>
+                ))}
+              </Menu.Content>
+            </Menu.Root>
+
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <IconButton
+                  aria-label="Add to dashboard"
+                  variant="ghost"
+                  size="xs"
+                >
+                  <Pin />
+                </IconButton>
+              </Menu.Trigger>
+              <Menu.Content>
+                {dashboards.length === 0 ? (
+                  <Menu.Item value="none" disabled>
+                    No dashboards
+                  </Menu.Item>
+                ) : (
+                  dashboards.map((d) => (
+                    <Menu.Item
+                      key={d.id}
+                      value={d.id}
+                      onClick={() => onPin(d.id, d.name)}
+                    >
+                      {d.name}
+                    </Menu.Item>
+                  ))
+                )}
+              </Menu.Content>
+            </Menu.Root>
+
+            <IconButton
+              aria-label="Explore queries"
+              variant="ghost"
+              size="xs"
+              onClick={openQueriesTab}
+            >
+              <Compass />
+            </IconButton>
+
             <GraphCardMenu
               graphId={widget.id}
               projectSlug={projectSlug}
               colSpan={widget.colSpan}
               rowSpan={widget.rowSpan}
-              onEdit={() => setIsDrawerOpen(true)}
+              onEdit={openCodeTab}
               onSizeChange={onSizeChange}
               onDelete={onDelete}
               isDeleting={isDeleting}
@@ -226,6 +324,8 @@ export function PlaygroundWidgetCard({
         isSaving={isSaving}
         onClose={handleClose}
         onSave={handleSave}
+        activeTab={drawerTab}
+        onTabChange={setDrawerTab}
         chart={
           isDrawerOpen ? (
             <SandboxedChartFrame

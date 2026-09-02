@@ -40,6 +40,8 @@ interface PlaygroundWidgetEditDrawerProps {
   isSaving: boolean;
   onClose: () => void;
   onSave: () => void;
+  activeTab: "code" | "queries";
+  onTabChange: (tab: "code" | "queries") => void;
 }
 
 export function PlaygroundWidgetEditDrawer({
@@ -55,6 +57,8 @@ export function PlaygroundWidgetEditDrawer({
   isSaving,
   onClose,
   onSave,
+  activeTab,
+  onTabChange,
 }: PlaygroundWidgetEditDrawerProps) {
   const canSave = isDirty && queryNamesAreValid(queries);
 
@@ -83,7 +87,8 @@ export function PlaygroundWidgetEditDrawer({
             </Box>
           )}
           <Tabs.Root
-            defaultValue="code"
+            value={activeTab}
+            onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
             variant="line"
             size="sm"
             display="flex"

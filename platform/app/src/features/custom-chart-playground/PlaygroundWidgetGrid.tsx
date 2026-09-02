@@ -29,12 +29,14 @@ interface PlaygroundWidgetGridProps {
   widgets: PlaygroundWidget[];
   projectId: string;
   projectSlug: string;
+  dashboards: { id: string; name: string }[];
   onWidgetDelete: (id: string) => void;
   onWidgetSizeChange: (id: string, size: SizeOption) => void;
   onWidgetSave: (
     input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
+  onWidgetPin: (id: string, dashboardId: string, dashboardName: string) => void;
   onWidgetsReorder: (layouts: GridLayout[]) => void;
   deletingWidgetId: string | null;
   savingWidgetId: string | null;
@@ -44,9 +46,11 @@ export function PlaygroundWidgetGrid({
   widgets,
   projectId,
   projectSlug,
+  dashboards,
   onWidgetDelete,
   onWidgetSizeChange,
   onWidgetSave,
+  onWidgetPin,
   onWidgetsReorder,
   deletingWidgetId,
   savingWidgetId,
@@ -91,9 +95,13 @@ export function PlaygroundWidgetGrid({
               widget={widget}
               projectId={projectId}
               projectSlug={projectSlug}
+              dashboards={dashboards}
               onDelete={() => onWidgetDelete(widget.id)}
               onSizeChange={(size) => onWidgetSizeChange(widget.id, size)}
               onSave={onWidgetSave}
+              onPin={(dashboardId, name) =>
+                onWidgetPin(widget.id, dashboardId, name)
+              }
               isDeleting={deletingWidgetId === widget.id}
               isSaving={savingWidgetId === widget.id}
             />
