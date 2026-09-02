@@ -44,7 +44,6 @@ import {
   ReportRunCells,
   ReportSubjectCell,
   SectionHeader,
-  TABLE_MIN_WIDTH,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
 import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
@@ -572,12 +571,7 @@ function AutomationsPage() {
                     />
                   ) : (
                     <TableShell>
-                      <Table.Root
-                        variant="line"
-                        width="full"
-                        minWidth={TABLE_MIN_WIDTH}
-                        style={{ tableLayout: "fixed" }}
-                      >
+                      <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
                             <Table.ColumnHeader width="20%">
@@ -780,21 +774,16 @@ function AutomationsPage() {
                     </EmptyHint>
                   ) : (
                     <TableShell>
-                      <Table.Root
-                        variant="line"
-                        width="full"
-                        minWidth={TABLE_MIN_WIDTH}
-                        style={{ tableLayout: "fixed" }}
-                      >
+                      <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader width="22%">
+                            <Table.ColumnHeader width="20%">
                               Name
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="20%">
+                            <Table.ColumnHeader width="18%">
                               Sends
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="18%" whiteSpace="nowrap">
                               Schedule
                             </Table.ColumnHeader>
                             <Table.ColumnHeader width="12%" whiteSpace="nowrap">
@@ -861,7 +850,13 @@ function AutomationsPage() {
                                       graphNameById={graphNameById}
                                     />
                                   </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
+                                  {/* No nowrap here: a cadence plus an IANA
+                                      zone ("Weekly · Monday 09:00
+                                      Europe/Amsterdam") is far wider than this
+                                      column, and under a fixed layout a
+                                      nowrap cell prints straight over its
+                                      neighbour instead of widening. */}
+                                  <Table.Cell>
                                     <Text textStyle="sm">
                                       {schedule?.cron
                                         ? describeSchedule(
@@ -916,12 +911,7 @@ function AutomationsPage() {
                     />
                   ) : (
                     <TableShell>
-                      <Table.Root
-                        variant="line"
-                        width="full"
-                        minWidth={TABLE_MIN_WIDTH}
-                        style={{ tableLayout: "fixed" }}
-                      >
+                      <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
                             <Table.ColumnHeader width="24%">

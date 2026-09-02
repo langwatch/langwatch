@@ -258,13 +258,6 @@ export function ReportRunCells({
  *  automation tables get their shared polish — a quiet uppercase header on a
  *  tinted strip, generous row height, and a soft hover — so no per-page table
  *  markup has to repeat it. */
-/**
- * Width below which these tables scroll instead of shrinking. Without a floor,
- * `width="full"` makes the table fit the shell at any cost, and the cost is the
- * Name column collapsing to its longest single word.
- */
-export const TABLE_MIN_WIDTH = "1000px";
-
 export function TableShell({ children }: { children: React.ReactNode }) {
   return (
     <Box
@@ -277,6 +270,12 @@ export function TableShell({ children }: { children: React.ReactNode }) {
       <Box
         overflowX="auto"
         css={{
+          // Percentage column widths only bind under a fixed layout, and they
+          // only mean anything above a floor: without one, `width="full"`
+          // shrinks the table to the shell at any cost, and the cost is the
+          // Name column collapsing to its longest single word. Below this the
+          // shell scrolls instead.
+          "& table": { tableLayout: "fixed", minWidth: "1000px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
             fontSize: "11px",
