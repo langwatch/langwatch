@@ -189,9 +189,13 @@ describe("buildCopilotStudioDataversePullConfig", () => {
   });
 
   describe("when the admin gives the bill its own credential", () => {
+    // Typing a billing pair of its own IS the two-app choice, which the form
+    // records explicitly — with the switch on its one-app default the builder
+    // would copy the conversation pair over whatever is held here.
     const WITH_BILLING = {
       ...REQUIRED,
       azureSubscriptionId: SUBSCRIPTION_ID,
+      azureBillingUsesSameApp: "false",
       credentialsBillingClientId: "billing-client-id",
       credentialsBillingClientSecret: "billing-client-secret",
     };
@@ -226,7 +230,13 @@ describe("buildCopilotStudioDataversePullConfig", () => {
     /** @scenario "A subscription cannot be saved without its own billing credential" */
     it("omits absent billing keys instead of sending empty strings", () => {
       const config = buildCopilotStudioDataversePullConfig(
-        composer({ ...REQUIRED, azureSubscriptionId: SUBSCRIPTION_ID }),
+        composer({
+          ...REQUIRED,
+          azureSubscriptionId: SUBSCRIPTION_ID,
+          // Two apps chosen but the pair not yet typed — the one state where
+          // "absent" is still the honest thing to send.
+          azureBillingUsesSameApp: "false",
+        }),
       ) as Record<string, unknown>;
 
       // The server-side guard reads "key present but blank" and "key absent"
@@ -348,6 +358,109 @@ describe("buildCopilotStudioDataversePullConfig", () => {
           values,
         }),
       ).toBe(values);
+    });
+  });
+});
+
+describe("given the one-app registration switch", () => {
+  const ONE_APP_WITH_SUBSCRIPTION = {
+    ...REQUIRED,
+    azureSubscriptionId: SUBSCRIPTION_ID,
+  };
+
+  describe("when the admin leaves the switch on its default", () => {
+    /** @scenario "With one app chosen, the saved bill credential is the conversation one" */
+    it("copies the conversation credential into the billing slots", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer(ONE_APP_WITH_SUBSCRIPTION),
+      ) as Record<string, unknown>;
+
+      expect(config.credentials).toMatchObject({
+        billingClientId: REQUIRED.credentialsClientId,
+        billingClientSecret: REQUIRED.credentialsClientSecret,
+      });
+    });
+
+    /** @scenario "The one-app choice is saved alongside the configuration" */
+    it("records the choice as an explicit boolean the adapter accepts", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer(ONE_APP_WITH_SUBSCRIPTION),
+      ) as Record<string, unknown>;
+
+      // An untouched switch holds nothing in form state, so only an explicit
+      // boolean written by the builder makes the default durable.
+      expect(config.azureBillingUsesSameApp).toBe(true);
+      // Through the adapter's own parser, not just present on the raw object:
+      // the schema is strip-mode, so an undeclared (or misspelled) key would
+      // vanish here silently — and the #7777 edit path reads the parsed side.
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.azureBillingUsesSameApp).toBe(true);
+    });
+
+    /** @scenario "Billing values typed before flipping back to one app are not saved" */
+    it("overrides billing values left over from a two-app detour", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({
+          ...ONE_APP_WITH_SUBSCRIPTION,
+          azureBillingUsesSameApp: "true",
+          credentialsBillingClientId: "leftover-billing-id",
+          credentialsBillingClientSecret: "leftover-billing-secret",
+        }),
+      ) as Record<string, unknown>;
+
+      expect(config.credentials).toMatchObject({
+        billingClientId: REQUIRED.credentialsClientId,
+        billingClientSecret: REQUIRED.credentialsClientSecret,
+      });
+    });
+
+    /** @scenario "A source claiming no subscription saves no billing credential" */
+    it("saves no billing credential and no record without a subscription", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer(REQUIRED),
+      ) as Record<string, unknown>;
+
+      expect(config.credentials).not.toHaveProperty("billingClientId");
+      expect(config.credentials).not.toHaveProperty("billingClientSecret");
+      // Like the prepaid flag, the choice rides only beside a subscription:
+      // without a bill to read there is no choice to record.
+      expect(config).not.toHaveProperty("azureBillingUsesSameApp");
+    });
+  });
+
+  describe("when the admin chooses a second app registration", () => {
+    /** @scenario "Choosing two apps is recorded too" */
+    it("saves the typed billing pair and records the choice", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({
+          ...ONE_APP_WITH_SUBSCRIPTION,
+          azureBillingUsesSameApp: "false",
+          credentialsBillingClientId: "billing-client-id",
+          credentialsBillingClientSecret: "billing-client-secret",
+        }),
+      ) as Record<string, unknown>;
+
+      expect(config.credentials).toMatchObject({
+        billingClientId: "billing-client-id",
+        billingClientSecret: "billing-client-secret",
+      });
+      expect(config.azureBillingUsesSameApp).toBe(false);
+    });
+  });
+
+  describe("when the flag would clash with the stored parserConfig", () => {
+    /** @scenario "The one-app choice is saved alongside the configuration" */
+    it("keeps the raw form string out of parserConfig, like the other switches", () => {
+      const parserConfig = buildParserConfig(
+        composer({
+          ...ONE_APP_WITH_SUBSCRIPTION,
+          azureBillingUsesSameApp: "true",
+        }),
+      );
+
+      // parserConfig wins the server's merge, so the form's string "true"
+      // would silently shadow the builder's boolean.
+      expect(parserConfig).not.toHaveProperty("azureBillingUsesSameApp");
     });
   });
 });
