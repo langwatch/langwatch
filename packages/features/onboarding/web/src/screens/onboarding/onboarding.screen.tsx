@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useRouter } from "../../behavior/next-router";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { LoadingScreen } from "../../components/LoadingScreen";
+import { LoadingScreen } from "../../ui/blocks/loading-screen";
 
 export default function Onboarding() {
   const { project } = useOrganizationTeamProject();

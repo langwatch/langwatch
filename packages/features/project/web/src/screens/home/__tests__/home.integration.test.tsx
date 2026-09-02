@@ -24,10 +24,10 @@ const gates = {
   activePlan: undefined as { free?: boolean | null } | undefined,
 };
 
-vi.mock("../components/useHomeComposition", () => ({
+vi.mock("../components/use-home-composition", () => ({
   useHomeComposition: () => gates.composition,
 }));
-vi.mock("../components/useProjectReach", () => ({
+vi.mock("../components/use-project-reach", () => ({
   useProjectReach: () => ({
     isLoading: false,
     isNewProject: gates.isNewProject,
@@ -36,8 +36,8 @@ vi.mock("../components/useProjectReach", () => ({
     hasExperiments: false,
   }),
 }));
-vi.mock("../components/dev/HomeStateSwitcher", () => ({ HomeStateSwitcher: () => null }));
-vi.mock("../components/dev/homeDevState", () => ({
+vi.mock("../components/dev/home-state-switcher", () => ({ HomeStateSwitcher: () => null }));
+vi.mock("../components/dev/home-dev-state", () => ({
   useHomeDevState: () => null,
   chartVariantFor: () => "strip",
 }));
@@ -48,7 +48,7 @@ vi.mock("../../../behavior/home-api", () => ({
     },
   },
 }));
-vi.mock("../components/LangyHomeHero", () => ({
+vi.mock("../components/langy-home-hero", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
@@ -57,11 +57,11 @@ vi.mock("../briefing", () => ({
   SetupHairline: () => <div data-testid="setup-hairline" />,
   BriefingMockSwitcher: () => null,
 }));
-vi.mock("../components/DocsGuides", () => ({
+vi.mock("../components/docs-guides", () => ({
   DocsGuides: () => <div data-testid="docs-guides" />,
 }));
-vi.mock("../components/HomeFortune", () => ({ HomeFortune: () => null }));
-vi.mock("../components/HomePageBanners", () => ({
+vi.mock("../components/home-fortune", () => ({ HomeFortune: () => null }));
+vi.mock("../components/home-page-banners", () => ({
   HomePageBanners: ({
     variant,
     children,
@@ -74,19 +74,19 @@ vi.mock("../components/HomePageBanners", () => ({
     </div>
   ),
 }));
-vi.mock("../components/LearningResources", () => ({ LearningResources: () => null }));
-vi.mock("../components/OnboardingProgress", () => ({
+vi.mock("../components/learning-resources", () => ({ LearningResources: () => null }));
+vi.mock("../components/onboarding-progress", () => ({
   OnboardingProgress: () => <div data-testid="onboarding-checklist" />,
 }));
-vi.mock("../components/RecentItemsSection", () => ({
+vi.mock("../components/recent-items-section", () => ({
   RecentItemsSection: () => <div data-testid="recent-items" />,
 }));
-vi.mock("../components/TracesOverview", () => ({
+vi.mock("../components/traces-overview", () => ({
   TracesOverview: ({ variant }: { variant?: string }) => (
     <div data-testid="traces-overview" data-variant={variant ?? "full"} />
   ),
 }));
-vi.mock("../components/WelcomeHeader", () => ({
+vi.mock("../components/welcome-header", () => ({
   WelcomeHeader: () => null,
   useTimeOfDay: () => "morning",
 }));

@@ -10,7 +10,7 @@
  * permissions, nothing refused while an answer is still arriving — now lives.
  */
 
-import WelcomeLayout from "../../components/welcome/WelcomeLayout";
+import WelcomeLayout from "../../ui/sections/welcome/welcome-layout";
 
 export default function SetupGuide() {
   return <WelcomeLayout />;

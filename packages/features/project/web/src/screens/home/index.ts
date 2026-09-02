@@ -52,4 +52,4 @@ export {
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "../../model/project-home-host";
-export { SIGNAL_FOCUSED_HOME_FLAG } from "./components/useShowSignalFocusedHome";
+export { SIGNAL_FOCUSED_HOME_FLAG } from "./components/use-show-signal-focused-home";

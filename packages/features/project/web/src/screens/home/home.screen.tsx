@@ -20,19 +20,19 @@ import {
   SetupHairline,
 } from "../../screens/home/briefing";
 import { homeApi } from "../../behavior/home-api";
-import { DocsGuides } from "./components/DocsGuides";
-import { HomeStateSwitcher } from "./components/dev/HomeStateSwitcher";
-import { chartVariantFor, useHomeDevState } from "./components/dev/homeDevState";
-import { HomeFortune } from "./components/HomeFortune";
-import { HomePageBanners } from "./components/HomePageBanners";
-import { LangyHomeHero } from "./components/LangyHomeHero";
-import { LearningResources } from "./components/LearningResources";
-import { OnboardingProgress } from "./components/OnboardingProgress";
-import { RecentItemsSection } from "./components/RecentItemsSection";
-import { TracesOverview } from "./components/TracesOverview";
-import { useHomeComposition } from "./components/useHomeComposition";
-import { useProjectReach } from "./components/useProjectReach";
-import { WelcomeHeader } from "./components/WelcomeHeader";
+import { DocsGuides } from "./components/docs-guides";
+import { HomeStateSwitcher } from "./components/dev/home-state-switcher";
+import { chartVariantFor, useHomeDevState } from "./components/dev/home-dev-state";
+import { HomeFortune } from "./components/home-fortune";
+import { HomePageBanners } from "./components/home-page-banners";
+import { LangyHomeHero } from "./components/langy-home-hero";
+import { LearningResources } from "./components/learning-resources";
+import { OnboardingProgress } from "./components/onboarding-progress";
+import { RecentItemsSection } from "./components/recent-items-section";
+import { TracesOverview } from "./components/traces-overview";
+import { useHomeComposition } from "./components/use-home-composition";
+import { useProjectReach } from "./components/use-project-reach";
+import { WelcomeHeader } from "./components/welcome-header";
 import { useProjectHomeHost } from "../../model/project-home-host";
 
 /**

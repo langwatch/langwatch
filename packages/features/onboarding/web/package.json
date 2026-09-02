@@ -13,64 +13,64 @@
       "default": "./src/screens/onboarding/index.ts"
     },
     "./features/onboarding/components/OnboardingMeshBackground": {
-      "types": "./src/features/onboarding/components/OnboardingMeshBackground.tsx",
-      "default": "./src/features/onboarding/components/OnboardingMeshBackground.tsx"
+      "types": "./src/ui/elements/onboarding-mesh-background.tsx",
+      "default": "./src/ui/elements/onboarding-mesh-background.tsx"
     },
     "./features/onboarding/components/sections/ViaClaudeCodeScreen": {
-      "types": "./src/features/onboarding/components/sections/ViaClaudeCodeScreen.tsx",
-      "default": "./src/features/onboarding/components/sections/ViaClaudeCodeScreen.tsx"
+      "types": "./src/ui/sections/via-claude-code-screen.tsx",
+      "default": "./src/ui/sections/via-claude-code-screen.tsx"
     },
     "./features/onboarding/components/sections/ViaClaudeDesktopScreen": {
-      "types": "./src/features/onboarding/components/sections/ViaClaudeDesktopScreen.tsx",
-      "default": "./src/features/onboarding/components/sections/ViaClaudeDesktopScreen.tsx"
+      "types": "./src/ui/sections/via-claude-desktop-screen.tsx",
+      "default": "./src/ui/sections/via-claude-desktop-screen.tsx"
     },
     "./features/onboarding/components/sections/observability/CodePreview": {
-      "types": "./src/features/onboarding/components/sections/observability/CodePreview.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/CodePreview.tsx"
+      "types": "./src/ui/sections/observability/code-preview.tsx",
+      "default": "./src/ui/sections/observability/code-preview.tsx"
     },
     "./features/onboarding/components/sections/observability/DocsLinks": {
-      "types": "./src/features/onboarding/components/sections/observability/DocsLinks.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/DocsLinks.tsx"
+      "types": "./src/ui/blocks/observability/docs-links.tsx",
+      "default": "./src/ui/blocks/observability/docs-links.tsx"
     },
     "./features/onboarding/components/sections/observability/FrameworkGrid": {
-      "types": "./src/features/onboarding/components/sections/observability/FrameworkGrid.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/FrameworkGrid.tsx"
+      "types": "./src/ui/sections/observability/framework-grid.tsx",
+      "default": "./src/ui/sections/observability/framework-grid.tsx"
     },
     "./features/onboarding/components/sections/observability/FrameworkIntegrationCode": {
-      "types": "./src/features/onboarding/components/sections/observability/FrameworkIntegrationCode.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/FrameworkIntegrationCode.tsx"
+      "types": "./src/ui/sections/observability/framework-integration-code.tsx",
+      "default": "./src/ui/sections/observability/framework-integration-code.tsx"
     },
     "./features/onboarding/components/sections/observability/InstallPreview": {
-      "types": "./src/features/onboarding/components/sections/observability/InstallPreview.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/InstallPreview.tsx"
+      "types": "./src/ui/sections/observability/install-preview.tsx",
+      "default": "./src/ui/sections/observability/install-preview.tsx"
     },
     "./features/onboarding/components/sections/observability/PlatformGrid": {
-      "types": "./src/features/onboarding/components/sections/observability/PlatformGrid.tsx",
-      "default": "./src/features/onboarding/components/sections/observability/PlatformGrid.tsx"
+      "types": "./src/ui/sections/observability/platform-grid.tsx",
+      "default": "./src/ui/sections/observability/platform-grid.tsx"
     },
     "./features/onboarding/components/sections/shared/InlineCopyButton": {
-      "types": "./src/features/onboarding/components/sections/shared/InlineCopyButton.tsx",
-      "default": "./src/features/onboarding/components/sections/shared/InlineCopyButton.tsx"
+      "types": "./src/ui/sections/shared/inline-copy-button.tsx",
+      "default": "./src/ui/sections/shared/inline-copy-button.tsx"
     },
     "./features/onboarding/components/sections/shared/build-mcp-config": {
-      "types": "./src/features/onboarding/components/sections/shared/build-mcp-config.ts",
-      "default": "./src/features/onboarding/components/sections/shared/build-mcp-config.ts"
+      "types": "./src/model/shared/build-mcp-config.ts",
+      "default": "./src/model/shared/build-mcp-config.ts"
     },
     "./features/onboarding/contexts/ActiveProjectContext": {
-      "types": "./src/features/onboarding/contexts/ActiveProjectContext.tsx",
-      "default": "./src/features/onboarding/contexts/ActiveProjectContext.tsx"
+      "types": "./src/ui/sections/active-project-context.tsx",
+      "default": "./src/ui/sections/active-project-context.tsx"
     },
     "./features/onboarding/regions/observability/codegen/registry": {
-      "types": "./src/features/onboarding/regions/observability/codegen/registry.tsx",
-      "default": "./src/features/onboarding/regions/observability/codegen/registry.tsx"
+      "types": "./src/ui/sections/observability/codegen/registry.tsx",
+      "default": "./src/ui/sections/observability/codegen/registry.tsx"
     },
     "./features/onboarding/regions/observability/types": {
-      "types": "./src/features/onboarding/regions/observability/types.ts",
-      "default": "./src/features/onboarding/regions/observability/types.ts"
+      "types": "./src/model/observability/types.ts",
+      "default": "./src/model/observability/types.ts"
     },
     "./features/onboarding/regions/observability/ui-options": {
-      "types": "./src/features/onboarding/regions/observability/ui-options.ts",
-      "default": "./src/features/onboarding/regions/observability/ui-options.ts"
+      "types": "./src/ui/sections/observability/ui-options.ts",
+      "default": "./src/ui/sections/observability/ui-options.ts"
     }
   },
   "scripts": {

@@ -3211,6 +3211,110 @@ cross-feature edges are the shared studio and trace vocabulary the studio move
 created; they close by promoting that vocabulary to a contract or a shared ui
 package, not by moving files.
 
+**Relayout of `@langwatch/onboarding-web` and `@langwatch/project-web`,
+2026-09-02 (standards lane):** the last two web packages still holding
+PascalCase filenames. Both packages' own rows, before and after the two steps.
+
+| Policy                       | onboarding before | after | project before | after |
+| ---------------------------- | ----------------: | ----: | -------------: | ----: |
+| `feature-source-filename`    |            0 (\*) |     0 |             34 |     0 |
+| `ui-web-private-layout`      |                78 |     0 |              2 |     0 |
+| `ui-web-root-components`     |                10 |     0 |              0 |     0 |
+| `ui-web-root-flat`           |                 0 |     0 |              2 |     0 |
+| `ui-web-feature-declaration` |                 1 |     0 |              0 |     0 |
+| `ui-web-layer-direction`     |                 0 |     0 |              0 |     0 |
+| `ui-web-public-entry`        |                15 |    15 |              1 |     1 |
+| `ui-screen-closure`          |                 4 |     4 |             32 |    32 |
+| `cross-feature`              |                 1 |     1 |              5 |     5 |
+| **total**                    |               109 |    20 |             76 |    38 |
+
+82 files renamed in step 1 (onboarding 47, project 35) and 104 moved in step 2
+(onboarding 102, project 2). No dependent needed an edit: `apps/ui` typechecks
+clean and runs 87 files / 743 tests, unchanged, and the seventeen
+`ui-screen-closure` findings `trace-web` raises against `@langwatch/onboarding-web`
+are identical before and after, because the fifteen deep subpath **keys** in the
+manifest were kept and only their targets repointed.
+
+(\*) is the first thing worth recording. `packages/features/onboarding` has no
+`feature.json`, so its `layoutVersion` is undefined and `lintFeatureLayouts`
+skips the package entirely: 47 PascalCase filenames reported as zero. Its
+sibling `packages/features/project` has one and reported all 34. **A web package
+with no feature ownership root is silently exempt from the filename grammar**,
+which is the same shape as the feature-parity tag trap — a policy that reads
+green because nothing was ever bound to it. Adding the missing `feature.json`
+is left as a decision rather than taken here: it would switch on
+`feature-source-layout` for the package in the same move, and this slice's
+contract was that a row may only fall.
+
+Step 2 dissolved `features/onboarding` rather than keeping it as a private web
+feature, following the trace-web precedent. The deciding edge is
+`components/welcome/api-card.tsx`, which reaches
+`features/onboarding/.../copyable-input-with-prefix.tsx`: package-global `ui`
+may not import `features/<f>/**` at all, so keeping the feature would have
+traded 78 `ui-web-private-layout` findings for a new
+`ui-web-global-feature-leakage` one. The package is also *entirely* onboarding —
+a private feature covering the whole package states nothing — and eleven of the
+fifteen public subpath exports point into that subtree, which a private feature
+by definition may not expose. Dissolving closed the missing `feature.json`
+finding with it.
+
+Layers came from the import graph by the algorithm this ledger already records,
+with two additions the earlier waves did not need:
+
+- **Files already inside a governed layer are pinned.** `model/onboarding-host.ts`,
+  the seven `behavior/*` hooks and `ui/elements/link.tsx` were placed by the
+  original lift and are fixed points the solve has to satisfy, not inputs it may
+  re-derive. All three pins import nothing local, so the constraint was
+  satisfiable; a pin that reached a view would not have been.
+- **A directory carrying raw assets stays whole, at the highest layer among its
+  members.** `regions/observability/codegen` holds 28 snippet files reached as
+  `./snippets/python/openai.snippet.py?raw`. A query-suffixed literal resolves
+  in no rewriter, so the assets have to keep their offset from `registry.tsx`;
+  splitting the directory by layer (`snippets.ts` solved to `model`, `registry.tsx`
+  to `sections`) would have moved them apart and broken 28 imports that
+  **typecheck clean either way**. Promotion is the safe direction — `sections`
+  may depend on every layer — but only after checking the importers: both of
+  `snippets.ts`'s were already `sections`.
+
+The solve is validated before a file moves. Every intra-package edge is checked
+against the layer matrix and any violation printed; the plan applied here
+printed none, which is why `ui-web-layer-direction` stayed at 0 in both packages
+rather than rising the way a name-based assignment would have.
+
+Traps, all of them already recorded and all of them live here. `vi.mock` is the
+loud one: `project-web` alone carried 14 of them, and a specifier sweep that
+walks only the TypeScript import grammar would have left every one pointing at a
+deleted path, registering a mock for a module nobody loads. The sweep used here
+matches quoted relative literals instead, so `vi.mock`, `vi.doMock`, dynamic
+`import()` and `require` all move together with real imports. macOS reported the
+eight icon renames (`Azure.tsx` to `azure.tsx` and friends) as target
+collisions; they go through a temporary name. And `.tsbuildinfo` was cleared
+before every `tsc`, because a stale one reports zero against a tree that no
+longer exists.
+
+One finding that is not a layout question. `ui/sections/via-claude-code-screen.tsx`
+displays the config-file path for each editor, and two of them read
+`../../../../.codeium/windsurf/mcp_config.json` and
+`../../../../Library/Application Support/Claude/claude_desktop_config.json`.
+They were `~/.codeium/…` and `~/Library/…` until `72ed591a13`, where the `~/`
+alias rewrite that moved the studio and traces family out of `platform` treated
+two **display strings** as module specifiers and resolved them to `src`. Nothing
+typechecks differently and no test covers the copy, so it has been sitting in
+front of customers since. Restored here, since the file was open anyway. The
+class is worth a sweep in every package that move touched: a `~/` rewrite has no
+way to tell a module specifier from a path a human is meant to read, and the
+tell is a display string with four `../` in it.
+
+Left as decisions, not swept, in these two packages: `ui-web-public-entry` 16
+(onboarding 15, project 1) needs the dependents repointed off deep subpaths, and
+`ui-screen-closure` 36 (project 32, onboarding 4) is import-driven and unmoved by
+any relayout, exactly as trace-web found. `cross-feature` 6 is the shared web
+vocabulary the studio move created. Two cosmetic residues of a move-only slice:
+`behavior/types.ts` is a vague name at package-global scope, inherited from
+`features/onboarding/types/types.ts`, and `screens/home/components/homeHeroScroll.css`
+stayed camelCase because the filename grammar walks only `.[cm]?[jt]sx?`. Both
+are renames, not moves, and neither is linted.
+
 
 The strict layout only means something if its lint is enforceable, and until
 `6ec280aec8` a large share of the reported total was drift rather than work.

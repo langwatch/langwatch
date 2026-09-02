@@ -6,7 +6,7 @@
  */
 
 import type React from "react";
-import ProductScreen from "../../features/onboarding/screens/ProductScreen";
+import ProductScreen from "../../ui/sections/product-screen";
 
 const OnboardingProduct: React.FC = () => <ProductScreen />;
 

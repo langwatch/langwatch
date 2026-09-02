@@ -25,9 +25,9 @@ import { useRouter } from "../../behavior/next-router";
 import { api } from "../../behavior/onboarding-api";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { useRequiredSession } from "../../behavior/use-required-session";
-import { SetupLayout } from "../../components/SetupLayout";
-import ErrorPage from "../../utils/compat/next-error";
-import { getSafeReturnToPath } from "../../utils/getSafeReturnToPath";
+import { SetupLayout } from "../../ui/elements/setup-layout";
+import ErrorPage from "../../ui/elements/compat/next-error";
+import { getSafeReturnToPath } from "../../model/get-safe-return-to-path";
 
 export default function ProjectOnboarding() {
   useRequiredSession();

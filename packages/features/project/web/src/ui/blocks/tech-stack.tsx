@@ -16,14 +16,14 @@ import { Code } from "lucide-react";
 import { Controller, type UseFormReturn } from "react-hook-form";
 import type { ProjectHostProject as Project } from "../../model/project-host";
 import { RadioCard } from "../elements/radio-card";
-import { Azure } from "../elements/icons/Azure";
-import { DSPy } from "../elements/icons/DSPy";
-import { LangChainParrot } from "../elements/icons/LangChainParrot";
-import { OpenAI } from "../elements/icons/OpenAI";
-import { PuzzleIcon } from "../elements/icons/PuzzleIcon";
-import { Python } from "../elements/icons/Python";
-import { TypeScript } from "../elements/icons/TypeScript";
-import { Vercel } from "../elements/icons/Vercel";
+import { Azure } from "../elements/icons/azure";
+import { DSPy } from "../elements/icons/ds-py";
+import { LangChainParrot } from "../elements/icons/lang-chain-parrot";
+import { OpenAI } from "../elements/icons/open-ai";
+import { PuzzleIcon } from "../elements/icons/puzzle-icon";
+import { Python } from "../elements/icons/python";
+import { TypeScript } from "../elements/icons/type-script";
+import { Vercel } from "../elements/icons/vercel";
 
 export type ProjectFormData = {
   name: string;
