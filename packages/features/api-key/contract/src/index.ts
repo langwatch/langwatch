@@ -1,5 +1,6 @@
 export * from "./api-key";
 export * from "./api-key.errors";
+export * from "./api-key.list";
 export * from "./api-key.service";
 export * from "./api-key.tokens";
 export * from "./api-key.visibility";

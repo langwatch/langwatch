@@ -24,7 +24,6 @@ export {
   type ApiKeyAppDependencies,
   type ApiKeyCaller,
   type CreateApiKeyRequest,
-  type NamedApiKeyBinding,
   type UpdateApiKeyRequest,
 } from "./app/api-key.app";
 export { createApiKeysRestApp } from "./transport/api-rest/api-key.api";

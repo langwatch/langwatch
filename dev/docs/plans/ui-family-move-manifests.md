@@ -432,7 +432,7 @@ What actually happened, against what was surveyed:
   `user.isAdmin` for the Backoffice, decoupled on purpose so that widening
   operator access could never widen the Backoffice. Both facts are already
   platform-tier permissions in the authz registry (`ops.actions =
-  ["view","manage"]`, `scopes: ["platform"]`), so the host answers
+["view","manage"]`, `scopes: ["platform"]`), so the host answers
   `hasOpsAccess()` from `ops:view` and `isOpsAdmin()` from `ops:manage`, the two
   page guards ask for those, and the decoupling is now PROVED rather than
   documented — `tests/ops-page-policy.integration.test.tsx` mounts every
@@ -553,15 +553,15 @@ Known costs, all reported rather than suppressed:
 
 ## Cross-family collisions (settle before dispatching pairs)
 
-| Component                                       | Families           | Resolution                                                                                                                                                     |
-| ----------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (LANDED; the platform copy stays for its eight non-gateway consumers)                                                         |
-| `me/InstallCliCard`                             | me+governance      | each took its own copy (governance's is `ui/elements/install-cli-card`; me's is `ui/blocks/install-cli-card`)                                                  |
-| `modelProviders/iconsMap`                       | me+gateway         | gateway drew ten locally; me took only the Design System's five marks and falls back to the generic model mark for the rest, on the legacy `iconKey` path only |
-| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                               |
-| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                              |
-| `settings/ScopeFilter` + `useUrlScopeFilter`      | data-retention+data-privacy | the SAME surface (`@langwatch/authz-web/surfaces/scope-picker`), component and pure address half both. Free, because every consumer of one already imports the other and `ui-screen-closure` counts import LINES. The platform copies stay for model-providers, api-keys and default-models |
-| traces-v2 deep imports                          | me+automations+annotations | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided. ANNOTATIONS DREW THE LINE: a placeholder is right for a widget and wrong for a page whose whole subject is the thing being placeheld — the queue walker stayed in `platform/app` rather than lose its conversation view, and moves with traces |
+| Component                                       | Families                    | Resolution                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gateway/ConfirmDialog`                         | gateway+governance          | design-system `./confirm-dialog` (LANDED; the platform copy stays for its eight non-gateway consumers)                                                                                                                                                                                                                                                                       |
+| `me/InstallCliCard`                             | me+governance               | each took its own copy (governance's is `ui/elements/install-cli-card`; me's is `ui/blocks/install-cli-card`)                                                                                                                                                                                                                                                                |
+| `modelProviders/iconsMap`                       | me+gateway                  | gateway drew ten locally; me took only the Design System's five marks and falls back to the generic model mark for the rest, on the legacy `iconKey` path only                                                                                                                                                                                                               |
+| `ui/{ListTable,Pagination}`                     | me+governance               | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                                                                                                                                                                                                                                             |
+| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance          | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                                                                                                                                                                                                                                            |
+| `settings/ScopeFilter` + `useUrlScopeFilter`    | data-retention+data-privacy | the SAME surface (`@langwatch/authz-web/surfaces/scope-picker`), component and pure address half both. Free, because every consumer of one already imports the other and `ui-screen-closure` counts import LINES. The platform copies stay for model-providers, api-keys and default-models                                                                                  |
+| traces-v2 deep imports                          | me+automations+annotations  | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided. ANNOTATIONS DREW THE LINE: a placeholder is right for a widget and wrong for a page whose whole subject is the thing being placeheld — the queue walker stayed in `platform/app` rather than lose its conversation view, and moves with traces |
 
 ## Single-owner files (serialize)
 
@@ -570,9 +570,14 @@ Known costs, all reported rather than suppressed:
 - `packages/architecture-lint/src/frontend-ui-boundaries.ts` — only if a
   new source root is ever added; prefer not.
 - `apps/ui/src/ui/sections/ui-settings-layout.tsx` + `model/ui-settings-menu.ts`
-  + `behavior/ui-organization-facts.ts` — the settings-chrome harvest, landed
-  with S5. Additive only from here: a settings family imports
-  `withUiSettingsLayout` and changes neither.
+  - `behavior/ui-organization-facts.ts` — the settings-chrome harvest, landed
+    with S5. Additive only from here: a settings family imports
+    `withUiSettingsLayout` and changes neither.
+- `apps/ui/src/behavior/ui-feedback.ts` + `ui-capabilities.ts`'s
+  `UiFailureNotice` — the credentials family added an optional `description` so a
+  refusal the SCREEN decided, or one whose code the registry does not list yet,
+  reads as itself rather than as the generic line. The registry still wins over
+  it. Additive only; the harvest that removes the need for it is still owed.
 - `apps/ui/src/features/catalogue.json`, `legacy-page-loaders.ts` (+ its
   unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
   filed under governance for routingPolicies and took them; me deleted the two
@@ -1167,8 +1172,7 @@ called; this one is a wire change.
 - **`ui-screen-closure` COUNTS IMPORT LINES, AND THAT CUTS BOTH WAYS.** Four
   modules wanted the authz surface and the first draft named it four times.
   `provider-scope-filter.ts` re-exports `ScopeFilterValue` and `ScopeHierarchy`
-  for the package, so only it and the screen name the surface: 4 findings became
-  2. The data-governance lesson ("put a shared control in the surface its sibling
+  for the package, so only it and the screen name the surface: 4 findings became 2. The data-governance lesson ("put a shared control in the surface its sibling
   already lives in") has a twin — put a shared TYPE behind the one module that
   already had to name the surface.
 - **The scope filter reads the address instead of mirroring it**, the same
@@ -1334,19 +1338,19 @@ evaluator config field, the workflow studio's LLM field and Langy's model pill,
 none of which this move may repoint. All nine went into
 `screens/prompt-studio/model-selection/` or `model/`:
 
-| # | platform module | package module | other platform consumers |
-|---|---|---|---|
-| 1 | `components/ModelSelector.tsx` | `screens/prompt-studio/model-selection/model-selector.tsx` | 26 |
-| 2 | `components/llmPromptConfigs/LLMConfigPopover.tsx` | `…/model-selection/llm-config-popover.tsx` | 5 |
-| 3 | `components/llmPromptConfigs/LLMModelDisplay.tsx` | `…/model-selection/llm-model-display.tsx` | 5 |
-| 4 | `components/NoModelsConfiguredCallout.tsx` | `…/model-selection/no-models-configured-callout.tsx` | 4 |
-| 5 | `components/outputs/OutputsSection.tsx` | `…/model-selection/outputs-section.tsx` | 1 |
-| 6 | `components/OverflownText.tsx` | `…/model-selection/overflown-text.tsx` | 1 |
-| 7 | `components/modelProviders/iconsMap.tsx` | `…/model-selection/model-provider-icons.tsx` | 10 |
-| 8 | `components/llmPromptConfigs/constants.ts` | `model/model-selection-constants.ts` | 5 |
-| 9 | `utils/clampMaxTokens.ts` | `model/clamp-max-tokens.ts` | 1 |
-| — | `hooks/useModelProvidersSettings.ts` | `behavior/use-model-providers-settings.ts` | 28 |
-| — | `hooks/useModelLimits.ts` | `behavior/use-model-limits.ts` | 0 — a real move |
+| #   | platform module                                    | package module                                             | other platform consumers |
+| --- | -------------------------------------------------- | ---------------------------------------------------------- | ------------------------ |
+| 1   | `components/ModelSelector.tsx`                     | `screens/prompt-studio/model-selection/model-selector.tsx` | 26                       |
+| 2   | `components/llmPromptConfigs/LLMConfigPopover.tsx` | `…/model-selection/llm-config-popover.tsx`                 | 5                        |
+| 3   | `components/llmPromptConfigs/LLMModelDisplay.tsx`  | `…/model-selection/llm-model-display.tsx`                  | 5                        |
+| 4   | `components/NoModelsConfiguredCallout.tsx`         | `…/model-selection/no-models-configured-callout.tsx`       | 4                        |
+| 5   | `components/outputs/OutputsSection.tsx`            | `…/model-selection/outputs-section.tsx`                    | 1                        |
+| 6   | `components/OverflownText.tsx`                     | `…/model-selection/overflown-text.tsx`                     | 1                        |
+| 7   | `components/modelProviders/iconsMap.tsx`           | `…/model-selection/model-provider-icons.tsx`               | 10                       |
+| 8   | `components/llmPromptConfigs/constants.ts`         | `model/model-selection-constants.ts`                       | 5                        |
+| 9   | `utils/clampMaxTokens.ts`                          | `model/clamp-max-tokens.ts`                                | 1                        |
+| —   | `hooks/useModelProvidersSettings.ts`               | `behavior/use-model-providers-settings.ts`                 | 28                       |
+| —   | `hooks/useModelLimits.ts`                          | `behavior/use-model-limits.ts`                             | 0 — a real move          |
 
 The nine narrowed in three ways. `ModelSelector` lost its dev-only
 `?__no_models=1` escape hatch, which was gated on `import.meta.env.PROD` — a
@@ -1959,6 +1963,275 @@ range.
   refusal in both directions is what turns "we did not get round to it" into a
   question somebody can answer.
 
+### settings S6 credentials + /cli/auth — MOVED. 3 keys, TWO packages, 29 platform files, 0 insertions, 9,269 deletions
+
+Moved thirteenth, and the first family to create TWO packages in one change and
+the first whose keys do not all share a frame. `@langwatch/api-key-web` holds
+`/settings/api-keys` and `/cli/auth`; `@langwatch/secret-web` holds
+`/settings/secrets`. Everything else follows the shape by now: one host port per
+package, a hand-written procedure map, `withUiPageGuard` in front of the loader
+registry, `withUiSettingsLayout` for the settings keys, a `testing.tsx` harness
+and a package-owned `vitest.setup.ts`.
+
+#### TWO PACKAGES, and the rule that decides which
+
+The ranking row said "create api-key-web" and left secrets implied. It is its own
+package, and the reasoning is the data-governance family's rule read strictly:
+**a key belongs to the family that owns its transport.** `secrets.*` is mounted
+from `@langwatch/secret-server`, the row is `@langwatch/secret-contract`'s
+`Secret`, the four refusal codes are its `HandledError` subclasses and the
+fifty-per-project ceiling is its constant. Nothing on that page comes from the
+API key contract.
+
+The RBAC family's EXCEPTION — the roles pages went to `@langwatch/authz-web`
+though `role.*` is the role feature's — turned on every TYPE on those pages
+coming from authz, so the transport was "a door rather than an owner". That test
+fails here in both directions, so the rule applies and secrets got its own
+package. The cost is one more host port, one more frontend feature and one more
+catalogue entry, for a 346-line page. The alternative was `@langwatch/secret-web`
+never existing and the next person looking for the secrets surface finding it
+under `api-key`.
+
+THE OTHER TWO KEYS COULD NOT BE SPLIT, which is what the ranking row got right:
+`/cli/auth` imports the permission ceiling (`utils.ts`) and the category picker
+that Settings > API Keys owns, so moving one without the other would have left
+the CLI screen importing files the settings move deletes.
+
+#### The CLI exchange, and why it is the only wire in this migration
+
+`/cli/auth` is the page a browser opened by `langwatch login` lands on. It talks
+to three REST routes — `/api/auth/cli/{lookup,approve,deny}` — and the OTHER SIDE
+OF THAT EXCHANGE IS A PUBLISHED BINARY: the CLI polls `/exchange` until the
+record these calls flip comes back approved. So the wire is a compatibility
+surface with software that is already installed, not an internal detail.
+
+A screen may not name `fetch` (`ui-screen-closure` lists it, and rightly), so the
+three calls are host-port methods and the transport lives in
+`apps/ui/src/behavior/ui-cli-device-flow.ts` — the browser-transport home the
+feature-pilot gate carved out, and the only place in `apps/ui` where `fetch` is
+allowed. THE SPLIT IS THE POINT: the SELECTION an approval carries is decided in
+the package and pinned there (`cli-auth.screen.test.tsx`), and the BODY it goes
+out as is pinned in `apps/ui/tests/cli-device-flow.unit.test.ts` — sixteen cases
+over the paths, the header, the snake-cased keys, the 404/410 split and the
+message precedence. Sabotaging `scope_type` to `scopeType` turns one of them red,
+which the old page-level suite could only have caught by accident.
+
+Three readings are preserved exactly because each one is a different sentence to
+the reader: 410 is "restart `langwatch login`", 404 is "that code was not
+recognised", anything else is the endpoint's own description. Collapsing any two
+costs the reader the one line that tells them what to do.
+
+#### Credential hygiene, which is what this family is actually about
+
+- **No read in either package carries key material.** `apiKey.list` answers
+  `ApiKeyListEntry`, whose `lookupIdPrefix` is five characters of the PUBLIC
+  lookup id and not a prefix of any secret; `secrets.list` answers the contract's
+  `Secret`, a `.strict()` schema whose own docblock reads "Safe metadata. The
+  encrypted value is deliberately absent." Both are asserted rather than assumed —
+  the secret one by parsing a row that carries a value and watching it fail.
+- **Exactly three shapes carry a credential and all three are MINTS.**
+  `apiKey.create`, `project.regenerateApiKey`, and the two secret writes (which
+  carry a value out and answer none back). Every one feeds a one-time surface.
+- **The one-time reveal is pinned by closing it.** `token-created-dialog` keeps
+  the token in screen state; the test closes the dialog, reopens the create flow
+  and asserts the token is gone. Sabotaging the close to keep the state turns it
+  red.
+- **What is DISPLAYED is masked; what is COPIED is real.** Three separate places
+  get this right and each would be silent if it did not: `copyText` bypasses the
+  CodeBlock copy trigger, the config block renders the masked JSON and copies the
+  unmasked one, and the Basic Auth tab masks the BASE64 BLOB rather than the
+  token — a token is not a substring of its own base64, so masking on it there
+  fails open.
+- **`maskSecret` hides a short value entirely.** Eight characters or fewer leaves
+  nothing between the two four-character ends, so the naive version prints the
+  whole thing. Sabotaging that branch turns the credential suite red.
+- **The legacy project key is the one credential on a READ, and it predates this
+  move.** `project.apiKey` has always travelled inside the organization graph the
+  shell holds; the row shows four characters and copies in full. The port declares
+  it with that history written down rather than passing it silently.
+
+#### The four refusal codes that had no words
+
+`secret_already_exists`, `secret_limit_reached`, `secret_name_reserved` and
+`secret_not_found` are declared `HandledError` subclasses and NONE of them is
+listed in `platform/app/src/features/errors/logic/codes.ts` — so the presentation
+registry's exhaustiveness never demanded an entry, none was written, and every one
+of them reached the customer as "Couldn't create the secret" plus the generic
+"something went wrong on our side". All four are things the reader can fix in the
+dialog they are looking at.
+
+`@langwatch/secret-web`'s `model/secret-refusal-copy.ts` is the model-config
+family's precedent applied ("a code-keyed copy table belongs to the feature that
+RAISES the codes"), and its test is exhaustive against the CONTRACT rather than
+against a list kept beside it: a fifth `HandledError` subclass added without copy
+fails. **A DELIBERATE ADDITION, and named as one** — a customer who hits the
+fifty-secret ceiling now reads why, which they did not last week.
+
+`UiFailureNotice` gained an optional `description` to carry it, plus the two form
+guards on the API Keys page that are decided in the browser and have no code to
+look up at all. The registry still WINS over it, so it can never talk over
+registered copy; it only fills the gap where there is no code.
+
+#### What did not travel, and what it cost
+
+- **`CreateProjectDrawer` is a RECORDED GAP, and half of a scenario with it.**
+  It is a registered `platform/app` drawer `DashboardLayout` also opens, and its
+  closure is `ProjectForm` — 301 lines of team selection and slug minting
+  belonging to the organization settings family — so the move may neither delete
+  nor copy it. The button addresses the drawer through the host, which is right
+  and does not open yet. The old page then ADOPTED the created project by matching
+  the slug the drawer reported; without the drawer's callback there is nothing to
+  adopt, so that half is a loss until the chrome layout route lands.
+- **The onboarding container's SIGN-OUT button did not travel.** `/cli/auth`
+  frames itself — it is not a settings page and never was — and the frame is a
+  narrowed copy of `OnboardingContainer`. The sign-out control reached the session
+  client and the analytics emitter, and it is also the one control on that frame
+  with nothing to do with approving a device code. The mesh background, the logo,
+  the entrance animation and the loading skeleton all travelled.
+- **Seven onboarding modules and `FullLogo` are family-local copies**, every one
+  with callers that stay: `CodePreview` (narrowed — its `llmPrompt` action was the
+  only thing reaching a toast singleton, and its inline `await import("shiki")`
+  became the Design System's shared singleton), `JsonHighlight`, `TabButton`,
+  `InlineCopyButton`, `copy-to-clipboard` (folded into the host), `maskApiKey`,
+  `build-mcp-config`, and the wordmark. `formatTimeAgo` is its third byte-identical
+  copy and `personalProject` its second.
+- **`RegenerateApiKeyDialog` was EXCLUSIVE and moved** — one caller, the rotate
+  control — so the platform file is deleted rather than copied.
+- **`apiKeyAnchor.ts` STAYS.** The trace drawer's `langwatch.api_key` attribute
+  links to `/settings/api-keys#api-key-<id>` and deletes-only forbids repointing
+  it. Fourteen lines, two copies, both pinned to the same literal strings.
+- **`filterRowsByScope` is the SECOND copy of the model-provider family's fan**,
+  byte-identical below the docblock. A web package may not import another web
+  package, so the choice is this or a third surface on `@langwatch/authz-web`
+  publishing twenty lines. Recorded rather than acted on.
+
+#### The `~/server/api/rbac` substitution, and the one difference it makes
+
+`hasPermissionWithHierarchy` became `permissionSatisfiedBy` and
+`getTeamRolePermissions` became `builtinRolePermissions(roleKeyForTeamRole(role))`
+— the RBAC family's fix, third use. THE TWO ROLE BAGS ARE NOT CHARACTER-IDENTICAL
+and here, unlike on the roles page, IT SHOWS. The contract's `admin` set lists
+`langy:create`, `langy:update` and `langy:delete` explicitly where the legacy bag
+left them to `langy:manage` and the hierarchy rule, and `langy` IS one of the API
+key permission categories.
+
+Everywhere a bag is read through `categoryAccessAvailability` that is invisible,
+because the manage implication applies either way. The one visible place is the
+CLI key's DEFAULT permission list, which filters by plain set membership: an
+organization admin's minted key now carries those three strings alongside the
+`langy:manage` it already carried. The key can do exactly what it could before —
+manage satisfies all three at the engine, which the test asserts beside the
+difference — but the stored list is three entries longer.
+`cli-key-defaults.unit.test.ts` pins it so it reads as a decision rather than as
+drift.
+
+#### The contract move is a REAL repoint, and this time it found no drift
+
+`RouterOutputs["apiKey"]["list"][number]` is produced by a PACKAGED transport, so
+the ruling allows the real fix: `ApiKeyListEntry` is declared in
+`@langwatch/api-key-contract` and `ApiKeyApp.listKeys` is ANNOTATED with it. The
+model-config family's twelve-line move found a live defect; this one type-checked
+first time, which is the other outcome and worth recording — the annotation is
+still what makes a future widening of a list answer a compile error rather than a
+credential disclosure.
+
+`NamedApiKeyBinding` moved from `@langwatch/api-key-server`'s app module into the
+contract, and the server barrel's export of it was DELETED rather than
+re-exported: nothing outside that package consumed it. `ApiKeyProject`,
+`ApiKeyTeam` and `ApiKeyUser` needed nothing — they were already contract types.
+
+#### The page guards, and why there are none
+
+NONE OF THE THREE KEYS CARRIES A PAGE-LEVEL GRANT OR A FLAG, one for one with the
+platform pages. Both settings pages were `SettingsLayout` and nothing else,
+deciding inline what a reader may DO — `apiKey.orgMembers` answering non-empty is
+how the API Keys page knows the reader is an organization admin, and
+`secrets:manage` is read per control. `/cli/auth` carried no guard because it does
+its own session redirect, which a permission guard would pre-empt: a refused
+reader would never reach the redirect that preserves their device code through
+SSO. `api-key-page-policy.integration.test.tsx` asserts all three in BOTH
+directions, and sabotaging one key with `organization:manage` turns it red.
+
+#### The specs, and the trap one of them was in
+
+- `specs/secrets/secrets-manager.feature` WAS 0/0 BOUND. It carried one untagged
+  scenario, so `check-feature-parity` counted nothing and reported it green while
+  binding nothing at all — the annotations family's trap, second sighting. Six
+  scenarios for the page's own behaviour were written and bound; the vocabulary
+  scenario stays deliberately UNTAGGED, because the suite covering it lives in
+  `platform/app` and deletes-only forbids adding the docblock that would bind it.
+- **Sixteen bindings were dropped by the move and every one was restored**, three
+  of them somewhere new. "zero selected reads None selected", "the scope filter
+  offers the same options as the model-providers page" and "the filter is keyboard
+  navigable" are the SURFACE's behaviour now, so they are bound in
+  `@langwatch/authz-web`'s own scope-picker suite — a caller asserting them again
+  would be testing that package through a page.
+- Seventeen scenarios were WRITTEN for behaviour that held before the move and had
+  never been stated: the one-time reveal, the masking split, the row that never
+  renders a secret, and eight states of the authorize screen.
+
+#### Known costs, all reported rather than suppressed
+
+- **5 new architecture-lint findings, 2 retired** (824 measured after). Mine, line
+  by line: `cross-feature` on `packages/features/api-key/web/package.json` for
+  `@langwatch/authz-web` (the edge governance, gateway, data-governance and
+  model-provider all carry), two `ui-screen-closure` for
+  `@langwatch/platform-api-client` in the two procedure maps (the line every
+  family carries), and two for the authz surface. Retired: two stale
+  `legacy-feature-fragment-baseline` rows for api-key files earlier passes had
+  already deleted.
+- **THE SURFACE IS NAMED TWICE, NOT SEVEN TIMES.** Five modules wanted it. The
+  components go through `ui/elements/scope-picker.tsx` and the address helpers
+  through `model/api-key-scope-filter.ts`, which already had to name it for the
+  predicate: 7 findings became 2. The model-provider lesson, applied to components
+  as well as types — and one import statement per module, because a separate
+  `export … from` is a second line and therefore a second finding.
+- **`sessionStorage` IS A FORBIDDEN IDENTIFIER, NOT A FORBIDDEN CALL.**
+  `ui-browser-capability` reads the name anywhere in a frontend feature's source,
+  so a port field called `sessionStorage` is a finding even though the feature
+  never touches the global. Renamed `visitStorage`; the global layer owns the API.
+- **The lead-source stamp is a RESTATEMENT.** `platform/app/src/utils/attribution.ts`
+  owns the `lw_attrib.` convention and stays with its capture hook and its signup
+  reader; the adapter knows one key of it, and the test pins both strings so a
+  rename on either side fails rather than silently stopping a marketing signal.
+- **Two `platform/app` docblocks still name deleted paths.**
+  `server/routes/auth-cli.ts` refers to `/pages/cli/auth.tsx` in two comments.
+  Correcting them would be an insertion; they are wrong and recorded.
+- ZERO new `platform/app` typecheck errors: the attributed baseline, none of them
+  this family's. Nothing outside the two families imported any deleted file — the
+  only outside consumer, `apiKeyAnchor`, stays.
+- **Six sabotages, each caught red then restored**: the CLI auth page guard, the
+  one-time reveal's close, `maskSecret`'s short-value branch, the clipboard's
+  honesty about a refused write, the approval body's `scope_type` keys, and the
+  secret value input's `type="password"`.
+
+#### The thirteenth family's own additions, for whoever moves the fourteenth
+
+- **AN ELEVENTH AND A TWELFTH HOST PORT OF THE SAME SHAPE.** Deferred again, for
+  the same reason. What the api-key one asks that none before it did is a
+  TRANSPORT: three device-flow calls, because the wire belongs to the application
+  and the screen may not name `fetch`. What the secret one asks is
+  `projectSwitcher()`, which answers `null` — the ability travels, the control
+  does not.
+- **THE TRANSPORT RULE DECIDES A PACKAGE, AND THE TYPE RULE IS THE EXCEPTION TO
+  IT.** Before folding a key into a neighbouring package because the move is
+  cheaper, check where its TYPES come from. Same contract as the neighbour: fold.
+  Its own contract: its own package, however small the page.
+- **PIN A WIRE WHERE THE WIRE IS.** A page suite that mocked `fetch` was asserting
+  the transport through a render. Splitting it — selection in the package, body in
+  `apps/ui` — made both halves legible and caught a key-casing sabotage the old
+  shape would have missed.
+- **A SPEC WITH ONE UNTAGGED SCENARIO REPORTS GREEN.** Second sighting of the
+  feature-parity trap. Check the binding count before you move a family, and check
+  it for the neighbours whose tests live in the directory you are deleting.
+- **RESTORE EVERY DROPPED BINDING, AND ASK WHERE IT BELONGS.** Diff the
+  `@scenario` tags of the files you delete against the ones you write. Three of
+  the sixteen belonged to the shared surface rather than to this family, and
+  moving them there is what stops a page suite from testing somebody else's
+  package.
+- **A LINT RULE THAT READS IDENTIFIERS WILL READ YOUR PORT'S FIELD NAMES.** Name a
+  port after what it is FOR, not after the browser API behind it.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -1969,28 +2242,29 @@ closures are computed net of that.
 
 **Dispatch order (effort = moving prod files + tests touching):**
 
-| # | Family | Keys | Effort | Gate |
-|---|---|---|---|---|
-| 1 | agents | 1 | ~2+0 | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies. |
-| 2 | settings S5 data governance | 4 | 5+5 | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one. |
-| 3 | datasets | 2 | 6+6 | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move. |
-| 4 | settings S4 model config | 2 | 7+6 | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect. |
-| 5 | prompts | 1 | 44+14 | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39. |
-| 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
-| 7 | settings S2 RBAC | 2 | 8+4 | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract. |
-| 8 | annotations | 5 | 12+7 | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound. |
-| 9 | settings S6 credentials + /cli/auth | 3 | 14+12 | MUST ship together (cli imports api-keys files); create api-key-web; rbac fix |
-| 10 | analytics | 9 | 49+17 | six ~/server modules; retires 4 of automations' 7 platform breaks; custom/[id] is tab-as-prop |
-| 11 | evaluations/evaluators | 7 | 16+8 | WORST drawer sharing (evaluatorEditor 20 callers); entangled with experiments at module level |
-| 12 | workflows/studio/chat | 3 | 53+19 | killing it also kills the prompt-model platform copies |
-| 13 | auth front door + public (joint) | 13 | ~76 | ZERO blockers of any kind but NO destination package — create auth/identity web |
-| 14 | onboarding | 4 | 54+11 | order after traces (traces-v2/onboarding is the largest consumer) |
-| 15 | settings S1 org/members/teams | 5 | 25+7 | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it) |
-| 16 | settings S3 billing | 4 | 17+9 | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first |
-| 17 | settings S8 integrations | 2 | 2+2 | zero blockers, no destination — ride along with any settings package |
-| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces | | | anti-targets / downstream |
+| #   | Family                                                                                                                    | Keys | Effort | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | agents                                                                                                                    | 1    | ~2+0   | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 2   | settings S5 data governance                                                                                               | 4    | 5+5    | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 3   | datasets                                                                                                                  | 2    | 6+6    | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 4   | settings S4 model config                                                                                                  | 2    | 7+6    | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect.                                                                                                                                                                                                                                                                        |
+| 5   | prompts                                                                                                                   | 1    | 44+14  | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39.                                                                                                                                                                                                                                                                                                                                  |
+| 6   | settings S7 identity                                                                                                      | 3    | 8+3    | needs a web package decision; EnrichedAuditLog contract type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 7   | settings S2 RBAC                                                                                                          | 2    | 8+4    | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract.                                                                                                                                                                                          |
+| 8   | annotations                                                                                                               | 5    | 12+7   | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound.                                                                                                                                                                                               |
+| 9   | settings S6 credentials + /cli/auth                                                                                       | 3    | 14+12  | **MOVED** — see the section above. Three keys and TWO packages: `secrets` went to a new `@langwatch/secret-web` rather than riding in `api-key-web`, because every type on that page is the secret contract's. The row was right that the CLI screen could not ship separately. What it missed is that `/cli/auth` talks to three REST routes the published CLI polls the other side of, so the exchange moved into `apps/ui/src/behavior` and is pinned there byte for byte; that the secrets spec was 0/0 bound and its four refusal codes had no customer copy at all; and that the rbac fix, harmless on the roles page, adds three explicit `langy` strings to an admin's CLI key. |
+| 10  | analytics                                                                                                                 | 9    | 49+17  | six ~/server modules; retires 4 of automations' 7 platform breaks; custom/[id] is tab-as-prop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 11  | evaluations/evaluators                                                                                                    | 7    | 16+8   | WORST drawer sharing (evaluatorEditor 20 callers); entangled with experiments at module level                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 12  | workflows/studio/chat                                                                                                     | 3    | 53+19  | killing it also kills the prompt-model platform copies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 13  | auth front door + public (joint)                                                                                          | 13   | ~76    | ZERO blockers of any kind but NO destination package — create auth/identity web                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 14  | onboarding                                                                                                                | 4    | 54+11  | order after traces (traces-v2/onboarding is the largest consumer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 15  | settings S1 org/members/teams                                                                                             | 5    | 25+7   | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 16  | settings S3 billing                                                                                                       | 4    | 17+9   | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 17  | settings S8 integrations                                                                                                  | 2    | 2+2    | zero blockers, no destination — ride along with any settings package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces |      |        | anti-targets / downstream                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 **Cross-cutting gates:**
+
 - tRPC subscriptions: apps/ui's transport declares none — blocks traces (5
   consumers), experiments workbench, langy layout, simulations+agent-testing.
 - The chrome layout route that would mount CurrentDrawer for package-served

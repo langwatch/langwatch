@@ -392,3 +392,64 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     When the user runs `langwatch logout`
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched
+
+  # ─────────────────────────────────────────────────────────────────────
+  # The authorize screen's own states, written down when the page moved
+  # out of `platform/app`. The wire underneath them — the three routes and
+  # their bodies — is unchanged, because the published CLI polls the other
+  # side of it.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @cli @login @integration
+  Scenario: an unauthenticated reader is bounced through sign-in with their code
+    Given a browser opened by `langwatch login` with no session
+    When the authorize page loads
+    Then it sends the reader to sign-in with the device code in the callback URL
+    And it looks up nothing until they are signed in
+
+  @bdd @cli @login @integration
+  Scenario: a reader whose session is still arriving is not bounced
+    Given the session answer has not arrived yet
+    When the authorize page renders
+    Then it waits rather than redirecting
+    And a signed-in reader never round-trips through sign-in for a frame
+
+  @bdd @cli @login @integration
+  Scenario: a reader who signed up mid-login round-trips through onboarding
+    Given a reader who has just signed up and belongs to no organization
+    When the authorize page loads
+    Then it sends them to onboarding with a return address carrying their code
+    So the CLI's poll can still succeed when they come back
+
+  @bdd @cli @login @integration
+  Scenario: an unrecognised code explains itself
+    Given a device code nothing recognises
+    When the authorize page looks it up
+    Then it names the code and says it may have expired or already been used
+
+  @bdd @cli @login @integration
+  Scenario: an expired code sends the reader back to their terminal
+    Given a device code past its deadline
+    When the authorize page looks it up
+    Then it says the code expired and to run `langwatch login` again
+    And it does not read as a generic failure
+
+  @bdd @cli @login @integration
+  Scenario: a refused approval says why
+    Given an approval the endpoint refuses
+    When the refusal arrives
+    Then the page shows the message the endpoint sent
+
+  @bdd @cli @login @integration
+  Scenario: denying the code rejects the CLI session
+    Given a pending device code
+    When the reader denies it
+    Then the CLI session is rejected
+    And the reader is told so even when the call could not be made
+
+  @bdd @cli @login @integration
+  Scenario: the CLI stamps itself as the acquisition source
+    Given a browser opened by `langwatch login`
+    When the authorize page loads
+    Then the CLI is recorded as the lead source
+    And a reader who originally arrived through a campaign keeps their real source

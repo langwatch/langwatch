@@ -3,6 +3,7 @@
   "governedWebPackages": [
     "@langwatch/agent-web",
     "@langwatch/annotation-web",
+    "@langwatch/api-key-web",
     "@langwatch/authz-web",
     "@langwatch/automation-web",
     "@langwatch/data-privacy-web",
@@ -13,6 +14,7 @@
     "@langwatch/model-provider-web",
     "@langwatch/ops-web",
     "@langwatch/prompt-web",
+    "@langwatch/secret-web",
     "@langwatch/user-web"
   ],
   "features": [
@@ -34,6 +36,16 @@
       "uses": {
         "screens": [
           "@langwatch/annotation-web/screens/annotations"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "api-key",
+      "root": "api-key",
+      "uses": {
+        "screens": [
+          "@langwatch/api-key-web/screens/api-key"
         ],
         "surfaces": []
       }
@@ -144,6 +156,16 @@
       "uses": {
         "screens": [
           "@langwatch/prompt-web/screens/prompt-studio"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "secret",
+      "root": "secret",
+      "uses": {
+        "screens": [
+          "@langwatch/secret-web/screens/secret"
         ],
         "surfaces": []
       }

@@ -46,6 +46,25 @@ export const browserUiStorage: UiBrowserStorage = {
   removeItem: (key: string) => window.localStorage.removeItem(key),
 };
 
+/**
+ * Per-TAB storage, for state that must not outlive the visit.
+ *
+ * The CLI authorize screen's first-touch acquisition stamp lives here rather
+ * than in `localStorage`, because that is where `platform/app`'s attribution
+ * module put it: a lead source belongs to the visit that produced the signup,
+ * and a value that survived the tab would attribute a later signup to a campaign
+ * the reader arrived on weeks ago.
+ */
+export const browserUiSessionStorage: UiBrowserStorage = {
+  get length() {
+    return window.sessionStorage.length;
+  },
+  key: (index: number) => window.sessionStorage.key(index),
+  getItem: (key: string) => window.sessionStorage.getItem(key),
+  setItem: (key: string, value: string) => window.sessionStorage.setItem(key, value),
+  removeItem: (key: string) => window.sessionStorage.removeItem(key),
+};
+
 export const browserUiLogger: UiBrowserLogger = {
   info: (...args: unknown[]) => console.info(...args),
   warn: (...args: unknown[]) => console.warn(...args),

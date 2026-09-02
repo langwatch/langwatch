@@ -31,12 +31,14 @@ import {
   ApiKeyAdminRequiredError,
   type ApiKey,
   type ApiKeyBinding,
+  type ApiKeyListEntry,
   type ApiKeyName,
   type ApiKeyProject,
   type ApiKeyService,
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type NamedApiKeyBinding,
   type UpdateApiKeyInput,
 } from "@langwatch/api-key-contract";
 
@@ -49,12 +51,6 @@ export interface ApiKeyCaller {
 export interface ApiKeyAppDependencies {
   apiKeys: ApiKeyService;
 }
-
-/** One of the caller's own bindings, with the scope named rather than only identified. */
-export type NamedApiKeyBinding = ApiKeyBinding & {
-  scopeName: string | null;
-  customRoleName: string | null;
-};
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
 export type CreateApiKeyRequest = Readonly<{
@@ -165,7 +161,10 @@ export class ApiKeyApp {
    * Never the secret: a key is identified by the first five characters of its
    * lookup id, which is enough to recognise one and not enough to use it.
    */
-  async listKeys(input: Readonly<{ organizationId: string }>, by: ApiKeyCaller) {
+  async listKeys(
+    input: Readonly<{ organizationId: string }>,
+    by: ApiKeyCaller,
+  ): Promise<ApiKeyListEntry[]> {
     await this.ensureMember(input.organizationId, by);
     const callerIsAdmin = await this.isOrganizationAdmin(input.organizationId, by);
 

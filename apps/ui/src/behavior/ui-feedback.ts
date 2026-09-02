@@ -72,11 +72,27 @@ export function readUiFailureCode(error: unknown): string | undefined {
   return void 0;
 }
 
-/** The words for one failure: the registry's when it has them, the action's otherwise. */
-export function resolveUiFailureCopy({ error, fallbackTitle }: UiFailureNotice): UiFailureCopy {
+/**
+ * The words for one failure: the registry's when it has them, the caller's
+ * otherwise, and the generic line when neither has anything.
+ *
+ * The registry still WINS over a caller's own description, which is the property
+ * that keeps `description` from being a way to talk over registered copy. It
+ * only fills the gap where there is no code to look up at all.
+ */
+export function resolveUiFailureCopy({
+  error,
+  fallbackTitle,
+  description,
+}: UiFailureNotice): UiFailureCopy {
   const code = readUiFailureCode(error);
   const registered = code === void 0 ? void 0 : UI_FAILURE_COPY[code];
-  return registered ?? { title: fallbackTitle, description: UNKNOWN_UI_FAILURE_DESCRIPTION };
+  return (
+    registered ?? {
+      title: fallbackTitle,
+      description: description ?? UNKNOWN_UI_FAILURE_DESCRIPTION,
+    }
+  );
 }
 
 /** The toaster this feedback is rendered on, so a test can record instead. */

@@ -252,3 +252,38 @@ Feature: Token Created modal command snippets
     # Verifiable by grepping platform/app/package.json: no new syntax-highlighting dependency added.
     When this feature is implemented
     Then no syntax-highlighting library other than Shiki appears in platform/app/package.json
+
+  # ─────────────────────────────────────────────────────────────────────
+  # THE ONE-TIME REVEAL. A minted token reaches the browser exactly once,
+  # in the create mutation's answer, and every read afterwards carries a
+  # public lookup prefix and nothing more. What is DISPLAYED is masked
+  # until the reader asks; what is COPIED is always the real value.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Copy this token now — the reveal is one-time
+    Given a key has just been minted and the dialog is open
+    When I close the dialog
+    Then the token is gone from the page
+    And reopening the create flow shows a blank form, never the minted token
+
+  @unit
+  Scenario: The .env tab shows the key masked and copies it in full
+    Given a minted token in a .env snippet
+    When the snippet is rendered masked
+    Then the rendered lines do not contain the token
+    And the copied lines do
+
+  @unit @integration
+  Scenario: The config block renders the masked key and copies the real one
+    Given a minted token in an MCP config block
+    When the block is rendered
+    Then the JSON on screen carries the masked key
+    And the copy button hands over the JSON carrying the real one
+
+  @unit
+  Scenario: The config block names a self-hosted endpoint
+    Given a deployment whose base URL is not the cloud one
+    When the MCP config is built
+    Then it names that endpoint
+    And a cloud deployment leaves the endpoint out, because the SDK defaults to it

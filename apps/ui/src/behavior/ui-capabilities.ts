@@ -55,6 +55,18 @@ export type UiSuccessNotice = {
 export type UiFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /**
+   * A sentence for a refusal the SCREEN made rather than the server.
+   *
+   * Ignored the moment the error carries a code this composition can say
+   * something better about, so it can never override registered copy. It exists
+   * for the failures that have no code at all: a form guard decided in the
+   * browser, or a feature-owned copy table for codes the registry does not list
+   * yet. Without it those degrade to the generic "something went wrong on our
+   * side", which is both untrue and unactionable for a thing the reader can fix
+   * where they are standing.
+   */
+  description?: string;
   id?: string;
 };
 

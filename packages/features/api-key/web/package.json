@@ -1,0 +1,51 @@
+{
+  "name": "@langwatch/api-key-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe API Keys settings screen and CLI device-flow authorize screen, presentation and client contracts.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./screens/api-key": {
+      "types": "./src/screens/api-key/index.ts",
+      "default": "./src/screens/api-key/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

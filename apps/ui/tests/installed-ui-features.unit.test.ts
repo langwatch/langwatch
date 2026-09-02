@@ -35,6 +35,26 @@ const ANNOTATION_PAGE_KEYS = [
   "pages/[project]/annotations/[slug]",
 ];
 
+const API_KEY_PAGE_KEYS = [
+  // Two keys, one package, one frontend feature — and they had to ship
+  // together: `/cli/auth` imports the permission ceiling and the category
+  // picker Settings > API Keys owns, so moving one without the other would have
+  // left the CLI screen importing files the settings move deletes. Neither
+  // carries a page-level grant; `api-key-page-policy.integration.test.tsx`
+  // asserts that in both directions.
+  "pages/settings/api-keys",
+  "pages/cli/auth",
+];
+
+const SECRET_PAGE_KEYS = [
+  // One key, its own package. `secrets.*` is `@langwatch/secret-server`'s
+  // transport and every type on the page is `@langwatch/secret-contract`'s, so
+  // the data-governance family's rule — a key belongs to the family that owns
+  // its transport — puts it here rather than in the API key package it moved
+  // alongside.
+  "pages/settings/secrets",
+];
+
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
   // page-level grant — `organization:manage` — because both pages read
@@ -184,6 +204,7 @@ describe("given what apps/ui serves itself", () => {
         [
           ...AGENT_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
+          ...API_KEY_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -193,18 +214,20 @@ describe("given what apps/ui serves itself", () => {
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
+          ...SECRET_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Fourteen for thirteen features: the personal workspace mounts two,
+      // Sixteen for fifteen features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
         "@langwatch/annotation-web",
+        "@langwatch/api-key-web",
         "@langwatch/authz-web",
         "@langwatch/automation-web",
         "@langwatch/data-privacy-web",
@@ -215,6 +238,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/model-provider-web",
         "@langwatch/ops-web",
         "@langwatch/prompt-web",
+        "@langwatch/secret-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
       ]);
@@ -264,6 +288,7 @@ describe("given what apps/ui serves itself", () => {
         [
           ...AGENT_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
+          ...API_KEY_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -273,10 +298,11 @@ describe("given what apps/ui serves itself", () => {
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
+          ...SECRET_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(14);
+      expect(merged.apis).toHaveLength(16);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

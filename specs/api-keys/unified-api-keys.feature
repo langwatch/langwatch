@@ -389,3 +389,44 @@ Feature: Unified API Keys
     Given a key id that is unknown, or belongs to another organization
     When I look it up against my own organization
     Then I get nothing back, so the two cases are indistinguishable
+
+  # ─────────────────────────────────────────────────────────────────────
+  # The page, as it behaves after the family moved out of `platform/app`.
+  # Every one of these held before the move and none was written down: the
+  # move is where somebody finally read both halves.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: A key row never renders its secret
+    Given the organization has API keys and ingestion keys
+    When I open Settings > API Keys
+    Then each row shows five characters of the key's public lookup id
+    And no row shows any part of the key's secret, however it is styled
+
+  @integration
+  Scenario: A member manages only their own keys
+    Given I am not an organization admin
+    And the table lists a key of mine and a key of somebody else's
+    When I look at the row actions
+    Then my own key offers edit and revoke
+    And the other person's key offers neither
+
+  @integration
+  Scenario: A key needs at least one scope
+    Given I am creating a key and have emptied the scope picker
+    When I submit the form
+    Then the page refuses it with a sentence naming what to do
+    And nothing is sent to the mint
+
+  @integration
+  Scenario: A member sees the page and not the write controls
+    Given I hold only the grant every member of the organization inherits
+    When I open Settings > API Keys
+    Then the page opens rather than refusing me
+    And what I may change is decided row by row, not at the door
+
+  @unit
+  Scenario: Every key the family claims is served by it
+    Given the API Key frontend feature
+    When its page loaders are read
+    Then it registers the settings key and the CLI authorize key, and nothing else
