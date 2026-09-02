@@ -198,6 +198,27 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
         }),
       });
     });
+
+    it("narrows to the picked queues without widening the caller's reach", async () => {
+      await caller.getOptimizedAnnotationQueues({
+        projectId: "project_123",
+        selectedAnnotations: "pending",
+        pageSize: 10,
+        pageOffset: 0,
+        queueIds: ["queue_a", "queue_b"],
+      });
+
+      expect(mockQueueItemCount).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          // Still only this caller's items: the pick is an extra AND clause,
+          // so a queue id from anywhere else can subtract rows, never add one.
+          userId: "test-user-id",
+          AND: expect.arrayContaining([
+            { annotationQueueId: { in: ["queue_a", "queue_b"] } },
+          ]),
+        }),
+      });
+    });
   });
 });
 

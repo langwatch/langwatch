@@ -59,6 +59,7 @@ import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { toaster } from "../ui/toaster";
 import { AnnotationColumnsMenu } from "./AnnotationColumnsMenu";
+import { AnnotationQueueFilter } from "./AnnotationQueueFilter";
 import { AnnotationCommentsChip } from "./AnnotationCommentsChip";
 import { AnnotationSuggestionsChip } from "./AnnotationSuggestionsChip";
 import UserAvatarGroup from "./AvatarGroup";
@@ -325,6 +326,7 @@ export const AnnotationsTable = ({
   } = usePeriodSelector();
 
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [selectedQueueIds, setSelectedQueueIds] = useState<string[]>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const isPageProvidedRows = providedRows !== undefined;
@@ -358,6 +360,7 @@ export const AnnotationsTable = ({
     {
       selectedAnnotations: statusFilter,
       queueId,
+      queueIds: selectedQueueIds,
       showQueueAndUser,
       ...queuedRange,
       enabled: !isPageProvidedRows,
@@ -367,6 +370,13 @@ export const AnnotationsTable = ({
   const scoreTypes = api.annotationScore.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
+  );
+
+  // Only the inbox pools several queues into one list, so only the inbox has
+  // anything to narrow.
+  const queues = api.annotation.getQueues.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && !!showQueueAndUser },
   );
 
   const activeScoreTypes: ActiveScoreType[] = useMemo(
@@ -421,6 +431,7 @@ export const AnnotationsTable = ({
   }, [
     statusFilter,
     queueId,
+    selectedQueueIds,
     paging.pageOffset,
     paging.pageSize,
     queuedRangeKey,
@@ -800,6 +811,13 @@ export const AnnotationsTable = ({
           </Heading>
         )}
         <Spacer />
+        {showQueueAndUser && (
+          <AnnotationQueueFilter
+            queues={queues.data ?? []}
+            selectedQueueIds={selectedQueueIds}
+            onSelectedQueueIdsChange={setSelectedQueueIds}
+          />
+        )}
         {showStatusFilter && (
           <Menu.Root>
             <Menu.Trigger asChild>

@@ -21,6 +21,7 @@ export function useAnnotationQueues(
   {
     selectedAnnotations,
     queueId,
+    queueIds,
     showQueueAndUser,
     allQueueItems,
     startDate,
@@ -29,6 +30,8 @@ export function useAnnotationQueues(
   }: {
     selectedAnnotations?: string;
     queueId?: string;
+    /** The reviewer's pick of queues to read. Empty or absent reads them all. */
+    queueIds?: string[];
     showQueueAndUser?: boolean;
     allQueueItems?: boolean;
     /** Narrows the read to items queued inside this range. */
@@ -55,6 +58,7 @@ export function useAnnotationQueues(
       pageSize,
       pageOffset,
       queueId: queueId ?? "",
+      ...(queueIds && queueIds.length > 0 ? { queueIds } : {}),
       showQueueAndUser: showQueueAndUser ?? false,
       allQueueItems: allQueueItems ?? false,
       ...dateRangeInput({ startDate, endDate }),

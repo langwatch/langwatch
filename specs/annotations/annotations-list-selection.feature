@@ -299,6 +299,40 @@ Rule: The columns say what the reviewer needs to judge a row
     And the columns menu offers none of them
     And every row has exactly as many cells as the header has columns
 
+Rule: The inbox can be narrowed to the queues being worked on
+
+  The inbox pools every queue the reviewer belongs to, which is what makes its
+  pending count trustworthy and its list a mix nobody asked for. The pick only
+  ever narrows: it is applied on top of the reach the reviewer already has, so
+  a queue id from anywhere else can subtract rows but never add one.
+
+  Background:
+    Given the user is authenticated with "annotations:view" permission
+    And the reviewer belongs to two queues
+
+  @integration
+  Scenario: The inbox reads every queue until one is picked
+    When the inbox renders
+    Then the queue control reads "All"
+    And the read asks for no particular queue
+
+  @integration
+  Scenario: The inbox narrows to the queues the reviewer picks
+    When the reviewer picks one queue
+    Then the read asks for that queue only
+    And the queue control names it
+
+  @integration
+  Scenario: A page that is one queue offers no queue filter
+    When a single queue's page renders
+    Then it carries no queue filter
+
+  @unit
+  Scenario: A picked queue cannot widen what the reviewer may read
+    Given the reviewer may read only their own items
+    When they pick a queue they do not belong to
+    Then the read still asks only for their own items
+
 Rule: The reviewer chooses which columns the list shows
 
   The list is read differently by different people, and one project's score

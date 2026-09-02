@@ -1006,6 +1006,12 @@ export const annotationRouter = createTRPCRouter({
         pageSize: z.number(),
         pageOffset: z.number(),
         queueId: z.string().optional(),
+        /**
+         * Narrows the read to these queues. Only ever narrows: it is applied
+         * on top of the reach the caller already has, so a queue id from
+         * anywhere else can subtract rows but never add one.
+         */
+        queueIds: z.array(z.string()).optional(),
         showQueueAndUser: z.boolean().optional(),
         allQueueItems: z.boolean().optional(),
         // The list's date range. A queue item is dated by when it was queued,
@@ -1085,6 +1091,14 @@ export const annotationRouter = createTRPCRouter({
       } else {
         // Default case - just user's items
         whereCondition.userId = userId;
+      }
+
+      // The reviewer's own pick of which queues to read, applied last so it can
+      // only cut into what the clauses above already allow.
+      if (input.queueIds && input.queueIds.length > 0) {
+        whereCondition.AND.push({
+          annotationQueueId: { in: input.queueIds },
+        });
       }
 
       // Get total count for pagination

@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   },
   items: [] as unknown[],
   scoreTypes: [] as { id: string; name: string; active: boolean }[],
+  queues: [] as { id: string; name: string }[],
   query: {} as Record<string, string>,
   openDrawer: vi.fn(),
   push: vi.fn(),
@@ -81,6 +82,7 @@ vi.mock("~/utils/api", () => ({
       deleteQueueItems: {
         useMutation: () => ({ mutate: mocks.deleteMutate, isLoading: false }),
       },
+      getQueues: { useQuery: () => ({ data: mocks.queues }) },
     },
   },
 }));
@@ -237,6 +239,7 @@ beforeEach(() => {
   mocks.requestEnable.mockResolvedValue(true);
   mocks.query = {};
   mocks.scoreTypes = [];
+  mocks.queues = [];
   mocks.periodIsDefault = true;
   mocks.queueReadArgs = null;
   // Column choices live in the browser, so one test's picks must not decide
@@ -690,6 +693,53 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
         headers.length,
       );
+    });
+  });
+
+  describe("given the inbox pools several queues", () => {
+    const twoQueues = () => {
+      mocks.queues = [
+        { id: "queue-1", name: "Tone review" },
+        { id: "queue-2", name: "Safety review" },
+      ];
+    };
+
+    /** @scenario "The inbox reads every queue until one is picked" */
+    it("reads them all and says so", () => {
+      twoQueues();
+      renderQueuePage({ showQueueAndUser: true });
+
+      expect(
+        screen.getByRole("button", { name: /Queues: All/ }),
+      ).toBeInTheDocument();
+      expect(mocks.queueReadArgs?.queueIds).toEqual([]);
+    });
+
+    /** @scenario "The inbox narrows to the queues the reviewer picks" */
+    it("narrows the read to a picked queue and names it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      twoQueues();
+      renderQueuePage({ showQueueAndUser: true });
+
+      await user.click(screen.getByRole("button", { name: /Queues:/ }));
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Safety review" }),
+      );
+
+      expect(mocks.queueReadArgs?.queueIds).toEqual(["queue-2"]);
+      expect(
+        screen.getByRole("button", { name: /Queues: Safety review/ }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "A page that is one queue offers no queue filter" */
+    it("offers no queue filter where the page is already one queue", () => {
+      twoQueues();
+      renderQueuePage({ queueId: "queue-1" });
+
+      expect(
+        screen.queryByRole("button", { name: /Queues:/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
