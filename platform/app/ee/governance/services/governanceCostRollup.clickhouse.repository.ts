@@ -35,6 +35,13 @@ export interface GovernanceCostRollupRow {
   RequestCount: number;
   RevisionCount: number;
   PreviousAmountNanoUsd: number | null;
+  /**
+   * Unix SECONDS, not milliseconds — both of these are `DateTime` columns.
+   * Null until a provider restates the cell to a different figure.
+   */
+  RevisedAt: number | null;
+  /** Unix SECONDS. The epoch on any row written before migration 00088. */
+  LastObservedAt: number;
   PulledItemsJson: string;
   Version: string;
   AppliedEventIds: string[];
@@ -105,6 +112,17 @@ const LATEST_PAYLOAD_COLUMNS = [
   "argMax(RequestCount, EventTimestamp) AS RequestCount",
   "argMax(RevisionCount, EventTimestamp) AS RevisionCount",
   "argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS PreviousAmountNanoUsd",
+  // The two DateTime markers come back as integer seconds rather than as
+  // formatted timestamps: a `DateTime` renders in the SERVER's timezone with
+  // no offset on it, so a client parsing that string reads the instant the
+  // client's own timezone makes of it. An integer has no timezone to get
+  // wrong. `RevisedAt` takes the same tuple form as the two Nullable money
+  // columns above — whether argMax skips a NULL first argument has varied
+  // between ClickHouse versions, and a cell restated back to unrevised must
+  // read as unrevised on every one of them rather than resurrecting an older
+  // version's revision date.
+  "argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS RevisedAt",
+  "toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LastObservedAt",
   "argMax(PulledItemsJson, EventTimestamp) AS PulledItemsJson",
   "argMax(Version, EventTimestamp) AS Version",
   "argMax(AppliedEventIds, EventTimestamp) AS AppliedEventIds",
@@ -313,6 +331,17 @@ export class GovernanceCostRollupClickHouseRepository {
    * because `CurrencyCode` is already a key column in the inner `GROUP BY`:
    * the screen can then say WHICH currency it could not state a total in,
    * rather than only that it could not.
+   *
+   * The §15 markers ride along too, aggregated the only ways that are honest
+   * for a whole day. `RevisedAt` is the LATEST revision anywhere in the day,
+   * because the marker says the day changed and one changed cell changed it.
+   * `LastObservedAt` is the NEWEST touch anywhere in the day, because a pull
+   * that reached any cell of the day looked at that day. And the prior total
+   * reconstructs what the day added up to before those revisions: each revised
+   * cell contributes what it used to hold, each untouched cell contributes
+   * what it still holds. Cells that cannot state a prior figure are counted
+   * rather than skipped, so the caller can withhold a partial "was" the same
+   * way it withholds a partial total.
    */
   async sumDaysByLane(input: {
     tenantId: string;
@@ -332,6 +361,17 @@ export class GovernanceCostRollupClickHouseRepository {
        * could report, so it is counted and not named.
        */
       currenciesWithoutUsdAmount: string[];
+      /**
+       * Unix SECONDS of the day's most recent revision, or null when no cell
+       * of it has ever been restated.
+       */
+      revisedAt: number | null;
+      /** What the day totalled before those revisions, nano-USD. */
+      previousAmountNanoUsd: number | null;
+      /** Cells that can state no prior figure. Above zero, withhold the "was". */
+      cellsWithoutPreviousAmount: number;
+      /** Unix SECONDS a pull last touched any cell of the day. */
+      lastObservedAt: number;
     }>
   > {
     const client = await this.resolveClient(input.tenantId);
@@ -347,11 +387,25 @@ export class GovernanceCostRollupClickHouseRepository {
               CurrencyCode,
               LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
             )
-          ) AS CurrenciesWithoutUsdAmount
+          ) AS CurrenciesWithoutUsdAmount,
+          max(LatestRevisedAt)             AS RevisedAt,
+          -- A cell nobody revised still contributed its figure to the older
+          -- total, so it carries that figure over. Only the revised ones swap
+          -- in what they used to hold.
+          sumOrNull(LatestPriorAmountNanoUsd)  AS PreviousAmountNanoUsd,
+          countIf(LatestPriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
+          max(LatestLastObservedAt)        AS LastObservedAt
         FROM (
           SELECT
             ${KEY_COLUMNS.join(",\n            ")},
-            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
+            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
+            argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
+            toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt,
+            if(
+              argMax(tuple(RevisedAt), EventTimestamp).1 IS NULL,
+              argMax(tuple(AmountNanoUsd), EventTimestamp).1,
+              argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1
+            ) AS LatestPriorAmountNanoUsd
           FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
           WHERE TenantId = {tenantid:String}
             AND Day >= {fromday:Date}
@@ -378,6 +432,10 @@ export class GovernanceCostRollupClickHouseRepository {
       amountNanoUsd: nullableInt(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
       currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
+      revisedAt: nullableInt(row.RevisedAt),
+      previousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
+      cellsWithoutPreviousAmount: int(row.CellsWithoutPreviousAmount),
+      lastObservedAt: int(row.LastObservedAt),
     }));
   }
 
@@ -579,6 +637,8 @@ export class GovernanceCostRollupClickHouseRepository {
       RequestCount: int(row.RequestCount),
       RevisionCount: int(row.RevisionCount),
       PreviousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
+      RevisedAt: nullableInt(row.RevisedAt),
+      LastObservedAt: int(row.LastObservedAt),
       PulledItemsJson: str(row.PulledItemsJson),
       Version: str(row.Version),
       AppliedEventIds: strArray(row.AppliedEventIds),

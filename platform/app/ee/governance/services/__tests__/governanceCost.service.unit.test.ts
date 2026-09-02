@@ -125,6 +125,12 @@ function laneRow(
     amountNanoUsd: 0,
     cellsWithoutAmount: 0,
     currenciesWithoutUsdAmount: [],
+    // Never revised, and never observed by a pull — the shape of a day that
+    // carries neither §15 marker, which is what most of this file is about.
+    revisedAt: null,
+    previousAmountNanoUsd: null,
+    cellsWithoutPreviousAmount: 0,
+    lastObservedAt: 0,
     ...overrides,
   };
 }
@@ -209,6 +215,12 @@ describe("GovernanceCostService.summary", () => {
             gatewayUsd: 7,
             billedCellsWithoutAmount: 0,
             gatewayCellsWithoutAmount: 0,
+            // Neither row was ever revised or observed by a pull, so the day
+            // carries neither §15 marker. Asserted exactly rather than by
+            // `toMatchObject` so a marker appearing from nowhere fails here.
+            billedRevisedAt: null,
+            billedPreviousUsd: null,
+            billedProvisional: false,
           },
         ]);
       });
@@ -977,6 +989,149 @@ describe("GovernanceCostService.summary", () => {
 
         expect(result.azureBilling).toBeNull();
       });
+    });
+  });
+});
+
+/**
+ * How much a day's figure can be trusted (ADR-128 §15).
+ *
+ * Both markers are DERIVED at read — one from the clock against a stored
+ * observation, one from a stored revision — so this is the layer that decides
+ * them, and the only layer where the clock is allowed to matter at all.
+ *
+ * Spec: specs/governance/governance-cost-restatement-markers.feature
+ */
+describe("GovernanceCostService.summary trust markers", () => {
+  const NOW = new Date("2026-08-31T12:00:00.000Z");
+  /** Unix seconds, the unit both `DateTime` markers arrive in. */
+  const seconds = (iso: string) => Math.floor(Date.parse(iso) / 1000);
+
+  async function seriesFor(rows: LaneRow[]) {
+    const service = createService({
+      prisma: prismaWithGovProject("gov-1"),
+      costRollup: rollupReturning({ rows }),
+    });
+    const result = await service.summary({
+      organizationId: "org-1",
+      windowDays: 30,
+      now: NOW,
+    });
+    return result.series;
+  }
+
+  describe("given a day a pull touched within the settling window", () => {
+    /** @scenario "A day a pull touched recently can still change" */
+    it("says the day can still change", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "pulled",
+          amountNanoUsd: 9 * NANO,
+          lastObservedAt: seconds("2026-08-30T04:00:00.000Z"),
+        }),
+      ]);
+
+      expect(day?.billedProvisional).toBe(true);
+    });
+  });
+
+  describe("given a day no pull has touched for longer than the settling window", () => {
+    /** @scenario "A day no pull has touched for longer than the settling window reads settled" */
+    it("says the day is settled", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "pulled",
+          amountNanoUsd: 9 * NANO,
+          // Thirty-one days before `now`: one day past the window.
+          lastObservedAt: seconds("2026-07-31T04:00:00.000Z"),
+        }),
+      ]);
+
+      // Anchored on the pull, never the calendar. A first connect backfills
+      // ninety days at once, and a calendar test would call every one of them
+      // settled the instant it landed, having been read exactly once.
+      expect(day?.billedProvisional).toBe(false);
+    });
+  });
+
+  describe("given a day that was restated and is still inside its window", () => {
+    /** @scenario "A day that was revised and can still change says both" */
+    it("reports both facts, because both are true", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "pulled",
+          amountNanoUsd: 9 * NANO,
+          revisedAt: seconds("2026-08-29T04:00:00.000Z"),
+          previousAmountNanoUsd: 12 * NANO,
+          lastObservedAt: seconds("2026-08-30T04:00:00.000Z"),
+        }),
+      ]);
+
+      // Providers restate inside the same thirty days the settling window
+      // covers, so the both-true day is the common case, not an edge one.
+      expect(day?.billedRevisedAt).toBe(Date.parse("2026-08-29T04:00:00.000Z"));
+      expect(day?.billedPreviousUsd).toBe(12);
+      expect(day?.billedProvisional).toBe(true);
+    });
+  });
+
+  describe("given a gateway day metered a moment ago", () => {
+    /** @scenario "Gateway days never claim they might change" */
+    it("never marks it as able to still change", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "gateway",
+          amountNanoUsd: 7 * NANO,
+          lastObservedAt: seconds("2026-08-31T11:00:00.000Z"),
+        }),
+      ]);
+
+      // We metered these ourselves and nobody restates them. Left in the
+      // general rule they would carry "can still move" for thirty days on the
+      // product's most-viewed and most-final numbers.
+      expect(day?.gatewayUsd).toBe(7);
+      expect(day?.billedProvisional).toBe(false);
+      expect(day?.billedRevisedAt).toBeNull();
+    });
+  });
+
+  describe("given a restated day part of which holds no dollar figure", () => {
+    /** @scenario "A revised day whose earlier figure cannot be stated in dollars withholds it" */
+    it("says it was revised but names no earlier amount", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "pulled",
+          amountNanoUsd: 9 * NANO,
+          revisedAt: seconds("2026-08-29T04:00:00.000Z"),
+          previousAmountNanoUsd: 12 * NANO,
+          cellsWithoutPreviousAmount: 1,
+          lastObservedAt: seconds("2026-08-30T04:00:00.000Z"),
+        }),
+      ]);
+
+      // A partial earlier figure reads as the whole one, which is the same lie
+      // the lane total already refuses to tell.
+      expect(day?.billedRevisedAt).not.toBeNull();
+      expect(day?.billedPreviousUsd).toBeNull();
+    });
+  });
+
+  describe("given a day summarized before the markers existed", () => {
+    /** @scenario "A day summarized before the markers existed reads as settled" */
+    it("reads as neither revised nor changeable", async () => {
+      const [day] = await seriesFor([
+        laneRow({
+          costSource: "pulled",
+          amountNanoUsd: 9 * NANO,
+          // The migration's backfill: no pull has ever been recorded against
+          // this day. The pullers look thirty days back, so any day genuinely
+          // still settling is re-stamped by the next daily pull.
+          lastObservedAt: 0,
+        }),
+      ]);
+
+      expect(day?.billedRevisedAt).toBeNull();
+      expect(day?.billedProvisional).toBe(false);
     });
   });
 });

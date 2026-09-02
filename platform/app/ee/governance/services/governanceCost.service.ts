@@ -41,7 +41,10 @@ import { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth"
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
-import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
+import {
+  GOVERNANCE_COST_SOURCE,
+  GOVERNANCE_SETTLING_WINDOW_DAYS,
+} from "../projections/governanceCostRollup.constants";
 import {
   readClaimedSubscription,
   readPrepaidDeclared,
@@ -145,6 +148,32 @@ export interface GovernanceCostDayDto {
   billedCellsWithoutAmount: number;
   /** Gateway-lane cells that day holding no USD figure. */
   gatewayCellsWithoutAmount: number;
+
+  /**
+   * When the provider last restated this day, epoch ms, or null if never
+   * (ADR-128 §15). Billed lane only, and not for symmetry's sake: a gateway
+   * outcome is priced once as it is served and nothing ever restates it, so a
+   * gateway field here could only ever be null and would invite a reader to
+   * wonder what a non-null one would have meant.
+   */
+  billedRevisedAt: number | null;
+  /**
+   * What the billed lane said this day cost before that restatement. Null when
+   * no restatement happened, and null when any cell of the day can state no
+   * prior figure — a partial "was" reads as the whole one, which is the same
+   * lie `billedUsd` refuses to tell.
+   */
+  billedPreviousUsd: number | null;
+  /**
+   * Whether the day is still inside its settling window, i.e. a pull touched
+   * it recently enough that the provider may still move it (§15).
+   *
+   * DERIVED at read from when a pull last touched the day, never stored: the
+   * answer changes with the clock, so a stored flag would only be a stale one.
+   * Orthogonal to `billedRevisedAt` — "already moved" and "can still move" are
+   * independent facts and the common case is both.
+   */
+  billedProvisional: boolean;
 }
 
 /**
@@ -311,7 +340,7 @@ export class GovernanceCostService {
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
       azureBilling,
       seats,
-      series: seriesFrom(rows),
+      series: seriesFrom(rows, now),
       windowDays,
       staleSources,
     };
@@ -502,7 +531,61 @@ type LaneRow = {
   amountNanoUsd: number | null;
   cellsWithoutAmount: number;
   currenciesWithoutUsdAmount: string[];
+  /** Unix SECONDS — see the repository; these two are `DateTime` columns. */
+  revisedAt: number | null;
+  previousAmountNanoUsd: number | null;
+  cellsWithoutPreviousAmount: number;
+  lastObservedAt: number;
 };
+
+/**
+ * Nano-USD to the dollar figure the screen renders, or null.
+ *
+ * The one place nano-USD becomes a JavaScript number, so the BigInt discipline
+ * holds everywhere upstream of it: a window total in nano-USD crosses 2^53 at
+ * roughly nine million dollars, and a float accumulator starts dropping low
+ * digits there without saying so.
+ *
+ * `cellsWithoutAmount` above zero withholds the figure entirely rather than
+ * stating the part that could be priced. That partial number reads as the
+ * whole one and is short by an amount nothing on the screen discloses.
+ */
+function usdFigure({
+  totalNanoUsd,
+  cellsWithoutAmount,
+}: {
+  totalNanoUsd: bigint | null;
+  cellsWithoutAmount: number;
+}): number | null {
+  if (cellsWithoutAmount > 0 || totalNanoUsd === null) return null;
+  return Number(nanoUsdToDecimalString(totalNanoUsd));
+}
+
+/**
+ * Whether a day may still move, from when a pull last touched it (§15).
+ *
+ * PULL-anchored, not calendar-anchored, and the difference is the whole rule.
+ * On first connect a puller backfills 90 days, so a calendar test would call
+ * every day older than the window settled the instant it landed, having been
+ * read exactly once. A source pulled weekly would go the other way and keep
+ * days provisional long after the provider stopped touching them. What we can
+ * honestly claim to know is when we last looked, so that is what it reads.
+ *
+ * Zero means never observed — a row written before the marker existed — and
+ * reads as settled, which is what the backfill was designed to say.
+ */
+function isWithinSettlingWindow({
+  lastObservedAtSeconds,
+  windowDays,
+  now,
+}: {
+  lastObservedAtSeconds: number;
+  windowDays: number;
+  now: Date;
+}): boolean {
+  if (lastObservedAtSeconds <= 0) return false;
+  return now.getTime() - lastObservedAtSeconds * 1000 < windowDays * 86_400_000;
+}
 
 /**
  * The figure for a set of rows, withheld unless every cell behind it is priced
@@ -521,16 +604,31 @@ function figureFor(rows: readonly LaneRow[]): number | null {
     0,
   );
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
-  if (withoutAmount > 0 || priced.length === 0) return null;
+  if (priced.length === 0) return null;
   // Summed in BigInt and divided by reading the digits out, per ADR-128 §3.
-  // A window total is nano-USD, so a lane past roughly nine million dollars
-  // crosses 2^53 and a float accumulator starts dropping the low digits
-  // silently — a wrong total wearing the same label as a right one.
   const totalNanoUsd = priced.reduce(
     (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
     0n,
   );
-  return Number(nanoUsdToDecimalString(totalNanoUsd));
+  return usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount });
+}
+
+/**
+ * What the billed lane said a day cost before its latest restatement, under
+ * the same withholding rule as the figure it will be shown beside.
+ *
+ * Null when the day was never revised: there is no earlier figure to name, and
+ * the marker that would carry it is not rendered anyway.
+ */
+function previousFigureFor(row: LaneRow): number | null {
+  if (row.revisedAt === null) return null;
+  return usdFigure({
+    totalNanoUsd:
+      row.previousAmountNanoUsd === null
+        ? null
+        : BigInt(row.previousAmountNanoUsd),
+    cellsWithoutAmount: row.cellsWithoutPreviousAmount,
+  });
 }
 
 /**
@@ -570,7 +668,10 @@ function totalFor(
  * part sits lower than the day actually cost, and a reader has no way to see
  * that it is short. A gap is the one shape that cannot be misread.
  */
-function seriesFrom(rows: readonly LaneRow[]): GovernanceCostDayDto[] {
+function seriesFrom(
+  rows: readonly LaneRow[],
+  now: Date,
+): GovernanceCostDayDto[] {
   const byDay = new Map<string, GovernanceCostDayDto>();
   for (const row of rows) {
     const entry = byDay.get(row.day) ?? {
@@ -579,13 +680,34 @@ function seriesFrom(rows: readonly LaneRow[]): GovernanceCostDayDto[] {
       gatewayUsd: null,
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
+      billedRevisedAt: null,
+      billedPreviousUsd: null,
+      billedProvisional: false,
     };
     if (row.costSource === GOVERNANCE_COST_SOURCE.PULLED) {
       entry.billedUsd = figureFor([row]);
       entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
+      entry.billedRevisedAt =
+        row.revisedAt === null ? null : row.revisedAt * 1000;
+      entry.billedPreviousUsd = previousFigureFor(row);
+      // The settling window is per SOURCE, and this row spans every source the
+      // billed lane holds that day. Every source runs on the default today —
+      // only Anthropic's window has been measured, and the rest are provisional
+      // constants until they are — so the default is exactly right here rather
+      // than an approximation. It stops being so the day a source is measured
+      // to differ, and that is the day this read has to group by source.
+      entry.billedProvisional = isWithinSettlingWindow({
+        lastObservedAtSeconds: row.lastObservedAt,
+        windowDays: GOVERNANCE_SETTLING_WINDOW_DAYS,
+        now,
+      });
     } else if (row.costSource === GOVERNANCE_COST_SOURCE.GATEWAY) {
       entry.gatewayUsd = figureFor([row]);
       entry.gatewayCellsWithoutAmount = row.cellsWithoutAmount;
+      // The gateway lane is EXEMPT from both markers (§15). We metered these
+      // rows ourselves in real time and no provider restates them, so "can
+      // still move" on the product's most-viewed and most-final numbers would
+      // be a warning about a thing that cannot happen.
     }
     byDay.set(row.day, entry);
   }
