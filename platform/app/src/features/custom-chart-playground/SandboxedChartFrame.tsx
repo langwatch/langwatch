@@ -33,6 +33,15 @@ export interface SandboxedChartFrameProps {
   theme: ChartFrameTheme;
   onLog: (entry: ChartFrameLogEntry) => void;
   /**
+   * `LW.navigate(target, params)` from the frame. A widget host with no
+   * router to navigate with (or that hasn't wired one up yet) can simply
+   * omit this — frameBridge no-ops safely when it's absent.
+   */
+  onNavigate?: (
+    target: string,
+    params: Readonly<Record<string, unknown>>,
+  ) => void;
+  /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
    * card gives the chart more room without lifting the bridge's own clamp.
@@ -46,6 +55,7 @@ export function SandboxedChartFrame({
   params,
   theme,
   onLog,
+  onNavigate,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -66,6 +76,8 @@ export function SandboxedChartFrame({
   executeQueryRef.current = executeQuery;
   const onLogRef = useRef(onLog);
   onLogRef.current = onLog;
+  const onNavigateRef = useRef(onNavigate);
+  onNavigateRef.current = onNavigate;
   const initialParamsRef = useRef(params);
   const bridgeRef = useRef<ReturnType<typeof createFrameBridge> | null>(null);
 
@@ -82,6 +94,8 @@ export function SandboxedChartFrame({
       theme,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
+      onNavigate: (target, navParams) =>
+        onNavigateRef.current?.(target, navParams),
       onTeardown: () => setTornDown(true),
     });
     bridgeRef.current = bridge;

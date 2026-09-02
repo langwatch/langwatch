@@ -26,6 +26,7 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { playgroundWidgetDefinitionSchema } from "~/server/analytics/playgroundWidgetDefinition";
 
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
+import { usePlaygroundChartNavigate } from "./usePlaygroundChartNavigate";
 import { usePlaygroundWidgetExecutor } from "./usePlaygroundWidgetExecutor";
 
 // The dashboard surfaces its own failures around the frame; the frame itself
@@ -39,6 +40,8 @@ export interface PlaygroundDashboardWidgetProps {
   /** The row's `CustomGraph.graph` column — a `PlaygroundWidgetDefinition`. */
   readonly graph: unknown;
   readonly projectId: string;
+  /** Host context for `LW.navigate` — never read off the frame's own params. */
+  readonly projectSlug: string;
   readonly maxHeight: number;
 }
 
@@ -46,10 +49,12 @@ export function PlaygroundDashboardWidget({
   id,
   graph,
   projectId,
+  projectSlug,
   maxHeight,
 }: PlaygroundDashboardWidgetProps) {
   const { colorMode } = useColorMode();
   const { period } = usePeriodSelector();
+  const onNavigate = usePlaygroundChartNavigate(projectSlug);
 
   // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
   // back: two `Date`s for the same instant are never `Object.is`-equal, so a
@@ -92,6 +97,7 @@ export function PlaygroundDashboardWidget({
       params={params}
       theme={colorMode === "dark" ? "dark" : "light"}
       onLog={noopLog}
+      onNavigate={onNavigate}
       maxHeight={maxHeight}
     />
   );

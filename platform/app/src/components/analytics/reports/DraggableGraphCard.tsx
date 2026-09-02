@@ -119,7 +119,11 @@ export function DraggableGraphCard({
           />
 
           <Box flex={1} minHeight={0}>
-            <GraphCardChartArea graph={graph} projectId={projectId} />
+            <GraphCardChartArea
+              graph={graph}
+              projectId={projectId}
+              projectSlug={projectSlug}
+            />
           </Box>
         </Card.Body>
       </Card.Root>
@@ -135,9 +139,11 @@ export function DraggableGraphCard({
 function GraphCardChartArea({
   graph,
   projectId,
+  projectSlug,
 }: {
   graph: GraphData;
   projectId: string;
+  projectSlug: string;
 }) {
   if (graph.kind === WORKBENCH_SQL_CHART_KIND) {
     return (
@@ -160,6 +166,7 @@ function GraphCardChartArea({
         id={graph.id}
         graph={graph.graph}
         projectId={projectId}
+        projectSlug={projectSlug}
         maxHeight={graph.rowSpan === 2 ? 600 : 300}
       />
     );

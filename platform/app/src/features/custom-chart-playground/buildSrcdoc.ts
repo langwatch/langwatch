@@ -11,6 +11,7 @@
  */
 
 import { buildAuthorRuntimeScript } from "./bridge/authorRuntime";
+import { buildChartsLibScript } from "./bridge/chartsLibSource";
 import { buildShimScript } from "./bridge/shimSource";
 
 /**
@@ -18,12 +19,20 @@ import { buildShimScript } from "./bridge/shimSource";
  * widget compiles against. React 18's UMD build is the one that added
  * `ReactDOM.createRoot`, and Recharts' UMD reads `window.PropTypes` as a
  * plain global rather than requiring it — hence prop-types loading first.
+ *
+ * Split around the `@langwatch/charts` library script: it needs
+ * `window.React`/`window.Recharts` already loaded (hence after Recharts) but
+ * itself needs nothing from Babel, so it lands ahead of that CDN script too —
+ * still satisfying "after Recharts, before the author runtime" with room to
+ * spare.
  */
-const CDN_SCRIPTS = [
+const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
   "https://unpkg.com/react@18/umd/react.production.min.js",
   "https://unpkg.com/prop-types@15/prop-types.min.js",
   "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
   "https://unpkg.com/recharts@2/umd/Recharts.js",
+];
+const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
   "https://unpkg.com/@babel/standalone@7/babel.min.js",
 ];
 
@@ -60,7 +69,13 @@ export function buildSrcdoc(code: string): string {
     "    border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin: 0;",
     "  }",
     "</style>",
-    ...CDN_SCRIPTS.map((src) => `<script src="${src}" crossorigin></script>`),
+    ...CDN_SCRIPTS_BEFORE_CHARTS_LIB.map(
+      (src) => `<script src="${src}" crossorigin></script>`,
+    ),
+    `<script>${buildChartsLibScript()}</script>`,
+    ...CDN_SCRIPTS_AFTER_CHARTS_LIB.map(
+      (src) => `<script src="${src}" crossorigin></script>`,
+    ),
     "</head><body>",
     '<div id="lw-root"></div>',
     '<pre id="lw-compile-error"></pre>',

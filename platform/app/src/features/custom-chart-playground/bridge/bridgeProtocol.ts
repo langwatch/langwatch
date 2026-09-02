@@ -106,6 +106,22 @@ export interface LwSetHeightMessage {
   readonly px: number;
 }
 
+/**
+ * Route keys `LW.navigate` may target. An allowlist, not a raw path: author
+ * code is semi-trusted (it runs in the sandboxed frame but was written by
+ * whoever has playground edit access), so a raw destination path would be an
+ * open redirect. The host resolves each key to a real URL itself — see
+ * `usePlaygroundChartNavigate`.
+ */
+export const NAVIGABLE_TARGETS = ["traces", "trace"] as const;
+export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];
+
+export interface LwNavigateMessage {
+  readonly type: "lw:navigate";
+  readonly target: string;
+  readonly params: Readonly<Record<string, unknown>>;
+}
+
 /** Where a forwarded log/error line originated inside the frame. */
 export type ChartFrameLogSource =
   | "console"
@@ -134,6 +150,7 @@ export interface LwHeartbeatMessage {
 export type FrameToParentMessage =
   | LwQueryMessage
   | LwSetHeightMessage
+  | LwNavigateMessage
   | LwLogMessage
   | LwErrorMessage
   | LwHeartbeatMessage;

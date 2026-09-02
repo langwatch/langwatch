@@ -106,6 +106,12 @@ export function buildShimScript(): string {
     },
     error: function (err) {
       post({ type: "lw:error", source: "lw.error", message: messageOf(err) });
+    },
+    // Fire-and-forget. Allowlisted target keys only — the host resolves each
+    // one to a real URL and drops anything it doesn't recognize; see
+    // frameBridge.ts's "lw:navigate" case and usePlaygroundChartNavigate.
+    navigate: function (target, params) {
+      post({ type: "lw:navigate", target: String(target), params: params || {} });
     }
   };
   window.LW = LW;

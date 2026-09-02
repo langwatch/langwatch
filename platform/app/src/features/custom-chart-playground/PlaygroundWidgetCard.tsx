@@ -28,6 +28,7 @@ import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinit
 
 import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
+import { usePlaygroundChartNavigate } from "./usePlaygroundChartNavigate";
 import { usePlaygroundWidgetExecutor } from "./usePlaygroundWidgetExecutor";
 
 /** A playground widget as the grid renders it. */
@@ -120,6 +121,7 @@ export function PlaygroundWidgetCard({
 
   const { executeQuery, runStandalone, params, lastRuns } =
     usePlaygroundWidgetExecutor(projectId, previewQueries);
+  const onNavigate = usePlaygroundChartNavigate(projectSlug);
 
   const isDirty =
     draftCode !== widget.code || !queriesEqual(draftQueries, widget.queries);
@@ -204,6 +206,7 @@ export function PlaygroundWidgetCard({
                 params={params}
                 theme={colorMode === "dark" ? "dark" : "light"}
                 onLog={noopLog}
+                onNavigate={onNavigate}
                 maxHeight={rowSpanHeight(widget.rowSpan)}
               />
             </Box>
@@ -232,6 +235,7 @@ export function PlaygroundWidgetCard({
               params={params}
               theme={colorMode === "dark" ? "dark" : "light"}
               onLog={noopLog}
+              onNavigate={onNavigate}
               maxHeight={DRAWER_PREVIEW_HEIGHT_PX}
             />
           ) : null

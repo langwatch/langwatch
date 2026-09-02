@@ -23,7 +23,8 @@ export function buildAuthorRuntimeScript(): string {
     "react": function () { return window.React; },
     "react-dom": function () { return window.ReactDOM; },
     "react-dom/client": function () { return window.ReactDOM; },
-    "recharts": function () { return window.Recharts; }
+    "recharts": function () { return window.Recharts; },
+    "@langwatch/charts": function () { return window.LWCharts; }
   };
 
   function requireShim(specifier) {

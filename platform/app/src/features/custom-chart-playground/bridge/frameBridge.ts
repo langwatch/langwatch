@@ -50,6 +50,17 @@ export interface CreateFrameBridgeOptions {
   readonly theme: ChartFrameTheme;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
+  /**
+   * `LW.navigate(target, params)` from the frame. Forwarded as-is —
+   * allowlist checking and route resolution happen in the caller (see
+   * `usePlaygroundChartNavigate`), not here. Omitted entirely, a navigate
+   * message is silently dropped (a no-op is the correct behavior when a
+   * widget host has no router to navigate with).
+   */
+  readonly onNavigate?: (
+    target: string,
+    params: Readonly<Record<string, unknown>>,
+  ) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
 }
@@ -64,7 +75,8 @@ export interface FrameBridge {
 export function createFrameBridge(
   options: CreateFrameBridgeOptions,
 ): FrameBridge {
-  const { iframe, executeQuery, onLog, onHeightChange, onTeardown } = options;
+  const { iframe, executeQuery, onLog, onHeightChange, onNavigate, onTeardown } =
+    options;
 
   let port: MessagePort | null = null;
   let initialized = false;
@@ -140,6 +152,9 @@ export function createFrameBridge(
         return;
       case "lw:set-height":
         onHeightChange(message.px);
+        return;
+      case "lw:navigate":
+        onNavigate?.(message.target, message.params ?? {});
         return;
       case "lw:log":
         onLog({
