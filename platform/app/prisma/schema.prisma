@@ -158,6 +158,12 @@ model User {
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
+  /// How Langy should reach this person's code when a task needs a change
+  /// (ADR-129). "github" means they chose the pull request path and asked to
+  /// be remembered; NULL means ask. A shared local folder is never stored
+  /// here, because a folder has to be shared again each time.
+  /// Spec: specs/langy/langy-code-access.feature
+  langyCodeAccessPreference     String?
   /// When this person last said "not now" to being offered a passkey
   /// (ADR-120). On the account rather than in browser storage for two
   /// reasons: a per-browser record forgets on a new device, which is exactly
@@ -1782,6 +1788,13 @@ model ModelProvider {
   // Fallback priority used when a VK has no RoutingPolicy. Lower =
   // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
   fallbackPriorityGlobal Int?
+
+  // Regular expression sources, one per entry, naming the models of this
+  // provider that may run a Langy conversation with the permission checks
+  // skipped on the developer's machine (ADR-129). Null or an empty list
+  // means the provider's registry default applies; a stored list replaces
+  // that default rather than extending it.
+  langySkipPermissionsModels Json?
 
   // Health / circuit breaker state written by the gateway.
   healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)

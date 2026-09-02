@@ -861,6 +861,18 @@ const presentations = {
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
   },
+  model_provider_skip_permissions_pattern_invalid: {
+    // The field takes one pattern per line, so the reader needs the line
+    // number to find the one that failed. `meta.line` is one-based, matching
+    // what the textarea shows.
+    title: "One of the allowed model patterns can't be read",
+    describe: (error) => {
+      const line = error.meta.line;
+      const where =
+        typeof line === "number" && line > 0 ? `Line ${line}` : "One line";
+      return `${where} of the allowed models list is not a valid pattern. Correct it and save again. Nothing was saved.`;
+    },
+  },
   model_provider_credentials_unreadable: {
     title: "This provider needs its credentials again",
     describe: () =>
@@ -2407,6 +2419,39 @@ const presentations = {
     title: "Too many messages just now",
     describe: () =>
       "That one wasn't sent. Wait a few seconds, then send it again.",
+  },
+  // ADR-129, the developer's own folder. Every one of these is something the
+  // person reading it can act on in the terminal or in the panel, which is
+  // why they are named rather than left as an unknown failure.
+  langy_local_workspace_offline: {
+    title: "No folder is connected",
+    describe: () =>
+      "Langy has no folder to work in. Run `npx langwatch@latest langy --share-control` in the folder you want it to change, then approve the request in the terminal.",
+  },
+  langy_local_request_invalid: {
+    title: "That request is not open",
+    describe: () =>
+      "The request to share a folder is not one you can approve. Ask Langy for the code change again to get a new one.",
+  },
+  langy_local_request_expired: {
+    title: "That request expired",
+    describe: () =>
+      "A request to share a folder lasts fifteen minutes. Ask Langy for the code change again to get a new one.",
+  },
+  langy_local_permission_timeout: {
+    title: "Nobody answered the permission card",
+    describe: () =>
+      "The command did not run. Send Langy a message and it will ask again.",
+  },
+  langy_local_skip_model_not_allowed: {
+    title: "This model cannot skip permission checks",
+    describe: () =>
+      "Check the allowed models list in the provider settings, or answer each card as it comes.",
+  },
+  langy_wait_expired: {
+    title: "That card is no longer waiting",
+    describe: () =>
+      "Langy stopped waiting for an answer. Send your answer as a message and it will pick it up.",
   },
   langy_turn_in_progress: {
     title: "Langy is still replying",

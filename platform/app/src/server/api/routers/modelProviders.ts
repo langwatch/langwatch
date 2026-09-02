@@ -230,6 +230,17 @@ export const modelProviderRouter = createTRPCRouter({
           rateLimitRpd: z.number().int().min(0).nullable().optional(),
           fallbackPriorityGlobal: z.number().int().nullable().optional(),
           providerConfig: z.object({}).passthrough().nullable().optional(),
+          // Regular expression sources naming the models allowed to run a
+          // Langy conversation with the permission checks skipped (ADR-129).
+          // Whether each line compiles is checked in the service, which owns
+          // the refusal the drawer renders on the field. Omitted leaves the
+          // stored list alone; an empty list clears it and returns the
+          // provider to its registry default.
+          langySkipPermissionsModels: z
+            .array(z.string().trim().min(1).max(200))
+            .max(50)
+            .nullable()
+            .optional(),
         })
         .superRefine(requireTenantAnchor),
     )
@@ -264,6 +275,7 @@ export const modelProviderRouter = createTRPCRouter({
             | Record<string, unknown>
             | null
             | undefined,
+          langySkipPermissionsModels: input.langySkipPermissionsModels,
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
