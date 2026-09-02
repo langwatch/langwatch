@@ -37,8 +37,8 @@ const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
 
 /**
- * The last migration that predates 00087, which is where those four rollup
- * columns gained their merge rule.
+ * The last migration that needs the setting above. 00088 is where those four
+ * rollup columns gained their merge rule.
  *
  * Migrations up to here are merged history: they still create the tables the
  * old way on a new install, and on ClickHouse 26 they only run with the
@@ -358,7 +358,7 @@ async function bootstrapDatabase(
 
   // ClickHouse 26.0 refuses to create an AggregatingMergeTree table with a
   // column that is neither in the sorting key nor an aggregate state. Four
-  // rollups were created that way before 00087 converted them, and those
+  // rollups were created that way before 00088 converted them, and those
   // CREATE TABLE statements are merged history that a new install still
   // replays. The presence of the setting that relaxes the check is what says
   // the server enforces it — read rather than inferred from a version number,
