@@ -451,6 +451,80 @@ describe("the governance cost screen", () => {
     });
   });
 
+  describe("given the read side sent an Azure billing note", () => {
+    // These render the actual wiring — DTO field to page to panel — which the
+    // note's decision and sentence unit tests cannot see: deleting the
+    // `laneNote` pass-through in `costs.tsx` or the render in
+    // `CostLanePanel.tsx` fails here and nowhere else.
+    const withNote = (azureBilling: string | null) => {
+      harness.query = {
+        data: summaryFixture({
+          azureBilling,
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+    };
+
+    /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
+    it("explains a declared-prepaid tenant's empty bill on the billed lane", () => {
+      withNote("prepaid_declared");
+      renderScreen();
+
+      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
+        "cost-lane-billed-lane-note",
+      );
+      expect(note).toHaveTextContent(/prepaid.*never appear.*bill/i);
+    });
+
+    /** @scenario "A tenant that declared nothing is never told it is prepaid" */
+    it("says the bill was read and holds nothing, without mentioning prepaid", () => {
+      withNote("no_spend_recorded");
+      renderScreen();
+
+      const billed = screen.getByTestId("cost-lane-billed");
+      const note = within(billed).getByTestId("cost-lane-billed-lane-note");
+      expect(note).toHaveTextContent(/was read/i);
+      expect(note).toHaveTextContent(/no .*charges/i);
+      for (const readable of readableStrings(billed)) {
+        expect(readable).not.toMatch(/prepaid/i);
+      }
+    });
+
+    /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
+    it("renders the figures with no note when the read side sent none", () => {
+      // The read side withholds the note whenever the bill holds amounts;
+      // the screen's half of that contract is to render nothing extra.
+      harness.query = {
+        data: summaryFixture({ azureBilling: null }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const billed = screen.getByTestId("cost-lane-billed");
+      expect(within(billed).getByText("$123.45")).toBeInTheDocument();
+      expect(
+        within(billed).queryByTestId("cost-lane-billed-lane-note"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("reports a failed read as missing data on the lane", () => {
+      withNote("billing_read_failed");
+      renderScreen();
+
+      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
+        "cost-lane-billed-lane-note",
+      );
+      expect(note).toHaveTextContent(/could not be read/i);
+    });
+  });
+
   describe("given a viewer whose role bag omits the cost permission", () => {
     it("does not render the lanes", () => {
       // Not a spec scenario — the guard's negative half, so the permission
