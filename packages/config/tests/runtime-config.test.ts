@@ -8,6 +8,7 @@ import {
   environmentExactOneSchema,
   environmentLegacyTruthySchema,
   environmentNotExactOneSchema,
+  environmentOneOrTrueSchema,
   environmentPresenceSchema,
   InvalidRuntimeConfigError,
   portSchema,
@@ -35,6 +36,19 @@ describe("RuntimeConfig", () => {
     expect(environmentNotExactOneSchema.parse("1")).toBe(false);
     expect(environmentLegacyTruthySchema.parse("yes")).toBe(true);
     expect(environmentLegacyTruthySchema.parse("false")).toBe(false);
+    // The App reads IS_SAAS as `=== "1" || ?.toLowerCase() === "true"`, and two
+    // processes deriving one deployment fact from one variable have to agree on
+    // every spelling of it. "yes" is the spelling that separates this from the
+    // legacy-truthy schema next door.
+    expect(environmentOneOrTrueSchema.parse("1")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("true")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("TRUE")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("True")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse(true)).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("yes")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse("0")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse("")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse(undefined)).toBe(false);
   });
 
   /** @scenario Nested semantic keys derive environment bindings */

@@ -41,6 +41,8 @@
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/coding-agent-server": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-server": "workspace:*",

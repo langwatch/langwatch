@@ -478,6 +478,9 @@ importers:
       '@langwatch/platform-api-client':
         specifier: workspace:*
         version: link:../../packages/platform-api-client
+      '@langwatch/prompt-web':
+        specifier: workspace:*
+        version: link:../../packages/features/prompt/web
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../../packages/react-rum
@@ -584,6 +587,12 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/billing/contract
+      '@langwatch/enterprise-billing-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/billing/server
       '@langwatch/enterprise-worker':
         specifier: workspace:*
         version: link:../../packages/enterprise/composition/worker
@@ -1189,6 +1198,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../../../features/evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../eventing
@@ -1207,6 +1219,12 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../../../features/scenario/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../../../features/trace/contract
       '@slack/webhook':
         specifier: ^7.0.6
         version: 7.1.0
@@ -1216,6 +1234,9 @@ importers:
       geoip-country:
         specifier: ^5.0.202607010001
         version: 5.0.202607010001
+      ioredis:
+        specifier: ^5.9.3
+        version: 5.10.1
       nanoid:
         specifier: ^5.1.6
         version: 5.1.16
@@ -5109,21 +5130,54 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@copilotkit/react-core':
+        specifier: ~1.8.14
+        version: 1.8.14(@types/react@19.2.18)(encoding@0.1.13)(graphql@16.14.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@copilotkit/react-ui':
+        specifier: ~1.8.14
+        version: 1.8.14(@types/react@19.2.18)(encoding@0.1.13)(graphql@16.14.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@copilotkit/runtime-client-gql':
+        specifier: 1.8.13
+        version: 1.8.13(encoding@0.1.13)(graphql@16.14.2)(react@19.2.8)
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/sortable':
+        specifier: ^10.0.0
+        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/utilities':
+        specifier: 3.2.2
+        version: 3.2.2(react@19.2.8)
+      '@hookform/resolvers':
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/dataset-web':
+        specifier: workspace:*
+        version: link:../../dataset/web
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../experiment/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -5136,6 +5190,12 @@ importers:
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      clsx:
+        specifier: 2.1.1
+        version: 2.1.1
       immer:
         specifier: ^11.1.8
         version: 11.1.8
@@ -5163,6 +5223,9 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+      zod-validation-error:
+        specifier: ^5.0.0
+        version: 5.0.0(zod@4.4.3)
       zustand:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -22389,7 +22452,7 @@ snapshots:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)
       '@elevenlabs/elevenlabs-js': 2.58.0(bufferutil@4.1.0)(encoding@0.1.13)
-      '@openai/agents': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
+      '@openai/agents': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/context-async-hooks': 2.7.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-node': 0.217.0(@opentelemetry/api@1.9.1)
@@ -22718,24 +22781,6 @@ snapshots:
       - ws
 
   '@openai/agents@0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)':
-    dependencies:
-      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
-      '@openai/agents-openai': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
-      '@openai/agents-realtime': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(bufferutil@4.1.0)(zod@3.25.76)
-      debug: 4.4.3(supports-color@10.2.2)
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@cfworker/json-schema'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-      - ws
-
-  '@openai/agents@0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)':
     dependencies:
       '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
       '@openai/agents-openai': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)

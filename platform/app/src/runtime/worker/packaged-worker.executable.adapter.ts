@@ -51,10 +51,6 @@ export class PackagedWorkerExecutableComposition extends WorkerExecutableComposi
           clickHouseEnabled: isClickHouseEnabled(),
         });
         const ports = createLegacyWorkerPorts(app);
-        // The SaaS meter's sender comes from the graph these options compose,
-        // so the closure reads it back through this holder rather than closing
-        // over a handle that does not exist yet.
-        const packaged: { composition?: WorkerProductionComposition } = {};
         const composition = WorkerProductionComposition.create({
           config: context.config,
           eventing: packagedWorkerEventing(handoff),
@@ -64,10 +60,8 @@ export class PackagedWorkerExecutableComposition extends WorkerExecutableComposi
           observability: context.observability,
           ...packagedWorkerCapabilities({
             handoff,
-            billingUsageDispatch: () => billingUsageSender(packaged.composition),
           }),
         });
-        packaged.composition = composition;
         application = composition.application;
         return {
           // Composing is all that happens here. Installing 26 pipelines is what
@@ -94,24 +88,6 @@ export class PackagedWorkerExecutableComposition extends WorkerExecutableComposi
   private constructor(private readonly source: Readonly<Record<string, unknown>>) {
     super();
   }
-}
-
-/**
- * The SaaS meter's sender, taken from the graph these very options composed.
- *
- * The billable-events meter is configured on the Eventing runtime before any
- * pipeline exists, so it cannot close over a handle to the billing pipeline —
- * it closes over this, called when a billable event is dispatched, and the
- * installer's proxy refuses until the pipeline it names is registered.
- */
-function billingUsageSender(composition: WorkerProductionComposition | undefined) {
-  const commands = composition?.billingReporting?.commands;
-  if (!commands) {
-    throw new Error(
-      "Packaged worker billing reporting is not composed; the billable-events meter has no sender.",
-    );
-  }
-  return commands.reportUsageForMonth;
 }
 
 /**

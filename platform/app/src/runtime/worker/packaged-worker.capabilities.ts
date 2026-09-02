@@ -1,16 +1,10 @@
-import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import { AppGovernanceEventingAdapter } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
 import { TraceProcessingServerInstaller } from "@langwatch/trace-server";
-import type {
-  WorkerGlobalProjectionsCompositionOptions,
-  WorkerProductionCompositionOptions,
-} from "@langwatch/worker";
+import type { WorkerProductionCompositionOptions } from "@langwatch/worker";
 import type {
   WorkerEventingHandoff,
   WorkerEventingSubstrate,
 } from "~/server/app-layer/worker-eventing-handoff";
-import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
-import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
 
 /**
  * The handoff, once it is known to describe a graph that can consume.
@@ -131,17 +125,6 @@ export function packagedWorkerEventing(
  */
 export const workerCapabilityAlreadyConnected = (): void => void 0;
 
-/**
- * The SaaS meter's usage sender, resolved when a billable event is dispatched
- * rather than when these options are built.
- *
- * The pipeline that answers it is registered by the very composition the
- * options are passed to, so nothing here can hold a direct handle.
- */
-export type PackagedWorkerBillingUsageDispatch = () => (
-  data: ReportUsageForMonthCommandData,
-) => Promise<void>;
-
 /** Everything a packaged worker mounts, minus the process boundaries it is given. */
 export type PackagedWorkerCapabilityOptions = Omit<
   WorkerProductionCompositionOptions,
@@ -169,9 +152,8 @@ export type PackagedWorkerCapabilityOptions = Omit<
  */
 export function packagedWorkerCapabilities(options: {
   handoff: WorkerEventingHandoff;
-  billingUsageDispatch: PackagedWorkerBillingUsageDispatch;
 }): PackagedWorkerCapabilityOptions {
-  const { capabilities, isSaas, topic } = options.handoff;
+  const { capabilities, topic } = options.handoff;
   const definition = (name: string) => capabilities.definition(name);
 
   return {
@@ -228,30 +210,5 @@ export function packagedWorkerCapabilities(options: {
       scimSync: { pipeline: definition("scim-sync") },
       joinRequest: { pipeline: definition("join-requests") },
     },
-    ...(isSaas
-      ? { globalProjections: { configure: saasGlobalProjections(options.billingUsageDispatch) } }
-      : {}),
-  };
-}
-
-/**
- * The cross-pipeline pair a SaaS install configures on the runtime itself.
- *
- * Their `global:*` keys share `event-sourcing/jobs` with every pipeline's, so a
- * consumer without them rejects every billable span, evaluation, experiment and
- * simulation event for redelivery. A fresh closure rather than the App's is
- * deliberate — the App's closes over the App's own EventSourcing — but both are
- * gated on the one `config.isSaas` the handoff carries, so the two graphs can
- * never disagree about whether these keys exist.
- */
-function saasGlobalProjections(
-  billingUsageDispatch: PackagedWorkerBillingUsageDispatch,
-): WorkerGlobalProjectionsCompositionOptions["configure"] {
-  return (registry) => {
-    registry.registerMapProjection(orgBillableEventsMeterProjection);
-    registry.registerMapSubscriber(
-      "orgBillableEventsMeter",
-      createBillingMeterDispatchSubscriber({ getDispatch: billingUsageDispatch }),
-    );
   };
 }

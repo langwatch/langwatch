@@ -1,6 +1,7 @@
 import {
   Config,
   environmentBooleanSchema,
+  environmentOneOrTrueSchema,
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
@@ -73,6 +74,37 @@ export const workerConfigDefinition = RuntimeConfig.define({
     appId: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_ID" }),
     privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
     host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
+  },
+  /**
+   * Which product this deployment is, as the one variable both graphs read.
+   *
+   * The App gates its cross-pipeline billable-events meter on `config.isSaas`
+   * and this process gates its own on this leaf, and the pair's `global:*`
+   * routing keys share `event-sourcing/jobs` with every pipeline's. Two graphs
+   * that disagreed would not fail loudly: a consumer without the pair rejects
+   * every billable span, evaluation, experiment and simulation event for
+   * redelivery forever, and a consumer that has it where the producer does not
+   * meters a self-hosted install into a table nobody bills from.
+   *
+   * `environmentOneOrTrueSchema` is the App's own reading of the variable,
+   * spelling for spelling; see its frozen-twin note in `@langwatch/config`.
+   */
+  deployment: {
+    saas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
+  },
+  /**
+   * The AI Gateway knobs this process resolves for the pipelines it consumes.
+   *
+   * The raw string is carried rather than a number: `settlementGraceMs` in
+   * `@langwatch/gateway-server` owns the parse, its bound and the warning it
+   * logs, and the REST settlement policy the App serves calls the same
+   * function on the same variable. Parsing here as well is how the two ends of
+   * one grace window drift apart.
+   */
+  gateway: {
+    spendSettlementGraceMs: Config.value(optionalEnvironmentString, {
+      env: "LW_SPEND_SETTLEMENT_GRACE_MS",
+    }),
   },
   /**
    * How many ordered lanes the metric and log command paths spread across.
@@ -204,6 +236,16 @@ export type WorkerEventingConfig = Readonly<{
   foldCacheTtlSeconds?: number;
 }>;
 
+/** Which product this deployment is, resolved from the one shared variable. */
+export type WorkerDeploymentConfig = Readonly<{
+  saas: boolean;
+}>;
+
+/** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
+export type WorkerGatewayConfig = Readonly<{
+  spendSettlementGraceMs?: string;
+}>;
+
 /** The GitHub App credentials the branch sweep mints installation tokens with. */
 export type WorkerGithubConfig = Readonly<{
   appId?: string;
@@ -220,6 +262,8 @@ export type WorkerConfig = Readonly<{
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
   shutdown: WorkerShutdownConfig;
+  deployment: WorkerDeploymentConfig;
+  gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
   processing: WorkerProcessingConfig;
   eventing: WorkerEventingConfig;
@@ -246,6 +290,8 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       environment: value.environment,
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
+    deployment: value.deployment,
+    gateway: value.gateway,
     github: value.github,
     processing: value.processing,
     eventing: value.eventing,

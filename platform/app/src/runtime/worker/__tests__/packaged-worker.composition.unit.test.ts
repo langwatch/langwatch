@@ -240,7 +240,6 @@ describe("packaged worker composition root", () => {
       handoff: packagedHandoff(legacy, { substrate: appSubstrate(), ...overrides }),
       clickHouseEnabled: true,
     });
-    const packaged: { composition?: WorkerProductionComposition } = {};
     const composition = WorkerProductionComposition.create({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing: packagedWorkerEventing(handoff),
@@ -248,14 +247,8 @@ describe("packaged worker composition root", () => {
       transport,
       ...packagedWorkerCapabilities({
         handoff,
-        billingUsageDispatch: () => {
-          const commands = packaged.composition?.billingReporting?.commands;
-          if (!commands) throw new Error("billing reporting is not composed");
-          return commands.reportUsageForMonth;
-        },
       }),
     });
-    packaged.composition = composition;
     return composition;
   }
 
@@ -378,7 +371,6 @@ describe("packaged worker composition root", () => {
     it("supplies a connect hook that is the declared no-op, everywhere", () => {
       const capabilities = packagedWorkerCapabilities({
         handoff: handoffWith(),
-        billingUsageDispatch: () => async () => void 0,
       });
 
       expect([
@@ -393,35 +385,6 @@ describe("packaged worker composition root", () => {
         workerCapabilityAlreadyConnected,
         workerCapabilityAlreadyConnected,
         workerCapabilityAlreadyConnected,
-      ]);
-    });
-
-    /**
-     * Both graphs derive it from the one `config.isSaas` the handoff carries,
-     * because the pair's `global:*` keys share `event-sourcing/jobs` with every
-     * pipeline's: a consumer configured differently from the producer rejects
-     * every billable span, evaluation, experiment and simulation event for
-     * redelivery, forever.
-     */
-    it("configures the SaaS meter pair only where the App configured it", () => {
-      const registered: string[] = [];
-      const registry = {
-        registerMapProjection: (projection: { name: string }) => registered.push(projection.name),
-        registerMapSubscriber: (mapName: string, subscriber: { name: string }) =>
-          registered.push(`${mapName}/${subscriber.name}`),
-      };
-      const capabilitiesFor = (isSaas: boolean) =>
-        packagedWorkerCapabilities({
-          handoff: handoffWith({ isSaas }),
-          billingUsageDispatch: () => async () => void 0,
-        });
-
-      expect(capabilitiesFor(false).globalProjections).toBeUndefined();
-      capabilitiesFor(true).globalProjections?.configure(registry as never);
-
-      expect(registered).toEqual([
-        "orgBillableEventsMeter",
-        "orgBillableEventsMeter/billingMeterDispatch",
       ]);
     });
 

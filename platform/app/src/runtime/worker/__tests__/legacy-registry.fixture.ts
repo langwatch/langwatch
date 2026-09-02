@@ -9,7 +9,6 @@
  * says".
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import type { EventSourcingOptions } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { LogRuntimeAdapter } from "@langwatch/log-server";
 import { MetricRuntimeAdapter } from "@langwatch/metric-server";
@@ -21,8 +20,6 @@ import {
   PipelineRegistry,
   type PipelineRegistryWorkerCapabilities,
 } from "~/server/event-sourcing/registration/pipelineRegistry";
-import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
-import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
 
 /**
  * A permissive stand-in for the ~77 collaborators `PipelineRegistry` takes:
@@ -46,22 +43,6 @@ export function autoStub(): any {
     construct: () => autoStub(),
   });
 }
-
-/**
- * The SaaS cross-pipeline pair, configured on the runtime rather than on any
- * pipeline. Their `global:` keys share the queue with every pipeline's, so a
- * consumer without them rejects every billable span, evaluation, experiment
- * and simulation event for redelivery.
- */
-export const configureGlobalProjections: EventSourcingOptions["configureGlobalProjections"] = (
-  registry,
-) => {
-  registry.registerMapProjection(orgBillableEventsMeterProjection);
-  registry.registerMapSubscriber(
-    "orgBillableEventsMeter",
-    createBillingMeterDispatchSubscriber({ getDispatch: () => async () => void 0 }),
-  );
-};
 
 export type BuiltRegistry = {
   /** Pipeline names in mount order. */
@@ -96,7 +77,6 @@ export function buildLegacyRegistry(): LegacyBuild {
     // Producer-only: these suites read the registry, they never claim the queue.
     consumersEnabled: false,
     executionTarget: "worker",
-    configureGlobalProjections,
   });
 
   const redaction = autoStub();

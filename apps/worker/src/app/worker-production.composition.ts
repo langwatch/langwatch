@@ -31,6 +31,16 @@ import {
   ClickHouseMetricProcessingAdapter,
   resolveMetricCommandShardCount,
 } from "@langwatch/metric-server";
+import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
+import {
+  ClickHouseBillableEventsMeterAdapter,
+  EventingBillableEventsMeterAdapter,
+  EventingBillingMeterDispatchAdapter,
+  PostgresBillingTenantOrganizationAdapter,
+  RedisBillingTenantOrganizationCacheAdapter,
+  BillingTenantOrganizationService,
+  type BillingTenantOrganizationDatabase,
+} from "@langwatch/enterprise-billing-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
   TopicServerInstaller,
@@ -170,6 +180,7 @@ export type WorkerLangyConversationCompositionOptions = {
  * another feature's option, and the fallback goes when the platform root does.
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
+  BillingTenantOrganizationDatabase &
   GithubBranchMaintenanceDatabase &
   LangySessionKeyReapDatabase;
 
@@ -268,19 +279,6 @@ export type WorkerAuthzCompositionOptions = {
   installer: AuthzWorkerCapability;
 };
 
-/**
- * Cross-pipeline projections the Eventing runtime takes at construction.
- *
- * A global projection is not an installer: its queues join the shared job
- * registry as soon as the first pipeline registers, so it has to be configured
- * before any feature mounts. The live registry uses this seam for the SaaS
- * billable-events meter and the reporting subscriber that follows it, whose
- * `global:*` routing keys share `event-sourcing/jobs` with every pipeline.
- */
-export type WorkerGlobalProjectionsCompositionOptions = {
-  configure: NonNullable<WorkerEventingProductionOptions["configureGlobalProjections"]>;
-};
-
 /** Resolved technical inputs for the Worker-owned transport foundation. */
 export type WorkerInfrastructureCompositionOptions = Omit<
   WorkerInfrastructureAdapterOptions,
@@ -324,7 +322,6 @@ type WorkerProductionCompositionBaseOptions = {
   billingReporting?: WorkerBillingReportingCompositionOptions;
   authz?: WorkerAuthzCompositionOptions;
   identity?: WorkerIdentityCompositionOptions;
-  globalProjections?: WorkerGlobalProjectionsCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 };
@@ -367,12 +364,51 @@ export class WorkerProductionComposition {
       : undefined;
     const eventingOptions = createEventingPersistence(options, infrastructure);
 
+    // The SaaS billable-events meter and the dispatch subscriber that follows
+    // it, built HERE rather than received. They are configured on the runtime
+    // itself rather than on a pipeline, because their `global:*` queues join
+    // the shared job registry the moment the first pipeline registers — so the
+    // pair has to exist before any feature mounts, and the sender its
+    // subscriber calls is produced by a pipeline this same composition
+    // registers afterwards. That circle is why the dispatch is resolved
+    // lazily, from the reporting installer named below.
+    //
+    // Gated on this process's own deployment leaf, read from the one variable
+    // the App reads: the pair's routing keys share `event-sourcing/jobs` with
+    // every pipeline's, so a consumer that has them where the producer does
+    // not meters a self-hosted install, and one that lacks them where the
+    // producer has them rejects every billable span, evaluation, experiment
+    // and simulation event for redelivery forever.
+    // A SaaS worker that metered without composing the pipeline its reports
+    // are sent through would count every billable event correctly and report
+    // none of them — revenue that is present in ClickHouse, absent from
+    // Stripe, and visible nowhere else. Refuse at composition instead.
+    if (options.config.deployment.saas && !options.billingReporting) {
+      throw new Error(
+        "A SaaS worker mounts the billable-events meter, whose usage reports are sent by the billing reporting pipeline; compose that pipeline or do not declare this process SaaS.",
+      );
+    }
+    let billingReportingInstaller: BillingReportingWorkerFeatureInstaller | undefined;
+    const saasMeter = options.config.deployment.saas
+      ? saasBillableEventsMeter({
+          database: options.database ?? options.topic.database,
+          redis: eventingOptions.groupQueue.redis,
+          resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+          getDispatch: () => {
+            if (!billingReportingInstaller) {
+              throw new Error(
+                "SaaS billable-events metering is composed without the billing reporting pipeline; the meter has no sender.",
+              );
+            }
+            return billingReportingInstaller.commands.reportUsageForMonth;
+          },
+        })
+      : undefined;
+
     const eventing = WorkerEventingRuntime.createProduction({
       persistence: eventingOptions,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
-      ...(options.globalProjections
-        ? { configureGlobalProjections: options.globalProjections.configure }
-        : {}),
+      ...(saasMeter ? { configureGlobalProjections: saasMeter } : {}),
       ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
     const automation = options.automation
@@ -578,6 +614,7 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
+    billingReportingInstaller = billingReporting;
     const authz = options.authz
       ? AuthzWorkerFeatureInstaller.create({
           installer: options.authz.installer,
@@ -956,6 +993,57 @@ function createEventingPersistence(
   return {
     ...withoutConsumers(options.eventing),
     groupQueue: infrastructure.queueDependencies,
+  };
+}
+
+/**
+ * The SaaS cross-pipeline meter pair, composed from this process's own graph.
+ *
+ * Three substrates, and none of them is new to this composition: the tenant-
+ * keyed ClickHouse client the event store already resolves through, the one
+ * Prisma client this process opened, and the queue's one Redis.
+ *
+ * The ClickHouse client is asked for by ORGANIZATION here, which the tenant
+ * resolver answers because the routing directory behind it treats an
+ * organization id as a tenant of itself — the same lookup composed the other
+ * way round, and the same physical endpoint. That equivalence is what removes
+ * the recorded blocker: metering a private-instance customer needs their own
+ * cluster, and this graph reaches it without opening a second connection pool
+ * beside the one the process already holds. A directory that lost the
+ * organization arm would route every private-instance organization to the
+ * shared instance, so the pin below states it rather than leaving it inferred.
+ *
+ * Attribution rides the App's own Redis keyspace: both graphs answer "which
+ * organization is this project billed to" from `ttlcache:org:resolve:`, and
+ * the answer cannot go stale — a project belongs to a team and a team to an
+ * organization, and neither link is reassignable.
+ */
+export function saasBillableEventsMeter(options: {
+  database: BillingTenantOrganizationDatabase;
+  redis: EventingServerRuntimeOptions["groupQueue"]["redis"];
+  resolveClickHouseClient: EventingServerRuntimeOptions["resolveClickHouseClient"];
+  getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;
+}): NonNullable<WorkerEventingProductionOptions["configureGlobalProjections"]> {
+  const organizations = BillingTenantOrganizationService.create({
+    organizations: PostgresBillingTenantOrganizationAdapter.create({
+      database: options.database,
+    }).build().organizations,
+    cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: options.redis }),
+  });
+  const meter = EventingBillableEventsMeterAdapter.create({
+    organizations,
+    meter: ClickHouseBillableEventsMeterAdapter.create({
+      resolveClient: (organizationId) => options.resolveClickHouseClient(organizationId),
+    }).build(),
+  }).build();
+  const dispatch = EventingBillingMeterDispatchAdapter.create({
+    organizations,
+    getDispatch: options.getDispatch,
+  }).build();
+
+  return (registry) => {
+    registry.registerMapProjection(meter);
+    registry.registerMapSubscriber(meter.name, dispatch);
   };
 }
 

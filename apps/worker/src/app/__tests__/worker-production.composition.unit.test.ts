@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createTenantId,
   InMemoryProcessStore,
@@ -20,7 +23,10 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { ProjectService } from "@langwatch/project-contract";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerProductionComposition } from "../worker-production.composition";
+import {
+  saasBillableEventsMeter,
+  WorkerProductionComposition,
+} from "../worker-production.composition";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
   TopicWorkerFeatureInstaller,
@@ -285,49 +291,145 @@ describe("WorkerProductionComposition", () => {
     }
   });
 
-  it("carries the composition root's cross-pipeline projections into that graph", () => {
-    // A global projection joins the shared job registry when the first
-    // pipeline registers, not through an installer, so the only place it can
-    // be supplied is the Eventing runtime's construction. Without this seam a
-    // consumer of `event-sourcing/jobs` has no route for the SaaS billable
-    // meter's jobs and rejects every one of them for redelivery.
-    const composition = WorkerProductionComposition.create({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
-      eventing: {
-        database: createProcessPersistenceDatabase(),
-        resolveClickHouseClient: async () => ({
-          insert: async () => undefined,
-          query: async () => ({ json: async () => [] }),
-        }),
-        groupQueue: { redis: {} as never },
-        retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
-      },
-      lifecycle: new Lifecycle(),
-      transport: new Transport(),
-      trace: { installer: new TraceInstaller(new TraceAssignments()) },
-      topic: {
-        database: {} as never,
-        redis: null,
-        execution: {} as never,
-        metrics: {} as never,
-      },
-      globalProjections: {
-        configure: (registry) => {
-          registry.registerMapProjection({
-            name: "orgBillableEventsMeter",
-            eventTypes: ["lw.obs.trace.span_received"],
-            map: (event) => ({ eventId: event.id }),
-            store: { append: async () => void 0 },
-          });
+  describe("given the SaaS deployment leaf this process reads for itself", () => {
+    /**
+     * The routing keys the checked-in job registry says the cross-pipeline pair
+     * carries. Read rather than restated: `job-registry.json` is the switch's
+     * checklist for what the packaged consumer must be able to route, and a
+     * literal here would only ever assert this file against itself.
+     */
+    function expectedGlobalRoutingKeys(): string[] {
+      const registry = JSON.parse(
+        readFileSync(
+          join(dirname(fileURLToPath(import.meta.url)), "../../features/job-registry.json"),
+          "utf8",
+        ),
+      ) as { globalProjections: { pipeline: string; jobs: string[] } };
+      return registry.globalProjections.jobs
+        .map((job) => `${registry.globalProjections.pipeline}:${job}`)
+        .sort();
+    }
+
+    function compositionFor(
+      source: Record<string, unknown>,
+      options: { billingReporting?: boolean } = {},
+    ): WorkerProductionComposition {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
-      },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: {} as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(options.billingReporting === false
+          ? {}
+          : {
+              billingReporting: {
+                // Never built: these cases read what the runtime's own
+                // construction registers, and the reporting pipeline registers
+                // at install time.
+                installer: {
+                  buildProcessing: () => {
+                    throw new Error("billing reporting is not installed in this case");
+                  },
+                  connectSelfDispatch: () => void 0,
+                },
+              },
+            }),
+      });
+    }
+
+    function globalRoutingKeys(composition: WorkerProductionComposition): string[] {
+      composition.eventing.eventSourcing.register(blobMaintenanceDefinition());
+      return [...composition.eventing.eventSourcing.globalJobRegistry.keys()]
+        .filter((key) => key.startsWith("global:"))
+        .sort();
+    }
+
+    /**
+     * A global projection joins the shared job registry when the first pipeline
+     * registers, not through an installer, so the only place it can be
+     * configured is the Eventing runtime's construction. This graph builds the
+     * pair itself now rather than receiving it, and a consumer of
+     * `event-sourcing/jobs` without a route for the meter's jobs rejects every
+     * one of them for redelivery while every health signal stays green.
+     */
+    /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
+    it("mounts the billable-events meter pair a SaaS install produces into", () => {
+      expect(globalRoutingKeys(compositionFor({ IS_SAAS: "true" }))).toEqual(
+        expectedGlobalRoutingKeys(),
+      );
     });
 
-    composition.eventing.eventSourcing.register(blobMaintenanceDefinition());
+    /**
+     * The other direction of the same fact. A self-hosted App configures no
+     * meter, so a worker that mounted one anyway would write a billable row per
+     * span into a table nobody bills from and dispatch a monthly report command
+     * per project that no Stripe customer answers.
+     */
+    /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
+    it("mounts neither where the deployment is not SaaS", () => {
+      expect(globalRoutingKeys(compositionFor({}))).toEqual([]);
+    });
 
-    expect([...composition.eventing.eventSourcing.globalJobRegistry.keys()]).toContain(
-      "global:handler:orgBillableEventsMeter",
-    );
+    /**
+     * The meter is organization-keyed, and the tenant-keyed resolver this
+     * process already holds answers it because the routing directory behind it
+     * treats an organization id as a tenant of itself. Asking it for the
+     * TENANT instead would still return a client and still insert a row — into
+     * the shared instance, for a customer whose data belongs on their own
+     * cluster. Nothing downstream notices, so the pin is here.
+     */
+    /** @scenario "A worker routes the meter by organization, not by tenant" */
+    it("resolves the meter's ClickHouse client for the organization, not the tenant", async () => {
+      const resolveClickHouseClient = vi.fn(async () => ({ insert: async () => undefined }));
+      const registered: { store?: AppendStore<{ tenantId: string }> } = {};
+      saasBillableEventsMeter({
+        database: {
+          project: { findUnique: async () => ({ team: { organizationId: "org_private" } }) },
+        } as never,
+        redis: { get: async () => null, setex: async () => "OK" } as never,
+        resolveClickHouseClient: resolveClickHouseClient as never,
+        getDispatch: () => async () => void 0,
+      })({
+        registerMapProjection: (projection: { store: AppendStore<{ tenantId: string }> }) => {
+          registered.store = projection.store;
+        },
+        registerMapSubscriber: () => void 0,
+      } as never);
+
+      await registered.store?.append({ tenantId: "project_alpha" } as never, {} as never);
+
+      expect(resolveClickHouseClient).toHaveBeenCalledWith("org_private");
+      expect(resolveClickHouseClient).not.toHaveBeenCalledWith("project_alpha");
+    });
+
+    /**
+     * The reports the meter's dispatch subscriber asks for are sent by the
+     * billing reporting pipeline, which this same composition registers. A
+     * SaaS graph without it would count every billable event correctly and
+     * report none of them: revenue present in ClickHouse, absent from Stripe,
+     * and visible nowhere else.
+     */
+    /** @scenario "A SaaS worker refuses to meter without a pipeline to report through" */
+    it("refuses to meter where it composed no pipeline to report through", () => {
+      expect(() => compositionFor({ IS_SAAS: "true" }, { billingReporting: false })).toThrow(
+        /billing reporting pipeline/,
+      );
+    });
   });
 
   it("installs Topic's producer graph and boot seeds without claiming the shared Eventing queue", async () => {

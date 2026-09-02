@@ -1,4 +1,7 @@
-export { SubscriptionTrpcApi, type SubscriptionTrpcContext } from "./transport/api-trpc/subscription.api";
+export {
+  SubscriptionTrpcApi,
+  type SubscriptionTrpcContext,
+} from "./transport/api-trpc/subscription.api";
 export { CurrencyTrpcApi, type CurrencyTrpcContext } from "./transport/api-trpc/currency.api";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter";
 export {
@@ -33,8 +36,34 @@ export {
 } from "./ports/billable-events-meter.port";
 export {
   ClickHouseBillableEventsMeterAdapter,
+  type BillableEventsMeterClickHouseClient,
   type BillableEventsMeterClickHouseClientResolver,
 } from "./adapters/clickhouse.billable-events-meter.adapter";
+export {
+  BILLABLE_EVENTS_METER_PROJECTION_NAME,
+  EventingBillableEventsMeterAdapter,
+} from "./adapters/eventing.billable-events-meter.adapter";
+export {
+  BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
+  BILLING_METER_DISPATCH_SUPPRESS_MS,
+  EventingBillingMeterDispatchAdapter,
+} from "./adapters/eventing.billing-meter-dispatch.adapter";
+export { BillingTenantOrganizationPort } from "./ports/tenant-organization.port";
+export {
+  BillingTenantOrganizationService,
+  type BillingTenantOrganizationCache,
+} from "./services/tenant-organization.service";
+export {
+  BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
+  BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
+  RedisBillingTenantOrganizationCacheAdapter,
+  type BillingTenantOrganizationCacheRedis,
+} from "./adapters/redis.tenant-organization-cache.adapter";
+export {
+  PostgresBillingTenantOrganizationAdapter,
+  type BillingTenantOrganizationDatabase,
+  type BillingTenantOrganizationPersistence,
+} from "./adapters/postgres.tenant-organization.adapter";
 export { OrganizationPricingRepository } from "./ports/organization-pricing.port";
 export { BillingSubscriptionRepository } from "./ports/subscription.port";
 export {

@@ -24,6 +24,8 @@ describe("resolveWorkerConfig", () => {
         processorType: "batch",
       },
       shutdown: { processDeadlineMs: 25_000 },
+      deployment: { saas: false },
+      gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },
       processing: { metricShards: undefined, logShards: undefined },
       eventing: { foldCacheTtlSeconds: undefined },
@@ -227,5 +229,43 @@ describe("resolveWorkerConfig", () => {
     expect(() => resolveWorkerConfig({ STORED_OBJECTS_BACKEND: "gcs" })).toThrow(
       InvalidRuntimeConfigError,
     );
+  });
+
+  describe("when the deployment names itself SaaS", () => {
+    /**
+     * Every spelling the App accepts, and one it does not. The App reads the
+     * same variable as `=== "1" || ?.toLowerCase() === "true"`, and this
+     * process gates the cross-pipeline billable-events meter on the answer
+     * while the App gates its own producer half on it. A worker that read
+     * `yes` as SaaS would meter an install whose App configured no meter, and
+     * one that refused `TRUE` would leave a SaaS install's billable events
+     * counted by nobody. Neither disagreement fails loudly.
+     */
+    it.each([
+      ["1", true],
+      ["true", true],
+      ["TRUE", true],
+      ["True", true],
+      ["yes", false],
+      ["0", false],
+      ["false", false],
+      ["", false],
+    ])("reads IS_SAAS=%j as %s", (value, expected) => {
+      expect(resolveWorkerConfig({ IS_SAAS: value }).deployment.saas).toBe(expected);
+    });
+
+    it("is not SaaS where the variable is absent", () => {
+      expect(resolveWorkerConfig({}).deployment.saas).toBe(false);
+    });
+  });
+
+  it("carries the spend settlement grace unparsed, for the gateway package to bound", () => {
+    // `settlementGraceMs` in @langwatch/gateway-server owns the parse, its
+    // lower bound and the warning it logs, and the App's REST settlement
+    // policy calls that same function on this same variable. A second parse
+    // here is how the two ends of one grace window drift apart.
+    expect(resolveWorkerConfig({ LW_SPEND_SETTLEMENT_GRACE_MS: "45000" }).gateway).toEqual({
+      spendSettlementGraceMs: "45000",
+    });
   });
 });

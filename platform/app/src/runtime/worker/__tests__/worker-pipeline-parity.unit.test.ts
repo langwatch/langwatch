@@ -184,7 +184,6 @@ type ExpectedJobRegistry = {
   version: number;
   queue: string;
   pipelines: { name: string; feature: string; jobs: string[] }[];
-  globalProjections: { pipeline: string; jobs: string[] };
 };
 
 function expectedJobRegistry(): ExpectedJobRegistry {
@@ -196,9 +195,6 @@ function expectedRoutingKeys(expected: ExpectedJobRegistry): string[] {
   return [
     ...expected.pipelines.flatMap((pipeline) =>
       pipeline.jobs.map((job) => `${pipeline.name}:${job}`),
-    ),
-    ...expected.globalProjections.jobs.map(
-      (job) => `${expected.globalProjections.pipeline}:${job}`,
     ),
   ].sort();
 }
@@ -257,11 +253,6 @@ async function buildPackagedRegistry(legacy: LegacyBuild): Promise<BuiltRegistry
       transport: new NoopTransport(),
       ...packagedWorkerCapabilities({
         handoff: packagedHandoff(legacy),
-        // The SaaS meter's sender is the composed graph's own in production.
-        // Here nothing dispatches: the guard reads routing keys, and the
-        // meter's two `global:` keys come from the projection pair, not from
-        // where its subscriber sends.
-        billingUsageDispatch: () => async () => void 0,
       }),
     });
 

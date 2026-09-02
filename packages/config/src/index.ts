@@ -24,6 +24,31 @@ export const environmentNotExactOneSchema = z
   .optional()
   .transform((value) => value !== "1");
 
+/**
+ * Preserves the deployment switches that opt in for `1` or a case-insensitive
+ * `true`, and for nothing else.
+ *
+ * Frozen twin of the App's own reading of `IS_SAAS`
+ * (`source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true"`,
+ * `platform/app/src/env-create.mjs`). Two processes deriving one deployment
+ * fact from one variable have to agree on every spelling of it: a worker that
+ * accepted `yes` where the App does not would meter a self-hosted install, and
+ * one that rejected `TRUE` where the App accepts it would leave a SaaS
+ * install's billable events counted by nobody. Neither shows up as an error.
+ *
+ * The boolean arm is the same value after the App's env schema has already
+ * parsed it, so a caller reading a validated configuration and one reading raw
+ * environment strings resolve to the same leaf.
+ */
+export const environmentOneOrTrueSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform(
+    (value) =>
+      value === true ||
+      (typeof value === "string" && (value === "1" || value.toLowerCase() === "true")),
+  );
+
 /** Preserves legacy values that opt in with `1`, `true`, or `yes`. */
 export const environmentLegacyTruthySchema = z
   .union([z.string(), z.boolean()])
