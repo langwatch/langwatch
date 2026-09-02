@@ -28,6 +28,10 @@ Click **Create**. The secret is shown once, with a **Copy** button. LangWatch st
 
 **All providers** means the key reaches every provider its scopes can see, including providers you add later. An explicit selection stays as picked until you edit the key.
 
+<Frame caption="The Virtual Keys list: name, prefix, status, scopes, routing, spend this month and last use. A red bar under the spend marks a key past a budget.">
+  <img src="/images/ai-gateway/vk-list-spend.png" alt="The Virtual Keys list with active and expired keys and the Spent this month column" />
+</Frame>
+
 ## Ownership and scopes
 
 Ownership decides who can see and manage the key, which providers it reaches and where its traces and costs land.
@@ -58,15 +62,16 @@ Send the key in one of these headers:
 
 ## Edit a key
 
-Open the key from the list and click **Edit**. Ownership is read-only after creation. The edit drawer has the create fields plus three sections:
+Open the key from the list and click **Edit**. Ownership is read-only after creation. The edit drawer has the create fields plus two sections:
 
 | Section | What it sets |
 |---|---|
 | **Rate limits** | Requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits). |
-| **Cache control** | The cache mode and TTL in seconds. See [Cache control](/ai-gateway/cache-control). |
 | **Realtime voice** | The maximum number of open realtime sessions. See [Realtime](/ai-gateway/api/realtime). |
 
-The same settings are the `config` object on the API (`PATCH /api/gateway/v1/virtual-keys/:id`) and in `vk update <id> --config-json`: `modelsAllowed`, `providersAllowed`, `rateLimits`, `cache`, `fallback`, `realtime` and `guardrailAttachments`. Model aliases are set on the routing policy, not on the key. See [Model aliases](/ai-gateway/model-aliases).
+The drawer also shows a **Cache control** section. The gateway does not read it: caching is set by [cache rules](/ai-gateway/cache-control), which match on model, key or tag.
+
+The same settings are the `config` object on the API (`PATCH /api/gateway/v1/virtual-keys/:id`) and in `vk update <id> --config-json`: `modelsAllowed`, `providersAllowed`, `rateLimits`, `fallback`, `realtime` and `guardrailAttachments`. Model aliases are set on the routing policy, not on the key. See [Model aliases](/ai-gateway/model-aliases).
 
 Guardrails and cache rules attach to keys from their own pages. See [Guardrails](/ai-gateway/guardrails) and [Cache control](/ai-gateway/cache-control).
 
@@ -80,6 +85,8 @@ The key detail page shows the spend of the last 30 days, the provider chain in t
 | **Disable** | Requests are rejected until you click **Enable**. Budgets, configuration and a running rotation grace stay intact. | 403 `virtual_key_disabled` |
 | **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
 | **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
+
+A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed.
 
 Each transition emits a webhook event: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.virtual_key.disabled`, `gateway.virtual_key.enabled` and `gateway.virtual_key.revoked`. See [Webhooks](/features/webhooks).
 

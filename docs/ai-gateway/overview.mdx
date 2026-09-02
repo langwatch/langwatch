@@ -18,7 +18,11 @@ The gateway then gives you, on every request:
 - **Spend per key, person, team and project**, in the Usage page and as a spend event you can pull or receive by webhook.
 - **Budgets** on any of those scopes, and per end user of your product, that block the request or add a warning header.
 - **A trace** in Trace Explorer with the model, the tokens, the cost, the virtual key and the end user.
-- **Rate limits, routing, caching and guardrails** configured on the key, with no change in application code.
+- **Rate limits, routing and guardrails** on the key, and **cache rules** on the organization, with no change in application code.
+
+<Frame caption="AI Gateway > Virtual Keys: one key per application, its scope, its status and its spend this month.">
+  <img src="/images/ai-gateway/vk-list-spend.png" alt="The Virtual Keys list with seven acme keys, their prefix, status, scope and spend this month" />
+</Frame>
 
 ## Endpoints the gateway serves
 
