@@ -10,7 +10,6 @@ import {
 import {
   ArrowUp,
   Bot,
-  Cable,
   Code,
   Copy,
   ExternalLink,
@@ -26,20 +25,25 @@ import type { ReactNode } from "react";
 import { LuClock, LuPencil, LuTrash2 } from "react-icons/lu";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { agentContextChip } from "~/features/langy/logic/langyContextChips";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentType, TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
 import { agentHasDevTunnel, LocalTunnelBadge } from "./LocalTunnelBadge";
 
-const agentTypeIcons: Record<string, LucideIcon> = {
+/**
+ * The icon and the label per agent type. Both maps are keyed by the whole
+ * enum, so a new agent type does not compile until it names its icon and its
+ * word here, and no fallback stands in for it in silence.
+ */
+const agentTypeIcons: Record<AgentType, LucideIcon> = {
   signature: MessageSquare,
   code: Code,
   http: Globe,
   workflow: Workflow,
-  connected: Cable,
+  connected: Bot,
 };
 
-const agentTypeLabels: Record<string, string> = {
+const agentTypeLabels: Record<AgentType, string> = {
   signature: "Prompt",
   code: "Code",
   http: "HTTP",
@@ -155,8 +159,8 @@ export function AgentCardIcon({ icon: Icon }: { icon: LucideIcon }) {
   );
 }
 
-function AgentTypeIcon({ type }: { type: string }) {
-  return <AgentCardIcon icon={agentTypeIcons[type] ?? Bot} />;
+function AgentTypeIcon({ type }: { type: AgentType }) {
+  return <AgentCardIcon icon={agentTypeIcons[type]} />;
 }
 
 export type AgentCardProps = {
@@ -185,7 +189,7 @@ export function AgentCard({
   onViewHistory,
   onTest,
 }: AgentCardProps) {
-  const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
+  const typeLabel = agentTypeLabels[agent.type];
 
   const isCopiedAgent = !!agent.copiedFromAgentId;
   const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;

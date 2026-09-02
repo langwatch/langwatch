@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../../hooks/useTargetName";
 import {
+  type AgentTypeEnum,
+  agentTypeEnum,
   createInitialResults,
   createInitialUIState,
   type TargetConfig,
@@ -70,6 +72,53 @@ describe("TargetHeader", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("Agent target", () => {
+    const agentTarget = (agentType: AgentTypeEnum): TargetConfig => ({
+      id: "support-agent",
+      type: "agent",
+      agentType,
+      dbAgentId: "agent_1",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    describe("when the agent runs in the customer's own process", () => {
+      it("marks the column with the agent icon, not the code icon", () => {
+        renderWithProviders(
+          <TargetHeader
+            target={agentTarget("connected")}
+            onEdit={mockOnEdit}
+            onRemove={mockOnRemove}
+          />,
+        );
+
+        expect(screen.getByTestId("icon-connected")).toBeInTheDocument();
+        expect(screen.queryByTestId("icon-code")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when a new agent type is added", () => {
+      it("gives every declared agent type its own icon", () => {
+        for (const agentType of agentTypeEnum.options) {
+          const { unmount } = renderWithProviders(
+            <TargetHeader
+              target={agentTarget(agentType)}
+              onEdit={mockOnEdit}
+              onRemove={mockOnRemove}
+            />,
+          );
+
+          expect(
+            screen.getByTestId(/^icon-/),
+            `no icon for the ${agentType} agent type`,
+          ).toBeInTheDocument();
+          unmount();
+        }
+      });
+    });
   });
 
   describe("Prompt target", () => {
