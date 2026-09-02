@@ -10,17 +10,17 @@ import {
 } from "@chakra-ui/react";
 import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "../../components/ui/link";
-import { HandledErrorState } from "../../features/errors";
-import { TraceDrawerContent } from "../../explorer/components/TraceDrawer/TraceDrawerContent";
+import { Link } from "../../ui/blocks/link";
+import { HandledErrorState } from "../../ui/sections/errors";
+import { TraceDrawerContent } from "../../ui/sections/explorer/trace-drawer/trace-drawer-content";
 import {
   SharedTraceProvider,
   useSharedTrace,
-} from "../../explorer/context/SharedTraceContext";
-import { TraceViewerProvider } from "../../explorer/context/TraceViewerContext";
+} from "../../ui/sections/explorer/context/shared-trace-context";
+import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context";
 import { useDrawerStore } from "../../index";
 import { useRouter } from "../../behavior/next-router";
-import { api } from "../../behavior/trace-api";
+import { api } from "../../ui/sections/trace-api";
 
 /** There is no drawer to close on a share page. */
 const noop = () => undefined;

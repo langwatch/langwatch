@@ -10,7 +10,7 @@
 
 import { useMemo } from "react";
 
-import { useOptionalTraceHost } from "../model/trace-host";
+import { useOptionalTraceHost } from "./trace-host";
 
 export type TraceSessionReading = {
   data: { user: { id: string; name?: string | null; email?: string | null; image?: string | null } } | null;

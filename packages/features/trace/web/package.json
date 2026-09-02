@@ -15,132 +15,132 @@
       "default": "./src/index.ts"
     },
     "./components/SetupWithAgentButton": {
-      "types": "./src/components/SetupWithAgentButton.tsx",
-      "default": "./src/components/SetupWithAgentButton.tsx"
+      "types": "./src/ui/sections/setup-with-agent-button.tsx",
+      "default": "./src/ui/sections/setup-with-agent-button.tsx"
     },
     "./components/traces/RenderInputOutput": {
-      "types": "./src/components/traces/RenderInputOutput.tsx",
-      "default": "./src/components/traces/RenderInputOutput.tsx"
+      "types": "./src/ui/sections/traces/render-input-output.tsx",
+      "default": "./src/ui/sections/traces/render-input-output.tsx"
     },
     "./components/traces/SpanDetails": {
-      "types": "./src/components/traces/SpanDetails.tsx",
-      "default": "./src/components/traces/SpanDetails.tsx"
+      "types": "./src/ui/sections/traces/span-details.tsx",
+      "default": "./src/ui/sections/traces/span-details.tsx"
     },
     "./components/traces/TracesMapping": {
-      "types": "./src/components/traces/TracesMapping.tsx",
-      "default": "./src/components/traces/TracesMapping.tsx"
+      "types": "./src/ui/sections/traces/traces-mapping.tsx",
+      "default": "./src/ui/sections/traces/traces-mapping.tsx"
     },
     "./components/ui/IsolatedErrorBoundary": {
-      "types": "./src/components/ui/IsolatedErrorBoundary.tsx",
-      "default": "./src/components/ui/IsolatedErrorBoundary.tsx"
+      "types": "./src/ui/sections/isolated-error-boundary.tsx",
+      "default": "./src/ui/sections/isolated-error-boundary.tsx"
     },
     "./drawer.store": {
-      "types": "./src/drawer.store.ts",
-      "default": "./src/drawer.store.ts"
+      "types": "./src/behavior/drawer.store.ts",
+      "default": "./src/behavior/drawer.store.ts"
     },
     "./explorer/components/TraceDrawer/Chip": {
-      "types": "./src/explorer/components/TraceDrawer/Chip.tsx",
-      "default": "./src/explorer/components/TraceDrawer/Chip.tsx"
+      "types": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
+      "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"
     },
     "./explorer/components/TraceDrawer/conversationView": {
-      "types": "./src/explorer/components/TraceDrawer/conversationView/index.ts",
-      "default": "./src/explorer/components/TraceDrawer/conversationView/index.ts"
+      "types": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
+      "default": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts"
     },
     "./explorer/components/TraceDrawer/conversationView/expandContext": {
-      "types": "./src/explorer/components/TraceDrawer/conversationView/expandContext.ts",
-      "default": "./src/explorer/components/TraceDrawer/conversationView/expandContext.ts"
+      "types": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
+      "default": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts"
     },
     "./explorer/components/TraceIdPeek": {
-      "types": "./src/explorer/components/TraceIdPeek.tsx",
-      "default": "./src/explorer/components/TraceIdPeek.tsx"
+      "types": "./src/ui/sections/explorer/trace-id-peek.tsx",
+      "default": "./src/ui/sections/explorer/trace-id-peek.tsx"
     },
     "./explorer/components/TraceTable/registry/addons/conversation/Bubble": {
-      "types": "./src/explorer/components/TraceTable/registry/addons/conversation/Bubble.tsx",
-      "default": "./src/explorer/components/TraceTable/registry/addons/conversation/Bubble.tsx"
+      "types": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+      "default": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx"
     },
     "./explorer/hooks/useConversationTurns": {
-      "types": "./src/explorer/hooks/useConversationTurns.ts",
-      "default": "./src/explorer/hooks/useConversationTurns.ts"
+      "types": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts",
+      "default": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts"
     },
     "./explorer/types/trace": {
-      "types": "./src/explorer/types/trace.ts",
-      "default": "./src/explorer/types/trace.ts"
+      "types": "./src/ui/sections/explorer/types/trace.ts",
+      "default": "./src/ui/sections/explorer/types/trace.ts"
     },
     "./explorer/utils/legacyTraceToTurn": {
-      "types": "./src/explorer/utils/legacyTraceToTurn.ts",
-      "default": "./src/explorer/utils/legacyTraceToTurn.ts"
+      "types": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts",
+      "default": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts"
     },
     "./explorer/utils/traceEditMode": {
-      "types": "./src/explorer/utils/traceEditMode.ts",
-      "default": "./src/explorer/utils/traceEditMode.ts"
+      "types": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
+      "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
     },
     "./facet-lens.store": {
-      "types": "./src/facet-lens.store.ts",
-      "default": "./src/facet-lens.store.ts"
+      "types": "./src/behavior/facet-lens.store.ts",
+      "default": "./src/behavior/facet-lens.store.ts"
     },
     "./filter.store": {
-      "types": "./src/filter.store.ts",
-      "default": "./src/filter.store.ts"
+      "types": "./src/behavior/filter.store.ts",
+      "default": "./src/behavior/filter.store.ts"
     },
     "./hooks/usePageVisibility": {
-      "types": "./src/hooks/usePageVisibility.ts",
-      "default": "./src/hooks/usePageVisibility.ts"
+      "types": "./src/behavior/use-page-visibility.ts",
+      "default": "./src/behavior/use-page-visibility.ts"
     },
     "./hooks/useProjectSpanNames": {
-      "types": "./src/hooks/useProjectSpanNames.ts",
-      "default": "./src/hooks/useProjectSpanNames.ts"
+      "types": "./src/ui/sections/use-project-span-names.ts",
+      "default": "./src/ui/sections/use-project-span-names.ts"
     },
     "./hooks/useSSESubscription": {
-      "types": "./src/hooks/useSSESubscription.ts",
-      "default": "./src/hooks/useSSESubscription.ts"
+      "types": "./src/behavior/use-sse-subscription.ts",
+      "default": "./src/behavior/use-sse-subscription.ts"
     },
     "./model/export-types": {
       "types": "./src/model/export-types.ts",
       "default": "./src/model/export-types.ts"
     },
     "./preview-trace-id": {
-      "types": "./src/preview-trace-id.ts",
-      "default": "./src/preview-trace-id.ts"
+      "types": "./src/model/preview-trace-id.ts",
+      "default": "./src/model/preview-trace-id.ts"
     },
     "./scenario-role": {
-      "types": "./src/scenario-role.tsx",
-      "default": "./src/scenario-role.tsx"
+      "types": "./src/ui/elements/scenario-role.tsx",
+      "default": "./src/ui/elements/scenario-role.tsx"
     },
     "./screens/traces": {
       "types": "./src/screens/traces/index.ts",
       "default": "./src/screens/traces/index.ts"
     },
     "./server/tracer/collector/rag": {
-      "types": "./src/server/tracer/collector/rag.ts",
-      "default": "./src/server/tracer/collector/rag.ts"
+      "types": "./src/behavior/tracer/collector/rag.ts",
+      "default": "./src/behavior/tracer/collector/rag.ts"
     },
     "./server/tracer/tracesMapping": {
-      "types": "./src/server/tracer/tracesMapping.ts",
-      "default": "./src/server/tracer/tracesMapping.ts"
+      "types": "./src/behavior/tracer/traces-mapping.ts",
+      "default": "./src/behavior/tracer/traces-mapping.ts"
     },
     "./sse-status.store": {
-      "types": "./src/sse-status.store.ts",
-      "default": "./src/sse-status.store.ts"
+      "types": "./src/behavior/sse-status.store.ts",
+      "default": "./src/behavior/sse-status.store.ts"
     },
     "./trace-edit.store": {
-      "types": "./src/trace-edit.store.ts",
-      "default": "./src/trace-edit.store.ts"
+      "types": "./src/behavior/trace-edit.store.ts",
+      "default": "./src/behavior/trace-edit.store.ts"
     },
     "./utils/formatMilliseconds": {
-      "types": "./src/utils/formatMilliseconds.ts",
-      "default": "./src/utils/formatMilliseconds.ts"
+      "types": "./src/model/format-milliseconds.ts",
+      "default": "./src/model/format-milliseconds.ts"
     },
     "./utils/trace": {
-      "types": "./src/utils/trace.ts",
-      "default": "./src/utils/trace.ts"
+      "types": "./src/model/trace.ts",
+      "default": "./src/model/trace.ts"
     },
     "./utils/trpcError": {
-      "types": "./src/utils/trpcError.ts",
-      "default": "./src/utils/trpcError.ts"
+      "types": "./src/behavior/trpc-error.ts",
+      "default": "./src/behavior/trpc-error.ts"
     },
     "./view.store": {
-      "types": "./src/view.store.ts",
-      "default": "./src/view.store.ts"
+      "types": "./src/behavior/view.store.ts",
+      "default": "./src/behavior/view.store.ts"
     }
   },
   "scripts": {

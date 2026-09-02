@@ -3105,6 +3105,70 @@ entries naming deleted platform files. The relayout wave starts when the loader
 keys and the tRPC collaborators are done; the table below is the older per-policy
 inventory.
 
+**Relayout of `@langwatch/trace-web`, 2026-09-02 (standards lane):** the
+package's own rows, before and after two committed-size steps. Baseline 1,542
+findings.
+
+| Policy                     | Before | After step 1 | After step 2 |
+| -------------------------- | -----: | -----------: | -----------: |
+| `feature-source-filename`  |    509 |            0 |            0 |
+| `ui-web-private-layout`    |    722 |          722 |            0 |
+| `ui-web-root-flat`         |     68 |           68 |            0 |
+| `ui-web-root-components`   |     57 |           57 |            0 |
+| `ui-web-feature-declaration` |    4 |            4 |            0 |
+| `ui-screen-closure`        |    132 |          132 |          132 |
+| `ui-web-public-entry`      |     32 |           32 |           32 |
+| `cross-feature`            |     13 |           13 |           13 |
+| `package-cycle`            |      4 |            4 |            4 |
+| `enterprise-direction`     |      1 |            1 |            1 |
+| **total**                  |  1,542 |        1,033 |          182 |
+
+Step 1 was the filename grammar: 692 renames planned mechanically by the
+`rename-feature-sources` planner's algorithm, scoped to the package, applied
+with `mv` plus reference rewrites. **The planner rewrites module specifiers
+through the TypeScript grammar, which does not include `vi.mock("…")`** — those
+are plain call arguments, so 86 test files were left mocking paths that no
+longer existed and 464 tests went red without a single import error. A stale
+mock does not fail loudly; it silently registers a mock for a module nobody
+loads. Any scoped run of this planner needs a second pass over relative string
+literals that no longer resolve.
+
+Step 2 was the layout: 949 files moved into `model/`, `behavior/`,
+`ui/{elements,blocks,sections}` and `screens/`, with the sub-directory grouping
+preserved underneath (`ui/sections/explorer/trace-drawer/…`), so the module
+graph is unchanged and only paths moved. Layers were assigned from the import
+graph rather than by name, which is what keeps `ui-web-layer-direction` at zero:
+a file is `sections` if it transitively reaches `behavior`, `blocks` if it is a
+view reaching another view, `elements` if it is a view reaching none, `behavior`
+if it is not a view but touches React/Chakra/browser/state, and `model`
+otherwise. `ui-web-public-entry` needs the dependent packages repointed and is
+left for a later slice; `ui-web-root-flat` and `ui-web-root-components` closed
+as a side effect of the same move.
+
+Two decisions the move could not make, recorded rather than guessed:
+
+- **No private feature is extractable from the explorer yet.** `ui-web-*`
+  forbids package-global `model`/`behavior`/`ui` from importing
+  `features/<f>/**` at all, so a private feature may only be consumed by a
+  screen or by another feature's `ui/sections`. Every candidate subtree
+  (`explorer/onboarding` 38 files, `TraceDrawer` 136, `TraceTable` 95,
+  `SearchBar`, `Toolbar`, `FilterSidebar`, `transcript`, `flame`) is consumed by
+  sibling explorer code, not by a screen. The four legacy `features/*`
+  directories that arrived with the lift (`errors`, `langy`, `presence`,
+  `skills`) are cross-cutting utilities imported from 24 call sites across the
+  explorer and `components/`, which is the definition of package-global, so they
+  were dissolved into `model`/`behavior`/`ui` and their four missing
+  `feature.json` findings closed with them. Extracting `features/explorer` as a
+  single feature is viable (its only global-layer importers are two `behavior`
+  files) but is a design change, not a move.
+- **`ui-screen-closure` 132 is unchanged by any relayout.** The policy walks the
+  transitive import closure of the `./screens/traces` export and rejects direct
+  browser capability use (`fetch`, `localStorage`, `EventSource`, `process.env`,
+  `AppRouter`) and direct `@trpc`/`@tanstack/react-query`/`react-router`
+  imports. The closure is import-driven, so moving files neither adds nor
+  removes a finding; closing it means giving the screen a host port and passing
+  browser data and actions in.
+
 **Relayout step 0-1, 2026-09-02 (standards lane, sixteen finished web
 packages + `packages/ui-drawer`):** two mechanical slices landed.
 

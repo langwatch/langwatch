@@ -13,7 +13,7 @@
 
 import { useMemo } from "react";
 
-import { useTraceHost } from "../model/trace-host";
+import { useTraceHost } from "./trace-host";
 
 export type TraceCompatRouter = {
   query: Readonly<Record<string, string | undefined>>;

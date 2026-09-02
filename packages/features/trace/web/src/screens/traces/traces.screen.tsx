@@ -8,7 +8,7 @@
  * explorer itself.
  */
 
-import { TracesPage } from "../../explorer/components/TracesPage";
+import { TracesPage } from "../../ui/sections/explorer/traces-page";
 
 export default function TracesScreen() {
   return <TracesPage />;

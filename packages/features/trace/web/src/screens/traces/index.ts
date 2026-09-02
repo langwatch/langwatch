@@ -1,4 +1,4 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 /**
  * The trace family, as the browser application mounts it.
  *
@@ -35,8 +35,8 @@ export const traceScreens = {
 
 export type TraceScreenName = keyof typeof traceScreens;
 
-export { api as traceApi, api as traceApiHooks } from "../../behavior/trace-api";
-export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "../../behavior/trace-api";
+export { api as traceApi, api as traceApiHooks } from "../../ui/sections/trace-api";
+export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "../../ui/sections/trace-api";
 export {
   TraceHostPort,
   TraceHostProvider,
@@ -50,4 +50,4 @@ export {
   type TraceHostUser,
   type TraceRouteReading,
   type TraceSuccessNotice,
-} from "../../model/trace-host";
+} from "../../behavior/trace-host";

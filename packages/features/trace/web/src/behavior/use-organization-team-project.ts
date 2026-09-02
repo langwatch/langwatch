@@ -13,7 +13,7 @@
  * so a call site that passed one still compiles.
  */
 
-import { useTraceHost } from "../model/trace-host";
+import { useTraceHost } from "./trace-host";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

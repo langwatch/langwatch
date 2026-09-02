@@ -1,0 +1,32 @@
+import { api } from "./trace-api";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+
+export const useFieldRedaction = (field: "input" | "output") => {
+  if (typeof window !== "undefined" && window.location.pathname.includes("/share/")) {
+    return {
+      isRedacted: false,
+      isLoading: false,
+      visibleTo: null,
+    };
+  }
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+
+  const { data, isLoading } = api.project.getFieldRedactionStatus.useQuery(
+    {
+      projectId: projectId ?? "",
+    },
+    {
+      enabled: !!projectId,
+      staleTime: 2 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
+  );
+
+  return {
+    isRedacted: isLoading ? void 0 : data?.isRedacted[field],
+    isLoading,
+    visibleTo: data?.visibleTo[field] ?? null,
+  };
+};

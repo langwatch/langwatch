@@ -1,0 +1,45 @@
+import { keepPreviousData } from "@tanstack/react-query";
+import { useMemo } from "react";
+import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
+import { api } from "../../trace-api";
+import { LIVE_REFETCH_MS, useSseStatusStore } from "../../../../index";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
+import { useTraceQueryArgs } from "./use-trace-query-args";
+
+/**
+ * Secondary signal-detection query for the open drawer trace. Fired in
+ * parallel with `useSpanTree` so the cheap waterfall/list payload renders
+ * first and the badges + "Only LangWatch spans" filter light up once this
+ * resolves. Returns a Map<spanId, signals[]> for O(1) row lookup.
+ */
+export function useSpanLangwatchSignals() {
+  const shared = useSharedTrace();
+  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  // SSE-aware polling (see `useSpanTree` for the rationale): poll only
+  // when `useTraceFreshness`'s SSE subscription isn't keeping the cache
+  // fresh via invalidations.
+  const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
+
+  const query = api.tracesV2.spanLangwatchSignals.useQuery(queryArgs, {
+    enabled: isReady && !shared,
+    staleTime: 300_000,
+    gcTime: 1_800_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: true,
+    refetchInterval: isLive && !sseConnected ? LIVE_REFETCH_MS : false,
+  });
+
+  const rows = shared?.spanSignals ?? query.data;
+  const signalsBySpanId = useMemo(() => {
+    const map = new Map<string, LangwatchSignalBucket[]>();
+    for (const row of rows ?? []) {
+      map.set(row.spanId, row.signals);
+    }
+    return map;
+  }, [rows]);
+
+  const base = (shared
+    ? asSharedQueryResult(shared.spanSignals)
+    : query) as unknown as typeof query;
+  return { ...base, signalsBySpanId };
+}
