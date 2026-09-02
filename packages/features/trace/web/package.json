@@ -14,9 +14,25 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./components/traces/RenderInputOutput": {
+      "types": "./src/components/traces/RenderInputOutput.tsx",
+      "default": "./src/components/traces/RenderInputOutput.tsx"
+    },
+    "./components/traces/SpanDetails": {
+      "types": "./src/components/traces/SpanDetails.tsx",
+      "default": "./src/components/traces/SpanDetails.tsx"
+    },
+    "./components/traces/TracesMapping": {
+      "types": "./src/components/traces/TracesMapping.tsx",
+      "default": "./src/components/traces/TracesMapping.tsx"
+    },
     "./drawer.store": {
       "types": "./src/drawer.store.ts",
       "default": "./src/drawer.store.ts"
+    },
+    "./explorer/components/TraceIdPeek": {
+      "types": "./src/explorer/components/TraceIdPeek.tsx",
+      "default": "./src/explorer/components/TraceIdPeek.tsx"
     },
     "./facet-lens.store": {
       "types": "./src/facet-lens.store.ts",
@@ -26,9 +42,21 @@
       "types": "./src/filter.store.ts",
       "default": "./src/filter.store.ts"
     },
+    "./hooks/useProjectSpanNames": {
+      "types": "./src/hooks/useProjectSpanNames.ts",
+      "default": "./src/hooks/useProjectSpanNames.ts"
+    },
     "./preview-trace-id": {
       "types": "./src/preview-trace-id.ts",
       "default": "./src/preview-trace-id.ts"
+    },
+    "./server/tracer/collector/rag": {
+      "types": "./src/server/tracer/collector/rag.ts",
+      "default": "./src/server/tracer/collector/rag.ts"
+    },
+    "./server/tracer/tracesMapping": {
+      "types": "./src/server/tracer/tracesMapping.ts",
+      "default": "./src/server/tracer/tracesMapping.ts"
     },
     "./sse-status.store": {
       "types": "./src/sse-status.store.ts",
@@ -38,9 +66,21 @@
       "types": "./src/trace-edit.store.ts",
       "default": "./src/trace-edit.store.ts"
     },
+    "./utils/formatMilliseconds": {
+      "types": "./src/utils/formatMilliseconds.ts",
+      "default": "./src/utils/formatMilliseconds.ts"
+    },
+    "./utils/trace": {
+      "types": "./src/utils/trace.ts",
+      "default": "./src/utils/trace.ts"
+    },
     "./view.store": {
       "types": "./src/view.store.ts",
       "default": "./src/view.store.ts"
+    },
+    "./screens/traces": {
+      "types": "./src/screens/traces/index.ts",
+      "default": "./src/screens/traces/index.ts"
     }
   },
   "scripts": {
@@ -49,30 +89,89 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
     "@emotion/react": "^11.14.0",
     "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/annotation-web": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/coding-agent-web": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/presence-contract": "workspace:*",
+    "@langwatch/presence-web": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-web": "workspace:*",
+    "@langwatch/share-contract": "workspace:*",
+    "@langwatch/share-web": "workspace:*",
+    "@langwatch/suite-web": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@microlink/react-json-view": "^1.31.21",
+    "@paper-design/shaders-react": "^0.0.76",
+    "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.5",
+    "@tiptap/extension-document": "^3.27.1",
+    "@tiptap/extension-history": "^3.27.1",
+    "@tiptap/extension-paragraph": "^3.27.1",
+    "@tiptap/extension-placeholder": "^3.27.1",
+    "@tiptap/extension-text": "^3.27.1",
+    "@tiptap/pm": "^3.27.1",
+    "@tiptap/react": "^3.27.1",
+    "@trpc/react-query": "11.18.0",
+    "chakra-react-select": "^6.1.3",
+    "date-fns": "^4.4.0",
+    "langwatch": "workspace:*",
     "liqe": "^3.8.7",
     "lucide-react": "^1.22.0",
     "mermaid": "^11.16.0",
+    "motion": "^12.42.2",
+    "numeral": "^2.0.6",
+    "ohm-js": "^17.5.0",
+    "qs": "^6.15.3",
     "react": "^19.2.7",
+    "react-contextual-analytics": "^1.1.2",
+    "react-error-boundary": "^6.1.2",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
     "react-icons": "^5.7.0",
     "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^2.1.9",
+    "react-router": "^8.0.1",
     "remark-gfm": "^4.0.1",
+    "shiki": "^4.3.0",
+    "slugify": "^1.6.9",
     "zod": "^4.4.3",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query": "5.101.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@trpc/client": "11.18.0",
     "@trpc/server": "11.18.0",
-    "@types/react": "^19.2.14",
+    "@types/numeral": "^2.0.5",
+    "@types/qs": "^6.15.1",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",
     "react-dom": "^19.2.7",

@@ -25,10 +25,8 @@
 import type { UiPageLoaderRegistry } from "@langwatch/ui";
 
 export const legacyPageLoaders: UiPageLoaderRegistry = {
-  "pages/index": () => import("~/pages/index"),
   "pages/authorize": () => import("~/pages/authorize"),
   "pages/mcp/authorize": () => import("~/pages/mcp/authorize"),
-  "pages/share/[id]": () => import("~/pages/share/[id]"),
   "pages/onboarding": () => import("~/pages/onboarding"),
   "pages/onboarding/[team]/project": () => import("~/pages/onboarding/[team]/project"),
   "pages/onboarding/product/index": () => import("~/pages/onboarding/product/index"),
@@ -52,9 +50,7 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/evaluations/[id]/edit": () => import("~/pages/[project]/evaluations/[id]/edit"),
   "pages/[project]/evaluations/[id]/edit/choose": () =>
     import("~/pages/[project]/evaluations/[id]/edit"),
-  "pages/[project]/traces": () => import("~/pages/[project]/traces"),
   "pages/[project]/setup": () => import("~/pages/[project]/setup"),
-  "pages/[project]/studio/[workflow]": () => import("~/pages/[project]/studio/[workflow]"),
   "pages/[project]/annotations/my-queue": () => import("~/pages/[project]/annotations/my-queue"),
   // /experiments and /evaluations are one module: the experiments address
   // serves its guarded named export, the evaluations address its default.

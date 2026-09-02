@@ -31,6 +31,8 @@ export type QueryWrite = {
 
 export class FakeWorkflowHost extends WorkflowHostPort {
   readonly navigations: string[] = [];
+  /** How many times a screen asked to step back, which is all a test can assert. */
+  backs = 0;
   readonly queryWrites: QueryWrite[] = [];
   readonly successes: WorkflowSuccessNotice[] = [];
   readonly failures: WorkflowFailureNotice[] = [];
@@ -42,6 +44,7 @@ export class FakeWorkflowHost extends WorkflowHostPort {
       copyTargets?: readonly WorkflowCopyTarget[];
       params?: Readonly<Record<string, string | undefined>>;
       query?: Readonly<Record<string, string | undefined>>;
+      pathname?: string;
     } = {},
   ) {
     super();
@@ -60,7 +63,11 @@ export class FakeWorkflowHost extends WorkflowHostPort {
   }
 
   route(): WorkflowRouteReading {
-    return { params: this.options.params ?? {}, query: this.options.query ?? {} };
+    return {
+      params: this.options.params ?? {},
+      query: this.options.query ?? {},
+      pathname: this.options.pathname ?? "/",
+    };
   }
 
   setQuery(
@@ -72,6 +79,10 @@ export class FakeWorkflowHost extends WorkflowHostPort {
 
   navigate(to: string): void {
     this.navigations.push(to);
+  }
+
+  back(): void {
+    this.backs += 1;
   }
 
   succeeded(notice: WorkflowSuccessNotice): void {

@@ -14,9 +14,205 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./components/CopyButton": {
+      "types": "./src/components/CopyButton.tsx",
+      "default": "./src/components/CopyButton.tsx"
+    },
+    "./components/Delayed": {
+      "types": "./src/components/Delayed.tsx",
+      "default": "./src/components/Delayed.tsx"
+    },
+    "./components/ExternalImage": {
+      "types": "./src/components/ExternalImage.tsx",
+      "default": "./src/components/ExternalImage.tsx"
+    },
+    "./components/GenerateApiSnippetButton": {
+      "types": "./src/components/GenerateApiSnippetButton.tsx",
+      "default": "./src/components/GenerateApiSnippetButton.tsx"
+    },
+    "./components/GenerateApiSnippetDialog": {
+      "types": "./src/components/GenerateApiSnippetDialog.tsx",
+      "default": "./src/components/GenerateApiSnippetDialog.tsx"
+    },
+    "./components/HorizontalFormControl": {
+      "types": "./src/components/HorizontalFormControl.tsx",
+      "default": "./src/components/HorizontalFormControl.tsx"
+    },
+    "./components/HoverableBigText": {
+      "types": "./src/components/HoverableBigText.tsx",
+      "default": "./src/components/HoverableBigText.tsx"
+    },
+    "./components/OverflownText": {
+      "types": "./src/components/OverflownText.tsx",
+      "default": "./src/components/OverflownText.tsx"
+    },
+    "./components/VerticalFormControl": {
+      "types": "./src/components/VerticalFormControl.tsx",
+      "default": "./src/components/VerticalFormControl.tsx"
+    },
+    "./components/code/RenderCode": {
+      "types": "./src/components/code/RenderCode.tsx",
+      "default": "./src/components/code/RenderCode.tsx"
+    },
+    "./components/code/langwatchEndpointEnv": {
+      "types": "./src/components/code/langwatchEndpointEnv.ts",
+      "default": "./src/components/code/langwatchEndpointEnv.ts"
+    },
+    "./components/ui/PropertySectionTitle": {
+      "types": "./src/components/ui/PropertySectionTitle.tsx",
+      "default": "./src/components/ui/PropertySectionTitle.tsx"
+    },
+    "./components/ui/RedactedField": {
+      "types": "./src/components/ui/RedactedField.tsx",
+      "default": "./src/components/ui/RedactedField.tsx"
+    },
+    "./components/ui/SelectionActionBar": {
+      "types": "./src/components/ui/SelectionActionBar.tsx",
+      "default": "./src/components/ui/SelectionActionBar.tsx"
+    },
+    "./components/ui/delete-confirmation-dialog": {
+      "types": "./src/components/ui/delete-confirmation-dialog.tsx",
+      "default": "./src/components/ui/delete-confirmation-dialog.tsx"
+    },
+    "./components/ui/dialog": {
+      "types": "./src/components/ui/dialog.tsx",
+      "default": "./src/components/ui/dialog.tsx"
+    },
+    "./components/ui/drawer": {
+      "types": "./src/components/ui/drawer.tsx",
+      "default": "./src/components/ui/drawer.tsx"
+    },
+    "./components/ui/messages/index": {
+      "types": "./src/components/ui/messages/index.ts",
+      "default": "./src/components/ui/messages/index.ts"
+    },
+    "./hooks/useDejaViewLink": {
+      "types": "./src/hooks/useDejaViewLink.ts",
+      "default": "./src/hooks/useDejaViewLink.ts"
+    },
+    "./hooks/useFeatureFlag": {
+      "types": "./src/hooks/useFeatureFlag.ts",
+      "default": "./src/hooks/useFeatureFlag.ts"
+    },
+    "./hooks/useInteractiveTooltip": {
+      "types": "./src/hooks/useInteractiveTooltip.ts",
+      "default": "./src/hooks/useInteractiveTooltip.ts"
+    },
+    "./model/prism-language": {
+      "types": "./src/model/prism-language.ts",
+      "default": "./src/model/prism-language.ts"
+    },
+    "./model/prisma-types": {
+      "types": "./src/model/prisma-types.ts",
+      "default": "./src/model/prisma-types.ts"
+    },
+    "./optimization_studio/components/AddModelProviderKey": {
+      "types": "./src/optimization_studio/components/AddModelProviderKey.tsx",
+      "default": "./src/optimization_studio/components/AddModelProviderKey.tsx"
+    },
+    "./optimization_studio/components/FormatMoney": {
+      "types": "./src/optimization_studio/components/FormatMoney.tsx",
+      "default": "./src/optimization_studio/components/FormatMoney.tsx"
+    },
+    "./optimization_studio/components/History": {
+      "types": "./src/optimization_studio/components/History.tsx",
+      "default": "./src/optimization_studio/components/History.tsx"
+    },
+    "./optimization_studio/components/code/workflow-code-editor.transport": {
+      "types": "./src/optimization_studio/components/code/workflow-code-editor.transport.tsx",
+      "default": "./src/optimization_studio/components/code/workflow-code-editor.transport.tsx"
+    },
+    "./screens/studio": {
+      "types": "./src/screens/studio/index.ts",
+      "default": "./src/screens/studio/index.ts"
+    },
     "./screens/workflows": {
       "types": "./src/screens/workflows/index.ts",
       "default": "./src/screens/workflows/index.ts"
+    },
+    "./stores/upgradeModalStore": {
+      "types": "./src/stores/upgradeModalStore.ts",
+      "default": "./src/stores/upgradeModalStore.ts"
+    },
+    "./studio-host/api": {
+      "types": "./src/studio-host/api.ts",
+      "default": "./src/studio-host/api.ts"
+    },
+    "./studio-host/binding": {
+      "types": "./src/studio-host/binding.ts",
+      "default": "./src/studio-host/binding.ts"
+    },
+    "./studio-host/errors": {
+      "types": "./src/studio-host/errors.tsx",
+      "default": "./src/studio-host/errors.tsx"
+    },
+    "./studio-host/link": {
+      "types": "./src/studio-host/link.tsx",
+      "default": "./src/studio-host/link.tsx"
+    },
+    "./studio-host/next-router": {
+      "types": "./src/studio-host/next-router.ts",
+      "default": "./src/studio-host/next-router.ts"
+    },
+    "./studio-host/toaster": {
+      "types": "./src/studio-host/toaster.ts",
+      "default": "./src/studio-host/toaster.ts"
+    },
+    "./studio-host/use-drawer": {
+      "types": "./src/studio-host/use-drawer.ts",
+      "default": "./src/studio-host/use-drawer.ts"
+    },
+    "./studio-host/use-organization-team-project": {
+      "types": "./src/studio-host/use-organization-team-project.ts",
+      "default": "./src/studio-host/use-organization-team-project.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    },
+    "./utils/compat/next-dynamic": {
+      "types": "./src/utils/compat/next-dynamic.ts",
+      "default": "./src/utils/compat/next-dynamic.ts"
+    },
+    "./utils/compat/next-link": {
+      "types": "./src/utils/compat/next-link.tsx",
+      "default": "./src/utils/compat/next-link.tsx"
+    },
+    "./utils/compat/next-navigation": {
+      "types": "./src/utils/compat/next-navigation.ts",
+      "default": "./src/utils/compat/next-navigation.ts"
+    },
+    "./utils/constants": {
+      "types": "./src/utils/constants.ts",
+      "default": "./src/utils/constants.ts"
+    },
+    "./utils/formatMoney": {
+      "types": "./src/utils/formatMoney.ts",
+      "default": "./src/utils/formatMoney.ts"
+    },
+    "./utils/formatTimeAgo": {
+      "types": "./src/utils/formatTimeAgo.ts",
+      "default": "./src/utils/formatTimeAgo.ts"
+    },
+    "./utils/routes": {
+      "types": "./src/utils/routes.ts",
+      "default": "./src/utils/routes.ts"
+    },
+    "./utils/slugify": {
+      "types": "./src/utils/slugify.ts",
+      "default": "./src/utils/slugify.ts"
+    },
+    "./utils/stringCasing": {
+      "types": "./src/utils/stringCasing.ts",
+      "default": "./src/utils/stringCasing.ts"
+    },
+    "./utils/types": {
+      "types": "./src/utils/types.ts",
+      "default": "./src/utils/types.ts"
+    },
+    "./utils/zodSalvage": {
+      "types": "./src/utils/zodSalvage.ts",
+      "default": "./src/utils/zodSalvage.ts"
     }
   },
   "scripts": {
@@ -27,17 +223,36 @@
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/platform-api-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "^4.7.0",
+    "@tanstack/react-query": "5.101.4",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
+    "@trpc/server": "11.18.0",
     "@xyflow/react": "^12.11.1",
     "date-fns": "^4.4.0",
     "emoji-picker-react": "^4.19.1",
     "fast-deep-equal": "^3.1.3",
+    "langwatch": "workspace:*",
     "liquidjs": "^10.27.1",
     "lodash-es": "^4.17.21",
     "lucide-react": "^1.22.0",
@@ -45,12 +260,19 @@
     "monacopilot": "^1.2.12",
     "motion": "^12.42.2",
     "nanoid": "^5.1.5",
+    "numeral": "^2.0.6",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
+    "react-error-boundary": "^6.1.2",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.80.0",
     "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^2.1.9",
     "react-spinners": "^0.17.0",
+    "remark-gfm": "^4.0.1",
+    "slugify": "^1.6.9",
+    "superjson": "^2.2.6",
     "use-debounce": "^10.1.1",
     "usehooks-ts": "^3.1.1",
     "zod": "^4.4.3",
@@ -62,6 +284,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/lodash-es": "^4.17.12",
+    "@types/numeral": "^2.0.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",

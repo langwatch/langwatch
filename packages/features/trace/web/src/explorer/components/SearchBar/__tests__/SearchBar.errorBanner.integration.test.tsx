@@ -1,0 +1,311 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for the unified error banner in SearchBar.
+ *
+ * Feature: Unified error banner
+ *   - Parse errors render in the banner with a dismiss X
+ *   - AI errors render in the banner, with an expand chevron when details exist
+ *   - AI errors persist after closing AI mode (no unmount cleanup)
+ *   - Dismiss clears the underlying store state
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+vi.mock("../../../../behavior/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: undefined,
+    organization: undefined,
+    team: undefined,
+    isFetching: false,
+  }),
+}));
+
+vi.mock("../../../../hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    modelProviders: [],
+    customDefaultModel: null,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("../../../hooks/useTraceFacets", () => ({
+  useTraceFacets: () => ({ data: [], isLoading: false }),
+}));
+
+// SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
+// top level. These tests don't wrap with a tRPC provider, so stub the hook
+// out — server search is covered by its own dedicated suite.
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
+vi.mock("@paper-design/shaders-react", () => ({
+  MeshGradient: () => null,
+}));
+
+// These banner tests exercise the inline Ask AI composer path, so Langy is
+// gated off — the gate hooks carry session/tRPC wiring this suite doesn't
+// mount. The Langy-owned affordance is covered by SearchBar.integration.
+vi.mock("../../../../features/langy/hooks/useShowLangy", () => ({
+  useShowLangy: () => false,
+}));
+vi.mock("../../../../features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => false,
+}));
+vi.mock("@langwatch/langy-web", async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
+  const state = () => ({
+    isOpen: false,
+    askLangy: () => undefined,
+    openPanel: () => undefined,
+    attachContext: () => undefined,
+  });
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) => selector(state());
+  useLangyStore.getState = state;
+  return { ...actual, useLangyStore };
+});
+
+import { explainAnyError } from "../../../../features/errors";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { useFilterStore } from "../../../../index";
+import { SearchBar } from "../SearchBar";
+
+/**
+ * A handled failure exactly as tRPC delivers it — the code under `data.error`,
+ * with `meta` alongside. The banner has no other channel to a cause any more:
+ * the server stopped sending a sentence for it to print.
+ */
+function handledCause(code: string, meta: Record<string, unknown> = {}) {
+  return {
+    data: {
+      error: { code, httpStatus: 502, fault: "provider", meta, reasons: [] },
+    },
+  };
+}
+
+/**
+ * What the banner is required to render: the words the code-keyed registry
+ * has for this failure. Derived rather than transcribed — the assertion is
+ * "the banner delegates to the registry", not "the registry says X today".
+ */
+function registryCopy(cause: unknown): string {
+  const { title, description } = explainAnyError(cause);
+  return description ? `${title}. ${description}` : title;
+}
+
+afterEach(() => {
+  cleanup();
+  useFilterStore.getState().clearAll();
+});
+
+beforeEach(() => {
+  useFilterStore.getState().clearAll();
+});
+
+function renderSearchBar() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <SearchBar />
+    </ChakraProvider>,
+  );
+}
+
+describe("<SearchBar /> unified error banner", () => {
+  describe("given a parse error in the store", () => {
+    beforeEach(() => {
+      // Trigger a parse error by submitting an unclosed string literal
+      useFilterStore.getState().applyQueryText('@status:"unclosed');
+    });
+
+    it("renders the parse error message in the banner", () => {
+      renderSearchBar();
+      // The banner should contain the parse error message text
+      const parseError = useFilterStore.getState().parseError;
+      expect(parseError).not.toBeNull();
+      expect(screen.getByText(parseError!)).toBeInTheDocument();
+    });
+
+    it("shows no expand chevron (parse errors have no structured details)", () => {
+      renderSearchBar();
+      expect(screen.queryByLabelText(/expand error details/i)).not.toBeInTheDocument();
+    });
+
+    it("shows a dismiss X button", () => {
+      renderSearchBar();
+      expect(screen.getByLabelText(/dismiss error/i)).toBeInTheDocument();
+    });
+
+    describe("when the user clicks the dismiss X", () => {
+      // Asserted on the store rather than on the banner leaving the DOM:
+      // AnimatePresence runs its exit animation asynchronously under jsdom, so
+      // the element outlives the click and a DOM assertion would be timing, not
+      // behaviour.
+      it("clears the parse error from the store", async () => {
+        renderSearchBar();
+        const user = userEvent.setup();
+        await user.click(screen.getByLabelText(/dismiss error/i));
+        expect(useFilterStore.getState().parseError).toBeNull();
+      });
+    });
+  });
+
+  describe("given an AI error with structured details in the store", () => {
+    const details = {
+      provider: "openai",
+      model: "gpt-5-mini",
+      httpStatus: 503,
+      reason: "Service unavailable",
+    };
+    const aiError: AiActionError = {
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", details),
+      details,
+    };
+
+    beforeEach(() => {
+      useFilterStore.getState().setAiError(aiError);
+    });
+
+    it("renders the registry's copy for the failure's code", () => {
+      renderSearchBar();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
+    });
+
+    it("keeps the provider's own sentence out of the headline", () => {
+      // It is diagnostic detail, available behind the chevron — never the
+      // sentence a customer is shown first.
+      renderSearchBar();
+      expect(screen.queryByText("Service unavailable")).not.toBeInTheDocument();
+    });
+
+    it("shows an expand chevron because details are present", () => {
+      renderSearchBar();
+      expect(screen.getByLabelText(/expand error details/i)).toBeInTheDocument();
+    });
+
+    it("does not show the AiPromptInput inline error badge", () => {
+      // The inline ErrorBadge was removed from AiPromptInput — only the banner shows
+      // Verify no second instance of the error message appears elsewhere
+      renderSearchBar();
+      const messages = screen.getAllByText(registryCopy(aiError.cause));
+      expect(messages).toHaveLength(1);
+    });
+
+    describe("when the user clicks the expand chevron", () => {
+      it("reveals the structured detail fields", async () => {
+        renderSearchBar();
+        const user = userEvent.setup();
+        await user.click(screen.getByLabelText(/expand error details/i));
+        // Provider, model, status should now be visible
+        expect(screen.getByText("openai")).toBeInTheDocument();
+        expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
+        expect(screen.getByText("503")).toBeInTheDocument();
+        expect(screen.getByText("Service unavailable")).toBeInTheDocument();
+      });
+
+      it("shows a collapse chevron after expanding", async () => {
+        renderSearchBar();
+        const user = userEvent.setup();
+        await user.click(screen.getByLabelText(/expand error details/i));
+        expect(screen.getByLabelText(/collapse error details/i)).toBeInTheDocument();
+      });
+    });
+
+    describe("when the user clicks the dismiss X", () => {
+      it("clears the AI error from the store", async () => {
+        renderSearchBar();
+        const user = userEvent.setup();
+        await user.click(screen.getByLabelText(/dismiss error/i));
+        expect(useFilterStore.getState().aiError).toBeNull();
+      });
+    });
+  });
+
+  describe("given an AI error without structured details", () => {
+    const simpleAiError: AiActionError = {
+      code: "unknown",
+      cause: new Error("connection reset by peer"),
+    };
+
+    beforeEach(() => {
+      useFilterStore.getState().setAiError(simpleAiError);
+    });
+
+    it("renders the generic unknown copy, not the raw failure", () => {
+      renderSearchBar();
+      expect(screen.getByText(registryCopy(simpleAiError.cause))).toBeInTheDocument();
+      expect(screen.queryByText(/connection reset by peer/i)).not.toBeInTheDocument();
+    });
+
+    it("shows no expand chevron when there are no details", () => {
+      renderSearchBar();
+      expect(screen.queryByLabelText(/expand error details/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given both a parse error and an AI error", () => {
+    const aiError: AiActionError = {
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", { provider: "openai" }),
+      details: { provider: "openai" },
+    };
+
+    beforeEach(() => {
+      // Set both errors
+      useFilterStore.getState().applyQueryText('@status:"unclosed');
+      useFilterStore.getState().setAiError(aiError);
+    });
+
+    it("shows the AI error message (AI error wins priority)", () => {
+      renderSearchBar();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
+    });
+
+    it("does not show the parse error message while AI error is active", () => {
+      renderSearchBar();
+      const parseError = useFilterStore.getState().parseError!;
+      expect(screen.queryByText(parseError)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given no errors in the store", () => {
+    it("does not render the banner", () => {
+      renderSearchBar();
+      expect(screen.queryByLabelText(/dismiss error/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("AI error persistence — given an AI error set in the store", () => {
+    const aiError: AiActionError = {
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", { provider: "anthropic" }),
+      details: { provider: "anthropic" },
+    };
+
+    it("the error remains in the store after explicit set (simulating close of AI mode without unmount cleanup)", () => {
+      // Set error (simulates AiQueryComposer pushing error via useEffect)
+      useFilterStore.getState().setAiError(aiError);
+      // Verify it persists without being cleared
+      expect(useFilterStore.getState().aiError).toEqual(aiError);
+      renderSearchBar();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
+    });
+
+    it("clears when clearAll is called", () => {
+      useFilterStore.getState().setAiError(aiError);
+      useFilterStore.getState().clearAll();
+      expect(useFilterStore.getState().aiError).toBeNull();
+    });
+
+    it("clears when a new query is typed via applyQueryText", () => {
+      useFilterStore.getState().setAiError(aiError);
+      useFilterStore.getState().applyQueryText("@status:error");
+      expect(useFilterStore.getState().aiError).toBeNull();
+    });
+  });
+});

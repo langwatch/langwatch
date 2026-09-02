@@ -118,4 +118,5 @@ export class UiNavigationHost extends NavigationHostPort {
   navigate(to: string): void {
     this.actions.navigate(to);
   }
+
 }

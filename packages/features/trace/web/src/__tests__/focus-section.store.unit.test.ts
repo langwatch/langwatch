@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useFocusSectionStore } from "@langwatch/trace-web";
+import { useFocusSectionStore } from "../index";
 
 describe("useFocusSectionStore", () => {
   beforeEach(() => {

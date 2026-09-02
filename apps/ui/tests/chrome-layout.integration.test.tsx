@@ -14,7 +14,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { projectSwitchHref } from "../src/features/chrome/ui/blocks/ui-project-switcher";
 import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
 
@@ -22,9 +22,29 @@ vi.mock("../src/features/navigation", () => ({
   NavigationHostSection: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Both switchers read the navigation host, which the stubbed section above does
+// not mount. Their own "no host, no switcher" path is what renders here, and it
+// is what the header would show on a page the chrome reaches before the graph
+// lands — so the header assertions below are about the frame, not the controls.
+
 vi.mock("../src/features/installed-ui-page-keys", () => ({
   isUiInstalledPage: (key: string) => key === "pages/served-here",
 }));
+
+// The other composed registry the layout route reads. Both of them import every
+// feature in the package, which is the graph this suite is deliberately not
+// about — the drawer half has its own suite in `chrome-drawer.integration`.
+vi.mock("../src/features/installed-ui-drawers", () => ({
+  installedUiDrawers: {},
+}));
+
+// The layout route is lazy, and it is the heaviest module in this suite — it
+// pulls the design system's menu in through the product switcher. Resolving it
+// once up front keeps each assertion from racing a first-time module load,
+// which is what made the first test in the file fail while the rest passed.
+beforeAll(async () => {
+  await loaders["features/chrome/UiAppChrome"]();
+});
 
 // This package runs without vitest globals, so testing-library never registers
 // its own auto-cleanup: without this the first render's header is still in the

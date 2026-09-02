@@ -561,7 +561,7 @@ Known costs, all reported rather than suppressed:
 | `ui/{ListTable,Pagination}`                     | me+governance               | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                                                                                                                                                                                                                                             |
 | `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance          | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                                                                                                                                                                                                                                            |
 | `settings/ScopeFilter` + `useUrlScopeFilter`    | data-retention+data-privacy | the SAME surface (`@langwatch/authz-web/surfaces/scope-picker`), component and pure address half both. Free, because every consumer of one already imports the other and `ui-screen-closure` counts import LINES. The platform copies stay for model-providers, api-keys and default-models                                                                                  |
-| traces-v2 deep imports                          | me+automations+annotations  | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided. ANNOTATIONS DREW THE LINE: a placeholder is right for a widget and wrong for a page whose whole subject is the thing being placeheld — the queue walker stayed in `platform/app` rather than lose its conversation view, and moves with traces |
+| traces-v2 deep imports                          | me+automations+annotations  | SETTLED by the traces move: `@langwatch/trace-web` now publishes the explorer whole, so the me family's recent-traces placeholder, the automations query autocomplete and the annotations queue walker each have a real surface to consume. Each closes as a one-line repoint when its own family is next touched |
 
 ## Single-owner files (serialize)
 
@@ -3078,19 +3078,58 @@ as permission.
   `apps/ui/src/model` takes it, costs no finding, and is where the other three
   fold in.
 
-### workflows/studio/chat — MOVED (2 of 3 keys). 10 platform files, 0 insertions, 1,487 deletions
+### workflows/studio/chat — MOVED (3 of 3 keys). 264 platform files, 0 insertions, 51,255 deletions
 
-Moved seventeenth, and the third family whose keys did not all move. Two of
-three went into `@langwatch/workflow-web`: `/:project/workflows` and
-`/:project/chat/:workflow`. `/:project/studio/:workflow` stays in
-`platform/app`, blocked on a copy set argued with a number below.
+Moved seventeenth in two passes. The first took `/:project/workflows` and
+`/:project/chat/:workflow` into `@langwatch/workflow-web` and recorded
+`/:project/studio/:workflow` as blocked on a 40,543-line copy set. The second
+took the studio, because the thing it was blocked on stopped existing.
 
-#### THE STUDIO IS BLOCKED ON 40,543 LINES OF COPIES, NOT ON OWNERSHIP
+#### THE 40,543-LINE COPY SET WAS AN ARTEFACT OF THE COPY RULE
+
+The measurement below was right and its conclusion was wrong, and the difference
+is one ruling: **there are no copies.** A platform module the studio needs is
+MOVED into the package that owns it by transport and vocabulary, and the
+platform files that imported it are LEFT BROKEN, because `platform/app` does not
+have to compile during this migration. Under that rule "220 platform modules
+with other consumers" is not a wall — it is a list of modules whose owning
+family was already obvious, and the other consumers are the ones who lose a
+file, which is the whole point of a deletes-only migration.
+
+What the studio actually cost, measured at the destination:
+
+| destination                     | files   | lines      |
+| ------------------------------- | ------- | ---------- |
+| `@langwatch/workflow-web`       | 104     | 15,266     |
+| `@langwatch/experiment-web`     | 38      | 8,616      |
+| `@langwatch/prompt-web`         | 28      | 6,505      |
+| `@langwatch/model-provider-web` | 23      | 1,483      |
+| `@langwatch/trace-web`          | 22      | 5,278      |
+| `@langwatch/evaluator-web`      | 18      | 5,719      |
+| `@langwatch/analytics-web`      | 15      | 3,572      |
+| `@langwatch/dataset-web`        | 9       | 3,505      |
+| **total**                       | **257** | **49,944** |
+
+Every one of them is a MOVE. `platform/app` shows 0 insertions on every row of
+`git diff --numstat`, and the whole of `platform/app/src/optimization_studio/`
+is gone.
+
+Where each vocabulary landed, and why: `TracesMapping` and `tracesMapping` to
+the trace family, `FieldsFilters` to analytics, `DynamicZodForm` and
+`EvaluatorEditorShared` to the evaluator family, `experiments-v3` to the
+experiment family, `UploadCSVDrawer` and `DatasetEditorTable` to datasets,
+`PromptEditorDrawer` to prompts, `ModelSelector` and the model-provider pickers
+to model-provider. Not one destination was chosen by where the studio happens to
+call it from; each was chosen by whose transport and whose nouns the module
+speaks. That is why the same list reads as a wall under the copy rule and as a
+routing table under the move rule.
+
+#### The original measurement, kept because it is still the honest number
 
 The studio's transport is `workflow.*` and `optimization.*` and its types are
 `@langwatch/workflow-contract`'s, so the ownership rule puts it here without
-argument. What stops it is the deletes-only ruling meeting its closure. Measured
-by walking the real import graph from each page and counting only what has no
+argument. What stopped it was the copy rule meeting its closure. Measured by
+walking the real import graph from each page and counting only what has no
 importer outside the family:
 
 | key                     | exclusive (moves) | copies (platform modules with other consumers) |
@@ -3117,9 +3156,9 @@ three modules a browser package may not name at all:
 - `components/prompts/PromptEditorDrawer` (1,279), through
   `SignaturePromptEditorBridge`.
 
-That is the evaluations family's wall at five times the size, and it comes down
-the same way: when the trace and experiment vocabularies are packaged. Recorded
-as blocked with a number so it can be re-examined when the number changes.
+That is the evaluations family's wall at five times the size, and it came down
+exactly the predicted way — when the trace and experiment vocabularies were
+packaged, which is what the second pass did rather than waited for.
 
 #### WHAT THE TWO MOVED KEYS COST
 
@@ -3197,6 +3236,89 @@ field-clearing that handler exists for and drops the duplicate.
   into an upgrade modal is now reported as a failure like any other, and the
   registry still decides what the customer reads.
 
+#### THE STUDIO PASS: one seam, `src/studio-host/`, and no redesign
+
+257 files moved and the call sites inside them were not rewritten. The move used
+MIRRORED PATHS — a file at `platform/app/src/components/x/y.tsx` lands at
+`<pkg>/src/components/x/y.tsx` — so every relative import inside the closure
+survived untouched and only `~/` imports and cross-package edges needed
+rewriting (215 + 198 + 26 of them). What the closure reached for that a feature
+package may not name at all is answered by ONE new directory,
+`@langwatch/workflow-web/src/studio-host/`, which is a seam and not a rewrite:
+
+- `api.ts` — `api` is this family's `createFeatureApi` instance. The tRPC cache
+  key is the procedure PATH, so a second instance is a second handle on the same
+  cache, not a second request.
+- `use-organization-team-project.ts` — the application's 771-line hook, narrowed
+  to the seven things fifty-six studio files actually read, answered from
+  `WorkflowHostPort` plus one query for model providers.
+  `redirectToOnboarding` is ACCEPTED AND IGNORED: sending a reader to onboarding
+  is the application's decision about its own route table.
+- `toaster.ts`, `errors.tsx`, `use-drawer.ts`, `next-router.ts`, `link.tsx` —
+  module-scope singletons bound to the mounted host by `binding.ts`, which the
+  screen calls on render. `UNKNOWN_ERROR_DESCRIPTION` is the platform registry's
+  sentence word for word, because the words a customer reads did not change.
+- `model/prisma-types.ts` and `model/prism-language.ts` — the generated Prisma
+  shapes and the syntax-highlighter union restated, the same obligation
+  `@langwatch/enterprise-billing-contract` already carries for its enum copies.
+
+`behavior/workflow-api.ts` grew from the two workflow segments to twenty-four,
+because the studio reads agents, analytics, datasets, evaluations, experiments,
+model providers, prompts, secrets, stored objects and traces. The borrowed
+segments are typed behind a named `Unpublished` alias rather than pretended to be
+published contracts — a procedure map is strings, and claiming a shape the owning
+family has not published would be a lie the compiler would then enforce.
+
+`WorkflowHostPort` gained exactly one method, `back()`, and `WorkflowScope`
+gained `projectName`, `organizationId`, `teamId` and `isResolved`. That is the
+whole port change: the studio needed a name for the project, the two enclosing
+scope ids, a settling flag and a way back.
+
+#### What did not travel with the studio, each named
+
+- **`DashboardLayout`.** Chrome belongs to the route tree. The studio draws its
+  own full-viewport header, so the only thing lost is the sidebar on the
+  workflow-not-found dead end, which now carries its own "Back to workflows"
+  button.
+- **`CurrentDrawer`, `GlobalTraceV2DrawerMount`, `GlobalUpgradeModal`.**
+  Application chrome mounted at the app root. `OptimizationStudio` rendered all
+  three; a feature package that mounted the application's drawer registry would
+  be mounting the application. The drawer lane owns moving them.
+- **`@langwatch/langy-web`'s docking margins in `components/ui/drawer.tsx`.**
+  Sixth refusal of the same ungoverned package, on the same `es2023`-library
+  grounds the other five recorded.
+- **`import.meta.env.PROD`** in `ModelSelector`, which ADR-101 refuses in a
+  package: the force-empty branch is a constant `false`, exactly as prompt-web
+  already recorded for its own copy.
+
+#### Known costs of the studio pass
+
+- **The eight web packages now import each other cyclically.** The studio's
+  closure genuinely spans eight vocabularies and the edges run both ways; pnpm,
+  TypeScript and Vite all tolerate it, and no other shape was available without
+  inventing a ninth package to hold the shared half. Reported, not hidden.
+- **`@langwatch/workflow-web` is still not in `governedWebPackages`.** The
+  relayout owed by the first pass is now owed over 118 more files. New modules
+  went in the strict grammar; nothing that already existed was relaid out, which
+  is the ruling this pass was given.
+- **Seven platform files were left as duplicates by the move script and are
+  deleted now** (`hooks/useOpsPermission.ts`, `stores/upgradeModalStore.ts`,
+  `utils/{sseLink,trpc-transport,types,workflow-api}`,
+  `server/filters/types.ts`). A copy that survives is the one thing this
+  migration's rule does not allow, so they are named rather than quietly swept.
+- **A CONCURRENT LANE WROTE THE SAME MIRRORED PATHS.** The traces family move
+  ran against `@langwatch/trace-web` with the identical path scheme while this
+  pass ran. Content collided identically — same platform origin, so nothing was
+  lost — but the import rewrites raced. Anyone running two mirrored-path moves
+  into one package at once should expect that and re-run both packages' suites
+  after the second lands.
+- **Four stale test fixtures were repaired, none of them behaviour.** The
+  `Publish` menu suite carried a DSL the contract's own parser rejects (missing
+  `spec_version`, and a three-part `version` where the schema wants
+  `number.number`); `VersionToBeUsed` mocked `ModelSelector` at its old platform
+  path; `StudioDrawerWrapper` and `studio-not-found` needed a real host above
+  them rather than a mock of the binding.
+
 #### The row's promise about the prompt-model copies, and why it is not kept
 
 The ranking row said "killing it also kills the prompt-model platform copies".
@@ -3268,6 +3390,10 @@ this family's.
   number (51 exclusive files) hides that two of them cost 1,965 lines of copies
   between them and the third costs 40,543. The per-key walk is twenty minutes and
   it is what turns "this family is too big" into "two of these three move today".
+  AMENDED BY THE SECOND PASS: the per-key walk is still the right first move, but
+  the number it produces only means "blocked" while copies are the rule. Under
+  no-copies the same 40,543 lines are a routing table — read the list, decide
+  whose vocabulary each module speaks, and move it there.
 - **A GENERIC COMPONENT WITH ONE CONSUMER LEFT IS A MOVE, NOT A COPY.** Four
   earlier families each took a narrowed copy of `ReplicateToProjectDialog` and
   `PushToCopiesDialog` and each recorded the duplication. This family was the
@@ -3455,6 +3581,589 @@ handled error should copy:
 - Suites: `@langwatch/auth-web` 26 files / 177 tests green, `apps/ui` 81 files /
   698 tests green, `platform/app`'s loader parity 7 tests green.
 
+### chrome + navigation — MOVED. ONE package, 36 platform files, 0 insertions, 3,100+ deletions
+
+Not a family: the CHROME GAP itself, recorded by every family since the gateway
+and named in eighteen manifests above. Three things were missing and two of them
+are now here.
+
+Destination `@langwatch/navigation-web` (`packages/features/navigation/web`),
+created for this move, plus two `apps/ui` features — `features/navigation` for
+the page seam and `features/chrome` for the host chrome that composes it.
+
+#### What the chrome route renders, and where it sits
+
+`features/chrome/UiAppChrome` is a real layout route: it has no path, it holds
+the two `features/langy/ProjectLangyLayout` groups as its children, and React
+Router keeps it mounted while the pages below it swap. Everything behind a
+session is inside it. The front door, the public addresses and onboarding are
+outside it, because those pages have no project to switch between.
+
+It does two jobs. It mounts the NAVIGATION HOST once, above the outlet — which
+is what makes the switcher in the header and the screen under it read one
+workspace graph instead of two — and it draws a header: the mark linking home,
+the project switcher, the way into settings.
+
+**IT ASKS WHICH HALF SERVES THE PAGE, and that is not a hedge.** A page
+`platform/app` still serves renders its own `DashboardLayout`, header and all;
+drawing a second header over it would give those addresses two. So
+`ui/sections/ui-route-objects` now stamps each route's page key onto its
+`handle`, the layout reads the deepest match's key, and the header is drawn when
+`apps/ui` is the half that registered the loader for it. The branch is one
+`if`, it is exact rather than heuristic — a package screen cannot import
+`platform/app`, so it cannot have brought a header — and it disappears with the
+last legacy loader.
+
+#### The switcher: the recorded `projectSwitcher()` null is gone
+
+`ProjectSwitcherCombobox`, its popup and `projectPickItems` moved as they stood.
+The only platform reads in them were `ProjectAvatar` and `useRouter`; the first
+moved too and the second is the host port's `navigate`. `apps/ui`'s
+`features/chrome/ui/blocks/ui-project-switcher` supplies the groups and the
+hrefs, and both settings families that had recorded `null` —
+`@langwatch/organization-web`'s audit log and `@langwatch/secret-web` — now
+answer with the real control. Their adapter docblocks say so instead of
+recording the gap.
+
+**Two deliberate narrowings, both recorded rather than faked.** The pick href is
+the reader's own address with the `:project` segment swapped, not
+`buildProjectSwitchHref`'s `projectRoutes` lookup — that table is 
+`platform/app`'s and did not travel, and the swap gives the same answer for
+every `/:project/...` page, which is every page the switcher renders above. And
+the per-team "New Project" row is not offered: it opens the `createProject`
+drawer, which is the gap below.
+
+#### `pages/index` is the navigation package's, and its loader key is gone
+
+`useLandingRedirect` and the six modules under it moved whole:
+`products`, `logic/{productMemory,resolveLandingDestination,resolveNavigationMode}`,
+`navigationModeStore`, `useNavigationMode`, `useReachableProducts`,
+`useLlmOpsProjectSlug`, and `utils/resolveHomeDestination` with them. The screen
+is `@langwatch/navigation-web/screens/landing`, `apps/ui/src/features/navigation`
+serves the `pages/index` key, and the key is out of
+`platform/app/src/runtime/ui/legacy-page-loaders.ts`. No page guard, and the
+platform page had none: `/` is where a reader with nowhere to go arrives.
+
+Four seams changed shape, all of them at the port and none in the rules:
+
+- **`useOrganizationTeamProject` → `NavigationHostPort`.** The graph, the reader,
+  the grants and the two navigations arrive through one abstract class.
+- **`useFeatureFlag` → `featureFlag(flag)`,** keeping the pending state, because
+  a landing decision that resolves against a flag still in flight sends the
+  reader to the wrong home. Both hooks that took `enabled:` down to the QUERY
+  now simply do not ask, and their moved tests assert exactly that.
+- **`userCanOpenTeam` / `selectAmbientTeam` → `openableTeams()`.** Who may open a
+  team is the HOST's policy — the same test its chrome uses before rendering a
+  page at all — and `apps/ui` already writes it down once in
+  `behavior/ui-scope-resolution`. Restating it in the package would have been the
+  copy this migration forbids, so the port asks for the ANSWER, ordered, and
+  `resolveLlmOpsProjectSlug` reads it. Its moved test turns on which teams the
+  host offered instead of on an organization role, which is the same question at
+  the seam that owns it.
+- **`LoadingScreen` → `waiting()`.** A `ReactNode` off the port, the shape
+  `projectSwitcher()` established. That screen is motion-driven, full-logo and
+  has thirteen other callers in `platform/app`.
+
+`selectedProjectSlug` and `lastVisitedHomeKind` are read off the port too: both
+are the application shell's own scope memory, already read by
+`behavior/ui-scope-storage`, and a second reader of the same `localStorage` key
+in a package is a split brain waiting to happen.
+
+#### The product switcher, and what is left in `platform/app/src/features/navigation`
+
+The header carries TWO switchers. The project one is above; the product one —
+Me / LLM Ops / Gateway / Governance, each with its pitch line, only the ones the
+reader can reach — is `ProductSwitcherMenu`, moved as it stood. Which product an
+address belongs to is `resolveShellRoute`'s answer, the package's own resolver,
+so the mark on the open product is the same rule the platform shells used.
+
+Nine more modules travelled with it: `sectionNavItems`, `logic/{resolveShellRoute,
+resolveOrgSwitchDestination,resolveSettingsBackTarget}`, `shell/quietChipStyle`,
+`shell/useIsMobileViewport` and `useVisibleSectionNavItems`. That empties
+`features/navigation/logic/` entirely.
+
+**`trackEvent("navigation_product_switch", …)` did NOT travel**, the line
+`@langwatch/workflow-web` drew for `trackEvent("workflow_create")`: product
+analytics is the application's, and `platform/app/src/utils/tracking` no longer
+exists to import in any case. A port method the host could only answer with
+nothing is worse than its absence, so the loss is recorded in the control rather
+than papered over — that was written as a `productSwitched` port method first
+and taken back out when the host had nothing true to say.
+
+**THREE MOVED RESOLVERS ARRIVED WITHOUT TESTS, and not because they had none.**
+`resolveShellRoute`, `resolveOrgSwitchDestination` and `resolveSettingsBackTarget`
+each had a unit suite in `platform/app`; commit `379b452def` ("Delete what nothing
+in platform/app can reach any more", 1,209 files) swept all three while this move
+was in flight. They are rewritten in the package — 21 cases over the three,
+including the segment-boundary trap `resolveShellRoute`'s own docblock warns
+about (`/metadata/traces` is the LLM Ops product, not Me) and the organization
+check that stops a captured settings return path leading into another
+organization. A resolver the chrome asks on every render may not arrive without
+a suite.
+
+**WHAT STAYS, and why it is a sidebar problem rather than a navigation one.**
+`features/navigation/shell/` keeps ten modules — `NavigationV2Shell`,
+`ProductSidebar`, `ShellTopBar`, `MobileShell`, `IconRail`,
+`ProductScopeControl`, `OrganizationSelect`, `shellLayout`,
+`useNavigationV2ShellState`, `useProductFlagsByOrganization` — plus
+`useNavigationV2ShellActive`, `useNavigationV2Tracking` and `useSettingsMenu`.
+Every one of them reaches something that is not navigation's to move:
+`MainMenu` (642 lines), `PersonalSidebar`, `components/sidebar/*`,
+`features/command-bar`, `AppHeaderUserMenu`, `DashboardPageBody` and
+`utils/api`. The SIDEBAR is the blocker, not the shell. Two deliberate
+exceptions: `useNavigationV2Tracking` is what `legacy-ui-shell.adapter.tsx`
+hands `createUiApplication` as its navigation-tracking provider, so it is a host
+concern until `apps/ui` composes its own providers; and `useSettingsMenu` would
+be a second settings menu next to `apps/ui`'s already-harvested
+`model/ui-settings-menu`.
+
+`IconRail` was surveyed and left on purpose. It is a whole shell MODE rather than
+chrome the top bar needs, it has no consumer on this side, and moving it costs
+its logo anchor: a governed web package may not import `react-router`
+(`frontend-ui-boundaries` forbids it by name), so its `Link` would have become a
+button and lost middle-click.
+
+#### THE DRAWER HALF DID NOT LAND HERE — it landed next, see "drawers — MOVED" below
+
+Every family since the gateway recorded that `openPlatformDrawer` writes
+`?drawer.open=<name>` and nothing opens. The chrome layout route is where the
+mount belongs and it is empty. This is structural, not unfinished:
+
+- `platform/app/src/components/drawerRegistry.ts` names **forty-five** components
+  by module path, every one of them a `platform/app` module. A registry that
+  moved into `apps/ui` would have nothing to point at: `apps/ui` does not depend
+  on `@langwatch/web` and, by ADR-004, must not.
+- A registry that STAYS there has to be handed to the chrome, and the only place
+  that could happen is `runtime/ui/legacy-ui-shell.adapter.tsx` — a
+  `platform/app` file, which is deletes-only. A `drawers:` field on the install
+  it passes is an insertion, and the rule for this migration is zero.
+- `hooks/useDrawer.ts` owns the address vocabulary and the complex-prop stores
+  those drawers read, and it has **246 importers** in `platform/app`. Moving it
+  moves the gap rather than closing it, and takes the optimization studio with it.
+
+So the drawer half costs one `platform/app` insertion or forty-five moved
+components. **That is the constraint AS THIS MOVE FOUND IT, and the drawer move
+below found both halves of it wrong.** There were 38 components, not forty-five;
+and the third option nobody had costed is the one that worked — split the ONE
+file that held both the registry mechanism and the module paths, move the
+mechanism into `@langwatch/ui-drawer` where it names no drawer at all, and let
+each feature install its own. No `platform/app` file is edited and no drawer had
+to move to close the mount. What this move contributed is where the answer
+attaches: the mount point is a real layout route, above every project-scoped
+address, and the section below mounts `CurrentDrawer` on it.
+
+#### `pages/authorize` + `pages/mcp/authorize`: the row was wrong about the block
+
+The re-ranking says these two "were blocked only on the switcher". The switcher
+block is gone and they still did not move, because reading them found two more:
+
+- `/authorize` copies `project.apiKey`. `apps/ui`'s scope graph carries ids,
+  names and slugs and no key — deliberately, since the base key is gated
+  (`organization.base-key-redaction`) — so the reading has to be added to a port
+  and gated, which is an api-key-family decision and not a chrome one.
+- `/mcp/authorize` POSTs to `/api/mcp/authorize` and reads `isAllowedRedirectScheme`
+  off `~/mcp/redirectSchemes`, then hands the reader to a third-party address.
+  That is a REST exchange of the `/cli/auth` kind — which went into
+  `apps/ui/src/behavior` and is pinned there byte for byte — plus a redirect
+  allowlist, not a page move.
+
+They are a family-sized move with an owner question of their own, not a leftover
+of this one.
+
+#### What this move broke in `platform/app`, deliberately
+
+`components/DashboardLayout`, `components/AppHeaderUserMenu`,
+`components/settings/TeamForm`, `hooks/useOrganizationTeamProject`,
+`features/navigation/useSettingsMenu`, `features/navigation/useNavigationV2Tracking`,
+`components/ui/layouts/SectionNavigationLayout` and every remaining
+`features/navigation/shell/*` import something that moved — a logo, an avatar,
+the product registry, a switcher or a resolver. They are left broken, which is
+the rule for this migration. `pages/index.module.css` became unreachable with
+its page and is deleted.
+
+#### What is asserted, beyond the moved suites
+
+`apps/ui/tests/chrome-layout.integration.test.tsx` is the one new suite: it
+mounts the layout route over a page key this package serves and over one it does
+not, and asserts the header in the first case and its absence in the second —
+the double-header regression, in both directions. It also pins the pick href,
+including the segment-boundary case a plain `startsWith` gets wrong
+(`/acme-app-staging/traces` is not a sub-path of `/acme-app`).
+
+- Suites: `@langwatch/navigation-web` 13 files / 84 tests green, `apps/ui` 82
+  files / 705 tests green, `platform/app`'s loader parity 7 tests green.
+
+### drawers — MOVED (the infrastructure whole; 6 of 39 registry entries live)
+
+The gap eighteen manifests recorded, and the one the chrome section above said
+cost "one `platform/app` insertion or forty-five moved components". It cost
+neither, because the choice was false — and the forty-five was wrong too.
+
+#### The number was never forty-five
+
+`platform/app/src/components/drawerRegistry.ts` held **38 lazy components under
+39 registry keys** (the thirty-ninth, `traceV2Details`, is a noop whose real
+shell the traces page mounts itself). Every manifest since the gateway repeated
+"forty-five"; nothing in the tree ever had forty-five. Counted from the file
+before it was deleted: `grep -c "lazyDefault({"` is 38, and the object literal
+has 39 entries.
+
+#### Where the drawer infrastructure lives now
+
+`@langwatch/ui-drawer` (`packages/ui-drawer`), created for this move. It owns
+the whole URL-routed singleton model and **names no drawer at all**:
+
+| moved from | to |
+| --- | --- |
+| `hooks/useDrawer.ts` | `src/behavior/use-drawer.ts` |
+| `hooks/traceDrawerV2Routing.ts` | `apps/ui/src/features/drawers/model/ui-trace-drawer-routing.ts` |
+| `hooks/usePreloadDrawer.ts` | `src/behavior/drawer-preloader.ts` |
+| `components/drawerRegistry.ts` (the mechanism half) | `src/model/drawer-registry.ts` |
+| `components/CurrentDrawer.tsx` | `src/ui/sections/current-drawer.tsx` |
+| `utils/qsParseOptions.ts` (already deleted; restored from the trace copy) | `src/model/qs-parse-options.ts` |
+
+That is what unlocked it. The blocker was never the drawers — it was that the
+registry MECHANISM and the forty-odd module paths lived in ONE file, so moving
+either meant moving both. Split, the mechanism is framework code with no
+`platform/app` reach and the paths are composition.
+
+#### The registry is installed, the way page loaders already are
+
+`apps/ui/src/features/installed-ui-drawers.ts` is the twin of
+`installed-ui-features.ts`: it spreads one `UiDrawerRegistry` per feature, each
+declared in that feature's own `index.ts` beside its api binding and its page
+loaders. A feature publishes `{ key: lazyDrawer({ factory, key }) }`; nothing at
+the root knows what any drawer renders. **No host file is edited to hand a
+registry over**, which is what made this survivable under deletes-only.
+
+`ui-app-chrome` mounts `CurrentDrawer` once, above the outlet and **outside the
+header branch**. The header is conditional because a legacy page brings its own;
+a drawer is not, because it is addressed by the query string and renders through
+a portal, so a reader following `?drawer.open=…` onto a legacy page is asking
+for the same drawer.
+
+#### Four seams redesigned, each because the platform import has no package export
+
+- **The router.** `useDrawer` drove every navigation through
+  `~/utils/compat/next-router` — a faked Next router with
+  `push(url, as, { shallow, flushSync })`. `src/behavior/drawer-router.ts` reads
+  the same three facts (`query`, `asPath`, a push/replace of one address)
+  straight off `react-router`. `shallow` meant nothing outside Next. `flushSync`
+  was load-bearing for a real reason — a first-time lazy drawer under a
+  transition keeps the previous UI committed instead of painting the fallback —
+  and React Router 8 only wraps navigations in `startTransition` behind a future
+  flag this application does not set, so a plain navigate commits and the
+  fallback paints.
+- **The trace funnel.** `routeTraceDrawerForV2` named two drawers by hand INSIDE
+  the navigator. It is an install now (`installDrawerOpenRewrite`), registered
+  from `installed-ui-drawers.ts` at module scope so a deep link that names
+  `traceDetails` is funnelled before anything has mounted.
+- **`DrawerType`.** It was `keyof typeof drawers`, which only works while one
+  module names every drawer. `useDrawer<R>()` is generic over the registry
+  instead: `useUiDrawer()` in `apps/ui` binds it to the composed registry and
+  keeps per-drawer prop checking at the call site; a caller inside a feature
+  package, which may not name the application's registry, gets strings. Same
+  trade `@langwatch/workflow-web`'s studio copy made, without giving up the
+  typed half.
+- **The EXTERNAL-member restriction.** `CurrentDrawer` read
+  `useOrganizationTeamProject` for the organization role and drove
+  `platform/app`'s upgrade-modal store when a lite member addressed
+  `addDatasetRecord`. Both are host policy, not framework, so the whole rule is
+  one optional `restriction` prop. **`apps/ui` passes none today**, so the
+  restriction is NOT in force there — recorded rather than faked, and it closes
+  when that application has a membership tier to ask about.
+
+- **`warmChunk`.** `preloadDrawer` reached for `@langwatch/ui`'s warm-up, which
+  records a failed fetch so the global `vite:preloadError` listener does not
+  reload the page for a warm-up nobody awaited. A package may not import the
+  application, so the warmer is a parameter and `apps/ui` passes its own.
+
+#### Six entries live, and why the other 33 are not
+
+Registered and opening from their `?drawer.open=` addresses:
+
+| key | component now lives in | what it took |
+| --- | --- | --- |
+| `evaluatorHistory` | `@langwatch/evaluator-web/drawers` | the panel had already travelled; the platform copy was a duplicate and is deleted |
+| `evaluatorList` | `@langwatch/evaluator-web/drawers` | moved whole: transport → the package's map, project → the host port, `ConfirmDialog` → the Design System's (same four props), the two comparison type ids → `@langwatch/experiment-web/experiments-v3/types` |
+| `selectDataset` | `@langwatch/dataset-web/drawers` | moved whole; the list is fetched in the drawer because this package's `DatasetPickerList` is presentational — same procedure, so tRPC keys it to the same cache entry |
+| `promptList` | `@langwatch/prompt-web/drawers` | moved whole; icons, catalogue and handle formatting all had package homes already |
+| `agentTypeSelector` | `apps/ui/src/features/agent` | it was ALREADY a pure URL adapter — the control is `@langwatch/agent-web`'s — so the half that moved is the half that was always composition |
+| `traceDetails` → `traceV2Details` | the rewrite, not a component | the funnel travels as an install |
+
+The other thirty-three each need one of two things this move does not own:
+
+- **Their family's transport and host port extended.** `llmModelCost`,
+  `defaultModelOverride` and `editModelProvider` are the model-config family's
+  recorded gap and want `llmModelCost.createOrUpdate`, the matching-spans
+  preview, `ScopeChipPicker` and `HorizontalFormControl` in
+  `@langwatch/model-provider-web`. `onlineEvaluation` (1,407 lines) and
+  `guardrails` want a monitor-web that has no drawer content yet.
+  `createProject` / `editProject` / `createTeam` / `inviteMember` have no
+  destination package at all — settings S1 has not moved. The five
+  scenario/suite/agent-testing drawers and the three agent editors drag a code
+  editor, an outputs section and a scenario mapping section that have no package
+  home.
+- **One drawer navigator, not two.** `promptEditor`, `evaluatorEditor`,
+  `evaluatorCategorySelector`, `codeEvaluatorEditor`, `addOrEditDataset` and
+  `uploadCSV` have ALREADY travelled into their packages — and every one of them
+  drives `@langwatch/workflow-web/studio-host/use-drawer`, a second copy of this
+  same model with its own module-scope stack, complex props and flow callbacks,
+  reached through a router shim that throws without a `WorkflowHostProvider`.
+  Registering them today would give the application two drawer stacks that agree
+  only on the URL, and would throw on mount. **Repointing that file is the next
+  move and it is a small one** — it is the same eight functions — but the
+  studio's whole `studio-host/` tree was untracked and in flight, so it is
+  recorded rather than raced.
+
+#### One live defect found and fixed on the way
+
+`AgentTypeSelectorDrawer` passed `open={props.open === true}` to the control.
+The registry spreads the PARSED ADDRESS onto a drawer, so `open` arrives as the
+string `"agentTypeSelector"`, the strict comparison is false, and the control
+rendered closed — the drawer could never have opened from its own address. It
+reads the way every other registered drawer reads it now: anything defined and
+not `false` means open.
+
+#### What `platform/app` lost, deliberately
+
+Twelve files deleted, zero insertions: `hooks/useDrawer.ts` (246 importers),
+`hooks/traceDrawerV2Routing.ts`, `hooks/usePreloadDrawer.ts` and its test,
+`components/drawerRegistry.ts`, `components/CurrentDrawer.tsx` and its two
+tests, and the five drawer components that moved. Every one of those 246
+importers is left broken, which is the rule for this migration.
+
+#### What is asserted
+
+- `apps/ui/tests/chrome-drawer.integration.test.tsx` — the gap itself, driven the
+  way a reader does: an address naming a drawer, through the chrome LAYOUT
+  ROUTE, onto a page below it, and the drawer is on screen. Plus the close
+  (leaves the page's own query parameters alone), the legacy-page case, and the
+  address that names none.
+- `apps/ui/tests/installed-ui-drawers.unit.test.ts` — the one way a SPREAD
+  registry can fail that a single object literal could not: two features
+  registering the same name silently keeps one.
+- `packages/ui-drawer/src/ui/sections/__tests__/current-drawer.integration.test.tsx`
+  — the whole address round trip over a real router, including `goBack` between
+  two drawers and the installed open-rewrite. `platform/app` had no such test;
+  `CurrentDrawer` was only ever exercised through one drawer's bulk selection.
+- Suites: `@langwatch/ui-drawer` 3 files / 18 tests green, `apps/ui` 84 files /
+  711 tests green, `@langwatch/evaluator-web` 6 files / 41 tests green,
+  `@langwatch/dataset-web` 18 files / 117 tests green, `@langwatch/prompt-web`
+  38 files / 643 tests green.
+
+### traces — MOVED. 2 keys, 650 platform files, 0 insertions, 98,627 deletions
+
+Moved sixteenth, and it is the largest move of the programme by a factor of
+seven: 98,627 deletions out of `platform/app` against ops' 13,646, and the
+destination package went from 180 files to 979. Everything else follows the
+shape file for file — one host port (`model/trace-host.ts`), one hand-written
+procedure map (`behavior/trace-api.ts`), a `testing.tsx`-shaped `vitest.setup.ts`
+the gateway family introduced, and `withUiPageGuard` in front of the same loader
+registry.
+
+Destination `@langwatch/trace-web`, which already existed and already published
+the explorer's stores, formatters, transcript and flame views — which is exactly
+why five earlier families were told there was "no table surface to consume".
+There is now.
+
+**THE ROW'S TWO KEYS ARE TWO, and both were named by other families' manifests.**
+`/:project/traces` is the Trace Explorer. `/share/:id` the auth front door
+already assigned here in as many words — "it is the TRACE family's page … it
+moves with traces" — and the annotations family drew the same line for its queue
+walker. Both moved.
+
+#### The subscription gate is closed, and it is what unblocked this family
+
+The re-ranking table listed traces first under "cross-cutting gates: apps/ui's
+transport declares none". `ProcedureShape` has a `subscription` variant now and
+`sse-subscription-link.ts` carries them, so `traces.onTraceUpdate`,
+`tracesV2.onDiscoverUpdate`, `export.onExportProgress` and the two presence
+streams are declared in the map like any other procedure and the live explorer
+keeps streaming. That is the one thing the ops family recorded losing
+(`ops.dashboardStream`) and this family did not have to lose.
+
+#### MOVE DIRECTORIES, NOT CLOSURES — and what that cost
+
+`features/traces-v2` moved whole to `src/explorer`, `components/traces` whole to
+`src/components/traces`, and the two page bodies to `src/screens/traces`. The
+platform layout is MIRRORED under the package root for everything the closure
+dragged (`src/hooks/`, `src/utils/`, `src/components/`, `src/features/`,
+`src/shared/`, `src/server/`), which is the convention the studio agent had
+already started in this package and the cheapest possible import rewrite: every
+`~/X` became a relative path to `src/X`.
+
+- **157 closure files came with them**, 16,640 lines: the onboarding
+  observability codegen and its 28 `?raw` snippets, `features/presence`,
+  `features/langy`'s three gates, `components/me`'s personal-feature gate, ten
+  `components/ui` pieces, `shared/traces/*`, `server/traces/edit-overlay/*` and
+  `server/tracer/tracesMapping`.
+- **`~/server/tracer/tracesMapping` did NOT become a contract module.** The row
+  asked for that; the file had already been moved into `@langwatch/trace-web`'s
+  mirrored `src/server/tracer/` by the studio slice that needed it, and moving it
+  a second time into `trace-contract` would have broken that slice mid-flight for
+  no gain — it is browser-safe where it is, and its two Prisma row types now come
+  from `@langwatch/annotation-contract` rather than from the generated client.
+- **`features/errors` was COPIED, not moved**, and it is the one deliberate copy
+  in this move: `logic/presentation.ts` is 3,696 lines of code-keyed customer
+  copy with ~100 `platform/app` importers, and moving it would have taken the
+  error registry away from every surface that has not moved yet. The copy carries
+  the alignment obligation `@langwatch/enterprise-billing-contract` states about
+  its Prisma enum copies. It dies when the registry gets the package it has been
+  owed since the governance family.
+
+#### The procedure map is the biggest one yet, and three-quarters of it is not this feature's
+
+`behavior/trace-api.ts` declares 90 procedures under 27 mount points. Only
+`tracesV2.*`, `traces.*`, `traceEditOverlay.*` and `sharedTrace.*` are the trace
+feature's; the rest — `annotation`, `annotationScore`, `savedViews`, `share`,
+`pinnedTrace`, `presence`, `prompts`, `evaluators`, `monitors`, `scenarios`,
+`translate`, `apiKey`, `user`, `organization`, `project`, `storedObjects`,
+`export`, `featureFlag`, `analytics`, `modelProvider`, `personalWorkspaceFeatures`,
+`setupSkills`, `ops` — are other features' transports the drawer reads on the way
+to rendering one trace. Addressing them costs this package nothing but the
+strings, exactly as the analytics family argued: the payload types come from the
+CONTRACTS (`@langwatch/trace-contract`, `annotation-contract`, `share-contract`,
+`presence-contract`, `coding-agent-contract`, `scenario-contract`), and a
+contract is portable by construction.
+
+The map exports `api` as well as `traceApi`, which is what let ~60 files keep
+their `api.tracesV2.header.useQuery(...)` call sites unchanged.
+
+#### Four shims kept ~150 call sites from being edited at all
+
+- **`behavior/use-organization-team-project.ts`** answers the platform hook's
+  NAME and SHAPE off the host port. Fifty-nine call sites destructure it; none
+  changed. The redirect-to-onboarding bouncer did not travel — that is landing
+  policy and belongs to whatever serves the address — and the options object is
+  accepted and ignored so a caller that passed one still compiles.
+- **`behavior/next-router.ts`** is `useRouter`, adapted. `react-router` is sealed
+  off from `src/features/*` and the host already answers everything five call
+  sites read.
+- **`behavior/auth-session.ts`** is `useSession` and `useRequiredSession` over
+  `host.currentUser()`. The 200-line public-route table and the sign-in redirect
+  did not travel, for the same reason.
+- **`behavior/use-drawer.ts`** is the overlay ADDRESS, with the module-level
+  navigation STACK ported. The stack was nearly dropped and should not have been:
+  two scenarios in `specs/traces-v2/drawer-stacking.feature` pin it, and
+  `getTopDrawer` is the STACK's top rather than the address bar's — that
+  difference is the whole point of the second scenario, because the trace drawer
+  mounts from its own store and the address can name an overlay the stack has
+  already left. What did NOT travel is `complexProps` and `flowCallbacks`:
+  nothing addressable survives a reload, and no caller in this family registered
+  one.
+
+`setQuery` MERGES here, and this is the first family that needed it to.
+`UiRoutePort.setQuery` replaces the whole query, which is right for a screen that
+owns its address; the explorer does not own its address alone — the filter rail,
+the time range, the lens, the drawer and the span selection each write their own
+keys from different components in the same tick. The merge is done in the
+adapter, over the reading.
+
+#### Hazards, as they actually resolved
+
+- **`usePublicEnv` could not keep its static half.** It read
+  `@langwatch/ui/public-config`, and `@langwatch/ui` IS `apps/ui` — a feature
+  package naming it closes a cycle onto the application that mounts it. The
+  package reads the `langwatch-public-config` meta tag itself now, narrowed to
+  the two keys this family uses (`BASE_HOST`, `DEMO_PROJECT_SLUG`), and a MISSING
+  tag reads as "unknown deployment" rather than throwing: the application's
+  reader throws, which is right for a boot boundary and wrong for a test that
+  mounts one surface.
+- **`apps/ui`'s `lib` went to `es2023`.** `@langwatch/langy-web` — which the
+  explorer's search bar, bulk action bar and drawer all reach for — uses
+  `toSorted`, `findLast` and `findLastIndex`, and a workspace package resolves to
+  its dependency's SOURCE. Additive only, and it is what let the Langy handoff
+  travel WHOLE rather than being dropped the way the me, automations and agents
+  families each had to drop theirs. THIS FAMILY LOSES NO LANGY SURFACE.
+- **The ambient declarations needed a triple-slash reference.** `*.css` (langy's)
+  and `*?raw` (the 28 onboarding snippets) resolve inside the package's own
+  `include` and nowhere else, so `screens/traces/index.ts` references
+  `types/ambient.d.ts` — the automations family's fourth-family addition, second
+  sighting.
+- **`AppRouter` became a phantom type.** `utils/trpcError` and `useSSESubscription`
+  typed a `TRPCClientError` by the application's mounted router, which does not
+  exist until a process instantiates it. Nothing reads a procedure off it.
+- **The browser lane is excluded, and CI never ran it either.** Two
+  `*.browser.test.tsx` files drive a contenteditable caret, which jsdom does not
+  have; `platform/app` ran them from a separate `vitest.browser.config.ts` that
+  CI did not run. The analytics family recorded the same thing about its own.
+- **`EvaluatorTracesMapping` came with the TracesMapping suite** and needed
+  `useFilterParams`, which reads `~/server/filters/registry` and
+  `~/server/analytics/utils`. `behavior/use-filter-params.ts` answers the project
+  and a 30-day window instead, so the mapping preview samples RECENT traces
+  rather than filtered ones — which is what it showed on an unfiltered page
+  anyway. The same wall the automations family hit, and the same answer.
+
+#### Overlays, and the chrome gap
+
+`traceV2Details` is this family's OWN and does not have the problem every earlier
+family recorded: `GlobalTraceV2DrawerMount` mounts it from the explorer's own
+store, inside the screen, so opening a trace from the table works on a
+package-served page. Six overlays are other features' — `addDatasetRecord`,
+`evaluatorEditor`, `onlineEvaluation`, `promptEditor`, `automation` and
+`scenarioRunDetail` — and those write the right `?drawer.open=…` address and open
+nothing until the chrome layout route mounts `CurrentDrawer` above a screen
+served from `apps/ui`. Same gap, same closing work. `components/drawerRegistry.ts`
+was NOT touched: every entry this family opens has openers outside it.
+
+#### Known costs, all reported rather than suppressed
+
+- **`platform/app` is left broken in the usual way and worse.** 650 files are
+  gone, and the closure took modules whose remaining consumers are other
+  families' — `components/Markdown`, `components/UserAvatar`,
+  `components/SetupWithAgentButton`, `components/modelProviders/iconsMap`,
+  `hooks/useSSESubscription`, `hooks/useReducedMotion`, `hooks/useDejaViewLink`,
+  `utils/trpcError` and `components/ui/{IsolatedErrorBoundary,RedactedField,…}`.
+  Under the not-gradual ruling those consumers are left broken; every one of them
+  closes when its own family moves.
+- ONE PLATFORM FILE WAS RESTORED rather than moved, and it is worth naming
+  because the closure walker took it by accident: `src/env.mjs` is reached by a
+  relative import from a moved module and is the application's own environment
+  boundary. `platform/app`'s test setup imports it, so taking it turned the
+  loader-parity suite from red into unrunnable. The same sweep briefly took
+  `utils/api.tsx`, `components/drawerRegistry.ts` and 120 files under
+  `src/server/` — every one put back. A closure walker that follows RELATIVE
+  imports out of a moved file will walk into the whole application; bound it by
+  path prefix, and audit what it took before believing the diff.
+- New architecture-lint findings, every one an import: the procedure map's
+  `@langwatch/platform-api-client` (the exception every family since governance
+  carries), `react-router` in `useURLSync` (the explorer keeps its own
+  address-sync loop), `@tanstack/react-query`'s `keepPreviousData`, and eleven
+  web-to-web edges — `@langwatch/ops-web` for `Kbd` (14 lines, the shape the
+  explorer already had), `langy-web`, `presence-web`, `annotation-web`,
+  `coding-agent-web`, `share-web`, `suite-web`, `evaluator-web`, `scenario-web`,
+  `model-provider-web` and `workflow-web`.
+- ZERO scenario bindings lost. Every moved test kept its annotations, including
+  the two `specs/traces-v2/drawer-stacking.feature` cases the drawer stack exists
+  for.
+- Suites: `@langwatch/trace-web` 231 files / 1,817 tests green (from 42 / 406
+  before the move), `apps/ui` 84 files / 711 tests green, `platform/app`'s loader
+  parity 7 tests green. `pnpm typecheck` clean for both `@langwatch/trace-web`
+  and `apps/ui`.
+
+#### The sixteenth family's own additions, for whoever moves the seventeenth
+
+- **A package that already publishes half a family is the cheapest destination
+  and the most dangerous one.** `@langwatch/trace-web` held 180 files of stores
+  and formatters that the moving 979 imported by PACKAGE NAME. 301 files had to
+  have `@langwatch/trace-web` rewritten to a relative path before anything
+  compiled, because a package that self-references through its own `exports` is
+  resolvable at runtime and not by `moduleResolution: "bundler"`.
+- **Mirror the source layout for the closure; do not relayout it.** `src/hooks/`,
+  `src/utils/`, `src/components/` and `src/server/` under the package are exactly
+  `platform/app/src`'s, which turns every `~/X` into one relative path and every
+  test's `vi.mock("~/X")` with it. The grammar directories (`model/`, `behavior/`,
+  `screens/`) hold only what this move WROTE.
+- **A shim named after the hook it replaces is worth more than a better name.**
+  Four modules kept the platform names — `useOrganizationTeamProject`,
+  `useRouter`, `useSession`, `useDrawer` — and that is what kept ~150 call sites
+  and every `vi.mock` path in 231 test files from needing an edit.
+- **Check the destination's git status before moving a file into it.** Two other
+  slices were moving into this package at the same time; `mv` of a directory onto
+  an existing directory of the same name NESTS rather than merges, and the tell is
+  a path like `components/traces/traces/`.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -3478,18 +4187,20 @@ closures are computed net of that.
 | 9   | settings S6 credentials + /cli/auth                                                                                       | 3    | 14+12  | **MOVED** — see the section above. Three keys and TWO packages: `secrets` went to a new `@langwatch/secret-web` rather than riding in `api-key-web`, because every type on that page is the secret contract's. The row was right that the CLI screen could not ship separately. What it missed is that `/cli/auth` talks to three REST routes the published CLI polls the other side of, so the exchange moved into `apps/ui/src/behavior` and is pinned there byte for byte; that the secrets spec was 0/0 bound and its four refusal codes had no customer copy at all; and that the rbac fix, harmless on the roles page, adds three explicit `langy` strings to an admin's CLI key.                                                                                                                         |
 | 10  | analytics                                                                                                                 | 9    | 49+17  | **MOVED** — see the section above. Nine keys, eight screens, 72 platform files. The row was right about the four retired automations breaks and about `custom/[id]` being tab-as-prop, and it undercounted the files by half: `features/analytics-query` (21 prod + 18 tests) and the filter rail were not in its 49+17. What it missed is that three of the nine keys address ANOTHER feature's transport and stay here anyway — the first overruled ownership call, argued on the record — and that governing a destination which already had 6,150 lines of its own meant relaying the whole package out first.                                                                                                                                                                                              |
 | 11  | evaluations/evaluators                                                                                                    | 7    | 16+8   | **MOVED (3 of 7 keys), TWO packages** — see the section above. THREE keys and four features, not one family: `evaluators` to `@langwatch/evaluator-web`, `online-evaluations` to a NEW `@langwatch/monitor-web`, and `evaluations/wizard` retired to a route-table redirect. The row's drawer warning was right and undercounted the shape: `evaluatorEditor` has 15 openers not 20, but SIX of the family's seven overlays stay platform-owned, so both moved screens lose their create and edit actions to the recorded chrome gap. What it missed is that `experiments/index` needed no split at all — the shared module is the experiments page end to end — and that the two `edit` keys are blocked on ~8,000 lines of copies, 1,414 of them the trace feature's mapping vocabulary that 31 modules read. |
-| 12  | workflows/studio/chat                                                                                                     | 3    | 53+19  | **MOVED (2 of 3 keys)** — see the section above. TWO keys, not three: `/:project/workflows` and `/:project/chat/:workflow` went to `@langwatch/workflow-web`, which already owned their presentation, so the move is adapters plus pages. `/:project/studio/:workflow` STAYS, blocked on a copy set of 220 files and 40,543 lines — `~/server/tracer/tracesMapping` and `components/traces/TracesMapping` again, plus all of `experiments-v3`, `DynamicZodForm`, the dataset editor, the prompt editor drawer and `FieldsFilters`' three `~/server` imports. The row's promise about the prompt-model copies is NOT kept and could not have been: those nine copies are reached through the studio's LLM field, and every one of them has other platform consumers anyway.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 12  | workflows/studio/chat                                                                                                     | 3    | 53+19  | **MOVED (3 of 3 keys)** — see the section above. The first pass took `/:project/workflows` and `/:project/chat/:workflow` into `@langwatch/workflow-web`, which already owned their presentation, so that move was adapters plus pages. The second took `/:project/studio/:workflow`, which the first pass had recorded as blocked on a 220-file, 40,543-line copy set: under the no-copies ruling that set is a routing table, not a wall, and its 257 files were MOVED across eight web packages (workflow 104, experiment 38, prompt 28, model-provider 23, trace 22, evaluator 18, analytics 15, dataset 9 — 49,944 lines), leaving `platform/app/src/optimization_studio/` deleted entirely. The row's promise about the prompt-model copies is kept after all, by moving them rather than by killing them: `ModelSelector` and its eight siblings are in `@langwatch/model-provider-web`, and the platform files that still imported them are broken on purpose. |
 | 13  | auth front door + public (joint)                                                                                          | 13   | ~76    | **MOVED (8 keys of 13)** — see the section above. The row was right that there were no blockers and that the missing destination was the whole problem; `@langwatch/auth-web` is it. What it got wrong is "joint": the four public keys are three OTHER families' pages. `pages/index` is navigation's (243 lines of `useLandingRedirect`), `pages/share/[id]` is the trace view and moves with traces on the line annotations drew, and `pages/{authorize,mcp/authorize}` are one handoff family blocked on the chrome gap in the one way that is not survivable — `ProjectSelector` IS how you choose what is being authorized, and `apps/ui` answers `projectSwitcher()` with `null`. What it missed is that the front door has no page guard by design, that the identity wire has to travel INSIDE the package to stay one client, and that the presentation registry has to be reachable for four of the moved suites to pass — which is what forced the explainer seam plus a 33-entry harvest. |
 | 14  | onboarding                                                                                                                | 4    | 54+11  | order after traces (traces-v2/onboarding is the largest consumer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 15  | settings S1 org/members/teams                                                                                             | 5    | 25+7   | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 16  | settings S3 billing                                                                                                       | 4    | 17+9   | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 17  | settings S8 integrations                                                                                                  | 2    | 2+2    | **MOVED (1 key, not 2)** — `@langwatch/github-web/screens/integrations` serves `pages/settings/integrations` through `apps/ui/src/features/github`, with the host port, the procedure map and the `organization:manage` guard inside the harvested settings chrome. The row's second key was a guess at a sibling that does not exist: the route table declares one `/settings/integrations` row and nothing else in it names an integration. "No destination" was wrong too — the package already existed, holding the connect popup the Langy card opens. |
-| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces |      |        | anti-targets / downstream                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench |      |        | anti-targets / downstream                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **Cross-cutting gates:**
 
-- tRPC subscriptions: apps/ui's transport declares none — blocks traces (5
-  consumers), experiments workbench, langy layout, simulations+agent-testing.
+- tRPC subscriptions: CLOSED. `ProcedureShape` has a `subscription` variant and
+  `sse-subscription-link.ts` carries the lane, which is what let the traces
+  family move with its five live procedures intact. The experiments workbench,
+  the langy layout and simulations+agent-testing are no longer blocked on it.
 - The chrome layout route that would mount CurrentDrawer for package-served
   screens is SEPARATE work from moving ProjectLangyLayout, and it is what
   closes the recorded me/automations/gateway drawer gaps.

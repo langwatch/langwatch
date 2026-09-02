@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRowPulseStore } from "@langwatch/trace-web";
+import { useRowPulseStore } from "../index";
 
 beforeEach(() => {
   vi.useFakeTimers();

@@ -6,16 +6,16 @@
  * and fails the moment a page key changes. Every family before this one left
  * its keys alone for the same reason.
  *
- * THE THIRD KEY IS NOT HERE. `pages/[project]/studio/[workflow]` is still
- * served by `platform/app`, and it is blocked on the size of its copy set
- * rather than on ownership — the numbers are in
- * `dev/docs/plans/ui-family-move-manifests.md` and restated in the package's
- * screen entry. The route table is unchanged either way, so a reader moving
- * between the list and the studio never learns which half of the product served
- * which page.
+ * THE THIRD KEY LANDED. `pages/[project]/studio/[workflow]` was recorded as
+ * blocked on a copy set of 220 platform modules; the deletes-only ruling turned
+ * every one of those copies into a move, and the studio now answers out of
+ * `@langwatch/workflow-web/screens/studio`. The route table is unchanged, so a
+ * reader moving between the list and the studio never learns which half of the
+ * product served which page.
  *
  * THE POLICIES DIFFER AND THEY ARE THE PLATFORM PAGES', ONE FOR ONE. The list
- * page was `withPermissionGuard("workflows:view")`; the chat page was not
+ * page was `withPermissionGuard("workflows:view")`; the studio page and the chat
+ * page were not
  * wrapped at all, which is what a shared link to a published workflow's chat
  * has always done. `layoutComponent: DashboardLayout` was the other half of the
  * list page's call and does not travel — chrome belongs to the route tree, and
@@ -27,6 +27,7 @@
  * stable for the life of the route.
  */
 
+import { studioScreens } from "@langwatch/workflow-web/screens/studio";
 import { workflowScreens } from "@langwatch/workflow-web/screens/workflows";
 import type { ComponentType } from "react";
 
@@ -63,7 +64,20 @@ const workflowChatPage: UiPageLoader = async () => {
   return { default: withWorkflowHost(guarded) };
 };
 
+/**
+ * The studio carries NO page guard, which is the platform page's own policy:
+ * `pages/[project]/studio/[workflow]` was never wrapped, and a workflow the
+ * reader cannot open is refused by `workflow.getById` rather than by the route.
+ */
+const workflowStudioPage: UiPageLoader = async () => {
+  const module = await studioScreens.studio();
+  const guarded = withUiPageGuard({ fallbacks: FALLBACKS })(module.default as ComponentType);
+  guarded.displayName = "WorkflowStudioPage";
+  return { default: withWorkflowHost(guarded) };
+};
+
 export const workflowPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/workflows": workflowsListPage,
   "pages/[project]/chat/[workflow]": workflowChatPage,
+  "pages/[project]/studio/[workflow]": workflowStudioPage,
 };

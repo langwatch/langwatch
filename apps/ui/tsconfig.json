@@ -4,7 +4,7 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "types": [],
     "strict": true,
     "noUncheckedIndexedAccess": true,

@@ -1,0 +1,149 @@
+import { createLogger } from "@langwatch/observability";
+import { useCallback, useEffect, useState } from "react";
+import { toaster } from "../../studio-host/toaster";
+import { generateOtelTraceId } from "@langwatch/trace-web/utils/trace";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+import { usePostEvent } from "./usePostEvent";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+
+const logger = createLogger("langwatch:studio:execution");
+
+export const useWorkflowExecution = () => {
+  const { postEvent, socketStatus } = usePostEvent();
+
+  const [triggerTimeout, setTriggerTimeout] = useState<{
+    trace_id: string;
+    timeout_on_status: "waiting" | "running";
+  } | null>(null);
+
+  const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore((state) => ({
+    getWorkflow: state.getWorkflow,
+    setWorkflowExecutionState: state.setWorkflowExecutionState,
+  }));
+
+  const socketAvailable = useCallback(() => {
+    if (socketStatus !== "connected") {
+      toaster.create({
+        title: "Studio is not connected yet",
+        type: "error",
+        duration: 5000,
+      });
+      return false;
+    }
+    return true;
+  }, [socketStatus]);
+
+  useEffect(() => {
+    const workflow = getWorkflow();
+    if (
+      triggerTimeout &&
+      workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
+      workflow.state.execution?.status === triggerTimeout.timeout_on_status
+    ) {
+      logger.warn(
+        {
+          trace_id: triggerTimeout.trace_id,
+          timeout_on_status: triggerTimeout.timeout_on_status,
+        },
+        "workflow execution timeout triggered",
+      );
+      setWorkflowExecutionState({
+        status: "error",
+        error: "Timeout",
+        timestamps: { finished_at: Date.now() },
+      });
+      toaster.create({
+        title: `Timeout ${
+          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
+        } workflow execution`,
+        type: "error",
+        duration: 5000,
+      });
+    }
+  }, [triggerTimeout, setWorkflowExecutionState, getWorkflow]);
+
+  const startWorkflowExecution = useCallback(
+    ({
+      untilNodeId,
+      inputs,
+    }: {
+      untilNodeId?: string;
+      inputs?: Array<Record<string, string>>;
+    }) => {
+      if (!socketAvailable()) {
+        return;
+      }
+
+      const trace_id = generateOtelTraceId();
+      logger.info({ trace_id, untilNodeId }, "workflow execution starting");
+
+      setWorkflowExecutionState({
+        status: "waiting",
+        trace_id,
+        until_node_id: untilNodeId,
+      });
+
+      const workflow = getWorkflow();
+      const payload: StudioClientEvent = {
+        type: "execute_flow",
+        payload: {
+          trace_id,
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
+          until_node_id: untilNodeId,
+          inputs: inputs,
+          manual_execution_mode: true,
+          origin: "workflow",
+        },
+      };
+      postEvent(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
+      }, 20_000);
+    },
+    [socketAvailable, getWorkflow, postEvent, setWorkflowExecutionState],
+  );
+
+  const stopWorkflowExecution = useCallback(
+    ({ trace_id }: { trace_id: string }) => {
+      if (!socketAvailable()) {
+        return;
+      }
+
+      logger.info({ trace_id }, "workflow execution stopping");
+
+      const workflow = getWorkflow();
+      const current_state = workflow.state.execution?.status;
+      if (current_state === "waiting") {
+        setWorkflowExecutionState({
+          status: "idle",
+          trace_id: undefined,
+        });
+        return;
+      }
+
+      const payload: StudioClientEvent = {
+        type: "stop_execution",
+        payload: { trace_id },
+      };
+      postEvent(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({
+          trace_id,
+          timeout_on_status: "running",
+        });
+      }, 10_000);
+    },
+    [socketAvailable, setWorkflowExecutionState, postEvent, getWorkflow],
+  );
+
+  return {
+    startWorkflowExecution,
+    stopWorkflowExecution,
+  };
+};

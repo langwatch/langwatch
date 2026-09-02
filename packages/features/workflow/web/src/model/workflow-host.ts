@@ -21,10 +21,31 @@
 
 import { createContext, useContext } from "react";
 
-/** The project the current page is about. */
+/**
+ * The project the current page is about.
+ *
+ * FOUR FIELDS WERE ADDED FOR THE OPTIMIZATION STUDIO, and they are additions
+ * rather than a second port because they are the same question: fifty-six
+ * modules in the studio's closure asked the application's
+ * `useOrganizationTeamProject` for the scope, and between all of them they read
+ * the project, the organization, the team and whether the answer had settled.
+ * Everything else that hook resolves — the demo project, the external-member
+ * permission table, the onboarding redirect — is the application's own business
+ * and stayed there.
+ *
+ * `isResolved` is the tri-state the studio actually needs: a screen that treats
+ * "still arriving" as "no project" renders an empty studio over a workflow that
+ * is about to load.
+ */
 export type WorkflowScope = {
   projectId: string | undefined;
   projectSlug: string | undefined;
+  /** The project's display name, for the places that title something with it. */
+  projectName?: string | undefined;
+  organizationId?: string | undefined;
+  teamId?: string | undefined;
+  /** False while the composing application is still resolving the scope. */
+  isResolved?: boolean;
 };
 
 /** One project the reader may replicate a workflow into. */
@@ -58,10 +79,19 @@ export type WorkflowSuccessNotice = {
   id?: string;
 };
 
-/** The path parameters and query string the screen was opened with. */
+/**
+ * The path parameters and query string the screen was opened with.
+ *
+ * `pathname` was added for the studio: its drawer navigation composes an
+ * address out of the current one, and ninety-odd of its call sites read
+ * `router.pathname` or `router.asPath` off the compat shim that no longer
+ * travels with them.
+ */
 export type WorkflowRouteReading = {
   params: Readonly<Record<string, string | undefined>>;
   query: Readonly<Record<string, string | undefined>>;
+  /** The matched route path, e.g. `/:project/studio/:workflow`. */
+  pathname?: string;
 };
 
 /** The one thing a screen is handed. */
@@ -86,6 +116,15 @@ export abstract class WorkflowHostPort {
   /** Goes to an address this application serves — the studio, after a create. */
   abstract navigate(to: string): void;
 
+  /**
+   * Steps back one entry in the reader's own history.
+   *
+   * Added for the studio, which offers a way out of a dead end and out of a
+   * drawer it opened. A host with no history to step back through may make this
+   * a no-op; nothing in the family treats it as a navigation that must land.
+   */
+  abstract back(): void;
+
   abstract succeeded(notice: WorkflowSuccessNotice): void;
   abstract failed(failure: WorkflowFailureNotice): void;
 }
@@ -102,6 +141,17 @@ export const WorkflowHostProvider = WorkflowHostContext.Provider;
  * it, which is a composition fault rather than something a screen can degrade
  * around.
  */
+/**
+ * The host, or nothing.
+ *
+ * For the handful of things that are still correct without one: a link is an
+ * anchor whether or not a router is listening, and refusing to render it would
+ * turn a missing composition into a blank page rather than a slower navigation.
+ */
+export function useOptionalWorkflowHost(): WorkflowHostPort | undefined {
+  return useContext(WorkflowHostContext);
+}
+
 export function useWorkflowHost(): WorkflowHostPort {
   const host = useContext(WorkflowHostContext);
   if (!host) {

@@ -93,6 +93,21 @@ const AUTH_PAGE_KEYS = [
   "pages/invite/accept",
 ];
 
+/**
+ * The chrome layout route, which is a KEY and not a page: the route table entry
+ * that names it carries children and no path, so it renders the header and the
+ * navigation host around whatever matched below it. It is registered the same
+ * way every page is, because the loader registry is the one seam the route table
+ * resolves a component through.
+ */
+const CHROME_PAGE_KEYS = ["features/chrome/UiAppChrome"];
+
+/**
+ * The root address, `/`. Its whole body is the landing redirect, and it carries
+ * no page guard for the same reason the front door carries none.
+ */
+const NAVIGATION_PAGE_KEYS = ["pages/index"];
+
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
   // page-level grant — `organization:manage` — because both pages read
@@ -212,13 +227,22 @@ const PROMPT_PAGE_KEYS = [
 ];
 
 const WORKFLOW_PAGE_KEYS = [
-  // TWO keys of the ranking row's three. `pages/[project]/studio/[workflow]`
-  // is deliberately absent: the optimization studio's copy set is 220 files and
-  // 40,543 lines of `platform/app`, including the trace feature's mapping
-  // vocabulary and three `~/server` modules a browser package may not name, so
-  // it stays where it is and the route table still serves it.
+  // ALL THREE keys of the ranking row. The studio was recorded as blocked on a
+  // copy set of 220 `platform/app` modules; under the deletes-only ruling those
+  // stopped being copies and became moves — the trace, experiment, evaluator,
+  // dataset, prompt and model-provider vocabularies each went to the package
+  // that owns them, and what no feature owns stayed with the studio.
   "pages/[project]/workflows",
   "pages/[project]/chat/[workflow]",
+  "pages/[project]/studio/[workflow]",
+];
+
+const TRACE_PAGE_KEYS = [
+  // The Trace Explorer, and the read-only page a share link lands on. Two keys,
+  // two screens, and only the first of them takes a grant: `/share/:id` is
+  // reachable signed out by design.
+  "pages/[project]/traces",
+  "pages/share/[id]",
 ];
 
 const OPS_PAGE_KEYS = [
@@ -296,6 +320,7 @@ describe("given what apps/ui serves itself", () => {
           ...AUTH_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...CHROME_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
@@ -304,10 +329,12 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
+          ...NAVIGATION_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...TRACE_PAGE_KEYS,
           ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
@@ -315,7 +342,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Twenty-three for twenty-two features: the personal workspace mounts
+      // One more binding than there are features: the personal workspace mounts
       // two, because the coding-agent tables its screens render call procedures
       // of their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
@@ -335,10 +362,12 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/enterprise-governance-web",
         "@langwatch/model-provider-web",
         "@langwatch/monitor-web",
+        "@langwatch/navigation-web",
         "@langwatch/ops-web",
         "@langwatch/organization-web",
         "@langwatch/prompt-web",
         "@langwatch/secret-web",
+        "@langwatch/trace-web",
         "@langwatch/workflow-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
@@ -394,6 +423,7 @@ describe("given what apps/ui serves itself", () => {
           ...AUTH_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...CHROME_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
@@ -402,15 +432,17 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
+          ...NAVIGATION_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...TRACE_PAGE_KEYS,
           ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(23);
+      expect(merged.apis).toHaveLength(25);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

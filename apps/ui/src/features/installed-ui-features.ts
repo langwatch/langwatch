@@ -22,6 +22,7 @@ import { apiKeyApiBinding, apiKeyPageLoaders } from "./api-key";
 import { annotationApiBinding, annotationPageLoaders } from "./annotation";
 import { authApiBinding, authPageLoaders } from "./auth";
 import { authzApiBinding, authzPageLoaders } from "./authz";
+import { chromePageLoaders } from "./chrome";
 import { automationsAllPageLoaders, automationsApiBinding } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
 import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
@@ -31,11 +32,13 @@ import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { githubApiBinding, githubPageLoaders } from "./github";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
+import { navigationApiBinding, navigationPageLoaders } from "./navigation";
 import { monitorApiBinding, monitorPageLoaders } from "./monitor";
 import { opsApiBinding, opsPageLoaders } from "./ops";
 import { organizationApiBinding, organizationPageLoaders } from "./organization";
 import { promptApiBinding, promptPageLoaders } from "./prompt";
 import { secretApiBinding, secretPageLoaders } from "./secret";
+import { traceApiBinding, tracePageLoaders } from "./traces";
 import { workflowApiBinding, workflowPageLoaders } from "./workflows";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
@@ -47,6 +50,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...apiKeyPageLoaders,
     ...authPageLoaders,
     ...authzPageLoaders,
+    ...chromePageLoaders,
     ...automationsAllPageLoaders,
     ...dataPrivacyPageLoaders,
     ...dataRetentionPageLoaders,
@@ -56,11 +60,13 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...githubPageLoaders,
     ...governancePageLoaders,
     ...modelProviderPageLoaders,
+    ...navigationPageLoaders,
     ...monitorPageLoaders,
     ...opsPageLoaders,
     ...organizationPageLoaders,
     ...promptPageLoaders,
     ...secretPageLoaders,
+    ...tracePageLoaders,
     ...workflowPageLoaders,
     ...personalWorkspacePageLoaders,
   },
@@ -81,10 +87,12 @@ export const installedUiFeatures: UiFeatureInstall = {
     governanceApiBinding,
     modelProviderApiBinding,
     monitorApiBinding,
+    navigationApiBinding,
     opsApiBinding,
     organizationApiBinding,
     promptApiBinding,
     secretApiBinding,
+    traceApiBinding,
     workflowApiBinding,
     ...personalWorkspaceApiBindings,
   ],

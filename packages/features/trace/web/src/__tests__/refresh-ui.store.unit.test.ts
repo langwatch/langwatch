@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRefreshUIStore } from "@langwatch/trace-web";
+import { useRefreshUIStore } from "../index";
 
 beforeEach(() => {
   vi.useFakeTimers();

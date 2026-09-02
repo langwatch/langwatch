@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSuggestionState } from "@langwatch/trace-web";
+import { getSuggestionState } from "../index";
 
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {

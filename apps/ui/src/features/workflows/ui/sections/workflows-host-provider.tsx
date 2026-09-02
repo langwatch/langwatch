@@ -40,15 +40,40 @@ function WorkflowHost({ children }: { children: ReactNode }) {
    * platform pages did: every workflow belongs to a project.
    */
   const project = useMemo(() => {
-    if (!scope.projectId) return { projectId: void 0, projectSlug: void 0 };
+    if (!scope.projectId) {
+      return {
+        projectId: void 0,
+        projectSlug: void 0,
+        projectName: void 0,
+        organizationId: void 0,
+        teamId: void 0,
+        isResolved: organizations.isFetched,
+      };
+    }
     for (const organization of organizations.data ?? []) {
       for (const team of organization.teams) {
         const found = team.projects.find((candidate) => candidate.id === scope.projectId);
-        if (found) return { projectId: found.id, projectSlug: found.slug };
+        if (found) {
+          return {
+            projectId: found.id,
+            projectSlug: found.slug,
+            projectName: found.name,
+            organizationId: organization.id,
+            teamId: team.id,
+            isResolved: true,
+          };
+        }
       }
     }
-    return { projectId: scope.projectId, projectSlug: void 0 };
-  }, [organizations.data, scope.projectId]);
+    return {
+      projectId: scope.projectId,
+      projectSlug: void 0,
+      projectName: void 0,
+      organizationId: scope.organizationId ?? void 0,
+      teamId: void 0,
+      isResolved: organizations.isFetched,
+    };
+  }, [organizations.data, organizations.isFetched, scope.projectId, scope.organizationId]);
 
   const copyTargets = useMemo(
     () =>
@@ -61,6 +86,18 @@ function WorkflowHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
+  /**
+   * The studio's own router shim reads `pathname`, which the route capability
+   * does not carry: `UiRouteReadingValues` is parameters and query only. The
+   * address bar is the honest answer and the one the platform compat shim gave.
+   */
+  const routeReading = useMemo(
+    () => ({
+      ...reading,
+      pathname: typeof window === "undefined" ? "" : window.location.pathname,
+    }),
+    [reading],
+  );
   const host = useMemo(
     () =>
       UiWorkflowHost.create(
@@ -68,16 +105,17 @@ function WorkflowHost({ children }: { children: ReactNode }) {
           scope: project,
           hasPermission: (permission: string) => session.hasPermission(permission),
           copyTargets,
-          route: reading,
+          route: routeReading,
         },
         {
           setQuery: (next, options) => route.setQuery(next, options),
           navigate: (to) => navigation.navigate(to),
+          back: () => navigation.back(),
           succeeded: (notice) => feedback.succeeded(notice),
           failed: (failure) => feedback.failed(failure),
         },
       ),
-    [project, session, copyTargets, reading, route, navigation, feedback],
+    [project, session, copyTargets, routeReading, route, navigation, feedback],
   );
 
   return <WorkflowHostProvider value={host}>{children}</WorkflowHostProvider>;

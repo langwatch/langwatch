@@ -3,7 +3,7 @@
  * See specs/traces-v2/bulk-actions.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { useSelectionStore } from "@langwatch/trace-web";
+import { useSelectionStore } from "../index";
 
 const selection = () => Array.from(useSelectionStore.getState().traceIds);
 

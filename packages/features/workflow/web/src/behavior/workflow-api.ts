@@ -103,6 +103,35 @@ export type WorkflowOrganizationGraph = {
   }[];
 };
 
+
+/**
+ * A procedure the OPTIMIZATION STUDIO calls whose row shape no contract package
+ * publishes yet.
+ *
+ * The studio reaches eleven other features' transports — datasets, prompts,
+ * evaluators, experiments, model providers, saved views, traces — and every one
+ * of those rows is declared in a `*-server` package's transport rather than in
+ * a contract a browser package may name. Restating fifty row shapes by hand
+ * would be fifty restatements to keep in step with a server nobody would notice
+ * drifting.
+ *
+ * So the borrowed procedures are declared by PATH ONLY, which is the part that
+ * is actually load-bearing: the segment names are what tRPC hashes into the
+ * React Query cache key, and getting one wrong is what silently splits a cache.
+ * The row shapes stay where the call sites already had them — inferred from the
+ * data the procedure returns — until the owning feature's contract publishes
+ * them.
+ *
+ * THIS IS THE OWED WORK, named rather than hidden: every `Unpublished` below is
+ * one shape a contract package should declare, and the day it does, the entry
+ * stops being a placeholder without any call site changing.
+ */
+// oxlint-disable-next-line no-explicit-any
+type Unpublished = any;
+
+type UnpublishedQuery = { query: { input: Unpublished; output: Unpublished } };
+type UnpublishedMutation = { mutation: { input: Unpublished; output: Unpublished } };
+
 export type WorkflowApiMap = {
   workflow: {
     /** The project's workflows, newest edit first, with copy lineage redacted. */
@@ -157,6 +186,20 @@ export type WorkflowApiMap = {
         output: { pushedTo: number; selectedCopies: number };
       };
     };
+
+    /**
+     * The studio's own eight, and they are the family's own transport rather
+     * than borrowed vocabulary — the graph it loads, autosaves, commits,
+     * publishes and restores.
+     */
+    getById: UnpublishedQuery;
+    getVersions: UnpublishedQuery;
+    engineMode: UnpublishedQuery;
+    autosave: UnpublishedMutation;
+    commitVersion: UnpublishedMutation;
+    generateCommitMessage: UnpublishedMutation;
+    publish: UnpublishedMutation;
+    restoreVersion: UnpublishedMutation;
   };
 
   optimization: {
@@ -167,7 +210,13 @@ export type WorkflowApiMap = {
     getPublishedWorkflow: {
       query: {
         input: { workflowId: string; projectId: string };
-        output: { dsl: unknown } | null;
+        /**
+         * Null when nothing is published yet. The row itself is the workflow
+         * version — `dsl`, `version`, `isComponent`, `isEvaluator` — and the
+         * studio's publish menu reads all four, so it is `Unpublished` rather
+         * than the one field the chat address needed.
+         */
+        output: Unpublished;
       };
     };
 
@@ -182,12 +231,111 @@ export type WorkflowApiMap = {
         output: unknown;
       };
     };
+
+    /** The saved components and evaluators the node palette offers. */
+    getComponents: UnpublishedQuery;
+    toggleSaveAsComponent: UnpublishedMutation;
+    disableAsComponent: UnpublishedMutation;
+    toggleSaveAsEvaluator: UnpublishedMutation;
+    disableAsEvaluator: UnpublishedMutation;
   };
 
   organization: {
     getAll: { query: { input: { isDemo: boolean }; output: WorkflowOrganizationGraph[] } };
   };
+
+  /**
+   * THE BORROWED VOCABULARY, one segment per feature the studio reaches.
+   *
+   * Every path here is the path the call site already wrote as `api.x.y`, kept
+   * letter for letter so a studio query and the same query fired from a page
+   * this application still serves land on ONE React Query cache entry.
+   */
+  agents: { getById: UnpublishedQuery; update: UnpublishedMutation };
+  analytics: { dataForFilter: UnpublishedQuery };
+  annotationScore: { getAllActive: UnpublishedQuery };
+  dataset: {
+    getAll: UnpublishedQuery;
+    getById: UnpublishedQuery;
+    upsert: UnpublishedMutation;
+    validateDatasetName: UnpublishedQuery;
+    findNextName: UnpublishedQuery;
+  };
+  datasetRecord: {
+    create: UnpublishedMutation;
+    deleteMany: UnpublishedMutation;
+    download: UnpublishedMutation;
+    getAll: UnpublishedQuery;
+    getHead: UnpublishedQuery;
+    listPaginated: UnpublishedQuery;
+    update: UnpublishedMutation;
+  };
+  evaluations: {
+    availableCustomEvaluators: UnpublishedQuery;
+    availableEvaluators: UnpublishedQuery;
+    runEvaluation: UnpublishedMutation;
+  };
+  evaluators: {
+    getAll: UnpublishedQuery;
+    create: UnpublishedMutation;
+    getById: UnpublishedQuery;
+    update: UnpublishedMutation;
+  };
+  experiments: {
+    getExperimentBatchEvaluationRun: UnpublishedQuery;
+    getExperimentBatchEvaluationRuns: UnpublishedQuery;
+    getExperimentBySlugOrId: UnpublishedQuery;
+  };
+  featureFlag: { isEnabled: UnpublishedQuery };
+  httpProxy: { execute: UnpublishedMutation };
+  llmModelCost: { getModelLimits: UnpublishedQuery };
+  modelProvider: {
+    getAllForProject: UnpublishedQuery;
+    getAllForProjectForFrontend: UnpublishedQuery;
+    getResolvedDefault: UnpublishedQuery;
+    listAllForProjectForFrontend: UnpublishedQuery;
+  };
+  monitors: { isNameAvailable: UnpublishedMutation };
+  ops: { getScope: UnpublishedQuery };
+  project: {
+    getFieldRedactionStatus: UnpublishedQuery;
+    getProjectAPIKey: UnpublishedQuery;
+  };
+  promptTags: {
+    create: UnpublishedMutation;
+    delete: UnpublishedMutation;
+    getAll: UnpublishedQuery;
+  };
+  prompts: {
+    assignTag: UnpublishedMutation;
+    checkHandleUniqueness: UnpublishedQuery;
+    getAllPromptsForProject: UnpublishedQuery;
+    create: UnpublishedMutation;
+    getAllVersionsForPrompt: UnpublishedQuery;
+    getByIdOrHandle: UnpublishedQuery;
+    getTagsForConfig: UnpublishedQuery;
+    update: UnpublishedMutation;
+    updateHandle: UnpublishedMutation;
+  };
+  savedViews: {
+    create: UnpublishedMutation;
+    delete: UnpublishedMutation;
+    getAll: UnpublishedQuery;
+    rename: UnpublishedMutation;
+    reorder: UnpublishedMutation;
+  };
+  secrets: { list: UnpublishedQuery };
+  storedObjects: { headById: UnpublishedQuery };
+  traces: {
+    getFieldNames: UnpublishedQuery;
+    getFormattedSpansDigest: UnpublishedQuery;
+    getSampleTraces: UnpublishedQuery;
+    getSampleTracesDataset: UnpublishedQuery;
+    getTopicCounts: UnpublishedQuery;
+    getTracesWithSpansByThreadIds: UnpublishedQuery;
+  };
 };
+
 
 /**
  * The Workflows family's typed tRPC hooks. Same machinery, same transport and

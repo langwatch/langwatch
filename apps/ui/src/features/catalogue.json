@@ -17,10 +17,12 @@
     "@langwatch/github-web",
     "@langwatch/model-provider-web",
     "@langwatch/monitor-web",
+    "@langwatch/navigation-web",
     "@langwatch/ops-web",
     "@langwatch/organization-web",
     "@langwatch/prompt-web",
     "@langwatch/secret-web",
+    "@langwatch/trace-web",
     "@langwatch/user-web"
   ],
   "features": [
@@ -98,6 +100,16 @@
       }
     },
     {
+      "id": "chrome",
+      "root": "chrome",
+      "uses": {
+        "screens": [],
+        "surfaces": [
+          "@langwatch/navigation-web/chrome"
+        ]
+      }
+    },
+    {
       "id": "data-privacy",
       "root": "data-privacy",
       "uses": {
@@ -124,6 +136,16 @@
         "screens": [
           "@langwatch/dataset-web/screens/datasets"
         ],
+        "surfaces": [
+          "@langwatch/dataset-web/drawers"
+        ]
+      }
+    },
+    {
+      "id": "drawers",
+      "root": "drawers",
+      "uses": {
+        "screens": [],
         "surfaces": []
       }
     },
@@ -134,7 +156,9 @@
         "screens": [
           "@langwatch/evaluator-web/screens/evaluators"
         ],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/evaluator-web/drawers"
+        ]
       }
     },
     {
@@ -173,6 +197,16 @@
       "uses": {
         "screens": [
           "@langwatch/model-provider-web/screens/model-provider"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "navigation",
+      "root": "navigation",
+      "uses": {
+        "screens": [
+          "@langwatch/navigation-web/screens/landing"
         ],
         "surfaces": []
       }
@@ -224,7 +258,9 @@
         "screens": [
           "@langwatch/prompt-web/screens/prompt-studio"
         ],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/prompt-web/drawers"
+        ]
       }
     },
     {
@@ -238,11 +274,22 @@
       }
     },
     {
+      "id": "traces",
+      "root": "traces",
+      "uses": {
+        "screens": [
+          "@langwatch/trace-web/screens/traces"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "workflows",
       "root": "workflows",
       "uses": {
         "screens": [
-          "@langwatch/workflow-web/screens/workflows"
+          "@langwatch/workflow-web/screens/workflows",
+          "@langwatch/workflow-web/screens/studio"
         ],
         "surfaces": []
       }

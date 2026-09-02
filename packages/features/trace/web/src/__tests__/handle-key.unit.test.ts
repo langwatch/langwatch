@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EditorContext, handleKey, type KeyAction } from "@langwatch/trace-web";
+import { type EditorContext, handleKey, type KeyAction } from "../index";
 
 function ctx(overrides: Partial<EditorContext> = {}): EditorContext {
   return {

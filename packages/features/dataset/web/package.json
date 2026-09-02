@@ -14,6 +14,26 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./components/datasets/DatasetPickerList": {
+      "types": "./src/components/datasets/DatasetPickerList.tsx",
+      "default": "./src/components/datasets/DatasetPickerList.tsx"
+    },
+    "./components/datasets/UploadCSVDrawer": {
+      "types": "./src/components/datasets/UploadCSVDrawer.tsx",
+      "default": "./src/components/datasets/UploadCSVDrawer.tsx"
+    },
+    "./components/datasets/editor/DatasetEditorTable": {
+      "types": "./src/components/datasets/editor/DatasetEditorTable.tsx",
+      "default": "./src/components/datasets/editor/DatasetEditorTable.tsx"
+    },
+    "./components/datasets/editor/DatasetPreviewTable": {
+      "types": "./src/components/datasets/editor/DatasetPreviewTable.tsx",
+      "default": "./src/components/datasets/editor/DatasetPreviewTable.tsx"
+    },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
     "./screens/datasets": {
       "types": "./src/screens/datasets/index.ts",
       "default": "./src/screens/datasets/index.ts"
@@ -30,9 +50,14 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "3.2.2",
     "@emotion/react": "^11.14.0",
+    "@hookform/resolvers": "^5.4.0",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.5",
     "date-fns": "^4.1.0",
@@ -40,6 +65,10 @@
     "nanoid": "^5.1.5",
     "papaparse": "^5.5.3",
     "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-papaparse": "^4.4.0",
+    "use-debounce": "^10.1.1",
     "zustand": "^4.5.7"
   },
   "devDependencies": {

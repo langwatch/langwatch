@@ -54,6 +54,7 @@ export type WorkflowHostActions = {
     options?: { replace?: boolean },
   ) => void;
   navigate: (to: string) => void;
+  back: () => void;
   succeeded: (notice: WorkflowSuccessNotice) => void;
   failed: (failure: WorkflowFailureNotice) => void;
 };
@@ -95,6 +96,10 @@ export class UiWorkflowHost extends WorkflowHostPort {
 
   navigate(to: string): void {
     this.actions.navigate(to);
+  }
+
+  back(): void {
+    this.actions.back();
   }
 
   succeeded(notice: WorkflowSuccessNotice): void {

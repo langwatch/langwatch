@@ -1,6 +1,6 @@
 import { useInvalidateProcedure } from "@langwatch/platform-api-client";
 import { readChangeTraceNameRejection } from "@langwatch/trace-contract";
-import { traceApi } from "../trace-api";
+import { traceApi } from "../behavior/trace-api";
 
 export type RenameTraceOutcome =
   | { ok: true }

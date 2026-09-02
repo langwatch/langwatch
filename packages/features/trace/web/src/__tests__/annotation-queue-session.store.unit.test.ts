@@ -8,7 +8,7 @@ import {
   isSessionMarked,
   sessionTraceIds,
   useAnnotationQueueSessionStore,
-} from "@langwatch/trace-web";
+} from "../index";
 
 const state = () => useAnnotationQueueSessionStore.getState();
 

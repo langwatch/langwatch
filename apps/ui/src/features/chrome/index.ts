@@ -14,29 +14,34 @@
  * IS a package's — the switcher control, the product registry, the landing
  * rules — lives in `@langwatch/navigation-web`, and this composes it.
  *
- * ## THE DRAWER GAP IS NOT CLOSED, AND THIS IS WHY
+ * ## THE DRAWER GAP IS CLOSED, AND NEITHER OF THE TWO PRICES WAS PAID
  *
- * Every moved family records the same line: `openPlatformDrawer` writes
- * `?drawer.open=<name>` and nothing opens, because no `CurrentDrawer` is mounted
- * above a screen served from here. This layout route is where that mount
- * belongs, and it is empty for a reason that is structural rather than
- * unfinished work:
+ * Every moved family recorded the same line: `openPlatformDrawer` writes
+ * `?drawer.open=<name>` and nothing opens, because no `CurrentDrawer` was
+ * mounted above a screen served from here. This section used to say the mount
+ * cost one `platform/app` insertion or forty-five moved components. It cost
+ * neither, because the choice was false: what had to move was not the forty-five
+ * DRAWERS, it was the registry MECHANISM they were nailed to.
  *
- * - `platform/app/src/components/drawerRegistry.ts` names FORTY-FIVE components
- *   by module path, every one of them a `platform/app` module. A registry that
- *   moved here would have nothing to point at: this package does not depend on
- *   `@langwatch/web` and, by ADR-004, must not.
- * - A registry that STAYS there has to be handed over, and the only place that
- *   could happen is `runtime/ui/legacy-ui-shell.adapter.tsx` — a `platform/app`
- *   file, which is deletes-only for the duration of this migration. Adding a
- *   `drawers:` field to the install it passes is an insertion.
- * - `hooks/useDrawer.ts`, which owns the address vocabulary and the complex-prop
- *   stores those drawers read, has 246 importers in `platform/app`. Moving it
- *   moves the gap rather than closing it.
+ * - `@langwatch/ui-drawer` now owns the address vocabulary, the navigation
+ *   stack, the complex-prop and flow-callback stores, the lazy registry and
+ *   `CurrentDrawer` — moved whole out of `hooks/useDrawer.ts`,
+ *   `components/drawerRegistry.ts` and `components/CurrentDrawer.tsx`. It names
+ *   no drawer at all, so nothing in it points at `platform/app`.
+ * - The registry is INSTALLED, the way page loaders already are: a feature
+ *   publishes `{ key: lazyDrawer(...) }` and `installed-ui-drawers.ts` spreads
+ *   them. No host has to hand anything over, so no `platform/app` file is
+ *   edited.
+ * - `ui-app-chrome` mounts the host once, above the outlet and OUTSIDE the
+ *   header branch — a drawer is addressed by the query string and renders
+ *   through a portal, so it opens over a legacy page too.
  *
- * So the drawer half needs one `platform/app` insertion or forty-five moved
- * components, and neither is available here. The mount point is this file's
- * layout route when it is.
+ * WHAT IS STILL OPEN is per drawer rather than structural: a drawer opens as
+ * soon as its component lives in its family's package with that package's
+ * transport and host port behind it. The ones that do are registered; the ones
+ * whose component is still a `platform/app` module, or whose closure drives
+ * `@langwatch/workflow-web`'s studio drawer navigator instead of this one, are
+ * recorded drawer by drawer in the family manifests.
  */
 
 import { chromePageLoaders } from "./ui/sections/chrome-routes";
