@@ -19,6 +19,12 @@ export {
   type BugReportTrpcContext,
   type BugReportTrpcPorts,
 } from "./transport/api-trpc/bug-report.api";
+export { BugReportRepository } from "./ports/bug-report.repository";
+export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository";
+export {
+  BugReportInboxService,
+  type BugReportListing,
+} from "./services/bug-report-inbox.service";
 export {
   OpsTrpcApi,
   type OpsScope,

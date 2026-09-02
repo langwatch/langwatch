@@ -167,29 +167,3 @@ async function resolveLinkedProjectId({
     return null;
   }
 }
-
-export async function getAllBugReports({
-  page,
-  pageSize,
-  search,
-}: {
-  page: number;
-  pageSize: number;
-  search?: string;
-}): Promise<{ reports: Omit<BugReport, "sessionData">[]; total: number }> {
-  const repository = new BugReportRepository(prisma);
-  const [reports, total] = await Promise.all([
-    repository.findAll({ page, pageSize, search }),
-    repository.count({ search }),
-  ]);
-  return { reports, total };
-}
-
-export async function getBugReportById({
-  id,
-}: {
-  id: string;
-}): Promise<BugReport | null> {
-  const repository = new BugReportRepository(prisma);
-  return repository.findById({ id });
-}

@@ -75,7 +75,12 @@ export {
   NullTraceAnalyticsRollupRepository,
   type TraceAnalyticsRollupRepository,
 } from "./repositories/trace-analytics-rollup.repository";
-export type { TraceClickHouseClient, TraceClickHouseResolver } from "./ports/clickhouse.port";
+export type {
+  TraceClickHouseClient,
+  TraceClickHouseResolver,
+  TraceClickHouseWriteClient,
+  TraceClickHouseWriteResolver,
+} from "./ports/clickhouse.port";
 export {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
@@ -119,6 +124,13 @@ export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.por
 export { TraceSpanStoragePort } from "./ports/trace-span-storage.port";
 export { ClickHouseTraceSpanStorageAdapter } from "./adapters/clickhouse.trace-span-storage.adapter";
 export { TraceStoredSpanReaderPort } from "./ports/trace-stored-span-reader.port";
+export { TraceDerivationSpanReaderPort } from "./ports/trace-derivation-span-reader.port";
+export { ClickHouseTraceDerivationSpanReaderAdapter } from "./adapters/clickhouse.trace-derivation-span-reader.adapter";
+export { TraceEventDerivationService } from "./services/trace-event-derivation.service";
+export {
+  ScenarioRoleMetricsDerivationService,
+  type ScenarioRoleMetricsDerivationInput,
+} from "./services/scenario-role-metrics-derivation.service";
 export { TraceSpanCollectionService } from "./services/trace-ingestion.service";
 export { TrackedEventSpanService } from "./services/tracked-event-span.service";
 export {
@@ -343,3 +355,14 @@ export {
   detectCausalityLoop,
   type EvaluationTriggerSubscriberDeps,
 } from "./subscribers/evaluation-trigger.subscriber";
+export { TraceExistencePort } from "./ports/trace-existence.port";
+export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/trace-existence.repository";
+export {
+  TraceEditOverlayRepository,
+  type TraceEditOverlayRow,
+} from "./repositories/prisma/prisma.trace-edit-overlay.repository";
+export {
+  TraceEditOverlayService,
+  type TraceEditIOField,
+} from "./services/trace-edit-overlay.service";
+export { createTraceProcessingProducerPipeline } from "./adapters/trace-processing-producer.adapter";

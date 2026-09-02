@@ -29,6 +29,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

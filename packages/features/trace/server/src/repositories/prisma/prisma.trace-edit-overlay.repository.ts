@@ -1,10 +1,23 @@
+/**
+ * The stored reviewer correction for a trace, over Prisma.
+ *
+ * Moved out of the application process unchanged: every filter, include and
+ * return shape — and the two-constraint upsert retry below — is the one a
+ * reviewer's save has always run through.
+ */
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient, TraceEditOverlay } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import type {
-  TraceEditOverlayAuthor,
-  TraceEditOverlayPatch,
-} from "@langwatch/trace-contract";
+import type { Prisma, PrismaClient, TraceEditOverlay } from "@langwatch/prisma-client/generated";
+import type { TraceEditOverlayAuthor, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+
+/**
+ * The id prefix every correction carries.
+ *
+ * Stated rather than imported: the application's `KSUID_RESOURCES` table is a
+ * browser-shared constant map, and one entry of it reaching a server package
+ * would drag the whole map. The value is the wire format of every id already
+ * stored.
+ */
+const TRACE_EDIT_OVERLAY_KSUID_RESOURCE = "traceedit";
 
 /** Only what an attribution line renders. The row is read on every corrected
  *  trace, so it never carries the rest of the User record. */
@@ -85,7 +98,7 @@ export class TraceEditOverlayRepository {
       return await this.prisma.traceEditOverlay.upsert({
         where: { projectId_traceId: { projectId, traceId } },
         create: {
-          id: generate(KSUID_RESOURCES.TRACE_EDIT_OVERLAY).toString(),
+          id: generate(TRACE_EDIT_OVERLAY_KSUID_RESOURCE).toString(),
           projectId,
           traceId,
           patch: stored,

@@ -70,6 +70,15 @@ import {
   type ApiExecutionCollaborators,
 } from "./api-trpc-collaborators.execution.composition";
 import {
+  composeApiProductCollaborators,
+  sealApiTrpcCollaborators,
+  withApiProductCollaborators,
+  ApiTrpcCollaboratorGapReport,
+  type ApiAnnotationTraceContentPort,
+  type ApiProductCollaborators,
+  type ApiSimulationEvidencePort,
+} from "./api-trpc-collaborators.product.composition";
+import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
 } from "./api-trpc-features.composition";
@@ -248,6 +257,24 @@ export type ApiProductionCompositionOptions = {
    * renderer onto its import graph. See {@link ApiIdentityMailPort}.
    */
   mail?: ApiIdentityMailPort;
+  /**
+   * The reviewer's trace content, for the annotation queue.
+   *
+   * The one thing the product half cannot build for itself: resolving a
+   * trace's full content with the caller's own redactions applied reaches a
+   * trace application this process does not compose. Absent means
+   * `annotation.getQueueItems` refuses by name rather than showing a reviewer
+   * an empty queue — see {@link ApiAnnotationTraceContentPort}.
+   */
+  traceContent?: ApiAnnotationTraceContentPort;
+  /**
+   * Whether a project has run any simulation, for the setup checklist.
+   *
+   * Absent reports that one step as not started, which is what the application
+   * answered whenever the read failed and is the safe direction: a checklist
+   * that wrongly says "done" stops somebody finishing their setup.
+   */
+  simulations?: ApiSimulationEvidencePort;
 };
 
 /** The credential pair every product transport on this process is built from. */
@@ -282,6 +309,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAnalytics: ApiAnalyticsCollaborators | undefined;
   private composedIdentity: ApiIdentityCollaborators | undefined;
   private composedExecution: ApiExecutionCollaborators | undefined;
+  private composedProduct: ApiProductCollaborators | undefined;
   /**
    * The one shared counter. Built at construction rather than inside
    * {@link composeFeaturePorts} because two callers meter through it — the
@@ -367,6 +395,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // it, and the evaluation re-score reports through a PRODUCER-only
     // registration of the same pipeline the worker drains.
     this.composedExecution = this.composeExecution(options, agents, encryption);
+    // The product half: a reviewer's annotations, the support inbox, the
+    // project's privacy rules and its setup checklist. It composes FIRST
+    // because it is the one half that cannot be missing on a process holding a
+    // database, which is what makes it the seed the other three fold onto.
+    this.composedProduct = this.composeProduct(options, authz);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: this.composedDatabase?.connection,
       // The SAME AuthZ service the REST doors authorize through: a permission
@@ -374,12 +407,25 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // same procedure would have.
       authz,
       audit: this.options.audit,
-      collaborators: withApiExecutionCollaborators(
-        withApiIdentityCollaborators(
-          withApiAnalyticsCollaborators(this.options.trpcCollaborators, this.composedAnalytics),
-          this.composedIdentity,
+      // Four folds and one seal. Each fold fills the entries its half owns and
+      // passes the rest through, which is what lets them compose in any order;
+      // the seal is what refuses a set any of them left incomplete, naming the
+      // entries rather than mounting twenty-two namespaces over the gaps.
+      collaborators: sealApiTrpcCollaborators(
+        withApiExecutionCollaborators(
+          withApiIdentityCollaborators(
+            withApiAnalyticsCollaborators(
+              withApiProductCollaborators(
+                this.options.trpcCollaborators,
+                this.composedProduct,
+              ),
+              this.composedAnalytics,
+            ),
+            this.composedIdentity,
+          ),
+          this.composedExecution,
         ),
-        this.composedExecution,
+        LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
       ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
     });
@@ -925,6 +971,46 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * Composes the product half of the collaborator set.
+   *
+   * One gate, and it is the database: every port in this half is a row read
+   * with a project or user id already in hand. The two capabilities it cannot
+   * build for itself — the reviewer's trace content and the simulations step of
+   * the setup checklist — arrive on the options and each degrades where it is
+   * used rather than here, so neither can make four namespaces unmountable.
+   *
+   * The ClickHouse client is the SAME one the charted reads run on, opened once
+   * by {@link composeAnalytics}. Only trace existence is read through it here,
+   * and a second connection would be a second pool against one server.
+   */
+  private composeProduct(
+    options: ApiRuntimeCompositionOptions,
+    authz: AuthzService,
+  ): ApiProductCollaborators | undefined {
+    const database = this.composedDatabase?.connection;
+    const projects = this.composedTenancy?.projects;
+    const organizations = this.composedTenancy?.organizations;
+    const users = this.composedAuth?.compose().users;
+    // A host that injected its own api-key and organization pair composed no
+    // tenancy here, so it holds the collaborator set whole and hands it in
+    // rather than having this half built for it.
+    if (!database || !projects || !organizations || !users) return undefined;
+
+    return composeApiProductCollaborators({
+      prisma: database.client,
+      authz,
+      projects,
+      organizations,
+      users,
+      processName: options.config.serviceName,
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      eventing: this.composedEventing?.eventSourcing,
+      ...(this.options.traceContent ? { traceContent: this.options.traceContent } : {}),
+      ...(this.options.simulations ? { simulations: this.options.simulations } : {}),
+    });
+  }
+
+  /**
    * Composes the execution half of the collaborator set over this process's
    * own graph.
    *
@@ -1381,5 +1467,30 @@ class ApiProductionProcess extends ApiRuntimeProcessPort {
 
   close(): Promise<void> {
     return this.process.close();
+  }
+}
+
+/**
+ * Writes the entries a collaborator set is missing to the process log.
+ *
+ * Named one by one on purpose. "The record did not mount" is a symptom every
+ * half shares; "no `evaluations` entry and no `application.workflows` slice" is
+ * the execution half, and an operator can act on that without reading a
+ * composition.
+ */
+export class LoggedApiCollaboratorGap extends ApiTrpcCollaboratorGapReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiCollaboratorGap {
+    return new LoggedApiCollaboratorGap(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  incomplete(missing: readonly string[]): void {
+    this.logger.warn(
+      { missing },
+      `API process composed an incomplete tRPC collaborator set, so it serves no packaged namespaces: ${missing.join(", ")} ${missing.length === 1 ? "was" : "were"} never filled by any half.`,
+    );
   }
 }

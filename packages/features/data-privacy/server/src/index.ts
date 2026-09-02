@@ -6,6 +6,25 @@ export {
 export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port";
 export { DataPrivacyResolutionService } from "./services/data-privacy-resolution.service";
 export {
+  DataPrivacyDirectoryPort,
+  type DataPrivacyOrganizationDirectory,
+  type DataPrivacyProjectLineage,
+} from "./ports/data-privacy-directory.port";
+export { DataPrivacyPermissionsPort } from "./ports/data-privacy-permissions.port";
+export {
+  PrismaDataPrivacyDirectoryRepository,
+  type DataPrivacyDirectoryDatabase,
+} from "./repositories/prisma/prisma.data-privacy-directory.repository";
+export {
+  DataPrivacySnapshotService,
+  type DataPrivacySnapshotPolicies,
+} from "./services/data-privacy-snapshot.service";
+export {
+  DataPrivacyScopeAuthorizationService,
+  requiredDataPrivacyWritePermission,
+} from "./services/data-privacy-scope-authorization.service";
+export { DataPrivacyService } from "./services/data-privacy.service";
+export {
   OtelPiiAnalysisMetricsAdapter,
   PII_ANALYSIS_DURATION_METRIC_NAME,
   PII_ANALYSIS_EVALUATOR_TYPE,

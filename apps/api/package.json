@@ -63,6 +63,8 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-server": "workspace:*",
     "@langwatch/enterprise-api": "workspace:*",
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*",
+    "@langwatch/enterprise-managed-provider-server": "workspace:*",
     "@langwatch/enterprise-plan-gate": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/entitlement-server": "workspace:*",

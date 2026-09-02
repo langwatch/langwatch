@@ -1,9 +1,9 @@
 import { ValidationError } from "@langwatch/handled-error";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
-} from "./traceEditOverlay.repository";
+} from "../repositories/prisma/prisma.trace-edit-overlay.repository";
 import {
   emptyTraceEditOverlayPatch,
   encodeSpanIOFromEditedText,
