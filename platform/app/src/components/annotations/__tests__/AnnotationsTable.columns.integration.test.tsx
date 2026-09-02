@@ -482,23 +482,51 @@ describe("AnnotationsTable columns and row actions", () => {
       fireEvent.click(screen.getByRole("button", { name: /Export/ }));
 
       const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      // The columns the table shows, in table order. "Helpfulness" is a score
+      // type of its own and off by default, so it is not here; the folded
+      // Scores column is what carries the answers, and it names the type.
       expect(call.fields).toEqual([
-        "Date queued",
-        "Status",
-        "Queued by",
         "Trace ID",
+        "Status",
+        "People",
+        "Date queued",
         "Input",
         "Output",
+        "Scores",
         "Comments",
         "Suggestions",
-        "Helpfulness",
         "Annotators",
       ]);
       expect(call.rows).toHaveLength(2);
       expect(call.rows[0]).toContain("trace-1");
       expect(call.rows[0]).toContain("Pending");
-      expect(call.rows[0]).toContain("good (on point)");
+      expect(call.rows[0]).toContain("Helpfulness: good (on point)");
       expect(call.fileName).toBe("Annotations - 2026-08-08.csv");
+    });
+
+    /** @scenario "A queue page exports the rows on screen" */
+    it("drops a column from the file when the reviewer hides it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      mocks.scoreTypes = [{ id: "score-1", name: "Helpfulness", active: true }];
+      renderQueuePage();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Suggestions" }),
+      );
+      // ...and take a score type's own column, which is off by default, on.
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Helpfulness" }),
+      );
+      await user.click(screen.getByRole("button", { name: /Export/ }));
+
+      const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      expect(call.fields).not.toContain("Suggestions");
+      expect(call.fields).toContain("Helpfulness");
     });
   });
 

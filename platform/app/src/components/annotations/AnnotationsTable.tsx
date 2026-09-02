@@ -66,6 +66,7 @@ import UserAvatarGroup from "./AvatarGroup";
 import {
   annotationColumnOptions,
   isColumnVisible,
+  SCORE_COLUMN_PREFIX,
   scoreColumnId,
 } from "./annotationColumns";
 import {
@@ -244,6 +245,70 @@ const givenScores = ({
       name: scoreType.name,
     })),
   );
+
+/**
+ * One column's value for one row, as the CSV writes it. Keyed by the same
+ * column ids the table lays out, so the export follows what the reviewer chose
+ * to see instead of keeping a second list that drifts from it.
+ */
+const exportedCell = ({
+  row,
+  columnId,
+  activeScoreTypes,
+}: {
+  row: AnnotationRow;
+  columnId: string;
+  activeScoreTypes: ActiveScoreType[];
+}): string => {
+  if (columnId.startsWith(SCORE_COLUMN_PREFIX)) {
+    return scoreValuesFor({
+      annotations: row.annotations,
+      scoreTypeId: columnId.slice(SCORE_COLUMN_PREFIX.length),
+    })
+      .map(scoreExportLine)
+      .join("\n");
+  }
+
+  switch (columnId) {
+    case "queuedBy":
+      return row.createdByUser?.name ?? "";
+    case "date":
+      return row.date ? row.date.toISOString() : "";
+    case "input":
+      return row.trace?.input?.value ?? "";
+    case "output":
+      return row.trace?.output?.value ?? "";
+    case "scores":
+      // The folded column names each type, the way its badges do — otherwise
+      // the file would hold a column of bare answers nobody can attribute.
+      return givenScores({ annotations: row.annotations, activeScoreTypes })
+        .map((score) => `${score.name}: ${scoreExportLine(score)}`)
+        .join("\n");
+    case "comments":
+      return row.annotations
+        .map((annotation) => annotation.comment)
+        .filter(Boolean)
+        .join("\n");
+    case "suggestions":
+      return row.annotations
+        .map((annotation) =>
+          suggestionExportLine({ annotation, traceId: row.traceId }),
+        )
+        .filter(Boolean)
+        .join("\n");
+    default:
+      return "";
+  }
+};
+
+/** One score as the file writes it: the answer, and why it was given. */
+const scoreExportLine = (score: {
+  value: string[];
+  reason?: string | null;
+}): string =>
+  score.reason
+    ? `${score.value.join(", ")} (${score.reason})`
+    : score.value.join(", ");
 
 const scoreValuesFor = ({
   annotations,
@@ -765,52 +830,33 @@ export const AnnotationsTable = ({
   );
 
   const exportPage = useCallback(() => {
+    // The file is the rows on screen, so it carries the columns on screen: a
+    // score type the reviewer folded away is not in it either, and the folded
+    // Scores column exports what its cell shows. Trace id, status and
+    // annotators ride along whatever the reviewer picked — they say which row
+    // this is and what became of it, rather than being something chosen to
+    // read.
+    const visibleColumns = columnOptions.filter((column) =>
+      isColumnVisible({ column, choices }),
+    );
+
     const fields = [
-      dateColumnLabel,
-      "Status",
-      "Queued by",
       "Trace ID",
-      "Input",
-      "Output",
-      "Comments",
-      "Suggestions",
-      ...activeScoreTypes.map((scoreType) => scoreType.name),
+      "Status",
+      ...visibleColumns.map((column) => column.label),
       "Annotators",
     ];
     const data = pageRows.map((row) => [
-      row.date ? row.date.toISOString() : "",
-      row.doneAt ? "Completed" : "Pending",
-      row.createdByUser?.name ?? "",
       row.traceId,
-      row.trace?.input?.value ?? "",
-      row.trace?.output?.value ?? "",
-      row.annotations
-        .map((annotation) => annotation.comment)
-        .filter(Boolean)
-        .join("\n"),
-      row.annotations
-        .map((annotation) =>
-          suggestionExportLine({ annotation, traceId: row.traceId }),
-        )
-        .filter(Boolean)
-        .join("\n"),
-      ...activeScoreTypes.map((scoreType) =>
-        scoreValuesFor({
-          annotations: row.annotations,
-          scoreTypeId: scoreType.id,
-        })
-          .map((score) =>
-            score.reason
-              ? `${score.value.join(", ")} (${score.reason})`
-              : score.value.join(", "),
-          )
-          .join("\n"),
+      row.doneAt ? "Completed" : "Pending",
+      ...visibleColumns.map((column) =>
+        exportedCell({ row, columnId: column.id, activeScoreTypes }),
       ),
       annotatorNames(row.annotations).join(", "),
     ]);
 
     downloadCsv({ fields, rows: data, fileName: csvFileName("Annotations") });
-  }, [activeScoreTypes, dateColumnLabel, pageRows]);
+  }, [activeScoreTypes, choices, columnOptions, pageRows]);
 
   const selectedCount = selectedRows.length;
 
