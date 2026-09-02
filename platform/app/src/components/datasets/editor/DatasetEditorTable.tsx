@@ -230,7 +230,8 @@ export function DatasetEditorTable({
   // landing a moment later removes from the grid. Presentation of search
   // RESULTS stays on `isSearching`, which is the right gate for it: there is
   // nothing to say about matches until the search has actually run.
-  const searchOwnsTheGrid = !!datasetId && (!!searchInput.trim() || isSearching);
+  const searchOwnsTheGrid =
+    !!datasetId && (!!searchInput.trim() || isSearching);
 
   // Where the user was before the search started, so clearing it puts them back
   // rather than on page 1 — see `onSearchChange` below, which maintains it.

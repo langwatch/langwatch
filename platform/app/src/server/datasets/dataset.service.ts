@@ -918,110 +918,17 @@ export class DatasetService {
     };
 
     if (dataset.contentLayout === "s3_jsonl") {
-      if (dataset.status !== "ready") {
-        throw new DatasetNotReadyError({
-          status: dataset.status,
-          statusError: dataset.statusError,
-        });
-      }
-
-      const rowCount = dataset.rowCount ?? 0;
-      if (rowCount > DATASET_SEARCH_MAX_ROWS) {
-        throw new DatasetTooLargeToSearchError({
-          rowCount,
-          maxRows: DATASET_SEARCH_MAX_ROWS,
-        });
-      }
-
-      // Which chunks to read. `chunkOffsets` is what ordinary paging trusts to
-      // locate rows, so the search has to agree with it: enumerating by
-      // `chunkCount` alone would, on a dataset whose count has drifted below its
-      // offsets, stop early and report "no matches" for rows the user can page
-      // to — the silent-wrong-answer this path exists to avoid. Offsets first,
-      // `chunkCount` as the fallback for legacy rows that have none.
-      // Same all-or-nothing validation the paged read uses. Keeping the
-      // individually-valid entries of a half-written array would scan only the
-      // chunks those entries name and report "no matches" for rows the pager,
-      // which rejects the whole array and falls back to `chunkCount`, still
-      // displays — the same dataset answering two ways.
-      const offsets = readValidChunkOffsets(dataset.chunkOffsets);
-
-      let chunkIndexes: number[];
-      if (offsets.length > 0) {
-        chunkIndexes = [...new Set(offsets.map((o) => o.index))].sort(
-          (a, b) => a - b,
-        );
-      } else {
-        // I-COUNT: a `ready` s3_jsonl dataset with no offsets MUST have a
-        // chunkCount. `?? 0` would scan zero chunks and report "no matches" for
-        // a dataset that has them.
-        if (dataset.chunkCount == null) {
-          throw new DatasetChunkCountMissingError(dataset.id);
-        }
-        chunkIndexes = Array.from({ length: dataset.chunkCount }, (_, i) => i);
-      }
-
-      const storage = await getDatasetStorage(params.projectId);
-      // `readChunk` per index, never `readChunks`: the plural form pulls every
-      // chunk into the heap at once, which is exactly what the row cap and the
-      // one-at-a-time read are here to prevent.
-      let rowsRead = 0;
-      for (const index of chunkIndexes) {
-        const rows = await storage.readChunk({
-          projectId: params.projectId,
-          datasetId: dataset.id,
-          index,
-        });
-        // Backstop for a `rowCount` that under-reports (or is null, which reads
-        // as 0 and would sail past the up-front check): the cap has to hold on
-        // what is actually read, not only on what the row claims.
-        rowsRead += rows.length;
-        if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
-          throw new DatasetTooLargeToSearchError({
-            rowCount: rowsRead,
-            maxRows: DATASET_SEARCH_MAX_ROWS,
-          });
-        }
-        for (const line of rows) {
-          collect(adaptS3JsonlRecord(line, dataset));
-        }
-      }
+      await this.scanChunksForMatches({
+        dataset,
+        projectId: params.projectId,
+        collect,
+      });
     } else {
-      // Postgres-backed (legacy) content. `sizeBytes` is null on these rows, so
-      // the export-time byte guard can never fire here — the row cap is the only
-      // thing bounding this scan.
-      const { count: rowCount } =
-        await this.recordRepository.countAndMaxUpdatedAt({
-          datasetId: dataset.id,
-          projectId: params.projectId,
-        });
-      if (rowCount > DATASET_SEARCH_MAX_ROWS) {
-        throw new DatasetTooLargeToSearchError({
-          rowCount,
-          maxRows: DATASET_SEARCH_MAX_ROWS,
-        });
-      }
-
-      // Keyset-paginate, like the PG→S3 backfill's streaming scan: `skip`/`take`
-      // would re-run a count(*) alongside every page (listPaginated does), so a
-      // scan at the cap would issue ~50 redundant full counts, and OFFSET
-      // degrades as it walks. The cursor is the previous page's last id, in the
-      // same canonical [createdAt asc, id asc] order the paged read uses — so
-      // matches come back in the order the user sees them when not searching.
-      let cursorId: string | undefined;
-      for (;;) {
-        const records = await this.recordRepository.findDatasetRecordsPage({
-          datasetId: dataset.id,
-          projectId: params.projectId,
-          take: DATASET_SEARCH_SCAN_BATCH,
-          cursorId,
-        });
-        if (records.length === 0) break;
-        for (const record of records) collect(record);
-        if (records.length < DATASET_SEARCH_SCAN_BATCH) break;
-        cursorId = records[records.length - 1]?.id;
-        if (!cursorId) break;
-      }
+      await this.scanPostgresRecordsForMatches({
+        dataset,
+        projectId: params.projectId,
+        collect,
+      });
     }
 
     return {
@@ -1035,6 +942,146 @@ export class DatasetService {
         totalPages: Math.ceil(matchCount / params.limit),
       },
     };
+  }
+
+  /**
+   * Which chunk indexes a scan of the whole dataset has to read.
+   *
+   * `chunkOffsets` is what ordinary paging trusts to locate rows, so the search
+   * has to agree with it: enumerating by `chunkCount` alone would, on a dataset
+   * whose count has drifted below its offsets, stop early and report "no
+   * matches" for rows the user can page to — the silent wrong answer this path
+   * exists to avoid. Offsets first, `chunkCount` as the fallback for legacy
+   * rows that have none.
+   *
+   * Offsets are validated all-or-nothing, the same way the paged read validates
+   * them. Keeping the individually-valid entries of a half-written array would
+   * scan only the chunks those entries name and report "no matches" for rows
+   * the pager — which rejects the whole array and falls back to `chunkCount` —
+   * still displays: the same dataset answering two ways.
+   *
+   * @throws {DatasetChunkCountMissingError} on an offsets-less dataset whose
+   *   `chunkCount` has gone null (I-COUNT drift). `?? 0` would scan zero chunks
+   *   and report "no matches" for a dataset that has them.
+   */
+  private chunkIndexesToScan(dataset: Dataset): number[] {
+    const offsets = readValidChunkOffsets(dataset.chunkOffsets);
+    if (offsets.length > 0) {
+      return [...new Set(offsets.map((o) => o.index))].sort((a, b) => a - b);
+    }
+    if (dataset.chunkCount == null) {
+      throw new DatasetChunkCountMissingError(dataset.id);
+    }
+    return Array.from({ length: dataset.chunkCount }, (_, i) => i);
+  }
+
+  /**
+   * Reads every chunk of an `s3_jsonl` dataset once, offering each row to
+   * `collect`. One chunk is held in the heap at a time.
+   *
+   * @throws {DatasetNotReadyError} if the dataset is still preparing
+   * @throws {DatasetTooLargeToSearchError} past the row cap
+   */
+  private async scanChunksForMatches({
+    dataset,
+    projectId,
+    collect,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    collect: (record: DatasetRecord) => void;
+  }) {
+    if (dataset.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: dataset.status,
+        statusError: dataset.statusError,
+      });
+    }
+
+    const rowCount = dataset.rowCount ?? 0;
+    if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    const storage = await getDatasetStorage(projectId);
+    // `readChunk` per index, never `readChunks`: the plural form pulls every
+    // chunk into the heap at once, which is exactly what the row cap and the
+    // one-at-a-time read are here to prevent.
+    let rowsRead = 0;
+    for (const index of this.chunkIndexesToScan(dataset)) {
+      const rows = await storage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index,
+      });
+      // Backstop for a `rowCount` that under-reports (or is null, which reads
+      // as 0 and would sail past the up-front check): the cap has to hold on
+      // what is actually read, not only on what the row claims.
+      rowsRead += rows.length;
+      if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount: rowsRead,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
+      for (const line of rows) {
+        collect(adaptS3JsonlRecord(line, dataset));
+      }
+    }
+  }
+
+  /**
+   * Walks every record of a Postgres-backed (legacy) dataset once, offering
+   * each to `collect`. One batch is held in the heap at a time.
+   *
+   * `sizeBytes` is null on these rows, so the export-time byte guard can never
+   * fire here — the row cap is the only thing bounding this scan.
+   *
+   * @throws {DatasetTooLargeToSearchError} past the row cap
+   */
+  private async scanPostgresRecordsForMatches({
+    dataset,
+    projectId,
+    collect,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    collect: (record: DatasetRecord) => void;
+  }) {
+    const { count: rowCount } =
+      await this.recordRepository.countAndMaxUpdatedAt({
+        datasetId: dataset.id,
+        projectId,
+      });
+    if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    // Keyset-paginate, like the PG→S3 backfill's streaming scan: `skip`/`take`
+    // would re-run a count(*) alongside every page (listPaginated does), so a
+    // scan at the cap would issue ~50 redundant full counts, and OFFSET
+    // degrades as it walks. The cursor is the previous page's last id, in the
+    // same canonical [createdAt asc, id asc] order the paged read uses — so
+    // matches come back in the order the user sees them when not searching.
+    let cursorId: string | undefined;
+    for (;;) {
+      const records = await this.recordRepository.findDatasetRecordsPage({
+        datasetId: dataset.id,
+        projectId,
+        take: DATASET_SEARCH_SCAN_BATCH,
+        cursorId,
+      });
+      for (const record of records) collect(record);
+      if (records.length < DATASET_SEARCH_SCAN_BATCH) break;
+      cursorId = records[records.length - 1]?.id;
+      if (!cursorId) break;
+    }
   }
 
   /**
