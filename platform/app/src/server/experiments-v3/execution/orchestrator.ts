@@ -2303,20 +2303,41 @@ const dispatchWithBusyRetry = async ({
         signal: AbortSignal.timeout(callTimeoutMs),
       });
     } catch (error) {
-      const retryAfterMs = busyRetryAfterMs(error);
-      if (retryAfterMs === undefined || now() >= budgetEndsAt) throw error;
-      // A stopped run waits for nothing: the row fails now rather than
-      // holding a slot of the run for the rest of the budget.
-      if (isAborted && (await isAborted())) throw error;
-      // Jitter spreads the retries of the rows that hit a full agent at once.
-      const waitMs = Math.min(
-        retryAfterMs + Math.floor(Math.random() * retryAfterMs),
-        budgetEndsAt - now(),
-      );
-      await sleep(Math.max(0, waitMs));
+      const waitMs = await busyWaitMs({ error, now, budgetEndsAt, isAborted });
+      if (waitMs === undefined) throw error;
+      await sleep(waitMs);
     }
   }
 };
+
+/**
+ * How long to wait before the next attempt, or nothing when the turn must
+ * fail now.
+ *
+ * It fails now for three reasons: the agent refused for a reason other than
+ * being busy, the retry budget is spent, or the run was stopped. A stopped run
+ * waits for nothing, so the row fails rather than holding a slot of the run
+ * for the rest of the budget.
+ */
+async function busyWaitMs({
+  error,
+  now,
+  budgetEndsAt,
+  isAborted,
+}: {
+  error: unknown;
+  now: () => number;
+  budgetEndsAt: number;
+  isAborted?: () => Promise<boolean>;
+}): Promise<number | undefined> {
+  const retryAfterMs = busyRetryAfterMs(error);
+  if (retryAfterMs === undefined || now() >= budgetEndsAt) return undefined;
+  if (isAborted && (await isAborted())) return undefined;
+
+  // Jitter spreads the retries of the rows that hit a full agent at once.
+  const jittered = retryAfterMs + Math.floor(Math.random() * retryAfterMs);
+  return Math.max(0, Math.min(jittered, budgetEndsAt - now()));
+}
 
 /** How long a busy agent asked to be left alone, or nothing if it is not busy. */
 const busyRetryAfterMs = (error: unknown): number | undefined => {

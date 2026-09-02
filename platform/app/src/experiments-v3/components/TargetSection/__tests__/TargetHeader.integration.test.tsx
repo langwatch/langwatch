@@ -105,7 +105,17 @@ describe("TargetHeader", () => {
     });
 
     describe("when a new agent type is added", () => {
-      it("gives every declared agent type its own icon", () => {
+      // Restated here rather than read off the component, so a type that
+      // silently takes another type's icon fails instead of passing.
+      const EXPECTED_ICON: Record<AgentTypeEnum, string> = {
+        code: "icon-code",
+        signature: "icon-code",
+        http: "icon-globe",
+        workflow: "icon-workflow",
+        connected: "icon-connected",
+      };
+
+      it("gives every declared agent type the icon it is meant to carry", () => {
         for (const agentType of agentTypeEnum.options) {
           const { unmount } = renderWithProviders(
             <TargetHeader
@@ -116,8 +126,8 @@ describe("TargetHeader", () => {
           );
 
           expect(
-            screen.getByTestId(/^icon-/),
-            `no icon for the ${agentType} agent type`,
+            screen.getByTestId(EXPECTED_ICON[agentType]),
+            `the ${agentType} agent type carries the wrong icon`,
           ).toBeInTheDocument();
           unmount();
         }
