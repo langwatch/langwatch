@@ -30,6 +30,17 @@ const CREDENTIALS = {
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
 };
+/**
+ * The billing identity beside the bot's (ADR-128 §21.1): same tenant, its own
+ * registered app. Kept INSIDE the credentials map — the never-echo guards
+ * match the key "credentials" by exact string, so a secret anywhere else
+ * would reach the browser.
+ */
+const WITH_BILLING = {
+  ...CREDENTIALS,
+  billingClientId: "billing-client-id",
+  billingClientSecret: "billing-client-secret",
+};
 const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 const TRANSCRIPT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -136,16 +147,23 @@ afterEach(() => {
 async function runPull({
   azureSubscriptionId,
   cursor = null,
+  credentials = WITH_BILLING,
 }: {
   azureSubscriptionId?: string;
   cursor?: string | null;
+  /**
+   * Defaults to the full pair of identities. Cost tests exercising the read
+   * need the billing one; the separation tests below override this to prove
+   * what each identity can and cannot do.
+   */
+  credentials?: Record<string, string>;
 }) {
   const { CopilotStudioDataversePuller } = await import(
     "../copilotStudioDataverse.puller"
   );
   const adapter = new CopilotStudioDataversePuller();
   return adapter.runOnce(
-    { cursor, credentials: CREDENTIALS },
+    { cursor, credentials },
     {
       adapter: "copilot_studio_dataverse" as const,
       environmentUrl: ENVIRONMENT_URL,
@@ -664,5 +682,83 @@ describe("the Azure cost read inside the Dataverse source", () => {
       );
       expect(costEvents(result.events).length).toBeGreaterThan(0);
     });
+  });
+});
+
+/**
+ * The billing identity is a second registered app on the same connection
+ * (ADR-128 §21.1). The bill is read with it and only with it; the
+ * conversation credential never stands in, because a fallback would quietly
+ * re-create the one broad grant the split exists to break.
+ *
+ * Spec: specs/governance/azure-billing-identity.feature
+ * Decision: ADR-128 §21 (v3.4).
+ */
+describe("the billing identity beside the bot's", () => {
+  const signInCalls = () =>
+    capturedCalls.filter((call) =>
+      call.url.includes("login.microsoftonline.com"),
+    );
+  const armScope = encodeURIComponent("https://management.azure.com/.default");
+
+  /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
+  it("presents the billing secret for the bill and the bot's for the environment", async () => {
+    await runPull({
+      azureSubscriptionId: SUBSCRIPTION_ID,
+      credentials: WITH_BILLING,
+    });
+
+    const bodies = signInCalls().map((call) => String(call.init?.body));
+    const billSignIns = bodies.filter((body) => body.includes(armScope));
+    const environmentSignIns = bodies.filter(
+      (body) => !body.includes(armScope),
+    );
+
+    expect(billSignIns.length).toBeGreaterThan(0);
+    for (const body of billSignIns) {
+      expect(body).toContain("client_id=billing-client-id");
+      expect(body).toContain("client_secret=billing-client-secret");
+      expect(body).not.toContain("app-client-secret");
+    }
+    expect(environmentSignIns.length).toBeGreaterThan(0);
+    for (const body of environmentSignIns) {
+      expect(body).toContain("client_id=app-client-id");
+      expect(body).not.toContain("billing-client-secret");
+    }
+  });
+
+  /** @scenario "A source without a billing credential never borrows the conversation one" */
+  it("skips the bill entirely rather than fall back to the bot's credential", async () => {
+    const result = await runPull({
+      azureSubscriptionId: SUBSCRIPTION_ID,
+      credentials: CREDENTIALS,
+    });
+
+    // Zero Resource Manager traffic of any kind — not the cost query, and
+    // not a sign-in for its audience either. Asserted on the captured call
+    // list, not on the absence of a log line.
+    expect(costCalls()).toHaveLength(0);
+    const bodies = signInCalls().map((call) => String(call.init?.body));
+    expect(bodies.some((body) => body.includes(armScope))).toBe(false);
+
+    expect(conversationEvents(result.events)).toHaveLength(1);
+    expect(result.errorCount).toBe(0);
+  });
+
+  /** @scenario "The billing credential is only ever presented to the sign-in service" */
+  it("sends the billing secret to the sign-in host and nowhere else", async () => {
+    await runPull({
+      azureSubscriptionId: SUBSCRIPTION_ID,
+      credentials: WITH_BILLING,
+    });
+
+    const carryingSecret = capturedCalls.filter((call) =>
+      JSON.stringify(call).includes("billing-client-secret"),
+    );
+    // It must be presented somewhere, or the assertion below is vacuous.
+    expect(carryingSecret.length).toBeGreaterThan(0);
+    for (const call of carryingSecret) {
+      expect(new URL(call.url).host).toBe("login.microsoftonline.com");
+    }
   });
 });

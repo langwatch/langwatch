@@ -969,6 +969,16 @@ export class CopilotStudioDataversePuller
     // permission grant to ask the customer for.
     if (!subscriptionId) return { events: [], cost: previous };
 
+    // The bill is read with its own registered app or not at all (ADR-128
+    // §21.1). Falling back to the bot's credential here would quietly
+    // re-create the one broad grant the split exists to break — and would do
+    // it precisely for the customer who declined to hand out billing access.
+    const billingClientId = options.credentials?.billingClientId;
+    const billingClientSecret = options.credentials?.billingClientSecret;
+    if (!billingClientId || !billingClientSecret) {
+      return { events: [], cost: previous };
+    }
+
     const nowMs = Date.now();
     // Neither of the two skips above and below is a failed read. Azure
     // publishes this bill once a day and refuses a caller that asks too often,
@@ -986,7 +996,13 @@ export class CopilotStudioDataversePuller
 
     try {
       const token = await resolveEnvironmentToken({
-        credentials: options.credentials,
+        // Same tenant, different registered app: the billing identity holds
+        // Cost Management Reader and nothing an employee ever typed.
+        credentials: {
+          tenantId: options.credentials?.tenantId ?? "",
+          clientId: billingClientId,
+          clientSecret: billingClientSecret,
+        },
         environmentUrl: config.environmentUrl,
         scope: AZURE_MANAGEMENT_SCOPE,
         signal: options.signal,
