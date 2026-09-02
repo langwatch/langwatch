@@ -12,7 +12,7 @@ The gateway decides one cache action for every request, in this order:
 2. **Provider default.** If no rule matches and the request resolves to an Anthropic model, the gateway applies `force` on its own. This default only runs when the body is 4096 bytes or larger and the client did not send any `cache_control` marker.
 3. **Passthrough.** Otherwise the body reaches the provider unchanged.
 
-The response header `X-LangWatch-Cache-Mode` reports the outcome: `respect`, `disable` or `force` when a rule fired, `auto` when the provider default fired. The header is absent when nothing changed the body.
+The response header `X-LangWatch-Cache-Mode` reports the outcome: `respect`, `disable` or `force` when a rule fired, `auto` when the provider default fired. The header is absent when neither a rule nor the provider default changed the body.
 
 ## Actions
 

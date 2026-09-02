@@ -590,59 +590,10 @@
             ]
           },
           {
-            "group": "Coding CLI Integrations",
-            "pages": [
-              "ai-gateway/cli/overview",
-              {
-                "group": "Claude Code",
-                "icon": "/images/logos/anthropic.svg",
-                "pages": [
-                  "ai-gateway/cli/claude-code"
-                ]
-              },
-              {
-                "group": "Codex",
-                "icon": "/images/logos/openai.svg",
-                "pages": [
-                  "ai-gateway/cli/codex"
-                ]
-              },
-              {
-                "group": "Gemini CLI",
-                "icon": "/images/logos/google.svg",
-                "pages": [
-                  "ai-gateway/cli/gemini-cli"
-                ]
-              },
-              {
-                "group": "OpenCode",
-                "icon": "code",
-                "pages": [
-                  "ai-gateway/cli/opencode"
-                ]
-              },
-              {
-                "group": "Cursor",
-                "icon": "arrow-pointer",
-                "pages": [
-                  "ai-gateway/cli/cursor"
-                ]
-              },
-              {
-                "group": "Aider",
-                "icon": "wand-magic-sparkles",
-                "pages": [
-                  "ai-gateway/cli/aider"
-                ]
-              }
-            ]
-          },
-          {
             "group": "Virtual Keys & Budgets",
             "pages": [
               "ai-gateway/virtual-keys",
               "ai-gateway/budgets",
-              "ai-gateway/provider-bindings",
               "ai-gateway/rate-limits",
               "ai-gateway/rbac"
             ]
@@ -665,8 +616,7 @@
               "ai-gateway/governance/routing-policies",
               "ai-gateway/governance/retention",
               "ai-gateway/governance/ocsf-export",
-              "ai-gateway/governance/architecture",
-              "ai-gateway/governance/activity-monitor-event-sourcing"
+              "ai-gateway/governance/architecture"
             ]
           },
           {
@@ -689,7 +639,6 @@
               {
                 "group": "Caching & Performance",
                 "pages": [
-                  "ai-gateway/caching-passthrough",
                   "ai-gateway/cache-control",
                   "ai-gateway/streaming"
                 ]
@@ -720,9 +669,12 @@
             "pages": [
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
+              "ai-gateway/api/responses",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/elevenlabs",
               "ai-gateway/api/realtime",
+              "ai-gateway/api/gemini-native",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -746,8 +698,6 @@
               "ai-gateway/cookbooks/migrate-from-direct",
               "ai-gateway/cookbooks/migrate-from-portkey",
               "ai-gateway/cookbooks/credential-leak-incident",
-              "ai-gateway/cookbooks/multi-tenant-reseller",
-              "ai-gateway/cookbooks/cache-control-rollout",
               "ai-gateway/cookbooks/prometheus-alerts",
               "ai-gateway/cookbooks/grafana-dashboard",
               "ai-gateway/cookbooks/production-runbook"
@@ -2029,6 +1979,54 @@
     {
       "source": "/agent-simulations/red-teaming",
       "destination": "/agent-testing/red-teaming"
+    },
+    {
+      "source": "/ai-gateway/cli/overview",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/cli/aider",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/cli/claude-code",
+      "destination": "/coding-agents/claude-code"
+    },
+    {
+      "source": "/ai-gateway/cli/codex",
+      "destination": "/coding-agents/openai-codex"
+    },
+    {
+      "source": "/ai-gateway/cli/gemini-cli",
+      "destination": "/coding-agents/gemini-cli"
+    },
+    {
+      "source": "/ai-gateway/cli/opencode",
+      "destination": "/coding-agents/opencode"
+    },
+    {
+      "source": "/ai-gateway/cli/cursor",
+      "destination": "/coding-agents/overview"
+    },
+    {
+      "source": "/ai-gateway/provider-bindings",
+      "destination": "/ai-gateway/providers/overview"
+    },
+    {
+      "source": "/ai-gateway/governance/activity-monitor-event-sourcing",
+      "destination": "/ai-gateway/governance/architecture"
+    },
+    {
+      "source": "/ai-gateway/caching-passthrough",
+      "destination": "/ai-gateway/cache-control"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/cache-control-rollout",
+      "destination": "/ai-gateway/cache-control"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/multi-tenant-reseller",
+      "destination": "/ai-gateway/billing-events"
     }
   ]
 }

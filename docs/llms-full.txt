@@ -3915,7 +3915,7 @@ The gateway decides one cache action for every request, in this order:
 2. **Provider default.** If no rule matches and the request resolves to an Anthropic model, the gateway applies `force` on its own. This default only runs when the body is 4096 bytes or larger and the client did not send any `cache_control` marker.
 3. **Passthrough.** Otherwise the body reaches the provider unchanged.
 
-The response header `X-LangWatch-Cache-Mode` reports the outcome: `respect`, `disable` or `force` when a rule fired, `auto` when the provider default fired. The header is absent when nothing changed the body.
+The response header `X-LangWatch-Cache-Mode` reports the outcome: `respect`, `disable` or `force` when a rule fired, `auto` when the provider default fired. The header is absent when neither a rule nor the provider default changed the body.
 
 ## Actions
 
@@ -7223,8 +7223,8 @@ For a bare model name the gateway tries four steps and stops at the first one th
 
 1. **Providers that declare the model.** A custom provider lists the models it serves, and a hosted provider ships a catalog. This is what makes a declared model routable without a prefix.
 2. **The vendor in the name.** A short built-in table maps a prefix to the vendor that originated it. This is the safety net for a model newer than the shipped catalog.
-3. **Providers that declared nothing.** A provider with no model list cannot be ruled out by a model it does not list.
-4. **A key with one provider.** With one provider there is nothing to choose between, so any model name is forwarded to it.
+3. **Providers with no model list.** A provider with no model list cannot be ruled out by a model it does not list.
+4. **A key with one provider.** With one provider there is no choice to make, so the gateway forwards any model name to it.
 
 If all four steps leave no provider, the request is refused with `model_not_recognized`.
 
@@ -7866,7 +7866,7 @@ Patterns are regular expressions. They are not anchored: `shell` matches `run_sh
 
 Tools, MCP servers and web addresses are checked on the body as sent, before the model resolves and before any guardrail runs. A refused request never reaches the provider.
 
-Model rules run after the model resolves, on the model that will be served. An alias or a tier that resolves to a refused model is refused; a refused name that resolves to a permitted model is served, because nothing refused runs. A rule written `openai/gpt-4.*` and one written `gpt-4.*` refuse the same model.
+Model rules run after the model resolves, on the model that will be served. An alias or a tier that resolves to a refused model is refused; a refused name that resolves to a permitted model is served, because the rule checks the served model, not the requested name. A rule written `openai/gpt-4.*` and one written `gpt-4.*` refuse the same model.
 
 A pattern that does not compile fails the request closed with `500 internal_error`. The gateway never skips a rule it cannot read.
 

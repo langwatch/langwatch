@@ -387,39 +387,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [TypeScript SDK integration](https://langwatch.ai/docs/ai-gateway/sdks/typescript.md): Use the LangWatch AI Gateway with the official OpenAI + Anthropic TypeScript SDKs, with proper trace propagation.
 
-## Coding CLI Integrations
-
-- [Overview](https://langwatch.ai/docs/ai-gateway/cli/overview.md)
-
-### Claude Code
-
-- [Claude Code](https://langwatch.ai/docs/ai-gateway/cli/claude-code.md)
-
-### Codex
-
-- [Codex](https://langwatch.ai/docs/ai-gateway/cli/codex.md)
-
-### Gemini CLI
-
-- [Gemini Cli](https://langwatch.ai/docs/ai-gateway/cli/gemini-cli.md)
-
-### OpenCode
-
-- [Opencode](https://langwatch.ai/docs/ai-gateway/cli/opencode.md)
-
-### Cursor
-
-- [Cursor](https://langwatch.ai/docs/ai-gateway/cli/cursor.md)
-
-### Aider
-
-- [Aider](https://langwatch.ai/docs/ai-gateway/cli/aider.md)
-
 ## Virtual Keys & Budgets
 
 - [Virtual Keys](https://langwatch.ai/docs/ai-gateway/virtual-keys.md): Mint, rotate, revoke, and scope virtual API keys for the LangWatch AI Gateway.
 - [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Hierarchical, windowed spend limits enforced at the gateway.
-- [Provider Bindings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md)
 - [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bindings, and providers, including the precedence model and the 429 envelope.
 - [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): Role-based access control for the LangWatch AI Gateway, resources, actions, and default role mappings.
 
@@ -439,7 +410,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): What the LangWatch AI Gateway stores for each request, and which setting governs how long each record lives.
 - [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
 - [LangWatch AI Gateway architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): The components of the LangWatch AI Gateway and how they connect, from the request pipeline in the gateway service to the control plane routes, the change feed, the spend spool and the auth cache.
-- [Activity Monitor Event Sourcing](https://langwatch.ai/docs/ai-gateway/governance/activity-monitor-event-sourcing.md)
 
 ## Providers
 
@@ -457,7 +427,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Caching & Performance
 
-- [Caching Passthrough](https://langwatch.ai/docs/ai-gateway/caching-passthrough.md)
 - [Cache Control](https://langwatch.ai/docs/ai-gateway/cache-control.md): Cache rules decide, per request, whether the LangWatch AI Gateway forwards, strips, or injects provider prompt-cache markers.
 - [Streaming](https://langwatch.ai/docs/ai-gateway/streaming.md): SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
 
@@ -481,9 +450,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [POST /v1/chat/completions](https://langwatch.ai/docs/ai-gateway/api/chat-completions.md): OpenAI-compatible chat completions through the LangWatch AI Gateway.
 - [POST /v1/messages](https://langwatch.ai/docs/ai-gateway/api/messages.md): Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
+- [POST /v1/responses](https://langwatch.ai/docs/ai-gateway/api/responses.md): OpenAI Responses API through the LangWatch AI Gateway, for OpenAI, Azure OpenAI and codex models.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
 - [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway on OpenAI's wire, served by OpenAI and ElevenLabs.
+- [ElevenLabs API paths](https://langwatch.ai/docs/ai-gateway/api/elevenlabs.md): ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 - [Realtime voice](https://langwatch.ai/docs/ai-gateway/api/realtime.md): Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor.
+- [Gemini native (/v1beta)](https://langwatch.ai/docs/ai-gateway/api/gemini-native.md): Google's generative-language API paths, forwarded by the LangWatch AI Gateway to a Gemini or Vertex credential without translation.
 - [GET /v1/models](https://langwatch.ai/docs/ai-gateway/api/models.md): List the models a virtual key can access through the LangWatch AI Gateway.
 - [Error Envelope](https://langwatch.ai/docs/ai-gateway/api/errors.md): OpenAI-compatible error shapes and a complete type enum.
 - [Management REST API](https://langwatch.ai/docs/ai-gateway/api/management.md): Manage virtual keys, budgets, and routing policies programmatically via /api/gateway/v1/*.
@@ -503,8 +475,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Migrating from direct provider calls](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-direct.md): Move from app → OpenAI/Anthropic to app → LangWatch Gateway → providers, without rewriting your integration.
 - [Migrating from Portkey](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-portkey.md): Move your Portkey gateway configuration to LangWatch, virtual keys, budgets, fallback, guardrails, with a side-by-side mapping of concepts and a concrete code migration.
 - [Credential-leak incident response](https://langwatch.ai/docs/ai-gateway/cookbooks/credential-leak-incident.md): End-to-end playbook for when a virtual key (or the underlying provider credential) has leaked, containment, communication, rotation, and post-incident forensics.
-- [Multi Tenant Reseller](https://langwatch.ai/docs/ai-gateway/cookbooks/multi-tenant-reseller.md)
-- [Cache Control Rollout](https://langwatch.ai/docs/ai-gateway/cookbooks/cache-control-rollout.md)
 - [Prometheus alert rules](https://langwatch.ai/docs/ai-gateway/cookbooks/prometheus-alerts.md): Production-ready PromQL alert rules for the LangWatch AI Gateway.
 - [Grafana dashboard](https://langwatch.ai/docs/ai-gateway/cookbooks/grafana-dashboard.md): Importable Grafana dashboard JSON for the LangWatch AI Gateway, request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
 - [Production runbook](https://langwatch.ai/docs/ai-gateway/cookbooks/production-runbook.md): Diagnose p99 spikes, goroutine leaks, memory growth, and other "why is the gateway slow?" incidents using the loopback-bound pprof admin listener.

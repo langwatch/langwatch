@@ -26,7 +26,7 @@ Patterns are regular expressions. They are not anchored: `shell` matches `run_sh
 
 Tools, MCP servers and web addresses are checked on the body as sent, before the model resolves and before any guardrail runs. A refused request never reaches the provider.
 
-Model rules run after the model resolves, on the model that will be served. An alias or a tier that resolves to a refused model is refused; a refused name that resolves to a permitted model is served, because nothing refused runs. A rule written `openai/gpt-4.*` and one written `gpt-4.*` refuse the same model.
+Model rules run after the model resolves, on the model that will be served. An alias or a tier that resolves to a refused model is refused; a refused name that resolves to a permitted model is served, because the rule checks the served model, not the requested name. A rule written `openai/gpt-4.*` and one written `gpt-4.*` refuse the same model.
 
 A pattern that does not compile fails the request closed with `500 internal_error`. The gateway never skips a rule it cannot read.
 

@@ -41,8 +41,8 @@ For a bare model name the gateway tries four steps and stops at the first one th
 
 1. **Providers that declare the model.** A custom provider lists the models it serves, and a hosted provider ships a catalog. This is what makes a declared model routable without a prefix.
 2. **The vendor in the name.** A short built-in table maps a prefix to the vendor that originated it. This is the safety net for a model newer than the shipped catalog.
-3. **Providers that declared nothing.** A provider with no model list cannot be ruled out by a model it does not list.
-4. **A key with one provider.** With one provider there is nothing to choose between, so any model name is forwarded to it.
+3. **Providers with no model list.** A provider with no model list cannot be ruled out by a model it does not list.
+4. **A key with one provider.** With one provider there is no choice to make, so the gateway forwards any model name to it.
 
 If all four steps leave no provider, the request is refused with `model_not_recognized`.
 
