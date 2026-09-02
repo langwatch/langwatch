@@ -1990,6 +1990,18 @@ const presentations = {
     describe: () =>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
   },
+  // ADR-128 §12. Both are races rather than mistakes: a review queue is read
+  // by people, and the world moves between reading it and clicking.
+  identity_match_suggestion_not_found: {
+    title: "That match suggestion is no longer there",
+    describe: () =>
+      "Somebody may have confirmed it already, or it stopped being suggested. Reload to see the current list.",
+  },
+  identity_already_linked: {
+    title: "This person is already linked to an account",
+    describe: () =>
+      "Someone linked them while this list was open. Reload to see who they are linked to.",
+  },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
     describe: () =>
