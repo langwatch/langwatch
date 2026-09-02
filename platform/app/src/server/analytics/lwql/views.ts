@@ -294,8 +294,17 @@ function sourceRelation({
  */
 function postgresTenantPredicate({
   names,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
+  /**
+   * Database the key-map table actually lives in. Defaults to
+   * {@link LangWatchQLNames.database} — see `provisioning.ts`'s
+   * `lwqlClickHouseSetupStatements` for why this must agree with every other
+   * key-map reference: a real deploy's key map lives in the app's own
+   * ClickHouse database (migration 00084), not `names.database`.
+   */
+  sourceDatabase?: string;
 }): string {
   // The key map is aliased and the inner reference qualified because the two
   // relations name their tenant column the same way: written bare, the
@@ -303,7 +312,8 @@ function postgresTenantPredicate({
   // subquery, which ClickHouse does not support and would fail rather than
   // silently widen — but failing at provisioning time is not a risk worth
   // taking for two characters.
-  const keyMap = `${assertIdentifier(names.database, "database")}.${assertIdentifier(names.keyMapTable, "keyMapTable")}`;
+  const keyMapDatabase = sourceDatabase ?? names.database;
+  const keyMap = `${assertIdentifier(keyMapDatabase, "database")}.${assertIdentifier(names.keyMapTable, "keyMapTable")}`;
   return (
     `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
     `    SELECT ${KEY_MAP_ALIAS}.${quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +
@@ -471,7 +481,7 @@ export function lwqlViewStatement({
       ? `${aliased} FINAL`
       : aliased;
   const where = postgres
-    ? `\n${postgresTenantPredicate({ names })}`
+    ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
     : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";

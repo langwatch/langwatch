@@ -282,6 +282,7 @@ export default async function execute() {
           names,
           password,
           lwqlTables,
+          sourceDatabase,
         });
         for (const statement of accessStatements) {
           await client.command({ query: statement });
