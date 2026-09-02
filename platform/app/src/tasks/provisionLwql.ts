@@ -1,10 +1,13 @@
 /**
  * Deploy-time provisioning for LangWatchQL: creates the ClickHouse-native
  * views and the PostgreSQL approved views, and backfills the key-map table
- * from every project's `lwqlKey`. The ClickHouse access model (restricted
- * user, settings profile, grants, row policies) and the PostgreSQL-mapped
- * views are infra's job — terraform provisions both out of band, and this
- * task never touches either.
+ * from every project's `lwqlKey`. Outside SaaS it also reconciles the
+ * ClickHouse access model (restricted user, settings profile, grants, row
+ * policies) by default — see {@link shouldSelfProvisionLwqlAccessModel}. In
+ * SaaS that access model, and the PostgreSQL-mapped reader role, stay
+ * Terraform's job: Terraform provisions them out of band so it remains the
+ * single writer to that security boundary, and the unprivileged Cloud runtime
+ * never issues `CREATE USER`/`GRANT`.
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
  * this task writes into) in `start:prepare:db`. A deploy with no `LWQL_*`
@@ -32,6 +35,7 @@ import {
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
+  shouldSelfProvisionLwqlAccessModel,
   withTenancyOptOut,
 } from "../server/analytics/lwql/productionProvisioning";
 import {
@@ -42,6 +46,7 @@ import {
 import { lwqlSourceTables } from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
+import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:task:provisionLwql");
 
@@ -173,7 +178,7 @@ export default async function execute() {
 
   logger.info(
     { database: names.database, sourceDatabase },
-    "provisioning LangWatchQL objects — the ClickHouse access model and PostgreSQL-mapped views are provisioned by infra, out of band",
+    "provisioning LangWatchQL objects — outside SaaS the ClickHouse access model is reconciled here by default; in SaaS it and the PostgreSQL-mapped reader role are provisioned by Terraform, out of band",
   );
 
   // The schema the tables actually live in (Prisma's `?schema=` URL
@@ -243,15 +248,24 @@ export default async function execute() {
     // the deploy one step earlier.
     await backfillKeyMap({ client, names, sourceDatabase });
 
-    // Opt-in only, off by default. In Cloud/SaaS the ClickHouse access model
-    // (restricted user, settings profile, GRANTs, row policies) is Terraform's
-    // job, out of band — issuing CREATE USER/GRANT here would be rejected
-    // against that server-managed identity (see productionProvisioning.ts).
-    // A self-hosted/dev deployment has no such Terraform job, so it can opt in
-    // here instead: this is the exact gap that leaves a newly-catalogued view
-    // (e.g. trace_metrics_by_minute) created but ungranted, failing
-    // ACCESS_DENIED, until someone re-runs the out-of-band job by hand.
-    if (process.env.LWQL_SELF_PROVISION_ACCESS_MODEL === "true") {
+    // Default outside SaaS, the exception being SaaS itself: there the
+    // ClickHouse access model (restricted user, settings profile, GRANTs, row
+    // policies) stays Terraform's job, out of band — Terraform is the single
+    // writer to that security boundary during incidents, the Cloud runtime
+    // identity is unprivileged by design, and issuing CREATE USER/GRANT here
+    // would be rejected against that server-managed identity (see
+    // productionProvisioning.ts). A self-hosted/dev deployment has no such
+    // Terraform job, so the app reconciles the model itself — closing the exact
+    // gap that leaves a newly-catalogued view (e.g. trace_metrics_by_minute)
+    // created but ungranted, failing ACCESS_DENIED, until someone re-runs the
+    // out-of-band job by hand. `LWQL_SELF_PROVISION_ACCESS_MODEL` overrides in
+    // both directions (see shouldSelfProvisionLwqlAccessModel).
+    if (
+      shouldSelfProvisionLwqlAccessModel({
+        override: process.env.LWQL_SELF_PROVISION_ACCESS_MODEL,
+        isSaas: env.IS_SAAS,
+      })
+    ) {
       try {
         const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
         if (!password) {
