@@ -82,10 +82,44 @@ function EmptyPanel({
   );
 }
 
+/** A ranked row with the bar it draws. */
+export interface RankBar extends RankRow {
+  /** Bar length as a percentage of the panel width. Never negative. */
+  widthPct: number;
+  isCredit: boolean;
+}
+
 /**
- * Ranked horizontal bars — label, a bar proportional to the leader, and the
- * figure. The bar is scaled against the largest row rather than the total, so
- * a long tail stays legible instead of collapsing into slivers.
+ * How long each ranked bar is drawn.
+ *
+ * Cost here is signed — a credited or refunded period arrives as a negative
+ * figure — so the bars are scaled against the largest magnitude rather than
+ * against the top row. Scaling against the top row divides by a negative
+ * whenever a credit leads, which draws bars pointing the wrong way, and the
+ * obvious guard against that collapses a panel of nothing but credits to
+ * nothing at all.
+ *
+ * Extracted from the panel because the width lands in a generated class name
+ * that jsdom cannot resolve, which leaves the arithmetic untestable through
+ * the rendered output.
+ */
+export function rankBarGeometry(rows: RankRow[]): RankBar[] {
+  const scale = rows.reduce(
+    (max, row) => Math.max(max, Math.abs(row.value)),
+    0,
+  );
+  return rows.map((row) => ({
+    ...row,
+    widthPct: scale > 0 ? (Math.abs(row.value) / scale) * 100 : 0,
+    isCredit: row.value < 0,
+  }));
+}
+
+/**
+ * Ranked horizontal bars — label, bar, figure. Rows are ordered by what was
+ * spent, and each bar is scaled against the largest figure rather than the
+ * total, so a long tail stays legible instead of collapsing into slivers.
+ * `rankBarGeometry` explains why "largest" means largest magnitude.
  */
 export function CostRankList({
   rows,
@@ -99,10 +133,12 @@ export function CostRankList({
   const shown = useMemo(
     // Copied before sorting: these rows can be a query cache, and sorting in
     // place would reorder what every other reader of that cache sees.
-    () => [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, maxRows),
+    () =>
+      rankBarGeometry(
+        [...(rows ?? [])].sort((a, b) => b.value - a.value).slice(0, maxRows),
+      ),
     [rows, maxRows],
   );
-  const leader = shown[0]?.value ?? 0;
 
   if (rows === null) return <EmptyPanel height="220px" unanswered />;
   if (shown.length === 0)
@@ -125,8 +161,21 @@ export function CostRankList({
             <Box
               height="100%"
               borderRadius="sm"
-              width={leader > 0 ? `${(row.value / leader) * 100}%` : "0%"}
-              backgroundColor={getHexColorForString(row.label)}
+              width={`${row.widthPct}%`}
+              // The same number, readable without resolving styling — the
+              // width above lands in a generated class name. `MeterBar` does
+              // the same for the same reason.
+              data-width-pct={row.widthPct}
+              data-credit={row.isCredit ? "true" : undefined}
+              // A credit is drawn as an outline rather than a fill, so a
+              // refund and a charge of the same size do not read alike.
+              backgroundColor={
+                row.isCredit ? "transparent" : getHexColorForString(row.label)
+              }
+              borderWidth={row.isCredit ? "2px" : undefined}
+              borderColor={
+                row.isCredit ? getHexColorForString(row.label) : undefined
+              }
             />
           </Box>
           <Text

@@ -12,7 +12,13 @@ import type {
   GovernanceCostSummaryDto,
 } from "@ee/governance/services/governanceCost.service";
 import numeral from "numeral";
-import { useMemo, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   CostLanePanel,
@@ -92,9 +98,52 @@ import { api } from "~/utils/api";
 
 interface CostFilters {
   department: string;
+  /**
+   * Carried alongside the id rather than looked up from the response. The
+   * options come from the window being viewed, so a lookup has nothing to find
+   * the moment the window changes, and the chip would name a department the
+   * screen is no longer filtering by — or worse, name all of them.
+   */
+  departmentName: string | null;
   windowDays: number;
   interval: TimeInterval;
   groupBy: GroupBy;
+}
+
+/**
+ * Drops a department selection the current window no longer contains.
+ *
+ * A window can answer without the department the reader is standing on: it
+ * spent nothing over the shorter span, so it has no row and no option in the
+ * picker. The selection would stay behind and filter every remaining row away,
+ * leaving an empty panel under a chip that no longer had a name to show.
+ * Clearing it is the only outcome where the label and the rows agree.
+ *
+ * Only an answered read counts. A read still in flight is not evidence that the
+ * department is gone, and resetting on one would throw the reader's choice away
+ * on every refetch.
+ */
+function useDepartmentSelectionReset({
+  filters,
+  breakdowns,
+  setFilters,
+}: {
+  filters: CostFilters;
+  breakdowns: Breakdowns;
+  setFilters: Dispatch<SetStateAction<CostFilters>>;
+}) {
+  const { departmentRows, departments } = breakdowns;
+  const selected = filters.department;
+  useEffect(() => {
+    if (selected === ALL_DEPARTMENTS) return;
+    if (departmentRows === null) return;
+    if (departments.some((d) => d.id === selected)) return;
+    setFilters((current) => ({
+      ...current,
+      department: ALL_DEPARTMENTS,
+      departmentName: null,
+    }));
+  }, [selected, departmentRows, departments, setFilters]);
 }
 
 function CostsPage() {
@@ -105,6 +154,7 @@ function CostsPage() {
   const organizationId = organization?.id ?? "";
   const [filters, setFilters] = useState<CostFilters>({
     department: ALL_DEPARTMENTS,
+    departmentName: null,
     windowDays: 30,
     interval: "day",
     groupBy: "team",
@@ -125,6 +175,8 @@ function CostsPage() {
     // the other gets the lanes and no failed queries underneath them.
     enabled: !!organizationId && hasAnyPermission("activityMonitor:view"),
   });
+
+  useDepartmentSelectionReset({ filters, breakdowns, setFilters });
 
   // `null` until the reader picks a side, which is what lets the default below
   // follow the data. Deliberately not persisted: the same rule the trace
@@ -159,9 +211,11 @@ function CostsPage() {
         </HStack>
         {showSample && <CostSampleBanner />}
         <CostFilterBar
-          department={filters.department}
+          departmentName={filters.departmentName}
           departments={breakdowns.departments}
-          onDepartmentChange={(department) => patch({ department })}
+          onDepartmentChange={(department, departmentName) =>
+            patch({ department, departmentName })
+          }
           windowDays={filters.windowDays}
           onWindowDaysChange={(windowDays) => patch({ windowDays })}
           interval={filters.interval}
@@ -392,14 +446,21 @@ function useBreakdownQueries({
   );
 
   const departmentRows = byDepartment.data ?? null;
+  // The picker is the one place an unanswered read may fall back to empty: it
+  // offers choices, it does not report a measurement. Memoised because the
+  // selection reset watches this list, and a fresh array every render would
+  // wake that effect on every render.
+  const departments = useMemo(
+    () =>
+      (departmentRows ?? []).map((row) => ({
+        id: row.departmentId ?? "unassigned",
+        name: row.departmentName,
+      })),
+    [departmentRows],
+  );
   return {
     departmentRows,
-    // The picker is the one place an unanswered read may fall back to empty:
-    // it offers choices, it does not report a measurement.
-    departments: (departmentRows ?? []).map((row) => ({
-      id: row.departmentId ?? "unassigned",
-      name: row.departmentName,
-    })),
+    departments,
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
     // `.buckets`, not the result object: the read answers a wrapper, and
