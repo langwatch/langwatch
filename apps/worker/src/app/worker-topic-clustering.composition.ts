@@ -1,4 +1,6 @@
 import { histogram, type HistogramHandle } from "@langwatch/observability/metrics";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { ModelProviderExecutionAdapter } from "@langwatch/model-provider-server";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -25,6 +27,10 @@ export const TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME = "payload_size_bytes";
  * The clustering pipeline mounts either way, so all nine of its routing keys
  * stay claimed, the schedule advances, and every command and projection is
  * real. What is absent is the page RUN.
+ *
+ * It is reported only when this process composed no model gateway. A process
+ * that composed one resolves all four questions through it and reports
+ * nothing — the absence names a deployment, not a permanent shape.
  */
 export abstract class WorkerTopicAbsenceReportPort {
   abstract withoutClusteringModels(): void;
@@ -34,6 +40,15 @@ export type WorkerTopicClusteringOptions = Readonly<{
   config: WorkerConfig;
   /** The deployment's tenant-keyed ClickHouse client. */
   resolveClickHouseClient: TopicClusteringClickHouseResolver;
+  /**
+   * The model gateway this process composed, when it composed one.
+   *
+   * The SAME instance the evaluation path resolves its `X_LITELLM_*`
+   * environment through — see `worker-model-provider.composition.ts`. Two
+   * gateways would be two decryptions of one stored credential and two answers
+   * to which model a project clusters with.
+   */
+  modelProviders?: ModelProviderService;
   absence?: WorkerTopicAbsenceReportPort;
   /** Injected by the mount test; the process's own `fetch` otherwise. */
   fetch?: typeof globalThis.fetch;
@@ -44,10 +59,19 @@ export type WorkerTopicClusteringOptions = Readonly<{
  * substrates.
  *
  *     resolveClickHouseClient  the event store's own tenant-keyed client
- *     models                   ABSENT — see AbsentTopicClusteringModels
+ *     models                   the model gateway, through the packaged
+ *                              ModelProviderExecutionAdapter — or ABSENT on a
+ *                              process that composed no gateway
  *     langevals                a direct POST, no S3 staging
  *     langevalsEndpoint        LANGEVALS_ENDPOINT
  *     observePayloadSize       payload_size_bytes, over OTLP
+ *
+ * THE MODELS PORT IS THE PACKAGE'S OWN. `ModelProviderExecutionAdapter` in
+ * `@langwatch/model-provider-server` implements all four methods over
+ * `ModelProviderService` — it is the same adapter the application composes —
+ * so nothing here re-derives which model a project clusters with, which
+ * embeddings model it names, or what LiteLLM is handed. This composition only
+ * says which gateway instance answers.
  *
  * THE LANGEVALS TRANSPORT IS DELIBERATELY DIFFERENT from the application's,
  * and the difference is named rather than hidden. The App posts through a
@@ -64,7 +88,7 @@ export type WorkerTopicClusteringOptions = Readonly<{
 export function createWorkerTopicClusteringExecution(
   options: WorkerTopicClusteringOptions,
 ): TopicClusteringExecutionDependencies {
-  options.absence?.withoutClusteringModels();
+  if (!options.modelProviders) options.absence?.withoutClusteringModels();
   const payloadSize = histogram({
     name: TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME,
     description: "Size of a request payload in bytes",
@@ -72,7 +96,9 @@ export function createWorkerTopicClusteringExecution(
 
   return {
     resolveClickHouseClient: options.resolveClickHouseClient,
-    models: new AbsentTopicClusteringModels(),
+    models: options.modelProviders
+      ? ModelProviderExecutionAdapter.create({ modelProviders: options.modelProviders })
+      : new AbsentTopicClusteringModels(),
     langevals: WorkerTopicClusteringLangevalsAdapter.create(
       options.fetch ?? ((input, init) => globalThis.fetch(input, init)),
     ),
@@ -138,13 +164,15 @@ export class WorkerTopicClusteringLangevalsAdapter extends TopicClusteringLangev
 }
 
 /**
- * The one named absence: which model clusters a project's topics.
+ * What answers when this process composed no model gateway.
  *
- * WHY IT CANNOT BE COMPOSED HERE. All four methods resolve through the
- * customer's own model-provider configuration — which provider is enabled for
- * the clustering feature, which embeddings model it names, and the decrypted
- * credentials LiteLLM is handed. That cascade is the ModelProvider capability,
- * and it is not composable in this process.
+ * All four methods resolve through the customer's own model-provider
+ * configuration — which provider is enabled for the clustering feature, which
+ * embeddings model it names, and the decrypted credentials LiteLLM is handed.
+ * That cascade is `ModelProviderService`, which this process CAN now compose
+ * (`worker-model-provider.composition.ts`); what a deployment can still be
+ * missing is one of its preconditions — the database, the tenancy graph, or
+ * the stored-secret cipher every provider credential is encrypted under.
  *
  * REFUSING BEATS DEFAULTING, and by a long way. A clustering run that fell
  * back to some built-in model would name a customer's topics with a provider
@@ -181,7 +209,7 @@ export class TopicClusteringModelsUnavailableError extends Error {
 
   constructor(projectId: string) {
     super(
-      `This process cannot resolve a clustering model for project ${projectId}: topic clustering runs on the project's own model provider, and that credential cascade is not composable here.`,
+      `This process cannot resolve a clustering model for project ${projectId}: topic clustering runs on the project's own model provider, and this process composed no model gateway to read it through.`,
     );
   }
 }

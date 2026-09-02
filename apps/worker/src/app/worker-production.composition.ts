@@ -171,6 +171,10 @@ import {
   WorkerTopicAbsenceReportPort,
 } from "./worker-topic-clustering.composition";
 import {
+  tryCreateWorkerModelProviders,
+  WorkerModelProviderAbsenceReportPort,
+} from "./worker-model-provider.composition";
+import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
 } from "./worker-evaluation-processing.composition";
@@ -1019,11 +1023,44 @@ export class WorkerProductionComposition {
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
     trackedEvents.connect(trace.commands.recordSpan);
+    // The model gateway, composed once for every path in this process that
+    // resolves a customer's model: topic clustering's four questions and an
+    // online evaluation's `X_LITELLM_*` environment. Two gateways would be two
+    // decryptions of one stored credential and two answers to which model a
+    // project clusters with, so it is built here and handed down.
+    //
+    // The cipher is the SAME `resolveWorkerStoredSecretCipher` the three other
+    // stored-secret verticals read under — a provider credential is written by
+    // the control plane under `CREDENTIALS_SECRET` — and its absence is a gate
+    // rather than a degradation, because a gateway that could not decrypt would
+    // report every configured provider as unusable instead of failing honestly.
+    const modelProviders = tryCreateWorkerModelProviders({
+      config: options.config,
+      database: options.database,
+      redis: processRedis,
+      encryption: options.config.automation.credentialsEncryptionKey
+        ? resolveWorkerStoredSecretCipher(options.config)
+        : undefined,
+      // THE ONE PRECONDITION THIS PROCESS STILL MISSES. A provider row's scope
+      // is the triple project/team/organization and its reads are authorized,
+      // so the gateway takes the whole tenancy graph — and this process composes
+      // the READ half of Project only (`createWorkerTraceCapabilityServices`),
+      // no `OrganizationService` beyond Billing's tenant lookup, and AuthZ's
+      // consumer pipeline rather than an `AuthzService`. Composing those three
+      // is its own slice: `PostgresOrganizationAdapter` needs an `AuthzService`
+      // and `PostgresAuthzAdapter` needs a metric registry this process does
+      // not hold. Named here so the gap is a decision an operator reads at
+      // boot, not an empty provider list a customer discovers.
+      tenancy: undefined,
+      ...(WorkerProductionComposition.modelProviderAbsence(options)
+        ? { absence: WorkerProductionComposition.modelProviderAbsence(options)! }
+        : {}),
+    });
     // Topic's runtime, composed here rather than received. Its execution
     // ports are this process's own — the tenant-keyed ClickHouse client the
-    // event store already resolves through, a direct langevals POST, and an
-    // OTLP metrics adapter that writes the same two series the App writes —
-    // and its one absence is reported by name at boot.
+    // event store already resolves through, the model gateway above, a direct
+    // langevals POST, and an OTLP metrics adapter that writes the same two
+    // series the App writes.
     const topicRuntime = createWorkerTopicRuntime({
       config: options.config,
       database: options.database,
@@ -1032,6 +1069,7 @@ export class WorkerProductionComposition {
         .resolveClickHouseClient as unknown as Parameters<
         typeof createWorkerTopicRuntime
       >[0]["resolveClickHouseClient"],
+      ...(modelProviders ? { modelProviders: modelProviders.modelProviders } : {}),
       ...(WorkerProductionComposition.topicAbsence(options)
         ? { absence: WorkerProductionComposition.topicAbsence(options)! }
         : {}),
@@ -1423,6 +1461,15 @@ export class WorkerProductionComposition {
   ): WorkerIdentityAbsenceReportPort | undefined {
     return options.observability
       ? LoggedWorkerIdentityAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place the model gateway's absences are declared. */
+  private static modelProviderAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerModelProviderAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerModelProviderAbsence.create(options.observability.logger)
       : undefined;
   }
 
@@ -2065,6 +2112,45 @@ export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
     this.logger.warn(
       { reason: "no-model-provider-cascade" },
       "worker composed topic clustering without a model resolver: the schedule, its commands and its projections are live, and every clustering page refuses by name rather than naming a customer's topics with a provider they did not choose",
+    );
+  }
+}
+
+/**
+ * Names the model gateway's absences once, at boot, rather than leaving them
+ * inferred from a clustering schedule that never advances.
+ *
+ * The first is the one that matters to an operator: it says WHY no model can be
+ * resolved, and the two reasons need different actions — one is a variable
+ * nobody exported, the other is a capability this process does not compose yet.
+ */
+export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn" | "info">): LoggedWorkerModelProviderAbsence {
+    return new LoggedWorkerModelProviderAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn" | "info">) {
+    super();
+  }
+
+  withoutModelGateway(reason: "no-encryption" | "no-tenancy"): void {
+    this.logger.warn(
+      { reason },
+      "worker composed no model gateway: topic clustering and online evaluation both refuse by name, because neither can read the project's own model provider",
+    );
+  }
+
+  withoutModelTranslation(): void {
+    this.logger.info(
+      { reason: "no-execution-proxy" },
+      "worker composed the model gateway without a translation model: this process serves no transport that translates, and a translation executes against the NLP engine's proxy address it does not join",
+    );
+  }
+
+  withoutConnectionWindows(): void {
+    this.logger.warn(
+      { reason: "no-redis" },
+      "worker composed the model gateway without the connection-test windows: the window is a shared budget and this deployment configured no Redis, so a connection test refuses rather than spending a second ceiling",
     );
   }
 }

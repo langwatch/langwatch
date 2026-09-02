@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
@@ -198,10 +199,61 @@ describe("given a worker that composes every capability for itself", () => {
   });
 
   /**
+   * The four resolutions a clustering page makes, through the gateway this
+   * process composes.
+   *
+   * The adapter is the model-provider package's own — nothing in the worker
+   * re-derives which model a project clusters with — so what this drives is the
+   * WIRING: that the composition reaches the gateway for all four questions,
+   * with the two feature keys the clustering run is stored under, rather than
+   * refusing.
+   */
+  /** @scenario "Topic clustering resolves its models through the composed gateway" */
+  it("resolves all four clustering models through the model gateway", async () => {
+    const featureKeys: string[] = [];
+    const openai = { provider: "openai", enabled: true, customKeys: { OPENAI_API_KEY: "sk-1" } };
+    const modelProviders = {
+      resolveModelForFeature: async ({ featureKey }: { featureKey: string }) => {
+        featureKeys.push(featureKey);
+        return { model: "openai/text-embedding-3-small" };
+      },
+      getExecutionProviders: async () => ({ openai }),
+      prepareExecution: async ({ model }: { model: string }) => ({ model }),
+    } as unknown as ModelProviderService;
+    const execution = createWorkerTopicClusteringExecution({
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      resolveClickHouseClient: async () => ({ query: async () => ({ json: async () => [] }) }) as never,
+      modelProviders,
+    });
+
+    await expect(execution.models.resolveClusteringModel("project-1")).resolves.toEqual({
+      model: "openai/text-embedding-3-small",
+    });
+    await expect(execution.models.findExecutionProviders("project-1")).resolves.toEqual({ openai });
+    await expect(execution.models.resolveEmbeddingsModel("project-1")).resolves.toEqual({
+      model: "openai/text-embedding-3-small",
+      modelProvider: openai,
+    });
+    await expect(
+      execution.models.prepareLitellmParams({
+        model: "openai/text-embedding-3-small",
+        modelProvider: openai as never,
+        projectId: "project-1",
+      }),
+    ).resolves.toEqual({ model: "openai/text-embedding-3-small" });
+
+    expect(featureKeys).toEqual([
+      "analytics.topic_clustering_llm",
+      "analytics.topic_clustering_embeddings",
+    ]);
+  });
+
+  /**
    * Topic clustering runs on the project's own model provider. A page that
    * fell back to a built-in model would name a customer's topics with a
-   * provider they never chose and bill it to a key they never gave us, so all
-   * four resolutions refuse by name and the schedule keeps its place.
+   * provider they never chose and bill it to a key they never gave us, so a
+   * process that composed no gateway refuses all four resolutions by name and
+   * the schedule keeps its place.
    */
   /** @scenario "Topic clustering refuses by name rather than inventing a model" */
   it("refuses every clustering model resolution by name", async () => {

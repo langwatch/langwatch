@@ -12,6 +12,33 @@ import {
   prepareLitellmParams,
   resolveMaxTokensCeiling,
 } from "@langwatch/model-provider-server";
+import type { WorkerModelProviders } from "./worker-model-provider.composition";
+
+/**
+ * The evaluator environment, over the gateway this process composed.
+ *
+ * It takes the whole `WorkerModelProviders` bundle rather than the two
+ * services separately, which is what makes the sharing structural: the model
+ * gateway and the managed-provider service that decides whether LangWatch
+ * supplies an organization's credentials come out of ONE composition, and the
+ * topic clustering path takes the same instance. A caller cannot hand this the
+ * gateway from one graph and the managed service from another, which is how a
+ * managed-Bedrock organization would get its own key on one path and the proxy
+ * credentials on the other.
+ */
+export function createWorkerEvaluationModelEnv(input: {
+  models: WorkerModelProviders;
+  azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+  /** The process environment an evaluator's own `envVars` are read from. */
+  environment: Readonly<Record<string, string | undefined>>;
+}): WorkerEvaluationModelEnv {
+  return WorkerEvaluationModelEnv.create({
+    modelProviders: input.models.modelProviders,
+    managedProviders: input.models.managedProviders,
+    azureSafetyCredentials: input.azureSafetyCredentials,
+    environment: input.environment,
+  });
+}
 
 /**
  * The environment an evaluator executes with, resolved from the project's own

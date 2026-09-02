@@ -540,6 +540,46 @@ export const workerConfigDefinition = RuntimeConfig.define({
       http: Config.value(optionalProxyValue, { env: "HTTP_PROXY" }),
       noProxy: Config.value(optionalProxyValue, { env: "NO_PROXY" }),
     },
+    /**
+     * The address policy an outbound model-provider credential probe is judged
+     * by.
+     *
+     * These two are the whole of what the model gateway needs from the
+     * environment that this module does not already read. The other three
+     * inputs are projections rather than new leaves, and each is a deliberate
+     * refusal to declare a twin:
+     *
+     *   isSaas          `deployment.saas`, already read from `IS_SAAS` through
+     *                   the same one-or-true schema the App reads it with. A
+     *                   second leaf over one variable is how two answers to
+     *                   "is this the hosted install" get into one process, and
+     *                   that answer decides whether a SYSTEM provider is
+     *                   switched on for every project.
+     *   cipher key      `automation.credentialsEncryptionKey`, which already
+     *                   resolves `CREDENTIALS_SECRET` then `NEXTAUTH_SECRET`
+     *                   in the App's own order. A provider credential is
+     *                   written by whichever tier the customer saved it on and
+     *                   read back by the other, so a second key here would
+     *                   report every configured provider as unusable.
+     *   environment     the raw string bag, resolved below. WHICH variable
+     *                   carries a provider's key is the provider registry's
+     *                   business; whether this deployment set it is the
+     *                   environment's.
+     *
+     * An unset allowlist is an empty one rather than a wildcard: a wildcard
+     * read out of an absent variable is how a fence stops fencing without
+     * anyone deciding it should. Both are read exactly as `apps/api` reads
+     * them, because a probe answered differently by the two tiers is a
+     * credential that saves on one screen and fails on the other.
+     */
+    modelProvider: {
+      blockLocalHttpCalls: Config.value(environmentOneOrTrueSchema, {
+        env: "BLOCK_LOCAL_HTTP_CALLS",
+      }),
+      allowedProxyHosts: Config.value(optionalEnvironmentString, {
+        env: "ALLOWED_PROXY_HOSTS",
+      }),
+    },
   },
 });
 
@@ -599,6 +639,32 @@ export type WorkerInfrastructureConfig = Readonly<{
   groupQueue: GroupQueuePolicy;
   storage: WorkerStorageConfig;
   outboundProxy: WorkerOutboundProxyConfig;
+  modelProvider: WorkerModelProviderConfig;
+}>;
+
+/**
+ * What the model gateway was told about this deployment.
+ *
+ * `isSaas` is deliberately NOT here: it is `deployment.saas`, and the gateway
+ * composition reads it from there so one variable keeps one meaning across
+ * this process. What is here is the fence a credential probe is judged by,
+ * plus the environment bag a SYSTEM provider's credential and a managed
+ * organization's Bedrock configuration are read out of.
+ */
+export type WorkerModelProviderConfig = Readonly<{
+  blockLocalHttpCalls: boolean;
+  allowedProxyHosts: readonly string[];
+  /**
+   * The process environment the provider registry resolves a system
+   * credential from.
+   *
+   * A map rather than named leaves, and it is the one place in this config
+   * where that is right: sixteen providers each with their own `apiKey` and
+   * optional `endpointKey`, plus custom providers naming keys no schema here
+   * could enumerate. Reading it here rather than at the gateway is what keeps
+   * this module the process's only environment reader.
+   */
+  environment: Readonly<Record<string, string | undefined>>;
 }>;
 
 export type WorkerShutdownConfig = Readonly<{
@@ -927,6 +993,10 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         dataplaneS3: resolveWorkerDataplaneS3Config(source),
       },
       outboundProxy: value.infrastructure.outboundProxy,
+      modelProvider: resolveWorkerModelProviderConfig(
+        value.infrastructure.modelProvider,
+        environmentStrings(source),
+      ),
     },
     featureFlags: resolveFeatureFlagConfig(source),
   };
@@ -1193,6 +1263,33 @@ function resolveWorkerPrivateClickHouseRoutes(
 }
 
 /** The environment bag as the shared ClickHouse helpers read it. */
+/**
+ * The deployment's answers for the model gateway.
+ *
+ * The allowlist is split on commas and trimmed, and blank entries are dropped:
+ * an empty host matches nothing useful and would otherwise sit in the list
+ * looking like a rule. The flag arrived already read as `1`-or-`true`, which
+ * is the App's own spelling and `apps/api`'s, so the three tiers cannot
+ * disagree about whether the fence is up.
+ */
+function resolveWorkerModelProviderConfig(
+  value: Readonly<{
+    blockLocalHttpCalls: boolean;
+    allowedProxyHosts: string | undefined;
+  }>,
+  environment: Readonly<Record<string, string | undefined>>,
+): WorkerModelProviderConfig {
+  return {
+    blockLocalHttpCalls: value.blockLocalHttpCalls,
+    allowedProxyHosts:
+      value.allowedProxyHosts
+        ?.split(",")
+        .map((host) => host.trim())
+        .filter((host) => host.length > 0) ?? [],
+    environment,
+  };
+}
+
 function environmentStrings(
   source: Readonly<Record<string, unknown>>,
 ): Record<string, string | undefined> {

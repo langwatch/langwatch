@@ -2088,10 +2088,13 @@ analytics cache keeps the `evaluation_analytics` prefix, which is a WIRE FORMAT 
 `TraceAnalyticsAttributePolicy` moved out of `runtime/app/features/` into
 `apps/worker/src/features/evaluation/`.
 
-TOPIC: all nine keys mounted, ONE NAMED ABSENCE. Clustering runs on the PROJECT's own model provider;
-a page that fell back to a built-in model would name a customer's topics with a provider they never
-chose and bill it to a key they never gave us, so all four resolutions refuse through
-`AbsentTopicClusteringModels` and the schedule keeps its place. The langevals exchange is REAL and
+TOPIC: all nine keys mounted, and the one named absence is now CONDITIONAL rather than permanent.
+Clustering runs on the PROJECT's own model provider; a page that fell back to a built-in model would
+name a customer's topics with a provider they never chose and bill it to a key they never gave us.
+**CORRECTED 2026-09-02 by the model-gateway lane: `createWorkerTopicClusteringExecution` now takes an
+optional `modelProviders` and wires the packaged `ModelProviderExecutionAdapter` when it has one, so
+`withoutClusteringModels()` is reported and `AbsentTopicClusteringModels` answers ONLY on a process
+that composed no gateway.** The schedule keeps its place either way. The langevals exchange is REAL and
 posts DIRECTLY — a deliberate difference from the App's staged client, which spools the page through
 S3 first. The three Prisma repositories were narrowed from `PrismaClient` to `Pick<>` shapes
 (`TopicDatabase`, `TopicClusteringDatabase`, `TopicModelProjectionDatabase`) so the worker's one
@@ -4231,6 +4234,8 @@ refusal when the bundle is absent, and the receipt ledger named at boot.
   docblock, which finalises after the provider has answered. What is lost is the
   narrower crash window, not the guarantee.
 - **`withoutClusteringModels()` is NOT closed, and it is one composition away.**
+  **CLOSED 2026-09-02 by the model-gateway lane; see "The worker's own model
+  gateway" at the end of this document.**
   `ModelProviderExecutionAdapter` in `@langwatch/model-provider-server` already
   implements `TopicClusteringModelsPort` whole; what it needs is a
   `ModelProviderService`, which means composing `PostgresModelProviderAdapter`'s
@@ -5725,3 +5730,158 @@ middleware,modelProviders,nlpgo,ops,organizations,posthog.ts,profiling,...}`,
 `src/*.ts` boot files. `src/{utils,test-utils,components}`,
 `server/{better-auth,mailer,tracer,auth0,role-bindings,teams,utils,otel}` and
 `src/features/errors` are **gone**.
+
+## (g3) The worker's own model gateway (2026-09-02)
+
+`apps/worker` composes `ModelProviderService` for itself. The capability was the
+last shared blocker under the worker's two model-using paths — topic clustering
+asks it four questions, an online evaluation asks it for the `X_LITELLM_*`
+environment — and both had been answering by name because the six ports
+`PostgresModelProviderAdapter` takes were platform classes. They are not any
+more, and none of them is a copy: every one is the packaged adapter that
+`apps/api/src/app/api-model-provider.composition.ts` already composes.
+
+`apps/worker/src/app/worker-model-provider.composition.ts` is the composition.
+
+```
+createWorkerModelProviders
+  |- PostgresModelProviderAdapter          the packaged adapter, over this
+  |    |                                   process's one Prisma client
+  |    |- credentials    EncryptedModelProviderCredentialAdapter over the SAME
+  |    |                 cipher resolveWorkerStoredSecretCipher already gives
+  |    |                 Automation, the gateway's endpoint secrets and
+  |    |                 Governance ingestion (CREDENTIALS_SECRET, then
+  |    |                 NEXTAUTH_SECRET — the App's own order)
+  |    |- catalog        RegistryModelProviderCatalogAdapter + the deployment's
+  |    |                 three facts: IS_SAAS (projected from deployment.saas),
+  |    |                 the environment bag, and the SSRF fence a credential
+  |    |                 probe is judged by
+  |    |- connectionRateLimiter  a frozen twin of the App's Redis fixed window,
+  |    |                 counted in the queue's own connection under the same
+  |    |                 `langwatch:ratelimit:` prefix
+  |    |- codexTokenRefresher   CodexOAuthModelProviderTokenRefresherAdapter
+  |    |- ids            PrefixedModelProviderIdAdapter over nanoid, the same
+  |    |                 minter the API tier writes rows with
+  |    `- translation    ABSENT by name — see below
+  `- PostgresManagedProviderAdapter        the Enterprise managed-provider
+                                           service, composed over the same
+                                           ProjectService, so one graph answers
+                                           "is this organization managed"
+```
+
+`WorkerModelProviders` carries the gateway and the managed-provider service as
+ONE value, and both consumers take that value rather than the two services
+apart. That is what makes the sharing structural: a caller cannot hand topic
+clustering a gateway from one graph and the evaluator environment a managed
+service from another, which is how a managed-Bedrock organization would get its
+own key on one path and the proxy credentials on the other.
+
+**Config leaves added** (`apps/worker/src/platform/config/worker.config.ts`,
+`infrastructure.modelProvider`): `BLOCK_LOCAL_HTTP_CALLS` and
+`ALLOWED_PROXY_HOSTS`, plus the raw environment bag resolved from the source the
+way `apps/api` resolves it. Three inputs the gateway also needs are PROJECTIONS
+rather than new leaves, and each is a deliberate refusal to declare a twin:
+`isSaas` is `deployment.saas` (already `IS_SAAS` through the same one-or-true
+schema), the cipher key is `automation.credentialsEncryptionKey` (already
+`CREDENTIALS_SECRET` then `NEXTAUTH_SECRET`), and WHICH variable carries a
+provider's key is the provider registry's business rather than a schema here.
+Two leaves over one variable is how two answers to one deployment fact get into
+one process, and both of these decide whether a customer's provider is usable.
+
+**`withoutClusteringModels()` is closed.** `createWorkerTopicClusteringExecution`
+takes an optional `modelProviders` and wires
+`ModelProviderExecutionAdapter` — the model-provider package's own four-method
+implementation of `TopicClusteringModelsPort`, the same one the application
+composes — when it has one. Nothing in the worker re-derives which model a
+project clusters with. `AbsentTopicClusteringModels` still answers on a process
+that composed no gateway, and the absence is reported only then.
+
+**`EvaluationModelEnvPort` points at the same service.**
+`createWorkerEvaluationModelEnv` in
+`apps/worker/src/app/worker-evaluation-model-env.composition.ts` builds
+`WorkerEvaluationModelEnv` from the `WorkerModelProviders` bundle, so the
+evaluation execution bundle and the clustering runtime resolve through one
+gateway.
+
+### Named absences and recorded losses
+
+- **The gateway is composed but GATED, and production still misses one
+  precondition.** `tryCreateWorkerModelProviders` refuses on two, told apart by
+  name at boot: `no-encryption` (a deployment that never set
+  `CREDENTIALS_SECRET` — a gateway without the cipher would report every
+  configured provider as unusable rather than failing honestly) and
+  `no-tenancy`. Today `worker-production.composition.ts` passes
+  `tenancy: undefined`, so `no-tenancy` is what a production worker logs. A
+  provider row's scope is the triple project/team/organization and its cost
+  reads are authorized, so the adapter takes a whole `ProjectService`,
+  `OrganizationService` and `AuthzService`; this process composes the READ half
+  of Project only (`createWorkerTraceCapabilityServices`), Billing's narrow
+  tenant-organization lookup, and AuthZ's CONSUMER pipeline rather than an
+  `AuthzService`. Composing the three is its own slice and its wall is named:
+  `PostgresOrganizationAdapter` requires an `AuthzService`, and
+  `PostgresAuthzAdapter` requires a prom-client `Registry` this process
+  deliberately does not hold (it writes every series over OTLP), so closing it
+  means an OTel twin of `ObservabilityAuthzMetricsAdapter`'s two counters plus a
+  decision about whether the worker's authz registration may also produce. That
+  is the SAME `ProjectService`-wave prerequisite the worker blocker graph
+  already names as gating five conversions; this lane adds the model gateway to
+  the list of things it unblocks rather than a new blocker.
+- **`translation` is absent by name.** A translation is a model call executed
+  against the OpenAI-compatible proxy that hangs off the NLP engine's address —
+  the Workflow feature's path joined to a deployment's engine address, a join
+  this process does not make and has no other reason to. `apps/api` makes it
+  with `nlpProxyBaseUrl` from `@langwatch/workflow-server`; carrying that here
+  would be a second description of the same URL for a method no command,
+  projection or subscriber in this process calls. `AbsentWorkerModelTranslation`
+  refuses by name so a future caller finds the decision.
+- **The connection-test window refuses without Redis.** The window is a SHARED
+  budget spent against the same keyspace the other tier counts in, so an
+  in-memory counter would hand out a second ceiling rather than a smaller one.
+  A deployment with no Redis loses its connection-test button and nothing else —
+  every other gateway path is a read — and the absence is reported at boot.
+- **`withoutTitleGeneration()` is NOT closed, and it is one MOVE away rather
+  than one composition away.** Langy's conversation title generator resolves a
+  model through exactly this cascade, and the gateway now exists; what does not
+  is the generator. `createLangyConversationTitleGenerator` is still
+  `platform/app/src/runtime/app/features/langy-title-generation.adapter.ts`
+  (139 lines: the prompt, the title sanitiser, the resolve-then-fall-back model
+  cascade and one `generateText` call), and its message reader is already
+  packaged as `LangyMessageService.createTrustedMessageReader`. Moving it into
+  `@langwatch/langy-server` (which gains `ai`) and passing the gateway is the
+  whole of the remaining work. Left here because it is a package move with a
+  platform deletion, which is a slice rather than a wiring change.
+- **`withoutSpendSettlement()`, `withoutExecutionPool()`, `withoutAgentManager()`,
+  `withoutSessionKeyMint()` and the eight automation-settlement absences are NOT
+  this service's.** Grepped and checked one by one: they name an all-instance
+  ClickHouse directory, a scenario execution pool, the Langy agent manager, an
+  authorization graph and Automation's own persistence — none resolves a model.
+
+### Gates
+
+`cd apps/worker && pnpm exec vitest run`: **57 files / 431 tests, all passing**
+(baseline 56 / 423; this lane adds
+`src/app/__tests__/worker-model-provider.composition.unit.test.ts` with 6, one
+clustering scenario to `worker-capability-mount.composition.unit.test.ts` and
+one config scenario). `tsc --noEmit` and `tsc --noEmit -p tsconfig.test.json`
+both **0 errors** after two pre-existing test-only breaks from other lanes were
+cleared: `@langwatch/workflow-contract` was undeclared in `apps/worker`'s
+`package.json` (the evaluation composition test type-imports it) and the dataset
+backfill task's test fixture was stale against
+`DatasetMigrationRunResult` (`"migrated"` for `"completed"`, and a three-field
+summary for the package's five). `apps/worker/src/features/job-registry.json` is
+byte-unchanged and the registry-parity assertion in
+`worker-capability-mount.composition.unit.test.ts` is green.
+`git diff --numstat -- platform/app`: **0 insertions on every row**, and this
+lane wrote nothing there at all.
+
+**Worker absence count** (`grep -rn "abstract without" apps/worker/src`):
+**23 declared before, 26 after.** One is closed in the sense that matters —
+`withoutClusteringModels()` is now CONDITIONAL, reported only by a process that
+composed no gateway, where before it was reported by every process — and its
+declaration stays because the deployment it names is still reachable. Three are
+new, and each names a decision that was previously invisible because no gateway
+existed to make it: `withoutModelGateway(reason)`, `withoutModelTranslation()`
+and `withoutConnectionWindows()`. The count going UP while a blocker comes down
+is the honest shape here: a capability that could not be composed at all had one
+absence, and a capability that is composed has as many as it has surfaces it
+does not serve.

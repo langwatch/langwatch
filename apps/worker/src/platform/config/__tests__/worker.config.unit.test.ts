@@ -123,6 +123,15 @@ describe("resolveWorkerConfig", () => {
           },
         },
         outboundProxy: { https: undefined, http: undefined, noProxy: undefined },
+        // The fence a model-provider credential probe is judged by. An unset
+        // allowlist is an EMPTY one rather than a wildcard, and the
+        // environment bag a system provider's credential is read from is
+        // empty because this source names nothing.
+        modelProvider: {
+          blockLocalHttpCalls: false,
+          allowedProxyHosts: [],
+          environment: {},
+        },
       },
       // A deployment that set no flag variable overrides nothing and force-
       // enables nothing, which is a process that runs every flag on its stored
@@ -227,7 +236,7 @@ describe("resolveWorkerConfig", () => {
   });
 
   it("resolves Worker-private Redis, queue, storage, and proxy settings once", () => {
-    const config = resolveWorkerConfig({
+    const source = {
       REDIS_URL: "redis://redis.example.test:6379",
       REDIS_DB_INDEX: "4",
       GLOBAL_QUEUE_CONCURRENCY: "12",
@@ -244,7 +253,8 @@ describe("resolveWorkerConfig", () => {
       LANGWATCH_LOCAL_STORAGE_PATH: "/worker/objects",
       HTTPS_PROXY: " https://proxy.example.test:8443 ",
       NO_PROXY: " internal.example.test ",
-    });
+    };
+    const config = resolveWorkerConfig(source);
 
     expect(config.infrastructure).toEqual({
       // Neither datastore is named by this case, and both are still projected:
@@ -296,7 +306,45 @@ describe("resolveWorkerConfig", () => {
         http: undefined,
         noProxy: "internal.example.test",
       },
+      // The environment bag is the source itself, unfiltered: WHICH variable
+      // carries a provider's key is the provider registry's business, and a
+      // schema here that enumerated them would drop the custom providers whose
+      // key names nothing in this repository knows.
+      modelProvider: {
+        blockLocalHttpCalls: false,
+        allowedProxyHosts: [],
+        environment: source,
+      },
     });
+  });
+
+  /**
+   * The two leaves the model gateway adds, read exactly as the API tier reads
+   * them.
+   *
+   * The flag opts in for `1` or a case-insensitive `true` and for nothing
+   * else, because two tiers disagreeing about whether a fence is up is worse
+   * than either answer; the allowlist drops blank entries, which would
+   * otherwise sit in the list looking like a rule while matching nothing.
+   */
+  it("reads the model-provider egress fence the way the API tier reads it", () => {
+    expect(
+      resolveWorkerConfig({
+        BLOCK_LOCAL_HTTP_CALLS: "TRUE",
+        ALLOWED_PROXY_HOSTS: " api.internal.example.test , ,localhost ",
+      }).infrastructure.modelProvider,
+    ).toEqual({
+      blockLocalHttpCalls: true,
+      allowedProxyHosts: ["api.internal.example.test", "localhost"],
+      environment: {
+        BLOCK_LOCAL_HTTP_CALLS: "TRUE",
+        ALLOWED_PROXY_HOSTS: " api.internal.example.test , ,localhost ",
+      },
+    });
+    expect(
+      resolveWorkerConfig({ BLOCK_LOCAL_HTTP_CALLS: "yes" }).infrastructure.modelProvider
+        .blockLocalHttpCalls,
+    ).toBe(false);
   });
 
   it("preserves empty S3 credentials as the default AWS credential chain", () => {

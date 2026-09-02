@@ -2,8 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { DatasetContentBackfillTask } from "../backfill-dataset-content-to-object-storage.task";
 
 const migrated = {
-  status: "migrated" as const,
-  summary: { datasets: 2, chunks: 7, bytes: 1_024 },
+  status: "completed" as const,
+  summary: {
+    migrated: 2,
+    wouldMigrate: 0,
+    alreadyMigrated: 5,
+    skippedConcurrentWrite: 0,
+    failed: 0,
+  },
 };
 
 describe("given a dataset content backfill", () => {

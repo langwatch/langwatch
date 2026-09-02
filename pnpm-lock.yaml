@@ -212,6 +212,12 @@ importers:
       '@langwatch/enterprise-billing-server':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/billing/server
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/governance/contract
+      '@langwatch/enterprise-governance-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/governance/server
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/licensing/contract
@@ -449,6 +455,9 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.4.3
+      zod-validation-error:
+        specifier: ^5.0.0
+        version: 5.0.0(zod@4.4.3)
     devDependencies:
       '@opentelemetry/otlp-transformer':
         specifier: 0.55.0
@@ -6550,6 +6559,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -6571,6 +6583,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/role-contract':
+        specifier: workspace:*
+        version: link:../../role/contract
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -31702,7 +31717,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.19.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -34881,7 +34896,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.19.0):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 
