@@ -72580,12 +72580,12 @@ openapi: "GET /api/workflows"
 
 ---
 title: "Overview"
-description: "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design."
+description: "List, run, update, and archive the workflows you build in the LangWatch workflow editor."
 ---
 
 ## Intro
 
-Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+List, run, update, and archive the workflows you build in the LangWatch workflow editor.
 
 ---
 

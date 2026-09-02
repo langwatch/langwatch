@@ -85,7 +85,7 @@ class Code:
 
 - **Inputs** and **Outputs** work as on the LLM node. Adding an input also adds the parameter to the `__call__` signature. Every parameter defaults to `None`, so an input that is not connected does not raise an error.
 - Click the source to open the code editor. **Save** keeps the editor open, **Save & Close** returns to the drawer.
-- **Secrets**: the editor lists the secrets of the project and inserts `secrets.NAME` at the cursor. The value reaches the code at run time only; the editor and the saved workflow hold the name. Manage the values under **Settings**, **Secrets**. See [Secrets](/platform/secrets).
+- **Secrets**: the editor lists the secrets of the project and inserts `secrets.NAME` at the cursor. The value reaches the code at run time only; the editor and the saved workflow hold the name. Manage the values under **Settings**, **Secrets**.
 
 <Frame>
 <img className="block" src="/images/workflows/code-editor.png" alt="The Python code editor with the Secrets button and Save and Close" />
