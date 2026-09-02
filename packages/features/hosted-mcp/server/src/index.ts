@@ -14,3 +14,9 @@ export {
   registerOAuthClient,
   type RegisteredOAuthClient,
 } from "./repositories/redis/redis.oauth-client.repository";
+export {
+  createMcpAuthorizeRestApp,
+  type McpAuthorizeProject,
+  type McpAuthorizeRestPorts,
+  type McpAuthorizeSession,
+} from "./transport/api-rest/mcp-authorize.api";

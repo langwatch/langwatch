@@ -13,7 +13,10 @@ import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
-import type { OrganizationRestService } from "@langwatch/organization-server";
+import type {
+  OrganizationRestInviteService,
+  OrganizationRestService,
+} from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PromptRestService } from "@langwatch/prompt-server";
 import type { ShareService } from "@langwatch/share-contract";
@@ -175,6 +178,45 @@ describe("given the organization management door this process composes", () => {
     });
   });
 
+  describe("when this deployment composed an invitation service", () => {
+    /**
+     * The same service `organization.*` administers over tRPC. What this pins
+     * is that the route reaches it and returns what it holds: a listing that
+     * answered `[]` would look like a working door and tell an administrator
+     * nobody had been invited.
+     */
+    it("lists the organization's invitations through it", async () => {
+      const listInvites = vi.fn(async () => [
+        {
+          id: "invite-1",
+          organizationId: "organization-1",
+          email: "newcomer@acme.test",
+          role: "MEMBER",
+          status: "PENDING",
+          inviteCode: "code-1",
+          inviteUrl: "https://app.langwatch.test/invite/accept?inviteCode=code-1",
+          teamIds: "",
+          teamAssignments: null,
+          expiration: new Date(0),
+          createdAt: new Date(0),
+        },
+      ]);
+      const api = mount({
+        organizationManagement: {
+          organizations: {} as unknown as OrganizationRestService,
+          planType: "ENTERPRISE",
+          invites: { listInvites } as unknown as OrganizationRestInviteService,
+        },
+      });
+
+      const response = await api.fetch("/api/organization/latest/invites");
+
+      expect(response.status).toBe(200);
+      expect(listInvites).toHaveBeenCalledWith({ organizationId: "organization-1" });
+      await expect(response.text()).resolves.toContain("newcomer@acme.test");
+    });
+  });
+
   describe("when the organization's plan is not Enterprise", () => {
     it("refuses the whole family before it reads anything", async () => {
       const getSettings = vi.fn();
@@ -200,6 +242,8 @@ type MountOptions = {
   organizationManagement?: {
     organizations: OrganizationRestService;
     planType: string;
+    /** The invitation half, where this process composed one. */
+    invites?: OrganizationRestInviteService;
   };
 };
 
@@ -231,6 +275,13 @@ function mount(options: MountOptions) {
               shares: () => ({}) as ShareService,
               projects: () => ({}) as ProjectService,
               audit: () => {},
+              ...(management.invites
+                ? {
+                    invites: () => management.invites!,
+                    buildInviteAcceptUrl: (inviteCode: string) =>
+                      `https://app.langwatch.test/invite/accept?inviteCode=${inviteCode}`,
+                  }
+                : {}),
             },
           }
         : {}),

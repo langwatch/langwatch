@@ -2,16 +2,6 @@
   "version": 1,
   "edges": {
     "backend-to-browser": {
-      "platform/app/src/app/api/copilotkit/[[...route]]/service-adapter.ts": [
-        "~/optimization_studio/server/addEnvs",
-        "~/prompts/schemas/version-metadata-schema",
-        "~/prompts/types"
-      ],
-      "platform/app/src/app/api/shared/platform-url.ts": ["~/env.mjs"],
-      "platform/app/src/app/api/workflows/post_event/post-event.ts": [
-        "../../../../optimization_studio/server/addEnvs",
-        "../../../../optimization_studio/server/lambda"
-      ],
       "platform/app/src/server.mts": ["./env-load", "./instrumentation.node", "./start"],
       "platform/app/src/server/analytics/utils.ts": ["../../hooks/useFilterParams"],
       "platform/app/src/server/api/rbac.ts": ["~/env.mjs"],
@@ -94,7 +84,6 @@
       ],
       "platform/app/src/server/routes/gateway-internal.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/health-checks.ts": ["~/env.mjs"],
-      "platform/app/src/server/routes/misc.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/playground.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/workflows.ts": ["~/optimization_studio/server/addEnvs"],
       "platform/app/src/server/storage.ts": ["../env.mjs"],

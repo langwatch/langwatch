@@ -224,6 +224,7 @@ export {
  * delegation are the feature's.
  */
 export { createTriggerRestApp } from "./transport/api-rest/automation.api";
+export { createSlackTriggerRestApp } from "./transport/api-rest/slack-trigger.api";
 // The RFC 8058 one-click unsubscribe door. Its own family rather than part of
 // the trigger surface: the HMAC token IS the authorization, so it authenticates
 // nobody and shares no policy with the credentialed routes beside it.
@@ -246,3 +247,15 @@ export {
   type ReportGraphInput,
 } from "./services/report-chart.service";
 export { toReportTraceRow } from "./services/report-trace-row.service";
+export {
+  AUTOMATION_AUTO_PAUSED_METRIC_NAME,
+  AUTOMATION_CEILING_BREACH_METRIC_NAME,
+  AUTOMATION_CONTAINMENT_FAILED_METRIC_NAME,
+  AutomationRunawayMetricsSink,
+  NoopAutomationRunawayMetrics,
+  OtelAutomationRunawayMetricsAdapter,
+} from "./adapters/otel.automation-runaway-metrics.adapter";
+export {
+  AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
+  OtelAutomationSettlementObservabilityAdapter,
+} from "./adapters/otel.automation-settlement-observability.adapter";

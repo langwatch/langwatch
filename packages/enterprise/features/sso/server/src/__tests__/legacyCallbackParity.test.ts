@@ -13,8 +13,8 @@
  *
  * So this asserts the two halves agree, both ways.
  */
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import * as ssoServer from "@langwatch/enterprise-sso-server";
 import {
   buildGenericOAuthConfigs,
   LEGACY_CALLBACK_PROVIDER_IDS,
@@ -81,18 +81,23 @@ describe("legacy callback rewrites", () => {
       }
     });
 
-    it("leaves legacy provider callbacks to better-auth's core route", async () => {
-      const source = await readFile(
-        new URL("../../../../../../../platform/app/src/server/api-router.ts", import.meta.url),
-        "utf8",
-      );
-
-      expect(source).toContain("LEGACY_CALLBACK_PROVIDER_IDS");
-      expect(source).not.toContain("rewriteCallback(provider)");
-
-      for (const providerId of LEGACY_CALLBACK_PROVIDER_IDS) {
-        expect(source).not.toContain(`.all("/${providerId}", rewriteCallback(`);
-      }
+    /**
+     * This package ships no rewrite of its own, which is the other half of the
+     * pin: a provider is served at the legacy path because its config names
+     * that path, and the only thing that could break that is a route rewriting
+     * the callback out from under it.
+     *
+     * It used to be checked by READING the router that mounted better-auth and
+     * asserting no `rewriteCallback` appeared in it. That router was
+     * `platform/app/src/server/api-router.ts`, which no longer exists — the
+     * process that mounts the auth catch-all is a different workspace now, and
+     * a test in this package reaching across into a sibling app's source is
+     * exactly the guard that dies on the next move. So what is pinned here is
+     * the fact this package OWNS: no rewriting helper leaves it. A rewrite
+     * mounted by a process is that process's own regression test to write.
+     */
+    it("ships no callback rewrite of its own, which is what would break the pin", () => {
+      expect(Object.keys(ssoServer).filter((name) => /rewrite/i.test(name))).toEqual([]);
     });
   });
 

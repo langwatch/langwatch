@@ -1,16 +1,15 @@
 /**
  * The REST families the API process mounts from its OWN graph.
  *
- * Two lists rather than one, and the split is by what a mount costs.
- * {@link createAppRestFeatures} enumerates the thirty-two families that belong
- * to a feature package, and it is all-or-nothing: calling it means holding
- * every one of those services, which the API process does not yet. This list
- * is the one it can actually build — the families that describe the process
- * (the API document), and the product families whose service this process has
- * already composed.
+ * This is the ONE list. It was two for a while, because the packaged families
+ * lived behind an all-or-nothing call that meant holding thirty-two services at
+ * once; that call is deleted and the packaged families are now
+ * {@link mountApiPackagedRestFamilies}, a per-family conditional enumeration
+ * this one spreads in. So the list covers the families that describe the
+ * process (the API document), the ones the process owns outright, and every
+ * product family whose service this process has composed.
  *
- * The invariant both lists keep is the same one, and it is the reason this is a
- * list at all. A family reaches the route-policy registry when it is BUILT, and
+ * The invariant is the reason this is a list at all. A family reaches the route-policy registry when it is BUILT, and
  * the registry is what the route-authorization audit reads — so a family that
  * is served must appear in an enumeration, and mounting is iterating one.
  * Adding an `api.route(...)` beside these instead of an entry here is the thing
@@ -121,6 +120,7 @@ import {
 import {
   mountEvaluationsLegacyRest,
   type ApiEvaluationBatchRestCollaborators,
+  type ApiEvaluationRunRestCollaborators,
 } from "../features/evaluation/evaluations-legacy-rest.mount";
 import {
   mountCollectorRest,
@@ -129,6 +129,21 @@ import {
   type ApiTraceLegacyRestCollaborators,
   type ApiTracesRestCollaborators,
 } from "../features/trace/trace-rest.mount";
+import {
+  createOpsClickHouseExplainRestApp,
+  type OpsClickHouseExplainRestPorts,
+} from "@langwatch/ops-server";
+import { createDspyStepsRestApp, type DspyStepsRestPorts } from "@langwatch/experiment-server";
+import {
+  createMcpAuthorizeRestApp,
+  type McpAuthorizeRestPorts,
+} from "@langwatch/hosted-mcp-server";
+import { createImageProxyRestApp } from "../features/image-proxy/image-proxy-rest";
+import {
+  mountApiPackagedRestFamilies,
+  type ApiPackagedRestAbsenceReport,
+  type ApiPackagedRestCollaborators,
+} from "./app-rest.packaged-families";
 
 /**
  * The project credential a handler-managed family resolves through.
@@ -280,6 +295,15 @@ export type ApiProcessRestServices = Readonly<{
    */
   evaluationBatch?: ApiEvaluationBatchRestCollaborators | undefined;
   /**
+   * The four evaluate doors' collaborators, or none.
+   *
+   * None where this process composed no evaluator RUNTIME. The doors are then
+   * left unregistered rather than mounted: each one authenticates, validates
+   * and then has to run an evaluator, and a 500 at that last step is what an
+   * SDK retries forever.
+   */
+  evaluationRun?: ApiEvaluationRunRestCollaborators | undefined;
+  /**
    * The three URLs a synchronous studio run is started from, or none.
    *
    * Held apart from the Studio's editor doors even though two of the paths sit
@@ -288,6 +312,16 @@ export type ApiProcessRestServices = Readonly<{
    * holding a session transport.
    */
   workflowRun?: ApiWorkflowRunRestCollaborators | undefined;
+  /**
+   * The families that live in a FEATURE PACKAGE, and the services this process
+   * composed for them.
+   *
+   * One entry rather than twenty-eight because the decision is per family
+   * INSIDE it: `mountApiPackagedRestFamilies` mounts each one whose service is
+   * present and names the rest at boot. It is still one enumeration iterated
+   * once — see that module for why that is load-bearing rather than tidy.
+   */
+  packaged?: ApiPackagedRestCollaborators | undefined;
 }>;
 
 export type ApiProcessRestPorts = Readonly<{
@@ -401,6 +435,43 @@ export type ApiProcessRestPorts = Readonly<{
    * endpoints answering 500 to an alerting rule.
    */
   healthProbes?: HealthProbeRestPorts | undefined;
+  /**
+   * The operator-only ClickHouse EXPLAIN endpoint's collaborators, or none.
+   *
+   * None where the deployment provisioned no dedicated readonly ClickHouse
+   * account or no operator secret. The endpoint is cross-tenant BY DESIGN, so
+   * it is the one family whose absence is the safe answer rather than a
+   * degradation: with nothing to compare a bearer against, and no account the
+   * query may run as, a mounted door would leave a regex filter as the only
+   * thing between a token and the whole fleet's data.
+   */
+  opsClickHouseExplain?: OpsClickHouseExplainRestPorts | undefined;
+  /**
+   * The DSPy optimizer's step log's collaborators, or none.
+   *
+   * None where this process composed no per-project model-cost catalogue: a
+   * step recorded with every `cost` null is one an optimizer dashboard renders
+   * as a free run, which is a wrong fact rather than a missing one.
+   */
+  dspySteps?: DspyStepsRestPorts | undefined;
+  /**
+   * The hosted MCP OAuth approval step's collaborators, or none.
+   *
+   * None without Redis, a cipher and a browser session: the code lives in
+   * Redis for ten minutes, it embeds the project's credential under this
+   * deployment's key, and it is minted for the person who approved it.
+   */
+  mcpAuthorize?: McpAuthorizeRestPorts | undefined;
+  /**
+   * The public image relay's egress policy, or none.
+   *
+   * Always present in practice — the policy is two configuration leaves — but
+   * optional so a composition that reads no egress configuration mounts no
+   * public fetching door rather than one with an unstated fence.
+   */
+  imageProxy?:
+    | Readonly<{ blockLocalHttpCalls: boolean; allowedHosts: readonly string[] }>
+    | undefined;
 }>;
 
 /**
@@ -430,11 +501,22 @@ export type ApiProcessRestPorts = Readonly<{
  *     claiming those namespaces. It declines every path its allow-list does not
  *     recognise, so a family mounted after it keeps its own routing and its own
  *     404 — which is what `/api/v1/secret` depends on.
+ *
+ *  Between 4 and 5 sit the PACKAGED families, and their position is the one
+ *  thing about them that is not free. They come AFTER every literal door that
+ *  shares a namespace with one of them — `/api/dataset/generate` and
+ *  `/api/dataset/evaluate` before the dataset family's `/:slugOrId`, the
+ *  workbench's `/api/experiments/runs` before the experiment family's
+ *  `/:slug`, the Studio's `/api/workflows/code-completion` before the workflow
+ *  family's `/:workflowId` — and BEFORE the OTLP alias, whose wildcards are
+ *  broad on purpose.
  */
 export function createApiProcessRestFeatures(options: {
   security: AppRestSecurity;
   services?: ApiProcessRestServices;
   ports: ApiProcessRestPorts;
+  /** Names the packaged families this process left out, once, at boot. */
+  packagedAbsence?: ApiPackagedRestAbsenceReport | undefined;
 }): MountableRestApp[] {
   const { security, ports } = options;
   const services = options.services ?? {};
@@ -458,7 +540,7 @@ export function createApiProcessRestFeatures(options: {
   // door cannot leave the other answering the old way.
   const analytics = services.analytics;
   if (analytics) {
-    features.push(mountAnalyticsRest({ security, analytics }));
+    features.push(...mountAnalyticsRest({ security, analytics }));
   }
 
   // The governed-SQL family, over the SAME LangWatchQL service the workbench's
@@ -645,15 +727,60 @@ export function createApiProcessRestFeatures(options: {
   // The legacy evaluation family. Its catalogue route needs nothing, so the
   // family is mounted unconditionally; its batch and evaluate halves register
   // only where their port groups are supplied — the batch log where this
-  // process registered the run writer, the four evaluate doors nowhere yet.
-  // See the mount.
+  // process registered the run writer, the four evaluate doors where it
+  // composed an evaluator runtime. See the mount.
   features.push(
     mountEvaluationsLegacyRest({
       security,
       credential: ports.handlerManagedCredential,
       ...(services.evaluationBatch ? { batch: services.evaluationBatch } : {}),
+      ...(services.evaluationRun ? { evaluationRun: services.evaluationRun } : {}),
     }),
   );
+
+  // The packaged families, each conditional on the service this process
+  // composed for it. HERE and not earlier: `/api/dataset/generate` above,
+  // `/api/dataset/evaluate` immediately above, the workbench's literal
+  // `/api/experiments/runs` and the Studio's `/api/workflows/code-completion`
+  // all have to be registered before the packaged family whose parameterised
+  // segment would otherwise swallow them.
+  const packaged = services.packaged;
+  if (packaged) {
+    features.push(
+      ...mountApiPackagedRestFamilies({
+        security,
+        collaborators: packaged,
+        ...(options.packagedAbsence ? { report: options.packagedAbsence } : {}),
+      }),
+    );
+  }
+
+  // The operator EXPLAIN endpoint. `/api/ops` is a literal first segment
+  // nothing else claims, so its position among the families is free.
+  const opsClickHouseExplain = ports.opsClickHouseExplain;
+  if (opsClickHouseExplain) {
+    features.push(createOpsClickHouseExplainRestApp({ security, ports: opsClickHouseExplain }));
+  }
+
+  // The three doors the retired `misc.ts` still held that this process can
+  // serve. Each owns a literal first segment nothing above claims —
+  // `/api/dspy`, `/api/mcp`, `/api/image-proxy` — so their order is free, and
+  // all three are registered before the OTLP alias below for the same reason
+  // everything with its own routing is.
+  const dspySteps = ports.dspySteps;
+  if (dspySteps) {
+    features.push(createDspyStepsRestApp({ security, ports: dspySteps }));
+  }
+
+  const mcpAuthorize = ports.mcpAuthorize;
+  if (mcpAuthorize) {
+    features.push(createMcpAuthorizeRestApp({ security, ports: mcpAuthorize }));
+  }
+
+  const imageProxy = ports.imageProxy;
+  if (imageProxy) {
+    features.push(createImageProxyRestApp({ security, ...imageProxy }));
+  }
 
   // The SDK collector, before the OTLP alias that claims `/api/collector/*`.
   const collector = ports.collector;

@@ -15,26 +15,51 @@
  * for. This is the same judgment the charted tRPC reads already record.
  */
 import type { AnalyticsApp } from "@langwatch/analytics-server";
-import { createAnalyticsRestApp, timeseriesInputSchema } from "@langwatch/analytics-server";
+import {
+  createAnalyticsLegacyRestApp,
+  createAnalyticsRestApp,
+  timeseriesInputSchema,
+} from "@langwatch/analytics-server";
 import { flexibleDateSchema, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
 
 /**
- * `/api/analytics/timeseries`, bound to one process's analytics application.
+ * The charted reads' TWO public paths, bound to one process's analytics
+ * application.
+ *
+ * `/api/analytics/timeseries` is the canonical one and `/api/analytics` is the
+ * legacy path callers were written against. Both are mounted together because
+ * they answer the same question off the same application; they are two apps
+ * rather than an alias because their REFUSALS differ — the legacy one sends a
+ * bare `{ message }` or `{ error }` sentence where the canonical one sends the
+ * framework's envelope — and registering one as an alias of the other would
+ * change a wire two doors currently answer differently.
  *
  * The period bounds accept an ISO string as well as epoch milliseconds, which
- * is what the published endpoint has always accepted; `projectId` is dropped
- * because this door takes the project from the credential.
+ * is what both published endpoints have always accepted; `projectId` is dropped
+ * because both take the project from the credential.
+ *
+ * ORDERING between the two is free: `/api/analytics` is a literal path and
+ * `/api/analytics/timeseries` is a deeper literal path, so neither shadows the
+ * other whichever is registered first.
  */
 export function mountAnalyticsRest(options: {
   security: AppRestSecurity;
   analytics: () => AnalyticsApp;
-}): MountableRestApp {
-  return createAnalyticsRestApp({
-    security: options.security,
-    analytics: options.analytics,
-    requestSchema: timeseriesInputSchema.omit({ projectId: true }).extend({
-      startDate: flexibleDateSchema,
-      endDate: flexibleDateSchema,
-    }),
-  }).hono;
+}): MountableRestApp[] {
+  const requestSchema = timeseriesInputSchema.omit({ projectId: true }).extend({
+    startDate: flexibleDateSchema,
+    endDate: flexibleDateSchema,
+  });
+  return [
+    createAnalyticsRestApp({
+      security: options.security,
+      analytics: options.analytics,
+      requestSchema,
+    }).hono,
+    createAnalyticsLegacyRestApp({
+      security: options.security,
+      analytics: options.analytics,
+      requestSchema,
+    }).hono,
+  ];
 }

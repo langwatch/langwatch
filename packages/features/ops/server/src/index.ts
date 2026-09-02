@@ -209,3 +209,7 @@ export {
   type OpsExplainOutcome,
   OpsExplainService,
 } from "./services/ops-clickhouse-explain.service";
+export {
+  createOpsClickHouseExplainRestApp,
+  type OpsClickHouseExplainRestPorts,
+} from "./transport/api-rest/ops-clickhouse-explain.api";

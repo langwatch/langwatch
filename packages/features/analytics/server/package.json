@@ -33,6 +33,7 @@
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",

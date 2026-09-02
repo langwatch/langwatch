@@ -131,7 +131,12 @@ import {
   SuiteExecutionService,
   SuiteRunIdPort,
 } from "@langwatch/suite-server";
-import { ScenarioExecutionService, type SimulationService } from "@langwatch/scenario-contract";
+import {
+  ScenarioExecutionService,
+  type ScenarioService,
+  type ScenarioTabRegistry,
+  type SimulationService,
+} from "@langwatch/scenario-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
@@ -293,6 +298,17 @@ export type ApiAgentGroupCollaborators = Readonly<{
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
   /**
+   * The canonical Scenario service and the tab registry, published for the
+   * two packaged REST families that take them directly.
+   *
+   * Taken rather than rebuilt, for the same reason `simulations` is: a second
+   * adapter over the same rows would let `/api/scenarios` and the simulations
+   * page disagree about which scenarios a project holds, and a second tab
+   * registry would give one project two presence keyspaces.
+   */
+  scenarioService: ScenarioService;
+  scenarioTabs: ScenarioTabRegistry;
+  /**
    * The canonical Simulation service, published so the run EXPORT can sweep
    * through it.
    *
@@ -342,6 +358,13 @@ export function composeApiAgentGroupCollaborators(
     secretCipher: new ApiScenarioSecretCipher(options.encryption),
   });
 
+  const scenarioTabs = ScenarioTabRegistryService.create({
+    store: options.redis
+      ? RedisScenarioTabStoreAdapter.create(options.redis)
+      : new UnavailableApiScenarioTabStore(),
+    clock: new SystemScenarioClock(),
+  });
+
   const scenarioApp = ScenarioApp.create({
     scenarios,
     simulations,
@@ -349,12 +372,7 @@ export function composeApiAgentGroupCollaborators(
     // web process never holds anyway — `roleRunsWorkers` is false here — and
     // its prefetcher reaches ten other verticals' services.
     scenarioExecution: new UnavailableApiScenarioExecution(),
-    scenarioTabs: ScenarioTabRegistryService.create({
-      store: options.redis
-        ? RedisScenarioTabStoreAdapter.create(options.redis)
-        : new UnavailableApiScenarioTabStore(),
-      clock: new SystemScenarioClock(),
-    }),
+    scenarioTabs,
     users: options.users,
     broadcast: options.broadcast,
   });
@@ -390,6 +408,8 @@ export function composeApiAgentGroupCollaborators(
 
   return {
     scenarios: scenarioApp,
+    scenarioService: scenarios,
+    scenarioTabs,
     simulations,
     suites: suiteApp,
     langy: langyApp,

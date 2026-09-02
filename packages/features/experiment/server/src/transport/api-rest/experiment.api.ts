@@ -223,7 +223,8 @@ export function createExperimentsRestApp(options: {
   //
   // `:slug` is a parameter segment at the root of a namespace whose siblings are
   // literal (`/runs`, `/runs/:runId`), and those live in the v3 app, which mounts
-  // ahead of this one (see `server/api-router.ts`). The route-auth regression
+  // ahead of this one (see the mount order in the process's REST enumeration,
+  // `apps/api/src/app-rest/app-rest.process-features.ts`). The route-auth regression
   // test pins both directions, because a parameter swallowing a literal sibling
   // breaks in production rather than in a unit test.
   secured.access(requires("experiments:view")).get(

@@ -85,7 +85,7 @@ import {
   type RecentItem,
 } from "@langwatch/project-server";
 import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
-import type { RoleBindingScopeType } from "@langwatch/role-contract";
+import type { RoleBindingScopeType, RoleService } from "@langwatch/role-contract";
 import {
   PostgresRoleAdapter,
   RoleApp,
@@ -225,6 +225,16 @@ export type ApiProductGroupCollaborators = Readonly<{
   promptApp: PromptApp;
   /** For `ctx.app.roles` — the same application both role surfaces read. */
   roleApp: RoleApp;
+  /**
+   * The role service under {@link ApiProductGroupCollaborators.roleApp}.
+   *
+   * Exposed beside the application rather than composed a second time, because
+   * one other surface asks it a question no application method carries: the
+   * invitation half asks which custom roles an organization MAY ASSIGN, and an
+   * invitation validated against a second copy of that rule would be accepted
+   * on write and silently dropped on acceptance.
+   */
+  roles: RoleService;
   /** The `batchRecord` entry of {@link ApiTrpcCollaborators}. */
   batchRecordPorts: BatchRecordTrpcPorts<unknown, unknown>;
   /** The `dataset` entry. */
@@ -289,15 +299,16 @@ export function composeApiProductGroupCollaborators(
   const recentItems = PostgresRecentItemsAdapter.create({ database: options.prisma }).build();
 
   const bindingIds = KsuidAuthzBindingIdAdapter.create();
+  const roles = PostgresRoleAdapter.create({
+    database: options.prisma,
+    grants: options.grants,
+    permissions: options.authz,
+    newBindingId: () => bindingIds.newBindingId(),
+    scope: new ApiRoleScope(options.prisma),
+    permission: new ApiRolePermissions(),
+  }).build();
   const roleApp = RoleApp.create({
-    roles: PostgresRoleAdapter.create({
-      database: options.prisma,
-      grants: options.grants,
-      permissions: options.authz,
-      newBindingId: () => bindingIds.newBindingId(),
-      scope: new ApiRoleScope(options.prisma),
-      permission: new ApiRolePermissions(),
-    }).build(),
+    roles,
     permissions: options.authz,
     authzGrants: options.grants,
   });
@@ -325,6 +336,7 @@ export function composeApiProductGroupCollaborators(
     projectReads: options.projects,
     promptApp,
     roleApp,
+    roles,
     /**
      * The two batch-evaluation rollups, read off this process's own connection.
      *

@@ -1,4 +1,6 @@
+import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { configureLogger, createLogger, type Logger } from "@langwatch/observability";
+import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import {
   startOtlpMetricsExport,
   type ProcessObservabilityOptions,
@@ -79,6 +81,12 @@ export class ApiRuntimeBootstrap {
       flushers: [...(options.observability?.flushers ?? []), ...(metrics ? [metrics] : [])],
     };
     configureLogger(loggerConfiguration);
+    // The Grafana trace link every serialized HandledError carries. The
+    // package defaults to a no-op provider, so without this registration a
+    // customer-visible error reaches support with no way back to its trace.
+    // Registration only stores the function — `serialize()` reads the
+    // environment per call, so this is safe before the config phase.
+    setTraceUrlProvider(grafanaTraceUrlFromEnv);
 
     const resources = new ResourceScope();
     const graph = ScopedApiProcessGraph.create(resources);

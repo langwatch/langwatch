@@ -402,6 +402,20 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
   }
 
+  async getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections> {
+    // The anonymous resolution, then costs put back. `resolve` with no user id
+    // takes the public branch of every content category, which is what a key
+    // must see; the cost override is what `getProtectionsForProject` did, and
+    // it is sound because every project role grants `cost:view` and a project
+    // key carries full project access.
+    const protections = await this.protections.resolve({
+      projectId: input.projectId,
+      userId: undefined,
+      publiclyShared: false,
+    });
+    return { ...protections, canSeeCosts: true };
+  }
+
   isTraceNotFound(error: unknown): boolean {
     return error instanceof TraceNotFoundError;
   }

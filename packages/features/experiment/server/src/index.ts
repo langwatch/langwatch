@@ -176,3 +176,8 @@ export {
   type ExperimentInitRestCredential,
   type ExperimentInitRestPorts,
 } from "./transport/api-rest/experiment-init.api";
+export {
+  createDspyStepsRestApp,
+  type DspyStepsRestCredential,
+  type DspyStepsRestPorts,
+} from "./transport/api-rest/experiment-dspy-steps.api";

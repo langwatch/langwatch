@@ -33,6 +33,10 @@ import {
   closeApiProcessResources,
 } from "../api.process";
 import { ApiHttpListener } from "../api-http.listener";
+import {
+  CompositeApiRawSurface,
+  tryCreateApiStaticSurface,
+} from "../app-static/app-static.surface";
 import { tryCreateHostedMcpSurface } from "../features/mcp/hosted-mcp.mount";
 import {
   ApiMetricsPort,
@@ -892,6 +896,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       baseHost:
         options.config.infrastructure.execution.publicBaseUrl ?? "https://app.langwatch.ai",
     });
+    // The built browser bundle, served by this process off the same listener.
+    // `apps/ui` is a build, not a deployable: the image ships its `dist/client`
+    // beside this app and the chart runs one interactive Deployment, so the pod
+    // that answers `/api/*` is the pod a browser asks for `/`. Asked LAST, after
+    // every claimed surface, because it is the fallback.
+    const staticSurface = tryCreateApiStaticSurface({
+      report: (message, context) =>
+        createLogger(options.config.serviceName).info(context, message),
+    });
+    const rawSurface = CompositeApiRawSurface.of([hostedMcp, staticSurface]);
     const process = ApiProcess.create({
       agents,
       ...(features ? { features } : {}),
@@ -916,7 +930,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         host: options.config.host,
         port: options.config.port,
         drainGraceMs: options.config.httpDrainGraceMs,
-        ...(hostedMcp ? { rawSurface: hostedMcp } : {}),
+        ...(rawSurface ? { rawSurface } : {}),
       },
     });
 

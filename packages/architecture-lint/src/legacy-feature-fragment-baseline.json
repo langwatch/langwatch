@@ -1,7 +1,6 @@
 {
   "version": 0,
   "fragments": [
-    {"feature":"agent","file":"platform/app/src/app/api/agents/agent-platform-url.ts","kind":"transport"},
     {"feature":"agent","file":"platform/app/src/runtime/app/features/agents.ts","kind":"composition"},
     {"feature":"agent","file":"platform/app/src/runtime/app/legacy-rest/agents.ts","kind":"composition"},
     {"feature":"agent","file":"platform/app/src/server/agents/agent-fields.ts","kind":"legacy-implementation"},
@@ -34,7 +33,6 @@
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/policy/dataRetentionPolicy.read.ts","kind":"legacy-implementation"},
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/resolveRetentionDays.ts","kind":"legacy-implementation"},
     {"feature":"data-retention","file":"platform/app/src/server/data-retention/retentionPolicy.schema.ts","kind":"legacy-implementation"},
-    {"feature":"dataset","file":"platform/app/src/app/api/dataset/generate/tools.ts","kind":"transport"},
     {"feature":"dataset","file":"platform/app/src/components/datasets/DatasetMappingPreview.tsx","kind":"page-shell"},
     {"feature":"dataset","file":"platform/app/src/components/datasets/DatasetSelector.tsx","kind":"page-shell"},
     {"feature":"dataset","file":"platform/app/src/runtime/app/features/dataset.ts","kind":"composition"},
@@ -81,8 +79,6 @@
     {"feature":"ops","file":"platform/app/src/server/app-layer/ops/repositories/replay.repository.ts","kind":"legacy-implementation"},
     {"feature":"ops","file":"platform/app/src/server/ops/explain-core.ts","kind":"legacy-implementation"},
     {"feature":"ops","file":"platform/app/src/server/ops/opsExplain.service.ts","kind":"legacy-implementation"},
-    {"feature":"ops","file":"platform/app/src/server/routes/ops.ts","kind":"transport"},
-    {"feature":"organization","file":"platform/app/src/app/api/middleware/organization.ts","kind":"transport"},
     {"feature":"organization","file":"platform/app/src/pages/settings/groups.tsx","kind":"page-shell"},
     {"feature":"organization","file":"platform/app/src/pages/settings/teams.tsx","kind":"page-shell"},
     {"feature":"organization","file":"platform/app/src/pages/settings/teams/[team].tsx","kind":"page-shell"},
@@ -141,7 +137,6 @@
     {"feature":"webhook","file":"platform/app/src/server/webhooks/sendWebhook.ts","kind":"legacy-implementation"},
     {"feature":"webhook","file":"platform/app/src/server/webhooks/signature.ts","kind":"legacy-implementation"},
     {"feature":"webhook","file":"platform/app/src/server/webhooks/urlPolicy.ts","kind":"legacy-implementation"},
-    {"feature":"workflow","file":"platform/app/src/app/api/workflows/post_event/post-event.ts","kind":"transport"},
     {"feature":"workflow","file":"platform/app/src/server/routes/workflows.ts","kind":"transport"},
     {"feature":"workflow","file":"platform/app/src/server/workflows/stripUnsupportedLLMParams.ts","kind":"legacy-implementation"},
     {"feature":"workflow","file":"platform/app/src/server/workflows/workflowEvaluation.service.ts","kind":"legacy-implementation"}

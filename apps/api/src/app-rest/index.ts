@@ -8,11 +8,13 @@
  * `packages/features/<f>/server/src/api/rest` needs exactly the same ones and
  * a package may not import an application.
  *
- * What this barrel still owns is the mount: {@link createAppRestFeatures},
- * which binds every family to one process's services and ports. The re-exports
- * below are the not-yet-moved families' one import site; a family that has
- * moved imports from `@langwatch/api`, `@langwatch/api/rest` and its own
- * feature package instead.
+ * What this barrel owns now is only the re-exports below, which are the
+ * legacy families' one import site; a family that has moved imports from
+ * `@langwatch/api`, `@langwatch/api/rest` and its own feature package
+ * instead. The all-or-nothing enumeration that used to live here
+ * (`createAppRestFeatures`, thirty-two product services in one call) is gone:
+ * the API process mounts what it composed through
+ * `createApiProcessRestFeatures`, one family at a time, and names the rest.
  *
  * The REST service is NOT a module-level singleton. Building one needs
  * authentication that reads API keys, sessions and role bindings out of a
@@ -23,14 +25,6 @@
  * the policy's enforcement is bound before the route is built — while letting
  * the feature live in a package that has no database of its own.
  */
-export {
-  type AppRestFeaturePorts,
-  type AppRestFeatureServices,
-  createAppRestFeatures,
-  portsUnavailableOffRequestPath,
-  servicesUnavailableOffRequestPath,
-} from "./app-rest.features";
-
 export {
   type AccessPolicy,
   anyAuthenticated,

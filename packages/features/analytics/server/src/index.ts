@@ -24,6 +24,7 @@ export {
   createAnalyticsRestApp,
   type AnalyticsTimeseriesRestBody,
 } from "./transport/api-rest/analytics.api";
+export { createAnalyticsLegacyRestApp } from "./transport/api-rest/analytics-legacy.api";
 
 /**
  * The LangWatchQL workbench: its restricted-identity service, the rollout gate

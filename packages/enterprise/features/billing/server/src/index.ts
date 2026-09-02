@@ -189,3 +189,7 @@ export {
   getUserSyncCacheSize,
   resetUserSyncCache,
 } from "./services/nurturing-user-sync.service";
+export {
+  createStripeWebhookRestApp,
+  type StripeWebhookRestPorts,
+} from "./transport/api-rest/stripe-webhook.api";

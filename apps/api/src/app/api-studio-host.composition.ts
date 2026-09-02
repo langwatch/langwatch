@@ -57,6 +57,35 @@ export function composeApiStudioHost(options: ApiStudioHostOptions): ApiStudioHo
   return ApiComposedStudioHost.create(options);
 }
 
+/**
+ * The ONE place this process builds a studio dispatch.
+ *
+ * Three surfaces open studio runs — `httpProxy.postStudioEvent`, the
+ * workbench's cell runner and `POST /api/workflows/post_event` — and each
+ * holds its own instance rather than sharing one, which is safe for exactly
+ * the reason the workbench's composition already records: the service holds no
+ * connection (each `postEvent` opens its own stream) and its
+ * sampling-parameter strip reads the SAME model gateway this process composed
+ * once. What must not be duplicated is the DECISION — which stream adapter,
+ * and what an absent engine address means — so that lives here and the callers
+ * take it.
+ *
+ * With no engine address the packaged unconfigured stream refuses by name, and
+ * the caller reports that AS a studio event rather than throwing at a browser
+ * that has a node lit up and a Stop button.
+ */
+export function composeApiWorkflowStudioDispatch(options: {
+  nlpServiceUrl: string | undefined;
+  modelProviders: ModelProviderService;
+}): WorkflowStudioDispatchService {
+  return WorkflowStudioDispatchService.create({
+    stream: options.nlpServiceUrl
+      ? HttpWorkflowStudioStreamAdapter.create({ serviceUrl: options.nlpServiceUrl })
+      : UnconfiguredWorkflowStudioStreamAdapter.create(),
+    modelProviders: options.modelProviders,
+  });
+}
+
 class ApiComposedStudioHost extends ApiStudioHostPort {
   static create(options: ApiStudioHostOptions): ApiComposedStudioHost {
     return new ApiComposedStudioHost(options);
@@ -70,10 +99,8 @@ class ApiComposedStudioHost extends ApiStudioHostPort {
     this.logger = createLogger(`${options.processName}:studio`);
     const modelProviders = options.modelProviders;
     this.dispatch = modelProviders
-      ? WorkflowStudioDispatchService.create({
-          stream: options.nlpServiceUrl
-            ? HttpWorkflowStudioStreamAdapter.create({ serviceUrl: options.nlpServiceUrl })
-            : UnconfiguredWorkflowStudioStreamAdapter.create(),
+      ? composeApiWorkflowStudioDispatch({
+          nlpServiceUrl: options.nlpServiceUrl,
           modelProviders,
         })
       : null;

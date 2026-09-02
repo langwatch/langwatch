@@ -23,6 +23,7 @@ import superjson from "superjson";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
+import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter";
 import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy";
 import type {
   ApiTrpcEnterpriseRequest,
@@ -326,17 +327,15 @@ function handledErrorCode(error: HandledError): TRPCError["code"] {
   return codes[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }
 
-function defaultErrorFormatter({
-  shape,
-  error,
-}: Parameters<NonNullable<ApiHttpOptions["errorFormatter"]>>[0]) {
-  const handled = HandledError.isHandled(error.cause) ? error.cause : undefined;
-  return {
-    ...shape,
-    message: handled?.code ?? shape.message,
-    data: { ...shape.data, error: handled?.serialize() ?? null },
-  };
-}
+/**
+ * The wire shape a failed call arrives in, when the host supplies none.
+ *
+ * `appTrpcErrorFormatter` rather than a local reduction of it: the browser's
+ * interceptors read `data.cause`, `data.authored` and `data.traceId` off every
+ * failure, and a formatter that omits them turns a named model-provider
+ * refusal into an unrenderable generic on the surface that serves it.
+ */
+const defaultErrorFormatter: ApiErrorFormatter = appTrpcErrorFormatter;
 
 /**
  * What stands in for the packaged application on a process that composed no

@@ -77,7 +77,24 @@ const renderLegacy: ErrorHandler = (error, context) => {
 const renderCanonical: ErrorHandler = (error, context) => {
   const status = statusOf(error);
   log(error, context, status);
+  return context.json(canonicalErrorFor(error).body, status);
+};
 
+/**
+ * Any thrown value as the canonical envelope, WITHOUT writing a response.
+ *
+ * The two callers want different things from one mapping. The `onError` above
+ * writes the response; a family that installs its own `onError` — to log what
+ * the caller actually received under its own name — wants the status and the
+ * body and writes them itself. Rendering it twice is how two surfaces come to
+ * publish two taxonomies for the same failure, so this is the one mapping and
+ * `renderCanonical` is a caller of it.
+ */
+export function canonicalErrorFor(error: unknown): {
+  status: ContentfulStatusCode;
+  body: ApiErrorBody;
+} {
+  const status = statusOf(error as Error);
   const body: ApiErrorBody = HandledError.isHandled(error)
     ? apiErrorBody({
         status,
@@ -93,9 +110,8 @@ const renderCanonical: ErrorHandler = (error, context) => {
         code: "internal_error",
         message: "An unknown error occurred",
       });
-
-  return context.json(body, status);
-};
+  return { status, body };
+}
 
 function statusOf(error: Error): ContentfulStatusCode {
   return HandledError.isHandled(error) ? (error.httpStatus as ContentfulStatusCode) : 500;

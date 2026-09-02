@@ -1,5 +1,6 @@
+import type { EventSourcing } from "@langwatch/eventing";
 import { IdentityEventingPort } from "@langwatch/identity-server";
-import type { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.infrastructure";
+import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition";
 
 /**
  * The identity ledgers' event stack, over this process's own eventing.
@@ -11,18 +12,41 @@ import type { ApiEventingInfrastructure } from "../platform/infrastructure/api-e
  * when the adapter is built or the deployment configured no Redis and there is
  * nothing to wait for.
  *
- * Absent is a supported shape and the two ledgers read it differently, which
- * is why both methods answer `null` rather than throwing: the identity ledger
- * stages nothing and returns — the projection catches up when a process that
- * does hold a queue folds the log — and the join-request ledger refuses,
- * because a join request has nowhere to land without one.
+ * THE SENDERS ARE RESOLVED AT BOOT, not looked up per send.
+ * {@link ApiIdentityPipelines} registers `identity`, `join-requests` and
+ * `sso-connections` producer-only on this process's runtime and reads every
+ * command dispatcher out of the registration, so a command a ledger names that
+ * the definition no longer declares fails this process's boot rather than one
+ * person's ceremony. Before that composition existed this method answered
+ * `null` for all three, which the identity ledger and the join-request ledger
+ * both turn into a thrown "the pipeline exposes no sender" — a write that
+ * arrives here and cannot leave.
+ *
+ * Absent is still a supported shape, and it is the empty registry: a
+ * deployment with no queue registers nothing and both ledgers refuse by name,
+ * which is the honest answer for a process that cannot enqueue.
  */
 export class ApiEventingIdentityAdapter extends IdentityEventingPort {
-  static create(eventing: ApiEventingInfrastructure | undefined): ApiEventingIdentityAdapter {
-    return new ApiEventingIdentityAdapter(eventing);
+  static create(input: {
+    /**
+     * The runtime the event store is read off, where this process composed a
+     * queue.
+     *
+     * The runtime rather than the infrastructure that wraps it: what this
+     * needs is the store, and naming the infrastructure would make the adapter
+     * composable only where a real Redis exists.
+     */
+    eventSourcing: EventSourcing | undefined;
+    /** The senders read out of this process's own producer registrations. */
+    pipelines: ApiIdentityPipelines;
+  }): ApiEventingIdentityAdapter {
+    return new ApiEventingIdentityAdapter(input.eventSourcing, input.pipelines);
   }
 
-  private constructor(private readonly eventing: ApiEventingInfrastructure | undefined) {
+  private constructor(
+    private readonly eventSourcing: EventSourcing | undefined,
+    private readonly pipelines: ApiIdentityPipelines,
+  ) {
     super();
   }
 
@@ -30,19 +54,7 @@ export class ApiEventingIdentityAdapter extends IdentityEventingPort {
     pipeline: string;
     command: string;
   }): Promise<{ send(data: unknown): Promise<unknown> } | null> {
-    const eventSourcing = this.eventing?.eventSourcing;
-    if (!eventSourcing?.isEnabled) return Promise.resolve(null);
-    try {
-      const pipeline = eventSourcing.getPipeline(input.pipeline as never) as unknown as {
-        commands: Record<string, { send(data: unknown): Promise<unknown> }>;
-      };
-      return Promise.resolve(pipeline.commands[input.command] ?? null);
-    } catch {
-      // An unregistered pipeline is the same answer as no event stack: this
-      // process stages nothing for it. Reported by the caller, which knows
-      // whether that is a delay or a refusal.
-      return Promise.resolve(null);
-    }
+    return Promise.resolve(this.pipelines.tryCommand(input));
   }
 
   tryEventStore<TEvent>(): Promise<{
@@ -52,7 +64,7 @@ export class ApiEventingIdentityAdapter extends IdentityEventingPort {
       aggregateType: never,
     ): Promise<unknown>;
   } | null> {
-    const eventSourcing = this.eventing?.eventSourcing;
+    const eventSourcing = this.eventSourcing;
     if (!eventSourcing?.isEnabled) return Promise.resolve(null);
     return Promise.resolve(
       (eventSourcing.getEventStore as () => unknown)() as {

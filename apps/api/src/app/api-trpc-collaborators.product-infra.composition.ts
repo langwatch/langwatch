@@ -177,6 +177,17 @@ export type ApiProductInfraCollaborators = Readonly<{
   monitorApp: MonitorApp;
   /** For `ctx.app.storedObjectApp`. */
   storedObjectApp: StoredObjectApp;
+  /**
+   * The CONTENT-ADDRESSED store itself, published for the one caller that
+   * needs to write bytes rather than read them: the scenario-event door, whose
+   * inline media the trace vertical's extractor externalises.
+   *
+   * The application above deliberately does not expose it — its portable half
+   * refuses by name — so this is the store and not a second one. A scenario
+   * recording and the same recording observed on its trace hash to the same
+   * object precisely because both write through this instance.
+   */
+  storedObjectBytes: StoredObjectsService;
   /** The `productInfra` entry of {@link ApiTrpcCollaborators}. */
   ports: AppProductInfraTrpcPorts<RetentionPolicySnapshot, StorageScopeUsage>;
   /** Released with the process: the pooled outbound handlers the S3 clients share. */
@@ -201,6 +212,7 @@ export function composeApiProductInfraCollaborators(
   return {
     monitorApp: monitors.app,
     storedObjectApp: storage.app,
+    storedObjectBytes: storage.bytes,
     ports: { dataRetention: retention, monitors: monitors.ports },
     close: () => storage.close(),
   };
@@ -270,7 +282,7 @@ const CONSEQUENCE = {
 function composeStoredObjects(
   options: ApiProductInfraCollaboratorsOptions,
   logger: Pick<Logger, "warn">,
-): { app: StoredObjectApp; close(): Promise<void> } {
+): { app: StoredObjectApp; bytes: StoredObjectsService; close(): Promise<void> } {
   const { storage } = options;
   if (!options.resolveClickHouseClient) options.report?.absent("clickhouse");
 
@@ -339,6 +351,7 @@ function composeStoredObjects(
       files: service,
       owners: ApiStoredObjectOwnerAbsence.create(logger),
     }),
+    bytes: service,
     close: () => aws.close(),
   };
 }
