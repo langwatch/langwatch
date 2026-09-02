@@ -150,10 +150,10 @@ Each table lists the actions a resource accepts. Resources marked **organization
 
 ## Custom roles
 
-A custom role is a named permission set you define. Create it at **Settings > Roles** with `organization:manage`. Custom roles are Enterprise.
+A custom role is a named permission set you define. Create it at **Settings > Roles & Permissions** with `organization:manage`. Custom roles are Enterprise.
 
 <Frame>
-<img src="/images/platform/roles-list.png" alt="Settings > Roles with the built-in roles and one custom role" />
+<img src="/images/platform/roles-list.png" alt="Settings > Roles & Permissions with the built-in roles and one custom role" />
 </Frame>
 
 A custom role has:
@@ -199,6 +199,10 @@ An API key can hold bindings too. A key with restricted permissions stores its s
 A group gives the same bindings to many people at once. Create a group at **Settings > Groups** (Enterprise), add members, and bind roles to the group at any scope. A binding on a group applies to every member of the group, and the members page shows it as "via" the group.
 
 A group synced from your identity provider through SCIM keeps its name and membership under the identity provider's control: you bind roles to it in LangWatch, and the identity provider decides who is in it.
+
+<Frame>
+<img src="/images/platform/groups-list.png" alt="Settings > Groups with one manual group, its access and its member count" />
+</Frame>
 
 **Also check:** [SCIM Groups](/platform/scim-groups).
 
