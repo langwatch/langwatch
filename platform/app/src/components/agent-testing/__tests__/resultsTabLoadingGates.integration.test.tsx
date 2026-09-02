@@ -238,4 +238,82 @@ describe("the Results tab loading gate", () => {
       });
     });
   });
+
+  describe("given a project with no run plan and runs inside the window", () => {
+    beforeEach(() => {
+      routerState.query = { project: "test-project", path: ["results"] };
+      routerState.asPath = "/test-project/agent-testing/results";
+      // One test suite, which is no run plan, so the plan list stays empty.
+      mockSuitesGetAll.mockReturnValue({
+        data: [
+          {
+            id: "test_suite_checkout",
+            name: "Checkout",
+            slug: "checkout",
+            scenarioIds: ["scen_1"],
+            labels: [],
+            kind: "test_suite",
+            scope: null,
+          },
+        ],
+        isLoading: false,
+      });
+      mockResultsOverview.mockReturnValue({
+        data: {
+          totals: {
+            executions: 5,
+            runCount: 5,
+            passRate: 80,
+            failingScenarios: 1,
+            cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 5 },
+            series: [],
+          },
+          groups: [],
+        },
+        isLoading: false,
+      });
+    });
+
+    describe("when the Results tab is opened", () => {
+      /** @scenario "A window that holds runs of no plan still reads the whole tab" */
+      it("reads the filter row and the count, never the empty state", () => {
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+
+        expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
+        expect(screen.getByText("5 executions")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("agent-testing-run-plans-table"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario "The plan table says when the runs of the window belong to no plan" */
+      it("says the runs were started outside a run plan", () => {
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText(
+            "These runs were started outside a run plan. Group by scenario or target to read them.",
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a project with no run plan and no run inside the window", () => {
+    describe("when the Results tab is opened", () => {
+      /** @scenario "The empty state of the tab offers a wider period" */
+      it("offers the next wider period", () => {
+        routerState.query = { project: "test-project", path: ["results"] };
+        routerState.asPath = "/test-project/agent-testing/results";
+        mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+
+        expect(screen.getByText("No runs yet")).toBeInTheDocument();
+        expect(screen.getByTestId("widen-period-button")).toHaveTextContent(
+          "Show the last 90 days",
+        );
+      });
+    });
+  });
 });
