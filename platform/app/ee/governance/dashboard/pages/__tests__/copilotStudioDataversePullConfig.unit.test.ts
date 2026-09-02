@@ -390,9 +390,11 @@ describe("given the one-app registration switch", () => {
       // An untouched switch holds nothing in form state, so only an explicit
       // boolean written by the builder makes the default durable.
       expect(config.azureBillingUsesSameApp).toBe(true);
-      expect(() =>
-        copilotStudioDataversePullConfigSchema.parse(config),
-      ).not.toThrow();
+      // Through the adapter's own parser, not just present on the raw object:
+      // the schema is strip-mode, so an undeclared (or misspelled) key would
+      // vanish here silently — and the #7777 edit path reads the parsed side.
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.azureBillingUsesSameApp).toBe(true);
     });
 
     /** @scenario "Billing values typed before flipping back to one app are not saved" */

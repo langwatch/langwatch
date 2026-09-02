@@ -164,6 +164,19 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    */
   azureBillingIsPrepaid: z.boolean().optional(),
   /**
+   * Whether the billing credential pair is a copy of the bot's, made by the
+   * create form's one-app switch (ADR-128 §21.1 form default), or a second
+   * app registration of its own.
+   *
+   * The adapter never reads this field; the billing token is minted from
+   * `billingClientId`/`billingClientSecret` either way. It exists because it
+   * is the only durable record of the choice — sealed credentials cannot be
+   * compared later — and the edit path (#7777) will need it to render the
+   * switch as the admin left it. Optional because a source without a
+   * subscription records no choice, and sources predate the switch.
+   */
+  azureBillingUsesSameApp: z.boolean().optional(),
+  /**
    * Whether to read the tenant's seat licences beside the conversations.
    *
    * On unless switched off. Seats are the half of the money the conversations
