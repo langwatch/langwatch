@@ -152,6 +152,9 @@ func TestDispatchStream_Azure_NoDeploymentMap_SelfMapsToModelID(t *testing.T) {
 			"on Azure providers the non-streaming lane serves fine")
 	for iter.Next(context.Background()) {
 	}
+	require.NoError(t, iter.Err(),
+		"the stream must drain cleanly; a mid-stream failure would leave the URL "+
+			"assertion below passing on a request that never produced a usable answer")
 
 	paths := upstream.received()
 	require.NotEmpty(t, paths, "the stream must actually reach the customer's Azure resource")

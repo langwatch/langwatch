@@ -58,23 +58,23 @@ Feature: Azure OpenAI provider routing through in-app dispatch paths
     anything left the box.
 
     Background:
-      Given an Azure provider slot on a virtual key with a correct endpoint and API key
-      And the provider row defines no explicit deployment mapping
+      Given an Azure provider credential with a correct endpoint and API key reaches dispatch
+      And the credential carries no explicit deployment mapping
 
     @integration
     Scenario: Gateway chat completion for an Azure model reaches the deployment named by the model id
-      When a chat completion for that model is sent through the gateway
+      When a chat completion for that model is dispatched
       Then the upstream request targets the deployment named by the model id
-      And the dispatch does not fail with "deployments not set"
+      And the dispatch is not refused as a provider-configuration error
 
     @integration
     Scenario: Gateway streaming chat completion for an Azure model reaches the deployment named by the model id
-      When a streaming chat completion for that model is sent through the gateway
+      When a streaming chat completion for that model is dispatched
       Then the upstream request targets the deployment named by the model id
-      And the dispatch does not fail with "deployments not set"
+      And the stream drains without error
 
     @integration
     Scenario: An explicit deployment mapping still decides the deployment on the gateway lane
-      Given the provider row maps the model to a deployment name that differs from the model id
-      When a chat completion for that model is sent through the gateway
+      Given the credential maps the model to a deployment name that differs from the model id
+      When a chat completion for that model is dispatched
       Then the upstream request targets the mapped deployment name
