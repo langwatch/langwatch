@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * The bill-credential guard, exercised through the real edit path.
+ *
+ * The guard's own unit tests prove what it refuses; these prove the SERVICE
+ * asks it. `updateSource` carries the stored encrypted envelope across when a
+ * client resends no secrets, which is exactly the shape that used to slip a
+ * new subscription claim past the credential check — the envelope was never
+ * proven to hold a billing pair, and the state "subscription named, bill
+ * unreadable forever" became storable one API call away. A test that binds
+ * the refusal to `updateSource` fails if the guard call is ever dropped from
+ * the service, which the guard's own tests cannot see.
+ *
+ * Spec: specs/governance/azure-billing-identity.feature
+ * Decision: ADR-128 §21.2 (v3.4).
+ */
+
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+
+const ORG = "org_1";
+const SOURCE_ID = "src_1";
+const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
+
+const rowWith = (over: Record<string, unknown> = {}) => ({
+  id: SOURCE_ID,
+  organizationId: ORG,
+  teamId: null,
+  sourceType: "copilot_studio_dataverse",
+  name: "Copilot Studio",
+  description: null,
+  ingestSecretHash: "",
+  parserConfig: {
+    adapter: "copilot_studio_dataverse",
+    environmentUrl: "https://orgacme01.crm4.dynamics.com",
+    // The stored form: encrypted at rest, unreadable to the guard.
+    credentials: "enc:v1:abcdef",
+  },
+  pollerCursor: null,
+  errorCount: 0,
+  pullSchedule: null,
+  status: "awaiting_first_event",
+  traceProjectId: null,
+  lastEventAt: null,
+  archivedAt: null,
+  createdAt: new Date("2026-08-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+  createdById: null,
+  ...over,
+});
+
+const fakePrisma = (row: ReturnType<typeof rowWith>) => {
+  const update = vi
+    .fn()
+    .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(rowWith(data)),
+    );
+  const client = {
+    ingestionSource: {
+      findUnique: vi.fn().mockResolvedValue(row),
+      // The bill-ownership listing. The row itself is the only source, and it
+      // is excluded from its own check by id.
+      findMany: vi.fn().mockResolvedValue([row]),
+      update,
+    },
+  };
+  return { client: client as unknown as PrismaClient, update };
+};
+
+describe("updateSource, when the edit touches the Azure bill claim", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given a source whose stored config claims no subscription", () => {
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("refuses an edit that adds the claim without re-entering credentials", async () => {
+      const { client, update } = fakePrisma(rowWith());
+
+      await expect(
+        IngestionSourceService.create(client).updateSource({
+          id: SOURCE_ID,
+          organizationId: ORG,
+          parserConfig: {
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+            azureSubscriptionId: SUBSCRIPTION,
+          },
+        }),
+      ).rejects.toThrow(/re-enter the credentials/i);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("saves the same edit when the credentials arrive with the billing pair", async () => {
+      const { client, update } = fakePrisma(rowWith());
+
+      await IngestionSourceService.create(client).updateSource({
+        id: SOURCE_ID,
+        organizationId: ORG,
+        parserConfig: {
+          environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          azureSubscriptionId: SUBSCRIPTION,
+          credentials: {
+            tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
+            clientId: "bot-client-id",
+            clientSecret: "bot-client-secret",
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          },
+        },
+      });
+
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a source whose stored config already claims the subscription", () => {
+    it("lets a rename through without resending secrets", async () => {
+      // The pair inside the envelope was proven when the claim was first
+      // saved. An edit that carries both across must stay an ordinary edit.
+      const { client, update } = fakePrisma(
+        rowWith({
+          parserConfig: {
+            adapter: "copilot_studio_dataverse",
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+            azureSubscriptionId: SUBSCRIPTION,
+            credentials: "enc:v1:abcdef",
+          },
+        }),
+      );
+
+      await IngestionSourceService.create(client).updateSource({
+        id: SOURCE_ID,
+        organizationId: ORG,
+        name: "Copilot Studio, renamed",
+        parserConfig: {
+          environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          azureSubscriptionId: SUBSCRIPTION,
+        },
+      });
+
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
+});

@@ -246,18 +246,55 @@ describe("given a save that names a subscription and carries credentials", () =>
   describe("when the credentials are not readable at this layer", () => {
     // An edit does not resend secrets: the service carries the stored,
     // already-validated envelope across, and by the time this guard sees the
-    // config the credentials are either absent or an encrypted string. Both
-    // were checked when they were first written; refusing here would lock an
-    // admin out of renaming their own source.
+    // config the credentials are either absent or an encrypted string.
+    // Whether that is fine depends entirely on whether the CLAIM is new.
     it.each([
       ["credentials absent", undefined],
       ["credentials already encrypted", "enc:v1:abcdef"],
-    ])("leaves the save alone — %s", (_case, credentials) => {
+    ])("leaves a create alone — %s", (_case, credentials) => {
       const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
       if (credentials !== undefined) parserConfig.credentials = credentials;
       expect(() =>
         assertAzureBillHasItsOwnCredential({ parserConfig }),
       ).not.toThrow();
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("leaves an edit alone when the stored config already claimed the bill", () => {
+      // The envelope was proven to hold the billing pair when the claim was
+      // first saved. Refusing here would lock an admin out of renaming their
+      // own source.
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: {
+            ...configNaming(SUBSCRIPTION),
+            credentials: "enc:v1:abcdef",
+          },
+          storedParserConfig: configNaming(SUBSCRIPTION),
+        }),
+      ).not.toThrow();
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it.each([
+      ["carried across encrypted", "enc:v1:abcdef"],
+      ["absent from the edit", undefined],
+    ])("refuses an edit that ADDS the claim while the credentials are %s", (_case, credentials) => {
+      // The escape this closes: an API edit adding the subscription while
+      // the stored envelope rides across unread would store exactly the
+      // state the create-path refusal exists to prevent — subscription
+      // named, billing pair never checked, bill silent forever.
+      const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
+      if (credentials !== undefined) parserConfig.credentials = credentials;
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig,
+          storedParserConfig: {
+            adapter: "copilot_studio_dataverse",
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          },
+        }),
+      ).toThrow(/re-enter the credentials/i);
     });
   });
 });

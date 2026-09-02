@@ -59,6 +59,21 @@ export function readClaimedSubscription(
 }
 
 /**
+ * The customer's own prepaid declaration, read off the stored config.
+ *
+ * A reader beside `readClaimedSubscription` for the same reason it exists:
+ * the config is untyped JSON, and every caller hand-reading the key is a
+ * caller that can quietly disagree with the others about what counts as
+ * declared. Only a stored `true` does — the declaration is a checkbox an
+ * admin ticked, never an inference (ADR-128 §21.4).
+ */
+export function readPrepaidDeclared(
+  parserConfig: Record<string, unknown> | null | undefined,
+): boolean {
+  return parserConfig?.azureBillingIsPrepaid === true;
+}
+
+/**
  * Refuse a save that names a subscription without the bill's own credential.
  *
  * The bill is read with its own registered app — one that holds Cost
@@ -68,17 +83,31 @@ export function readClaimedSubscription(
  * existing at all: refused here, it never needs explaining on a spend panel
  * months later to someone who was not in the room when the source was made.
  *
- * Only a save that carries readable credentials is judged. An edit does not
- * resend secrets — the service carries the stored, already-validated envelope
- * across, so by the time this guard runs the credentials are absent or an
- * encrypted string, and refusing either would lock an admin out of renaming
- * their own source. A create that carries no credentials at all cannot read
- * conversations either; that save fails for the louder reason.
+ * Only a save that carries readable credentials can be judged on its pair.
+ * An edit does not resend secrets — the service carries the stored,
+ * already-validated envelope across, so by the time this guard runs the
+ * credentials are absent or an encrypted string. Which of two saves that is
+ * decides everything:
+ *
+ * - The stored config ALREADY claimed a subscription: the envelope was
+ *   proven to hold the billing pair when the claim was first saved, and
+ *   refusing now would lock an admin out of renaming their own source.
+ * - The stored config claimed none: the envelope was never checked for a
+ *   billing pair, and waving the claim through would store exactly the
+ *   state this guard exists to refuse — one API edit away, invisible to
+ *   the form, explained to nobody. Refused; claiming a bill means
+ *   re-entering the credentials with the pair inside.
+ *
+ * On create (`storedParserConfig` absent) unreadable credentials pass
+ * through: a create that carries no credentials at all cannot read
+ * conversations either, and that save fails for the louder reason.
  */
 export function assertAzureBillHasItsOwnCredential(params: {
   parserConfig: Record<string, unknown> | null | undefined;
+  /** The config as stored before this edit. Omitted on create. */
+  storedParserConfig?: Record<string, unknown> | null;
 }): void {
-  const { parserConfig } = params;
+  const { parserConfig, storedParserConfig } = params;
   if (readClaimedSubscription(parserConfig) === null) return;
 
   const credentials = parserConfig?.credentials;
@@ -87,6 +116,16 @@ export function assertAzureBillHasItsOwnCredential(params: {
     credentials === null ||
     Array.isArray(credentials)
   ) {
+    if (
+      storedParserConfig !== undefined &&
+      readClaimedSubscription(storedParserConfig) === null
+    ) {
+      const editComplaint =
+        "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
+      throw new ValidationError(editComplaint, {
+        meta: { formErrors: [editComplaint] },
+      });
+    }
     return;
   }
 

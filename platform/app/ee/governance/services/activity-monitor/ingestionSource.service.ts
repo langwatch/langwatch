@@ -565,6 +565,7 @@ export class IngestionSourceService {
   private async assertEditedConfigAllowed(params: {
     organizationId: string;
     incoming: Record<string, unknown>;
+    stored: Record<string, unknown>;
     storedAdapter: string;
     sourceId: string;
   }): Promise<void> {
@@ -576,6 +577,7 @@ export class IngestionSourceService {
       organizationId: params.organizationId,
       parserConfig: params.incoming,
       sourceId: params.sourceId,
+      storedParserConfig: params.stored,
     });
   }
 
@@ -590,11 +592,17 @@ export class IngestionSourceService {
     organizationId: string;
     parserConfig: Record<string, unknown>;
     sourceId?: string;
+    /** The stored config on an edit; absent on create. The credential guard
+     * needs it to tell a claim carried across from a claim newly made. */
+    storedParserConfig?: Record<string, unknown>;
   }): Promise<void> {
     if (readClaimedSubscription(params.parserConfig) === null) return;
     // The bill's own credential first: it is a property of this save alone,
     // so it must not wait on the cross-source read below.
-    assertAzureBillHasItsOwnCredential({ parserConfig: params.parserConfig });
+    assertAzureBillHasItsOwnCredential({
+      parserConfig: params.parserConfig,
+      storedParserConfig: params.storedParserConfig,
+    });
     assertAzureBillNotAlreadyClaimed({
       parserConfig: params.parserConfig,
       claimedBy: await this.azureBillReaders(params.organizationId),
@@ -808,6 +816,7 @@ export class IngestionSourceService {
       await this.assertEditedConfigAllowed({
         organizationId: input.organizationId,
         incoming,
+        stored,
         storedAdapter: stored.adapter as string,
         sourceId: existing.id,
       });
