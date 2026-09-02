@@ -65,10 +65,22 @@ export const readValidChunkOffsets = (chunkOffsets: unknown): ChunkOffset[] => {
       (o) =>
         o != null &&
         Number.isInteger(o.index) &&
+        // Chunk keys are built by zero-padding the index, so a negative one
+        // addresses no object: the read comes back empty and that chunk's rows
+        // go missing from a dataset that still reports having them.
+        o.index >= 0 &&
         Number.isFinite(o.startRow) &&
         Number.isFinite(o.endRow) &&
         o.endRow >= o.startRow,
-    );
+    ) &&
+    // Each chunk named once. The two readers of this array key off different
+    // parts of it, so a repeated index makes the dataset answer two ways: the
+    // paged read selects entries by row range and fetches whatever `index`
+    // each one names, so it reads the duplicated chunk twice and never reads
+    // the one no entry names; a search deduplicates the indexes and reads it
+    // once. The grid then shows a row that the search reports no match for,
+    // which is the failure a user cannot make sense of.
+    new Set(raw.map((o) => o.index)).size === raw.length;
   return valid ? raw : [];
 };
 

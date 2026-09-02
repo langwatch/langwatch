@@ -979,22 +979,20 @@ export class DatasetService {
     if (offsets.length > 0) {
       // `byteSize` rides along so the scan can bound what it actually fetches,
       // not only what the dataset row claims it will. `readValidChunkOffsets`
-      // validates the row bounds and not this, so an otherwise-valid entry can
-      // carry no size; it becomes `null` — one chunk that cannot be measured —
-      // rather than a number, because arithmetic on `undefined` yields `NaN`
-      // and one such entry would silently disable the bound for the whole
-      // dataset.
-      const byIndex = new Map<number, number | null>();
-      for (const offset of offsets) {
-        if (byIndex.has(offset.index)) continue;
-        byIndex.set(
-          offset.index,
-          Number.isFinite(offset.byteSize) ? offset.byteSize : null,
-        );
-      }
-      return [...byIndex.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([index, byteSize]) => ({ index, byteSize }));
+      // validates the index and the row bounds but not this, so an
+      // otherwise-valid entry can carry no size; it becomes `null` — one chunk
+      // that cannot be measured — rather than a number, because arithmetic on
+      // `undefined` yields `NaN` and one such entry would silently disable the
+      // bound for the whole dataset.
+      //
+      // No deduplication needed: a repeated index is rejected at validation, so
+      // every entry here names a chunk no other entry names.
+      return offsets
+        .map((offset) => ({
+          index: offset.index,
+          byteSize: Number.isFinite(offset.byteSize) ? offset.byteSize : null,
+        }))
+        .sort((a, b) => a.index - b.index);
     }
     if (dataset.chunkCount == null) {
       throw new DatasetChunkCountMissingError(dataset.id);
