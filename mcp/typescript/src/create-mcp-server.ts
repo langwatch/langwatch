@@ -366,7 +366,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_get_prompt",
-    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history.",
+    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history. Use format: 'json' for the full raw API payload, or 'digest' (default) for a formatted summary.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle"),
       version: z
@@ -377,6 +377,12 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
         'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
       ),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+        ),
     },
     withToolLogging("platform_get_prompt", async (params) => {
       if (params.version != null && params.tag) {

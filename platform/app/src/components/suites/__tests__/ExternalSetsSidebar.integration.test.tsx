@@ -12,15 +12,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 
-// VoiceAgentsCallout inside SuiteSidebar pulls project context via
-// useOrganizationTeamProject, which fires tRPC queries the bare test rig
-// doesn't provide. Stub it so these external-sets tests stay narrow.
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(() => ({
-    project: { id: "project_1" },
-  })),
-}));
-
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));

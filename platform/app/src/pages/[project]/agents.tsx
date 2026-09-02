@@ -1,9 +1,8 @@
-import { Grid, Skeleton, Spacer, VStack } from "@chakra-ui/react";
+import { Button, Grid, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
-import { ConnectAgentPanel } from "~/components/agents/connected/ConnectAgentPanel";
 import { ConnectedAgentsSection } from "~/components/agents/connected/ConnectedAgentsSection";
 import type { ConnectedAgentView } from "~/components/agents/connected/connected-agent-rows";
 import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
@@ -183,13 +182,20 @@ function Page() {
       </PageLayout.Header>
 
       <VStack gap={6} width="full" align="stretch" padding={6}>
-        {connectedAgents.length === 0 && !agentsQuery.isLoading && (
-          <ConnectAgentPanel
-            onCreateOtherAgent={() => openDrawer("agentTypeSelector")}
-          />
-        )}
-
-        {!hasAgents && !agentsQuery.isLoading ? null : (
+        {!hasAgents && !agentsQuery.isLoading ? (
+          <VStack gap={3} paddingY={16}>
+            <Text color="fg.muted" fontSize="sm">
+              No agents yet
+            </Text>
+            <Button
+              size="sm"
+              onClick={() => openDrawer("agentTypeSelector")}
+              data-testid="agents-empty-new-agent"
+            >
+              <Plus size={16} /> New Agent
+            </Button>
+          </VStack>
+        ) : (
           <Grid
             templateColumns="repeat(auto-fill, minmax(300px, 1fr))"
             gap={4}

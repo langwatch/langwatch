@@ -87,6 +87,29 @@ describe("the simulations address", () => {
       state.flagEnabled = true;
     });
 
+    describe("and the previous-screens preference is recorded", () => {
+      beforeEach(() => {
+        localStorage.setItem(
+          "langwatch:prefer-legacy-simulations:v1:project-1",
+          "1",
+        );
+      });
+
+      afterEach(() => {
+        localStorage.clear();
+      });
+
+      /** @scenario "The previous-screens preference disables the Agent Testing redirect" */
+      it("renders the v1 page without redirecting", () => {
+        state.query = { project: "demo" };
+
+        render(<SimulationsRoute />);
+
+        expect(state.replace).not.toHaveBeenCalled();
+        expect(screen.getByText("v1 simulations page")).toBeDefined();
+      });
+    });
+
     /** @scenario "A saved simulations address opens in Agent Testing when the flag is on" */
     it("sends a saved run plan address to the plan in Agent Testing, without showing the v1 page", () => {
       state.query = {

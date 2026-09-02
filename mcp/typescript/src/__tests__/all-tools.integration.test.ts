@@ -104,17 +104,13 @@ const CANNED_PROMPT_DETAIL = {
   id: "p1",
   handle: "greeting-bot",
   name: "Greeting Bot",
-  latestVersionNumber: 3,
-  versions: [
-    {
-      version: 3,
-      commitMessage: "Updated tone",
-      model: "openai/gpt-4o",
-      messages: [{ role: "system", content: "You are a friendly bot." }],
-    },
-    { version: 2, commitMessage: "Added greeting" },
-    { version: 1, commitMessage: "Initial version" },
-  ],
+  version: 3,
+  versionId: "ver_p1v3",
+  commitMessage: "Updated tone",
+  model: "openai/gpt-4o",
+  messages: [{ role: "system", content: "You are a friendly bot." }],
+  parameters: {},
+  tags: [{ name: "latest", versionId: "ver_p1v3" }],
 };
 
 const CANNED_PROMPT_CREATED = {
@@ -307,19 +303,19 @@ const CANNED_AGENT_DETAIL = {
 };
 
 const CANNED_RUN_PLAN = {
-  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/run-plans/plan_abc",
+  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLANS_LIST = [CANNED_RUN_PLAN];
 
 const CANNED_RUN_PLAN_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/simulations/batches/batch_123",
+  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
 
 const CANNED_TEST_SUITE = {
-  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc",
+  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];
@@ -368,6 +364,15 @@ const CANNED_MODEL_PROVIDER_SET = {
 
 /** Track last request for each route so tests can assert on request body/params. */
 const lastRequests: Record<string, { method: string; url: string; body: string }> = {};
+
+/**
+ * Mutable prompt detail so the mock is stateful: a PUT updates it and the
+ * subsequent confirmation GET reflects the new version. Reset per test.
+ */
+let promptDetailState: typeof CANNED_PROMPT_DETAIL = { ...CANNED_PROMPT_DETAIL };
+beforeEach(() => {
+  promptDetailState = { ...CANNED_PROMPT_DETAIL };
+});
 
 function createMockServer(): Server {
   return createServer((req, res) => {
@@ -433,11 +438,39 @@ function createMockServer(): Server {
         method === "GET"
       ) {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
+        res.end(JSON.stringify(promptDetailState));
       } else if (
         url.match(/^\/api\/prompts\/[^/]+$/) &&
         method === "PUT"
       ) {
+        const parsed = JSON.parse(body) as {
+          commitMessage?: string;
+          model?: string;
+          messages?: Array<{ role: string; content: string }>;
+          tags?: string[];
+        };
+        const newVersionId = "ver_p1v4";
+        promptDetailState = {
+          ...promptDetailState,
+          version: 4,
+          versionId: newVersionId,
+          commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
+          model: parsed.model ?? promptDetailState.model,
+          messages: parsed.messages ?? promptDetailState.messages,
+          tags:
+            parsed.tags === undefined
+              ? promptDetailState.tags.map((tag) =>
+                  tag.name === "latest"
+                    ? { name: "latest", versionId: newVersionId }
+                    : tag,
+                )
+              : [
+                  { name: "latest", versionId: newVersionId },
+                  ...parsed.tags
+                    .filter((name) => name !== "latest")
+                    .map((name) => ({ name, versionId: newVersionId })),
+                ],
+        };
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       }
@@ -1087,7 +1120,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_get_prompt", () => {
     describe("when prompt exists", () => {
-      it("returns formatted prompt details with messages and versions", async () => {
+      it("returns formatted prompt details with messages and deployments", async () => {
         const { handleGetPrompt } = await import(
           "../tools/get-prompt.js"
         );
@@ -1099,7 +1132,7 @@ describe("All MCP tools integration", () => {
         expect(result).toContain("gpt-4o");
         expect(result).toContain("You are a friendly bot.");
         expect(result).toContain("v3");
-        expect(result).toContain("## Version History");
+        expect(result).toContain("## Deployments");
         expect(result).toContain("Updated tone");
       });
     });
@@ -1122,6 +1155,70 @@ describe("All MCP tools integration", () => {
 
         expect(result).toContain("updated successfully");
         expect(result).toContain("Switch to mini");
+        expect(result).toContain("**Version**: v4");
+        expect(result).toContain("**Version ID**: ver_p1v4");
+      });
+    });
+
+    describe("when an update supplies only messages and a commit message", () => {
+      /** @scenario Carrying forward prior fields when an update supplies only messages and a commit message */
+      it("does not send fields that would wipe prior prompt configuration", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          messages: [{ role: "system", content: "You are a helpful bot." }],
+          commitMessage: "Only messages changed",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("parameters");
+        expect(parsed).not.toHaveProperty("inputs");
+        expect(parsed).not.toHaveProperty("outputs");
+        expect(parsed).not.toHaveProperty("temperature");
+        expect(parsed).not.toHaveProperty("responseFormat");
+      });
+    });
+
+    describe("when an update omits tags", () => {
+      /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
+      it("does not send a tags field in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "No tag change requested",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("tags");
+      });
+    });
+
+    describe("when an update passes tags explicitly", () => {
+      /** @scenario Passing tags explicitly moves the tag to the new version */
+      it("sends the requested tags in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "Deploy new version to production",
+          tags: ["production"],
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed.tags).toEqual(["production"]);
       });
     });
   });

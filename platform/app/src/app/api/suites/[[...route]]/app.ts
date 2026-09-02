@@ -30,6 +30,7 @@ import { runNoteSchema } from "~/server/scenarios/run-note";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
+import { readTestingInterface, suitePath } from "~/server/suites/platform-path";
 import { parseSuiteScope, type SuiteScope } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { isSuiteKind, type SuiteKind } from "~/server/suites/types";
@@ -378,6 +379,44 @@ function createService() {
   });
 }
 
+/**
+ * How this project addresses its run plans in the platform.
+ *
+ * Two interfaces show the same rows, and the project decides which one it
+ * reads, so the interface is read once and applied to every plan an answer
+ * carries.
+ */
+async function planUrlsOf({
+  project,
+  organizationId,
+}: {
+  project: { id: string; slug: string };
+  organizationId: string | undefined;
+}): Promise<(slug: string) => string> {
+  const ui = await readTestingInterface({
+    projectId: project.id,
+    organizationId,
+  });
+  return (slug: string) =>
+    platformUrl({
+      projectSlug: project.slug,
+      path: suitePath({ ui, slug, kind: "run_plan" }),
+    });
+}
+
+/** Where one run plan opens in the platform, for the interface the project reads. */
+async function planUrl({
+  project,
+  organizationId,
+  slug,
+}: {
+  project: { id: string; slug: string };
+  organizationId: string | undefined;
+  slug: string;
+}): Promise<string> {
+  return (await planUrlsOf({ project, organizationId }))(slug);
+}
+
 const secured = createProjectApp({ basePath: "/api/suites" });
 
 // Every response of the family names its successor, refusals included.
@@ -413,13 +452,15 @@ secured.access(requires("scenarios:view")).get(
       kinds: [kind === "folder" ? "test_suite" : "run_plan"],
     });
 
+    const planUrlOf = await planUrlsOf({
+      project,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
+
     return c.json(
       suites.map((s) => ({
         ...toSuiteResponse(s),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${s.slug}`,
-        }),
+        platformUrl: planUrlOf(s.slug),
       })),
     );
   },
@@ -463,9 +504,10 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       ...toSuiteResponse(suite),
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/simulations/run-plans/${suite.slug}`,
+      platformUrl: await planUrl({
+        project,
+        organizationId: c.get("apiKeyOrganizationId"),
+        slug: suite.slug,
       }),
     });
   },
@@ -522,9 +564,10 @@ secured.access(requires("scenarios:create")).post(
       return c.json(
         {
           ...toSuiteResponse(suite),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
+          platformUrl: await planUrl({
+            project,
+            organizationId: c.get("apiKeyOrganizationId"),
+            slug: suite.slug,
           }),
         },
         201,
@@ -582,9 +625,10 @@ secured.access(requires("scenarios:update")).patch(
       });
       return c.json({
         ...toSuiteResponse(suite),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${suite.slug}`,
+        platformUrl: await planUrl({
+          project,
+          organizationId: c.get("apiKeyOrganizationId"),
+          slug: suite.slug,
         }),
       });
     } catch (error) {
@@ -633,9 +677,10 @@ secured.access(requires("scenarios:create")).post(
       return c.json(
         {
           ...toSuiteResponse(suite),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
+          platformUrl: await planUrl({
+            project,
+            organizationId: c.get("apiKeyOrganizationId"),
+            slug: suite.slug,
           }),
         },
         201,

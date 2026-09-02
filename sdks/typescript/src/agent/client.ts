@@ -603,6 +603,12 @@ export class AgentClient {
     try {
       const result = await context.with(parent, () => runtime.run(call));
       if (entry.cancelled) return;
+      // The handler answered, so its deadline is over. Disarming it before
+      // the export matters: an export slower than what is left of the limit
+      // would otherwise let the timer answer the call, and this branch would
+      // then answer it a second time.
+      this.releaseCall({ callId: frame.callId, entry });
+      await this.flushSpans();
       this.send({
         type: "result",
         protocol: PROTOCOL_VERSION,
@@ -615,9 +621,34 @@ export class AgentClient {
       const code = error instanceof AgentParameterError ? error.code : "agent_call_failed";
       const message = describeError(error);
       this.logger.warn(`agent "${runtime.name}" call ${frame.callId} failed: ${message}`);
+      this.releaseCall({ callId: frame.callId, entry });
+      await this.flushSpans();
       this.sendError({ callId: frame.callId, code, message });
     } finally {
       this.releaseCall({ callId: frame.callId, entry });
+    }
+  }
+
+  /**
+   * Exports the spans of the call now instead of at the exporter's next
+   * schedule. The judge reads the agent's spans right after the last turn,
+   * and a batch exporter would otherwise hold them for seconds, which is what
+   * made the judge report the spans missing.
+   *
+   * The call awaits this before it sends its result or its error: the frame is
+   * what tells the platform the turn is over, so a frame that goes out first
+   * lets the judge read the call while its spans are still in the exporter.
+   */
+  private async flushSpans(): Promise<void> {
+    const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };
+    const delegate =
+      typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
+    const flush = (delegate as { forceFlush?: () => Promise<void> } | null)?.forceFlush;
+    if (typeof flush !== "function") return;
+    try {
+      await flush.call(delegate);
+    } catch (error) {
+      this.logger.debug(`span flush after a call failed: ${describeError(error)}`);
     }
   }
 

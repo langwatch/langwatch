@@ -237,7 +237,8 @@ Feature: The test suites rail
     Given the Agent Testing page is open
     When the period picker is opened
     Then its list opens above the control
-    And it stays inside the page
+    And it offers the same ranges as the shared period control
+    And a free start and end date reaches any window, older than thirty days included
 
   @integration
   Scenario: Changing the period reloads the last results and the runs
@@ -247,10 +248,10 @@ Feature: The test suites rail
     And the runs sidebar reloads for the shorter period
     And the address names the new period
 
-  # --- The voice agents note ---
+  # --- The new-simulations announcement ---
 
   @integration
-  Scenario: The rail keeps the voice agents note
+  Scenario: The rail carries the new-simulations announcement
     Given the Agent Testing page is open
     When the rail is read
-    Then the voice agents note is shown, as it is on the v1 page
+    Then the announcement offering the way back to the previous screens is shown

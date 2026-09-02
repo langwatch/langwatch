@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
   assertSkillWasRead,
+  bashCommands,
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
   createSkillTestWorkDir,
@@ -176,6 +177,104 @@ describe("Connect Agent Skill", () => {
     },
     // One long autonomous turn: server edits (auth + trace adoption) plus a
     // chain of CLI commands (secret, agent, scenario, test suite, run).
+    1_800_000,
+  );
+
+  /** @scenario Connect-agent skill decorates the agent function instead of registering a URL */
+  it.skipIf(isCI)(
+    "connects a FastAPI chat agent with the connect_agent decorator",
+    async () => {
+      const tempFolder = createSkillTestWorkDir("langwatch-skill-connect-agent-decorator-");
+      console.log(`[connect-agent decorator dogfood] working dir: ${tempFolder}`);
+
+      try {
+        copyFixtureToWorkDir({
+          fixtureSubpath: "python-fastapi-chat",
+          workingDirectory: tempFolder,
+        });
+        installSkillToWorkDir({
+          workingDirectory: tempFolder,
+          skillSubpath: "connect-agent",
+        });
+
+        const apiKey = process.env.LANGWATCH_API_KEY?.trim();
+        if (apiKey) {
+          const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+          fs.writeFileSync(
+            path.join(tempFolder, ".env"),
+            `LANGWATCH_API_KEY=${apiKey}\n` +
+              (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+          );
+        }
+
+        const result = await scenario.run({
+          setId: SKILL_TESTS_SET_ID,
+          name: "Connect a FastAPI agent with the decorator",
+          description:
+            "The user has a FastAPI chat agent whose reply is produced by one Python function. " +
+            "The connect-agent skill must decorate that function with langwatch.connect_agent, " +
+            "leave the HTTP endpoint and its session authentication unchanged, not add a traceparent " +
+            "middleware and not register an HTTP agent, then check the agent with langwatch agent list.",
+          agents: [
+            createClaudeCodeAgent({ workingDirectory: tempFolder }),
+            scenario.userSimulatorAgent({ model: judgeModel }),
+            scenario.judgeAgent({
+              model: judgeModel,
+              criteria: [
+                "Agent read the connect-agent skill instructions before acting",
+                "Agent decorated the function that produces the agent's reply with langwatch.connect_agent instead of writing a second wrapper function or registering an HTTP agent with langwatch agent create",
+                "Agent did NOT add a traceparent middleware and did NOT weaken or remove the existing session authentication",
+                "Agent attempted to confirm the agent is online with `langwatch agent list` (the command is visible in the transcript)",
+                "If any `langwatch` platform command failed or the agent never came online, the agent reported that instead of claiming a run succeeded",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              "connect my agent to LangWatch simulations so my team can run test suites against the real agent. " +
+                "Keep the HTTP API as it is, it stays the way our web client talks to the agent.",
+            ),
+            scenario.agent(),
+            (state) => {
+              toolCallFix(state);
+              assertSkillWasRead(state, "connect-agent");
+
+              const pythonContent = readAll(findFiles(tempFolder, /\.py$/));
+              expect(
+                pythonContent,
+                "Expected the reply function to carry the langwatch.connect_agent decorator",
+              ).toMatch(/connect_agent\(/);
+              expect(
+                pythonContent,
+                "Expected the existing session authentication to survive",
+              ).toContain("require_session");
+              expect(
+                pythonContent,
+                "Expected no traceparent middleware: the SDK adopts the trace context itself",
+              ).not.toMatch(/propagate\.extract/);
+
+              // Read from the commands that ran, not from the transcript: the
+              // skill text quotes `langwatch agent create` in its HTTP
+              // fallback, and the agent may say it did not run it.
+              const commands = bashCommands(state);
+              expect(
+                commands.filter((command) => /langwatch agent (list|get)/.test(command)),
+                "Expected the agent to confirm the connection with `langwatch agent list` or `agent get`",
+              ).not.toEqual([]);
+              expect(
+                commands.filter((command) => /langwatch agent create/.test(command)),
+                "Expected no HTTP registration: the decorator path never runs `langwatch agent create`",
+              ).toEqual([]);
+            },
+            scenario.judge(),
+          ],
+        });
+
+        expect(result.success).toBe(true);
+      } finally {
+        removeSkillTestWorkDir(tempFolder);
+      }
+    },
     1_800_000,
   );
 });

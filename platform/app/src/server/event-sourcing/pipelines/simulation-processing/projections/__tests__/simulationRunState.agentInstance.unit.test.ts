@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
+import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -168,6 +169,39 @@ describe("simulationRunStateFoldProjection", () => {
       const twice = foldProjection.apply(once, recorded());
 
       expect(twice.Metadata).toBe(once.Metadata);
+    });
+  });
+
+  describe("when the finished event is folded after the instance record", () => {
+    /** @scenario "A finished event folded after the instance record still finishes the run" */
+    it("re-folds with the finished event even when the event log read misses it", async () => {
+      const history = [queued(), recorded()];
+      const stored = fold(history);
+      const written: SimulationRunStateData[] = [];
+      const projection = new SimulationRunStateFoldProjection({
+        store: {
+          get: async () => stored,
+          store: async (state) => {
+            written.push(state);
+          },
+        },
+      });
+      // The read runs right after the append, before the log returns it.
+      projection.eventLoader = async () => history;
+
+      const after = await new FoldProjectionExecutor().execute(
+        projection,
+        finished(),
+        { aggregateId: RUN_ID, tenantId: TENANT_ID },
+      );
+
+      expect(after.Status).toBe("SUCCESS");
+      expect(after.Verdict).toBe("success");
+      expect(after.FinishedAt).toBe(3000);
+      expect(JSON.parse(after.Metadata ?? "null")).toEqual({
+        langwatch: { agentInstance: INSTANCE },
+      });
+      expect(written).toHaveLength(1);
     });
   });
 });

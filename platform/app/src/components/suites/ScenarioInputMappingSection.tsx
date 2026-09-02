@@ -22,6 +22,11 @@ import type {
 } from "~/components/variables/VariableMappingInput";
 import type { Variable } from "~/components/variables/VariablesSection";
 import { VariablesSection } from "~/components/variables/VariablesSection";
+import {
+  fromOutputFieldState,
+  resolveOutputField,
+  toOutputFieldState,
+} from "./outputFieldState";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
@@ -170,15 +175,15 @@ export function ScenarioInputMappingSection({
   );
 
   const hasOutputs = (outputs ?? []).length > 0;
-  const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
-  // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
-  const selectedOutput =
-    outputField === undefined ? autoOutputLabel : outputField;
-  const hasOutputMapping = selectedOutput !== "" && hasOutputs;
+  const selectedOutput = resolveOutputField({
+    state: toOutputFieldState(outputField),
+    firstDeclaredOutput: outputs?.[0]?.identifier,
+  });
+  const hasOutputMapping = selectedOutput !== null && hasOutputs;
 
   const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
     () =>
-      hasOutputMapping
+      hasOutputMapping && selectedOutput !== null
         ? {
             output: {
               type: "source",
@@ -207,12 +212,13 @@ export function ScenarioInputMappingSection({
     _scenarioField: string,
     displayMapping: FieldMapping | undefined,
   ) => {
-    if (displayMapping?.type === "source" && displayMapping.path[0]) {
-      onOutputFieldChange?.(displayMapping.path[0]);
-    } else {
-      // Empty string signals "explicitly cleared" vs undefined which means "not yet set"
-      onOutputFieldChange?.("");
-    }
+    const selected =
+      displayMapping?.type === "source" && displayMapping.path[0];
+    onOutputFieldChange?.(
+      fromOutputFieldState(
+        selected ? { kind: "set", value: selected } : { kind: "cleared" },
+      ),
+    );
   };
 
   const handleDisplayMappingChange = (

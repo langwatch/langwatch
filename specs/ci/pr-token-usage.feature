@@ -23,12 +23,22 @@ Feature: PR token usage comment
     Then the existing comment is updated in place
     And no additional comment is created
 
-  Scenario: A pull request with no recorded usage gets no comment
-    Given LangWatch has no sessions recorded for the pull request
-    And the pull request has no comment carrying the usage marker
+  Scenario: A pull request with no attributed usage still gets a comment
+    Given LangWatch has no sessions attributed to the pull request
     When the workflow runs
-    Then no comment is created
-    And the workflow does not fail
+    Then a comment carrying the usage marker is posted
+    And it states that no usage was attributed
+    And staying silent is not an option, because a broken pipeline would then
+      look exactly like a pull request nobody used an agent on
+
+  @unit
+  Scenario: An empty report says what to check
+    Given a rollup with no sessions
+    When the comment body is built
+    Then the comment names the telemetry wiring, the declared checkout and the
+      agent as the things to check
+    And the guidance is folded, so an empty report costs one line
+    And a comment with usage carries no such guidance
 
   Scenario: An existing comment is refreshed even when usage drops to zero
     Given a pull request already has a comment carrying the usage marker
@@ -115,6 +125,85 @@ Feature: PR token usage comment
     When the comment body is built
     Then a note states how many of the total tokens the model rows cover
     And a rollup whose model rows match the totals carries no such note
+
+  Rule: A merged pull request is refreshed one last time
+
+    The per-pull-request workflow refreshes on every push, so the last comment
+    describes the world as it was at the last commit. Review agents keep
+    reading the diff after that, and a pull request approved as it stands
+    never gets another push. A merge is the moment the total stops moving.
+
+    Scenario: The comment is refreshed when the pull request merges
+      Given a pull request carries a usage comment
+      And no further commit is pushed to it
+      When the pull request is merged
+      Then its comment is refreshed a final time
+      And the tokens spent reviewing it after its last commit are included
+
+    @unit
+    Scenario: The last refresh says the number is settled
+      Given a pull request that has merged
+      When its comment is refreshed one last time
+      Then the comment states that the total is final at the merge commit
+      And a comment on an open pull request keeps the ordinary stamp
+
+    @unit
+    Scenario: A merged pull request gets one last refresh
+      Given a push to the default branch that merged a pull request
+      When the pull requests for the pushed commit are read
+      Then the pull request that merged into the pushed branch is named
+
+    @unit
+    Scenario: Only the pull requests that merged are refreshed
+      Given a commit associated with pull requests that did not merge it
+      When the pull requests for the pushed commit are read
+      Then open pull requests are passed over
+      And pull requests merged into another branch are passed over
+
+    @unit
+    Scenario: A batch merge refreshes every pull request it carried
+      Given a push to the default branch that merged more than one pull request
+      When the pull requests for the pushed commit are read
+      Then every merged pull request is named exactly once
+
+    @unit
+    Scenario: Every commit in the push is resolved, not just the tip
+      Given a push that landed more than one commit
+      When the commits to resolve are chosen
+      Then every commit in the push is resolved
+      And no pull request merged earlier in the push is left behind
+
+    @unit
+    Scenario: A pull request is stamped with the commit it landed on
+      Given a pull request whose commits all landed in this push
+      When the landing commit for each pull request is chosen
+      Then the last of its commits is named, never the first
+
+    @unit
+    Scenario: Each pull request in a batch keeps its own commit
+      Given a push that carried more than one pull request
+      When the landing commit for each pull request is chosen
+      Then each pull request is stamped with the commit that carried it
+      And never with the whole push's tip
+
+    @unit
+    Scenario: A push with no comparable range still resolves its tip
+      Given a push that created the branch, or a range that could not be read
+      When the commits to resolve are chosen
+      Then the push tip alone is resolved
+      And the job does not fail
+
+    @unit
+    Scenario: A merged fork pull request is still not commented on
+      Given a merged pull request whose head branch is in another repository
+      When the pull requests for the pushed commit are read
+      Then it is reported as a fork rather than refreshed
+
+    @unit
+    Scenario: A push that merged nothing changes nothing
+      Given a direct push to the default branch
+      When the pull requests for the pushed commit are read
+      Then no pull request is named and no comment is touched
 
   @unit
   Scenario: An unmapped pull request reads as no usage

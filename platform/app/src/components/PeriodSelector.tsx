@@ -222,6 +222,45 @@ const getPresetForRange = (
   );
 };
 
+/**
+ * The preset a window matches, by whole days or by a sub-day minute span.
+ * Undefined for a window that matches no preset, which is any free range.
+ */
+export const matchPeriodPreset = ({
+  period: { startDate, endDate },
+  mode,
+}: {
+  period: Period;
+  mode: PeriodMode;
+}): (typeof RELATIVE_PRESETS)[number] | undefined => {
+  if (mode !== "relative") return undefined;
+
+  const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+  if (matchedByDays) return matchedByDays;
+
+  const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  return RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+};
+
+/**
+ * What the window is called, the way the trigger names it: the matched
+ * preset's own label, or the start and end dates for a free range. A surface
+ * that renders its own trigger text uses this for the accessible name, so the
+ * name says what the control is set to rather than a day count.
+ */
+export const describePeriod = ({
+  period,
+  mode,
+}: {
+  period: Period;
+  mode: PeriodMode;
+}): string => {
+  const preset = matchPeriodPreset({ period, mode });
+  if (preset) return preset.label;
+
+  return `${format(period.startDate, "MMM d")} - ${format(period.endDate, "MMM d")}`;
+};
+
 /** Where the range list opens, relative to the trigger. */
 export type PeriodSelectorPlacement = NonNullable<
   NonNullable<PopoverRootProps["positioning"]>["placement"]
@@ -237,6 +276,7 @@ export function PeriodSelector({
   size = "sm",
   triggerVariant = "outline",
   placement = "bottom-end",
+  triggerProps,
 }: {
   period: Period;
   mode: PeriodMode;
@@ -260,6 +300,11 @@ export function PeriodSelector({
   triggerVariant?: ButtonProps["variant"];
   /** Where the range list opens. A control at the foot of a rail wants "top-start". */
   placement?: PeriodSelectorPlacement;
+  /**
+   * Spread onto the trigger button, for a surface that needs a test id or a
+   * height the size scale does not offer.
+   */
+  triggerProps?: ButtonProps & { "data-testid"?: string };
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
@@ -268,22 +313,8 @@ export function PeriodSelector({
     onClose();
   };
 
-  const getDateRangeLabel = () => {
-    if (mode === "relative") {
-      const matchedByDays = getPresetForRange(startDate, endDate, new Date());
-      if (matchedByDays) return matchedByDays.label;
-
-      const minutes = Math.round(
-        (endDate.getTime() - startDate.getTime()) / 60000,
-      );
-      const subDay = RELATIVE_PRESETS.find(
-        (preset) => preset.minutes === minutes,
-      );
-      if (subDay) return subDay.label;
-    }
-
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-  };
+  const getDateRangeLabel = () =>
+    describePeriod({ period: { startDate, endDate }, mode });
 
   return (
     <Popover.Root
@@ -298,6 +329,7 @@ export function PeriodSelector({
           size={size}
           minWidth="fit-content"
           onClick={onOpen}
+          {...triggerProps}
         >
           <LuCalendar />
           <Text>{label ?? getDateRangeLabel()}</Text>

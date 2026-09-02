@@ -18,6 +18,7 @@ import asyncio
 import atexit
 import json
 import logging
+import math
 import os
 import random
 import signal
@@ -31,6 +32,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 from opentelemetry import context as otel_context
 from opentelemetry import propagate
+from opentelemetry import trace as trace_api
 
 try:
     import websockets
@@ -66,7 +68,10 @@ logger = logging.getLogger("langwatch.agent")
 BACKOFF_INITIAL_SECONDS = 1.0
 BACKOFF_MAX_SECONDS = 30.0
 OPEN_TIMEOUT_SECONDS = 15.0
+HAPPY_EYEBALLS_DELAY_SECONDS = 0.25
+HAPPY_EYEBALLS_DELAY_VARIABLE = "LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY"
 SHUTDOWN_TIMEOUT_SECONDS = 3.0
+SPAN_FLUSH_TIMEOUT_MILLIS = 10_000
 GOING_AWAY_CLOSE_CODE = 1012
 
 SDK_INFO: SdkInfo = {"name": "langwatch", "version": __version__, "language": "python"}
@@ -86,6 +91,41 @@ _WEBSOCKETS_MAJOR = int(
 )
 
 NOT_CONNECTED = "connect_agent: the agent was not connected to LangWatch"
+
+
+def resolve_happy_eyeballs_delay() -> float:
+    """Seconds before the handshake tries the next resolved address.
+
+    `LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY` overrides the default; a value that
+    is not a non-negative number falls back to it.
+    """
+    raw = os.environ.get(HAPPY_EYEBALLS_DELAY_VARIABLE)
+    if raw is None or not raw.strip():
+        return HAPPY_EYEBALLS_DELAY_SECONDS
+    try:
+        value = float(raw)
+    except ValueError:
+        return HAPPY_EYEBALLS_DELAY_SECONDS
+    # `float()` reads "nan", "inf" and "-inf". An infinite delay stops the
+    # handshake from ever trying the next resolved address, so only a finite,
+    # non-negative number is a delay.
+    if not math.isfinite(value) or value < 0:
+        return HAPPY_EYEBALLS_DELAY_SECONDS
+    return value
+
+
+def _flush_quietly(force_flush: Callable[..., Any]) -> None:
+    try:
+        # The OpenTelemetry providers answer False when the flush ran out of
+        # time. The spans are then still in the exporter, and the judge can
+        # read the call without them, so the line has to say so.
+        if force_flush(SPAN_FLUSH_TIMEOUT_MILLIS) is False:
+            logger.debug(
+                "connect_agent: the span flush after a call timed out after %s ms",
+                SPAN_FLUSH_TIMEOUT_MILLIS,
+            )
+    except Exception as error:
+        logger.debug("connect_agent: the span flush after a call failed: %s", error)
 
 
 def resolve_transport(explicit: str | None = None) -> str:
@@ -606,6 +646,12 @@ class AgentClient:
         options: dict[str, Any] = {
             "max_size": MAX_FRAME_BYTES,
             "open_timeout": OPEN_TIMEOUT_SECONDS,
+            # Try the next resolved address after this delay instead of
+            # waiting on one that never answers. The endpoint resolves to IPv6
+            # and IPv4 addresses, and a host whose IPv6 route goes nowhere (a
+            # VPN tunnel that drops it, for one) would otherwise time out on
+            # every attempt.
+            "happy_eyeballs_delay": resolve_happy_eyeballs_delay(),
         }
         if _WEBSOCKETS_MAJOR >= 13:
             options["additional_headers"] = headers
@@ -919,7 +965,26 @@ class AgentClient:
             self._in_flight.pop(call_id, None)
             self._in_flight_agent.pop(call_id, None)
         if result is not None:
+            await self._flush_spans()
             await self._deliver(result)
+
+    async def _flush_spans(self) -> None:
+        """Export the spans of the call now, before the result goes out.
+
+        The judge reads the agent's spans right after the last turn, and a
+        batch exporter would otherwise hold them for its whole schedule delay,
+        which is what made the judge report the spans missing. The result is
+        what tells the platform the turn is over, so the flush has to finish
+        first: a result that arrives before its spans is the same missing
+        evidence. The export itself runs in a worker thread, so waiting for it
+        never blocks the connection loop.
+        """
+        force_flush = getattr(trace_api.get_tracer_provider(), "force_flush", None)
+        if not callable(force_flush):
+            return
+        await asyncio.get_running_loop().run_in_executor(
+            None, _flush_quietly, force_flush
+        )
 
     async def _deliver(self, frame: ResultFrame) -> None:
         if not await self._send(frame):

@@ -393,3 +393,25 @@ Feature: Python SDK connect_agent decorator
     Given a client registered over HTTP
     When the client stops
     Then a deregister frame is posted to the frames route before the thread ends
+
+  # --- Network ---
+
+  @unit
+  Scenario: The handshake moves on to the next address when one does not answer
+    Given an endpoint whose IPv6 address drops every packet
+    When the client connects
+    Then the handshake tries the next address after a short delay instead of waiting for the connect timeout
+
+  @unit
+  Scenario: The address delay can be tuned from the environment
+    Given LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY set to a number of seconds
+    When the client connects
+    Then that delay separates the address attempts
+    And an unset, empty or invalid value keeps the default of 0.25 seconds
+
+  @unit
+  Scenario: The spans of a call reach the platform before its result
+    Given an agent whose spans a batch exporter holds
+    When a call answers
+    Then the result reaches the platform only after those spans are exported
+    And an export that fails or times out is logged and the call still answers

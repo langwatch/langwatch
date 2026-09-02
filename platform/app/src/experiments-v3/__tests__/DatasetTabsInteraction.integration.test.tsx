@@ -7,21 +7,98 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SelectDatasetDrawer } from "~/components/datasets/SelectDatasetDrawer";
 import { DatasetTabs } from "../components/DatasetSection/DatasetTabs";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { type DatasetReference, DEFAULT_TEST_DATA_ID } from "../types";
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+    closeDrawer: mockCloseDrawer,
+    goBack: vi.fn(),
+    canGoBack: false,
+    drawerOpen: vi.fn(() => false),
+  }),
+  getComplexProps: () => ({}),
+  useDrawerParams: () => ({}),
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", name: "Test Project" },
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    dataset: {
+      getAll: {
+        useQuery: () => ({
+          data: [
+            {
+              id: "ds-1",
+              name: "Production Samples",
+              status: "ready",
+              columnTypes: [
+                { name: "input", type: "string" },
+                { name: "expected_output", type: "string" },
+              ],
+              updatedAt: new Date("2026-08-01T00:00:00Z"),
+              contentLayout: null,
+              useS3: false,
+              rowCount: 5,
+              s3RecordCount: null,
+              _count: { datasetRecords: 5 },
+            },
+          ],
+          isLoading: false,
+        }),
+      },
+    },
+  },
+}));
 
 // Mock callbacks
 const mockOnSelectExisting = vi.fn();
 const mockOnUploadCSV = vi.fn();
 const mockOnEditDataset = vi.fn();
 const mockOnSaveAsDataset = vi.fn();
+const mockCloseDrawer = vi.fn();
+const mockOnPickDataset = vi.fn();
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+/**
+ * The real wiring of the workbench header: choosing to pick an existing
+ * dataset opens the same Choose Dataset drawer the Add button uses. Mirrors
+ * EvaluationsV3Table's datasetHandlers.onSelectExisting.
+ */
+const SwitchableWorkbenchHeader = () => {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <>
+      <DatasetTabs
+        onSelectExisting={() => setPickerOpen(true)}
+        onUploadCSV={mockOnUploadCSV}
+        onEditDataset={mockOnEditDataset}
+        onSaveAsDataset={mockOnSaveAsDataset}
+      />
+      {pickerOpen && (
+        <SelectDatasetDrawer
+          open
+          onClose={() => setPickerOpen(false)}
+          onSelect={mockOnPickDataset}
+        />
+      )}
+    </>
+  );
+};
 
 const renderDatasetTabs = () => {
   return render(
@@ -259,6 +336,66 @@ describe("DatasetTabs user interactions", () => {
           type: "inline",
         }),
       );
+    });
+  });
+
+  describe("when the active tab menu is opened", () => {
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("offers Switch Dataset on the active tab's dropdown", async () => {
+      const user = userEvent.setup();
+      renderDatasetTabs();
+
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("opens the Choose Dataset drawer and loads a picked dataset into the workbench on Switch Dataset", async () => {
+      const user = userEvent.setup();
+      render(<SwitchableWorkbenchHeader />, { wrapper: Wrapper });
+
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Dataset"));
+
+      // The same picker the Add button's "Select existing dataset" opens.
+      await waitFor(() => {
+        expect(screen.getByText("Choose Dataset")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Production Samples"));
+      expect(mockOnPickDataset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          datasetId: "ds-1",
+          name: "Production Samples",
+        }),
+      );
+    });
+
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("offers Switch Dataset for saved datasets too", async () => {
+      const user = userEvent.setup();
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createSavedDataset("saved-ds", "Saved Dataset"));
+      store.setActiveDataset("saved-ds");
+
+      renderDatasetTabs();
+
+      await user.click(screen.getByTestId("dataset-tab-saved-ds"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
     });
   });
 
