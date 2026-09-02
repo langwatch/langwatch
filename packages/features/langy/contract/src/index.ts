@@ -18,6 +18,7 @@ export * from "./inline-channel/parts";
 export * from "./langy";
 export * from "./credential";
 export * from "./langy.service";
+export type { LangyStreamEntry } from "./langy.stream-entry";
 export * from "./langy.commands";
 export * from "./langy.errors";
 export * from "./langy.error-remediation";

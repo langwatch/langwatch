@@ -11,6 +11,13 @@
  * Registered here rather than by turning on `globals`, which would inject
  * `describe`/`it`/`expect` into 48 files that already import them.
  */
+/**
+ * The DOM matchers the moved suites already write.
+ *
+ * `toBeInTheDocument` and `toHaveAttribute` came from the application's own
+ * setup file; they travel with the tests that use them.
+ */
+import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 

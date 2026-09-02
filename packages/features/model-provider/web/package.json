@@ -16,6 +16,10 @@
       "types": "./src/components/NoModelsConfiguredCallout.tsx",
       "default": "./src/components/NoModelsConfiguredCallout.tsx"
     },
+    "./components/ProviderModelSelector": {
+      "types": "./src/components/ProviderModelSelector.tsx",
+      "default": "./src/components/ProviderModelSelector.tsx"
+    },
     "./components/icons/AISparklesLoader": {
       "types": "./src/components/icons/AISparklesLoader.tsx",
       "default": "./src/components/icons/AISparklesLoader.tsx"
