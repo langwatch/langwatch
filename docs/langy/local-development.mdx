@@ -1,0 +1,91 @@
+---
+title: Local development
+description: "Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with every command checked in the chat."
+sidebarTitle: Local development
+keywords:
+  - langy share control
+  - ai agent local folder
+  - langwatch langy cli
+---
+
+Langy reaches your code in two ways. It can open a [pull request through the GitHub App](/langy/pull-requests), or it can work in a folder you share from your machine. The shared folder is the faster path when you sit at your computer: there is no clone, the checks run with the toolchain you already have, and the pull request opens from your own `gh` login.
+
+Langy asks which way to use the first time a request needs a code change. Requests that the platform can do on its own, such as creating a scenario or an evaluation, never ask.
+
+<Info>**Also check:** [Pull requests](/langy/pull-requests) (the GitHub path), [The sandbox](/langy/security/sandbox) (where Langy itself runs), [CLI](/integration/cli) (the `langwatch` command).</Info>
+
+## How a shared folder works
+
+<Steps>
+  <Step title="Ask for a change">
+    Ask Langy for something that lives in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options: share your local folder, or use GitHub.
+  </Step>
+  <Step title="Run the command in the folder">
+    Pick "Share my local folder". The card shows one command. Run it in the folder you want Langy to work in:
+
+    ```bash
+    npx langwatch@latest langy --share-control
+    ```
+
+    The command signs you in when you are not signed in yet, then shows the request from your conversation and asks you to approve it in the terminal. The request expires after 15 minutes.
+  </Step>
+  <Step title="Langy works in the folder">
+    Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When it is not, Langy reports the branch name instead.
+  </Step>
+  <Step title="Disconnect">
+    Press Ctrl-C in the terminal to disconnect. The chat shows the folder as disconnected. The next request that needs code access asks again.
+  </Step>
+</Steps>
+
+The connection belongs to one conversation. A second code change in the same conversation uses the folder that is already connected. A new conversation asks again.
+
+{/* TODO screenshot: the code access card in the waiting state next to the terminal approve prompt */}
+
+## What Langy can do in the folder
+
+Every action runs on your machine, inside the shared folder, through the CLI. Langy cannot see or touch anything outside it.
+
+| Action | Asks first |
+|---|---|
+| Read a file, list a directory, search for text or files | No |
+| Edit a file, write a new file | No |
+| Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
+| Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
+| Read a secret file (`.env`, `*.pem`, `*.key`, `id_rsa`, `.netrc`) | Yes, even to read |
+| Reach a path outside the folder, or use `sudo` | Refused in every mode |
+
+Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
+
+A refused action is not silent. The CLI tells Langy why it was refused, and Langy finds another way inside the folder or says what it could not do.
+
+## Permissions
+
+When a command needs approval, the chat shows a permission card with the command, the folder and the machine name. The terminal points you to the chat.
+
+- **Allow once** runs this command.
+- **Allow this pattern this session** runs this command and, until you disconnect, every command that starts the same way, for example `pnpm *`.
+- **Deny** refuses it. Langy does not run it again in that turn.
+
+A card that gets no answer within 10 minutes expires, and Langy ends its turn and says what it still needs.
+
+### Skip permission checks
+
+The permission card carries a switch to skip all permission checks for the rest of the connection. Refusals for paths outside the folder and for `sudo` still apply.
+
+The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip permission checks**: one pattern per line. The defaults allow the frontier OpenAI and Anthropic models and no others. When the conversation's model is not on the list, the switch is disabled and says so.
+
+## Remembering GitHub
+
+The code access card has a "Remember this choice" option for GitHub. With it on, later requests skip the card and show a status line, "Using GitHub", with a **Change** link that clears the choice and asks again.
+
+The same choice is visible in **Settings > Integrations**, next to the GitHub connection. A shared local folder is never remembered: it is one command away and belongs to one conversation.
+
+## What the CLI does and does not do
+
+- The connection is outbound only, from your machine to LangWatch. Nothing listens on your machine.
+- The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
+- Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
+- A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
+- Nothing is installed. `npx langwatch@latest` runs the CLI from the registry.
+
+Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.

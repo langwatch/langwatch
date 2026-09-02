@@ -10,7 +10,21 @@ keywords:
 
 Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
 
-<Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+<Info>**Also check:** [Local development](/langy/local-development) (the same result from a folder on your machine), [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+
+## Two ways to reach your code
+
+The first time a request needs a code change, Langy asks how to reach the code.
+
+| | GitHub App | Shared local folder |
+|---|---|---|
+| Where the work runs | In Langy's sandbox, on a fresh clone | On your machine, in the folder you share |
+| Checks | Your CI, on the pull request | Your own toolchain, before the push |
+| Commits | The bot, with you as co-author | Your git identity |
+| Setup | Install the GitHub App once | Run one command per conversation |
+| Remembered | Yes, with "Remember this choice" | No, one conversation at a time |
+
+This page covers the GitHub App path. The shared folder is described in [Local development](/langy/local-development). Both end in a pull request that a person reviews.
 
 ## How a Langy PR is made
 
