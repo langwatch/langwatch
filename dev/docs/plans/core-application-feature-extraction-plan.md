@@ -921,6 +921,43 @@ Worker config gained `NEXTAUTH_SECRET` (one leaf, two named uses: unsubscribe si
 NEITHER IS MOUNTED: Trace still registers `graphTriggerActivity`, and the three broadcast producers are still the application's, so
 both are proven by composition-capability tests in `apps/worker` and are staged for the trace conversion at step (g).
 
+**Step (c) landed (uncommitted at time of writing): the span-storage WRITE repository.** The application's 1,970-line
+`SpanStorageClickHouseRepository` is one file with two halves, and only the write half is a trace-conversion prerequisite. What was
+harvested is exactly that half — `insertSpan`, `insertSpans`, the `stored_spans` write record and `toClickHouseRecord` — into
+`TraceSpanStorageClickHouseRepository` (`repositories/clickhouse/`), plus `ClickHouseTraceSpanStorageAdapter` satisfying the
+`TraceSpanStoragePort` the package already declared. The read half stayed: its windowed readers, memory caps and column projections
+serve `SpanStorageService`, which is where the trace-privacy vertical (step d) and the blob store (step e) attach. The application's
+copy is untouched and both now write the same rows.
+
+FOUR SURVEY ITEMS SHRANK ON CONTACT. (1) `SpanStorageService` was NOT carried, because it is not the seam this repository serves:
+its write surface is one delegating method, and the other twelve are reads that pull in `resolveOffloadedTraces`, the blob store and
+the visibility-window redactor — steps (d) and (e), dragged in early for nothing. The seam the write path actually serves is
+`TraceSpanStoragePort` → `SpanStorageStore`, both already in the package. (2) The coding-agent consumer needs NO new port:
+`CodingAgentTraceProcessingPort.tryGetNormalizedSpan` is already the narrow two-method port in coding-agent-server, and
+`AppCodingAgentTraceProcessingAdapter` is the platform adapter that renames onto it. Its dependency is a normalized-span READ, which
+belongs to the read half and to whoever composes `CodingAgentTraceProcessingPort` at conversion time — not to this slice. (3) There
+are NO prom-client metrics anywhere in the span-storage repository, so there is no OTel twin to pin. (4) The retention default is
+the one deliberate difference from the frozen twin: a package cannot read `PLATFORM_DEFAULT_RETENTION_DAYS`, so it is injected, and
+the worker passes `eventing.retention.defaultRetentionDays` — the number the event store already stamps its own rows with — rather
+than configuring it a second time.
+
+ONE PACKAGE-WIDE CHANGE WAS REQUIRED AND IS LOAD-BEARING: `TraceClickHouseWriteClient.insert` now takes `readonly unknown[]`. The
+Eventing substrate's client declares `readonly Record<string, unknown>[]`, which the old mutable spelling refused; narrowing it back
+fails `apps/worker`'s typecheck, so the write path would be uncomposable outside the application without it. This is the same
+correction `SuiteClickHouseClient` already carries, for the same reason.
+
+TWIN-DRIFT PINS, chosen because ClickHouse hides exactly these: the table name, the 34 write columns in the table's own order, the
+three insert settings as one literal object, the `(TenantId, TraceId, SpanId)` dedup triple, `StartTime` as both the
+`ReplacingMergeTree` version and the `toYearWeek` partition key, the hard-zero dropped counts, the span-then-resource-then-unknown
+service-name order and the retention stamp. An insert that omits a column succeeds by filling in that column's default, and no
+reader can tell a defaulted value from a written one. The pins are literals in the package's own test rather than a read of the
+application's source, which would die the moment either file moves.
+
+NOT MOUNTED: `apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, Trace still registers the
+span-storage projection, and `createWorkerSpanStorage` has no production caller. It is proven by a composition-capability test that
+drives `SpanStorageStore` → port → repository → a fake Eventing ClickHouse client end to end, asserting one insert per batch, tenant
+routing and the retention stamp. Deployment impact: none until step (g).
+
 ## How to execute the plan
 
 Use this loop continuously until the final gate passes:

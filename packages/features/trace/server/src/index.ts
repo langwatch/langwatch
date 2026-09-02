@@ -116,6 +116,7 @@ export {
 export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-span-spool.port";
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port";
 export { TraceSpanStoragePort } from "./ports/trace-span-storage.port";
+export { ClickHouseTraceSpanStorageAdapter } from "./adapters/clickhouse.trace-span-storage.adapter";
 export {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
