@@ -31,6 +31,13 @@ const exportedRows = (rows: (string | number)[][]) => {
   return unparse.mock.calls[0]![0].data;
 };
 
+/** The header row papaparse was actually handed, after the sink had its say. */
+const exportedFields = (fields: string[]) => {
+  unparse.mockClear();
+  downloadCsv({ fields, rows: [["a"]], fileName: "f.csv" });
+  return unparse.mock.calls[0]![0].fields;
+};
+
 describe("downloadCsv", () => {
   describe("given a cell a spreadsheet would run as a formula", () => {
     describe("when the file is written", () => {
@@ -42,6 +49,19 @@ describe("downloadCsv", () => {
         expect(
           exportedRows([["=cmd"], ["+cmd"], ["@cmd"], ["\tcmd"], ["\rcmd"]]),
         ).toEqual([["'=cmd"], ["'+cmd"], ["'@cmd"], ["'\tcmd"], ["'\rcmd"]]);
+      });
+    });
+  });
+
+  describe("given a column heading a spreadsheet would run as a formula", () => {
+    describe("when the file is written", () => {
+      it("marks the heading as text so it is shown, not executed", () => {
+        // A heading is not always fixed text: a score type column is headed
+        // with the name its project gave it, so it is somebody's typing too.
+        expect(exportedFields(["Trace ID", "=cmd|' /c calc'!A1"])).toEqual([
+          "Trace ID",
+          "'=cmd|' /c calc'!A1",
+        ]);
       });
     });
   });

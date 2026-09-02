@@ -16,7 +16,7 @@ const FORMULA_LEADERS = ["=", "+", "-", "@", "\t", "\r"];
  * A value that is simply a number is left alone: "-5" is not a formula, and
  * quoting it would turn a number column into a text one.
  */
-const neutralizeFormula = (cell: string | number): string | number => {
+const neutralizeFormula = <T extends string | number>(cell: T): T | string => {
   if (typeof cell !== "string" || cell.length === 0) return cell;
   if (!FORMULA_LEADERS.includes(cell[0]!)) return cell;
   if (Number.isFinite(Number(cell))) return cell;
@@ -29,6 +29,10 @@ const neutralizeFormula = (cell: string | number): string | number => {
  * that exports a table produces the same file and the same failure surface —
  * and one place where a cell that would run as a formula is defused, rather
  * than every caller having to remember.
+ *
+ * The header row is defused with the rest. A column heading is not always
+ * fixed text: a score type carries the name its project gave it, so a heading
+ * can be just as much somebody's typing as the cells beneath it.
  */
 export function downloadCsv({
   fields,
@@ -40,7 +44,7 @@ export function downloadCsv({
   fileName: string;
 }): void {
   const csv = Parse.unparse({
-    fields,
+    fields: fields.map(neutralizeFormula),
     data: rows.map((row) => row.map(neutralizeFormula)),
   });
   const url = window.URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
