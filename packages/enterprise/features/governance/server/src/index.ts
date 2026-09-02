@@ -209,6 +209,41 @@ export {
  */
 export { createGovernanceRestApp } from "./transport/api-rest/governance.api";
 
+// The CLI governance plane: thirteen routes under `/api/auth/cli` that
+// authenticate with a device-session bearer and dispatch into governance. They
+// sit under an auth path because the project-scoped governance REST rejects a
+// device token; the services underneath are the console's own.
+export {
+  createGovernanceCliRestApp,
+  type GovernanceCliAccessTokenPort,
+  type GovernanceCliBudgetPort,
+  type GovernanceCliCaller,
+  type GovernanceCliPersonalWorkspace,
+  type GovernanceCliRestPorts,
+} from "./transport/api-rest/governance-cli.api";
+
+// The Activity Monitor's push-mode receivers. A signal whose collection this
+// process did not compose is not mounted at all, so an exporter gets a 404
+// rather than a 500 from a receiver that pretends to serve it.
+export {
+  createGovernanceIngestRestApp,
+  type GovernanceIngestLogCollectionPort,
+  type GovernanceIngestMetricCollectionPort,
+  type GovernanceIngestRestPorts,
+  type GovernanceIngestSpendPort,
+  type GovernanceIngestTraceCollectionPort,
+} from "./transport/api-rest/governance-ingest.api";
+export {
+  extractIngestClientIp,
+  GovernanceIngestRateLimitPort,
+  INGEST_RATE_LIMIT_MAX_REQUESTS,
+  INGEST_RATE_LIMIT_WINDOW_SECONDS,
+} from "./ports/governance-ingest-rate-limit.port";
+export {
+  resolveOrgAdminEmail,
+  resolveSupportContact,
+} from "./services/organization-support-contact.service";
+
 /**
  * The governance tools installed on a hosted MCP session.
  *

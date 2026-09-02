@@ -8,7 +8,11 @@ import {
   type ProcessObservability,
 } from "@langwatch/observability/node";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type {
+  AuthzGrantsService,
+  AuthzPermission,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
@@ -127,12 +131,29 @@ import {
   type ApiGatewayGroupCollaborators,
 } from "./api-trpc-collaborators.gateway-group.composition";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
+import {
+  composeApiIdempotency,
+  type ApiIdempotencyComposition,
+} from "./api-idempotency.composition";
 import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
+import { createGatewaySpendRestApp, settlementGraceMs } from "@langwatch/gateway-server";
+import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition";
+import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition";
+import { composeApiGatewayInternalRest } from "./api-gateway-internal-rest.composition";
+import {
+  ApiGatewaySpendPipelineAbsenceReport,
+  composeApiGatewaySpendPipeline,
+  type ApiGatewaySpendPipeline,
+} from "./api-gateway-spend-pipeline.composition";
+import { canonicalErrorFor } from "./api-rest-observability.composition";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
+
+import { createPlatformUrlBuilder } from "./api-rest-ports";
 import { nanoid } from "nanoid";
 import {
   composeApiProductCollaborators,
@@ -153,8 +174,16 @@ import {
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
 import { composeApiModelProviderHost } from "./api-model-provider-host.composition";
-import { composeApiStudioHost } from "./api-studio-host.composition";
+import {
+  composeApiStudioHost,
+  composeApiWorkflowStudioDispatch,
+} from "./api-studio-host.composition";
+import {
+  composeApiAuthoringRest,
+  LoggedApiAuthoringRestAbsence,
+} from "./api-authoring-rest.composition";
 import { ApiExperimentRunAbsenceReport } from "./api-experiment-run.composition";
+import { composeApiExperimentFindOrCreate } from "../features/experiment/experiment-init-rest.mount";
 import { composeApiTraceReadStack } from "./api-trace-read-stack.composition";
 import {
   apiEntitlementAbsenceReport,
@@ -214,6 +243,15 @@ import {
   type ApiLangyRestComposition,
 } from "../features/langy/langy-rest.mount";
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
+import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
+import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
+import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount";
+import type { AuthCliDeviceFlowRestPorts } from "@langwatch/auth-server";
+import type {
+  GovernanceCliRestPorts,
+  GovernanceIngestRestPorts,
+  GovernanceIngestTraceCollectionPort,
+} from "@langwatch/enterprise-governance-server";
 import type { GithubRestPorts } from "@langwatch/github-server";
 
 /**
@@ -478,6 +516,32 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAgentGroup: ApiAgentGroupCollaborators | undefined;
   private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
   private composedGatewayGroup: ApiGatewayGroupCollaborators | undefined;
+  /**
+   * The process's ONE `Idempotency-Key` receipt ledger, or none.
+   *
+   * Held rather than rebuilt per door because the claim protocol only works
+   * when every keyed create on this process shares one takeover clock.
+   */
+  private composedIdempotency: ApiIdempotencyComposition | undefined;
+  /**
+   * The process's ONE producer registration of the gateway-spend pipeline, or
+   * none.
+   *
+   * Held rather than built per door because two doors produce on it — the data
+   * plane's drained batch and the voice settlement's confirmation — and two
+   * registrations of one pipeline would be two producers writing one routing
+   * key with two dispatchers behind them.
+   */
+  private composedGatewaySpendPipeline: ApiGatewaySpendPipeline | undefined;
+  /**
+   * The stored-secret cipher this process composed, or none.
+   *
+   * Held as well as passed down because two doors composed after the halves
+   * need it: the `Idempotency-Key` receipt ledger writes its stored response
+   * under it, and the gateway's internal control plane reads a provider's
+   * stored credentials with it.
+   */
+  private composedEncryption: SecretEncryptionPort | undefined;
   private composedGithub: GithubService | undefined;
   private composedMonitors: MonitorService | undefined;
   private composedModelProviders: ModelProviderService | undefined;
@@ -500,6 +564,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * which is handed a request policy rather than a configuration.
    */
   private composedLangyInternalSecret: string | undefined;
+  /**
+   * The one evaluator-id slug rule on this process.
+   *
+   * Held on the composition rather than constructed at a mount because three
+   * paths derive an id from an evaluation NAME — the SDK collector, the
+   * evaluate doors and Trace's custom-evaluation sync — and the derived id IS
+   * the key a verdict is stored under. Two instances cannot disagree today,
+   * but two CONSTRUCTION sites are how they come to.
+   */
+  private readonly evaluatorIdSlug = EvaluationNameAutoslugService.create();
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -534,6 +608,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const readiness = this.options.readiness ?? queueInfrastructure?.readiness;
     const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
     const encryption = composeApiSecretEncryption(options)?.encryption;
+    this.composedEncryption = encryption;
     const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
     const auth = tenancy ? this.resolveAuth(options, tenancy, queueInfrastructure) : undefined;
 
@@ -625,6 +700,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // execution and trace halves opened — this process's evaluator service,
     // its monitor directory and its ClickHouse — and because the gateway
     // application it builds is also what the public REST door is given.
+    // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
+    // create writes its resource to and the SAME cipher every other at-rest
+    // secret is written under. Composed before the gateway group because that
+    // half's three keyed REST creates dispatch through it.
+    this.composedIdempotency = composeApiIdempotency({
+      database: this.composedDatabase?.connection.client,
+      encryption,
+    });
     this.composedGatewayGroup = this.composeGatewayGroup(options, authz, queueInfrastructure);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: this.composedDatabase?.connection,
@@ -696,6 +779,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         tenancy,
         options.config.serviceName,
         options.config.infrastructure.execution.publicBaseUrl,
+        options.config.infrastructure.execution.nlpServiceUrl,
+        options.config.spendSettlementGraceMs,
+        options.config.gatewayInternalSecret,
+        options.config.gatewayJwtSecret,
       ),
       observability: options.observability,
       graph: options.graph,
@@ -881,6 +968,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     tenancy: ApiResolvedTenancy,
     serviceName: string,
     publicBaseUrl: string | undefined,
+    nlpServiceUrl: string | undefined,
+    /** The operator's settlement-grace override, still unparsed. */
+    spendSettlementGrace: string | undefined,
+    /** The HMAC secret the Go data plane signs its control-plane calls with. */
+    gatewayInternalSecret: string | undefined,
+    /** The key the credentials handed to that data plane are signed under. */
+    gatewayJwtSecret: string | undefined,
   ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
     const secrets = this.secrets;
     const gatewayApp = this.composedGatewayGroup?.gatewayApp;
@@ -939,10 +1033,48 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           gateway: () => gatewayApp,
         }).hono as unknown as Hono)
       : undefined;
+    // The billing reconciliation family, over the SAME spend ledger the gateway
+    // application prices a budget against. Mounted beside the platform family
+    // because they share `/api/gateway/v1`, and absent for the same reason:
+    // without a gateway group there is no ledger to reconcile against.
+    const gatewaySpendRest = this.composeGatewaySpendRest(spendSettlementGrace, restSecurity);
+    // The spend pipeline, registered producer-only. Registered BEFORE the
+    // internal family is composed because that family's `/spend-commands`
+    // route is the only reason a producer exists on this tier, and the voice
+    // settlement it also serves confirms through the same registration.
+    this.composedGatewaySpendPipeline = composeApiGatewaySpendPipeline({
+      eventing: this.composedEventing?.eventSourcing,
+      processName: serviceName,
+      report: LoggedApiGatewaySpendPipelineAbsence.create(createLogger(serviceName)),
+    });
+    // The Go data plane's control-plane calls, over the SAME gateway graph the
+    // console and the public REST door read. `/api/internal/gateway` is a
+    // literal first segment nothing else claims, so its position among the
+    // families is free.
+    const gatewayInternalRest = this.composeGatewayInternalRest(
+      restSecurity,
+      gatewayInternalSecret,
+      gatewayJwtSecret,
+    );
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const langyRest = this.composeLangyRest();
     const githubRest = this.composeGithubRest(authz);
+    // The two halves of `/api/auth/cli`. The device grant is this process's
+    // own — Redis, the directory, the credential service — and the governance
+    // plane rides the SAME session reader the grant mints through, so the
+    // writer and the reader of the CLI token keyspace can never be two
+    // spellings of it.
+    const authCliDeviceFlow = this.composeAuthCliDeviceFlow(authz, tenancy, publicBaseUrl);
+    const governanceCli = this.composeGovernanceCliRest(
+      authz,
+      authCliDeviceFlow,
+      publicBaseUrl,
+    );
+    // The Activity Monitor's receivers, over the trace collection the OTLP
+    // composition above already built — the same `trace_processing` producer
+    // registration, never a second one.
+    const governanceIngest = this.composeGovernanceIngestRest(otlpIngest?.otlp.traces);
     // The charted reads and the prompt library, over the SAME applications the
     // browser's `analytics.getTimeseries` and `prompts.*` procedures resolve
     // on. Taken from the halves rather than built a second time: two analytics
@@ -983,18 +1115,25 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // makes a download attributable to a person, and the store is what it
     // sweeps. Without either the family is left off.
     const authSession = this.composedAuth?.compose();
+    // ONE session port for every handler-managed family on this process. The
+    // export, the Studio's two doors, the playground and the two generators
+    // all resolve a person themselves, and two resolvers over the same
+    // transport would be two answers to who somebody is.
+    const authoringSession = authSession
+      ? ApiHandlerManagedSession.create({
+          auth: authSession.auth,
+          sessions: authSession.sessions,
+          authz,
+        })
+      : undefined;
     const simulations = this.composedAgentGroup?.simulations;
     const exportBroadcast = this.composedIdentity?.broadcast;
     const scenarioRunExport =
-      authSession && simulations && exportBroadcast
+      authoringSession && simulations && exportBroadcast
         ? {
             simulations: () => simulations,
             broadcast: () => exportBroadcast,
-            session: ApiHandlerManagedSession.create({
-              auth: authSession.auth,
-              sessions: authSession.sessions,
-              authz,
-            }),
+            session: authoringSession,
             recordExportRequested: async (entry: {
               userId: string;
               projectId: string;
@@ -1012,6 +1151,99 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             },
           }
         : undefined;
+    // The four authoring doors — the Studio's completion and run dispatch, the
+    // playground, and the two generators. Every one of them is a session door,
+    // so the transport composed above is what decides whether any is mounted;
+    // beyond that each names its own second condition. The studio dispatch is
+    // built through the SAME decision the `httpProxy.*` surface's is, so an
+    // absent engine address means the same thing on both.
+    const modelProviders = this.composedModelProviders;
+    const authoring = composeApiAuthoringRest({
+      session: authoringSession,
+      modelProviders,
+      projects,
+      workflows: this.composedExecution?.workflows,
+      studioDispatch: modelProviders
+        ? composeApiWorkflowStudioDispatch({ nlpServiceUrl, modelProviders })
+        : undefined,
+      nlpServiceUrl,
+      report: LoggedApiAuthoringRestAbsence.create(createLogger(serviceName)),
+    });
+    // The experiment workbench's ten doors, over the SAME application the
+    // `experiments.*` namespace answers from and the SAME run loop its own
+    // procedures start. Mounted where this process holds a session (two of the
+    // doors are the browser's) and the execution half; the run loop's own
+    // absence is answered inside the family, so a deployment with no progress
+    // store still reads and writes a saved setup.
+    const execution = this.composedExecution;
+    const experimentWorkbench =
+      authoringSession && execution
+        ? {
+            session: authoringSession,
+            credential: (input: { request: Request; permission: AuthzPermission }) =>
+              handlerManagedCredentials.authenticate(input),
+            experiments: () => execution.experiments,
+            run: execution.experimentRun,
+          }
+        : undefined;
+    // The ONE find-or-create rule on this process. Constructed here and handed
+    // to BOTH doors that resolve an SDK's `experiment_slug` — the create-or-take
+    // call and the batch result log — because an SDK that got one experiment
+    // from the first and a second from the other would split one run's results
+    // across two rows nothing downstream can rejoin.
+    const experimentFindOrCreate = execution
+      ? composeApiExperimentFindOrCreate(execution.experiments.experimentService)
+      : undefined;
+    const experimentInit = experimentFindOrCreate
+      ? {
+          credential: (input: { request: Request; permission: AuthzPermission }) =>
+            handlerManagedCredentials.authenticate(input),
+          findOrCreate: experimentFindOrCreate,
+        }
+      : undefined;
+    // The three synchronous run URLs, over the SAME graph service the
+    // workbench's own cells dispatch through — so a run started over REST and
+    // one started as an experiment cell resolve one published version, not two.
+    const workflowRun = execution
+      ? {
+          credential: (input: { request: Request; permission: AuthzPermission }) =>
+            handlerManagedCredentials.authenticate(input),
+          workflows: () => execution.experimentRun.workflows,
+        }
+      : undefined;
+    // The five subsystem probes. Every one of them posts a canary back through
+    // this deployment's own public boundary, so the origin is what decides
+    // whether the family exists at all; the automation application and the
+    // workflow lookup are the two probes' own collaborators.
+    //
+    // The probe's credential is resolved through the process's ONE API-key
+    // service and then NARROWED to the deprecated project key, which is the
+    // only class the routes have ever accepted. Resolving through the service
+    // rather than reading the column keeps one answer to "whose key is this";
+    // narrowing after it keeps the door exactly as wide as it was.
+    const automationApp = this.composedOrgGroup?.application.automation;
+    const healthProbes =
+      publicBaseUrl && automationApp && execution
+        ? {
+            resolveProjectByApiKey: async (token: string) => {
+              const resolved = await tenancy.apiKeys.tryResolveToken({ token });
+              return resolved?.type === "legacyProjectKey" ? { id: resolved.project.id } : null;
+            },
+            publicBaseUrl,
+            automation: () => automationApp,
+            workflowExists: async (input: { workflowId: string; projectId: string }) => {
+              try {
+                await execution.workflows.getById({
+                  id: input.workflowId,
+                  projectId: input.projectId,
+                });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          }
+        : undefined;
     const organizationManagement =
       organizationRest && shares && plans && projects
         ? {
@@ -1023,6 +1255,84 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             audit: this.composeManagementAudit(),
           }
         : undefined;
+    // The public trace doors, over the SAME read stack the explorer and the
+    // legacy grid answer from. Taken from the observability half rather than
+    // built again: two read stacks would be two answers to what one caller may
+    // see of one trace, and the redaction is the whole point of the stack.
+    const traceGroup = this.composedTraceGroup;
+    const traceStack = traceGroup?.traceReads;
+    const traceReads = traceStack
+      ? {
+          reads: traceStack,
+          platformUrl: createPlatformUrlBuilder(publicBaseUrl),
+          // The reserved-metadata amendment writes a synthetic span on the
+          // SAME `trace_processing` registration everything else on this
+          // process ingests through. Absent where the product half registered
+          // no queue, and then the PATCH route is not registered at all.
+          ...(this.composedProduct
+            ? {
+                updateTraceMetadata: (input: {
+                  projectId: string;
+                  traceId: string;
+                  metadata: Record<string, unknown>;
+                }) => traceStack.explorerPorts().updateTraceMetadata(input),
+              }
+            : {}),
+        }
+      : undefined;
+    const traceLegacy =
+      traceGroup && traceStack
+        ? {
+            traces: () => traceGroup.traces,
+            shares: () => traceGroup.share,
+            reads: traceStack,
+            credential: (input: { request: Request; permission: AuthzPermission }) =>
+              handlerManagedCredentials.authenticate(input),
+          }
+        : undefined;
+    // The SDK collector, over the SAME ingestion service the OTLP receiver
+    // uses — one dedup gate, one producer registration. Its evaluation half is
+    // the execution fold's own `reportEvaluation`, which is the same command
+    // the workbench's re-scores travel on; without it the collector still
+    // records spans and counts the evaluations as rejected by name.
+    const reportEvaluation = this.composedExecution?.evaluations.reportEvaluation;
+    // The batch result log's three collaborators. All three travel together
+    // because they are ONE write: the rows are a run's history, addressed by
+    // the experiment the first of them resolved and scored by the verdict
+    // command the third sends. A door holding two of the three would answer
+    // 200 to results that land nowhere a customer can read them back.
+    const evaluationBatch =
+      execution && experimentFindOrCreate && reportEvaluation
+        ? {
+            findOrCreate: experimentFindOrCreate,
+            // The SAME service the workbench's own cells write a run through,
+            // so an SDK's batch and a workbench run produce one history.
+            experiments: () => execution.experiments.experimentService,
+            reportEvaluation: (input: Record<string, unknown>) =>
+              reportEvaluation(input as never),
+          }
+        : undefined;
+    const collector = otlpIngest
+      ? {
+          credential: otlpIngest.collectorCredential,
+          ingestSpan: otlpIngest.ingestSpan,
+          // The plan allowance this process cannot read; the same degradation
+          // the OTLP receiver records, for the same reason.
+          ...(reportEvaluation
+            ? {
+                // The command's own data shape is the evaluation package's, and
+                // the execution half publishes it opaquely; the collector's port
+                // names the fields it actually sends.
+                reportEvaluation: (input: Record<string, unknown>) =>
+                  reportEvaluation(input as never),
+              }
+            : {}),
+          // ONE instance of the slug rule on this process, so the collector,
+          // the custom-evaluation sync and the evaluate doors derive one id
+          // for one evaluation name.
+          deriveEvaluatorId: (name: string) => this.evaluatorIdSlug.derive(name),
+        }
+      : undefined;
     for (const processRestApp of createApiProcessRestFeatures({
       security: restSecurity,
       services: {
@@ -1032,6 +1342,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(prompts ? { prompts: () => prompts } : {}),
         ...(organizationManagement ? { organizationManagement } : {}),
         ...(scenarioRunExport ? { scenarioRunExport } : {}),
+        ...(authoring ? { authoring } : {}),
+        ...(experimentWorkbench ? { experimentWorkbench } : {}),
+        ...(experimentInit ? { experimentInit } : {}),
+        ...(evaluationBatch ? { evaluationBatch } : {}),
+        ...(workflowRun ? { workflowRun } : {}),
+        ...(traceReads ? { traceReads } : {}),
+        ...(traceLegacy ? { traceLegacy } : {}),
         organizations: () => tenancy.organizations,
       },
       ports: {
@@ -1039,12 +1356,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // The SAME counter the packaged REST families and the identity
         // throttles meter through, so a caller has one budget per rule.
         rateLimit: (request) => this.rateLimiter.consume(request),
-        ...(otlpIngest ? { otlpIngest } : {}),
+        ...(otlpIngest ? { otlpIngest: otlpIngest.otlp } : {}),
+        ...(collector ? { collector } : {}),
         ...(bugReports ? { bugReports } : {}),
         ...(unsubscribe ? { unsubscribe } : {}),
         ...(langyRest ? { langy: langyRest } : {}),
         ...(githubRest ? { github: githubRest } : {}),
+        ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
+        ...(governanceCli ? { governanceCli } : {}),
+        ...(governanceIngest ? { governanceIngest } : {}),
         ...(publicBaseUrl ? { publicBaseUrl } : {}),
+        ...(healthProbes ? { healthProbes } : {}),
       },
     })) {
       rest.route("/", processRestApp);
@@ -1070,7 +1392,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // families because one of those owns a literal path inside
         // `/api/gateway/v1` — the spec document — and these routes claim
         // parameterised segments at the root of that namespace.
-        .route("/", gatewayRest ?? new Hono()),
+        .route("/", gatewayRest ?? new Hono())
+        // The billing reconciliation family shares that namespace, in the same
+        // relative order the retired router's enumeration gave the two: its
+        // paths are literal (`/spend-events`, `/spend-summaries`) and the
+        // platform family's are parameterised, and a literal segment wins over
+        // a parameter at the same position.
+        .route("/", gatewaySpendRest ?? new Hono())
+        // The internal control plane. Its own namespace, blocked at the
+        // ingress by the chart, and reached in-cluster through this process's
+        // internal Service rather than through the public host.
+        .route("/", gatewayInternalRest ?? new Hono()),
       // The subscription lane declares its access policy on the same security
       // every REST family does, so the one streaming route on this process is
       // a registry entry rather than an unaccounted-for endpoint. It is a
@@ -1269,6 +1601,110 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * reaches the inbox without pinging a channel is a delayed alert, not a lost
    * report — the back office lists it either way.
    */
+  /**
+   * The billing reconciliation REST family, or none.
+   *
+   * Absent where this process composed no gateway group: the four routes read
+   * the spend ledger that half opens, and a family mounted over a ledger that
+   * is not there would answer every reconciliation query with a 500. The
+   * ClickHouse-less shape is NOT this absence — that one mounts and says
+   * `spend_source_unavailable`, because a deployment holding no trace storage
+   * has spend to reconcile the moment it gains one.
+   */
+  /**
+   * The Go data plane's internal control plane, or none.
+   *
+   * Composed only where this process holds the gateway group, a database, the
+   * stored-secret cipher and a JWT signing key. What each absence means, and
+   * why the HMAC secret is deliberately not one of them, is in
+   * `api-gateway-internal-rest.composition.ts`.
+   *
+   * The optional collaborators are handed over where this process has them:
+   * the monitor directory and the evaluator service a guardrail check runs on,
+   * the Codex refresh the gateway's 401 recovery road calls, and the spend
+   * pipeline's senders — which serve both `/spend-commands` and the voice
+   * settlement, and are absent together because they are one registration.
+   * Each absent one is a route that refuses by name.
+   */
+  private composeGatewayInternalRest(
+    security: AppRestSecurity,
+    internalSecret: string | undefined,
+    jwtSecret: string | undefined,
+  ): Hono | undefined {
+    const gateway = this.composedGatewayGroup;
+    const database = this.composedDatabase?.connection;
+    const projects = this.composedTenancy?.projects;
+    if (!gateway || !database || !projects) return undefined;
+
+    const modelProviders = this.composedModelProviders;
+    const monitors = this.composedMonitors;
+    const spend = this.composedGatewaySpendPipeline;
+    return composeApiGatewayInternalRest({
+      security,
+      prisma: database.client,
+      gateway: gateway.composition,
+      projects,
+      internalSecret,
+      jwtSecret,
+      encryption: this.composedEncryption,
+      // The process's ONE producer registration, so the drained batch and the
+      // voice settlement write onto one stream with one set of dispatchers.
+      ...(spend
+        ? { spendCommands: spend.commands, spendConfirmation: spend.confirmation }
+        : {}),
+      ...(monitors ? { monitors } : {}),
+      ...(modelProviders
+        ? {
+            refreshCodex: (input: { providerRowId: string }) =>
+              modelProviders.refreshCodexForGateway(input),
+          }
+        : {}),
+    }) as Hono | undefined;
+  }
+
+  private composeGatewaySpendRest(
+    spendSettlementGrace: string | undefined,
+    security: AppRestSecurity,
+  ): Hono | undefined {
+    const gateway = this.composedGatewayGroup;
+    const database = this.composedDatabase?.connection;
+    const plans = this.composedPlanProvider;
+    if (!gateway || !database || !plans) return undefined;
+
+    // The Enterprise webhook platform, where this deployment has one. The
+    // replay route is the only one of the four that reads it, so its absence
+    // is that route refusing by name rather than the family being left off.
+    const webhooks = composeApiGatewayWebhooks({
+      database: database.client,
+      encryption: this.composedEncryption,
+      // The SAME ClickHouse the spend ledger itself is projected into: the
+      // emitted envelopes and the rows they were rendered from are two tables
+      // in one instance, and a second connection would be a second pool.
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+    });
+    const spend = composeApiGatewaySpendRest({
+      prisma: database.client,
+      gateway: gateway.composition,
+      // The SAME plan lookup every allowance banner on this process reads, so
+      // one organization cannot be entitled on one surface and refused here.
+      plans,
+      settlementGraceMs: settlementGraceMs(spendSettlementGrace),
+      ...(webhooks ? { webhooks } : {}),
+    });
+    return createGatewaySpendRestApp({
+      // The SAME credential resolution every other family on this process is
+      // built from; the family declares its own organization-scoped
+      // `Variables`, which the security chain sets before any handler runs.
+      security,
+      billingPlanGate: spend.billingPlanGate,
+      // The process's one canonical mapping. The family installs its own
+      // `onError` to log what the caller actually received and delegates the
+      // rendering here rather than keeping a second taxonomy.
+      canonicalError: (error) => canonicalErrorFor(error),
+      spend: () => spend.ports,
+    }).hono as unknown as Hono;
+  }
+
   private composeBugReports(tenancy: ApiResolvedTenancy): BugReportRestPorts | undefined {
     const database = this.composedDatabase?.connection;
     if (!database) return undefined;
@@ -1339,6 +1775,101 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       redis: this.composedQueueRedis,
       internalSecret: this.composedLangyInternalSecret,
       metrics: apiLangyRestMetrics(),
+    });
+  }
+
+  /**
+   * The RFC 8628 CLI device grant's collaborators, or none.
+   *
+   * Four things gate it, and each is fatal on its own: Redis (a device code
+   * has nowhere ephemeral to live without it), the database (the membership
+   * re-derivation that stands between an offboarded person and a live
+   * credential reads rows), the browser session (approval means naming who
+   * approved) and the credential service (the user-scoped CLI key is minted
+   * and revoked through it).
+   */
+  private composeAuthCliDeviceFlow(
+    authz: AuthzService,
+    tenancy: ApiResolvedTenancy,
+    publicBaseUrl: string | undefined,
+  ): AuthCliDeviceFlowRestPorts | undefined {
+    const auth = this.composedAuth?.compose();
+    return composeApiAuthCliDeviceFlow({
+      redis: this.composedQueueRedis,
+      prisma: this.composedDatabase?.connection.client,
+      session: auth
+        ? (request) =>
+            AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        : undefined,
+      apiKeys: tenancy.apiKeys,
+      organizations: this.composedIdentity?.application.organizations,
+      authz,
+      featureFlags: this.composedProductGroup?.featureFlagService,
+      publicBaseUrl,
+    });
+  }
+
+  /**
+   * The CLI governance plane's collaborators, or none.
+   *
+   * The bearer reader is taken FROM the device grant's own session service
+   * rather than built here: the grant writes the token records and this half
+   * reads them, so one implementation of the keyspace is the whole point. No
+   * device grant therefore means no governance CLI either — a reader with
+   * nothing writing for it would answer 401 to every valid token.
+   *
+   * NAMED ABSENCE: no spend store. The budget pre-flight answers `{ok: true}`
+   * without one, which is the documented degradation — the gateway still
+   * refuses the first real request through the same decision.
+   */
+  private composeGovernanceCliRest(
+    authz: AuthzService,
+    deviceFlow: AuthCliDeviceFlowRestPorts | undefined,
+    publicBaseUrl: string | undefined,
+  ): GovernanceCliRestPorts | undefined {
+    const sessions = deviceFlow?.sessions;
+    return composeApiGovernanceCliRest({
+      governance: this.options.enterprise?.governance.governance,
+      accessTokens: sessions
+        ? {
+            resolve: (authHeader) => sessions.tryResolveAccessToken(authHeader),
+            revoke: (input) => sessions.revokeAccessToken(input),
+          }
+        : undefined,
+      prisma: this.composedDatabase?.connection.client,
+      organizations: this.composedIdentity?.application.organizations,
+      plans: this.composedPlanProvider,
+      authz,
+      // The gateway group holds the spend decisions and this process does not
+      // compose it; the family says so by answering `{ok: true}` rather than
+      // guessing at a balance it cannot read.
+      budgets: undefined,
+      publicBaseUrl,
+    });
+  }
+
+  /**
+   * The Activity Monitor's receivers' collaborators, or none.
+   *
+   * The trace collection is HANDED IN rather than built, because it carries
+   * this process's single `trace_processing` producer registration — a second
+   * registration would describe one event stream twice and give the worker two
+   * catalogue entries for one aggregate.
+   *
+   * NAMED ABSENCES: no log fold, no metric fold and no spend ledger, so the
+   * webhook receiver and both `/v1/*` sub-paths are not registered at all and
+   * nothing is priced. Only `POST /api/ingest/otel/:sourceId` serves here.
+   */
+  private composeGovernanceIngestRest(
+    traceCollection: GovernanceIngestTraceCollectionPort | undefined,
+  ): GovernanceIngestRestPorts | undefined {
+    return composeApiGovernanceIngestRest({
+      governance: this.options.enterprise?.governance.governance,
+      projects: this.composedTenancy?.projects,
+      traceCollection,
+      prisma: this.composedDatabase?.connection.client,
+      // The SAME counter every other throttle on this process meters through.
+      rateLimit: (request) => this.rateLimiter.consume(request),
     });
   }
 
@@ -1966,6 +2497,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const evaluators = this.composedExecution?.evaluators;
     if (!database || !tenancy || !featureFlags || !evaluators) return undefined;
 
+    // A host's ledger wins: a process handed the product graph already holds
+    // one, and a second over the same receipt table would be a second takeover
+    // clock racing the first one's claims. Otherwise this process's own, which
+    // is absent only where it composed no database or no cipher — and then the
+    // three keyed creates refuse by name rather than executing unguarded.
+    const idempotency = this.options.gatewayIdempotency ?? this.composedIdempotency?.gateway;
+
     return composeApiGatewayGroupCollaborators({
       prisma: database.client,
       authz,
@@ -1991,9 +2529,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // installation bills through Stripe, and it is read from the one leaf
       // that already carries it rather than from a second of its own.
       saasBilling: options.config.infrastructure.modelProvider.isSaas,
-      ...(this.options.gatewayIdempotency
-        ? { idempotency: this.options.gatewayIdempotency }
-        : {}),
+      // A host's ledger wins: a process handed the product graph already holds
+      // one, and a second over the same table would be a second takeover clock
+      // racing the first one's claims. Otherwise this process's own.
+      ...(idempotency ? { idempotency } : {}),
       ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
       processName: options.config.serviceName,
     });
@@ -2465,6 +3004,31 @@ export class LoggedApiEventingAbsence extends ApiEventingAbsenceReportPort {
     this.logger.info(
       { reason: "no-queue" },
       "API composed without a Group Queue: it can produce no commands, so it composes no service whose writes are commands",
+    );
+  }
+}
+
+/**
+ * Names an unregistered spend pipeline once, at boot.
+ *
+ * `warn` rather than `info`, and the level is the point: the data plane keeps
+ * every spooled record and re-posts it, so this deployment accumulates a
+ * billing backlog it will drop when the gateway's own buffer fills. A line
+ * saying so at boot is what turns that into an operator's decision.
+ */
+export class LoggedApiGatewaySpendPipelineAbsence extends ApiGatewaySpendPipelineAbsenceReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiGatewaySpendPipelineAbsence {
+    return new LoggedApiGatewaySpendPipelineAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutQueue(): void {
+    this.logger.warn(
+      { reason: "no-queue" },
+      "API registered no gateway spend producer: /api/internal/gateway/spend-commands refuses with spend_pipeline_disabled and the data plane keeps spooling its billing records",
     );
   }
 }

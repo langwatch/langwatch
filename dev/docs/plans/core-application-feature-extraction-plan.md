@@ -2598,19 +2598,19 @@ dispatches through is not in `apps/api`'s composed graph.
 | POST | `/api/auth/cli/device-code` | hma([], session) | 200 RFC 8628 device grant | **whole family before `/api/auth/*`** | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
 | POST | `/api/auth/cli/exchange` | hma([], session) | 200 `device_session` or `api_key` kind; 400/408/410/428/429/500 | same | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
 | POST | `/api/auth/cli/refresh` | hma([], session) | 200 token pair; 400; 401 `invalid_grant` | same | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
-| GET | `/api/auth/cli/budget/status` | hma([], session) | 200 `{ok}`; 401; 402 `{error:{type:"budget_exceeded", …}}` | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/bootstrap` | hma([], session) | 200 bootstrap; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/budget-overview` | hma([], session) | 200 overview; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/personal-project` | hma([], session) | 200 `{project}`; 401; 403; 500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| POST | `/api/auth/cli/virtual-key` | hma([], session) | 201 `{id, secret, prefix}`; 400/401/403/409/500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| POST | `/api/auth/cli/project-key` | hma([], session) | 200 `{api_key, project}`; 400/401/403/404 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/ingest/sources` | hma(ingestionSources:view, session) | 200 `{sources}`; 401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/ingest/sources/:id/events` | hma(activityMonitor:view, session) | 200 `{events}`; 400/401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/ingest/sources/:id/health` | hma(activityMonitor:view, session) | 200 `{source, health}`; 400/401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/status` | hma([], session) | 200 `{setup}`; 401/402 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/ingestion-templates` | hma([], session) | 200 `{ingestion_templates}`; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| POST | `/api/auth/cli/governance/ingestion-key` | hma([], session) | 201 `{token, prefix, endpoint, project?}`; 400/401/403/404/412/500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
-| GET | `/api/auth/cli/governance/ingestion-keys` | hma([], session) | 200 `{keys}`; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; not mounted — `apps/api` composes no Enterprise governance application |
+| GET | `/api/auth/cli/budget/status` | hma([], session) | 200 `{ok}`; 401; 402 `{error:{type:"budget_exceeded", …}}` | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/bootstrap` | hma([], session) | 200 bootstrap; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/budget-overview` | hma([], session) | 200 overview; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/personal-project` | hma([], session) | 200 `{project}`; 401; 403; 500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| POST | `/api/auth/cli/virtual-key` | hma([], session) | 201 `{id, secret, prefix}`; 400/401/403/409/500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| POST | `/api/auth/cli/project-key` | hma([], session) | 200 `{api_key, project}`; 400/401/403/404 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/ingest/sources` | hma(ingestionSources:view, session) | 200 `{sources}`; 401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/ingest/sources/:id/events` | hma(activityMonitor:view, session) | 200 `{events}`; 400/401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/ingest/sources/:id/health` | hma(activityMonitor:view, session) | 200 `{source, health}`; 400/401/402/403 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/status` | hma([], session) | 200 `{setup}`; 401/402 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/ingestion-templates` | hma([], session) | 200 `{ingestion_templates}`; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| POST | `/api/auth/cli/governance/ingestion-key` | hma([], session) | 201 `{token, prefix, endpoint, project?}`; 400/401/403/404/412/500 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| GET | `/api/auth/cli/governance/ingestion-keys` | hma([], session) | 200 `{keys}`; 401 | same | no | **moved** → `@langwatch/enterprise-governance-server`; mounted where a host supplied the Enterprise governance application — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
 | GET | `/api/auth/cli/lookup` | hma([], session) | 200 `{user_code, status, …}`; 400/401/404/410 | same | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
 | POST | `/api/auth/cli/approve` | hma(project:update, session) | 200 `{ok, kind?, project?, organization_id}`; 400/401/403/404/409/410 | same | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
 | POST | `/api/auth/cli/deny` | hma([], session) | 200 `{ok}`; 400/401 | same | no | **moved** → `@langwatch/auth-server`; mounted where a host supplied the browser-session transport AND this process holds Redis |
@@ -6366,3 +6366,231 @@ the single port the four evaluate doors are waiting on.
 `pages/api/experiment/init.ts` stays for the same reason on the batch side —
 its family is `misc.ts`'s.
 
+
+## REST wave 3e: the CLI's two halves and the Activity Monitor's receivers, 2026-09-03
+
+**Two platform route modules (3,991 lines, 24 routes) left
+`platform/app/src/server/api-router.ts` and four platform files were deleted.**
+Wave 3a declined both of them by name; this lane took the decision they were
+waiting on. `routes/auth-cli.ts` is not one family, it is TWO families sharing
+a path prefix, so it was SPLIT by owner rather than moved whole — seven RFC
+8628 routes into `@langwatch/auth-server`, thirteen governance routes into
+`@langwatch/enterprise-governance-server`. `routes/ingest/**` went to
+governance with its two broken imports repaired against the packages that
+superseded them.
+
+### Route family → mount
+
+| Family | Moved to | Mounted in `apps/api` |
+| --- | --- | --- |
+| `POST /api/auth/cli/{device-code,exchange,refresh}`, `GET /lookup`, `POST /{approve,deny,logout}` | `@langwatch/auth-server` `transport/api-rest/auth-cli-device-flow.api.ts` | **yes, where a host supplied the browser-session transport and this process holds Redis** |
+| `GET /api/auth/cli/{budget/status,bootstrap,budget-overview,personal-project}`, `POST /{virtual-key,project-key}`, and the seven `/governance/*` reads and mints | `@langwatch/enterprise-governance-server` `transport/api-rest/governance-cli.api.ts` | **yes, where a host supplied the Enterprise governance application** — no host in this repository supplies one, so the family is absent on the OSS entrypoint |
+| `POST /api/ingest/otel/:sourceId` | `@langwatch/enterprise-governance-server` `transport/api-rest/governance-ingest.api.ts` | **yes**, over the SAME `trace_processing` producer registration the project-scoped OTLP receiver made |
+| `POST /api/ingest/webhook/:sourceId`, `POST /api/ingest/otel/:sourceId/v1/{logs,metrics}` | moved with the family | no — **not registered**, because this process folds neither logs nor metrics |
+
+Twenty of the twenty routes `auth-cli.ts` declared are accounted for (wave 3a's
+note said twenty-one; the file has twenty), and all four receivers moved.
+
+### What moved, beyond the transports
+
+- **The split point is the OWNER, not the path.** Eighteen of the CLI's routes
+  answer under `/api/auth/cli`, and only seven of them are auth's: the device
+  grant WRITES the session keyspace, and the other thirteen READ one before
+  dispatching into `GovernanceService`, the Enterprise plan gate and two RBAC
+  probes. Wave 3a refused to put Enterprise governance behind an auth
+  package's door and refused to move governance out of its own lane; splitting
+  is the answer that does neither. The two path sets are disjoint, so Hono
+  routes them without an ordering rule between them.
+- **The device-session state machine was already package-owned.**
+  `services/cli-device-session.service.ts` and `ports/cli-device-session-store.port.ts`
+  landed in `504d1517f7`; what was still on platform was the TRANSPORT over
+  them. This lane moved that and supplied the process's adapter,
+  `ApiCliDeviceSessionStore`, over the one Redis it opened.
+- **The Redis adapter is single-key on purpose.** Every record the grant
+  writes is TTL'd and read only by its own key, so the port is five key
+  operations rather than a repository — and each one touches a single key,
+  because a Redis cluster CROSSSLOT-rejects a multi-key operation whose keys
+  hash to different slots, which the device code, its user-code index and the
+  two token records always do. The poll throttle is `SET NX EX` in one round
+  trip; a get-then-set spelled by hand would let two concurrent polls both see
+  the window free.
+- **One keyspace, two packages.** `GovernanceCliAccessTokenPort` is bound in
+  `api-production.composition.ts` to the device grant's OWN
+  `CliDeviceSessionService` instance, so the writer and the reader of the CLI
+  token keyspace can never be two spellings of it. No device grant therefore
+  means no governance CLI either. A second reader would fail silently: tokens
+  would keep working and the sessions would simply stop being found.
+- **`resolveSupportContact` and `resolveOrgAdminEmail` moved into governance**
+  as `services/organization-support-contact.service.ts`. Wave 3a named the
+  first of them as one of the reasons `auth-cli.ts` could not move; the
+  governance CLI's ingestion-key mint is their only consumer left anywhere in
+  the repository, so they went with it rather than to the organization lane.
+- **`routes/ingest/rateLimit.ts` became `ports/governance-ingest-rate-limit.port.ts`** —
+  an abstract `GovernanceIngestRateLimitPort`, `extractIngestClientIp`, and the
+  two window constants (60 requests / 60 seconds, and the `lwingest:rate:` key
+  prefix, both unchanged). The process binds it to the SAME fixed-window
+  counter every other throttle on `apps/api` meters through, so one caller has
+  one budget per rule.
+- **The receivers' two broken imports were repaired against their successors.**
+  `./ingest-key-provenance.utils` no longer existed: the three provenance rules
+  are now `enforceApiKeyIdOn{Trace,Log,Metric}Request` in `@langwatch/trace-server`.
+  `~/server/otel/parseOtlpBody` was superseded by `@langwatch/otlp`'s
+  `readOtlpBody` and `parseOtlp{Traces,Logs,Metrics}`. These are the two
+  half-finished demolitions wave 3a would not repair inside another package;
+  both are now consumed rather than reinstated.
+- **`@langwatch/enterprise-governance-server` grew five dependencies** —
+  `@langwatch/enterprise-plan-gate`, `@langwatch/entitlement-contract`,
+  `@langwatch/otlp`, `@langwatch/trace-server` and
+  `@opentelemetry/otlp-transformer`. `@langwatch/auth-server` grew none: the
+  device grant reaches nothing it did not already declare, because the
+  organization application and the personal workspace arrive as ports.
+
+### Named absences
+
+- **Both governance families are absent without an Enterprise application.**
+  They ARE Enterprise governance — the CLI half reads sources, budgets and
+  ingestion templates; the receivers resolve a source's secret. A deployment
+  that composed none and mounted them anyway would answer 500 to every
+  `langwatch claude` pre-flight and 401 to every correctly configured
+  collector, both worse than the 404 a door that plainly is not there gives.
+- **The device grant is absent without Redis, the database, a browser session
+  or the credential service**, and each is fatal on its own: without Redis a
+  device code has nowhere ephemeral to live, so `/device-code` would hand out a
+  code no poll could resolve; without the database the membership re-derivation
+  that stands between an offboarded person and a live credential cannot run;
+  without a session the three browser routes cannot name who is approving,
+  which is the whole of what approval means; without the credential service
+  there is no user-scoped CLI key to mint.
+- **The budget pre-flight has no spend store on this process.** The gateway
+  group holds the spend decisions, and the port is left off rather than stubbed
+  — the family's documented degradation is `{ok: true}`, and the gateway still
+  surfaces the real block on the first request through the same decision. A
+  stand-in that guessed at a balance would refuse work nobody is over budget
+  for.
+- **The log and metric receivers are NOT REGISTERED.** This process folds
+  neither signal — the same absence the project-scoped OTLP receiver reports —
+  so `POST /api/ingest/webhook/:sourceId` and both `/v1/*` sub-paths 404.
+- **Nothing an ingest receiver carries is priced.** The gateway spend ledger,
+  its budget resolution and its change feed travel together as one optional
+  port, because one write without the others is worse than none: a debit row
+  nobody evicts a cache for is spend the gateway keeps routing against a stale
+  balance. Cost extraction lives on `/v1/logs`, which is unmounted here anyway.
+- **`LW_INGEST_RATE_LIMIT_DISABLED` is gone.** It was a `process.env` read
+  inside the route module, and a package may not read one. The escape hatch it
+  gave the volume-regression scenario is now the composition's: a deployment
+  that wants no ingest throttle leaves the port off, and every request passes —
+  the same answer the flag gave, decided where configuration is decided.
+
+### Judgment calls recorded
+
+- **The receivers JOIN this process's `trace_processing` producer registration
+  rather than making one of their own.** The brief suggested a producer-only
+  registration of the governance ingestion definitions, in the shape of
+  `api-agent-pipelines.composition.ts`. Reading
+  `apps/worker/src/app/worker-governance-ingestion.composition.ts` says those
+  definitions are `pulled_usage_processing` and `ingestion_pull_processing` —
+  the PULL-mode ingestion's aggregates, which a scheduled puller writes and
+  these push receivers never touch. What a receiver actually emits is
+  `recordSpan` on `trace_processing`. Registering a second copy of that
+  definition would put one aggregate in the event catalogue twice and give the
+  worker two descriptions of one stream, so `traceCollection` is HANDED IN from
+  `api-trace-ingest.composition.ts` — which is also why this mount is absent
+  wherever the OTLP receiver is.
+- **`/api/ingest/otel/:sourceId` is mounted and its three siblings are not,
+  from ONE port set.** The alternative — mounting all four and answering 501 on
+  the three — tells a collector to retry forever. Registration is where the
+  absence belongs, because a 404 is the only answer an exporter reads as "this
+  receiver does not serve that signal".
+- **Both halves of `/api/auth/cli` declare the same `basePath`.** Two
+  `createServiceApp({ basePath: "/api/auth/cli" })` calls in two packages look
+  like a duplication and are not: each mounts its own disjoint path set, and
+  the shared prefix is the URL contract the CLI is already shipped against.
+  Collapsing them would put one of the two packages inside the other.
+- **The governance CLI's thirteen inventory rows were rewritten.** They read
+  "not mounted — `apps/api` composes no Enterprise governance application",
+  which was true when no mount existed. The mount now exists and is conditioned
+  exactly the way `/api/github/*`'s is, so the rows say "mounted where a host
+  supplied the Enterprise governance application — no host in this repository
+  supplies one, so the family is absent on the OSS entrypoint". The fact is
+  unchanged; what changed is that the absence is now the host's rather than the
+  code's.
+- **The ingest throttle open-fails, and that is the contract rather than one
+  implementation's accident.** Ingest availability beats brute-force
+  protection: a receiver that refuses because its counter is unreachable drops
+  a customer's telemetry for an outage of ours, and the secret check still runs
+  either way. The port sits between the cheap header regex and the expensive
+  secret lookup, which is the position that makes it protect anything at all.
+
+### Coverage
+
+Three integration suites drive the real Hono apps returned by
+`createApiProcessRestFeatures` over fakes, and each pins refusals rather than
+only the golden path:
+
+- `apps/api/src/features/auth/__tests__/auth-cli-device-flow-rest.integration.test.ts`
+  (3) — the whole grant as one state machine over one in-memory store
+  (`/device-code` → `/lookup` → `/approve` → `/exchange`, asserting the session
+  carries the personal project and the scoped CLI key); a second poll inside
+  the window answering `slow_down` from ONE atomic claim; and a seat disabled
+  between approve and exchange refused with the CLI's one fatal code AND the
+  device code burned — because the CLI treats any non-200 as "keep polling", so
+  a refusal that left the record approved would spin one ceiling walk every
+  four seconds with no terminal error on screen.
+- `apps/api/src/features/enterprise/__tests__/governance-cli-rest.integration.test.ts`
+  (6) — the source list on Enterprise with the permission held; 402 with the
+  upgrade link raised BEFORE any permission is probed; 403 for an Enterprise
+  member without the governance permission, with no source read; 401 for a
+  missing or malformed bearer, before the plan is looked up; and on the
+  project-key door, the offboarded caller whose presented session is SEVERED
+  rather than left to expire, and the active member without project write
+  refused 403 rather than handed the shared write credential.
+- `apps/api/src/features/enterprise/__tests__/governance-ingest-rest.integration.test.ts`
+  (5) — a REAL OTLP export posted at the mounted app, asserted at the PRODUCER:
+  a `recordSpan` command carrying the span, tenanted to the hidden governance
+  project rather than to the source's organization; origin attributes REPLACED
+  rather than appended when the payload supplies its own, because two entries
+  under one key would let a payload forge the origin every downstream
+  governance filter reads; a valid secret pointed at another source's path
+  refused with the same bare 401 an unknown secret gets, so the answer never
+  confirms that some other source id exists; `wrong_endpoint` for a source type
+  that emits no spans; and 404 from all three unregistered receivers.
+
+### Gates
+
+- `apps/api` `tsc --noEmit`: **0 errors**. `tsc --noEmit -p tsconfig.test.json`:
+  4 errors in two files, none of them this lane's — three in
+  `src/app-trpc/__tests__/app-trpc.features.unit.test.ts`, whose `TestContext`
+  names no `github` on `ctx.app` (the gateway-group tRPC lane's mount added
+  it), and one in the gateway-internal lane's untracked
+  `src/app/__tests__/api-gateway-internal-rest.integration.test.ts`. Stale
+  `.tsbuildinfo` cleared before both runs.
+- `apps/api` vitest over this lane's three files: **14 tests, all green.**
+- `apps/api` whole suite: **480 tests passed, 0 test failures**, 66 files
+  passed. Seventeen files failed to LOAD, none of them this lane's, and the
+  cause is not this working tree: re-running the four directories that hold
+  them loads all seventeen (44 files / 402 tests, one assertion failure in
+  `app/__tests__/api-trpc-collaborators.org-group.integration.test.ts`, the
+  tRPC error-formatter lane's — a topic-clustering refusal now rendering as the
+  generic unknown). The load failure the whole run printed was
+  `Cannot find package '@azure/identity'` out of
+  `stored-object/server/src/adapters/azure-blob-token-provider.ts`, a
+  concurrent lane's `pnpm install` relinking `node_modules` mid-run.
+- `@langwatch/auth-server`: `tsc --noEmit` clean; 6 files / **57 tests**, the
+  wave 3a baseline.
+- `@langwatch/enterprise-governance-server`: `tsc --noEmit` clean; 65 files /
+  **591 tests**, the stated baseline.
+- `git diff --numstat -- platform/app`: **0 insertions** on every row.
+- `api-router.ts`: 297 lines at HEAD, 251 in this working tree. **Four of the
+  46 removed lines are this lane's** — two imports (`authCliApp`,
+  `ingestionRoutesApp`) and the two `api.route` lines under them; the rest
+  belong to the concurrent REST and leftovers lanes removing from the same
+  file. No platform module now names `routes/auth-cli`, `routes/ingest` or
+  `ingest-key-provenance`, and `platform/app/src/server/routes/ingest/` is
+  gone.
+
+### Not moved this slice, and why
+
+`platform/app/src/server/app-layer/__tests__/governance-ingestion-template.integration.test.ts`
+stays. It exercises the app-layer's ingestion-template service rather than the
+route, names neither receiver, and `server/app-layer/**` is off this lane's
+map.
