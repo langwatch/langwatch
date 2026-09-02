@@ -1,37 +1,36 @@
-import { useCallback, useRef, useState } from "react";
-import { describeError, explainSerializedError } from "../features/errors";
+/**
+ * Running a credential check against a provider that is already saved.
+ *
+ * The sibling `useModelProviderApiKeyValidation` — still `platform/app`'s,
+ * because the form that types a credential is still `platform/app`'s — checks a
+ * credential being TYPED; this one checks the credential already stored, which
+ * is the one the form deliberately never shows back. NOTHING HERE SENDS A KEY:
+ * the row id goes out and a verdict comes back.
+ *
+ * The three verdicts are kept apart on purpose. "We could not check this" is an
+ * answer, not a soft yes: six of the sixteen providers cannot be probed at all,
+ * and a control that rendered them as working would be wrong about more than a
+ * third of the list — worse than offering nothing, because the customer would
+ * stop looking too.
+ */
+
 import type {
   ModelProviderCredentialVerdict,
   ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
-import { api } from "../utils/api";
-
-/**
- * Running a credential check against a provider that is already saved.
- *
- * The sibling `useModelProviderApiKeyValidation` checks a credential being
- * typed; this one checks the credential already stored, which is the one the
- * form deliberately never shows back. Nothing here sends a key — the row id
- * goes out and a verdict comes back.
- *
- * The three verdicts are kept apart on purpose. "We could not check this" is
- * an answer, not a soft yes: six of the sixteen providers cannot be probed at
- * all, and a control that rendered them as working would be wrong about more
- * than a third of the list — worse than offering nothing, because the
- * customer would stop looking too.
- */
+import { useCallback, useRef, useState } from "react";
+import { describeFailure, describeRefusal } from "../model/connection-verdict-copy";
+import { modelProviderApi } from "./model-provider-api";
 
 /**
  * The wire shape of a verdict — the contract's own type, not a copy of it.
  *
  * The feature's contract package is where the union lives, so the packaged
  * transport that returns it and this hook that reads it are checked against one
- * declaration. That is the guard that failed the last time: the extraction
+ * declaration. That is the guard that failed the last time: an extraction
  * collapsed the procedure's output to `{ connected: boolean }`, and because the
  * hook named a type of its own, the two were free to disagree — every provider
  * fell past all three branches and rendered as untestable.
- *
- * A redeclaration here would buy nothing and cost exactly that.
  */
 type ConnectionTestResult = ModelProviderCredentialVerdict;
 
@@ -80,18 +79,12 @@ function toState(result: ConnectionTestResult): ConnectionTestState {
   switch (result.outcome) {
     case "verified":
       return { status: "works" };
-    case "refused": {
-      // The refusal is a serialized handled error riding on the payload, so it
-      // is read with `explainSerializedError` rather than `describeError`. Both
-      // land in the same code-keyed registry; only the transport differs. The
-      // provider's own sentence never appears in either — a rejected-credential
-      // body is where the credential itself tends to turn up.
-      const { title, description } = explainSerializedError(result.domainError);
-      return {
-        status: "refused",
-        message: description ? `${title}. ${description}` : title,
-      };
-    }
+    case "refused":
+      // The refusal is a serialized handled error riding on the payload, so its
+      // copy is read out of the code-keyed table rather than off the payload.
+      // The provider's own sentence never appears — a rejected-credential body
+      // is where the credential itself tends to turn up.
+      return { status: "refused", message: describeRefusal(result.domainError) };
     case "unchecked":
       return { status: "unchecked", message: uncheckedMessage(result.reason) };
   }
@@ -105,7 +98,8 @@ export function useModelProviderConnectionTest({
   organizationId: string | undefined;
 }) {
   const [results, setResults] = useState<Record<string, ConnectionTestState>>({});
-  const { mutateAsync: testConnection } = api.modelProvider.testConnection.useMutation();
+  const { mutateAsync: testConnection } =
+    modelProviderApi.modelProvider.testConnection.useMutation();
 
   /**
    * Which round of verdicts the visible ones belong to.
@@ -135,16 +129,13 @@ export function useModelProviderConnectionTest({
    * and nothing about the row's identity changes when its key does. Left
    * alone, a green "Connection works" survives the customer pasting a bad key
    * and saving — which is a success verdict about a credential that was never
-   * checked, the one thing this feature must not produce. The drawer closing
-   * is the moment a row may have changed underneath us, and re-asking is one
-   * click, so the cheap and correct move is to drop them all rather than
-   * reason about which row was touched.
+   * checked, the one thing this feature must not produce. The editor closing is
+   * the moment a row may have changed underneath us, and re-asking is one
+   * click, so the cheap and correct move is to drop them all rather than reason
+   * about which row was touched.
    *
-   * `useCredentialProbeGate` makes the same argument for the save-time probe:
-   * a refusal must not outlive the credential it was about.
-   *
-   * Bumping the generation is what makes this hold for a probe still in
-   * flight, whose answer would otherwise land after the clear.
+   * Bumping the generation is what makes this hold for a probe still in flight,
+   * whose answer would otherwise land after the clear.
    */
   const clearResults = useCallback(() => {
     generation.current += 1;
@@ -157,9 +148,9 @@ export function useModelProviderConnectionTest({
       setResult(modelProviderId, { status: "testing" }, asked);
 
       try {
-        // No cast. Asserting the shape here would give back exactly what
-        // importing the server's type was meant to prevent: a renamed field or
-        // a new outcome would compile, and `toState`'s `never` check would stop
+        // No cast. Asserting the shape here would give back exactly what naming
+        // the contract type was meant to prevent: a renamed field or a new
+        // outcome would compile, and `toState`'s exhaustiveness would stop
         // catching it.
         const result: ConnectionTestResult = await testConnection({
           modelProviderId,
@@ -168,19 +159,16 @@ export function useModelProviderConnectionTest({
         });
 
         setResult(modelProviderId, toState(result), asked);
-      } catch (error) {
+      } catch {
         // Not `error.message`: a handled error's message is replaced by its
         // stable code on the wire, so reading it renders a slug like
-        // `model_provider_test_rate_limited` at the customer. A failure to
-        // ask is reported as such, never as a verdict on the credential.
+        // `model_provider_test_rate_limited` at the customer. A failure to ask
+        // is reported as such, never as a verdict on the credential.
         setResult(
           modelProviderId,
           {
             status: "unchecked",
-            message: describeError({
-              error,
-              fallbackTitle: "Couldn't test this connection",
-            }),
+            message: describeFailure({ fallbackTitle: "Couldn't test this connection" }),
           },
           asked,
         );

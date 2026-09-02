@@ -1,9 +1,14 @@
 /**
  * Scope breadth order, broadest first: ORGANIZATION reaches the most, then
- * TEAM, then PROJECT. Settings tables and the virtual-key provider picker
- * share this order so an organization-wide row always sits above a team row,
- * which sits above a project row, and rows at the same scope read in name
- * order.
+ * TEAM, then PROJECT. The providers table and the default-models table share
+ * this order so an organization-wide row always sits above a team row, which
+ * sits above a project row, and rows at the same scope read in name order.
+ *
+ * A family-local copy of `platform/app/src/utils/scopeBreadth.ts`, which keeps
+ * two non-family callers there. `@langwatch/gateway-web` made the same copy for
+ * the virtual-key provider picker; a third caller in one more package is the
+ * signal that this belongs to the model-provider contract, and moving it there
+ * is a change to a package a page move does not own.
  */
 export const SCOPE_BREADTH = {
   ORGANIZATION: 0,

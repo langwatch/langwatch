@@ -246,7 +246,6 @@
     {"feature":"model-provider","file":"platform/app/src/features/onboarding/components/sections/model-provider/ModelProviderSetup.tsx","kind":"page-shell"},
     {"feature":"model-provider","file":"platform/app/src/features/onboarding/regions/model-providers/registry.tsx","kind":"legacy-implementation"},
     {"feature":"model-provider","file":"platform/app/src/features/onboarding/regions/model-providers/types.ts","kind":"legacy-implementation"},
-    {"feature":"model-provider","file":"platform/app/src/pages/settings/model-providers.tsx","kind":"page-shell"},
     {"feature":"model-provider","file":"platform/app/src/runtime/app/features/model-provider.ts","kind":"composition"},
     {"feature":"model-provider","file":"platform/app/src/server/modelProviders/aiCallFailedError.ts","kind":"legacy-implementation"},
     {"feature":"model-provider","file":"platform/app/src/server/modelProviders/codexAccount.service.ts","kind":"legacy-implementation"},

@@ -8,6 +8,7 @@
     "@langwatch/dataset-web",
     "@langwatch/enterprise-governance-web",
     "@langwatch/gateway-web",
+    "@langwatch/model-provider-web",
     "@langwatch/ops-web",
     "@langwatch/prompt-web",
     "@langwatch/user-web"
@@ -81,6 +82,16 @@
       "uses": {
         "screens": [
           "@langwatch/enterprise-governance-web/screens/governance"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "model-provider",
+      "root": "model-provider",
+      "uses": {
+        "screens": [
+          "@langwatch/model-provider-web/screens/model-provider"
         ],
         "surfaces": []
       }

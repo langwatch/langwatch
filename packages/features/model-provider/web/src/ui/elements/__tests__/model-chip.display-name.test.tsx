@@ -11,16 +11,22 @@
  * silently — these tests are what makes that fail instead.
  *
  * @see specs/model-providers/custom-model-display-name.feature
+ *
+ * Moved from
+ * `platform/app/src/components/settings/__tests__/ModelChip.displayName.integration.test.tsx`
+ * with the chip; every assertion travelled unchanged.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
-import { ModelChip } from "../ModelChip";
+import { ModelChip } from "../model-chip";
 
 afterEach(() => cleanup());
 
-function renderChip(ui: React.ReactElement) {
+function renderChip(ui: ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
@@ -33,17 +39,13 @@ describe("<ModelChip/>", () => {
     describe("when the role's saved model is a renamed custom model", () => {
       /** @scenario Default models table chip shows the configured display name */
       it("reads the configured display name", () => {
-        renderChip(
-          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
-        );
+        renderChip(<ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />);
 
         expect(screen.getByText(DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not read the raw model id", () => {
-        renderChip(
-          <ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
-        );
+        renderChip(<ModelChip model={FULL_ID} displayNames={{ [FULL_ID]: DISPLAY_NAME }} />);
 
         expect(screen.queryByText(MODEL_ID)).not.toBeInTheDocument();
       });
@@ -52,10 +54,7 @@ describe("<ModelChip/>", () => {
     describe("when the role's saved model has no entry in the displayNames map", () => {
       it("falls back to the model id's family part, unchanged from today", () => {
         renderChip(
-          <ModelChip
-            model="openai/gpt-4o-mini"
-            displayNames={{ [FULL_ID]: DISPLAY_NAME }}
-          />,
+          <ModelChip model="openai/gpt-4o-mini" displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
         );
 
         expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();
@@ -66,9 +65,7 @@ describe("<ModelChip/>", () => {
       const ALIAS_ID = "openai/latest";
 
       it("still picks the alias label from the id, not the display name", () => {
-        renderChip(
-          <ModelChip model={ALIAS_ID} displayNames={{ [ALIAS_ID]: "My Latest" }} />,
-        );
+        renderChip(<ModelChip model={ALIAS_ID} displayNames={{ [ALIAS_ID]: "My Latest" }} />);
 
         expect(screen.getByText("Latest")).toBeInTheDocument();
         expect(screen.queryByText("Latest smaller")).not.toBeInTheDocument();

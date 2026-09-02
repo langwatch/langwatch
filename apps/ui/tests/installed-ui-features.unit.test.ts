@@ -49,6 +49,15 @@ const DATASET_PAGE_KEYS = [
   "pages/[project]/datasets/[id]",
 ];
 
+const MODEL_PROVIDER_PAGE_KEYS = [
+  // Two settings keys, one package, one frontend feature. NEITHER CARRIES A
+  // PAGE-LEVEL GRANT: both platform pages framed themselves in `SettingsLayout`
+  // and nothing else, and both read `project:manage` inside the page to decide
+  // whether the write controls are live.
+  "pages/settings/model-providers",
+  "pages/settings/model-costs",
+];
+
 const GATEWAY_PAGE_KEYS = [
   "pages/gateway/virtual-keys",
   "pages/gateway/virtual-keys/[id]",
@@ -149,6 +158,7 @@ describe("given what apps/ui serves itself", () => {
           ...DATASET_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
@@ -156,7 +166,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Ten for nine features: the personal workspace mounts two, because the
+      // Eleven for ten features: the personal workspace mounts two, because the
       // coding-agent tables its screens render call procedures of their own and
       // `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
@@ -167,6 +177,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/dataset-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
+        "@langwatch/model-provider-web",
         "@langwatch/ops-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
@@ -221,11 +232,12 @@ describe("given what apps/ui serves itself", () => {
           ...DATASET_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(10);
+      expect(merged.apis).toHaveLength(11);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

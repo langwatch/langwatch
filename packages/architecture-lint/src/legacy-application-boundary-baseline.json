@@ -343,9 +343,6 @@
       "platform/app/src/components/settings/LLMModelCostDrawer.tsx": [
         "../../server/modelProviders/llmModelCost"
       ],
-      "platform/app/src/components/settings/ModelChip.tsx": [
-        "~/server/modelProviders/customModelDisplayNames"
-      ],
       "platform/app/src/components/settings/ModelProviderCustomModelInput.tsx": [
         "../../server/modelProviders/customModel.schema"
       ],
@@ -700,9 +697,6 @@
         "../server/filters/types"
       ],
       "platform/app/src/hooks/useLicenseEnforcement.tsx": ["../server/license-enforcement"],
-      "platform/app/src/hooks/useModelProviderConnectionTest.ts": [
-        "../server/modelProviders/providerValidation"
-      ],
       "platform/app/src/hooks/useModelProviderForm.ts": [
         "../server/modelProviders/customModel.schema"
       ],
@@ -801,9 +795,6 @@
       ],
       "platform/app/src/pages/settings/members.tsx": [
         "../../server/app-layer/organizations/repositories/organization.repository"
-      ],
-      "platform/app/src/pages/settings/model-providers.tsx": [
-        "../../server/modelProviders/customModelDisplayNames"
       ],
       "platform/app/src/pages/settings/roles.tsx": ["../../server/api/rbac"],
       "platform/app/src/pages/settings/teams/[team].tsx": [

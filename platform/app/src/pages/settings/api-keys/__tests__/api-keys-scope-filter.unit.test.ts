@@ -30,15 +30,6 @@ describe("given the scope-filter feature is implemented", () => {
     });
 
     /** @scenario The scope filter component is shared with the model-providers page */
-    it("model-providers also imports ScopeFilter from the shared settings component", () => {
-      const modelProviders = readFile("src/pages/settings/model-providers.tsx");
-      const importsScopeFilter =
-        modelProviders.includes("~/components/settings/ScopeFilter") ||
-        modelProviders.includes("components/settings/ScopeFilter");
-      expect(importsScopeFilter).toBe(true);
-    });
-
-    /** @scenario The scope filter component is shared with the model-providers page */
     it("no second scope-filter component file exists alongside ScopeFilter.tsx", () => {
       const settingsDir = path.join(LANGWATCH_ROOT, "src/components/settings");
       const files = fs.readdirSync(settingsDir);
@@ -92,23 +83,6 @@ describe("given the scope-filter feature is implemented", () => {
     it("ApiKeysSection imports useAvailableScopes from the shared hook", () => {
       const apiKeysSection = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
       expect(apiKeysSection).toContain("useAvailableScopes");
-    });
-
-    /** @scenario The available-scopes derivation is shared between api-keys and model-providers */
-    it("model-providers imports useAvailableScopes from the shared hook", () => {
-      const modelProviders = readFile("src/pages/settings/model-providers.tsx");
-      expect(modelProviders).toContain("useAvailableScopes");
-    });
-
-    /** @scenario The available-scopes derivation is shared between api-keys and model-providers */
-    it("model-providers calls useAvailableScopes rather than inline derivation", () => {
-      const modelProviders = readFile("src/pages/settings/model-providers.tsx");
-      // The shared hook call must be present
-      expect(modelProviders).toContain("useAvailableScopes(");
-      // The page must NOT re-implement the derivation inline as a standalone
-      // useMemo that builds teams: teams.map(...), projects: teams.flatMap(...)
-      // (i.e. the hook's own body pattern must not appear in the page file)
-      expect(modelProviders).not.toContain("teams.flatMap((t) =>");
     });
   });
 });

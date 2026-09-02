@@ -51,6 +51,7 @@ import {
   modelProviderValidateApiKeyTrpcInputSchema,
   modelProviderValidateKeyWithCustomUrlTrpcInputSchema,
   type CodexTokenKeys,
+  type ModelProviderListEntry,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -226,7 +227,17 @@ type CanonicalProvider = {
   scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
 };
 
-function toLegacyProvider(provider: CanonicalProvider) {
+/**
+ * The list projection the browser renders, as one declaration both halves read.
+ *
+ * The return type is `@langwatch/model-provider-contract`'s
+ * `ModelProviderListEntry` rather than whatever this function happens to build:
+ * `@langwatch/model-provider-web`'s providers table used to name this shape
+ * through `inferRouterOutputs<AppRouter>`, which a feature-web package cannot
+ * do, and an annotation here is what lets it name the contract instead without
+ * the two being free to drift.
+ */
+function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
   return {
     id: provider.id,
     provider: provider.provider,

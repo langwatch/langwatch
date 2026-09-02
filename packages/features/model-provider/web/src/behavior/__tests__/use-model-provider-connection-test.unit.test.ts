@@ -1,5 +1,12 @@
 /**
  * @vitest-environment jsdom
+ *
+ * Moved from
+ * `platform/app/src/hooks/__tests__/useModelProviderConnectionTest.unit.test.ts`.
+ * The mock changed from the application's `api` proxy to this package's
+ * procedure map and every assertion travelled unchanged.
+ *
+ * Spec: specs/model-providers/credential-validation.feature
  */
 
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -17,8 +24,8 @@ import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-c
  */
 const testConnectionMock = vi.fn<() => Promise<ModelProviderCredentialVerdict>>();
 
-vi.mock("../../utils/api", () => ({
-  api: {
+vi.mock("../model-provider-api", () => ({
+  modelProviderApi: {
     modelProvider: {
       testConnection: {
         useMutation: () => ({ mutateAsync: testConnectionMock }),
@@ -27,7 +34,7 @@ vi.mock("../../utils/api", () => ({
   },
 }));
 
-import { useModelProviderConnectionTest } from "../useModelProviderConnectionTest";
+import { useModelProviderConnectionTest } from "../use-model-provider-connection-test";
 
 const PROVIDER_ROW = "mp_1";
 
@@ -43,7 +50,7 @@ beforeEach(() => {
   testConnectionMock.mockReset();
 });
 
-describe("useModelProviderConnectionTest", () => {
+describe("given a saved provider whose stored credential can be checked", () => {
   describe("when the provider accepts the stored credential", () => {
     /** @scenario "A working credential says so" */
     it("reports that the connection works", async () => {

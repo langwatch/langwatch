@@ -1087,6 +1087,215 @@ Known costs, all reported rather than suppressed:
   promotion candidates for the Design System and were left alone rather than
   promoted inside a page move.
 
+### settings S4 model config — MOVED. 2 keys, 15 platform files, 0 insertions, 3,728 deletions
+
+Moved ninth, and the second settings family — which is what the seventh one was
+for: the chrome is `withUiSettingsLayout`, one import and one wrapper, and this
+move changed nothing about it. What this family adds is the first `apps/ui`
+answer to "the drawer stays behind" for a family with THREE of them.
+
+`@langwatch/model-provider-web` is created here, the eleventh governed web
+package, two-scope from birth (`model/` · `behavior/` · `ui/` · `screens/`) with
+its own `package.json`, `tsconfig`, `vitest.config.ts`, `vitest.setup.ts` and
+`testing.tsx`. It holds both screens, the cascade, the provider catalogue, the
+scope-filter fan, the connection-test hook, the provider marks and the model chip
+— 72 tests in 8 files where `platform/app` had 6 files.
+
+#### The three drawers that did not travel, and what the screens do instead
+
+This is the family's whole overlay story, and it is the FIRST to keep a drawer it
+could have deleted:
+
+- **`editModelProvider`** has a non-family opener (`EvaluatorTypeSelectorContent`
+  writes its address), and its closure is the provider form, the Codex device
+  sign-in and the custom-model editor. Stays registered; the screen names it.
+- **`llmModelCost`** has a non-family opener too — `UnmappedCostSuggestion` in a
+  trace links straight to `/settings/model-costs?drawer.open=llmModelCost`.
+  Stays registered; the screen names it.
+- **`defaultModelOverride` HAS NO OTHER OPENER AND STILL STAYS.** Deleting it
+  would mean moving `DefaultModelOverrideDrawer` (812 lines, 4 test files) plus
+  `ProviderModelSelector`, which `SimulationModelSelect` also renders — so the
+  registry entry survives with zero openers in `platform/app` and is reachable by
+  address alone. THE FIRST DELIBERATELY ORPHANED REGISTRY ENTRY. It is not a
+  regression relative to the other two: all three are the same chrome gap.
+
+`ModelProviderHostPort.openPlatformDrawer` is the shape, and it improves on the
+agents family's `openAgentEditor` in one way worth copying: `params` are the
+DRAWER'S OWN names, unprefixed, and the ADAPTER owns the `drawer.` vocabulary
+plus the clearing of every stale `drawer.*` key. A screen that has to write
+`drawer.editingId` knows one thing too many about the host.
+
+Same recorded gap as agents, me, automations and the gateway: nothing mounts the
+registry above a screen served from `apps/ui` until the chrome layout route
+exists, so the address is right and the drawer does not open yet.
+
+#### The contract move is a REAL repoint, and it found a live defect
+
+The survey's "server types the pages infer from AppRouter" is
+`RouterOutputs["modelProvider"]["listAllForProjectForFrontend"][number]`, read
+through `useAllModelProvidersList`. The producer is PACKAGED
+(`@langwatch/model-provider-server`'s tRPC transport), so the ruling allows the
+real fix rather than a restatement: `ModelProviderListEntry` is declared in
+`@langwatch/model-provider-contract` and `toLegacyProvider` is ANNOTATED with it.
+Twelve inserted lines in a package, and both halves are now checked against one
+declaration. `getDefaultModelsForProject` and `llmModelCost.getAllForProject`
+needed nothing at all — they already answer `ModelDefaultSnapshot` and
+`ModelCost[]`.
+
+Writing that declaration is what surfaced the defect: **the providers table's
+"System" chip and its read-only row have never rendered.** The canonical provider
+carries `isSystem` (`platform/app/src/runtime/app/features/model-provider.ts`
+sets it `true` on the env-fed pseudo-rows), the transport's list projection drops
+it, and the page read `(provider as any).isSystem` — always `undefined`. So an
+env-var-fed provider has been showing an Edit/Delete menu that its config, which
+lives in the server's process environment, cannot honour. RECORDED, NOT FIXED:
+the field is declared optional with the reason in its docblock, the screen
+behaves exactly as the page did, and adding it to the projection is a behaviour
+change a page move does not own. The datasets family made the same call in the
+other direction because its fix was one line in a function the screen itself
+called; this one is a wire change.
+
+#### What else the closure cost
+
+- **`filterProvidersByScope` and `useUrlScopeFilter` did not travel.** Both are
+  already harvested into `@langwatch/authz-web/surfaces/scope-picker`
+  (`scope-filter-address.ts`), so the package keeps only the fan over rows that
+  carry SEVERAL scopes — twenty lines in `model/provider-scope-filter.ts`. The
+  platform copies stay for the api-keys page.
+- **`ui-screen-closure` COUNTS IMPORT LINES, AND THAT CUTS BOTH WAYS.** Four
+  modules wanted the authz surface and the first draft named it four times.
+  `provider-scope-filter.ts` re-exports `ScopeFilterValue` and `ScopeHierarchy`
+  for the package, so only it and the screen name the surface: 4 findings became
+  2. The data-governance lesson ("put a shared control in the surface its sibling
+  already lives in") has a twin — put a shared TYPE behind the one module that
+  already had to name the surface.
+- **The scope filter reads the address instead of mirroring it**, the same
+  correction data-governance made: `useUrlScopeFilter` kept a `useState` synced by
+  an effect, and the screen reads `host.route().query.scope` and writes through
+  `setQuery`.
+- **`ModelChip`, `DefaultModelsSection`, `useModelProviderConnectionTest` and
+  `LLMModelCost` were EXCLUSIVE** — page plus their own tests, nothing else — so
+  they moved rather than being copied. `platform/app/src/utils/scopeBreadth.ts`
+  lost its last two importers with them and was deleted; the family took the
+  narrowed copy `@langwatch/gateway-web` already has.
+- **The provider marks are a THIRD copy.** `gateway-web`'s
+  `model-provider-icons.tsx` was copied verbatim (four Design System marks, ten
+  drawn locally). Recorded rather than acted on: these are the model-provider
+  feature's own marks, so THIS package is where they belong and gateway-web
+  should eventually import them from a surface here — a change to two packages
+  and eleven `platform/app` call sites.
+- **`DefaultModelsSection` lost its uncontrolled mode.** The `filter` /
+  `onFilterChange` props were optional and the section fell back to local state
+  plus its own duplicate filter dropdown. It is mounted in exactly one place, by
+  a page that owns the filter, so that branch was dead in production and alive
+  only in a test.
+- **`CodexCodingDefaultsAskHost` DID NOT TRAVEL, and could not have.** The ask is
+  QUEUED by `ModelProviderForm` — inside the editor drawer, still `platform/app`'s
+  — through a module-level zustand store, and ANSWERED by the page. A copy of the
+  store in the package would be a second, empty store. It is the same chrome gap
+  as the drawer: when the editor mounts above a package-served screen, the ask
+  can travel with it. Recorded as a loss until then.
+- **The Langy pill no longer follows a default-model deletion.**
+  `syncLangyAfterDefaultModelWrite` invalidates the caches AND nudges
+  `@langwatch/langy-web`'s store; `apps/ui` may not import that package. The
+  invalidation travelled and the nudge did not, so a Langy pill open beside the
+  settings page keeps a stale model until it refetches. Same class of loss as the
+  Langy context chip the me, automations, agents and datasets families took.
+
+#### Credentials, which is what this family is actually about
+
+- **Nothing on the wire this package reads carries a credential value.** The list
+  procedures answer `ModelProviderListEntry`, whose `customKeys` is the record
+  `credentialPolicy.tryMask` has already masked; `testConnection` takes a ROW ID
+  and answers a verdict. Both are now pinned: `model-providers.no-project.test.tsx`
+  asserts the probe's payload contains no `customKeys`, no `apiKey` and no
+  `customBaseUrl`, and the contract type's docblock says why widening it would be
+  a leak.
+- **THE FIRST FAMILY TO CARRY THE CODE-KEYED COPY FOR THE CODES ITS OWN SURFACE
+  RAISES.** `gateway-web`, `ops-web` and `user-web` all took a `describe-error.ts`
+  stub that degrades every code to the generic line. That is wrong here, because
+  the copy IS the feature: "that API key was refused" and "nothing answered, so
+  this key was not checked" send a customer to two different places. So
+  `model/connection-verdict-copy.ts` holds the seven `provider_*` refusal codes
+  verbatim from `features/errors/logic/presentation.ts`, including the two whose
+  description branches on `meta` (the Google door, the configurable endpoint), and
+  a unit test asserts that NOTHING arriving on the refusal is ever rendered — a
+  rejected-credential body is where a key turns up. The obligation to keep the two
+  in step is in the docblock and dies with the registry harvest.
+- Everything else still goes through the host: a delete refusal is
+  `host.failed({ error, fallbackTitle })` with the raw error, never
+  `error.message`, which since #5984 is the code slug.
+- **The delete path gained a reader-visible failure.** `platform/app` left a
+  refused provider deletion to a global MutationCache interceptor that showed a
+  modal; nothing above a package-served screen holds one, so an uncaught rejection
+  would have shown NOTHING. The screen catches and tells the host.
+  `isReportedGlobally` is on the port and answers `false` with the reason written
+  down — the datasets family's shape, second use.
+
+#### The page guard, and why there isn't one
+
+NEITHER KEY CARRIES A PAGE-LEVEL GRANT. Both platform pages were `SettingsLayout`
+and nothing else — no `withPermissionGuard`, no flag — and both read
+`hasPermission("project:manage")` INSIDE the page to decide whether the write
+controls are live. A reader who cannot manage providers can still see which ones
+exist, which is what a project-scoped member needs in order to understand why a
+model is missing. The datasets family's warning ("check each key's page
+separately") applies to a family whose keys BOTH carry none, and inventing one
+here would have refused readers the product admits today.
+
+#### Known costs, all reported rather than suppressed
+
+- 4 new architecture-lint findings, 794 → 798: one `cross-feature` for
+  `@langwatch/authz-web` (the edge governance, gateway and data-governance all
+  carry) and three `ui-screen-closure` — `@langwatch/platform-api-client` in the
+  procedure map (the line every family carries) and the authz surface named twice.
+  Two `legacy-application-boundary-baseline` entries and one
+  `legacy-feature-fragment-baseline` row went with their files, plus a third
+  boundary entry for `useModelProviderConnectionTest`; all three were already
+  STALE — the page and the hook stopped importing `~/server/modelProviders/*` some
+  time ago and the baseline still listed them.
+- `apps/ui/tests/settings-page-chrome.unit.test.ts` needed ONE WORD:
+  `settingsRouteSections()` reads `features/<feature>/ui/sections/<feature>-routes.tsx`
+  off a hardcoded list, so a third settings feature has to be named in it. The
+  seventh family's promise that the guard "needs no further edits" holds for its
+  LOGIC and not for that list — whoever moves the next settings family adds one
+  string there too.
+- **THE PERSONAL-WORKSPACE PAGE TEST WAS DELETED RATHER THAN MOVED, and it loses
+  no binding.** It drove the real `useOrganizationTeamProject` to prove the page
+  files a provider against the organization's project rather than the personal
+  one. That resolution is now `apps/ui`'s `activeScope()`, covered by
+  `ui-scope-resolution.unit.test.ts`, and porting the page half would have been
+  the fake host handing back the project id it was constructed with — a value
+  echo. Both its scenarios stay bound by
+  `platform/app/src/hooks/__tests__/useOrganizationTeamProject.personal-workspace.integration.test.tsx`.
+- **THREE ASSERTIONS IN A NEIGHBOUR'S SOURCE-READING GUARD WERE DELETED.**
+  `pages/settings/api-keys/__tests__/api-keys-scope-filter.unit.test.ts` read
+  `src/pages/settings/model-providers.tsx` off disk to prove the two pages share
+  `ScopeFilter` and `useAvailableScopes`. The file is gone, so those three cases
+  would ENOENT. Both scenarios they carried stay bound by their surviving api-keys
+  siblings. The seventh family's lesson stands and should be read as a
+  PRE-FLIGHT: grep for tests that read `platform/app/src/<your keys>` — including
+  from other families' directories — before deleting anything.
+- ZERO new `platform/app` typecheck errors. Nothing outside the family imported
+  either page, either deleted component, or the deleted hook.
+
+#### The ninth family's own additions, for whoever moves the tenth
+
+- **A SEVENTH host port of the same shape.** Deferred a seventh time, for the
+  seventh time because promotion is a change to packages a page move does not own.
+- **A drawer with no other opener can still be cheaper to leave than to move.**
+  `defaultModelOverride` is the counter-example to the agents family's "a pure
+  deletion" rule: the deciding number is not how many surfaces OPEN the drawer, it
+  is how many surfaces its CLOSURE is shared with.
+- **The adapter owns the `drawer.` prefix, not the screen.** Pass a drawer's own
+  parameter names; let the host spell the address.
+- **Annotating a packaged producer's return type is the cheapest contract move
+  there is** — and it is the one that finds the drift. Twelve lines bought a live
+  defect nobody had noticed in a `(x as any).field` read.
+- **A code-keyed copy table belongs to the feature that RAISES the codes.** The
+  registry harvest is still owed, but "degrade everything to the generic line" is
+  only free on a surface where the specific sentence was a nicety.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -1102,7 +1311,7 @@ closures are computed net of that.
 | 1 | agents | 1 | ~2+0 | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies. |
 | 2 | settings S5 data governance | 4 | 5+5 | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one. |
 | 3 | datasets | 2 | 6+6 | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move. |
-| 4 | settings S4 model config | 2 | 7+6 | create model-provider-web; 2 one-line platform breaks |
+| 4 | settings S4 model config | 2 | 7+6 | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect. |
 | 5 | prompts | 1 | 44+14 | "model out first" is now just NINE family-local copies (5 optimization_studio consumers die with workflows); ~70 prompt fragment lines retire; prompt-web governed, 57% adapter ratio |
 | 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
 | 7 | settings S2 RBAC | 2 | 8+4 | ~/server/api/rbac fix (shared with governance's baseline suppression); governing authz-web clears 14 findings governance+gateway carry |

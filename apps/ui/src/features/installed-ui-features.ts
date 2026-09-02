@@ -23,6 +23,7 @@ import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retent
 import { datasetApiBinding, datasetPageLoaders } from "./dataset";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
+import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
 import { opsApiBinding, opsPageLoaders } from "./ops";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
@@ -35,6 +36,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...datasetPageLoaders,
     ...gatewayPageLoaders,
     ...governancePageLoaders,
+    ...modelProviderPageLoaders,
     ...opsPageLoaders,
     ...personalWorkspacePageLoaders,
   },
@@ -46,6 +48,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     datasetApiBinding,
     gatewayApiBinding,
     governanceApiBinding,
+    modelProviderApiBinding,
     opsApiBinding,
     ...personalWorkspaceApiBindings,
   ],

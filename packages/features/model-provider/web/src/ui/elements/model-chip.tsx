@@ -1,16 +1,26 @@
 /**
- * Renders a model identifier ("openai/gpt-5.5") with the provider's
- * icon and the family name in mono font — the same primitive
- * `ProviderModelSelector` uses inside its dropdown items. Used in the
- * Default Models table cells (DefaultModelsSection.tsx).
+ * A model identifier ("openai/gpt-5.5") with the provider's mark and the family
+ * name in mono.
+ *
+ * Moved whole from `platform/app/src/components/settings/ModelChip.tsx`, whose
+ * only consumers were the Default Models table and its own test. The two icon
+ * sizes were `~/components/llmPromptConfigs/constants`, which keeps eleven
+ * non-family callers; two string constants are cheaper to state here than to
+ * reach for.
  */
+
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { AlertTriangle } from "lucide-react";
-import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
-import { modelDisplayLabel } from "@langwatch/model-provider-contract";
-import { isLatestAlias, resolveLatestAlias } from "@langwatch/model-provider-contract";
-import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  isLatestAlias,
+  modelDisplayLabel,
+  resolveLatestAlias,
+} from "@langwatch/model-provider-contract";
+import { AlertTriangle } from "lucide-react";
+import { modelProviderIcons } from "./model-provider-icons";
+
+const MODEL_ICON_SIZE = "16px";
+const MODEL_ICON_SIZE_SM = "14px";
 
 interface Props {
   /** Full model id of the form "provider/family-variant". */
@@ -18,10 +28,10 @@ interface Props {
   size?: "sm" | "md";
   /** When true, renders at reduced opacity to signal "inherited / placeholder". */
   inherited?: boolean;
-  /** When true, renders a warning treatment + tooltip: the model's
-   *  provider isn't enabled in the current cascade, so any AI feature
-   *  reading this default will fail at runtime until the user re-adds
-   *  the provider or picks a different model. */
+  /** When true, renders a warning treatment + tooltip: the model's provider
+   *  isn't enabled in the current cascade, so any AI feature reading this
+   *  default will fail at runtime until the user re-adds the provider or picks
+   *  a different model. */
   invalid?: boolean;
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`.
    *  Falls back to the id-derived family name for any model without an entry. */
@@ -37,15 +47,15 @@ export function ModelChip({
 }: Props) {
   const providerKey = model.split("/")[0] ?? "";
   const family = modelDisplayLabel({ fullModelId: model, displayNames });
-  // Alias detection reads the id, never `family` — a custom model can
-  // carry any display name, and branching on it would let one named
-  // "latest" masquerade as the alias (and vice versa).
+  // Alias detection reads the id, never `family` — a custom model can carry any
+  // display name, and branching on it would let one named "latest" masquerade
+  // as the alias (and vice versa).
   const idFamily = model.split("/").slice(1).join("/");
   const icon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
-  // Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with
-  // the resolved concrete id inline in muted text so the table reads
-  // as a single line, parens-disambiguated, instead of a stacked pair.
+  // Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with the
+  // resolved concrete id inline in muted text so the table reads as a single
+  // line, parens-disambiguated, instead of a stacked pair.
   const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
   const aliasLabel = isLatestAlias(model)
     ? idFamily === "latest"

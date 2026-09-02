@@ -10,10 +10,14 @@
  *
  * Binds "Config cells resolve inherited values only from the row's own
  * scope chain" in specs/model-providers/role-based-default-models.feature.
+ *
+ * Moved from
+ * `platform/app/src/components/settings/__tests__/defaultModelsResolveAtScope.unit.test.ts`
+ * with the walk itself; every assertion travelled unchanged.
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveAtScope } from "../DefaultModelsSection";
+import { resolveAtScope } from "../default-model-cascade";
 
 type ConfigRow = Parameters<typeof resolveAtScope>[0]["configs"][number];
 

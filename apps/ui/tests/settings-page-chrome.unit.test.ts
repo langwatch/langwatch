@@ -92,7 +92,7 @@ function legacySourceOf(moduleSpecifier: string): string {
  */
 function settingsRouteSections(): Map<string, string> {
   const sections = new Map<string, string>();
-  for (const feature of ["data-retention", "data-privacy"]) {
+  for (const feature of ["data-retention", "data-privacy", "model-provider"]) {
     sections.set(
       feature,
       readFileSync(
@@ -121,6 +121,8 @@ describe("the pages under /settings", () => {
       // stopped serving its key would not read as "nothing to check".
       expect(modules).toContain("pages/settings/data-retention");
       expect(modules).toContain("pages/settings/data-privacy");
+      expect(modules).toContain("pages/settings/model-providers");
+      expect(modules).toContain("pages/settings/model-costs");
     });
   });
 
