@@ -140,6 +140,48 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
   return false;
 }
 
+/**
+ * Axis tick formatter for an XAxis's `dataKey`. Time-like columns render as
+ * "MM-DD" when the series spans more than one calendar day, else "HH:mm";
+ * everything else (and unparsable values) falls back to the raw string.
+ */
+function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
+  const timeLike = isTimeLikeColumn(data, key);
+  let spansMultipleDays = false;
+  if (timeLike) {
+    const times = data
+      .map((row) => Date.parse(String(row[key])))
+      .filter((t) => !isNaN(t));
+    if (times.length > 0) {
+      spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
+    }
+  }
+  return (value: unknown): string => {
+    const raw = String(value);
+    if (!timeLike) return raw;
+    const parsed = Date.parse(raw);
+    if (isNaN(parsed)) return raw;
+    const date = new Date(parsed);
+    if (spansMultipleDays) {
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${mm}-${dd}`;
+    }
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+    return `${hh}:${min}`;
+  };
+}
+
+/** Compact-notation number formatter for a YAxis, null-safe like formatNumber. */
+function compactNumber(value: unknown): string {
+  if (isMissingNumber(value)) return "";
+  return new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value as number);
+}
+
 function numericColumns(data: Row[], exclude: string[]): string[] {
   const cols = columnsOf(data);
   return cols.filter(
@@ -184,6 +226,42 @@ function recharts() {
 
 function h(type: any, props: any, ...children: any[]) {
   return react().createElement(type, props, ...children);
+}
+
+/**
+ * A wrapping legend row rendered above a chart in place of Recharts' own
+ * `<Legend>`. Only meaningful with 2+ keys — callers gate on `keys.length > 1`.
+ */
+function legendBar(keys: string[], palette: string[], c: ReturnType<typeof chrome>) {
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "2px 12px",
+        marginBottom: 4,
+        fontSize: 10.5,
+        color: c.text,
+      },
+    },
+    ...keys.map((key, index) =>
+      h(
+        "div",
+        { key, style: { display: "flex", alignItems: "center", gap: 4 } },
+        h("span", {
+          style: {
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: colorAt(palette, index),
+            flexShrink: 0,
+          },
+        }),
+        key,
+      ),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -375,20 +453,41 @@ export function AreaTimeseries({
   });
 
   return h(
-    R.ResponsiveContainer,
-    { width: "100%", height },
+    "div",
+    { style: { height, display: "flex", flexDirection: "column" } },
+    keys.length > 1 && legendBar(keys, palette, c),
     h(
-      R.AreaChart,
-      { data: rows, margin: { top: 8, right: 12, bottom: 0, left: 0 } },
-      h(R.CartesianGrid, { stroke: c.grid, strokeDasharray: "3 3" }),
-      h(R.XAxis, { dataKey: x, stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.YAxis, { stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.Tooltip, {
-        contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
-        labelStyle: { color: c.text },
-      }),
-      keys.length > 1 && h(R.Legend, { wrapperStyle: { fontSize: 11, color: c.text } }),
-      ...areas,
+      "div",
+      { style: { flex: 1, minHeight: 0 } },
+      h(
+        R.ResponsiveContainer,
+        { width: "100%", height: "100%" },
+        h(
+          R.AreaChart,
+          { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
+          h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
+          h(R.XAxis, {
+            dataKey: x,
+            axisLine: false,
+            tickLine: false,
+            minTickGap: 24,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: axisTickFormatter(x, data),
+          }),
+          h(R.YAxis, {
+            axisLine: false,
+            tickLine: false,
+            width: 48,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: compactNumber,
+          }),
+          h(R.Tooltip, {
+            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            labelStyle: { color: c.text },
+          }),
+          ...areas,
+        ),
+      ),
     ),
   );
 }
@@ -449,28 +548,49 @@ export function StackedBars({
   const splitAt = projectionIndex(data, x, projectionFrom);
 
   return h(
-    R.ResponsiveContainer,
-    { width: "100%", height },
+    "div",
+    { style: { height, display: "flex", flexDirection: "column" } },
+    series.length > 1 && legendBar(series, palette, c),
     h(
-      R.BarChart,
-      { data, margin: { top: 8, right: 12, bottom: 0, left: 0 } },
-      h(R.CartesianGrid, { stroke: c.grid, strokeDasharray: "3 3" }),
-      h(R.XAxis, { dataKey: x, stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.YAxis, { stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.Tooltip, {
-        contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
-        labelStyle: { color: c.text },
-      }),
-      series.length > 1 && h(R.Legend, { wrapperStyle: { fontSize: 11, color: c.text } }),
-      ...series.map((key, index) =>
-        projectedBar(R, {
-          key,
-          dataKey: key,
-          color: colorAt(palette, index),
-          stackId: "stack",
-          rowCount: data.length,
-          splitAt,
-        }),
+      "div",
+      { style: { flex: 1, minHeight: 0 } },
+      h(
+        R.ResponsiveContainer,
+        { width: "100%", height: "100%" },
+        h(
+          R.BarChart,
+          { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
+          h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
+          h(R.XAxis, {
+            dataKey: x,
+            axisLine: false,
+            tickLine: false,
+            minTickGap: 24,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: axisTickFormatter(x, data),
+          }),
+          h(R.YAxis, {
+            axisLine: false,
+            tickLine: false,
+            width: 48,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: compactNumber,
+          }),
+          h(R.Tooltip, {
+            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            labelStyle: { color: c.text },
+          }),
+          ...series.map((key, index) =>
+            projectedBar(R, {
+              key,
+              dataKey: key,
+              color: colorAt(palette, index),
+              stackId: "stack",
+              rowCount: data.length,
+              splitAt,
+            }),
+          ),
+        ),
       ),
     ),
   );
@@ -496,26 +616,47 @@ export function GroupedBars({
   const palette = paletteFor(colors);
 
   return h(
-    R.ResponsiveContainer,
-    { width: "100%", height },
+    "div",
+    { style: { height, display: "flex", flexDirection: "column" } },
+    series.length > 1 && legendBar(series, palette, c),
     h(
-      R.BarChart,
-      { data, margin: { top: 8, right: 12, bottom: 0, left: 0 } },
-      h(R.CartesianGrid, { stroke: c.grid, strokeDasharray: "3 3" }),
-      h(R.XAxis, { dataKey: x, stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.YAxis, { stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.Tooltip, {
-        contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
-        labelStyle: { color: c.text },
-      }),
-      series.length > 1 && h(R.Legend, { wrapperStyle: { fontSize: 11, color: c.text } }),
-      ...series.map((key, index) =>
-        h(R.Bar, {
-          key,
-          dataKey: key,
-          fill: colorAt(palette, index),
-          isAnimationActive: false,
-        }),
+      "div",
+      { style: { flex: 1, minHeight: 0 } },
+      h(
+        R.ResponsiveContainer,
+        { width: "100%", height: "100%" },
+        h(
+          R.BarChart,
+          { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
+          h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
+          h(R.XAxis, {
+            dataKey: x,
+            axisLine: false,
+            tickLine: false,
+            minTickGap: 24,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: axisTickFormatter(x, data),
+          }),
+          h(R.YAxis, {
+            axisLine: false,
+            tickLine: false,
+            width: 48,
+            tick: { fill: c.axis, fontSize: 11 },
+            tickFormatter: compactNumber,
+          }),
+          h(R.Tooltip, {
+            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            labelStyle: { color: c.text },
+          }),
+          ...series.map((key, index) =>
+            h(R.Bar, {
+              key,
+              dataKey: key,
+              fill: colorAt(palette, index),
+              isAnimationActive: false,
+            }),
+          ),
+        ),
       ),
     ),
   );
@@ -550,12 +691,22 @@ export function ProjectionBars({
     { width: "100%", height },
     h(
       R.BarChart,
-      { data, margin: { top: 8, right: 12, bottom: 0, left: 0 } },
-      h(R.CartesianGrid, { stroke: c.grid, strokeDasharray: "3 3" }),
-      h(R.XAxis, { dataKey: x, stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.YAxis, {
-        stroke: c.axis,
+      { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
+      h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
+      h(R.XAxis, {
+        dataKey: x,
+        axisLine: false,
+        tickLine: false,
+        minTickGap: 24,
         tick: { fill: c.axis, fontSize: 11 },
+        tickFormatter: axisTickFormatter(x, data),
+      }),
+      h(R.YAxis, {
+        axisLine: false,
+        tickLine: false,
+        width: 48,
+        tick: { fill: c.axis, fontSize: 11 },
+        tickFormatter: compactNumber,
         // Auto-scaled domain can clip the budget's ReferenceLine when budget
         // exceeds the data's own max; pad the domain to always include it.
         domain:
@@ -612,52 +763,61 @@ export function Donut({
 
   return h(
     "div",
-    { style: { position: "relative", height, width: "100%" } },
+    { style: { height, display: "flex", flexDirection: "column" } },
+    data.length > 1 &&
+      legendBar(
+        data.map((row) => String(row[nameKey])),
+        palette,
+        c,
+      ),
     h(
-      R.ResponsiveContainer,
-      { width: "100%", height: "100%" },
+      "div",
+      { style: { flex: 1, minHeight: 0, position: "relative", width: "100%" } },
       h(
-        R.PieChart,
-        {},
+        R.ResponsiveContainer,
+        { width: "100%", height: "100%" },
         h(
-          R.Pie,
-          {
-            data,
-            dataKey: valueKey,
-            nameKey,
-            innerRadius: "55%",
-            outerRadius: "80%",
-            isAnimationActive: false,
-          },
-          ...data.map((_row, index) =>
-            h(R.Cell, { key: index, fill: colorAt(palette, index) }),
+          R.PieChart,
+          {},
+          h(
+            R.Pie,
+            {
+              data,
+              dataKey: valueKey,
+              nameKey,
+              innerRadius: "55%",
+              outerRadius: "80%",
+              isAnimationActive: false,
+            },
+            ...data.map((_row, index) =>
+              h(R.Cell, { key: index, fill: colorAt(palette, index) }),
+            ),
           ),
+          h(R.Tooltip, {
+            contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
+            labelStyle: { color: c.text },
+          }),
         ),
-        h(R.Tooltip, {
-          contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
-          labelStyle: { color: c.text },
-        }),
-        h(R.Legend, { wrapperStyle: { fontSize: 11, color: c.text } }),
       ),
-    ),
-    centerLabel &&
-      h(
-        "div",
-        {
-          style: {
-            position: "absolute",
-            top: "42%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            textAlign: "center",
-            fontSize: 13,
-            fontWeight: 600,
-            color: c.text,
-            pointerEvents: "none",
+      centerLabel &&
+        h(
+          "div",
+          {
+            style: {
+              position: "absolute",
+              top: "42%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 600,
+              color: c.text,
+              pointerEvents: "none",
+            },
           },
-        },
-        centerLabel,
-      ),
+          centerLabel,
+        ),
+    ),
   );
 }
 
@@ -776,7 +936,6 @@ export function Heatmap({
   colorScale,
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
-  const c = chrome();
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
   const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
   const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
@@ -817,11 +976,6 @@ export function Heatmap({
           });
         }),
       ),
-    ),
-    h(
-      "div",
-      { style: { fontSize: 10, color: c.axis, marginTop: 4 } },
-      `${yValues.length} × ${xValues.length}`,
     ),
   );
 }

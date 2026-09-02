@@ -1,7 +1,7 @@
-import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import { BarChart2, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useMemo } from "react";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
@@ -10,6 +10,8 @@ import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
+
+const stripPackPrefix = (n: string) => n.replace(/^(North-star|Legacy):\s*/, "");
 
 interface GraphCardHeaderProps {
   graphId: string;
@@ -137,13 +139,12 @@ export function GraphCardHeader({
       {...dragAttributes}
       {...dragListeners}
       align="center"
-      marginBottom={4}
+      marginBottom={2}
       cursor={isDragging ? "grabbing" : "grab"}
     >
-      <BarChart2 color="orange" />
-      <Heading size="sm" marginLeft={2}>
-        {displayName}
-      </Heading>
+      <Text fontSize="13px" fontWeight="500" lineClamp={1} title={displayName}>
+        {stripPackPrefix(displayName)}
+      </Text>
       <Spacer />
 
       {isSavedGraph && (

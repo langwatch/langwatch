@@ -86,13 +86,21 @@ export function DraggableGraphCard({
 
   return (
     <Box ref={setNodeRef} style={style} minWidth={0}>
-      <Card.Root height="full" minWidth={0}>
+      <Card.Root
+        height="full"
+        minWidth={0}
+        borderRadius="xl"
+        boxShadow="0 1px 2px rgba(16,16,32,0.04)"
+      >
         <Card.Body
           height="full"
           display="flex"
           flexDirection="column"
           minWidth={0}
           overflow="hidden"
+          paddingX={4}
+          paddingTop="14px"
+          paddingBottom={3}
         >
           <GraphCardHeader
             graphId={graph.id}
