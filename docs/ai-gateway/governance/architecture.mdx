@@ -90,6 +90,6 @@ The check is permissive on error: when the spend figure cannot be read, the requ
 
 ## Deployment
 
-The Helm chart in `charts/gateway` deploys the gateway as a Deployment with a Service, an optional Ingress, an HPA, a PodDisruptionBudget and a NetworkPolicy. The spool lives on the pod's writable emptyDir, so a pod that is killed loses at most the records not yet shipped, about a second of drain lag.
+The gateway sub-chart of the `langwatch` Helm chart deploys the gateway as a Deployment with a Service, an optional Ingress, an HPA, a PodDisruptionBudget and a NetworkPolicy. The spool lives on the pod's writable emptyDir, so a pod that is killed loses at most the records still in the spool, about a second of drain lag.
 
 **Also check:** [Helm deployment](/ai-gateway/self-hosting/helm) for the chart values, and [Budgets](/ai-gateway/budgets) for the budget scopes and periods.

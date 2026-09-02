@@ -3636,30 +3636,29 @@ If you rebill this traffic to your own customers, two more read next: [Billing a
 # FILE: ./ai-gateway/cookbooks/ci-smoke-test.mdx
 
 ---
-title: CI smoke test end-to-end gateway health check
-description: Provision a short-lived VK, make a real call, verify the response, then revoke. Runs in under 10 seconds.
+title: CI smoke test
+description: Create a short-lived virtual key, send a real completion through the LangWatch AI Gateway, check the response, then revoke the key.
 sidebarTitle: CI smoke test
 ---
 
-Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up, all from a CI job using only the `langwatch` CLI and `curl`.
+This guide builds a CI job that proves the whole gateway path works: the management API creates a virtual key, the key resolves at the data plane, a provider answers, and the key is revoked at the end. It needs only the `langwatch` CLI, `curl` and `jq`.
 
-<Info>Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
+Run it on a schedule so a broken credential or an expired secret shows up before a caller finds it.
 
-## What it validates
+## What it checks
 
-- The public REST API at `/api/gateway/v1/*` is reachable with the CI token.
-- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
-- VK creation + secret reveal flow works at the requested scope.
-- VK resolves end-to-end against the gateway data plane.
-- Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Gateway-Request-Id`, and `traceparent`.
-- VK revocation propagates (best-effort, cache TTL applies).
+- The management API at `/api/gateway/v1/*` answers with your CI token.
+- A virtual key is created at the scope you name and its secret is returned once.
+- The gateway resolves that secret and dispatches to a provider.
+- The response carries `X-LangWatch-Gateway-Request-Id`, so the request is traceable.
+- The key is revoked when the job ends, whether it passed or failed.
 
 ## Prerequisites
 
-- A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
-- A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
-- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields on its Advanced (Gateway) tab if you want CI to exercise them.
-- `jq` available on the runner.
+- An API key for the calling project, in `CI_LANGWATCH_TOKEN`. It needs the `virtualKeys:create` and `virtualKeys:revoke` permissions.
+- The scope the CI key lives at, in `CI_SCOPE`, written as `type:id`. The types are `org`, `team` and `project`, for example `org:acme`.
+- At least one model provider credential visible from that scope, configured under **Settings → Model Providers**.
+- `jq` on the runner.
 
 ## The script
 
@@ -3670,73 +3669,59 @@ set -euo pipefail
 
 export LANGWATCH_API_KEY="$CI_LANGWATCH_TOKEN"
 GATEWAY_URL="${LANGWATCH_GATEWAY_URL:-https://gateway.langwatch.ai}"
-TIMESTAMP=$(date -u +%Y%m%dT%H%M%S)
+MODEL="${SMOKE_MODEL:-openai/gpt-5-mini}"
+STAMP=$(date -u +%Y%m%dT%H%M%S)
 
 cleanup() {
   if [ -n "${VK_ID:-}" ]; then
-    echo "Revoking $VK_ID..."
+    echo "Revoking $VK_ID"
     langwatch virtual-keys revoke "$VK_ID" --format json >/dev/null || true
   fi
 }
 trap cleanup EXIT
 
-# 1. Mint short-lived VK at the org scope (uses the org's default RoutingPolicy)
-echo "Creating CI VK at ORG:$CI_ORG_SLUG..."
+# 1. Create the key.
+echo "Creating a virtual key at $CI_SCOPE"
 CREATE=$(langwatch virtual-keys create \
-  --name "ci-smoke-$TIMESTAMP" \
-  --env test \
-  --scope "ORG:$CI_ORG_SLUG" \
+  --name "ci-smoke-$STAMP" \
+  --scope "$CI_SCOPE" \
   --format json)
 
 VK_ID=$(echo "$CREATE" | jq -r '.virtual_key.id')
 VK_SECRET=$(echo "$CREATE" | jq -r '.secret')
 
-[ -z "$VK_ID" ] && { echo "FAIL: empty VK id"; exit 1; }
-[ -z "$VK_SECRET" ] && { echo "FAIL: empty secret"; exit 1; }
+[ -n "$VK_ID" ] && [ "$VK_ID" != "null" ] || { echo "FAIL: no virtual key id"; exit 1; }
+[ -n "$VK_SECRET" ] && [ "$VK_SECRET" != "null" ] || { echo "FAIL: no secret"; exit 1; }
 
-# 2. Call the gateway
-echo "Calling $GATEWAY_URL/v1/chat/completions..."
-TRACEPARENT="00-$(openssl rand -hex 16)-$(openssl rand -hex 8)-01"
+# 2. Check the key can reach at least one model.
+MODELS=$(curl -sS --fail-with-body --max-time 15 \
+  -H "Authorization: Bearer $VK_SECRET" \
+  "$GATEWAY_URL/v1/models" | jq -r '.data | length')
 
-RESPONSE_FILE=$(mktemp)
-HEADERS_FILE=$(mktemp)
-curl --fail-with-body --max-time 10 \
+[ "$MODELS" -gt 0 ] || { echo "FAIL: the key can route to no models"; exit 1; }
+
+# 3. Send a completion.
+BODY=$(mktemp)
+HEADERS=$(mktemp)
+curl -sS --fail-with-body --max-time 60 \
   -H "Authorization: Bearer $VK_SECRET" \
   -H "Content-Type: application/json" \
-  -H "traceparent: $TRACEPARENT" \
-  -D "$HEADERS_FILE" -o "$RESPONSE_FILE" \
+  -D "$HEADERS" -o "$BODY" \
   -X POST "$GATEWAY_URL/v1/chat/completions" \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}'
+  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":4}"
 
-# 3. Verify headers
-REQUEST_ID=$(grep -i '^x-langwatch-request-id:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
-RESP_TRACE_ID=$(grep -i '^x-langwatch-trace-id:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
-RESP_SPAN_ID=$(grep -i '^x-langwatch-span-id:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
-RESP_TRACEPARENT=$(grep -i '^traceparent:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
+# 4. Check the response.
+REQUEST_ID=$(grep -i '^x-langwatch-gateway-request-id:' "$HEADERS" \
+  | awk '{print $2}' | tr -d '\r')
+[ -n "$REQUEST_ID" ] || { echo "FAIL: no X-LangWatch-Gateway-Request-Id"; exit 1; }
 
-[ -z "$REQUEST_ID" ] && { echo "FAIL: missing X-LangWatch-Gateway-Request-Id"; exit 1; }
-[ ${#RESP_TRACE_ID} -ne 32 ] && { echo "FAIL: trace-id not 32 hex ($RESP_TRACE_ID)"; exit 1; }
-[ ${#RESP_SPAN_ID} -ne 16 ] && { echo "FAIL: span-id not 16 hex ($RESP_SPAN_ID)"; exit 1; }
+CONTENT=$(jq -r '.choices[0].message.content' "$BODY")
+[ -n "$CONTENT" ] && [ "$CONTENT" != "null" ] || { echo "FAIL: empty content"; exit 1; }
 
-# Trace id should match the incoming traceparent's trace id (chars 4..36)
-EXPECTED_TRACE_ID=${TRACEPARENT:3:32}
-if [ "$RESP_TRACE_ID" != "$EXPECTED_TRACE_ID" ]; then
-  echo "FAIL: trace propagation, expected $EXPECTED_TRACE_ID, got $RESP_TRACE_ID"
-  exit 1
-fi
-
-# Response traceparent should carry the same trace-id onward
-if [[ "$RESP_TRACEPARENT" != "00-$EXPECTED_TRACE_ID-"* ]]; then
-  echo "FAIL: response traceparent does not carry incoming trace-id"
-  exit 1
-fi
-
-# 4. Verify payload
-CONTENT=$(jq -r '.choices[0].message.content' "$RESPONSE_FILE")
-[ -z "$CONTENT" ] || [ "$CONTENT" = "null" ] && { echo "FAIL: empty content"; exit 1; }
-
-echo "OK: smoke test passed (request_id=$REQUEST_ID, trace=$RESP_TRACE_ID)"
+echo "OK: request_id=$REQUEST_ID"
 ```
+
+Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/model`, for example `anthropic/claude-sonnet-4-5` or `azure/<your deployment name>`. See [Model naming](/ai-gateway/providers/overview).
 
 ## GitHub Actions
 
@@ -3745,49 +3730,52 @@ echo "OK: smoke test passed (request_id=$REQUEST_ID, trace=$RESP_TRACE_ID)"
 name: Gateway smoke test
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with: { node-version: 22 }
       - run: npm i -g langwatch
       - run: bash ci-smoke-test.sh
         env:
           CI_LANGWATCH_TOKEN: ${{ secrets.CI_LANGWATCH_TOKEN }}
-          CI_ORG_SLUG:         ${{ vars.CI_ORG_SLUG }}
+          CI_SCOPE: ${{ vars.CI_SCOPE }}
           LANGWATCH_GATEWAY_URL: https://gateway.langwatch.ai
 ```
 
-## Interpreting failures
+Wall-clock time is one provider completion plus three short API calls, so it is dominated by the model you pick. Give the job a timeout rather than an expected duration.
 
-| Failure | What's broken | Where to look |
+## Reading a failure
+
+| Failure | Cause | Where to look |
 |---|---|---|
-| `FAIL: empty VK id` | REST API returning malformed response | Check `GET /api/gateway/v1/virtual-keys` manually; examine control-plane logs |
-| `curl ... exit 7` | Gateway unreachable | Check the LB + DNS; `nslookup gateway.langwatch.ai` |
-| `curl ... 401` | VK secret didn't resolve at the gateway | Auth cache bootstrapped against a stale `/changes` feed; check control-plane-to-gateway HMAC agreement |
-| `curl ... 403 model_not_allowed` | No ModelProvider visible from `ORG:$CI_ORG_SLUG` exposes `gpt-5-mini` | Replace the model in the script with one your eligible ModelProviders actually support, or add an OpenAI ModelProvider at the org scope |
-| `FAIL: trace propagation` | Per-tenant OTel middleware is off | See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake) |
-| `FAIL: empty content` | Upstream returned no content, provider outage | Compare to raw response body saved in `$RESPONSE_FILE` |
+| `FAIL: no virtual key id` | The CI token lacks `virtualKeys:create`, or the scope id is wrong | Run `langwatch virtual-keys list` with the same token |
+| `curl` exits 7 | The gateway hostname does not resolve or does not answer | DNS and the load balancer. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) |
+| `401 invalid_api_key` | The gateway could not resolve the secret | [Troubleshooting](/ai-gateway/troubleshooting#401-on-every-request) |
+| `FAIL: the key can route to no models` | No provider credential is visible from `CI_SCOPE` | Add a credential at that scope under **Settings → Model Providers** |
+| `400 model_not_recognized` | `SMOKE_MODEL` is not a model any visible credential serves | [Troubleshooting](/ai-gateway/troubleshooting#400-model_not_recognized) |
+| `502 provider_error` | The gateway is healthy and the provider is not | The provider's status page, and the body `curl` printed |
+| `FAIL: empty content` | The provider answered with no message content | Read `$BODY` in the job log |
 
-## Running it against self-hosted
+## Against a self-hosted install
 
 ```bash
-export LANGWATCH_ENDPOINT="https://langwatch.your-corp.internal"
-export LANGWATCH_GATEWAY_URL="https://gateway.your-corp.internal"
+export LANGWATCH_ENDPOINT="https://langwatch.acme.com"
+export LANGWATCH_GATEWAY_URL="https://gateway.acme.com"
 bash ci-smoke-test.sh
 ```
 
-Both URLs can be the same hostname if your LB routes `/api/*` to the control plane and `/v1/*` to the gateway fleet.
+The two hostnames can be the same if your load balancer routes `/api/*` to the control plane and `/v1/*` to the gateway.
 
 ## Alerting
 
-Pipe the script output into your alerting channel on failure. With PagerDuty:
+Fire your own alert from the job's failure step:
 
 ```yaml
       - name: Alert on failure
@@ -3797,13 +3785,13 @@ Pipe the script output into your alerting channel on failure. With PagerDuty:
             -d '{"routing_key":"${{ secrets.PD_KEY }}","event_action":"trigger","payload":{"summary":"Gateway smoke test failed","severity":"error","source":"github-actions"}}'
 ```
 
-Run this test at a higher frequency than your `/readyz` scrapes, it exercises the full hot path (auth cache → bifrost → upstream → debit enqueue → trace export) whereas `/readyz` only checks internal state.
+Run this more often than you read `/readyz`. The probe reports process state only, while this exercises authentication, dispatch, the provider and the spend record.
 
 ## See also
 
-- [langwatch CLI](/ai-gateway/cli/langwatch-cli): the `virtual-keys` commands used here.
-- [Observability](/ai-gateway/observability): what each response header means.
-- [Health Checks](/ai-gateway/self-hosting/health-checks): complementary internal-state probe.
+- [Health checks](/ai-gateway/self-hosting/health-checks): what each probe reports, and the synthetic request pattern.
+- [Observability](/ai-gateway/observability): what each response header carries.
+- [Troubleshooting](/ai-gateway/troubleshooting): the symptom sections this table points at.
 
 ---
 
@@ -4245,12 +4233,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
 
     {
       "type": "row",
-      "title": "Cache (Anthropic passthrough)",
+      "title": "Prompt cache",
       "gridPos": { "x": 0, "y": 54, "w": 24, "h": 1 }
     },
     {
       "type": "timeseries",
-      "title": "Cache outcomes",
+      "title": "Prompt cache outcomes",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 55, "w": 24, "h": 7 },
       "targets": [{
@@ -4326,47 +4314,41 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
 }
 ```
 
-## Reading the dashboard during an incident
+## Read it top down
 
-The panels are deliberately ordered so an on-call engineer scans top-down:
+1. **Request health.** Latency and the 5xx share together answer whether callers are affected.
+2. **Provider health.** An open circuit means the gateway is skipping a credential. Fallback events next to it say whether another credential is covering the traffic.
+3. **Auth cache.** Latency up with providers healthy points at cache misses and the control-plane round trips they cost.
+4. **Budgets.** Blocks climbing on a scope means a hard cap is rejecting traffic. Spend records dropped means budgets are being enforced against incomplete spend.
+5. **Guardrails.** `direction` and `verdict` separate policy working from policy going too wide.
+6. **Streaming.** Active streams is concurrency. The fail-open rate is chunks passing through unchecked, which is by design on the stream-chunk direction.
+7. **Prompt cache.** A prefix-heavy workload with near-zero hits means the provider is not reading its cache.
+8. **Infrastructure.** Goroutines climbing and never falling is a leak. Replicas and CPU connect autoscaler pressure to everything above.
+9. **Lifecycle.** A pod with `gateway_draining` at 1 and a flat in-flight count is a stuck handler that the kubelet will kill.
 
-1. **Request health**: is this user-impacting? Latency + error rate together answer it.
-2. **Provider health**: if error rate is up, which provider? If circuit is open, we're degraded but not down (fallback is handling it).
-3. **Auth cache**: if latency is up with upstreams happy, L1 miss spike points at control-plane pressure.
-4. **Budgets**: blocks climbing on a scope means a hard cap is rejecting traffic. Blocks flat on a scope you know is over its limit means the bundle has not refreshed, check the round-trips panel next to it.
-5. **Guardrails**: block spikes are either a legit policy enforcement or a regression. `direction` + `verdict` disambiguate.
-6. **Streaming**: active streams shows concurrency; fail-open rate is the request and response guardrail escape hatch firing (by design).
-7. **Cache (passthrough)**: Anthropic `cache_control` discount is only visible here; a drop to near-zero hits on a prefix-heavy workload is a regression.
-8. **Infrastructure**: goroutines climbing monotonically is the leak signal. Replicas + CPU correlate HPA pressure to everything above.
+## Link it from your alerts
 
-## Pairing with alerts and runbook
-
-Use this dashboard as the landing page from each alert's `runbook_url`. Example Alertmanager wiring:
+Put the dashboard URL in each alert's `runbook_url`, or in the notification body:
 
 ```yaml
 receivers:
   - name: slack-gateway
     slack_configs:
-      - channel: '#ai-platform-alerts'
+      - channel: '#ai-gateway-alerts'
         title: '{{ .CommonAnnotations.summary }}'
         text: |
           {{ .CommonAnnotations.description }}
 
           <https://grafana.internal/d/langwatch-ai-gateway|Dashboard>
-          <https://langwatch.ai/docs/ai-gateway/cookbooks/production-runbook|Runbook>
 ```
 
-When a page fires, the engineer lands on the dashboard, narrows the cause to a row, then opens the runbook recipe that matches that row.
-
-## Skipping panels you don't have metrics for
-
-If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+The engineer lands on the dashboard, narrows the cause to one row, then opens the matching section of [Troubleshooting](/ai-gateway/troubleshooting).
 
 ## See also
 
-- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): the rules that tell you *when* to open this dashboard.
-- [Production runbook](/ai-gateway/cookbooks/production-runbook): what to do when the dashboard pinpoints a row.
-- [Observability](/ai-gateway/observability): deep-dive on per-tenant OTel routing + span attribute reference.
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): the rules that say when to open this dashboard.
+- [Troubleshooting](/ai-gateway/troubleshooting): what to do once a row points at the cause.
+- [Observability](/ai-gateway/observability): every metric, its labels, and the span attributes next to them.
 
 ---
 
@@ -6597,7 +6579,7 @@ sidebarTitle: Observability
 
 ## Where each signal lands
 
-Every request produces three things you can read.
+Every request through `/v1` produces three things you can read.
 
 | Signal | Where you read it |
 |---|---|
@@ -6605,7 +6587,7 @@ Every request produces three things you can read.
 | Response headers | On the HTTP response your client already receives |
 | Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
 
-The gateway starts one span per request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
+The gateway starts one span per dispatched request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
 ## Trace attributes
 

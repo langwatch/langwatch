@@ -6,7 +6,7 @@ sidebarTitle: OCSF / SIEM export
 
 ## What the export contains
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index), and one per admin view of a member's or a team's workspace (`actionName` `governance.viewWorkspaceAs`). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
 
 Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
 
