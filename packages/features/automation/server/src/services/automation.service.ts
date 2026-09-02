@@ -38,12 +38,13 @@ import { ReportScheduleService } from "./report-schedule.service";
 import { CustomGraphRepository } from "../repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
 import { AutomationGraphService } from "./trigger-graph.service";
+import { ActiveTriggerCacheService } from "./active-trigger-cache.service";
 import { AutomationTemplateService } from "./automation-template.service";
 import type { AutomationPersistCapService } from "./persist-cap.service";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 export class AutomationService extends AutomationCapability {
-  private readonly activeCache = new Map<string, { expires: number; value: TriggerSummary[] }>();
+  private readonly activeCache: ActiveTriggerCacheService;
   private constructor(
     private readonly triggers: TriggerRepository,
     private readonly history: TriggerFireHistoryRepository,
@@ -59,6 +60,7 @@ export class AutomationService extends AutomationCapability {
     private readonly persistCaps: AutomationPersistCapService,
   ) {
     super();
+    this.activeCache = ActiveTriggerCacheService.create({ triggers, clock });
   }
 
   static create(deps: {
@@ -138,21 +140,6 @@ export class AutomationService extends AutomationCapability {
     return this.persistCaps.readPersistCapCounts(input);
   }
 
-  private async active(projectId: string): Promise<TriggerSummary[]> {
-    const cached = this.activeCache.get(projectId);
-    if (cached && cached.expires > this.clock.now().getTime()) {
-      return cached.value;
-    }
-
-    const value = await this.triggers.findActiveForProject(projectId);
-    this.activeCache.set(projectId, {
-      expires: this.clock.now().getTime() + 60_000,
-      value,
-    });
-
-    return value;
-  }
-
   getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     return this.triggers.findByIdOrThrow(input);
   }
@@ -214,18 +201,12 @@ export class AutomationService extends AutomationCapability {
     return this.triggers.findByCustomGraphIds(input);
   }
 
-  async getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
-    const triggers = await this.active(projectId);
-
-    return triggers.filter((trigger) => !trigger.customGraphId && trigger.triggerKind !== "REPORT");
+  getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
+    return this.activeCache.getActiveTraceTriggersForProject(projectId);
   }
 
-  async getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
-    const triggers = await this.active(projectId);
-
-    return triggers.filter(
-      (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
-    );
+  getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
+    return this.activeCache.getActiveGraphTriggersForProject(projectId);
   }
 
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
@@ -253,7 +234,7 @@ export class AutomationService extends AutomationCapability {
   }
 
   invalidate(projectId: string): Promise<void> {
-    this.activeCache.delete(projectId);
+    this.activeCache.invalidate(projectId);
 
     return Promise.resolve();
   }

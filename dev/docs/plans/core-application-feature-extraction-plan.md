@@ -898,6 +898,29 @@ answers will be needed before the named later boundary can close:
 
 Shared prerequisites, by leverage: (1) **ProjectService worker-composable** — gates langy-conversation (via ApiKeyService), scenario (prefetcher), gateway-spend (debit graph) and part of automation; it needs organizations, the LWQL ClickHouse key-map and S3 stored-objects. (2) **Packaged mail capability** — LANDED in baca75a26b; join-request converted on it, automation and evaluation can consume the same EmailDeliveryPort once their template placement is decided. (3) **Trace conversion** — surveyed 2026-09-02 (in the a3147dbb slice report): all-or-nothing, 28 byte-frozen keys, 21-field bundle census recorded; the binding wall is field 9, subscriber:graphTriggerActivity needing AutomationService.evaluateGraphTrigger. TWO CORRECTIONS: scenario's traceSummaryStore blocker clears WITHOUT trace converting (createAppTraceSummaryStore is 60 lines of purely packaged imports over substrates the worker holds), and the evaluator-engine path does not gate trace (its reactors close over command dispatchers the evaluation installer already defers). The trace↔automation cycle breaks at automation's GRAPH half: an AutomationGraphActivityPort backed by the packaged AutomationGraphService/GraphAlertDispatchService over the now-packaged EmailDeliveryPort + harvested encrypt/decrypt, Slack/webhook delivery, PrismaScheduledJobStore, unsubscribe-token verifier. Landing order: (a) the graph vertical, (b) a shared RedisTenantBroadcastAdapter frozen twin (trace/scenario/langy all need it), (c) the 1,970-line span-storage write repository, (d) the trace-privacy vertical (~2,700 lines + tiktoken), (e) blob store onto StoredObjectStorageRuntime, (f) four narrow ports + three OTel twins + the 13-line evaluationNameAutoslug move, (g) the conversion itself. (4) Model-provider resolution (getVercelAIModel) harvested with explicit params. (5) The all-instance ClickHouse directory (gateway-spend settlement) — endgame. Wave order: mail+join-request → Trace → scenario/evaluation → ProjectService wave → automation/langy-conversation/gateway-spend.
 
+**Steps (a) and (b) landed (uncommitted at time of writing).** (a) `AutomationGraphActivityPort` is the two methods
+`subscriber:graphTriggerActivity` actually calls, and `createGraphTriggerActivityHandler` now names it instead of the whole
+`AutomationService` — the published service satisfies it structurally, so the application compiles with zero platform edits.
+`PostgresAutomationGraphActivityAdapter` composes the vertical end to end from a narrowed database type, a clock, ProjectService,
+AnalyticsService, the outbound transports and the credentials cipher; the 60-second active-automation window moved into a shared
+`ActiveTriggerCacheService` so the full service and the graph-only adapter cannot disagree about which automations are live.
+Harvested into the feature: the unsubscribe-token format (both halves) and the no-reply address, each with the application's copy
+frozen and its recorded bytes pinned. Harvested into apps/worker: the trigger-mail envelope (no-reply To, BCC fan-out, unsubscribe
+footer, RFC 8058 headers), the Slack incoming-webhook client and a direct Slack Web API transport. FOUR SURVEY ITEMS PROVED OFF
+THIS PATH and were deliberately not dragged in: `PrismaScheduledJobStore` and the scheduler wake serve report schedules, the
+ClickHouse heartbeat resolver serves `decideGraphTriggerHeartbeat`, the runaway notifier and its three prom counters serve
+`handlePersistCapBreach`, and `sendLegacyEmail`/`sendLegacySlackWebhook` (the only two react-email renderers on the port) serve the
+settlement digest — none is reached by `evaluateGraphTrigger`, and all four refuse by name. The one real gap is the customer-supplied
+webhook URL: its SSRF fence, URL admission policy and dispatch budget are ~1,200 platform-only lines (`sendWebhook`,
+`httpDestination`, `urlPolicy`, `ssrfProtection`) that are shared egress policy rather than an automation asset, so the transport is
+an injected option and webhook alerts refuse by name without one. That harvest is its own slice. (b) `RedisTenantBroadcastAdapter`
+ships in notification-server with the channel and body pinned by literal; every candidate placement inside trace/scenario/langy trips
+cross-feature, so it lives beside the mail capability and the three features declare their own narrow port when they convert.
+Worker config gained `NEXTAUTH_SECRET` (one leaf, two named uses: unsubscribe signing and the credentials-key fallback),
+`TRIGGER_EMAIL_HOURLY_CAP`, `TRIGGER_EMAIL_TENANT_DAILY_CAP` and `CREDENTIALS_SECRET`, all at the application's spelling and defaults.
+NEITHER IS MOUNTED: Trace still registers `graphTriggerActivity`, and the three broadcast producers are still the application's, so
+both are proven by composition-capability tests in `apps/worker` and are staged for the trace conversion at step (g).
+
 ## How to execute the plan
 
 Use this loop continuously until the final gate passes:

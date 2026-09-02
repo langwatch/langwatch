@@ -157,6 +157,50 @@ export const workerConfigDefinition = RuntimeConfig.define({
     },
   },
   /**
+   * What the graph-alert half of Automation needs that is not a transport.
+   *
+   * The two ceilings are read from the application's own variables, with the
+   * application's own defaults, because both graphs count into ONE Redis
+   * keyspace while the pipelines are twinned: two processes with different
+   * hourly ceilings for the same automation would let the higher one spend the
+   * budget the lower one was protecting, and the customer would see a burst
+   * from one pod and silence from the next.
+   *
+   * `credentialsEncryptionKey` is the at-rest key a stored Slack bot token and
+   * a stored webhook secret were written under, read with the application's own
+   * precedence (`CREDENTIALS_SECRET`, then `NEXTAUTH_SECRET`) — the same pair
+   * the API executable resolves. A process holding the wrong one composes
+   * perfectly and then fails to decrypt the first credential it needs, which is
+   * why it is resolved at boot rather than at the first alert.
+   */
+  /**
+   * The application's `NEXTAUTH_SECRET`, which two unrelated things still rest
+   * on and which is therefore read once, here, rather than twice under the
+   * names of its uses.
+   *
+   * It SIGNS every unsubscribe footer link (ADR-031) — a link this process
+   * mints is verified months later by the application's public `/unsubscribe`
+   * route, out of somebody's inbox, so a second key would 404 every link the
+   * other half signed — and it is the ENCRYPTION key stored automation
+   * credentials fall back to when `CREDENTIALS_SECRET` is absent, because
+   * `platform/app/src/utils/encryption.ts` reads the pair in that order and
+   * the rows were written by whichever it found.
+   *
+   * The legacy empty-string value is kept as the application keeps it: the
+   * token signer refuses an empty key at the security boundary, while the
+   * no-reply tag deliberately degrades instead.
+   */
+  nextauthSecret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
+  automation: {
+    emailHourlyCap: Config.value(z.coerce.number().int().positive().default(100), {
+      env: "TRIGGER_EMAIL_HOURLY_CAP",
+    }),
+    tenantDailyCap: Config.value(z.coerce.number().int().positive().default(10000), {
+      env: "TRIGGER_EMAIL_TENANT_DAILY_CAP",
+    }),
+    credentialsEncryptionKey: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+  },
+  /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
    *
    * The raw string is carried rather than a number: `settlementGraceMs` in
@@ -321,6 +365,16 @@ export type WorkerStripeConfig = Readonly<{
 export type WorkerMailConfig = Readonly<{
   baseHost: string;
   mailer: MailerConfiguration;
+  /** Signs unsubscribe footer links and salts the no-reply tag; may be absent. */
+  unsubscribeSigningSecret?: string;
+}>;
+
+/** The graph-alert half of Automation's own knobs, as this process read them. */
+export type WorkerAutomationConfig = Readonly<{
+  emailHourlyCap: number;
+  tenantDailyCap: number;
+  /** Absent on a deployment that stored no encrypted automation credentials. */
+  credentialsEncryptionKey?: string;
 }>;
 
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
@@ -347,6 +401,7 @@ export type WorkerConfig = Readonly<{
   deployment: WorkerDeploymentConfig;
   /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
   mail?: WorkerMailConfig;
+  automation: WorkerAutomationConfig;
   stripe: WorkerStripeConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
@@ -361,7 +416,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     definition: workerConfigDefinition,
     source: normalizeWorkerConfigSource(source),
   }).value;
-  const mail = resolveWorkerMailConfig(value.mail);
+  const mail = resolveWorkerMailConfig(value.mail, value.nextauthSecret);
 
   return {
     processRole: value.processRole,
@@ -378,6 +433,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     }),
     deployment: value.deployment,
     ...(mail ? { mail } : {}),
+    automation: resolveWorkerAutomationConfig(value.automation, value.nextauthSecret),
     stripe: value.stripe,
     gateway: value.gateway,
     github: value.github,
@@ -412,12 +468,16 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
  */
 function resolveWorkerMailConfig(
   mail: WorkerConfigProjection["mail"],
+  nextauthSecret: string | undefined,
 ): WorkerMailConfig | undefined {
   const baseHost = mail.baseHost?.trim();
   if (!baseHost) return undefined;
 
+  const unsubscribeSigningSecret = nextauthSecret;
+
   return {
     baseHost,
+    ...(unsubscribeSigningSecret === undefined ? {} : { unsubscribeSigningSecret }),
     mailer: {
       defaultFrom: EmailProviderService.resolveDefaultFrom({
         emailDefaultFrom: mail.defaultFrom,
@@ -440,6 +500,30 @@ function resolveWorkerMailConfig(
       },
       resend: { apiKey: mail.resend.apiKey },
     },
+  };
+}
+
+/**
+ * The automation knobs, with the credentials key resolved the way the
+ * application resolves it.
+ *
+ * `CREDENTIALS_SECRET` first and `NEXTAUTH_SECRET` second, because that is the
+ * order `platform/app/src/utils/encryption.ts` reads them in and the rows were
+ * written by whichever it found. Falling back to neither is a valid
+ * deployment: an install that never stored a Slack bot token or a webhook
+ * secret has nothing to decrypt.
+ */
+function resolveWorkerAutomationConfig(
+  automation: WorkerConfigProjection["automation"],
+  nextauthSecret: string | undefined,
+): WorkerAutomationConfig {
+  const credentialsEncryptionKey =
+    automation.credentialsEncryptionKey?.trim() || nextauthSecret?.trim();
+
+  return {
+    emailHourlyCap: automation.emailHourlyCap,
+    tenantDailyCap: automation.tenantDailyCap,
+    ...(credentialsEncryptionKey ? { credentialsEncryptionKey } : {}),
   };
 }
 

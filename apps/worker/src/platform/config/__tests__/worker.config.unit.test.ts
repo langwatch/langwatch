@@ -25,6 +25,10 @@ describe("resolveWorkerConfig", () => {
       },
       shutdown: { processDeadlineMs: 25_000 },
       deployment: { saas: false },
+      // No `credentialsEncryptionKey`: an install that stored no encrypted
+      // automation credential has none to read, and the key is omitted rather
+      // than carried as an empty string that would look configured.
+      automation: { emailHourlyCap: 100, tenantDailyCap: 10_000 },
       stripe: { secretKey: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },

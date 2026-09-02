@@ -20,3 +20,11 @@ export {
 } from "./ports/email-delivery.port";
 export { EmailMimeService } from "./services/email-mime.service";
 export { EmailProviderService } from "./services/email-provider.service";
+export { RedisTenantBroadcastAdapter } from "./adapters/redis.tenant-broadcast.adapter";
+export {
+  TENANT_BROADCAST_EVENT_TYPES,
+  TenantBroadcastPort,
+  TenantBroadcastPublisherPort,
+  type TenantBroadcastEventType,
+  type TenantBroadcastMessage,
+} from "./ports/tenant-broadcast.port";

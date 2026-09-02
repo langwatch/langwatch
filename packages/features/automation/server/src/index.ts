@@ -118,6 +118,19 @@ export { AutomationSettlementDispatchService } from "./services/trigger-settleme
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service";
 export { AutomationClockPort } from "./ports/automation-clock.port";
+export { AutomationGraphActivityPort } from "./ports/automation-graph-activity.port";
+export {
+  PostgresAutomationGraphActivityAdapter,
+  type AutomationGraphActivityDatabase,
+} from "./adapters/postgres.automation-graph-activity.adapter";
+export { HmacUnsubscribeTokenAdapter } from "./adapters/hmac.unsubscribe-token.adapter";
+export { ActiveTriggerCacheService } from "./services/active-trigger-cache.service";
+export { UnsubscribeTokenService } from "./services/unsubscribe-token.service";
+export {
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
+  TriggerNoReplyService,
+  TriggerNoReplyWarningPort,
+} from "./services/trigger-no-reply.service";
 export { AutomationIntentRetentionPort } from "./ports/automation-intent-retention.port";
 export { AutomationScheduledIntentPort } from "./ports/automation-scheduled-intent.port";
 export {
@@ -128,7 +141,10 @@ export {
   type TestFireWebhook,
 } from "./ports/automation-test-fire.port";
 export { SchedulerWakePort } from "./ports/scheduler-wake.port";
-export { UnsubscribeTokenVerifierPort } from "./ports/unsubscribe-token.port";
+export {
+  UnsubscribeTokenVerifierPort,
+  type UnsubscribeTokenPayload,
+} from "./ports/unsubscribe-token.port";
 export { ScheduledJobStorePort, type ScheduledJobRecord } from "./ports/scheduled-jobs.port";
 export {
   AutomationTrpcApi,

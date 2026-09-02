@@ -12,6 +12,24 @@ import {
 
 export { AutomationPersistCapService };
 
+/**
+ * The graph-alert vertical's fixtures, so a composition root can prove its own
+ * wiring against the same rows the feature's own suite uses rather than
+ * inventing a second stand-in that agrees with nothing.
+ */
+export {
+  BreachingAnalytics,
+  createGraphActivityPrismaDouble,
+  customGraphRow,
+  FrozenClock,
+  FROZEN_NOW,
+  graphTriggerRow,
+  OneProject,
+  RecordingDelivery,
+  SilentLogger,
+  TestDispatchErrors,
+} from "./fixtures/graph-activity.fixture";
+
 class TestNotifier extends AutomationGraphNotifierPort {
   async dispatch() {
     return {

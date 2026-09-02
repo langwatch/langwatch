@@ -572,6 +572,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.1080.0
         version: 3.1108.0
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/analytics/contract
       '@langwatch/api-key-server':
         specifier: workspace:*
         version: link:../../packages/features/api-key/server
@@ -641,6 +644,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../packages/prisma-client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../packages/features/project/contract
@@ -656,6 +662,9 @@ importers:
       '@langwatch/scenario-server':
         specifier: workspace:*
         version: link:../../packages/features/scenario/server
+      '@langwatch/secret-server':
+        specifier: workspace:*
+        version: link:../../packages/features/secret/server
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../packages/features/stored-object/contract
@@ -680,6 +689,9 @@ importers:
       '@react-email/render':
         specifier: ^2.0.9
         version: 2.0.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@slack/webhook':
+        specifier: ^7.1.0
+        version: 7.1.0
       react:
         specifier: ^19.2.7
         version: 19.2.8
