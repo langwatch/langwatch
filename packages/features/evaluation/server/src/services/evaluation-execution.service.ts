@@ -180,7 +180,15 @@ function pickCausalityDepth(span: {
 // Internal types
 // ---------------------------------------------------------------------------
 
-type DataForEvaluation =
+/**
+ * What the evaluator dispatch is handed, in the engine's own terms.
+ *
+ * Exported because {@link EvaluationExecutionService.executeForData} takes it,
+ * and deliberately NOT re-exported from the package index: the published name
+ * is the legacy REST family's own `DataForEvaluation`, whose `default` arm is
+ * narrower and assignable to this one.
+ */
+export type DataForEvaluation =
   | { type: "default"; data: Record<string, unknown> }
   | { type: "custom"; data: Record<string, unknown> };
 
@@ -328,6 +336,33 @@ export class EvaluationExecutionService {
       evaluationThreadId,
       inputs: data.data as Record<string, unknown>,
     };
+  }
+
+  /**
+   * One evaluator over data the caller already holds, with no trace behind it.
+   *
+   * The same call {@link executeForTrace} makes once it has rendered a trace
+   * through its mappings — native, installed, code and workflow evaluators all
+   * dispatch from here — published because two doors ask the question without a
+   * trace to render: the gateway's inline guardrail check, which scores an
+   * input/output pair the data plane sent, and the legacy evaluate doors, which
+   * score whatever the SDK posted. Both used to reach a second copy of this
+   * dispatch in the platform application; one method is what stops a guardrail
+   * and a monitor disagreeing about what an evaluator does.
+   *
+   * There is no trace, so there are no dropped content categories and no
+   * causality depth to inherit; the augmenter is still applied, which is what
+   * keeps a redaction at ingestion visible in the result.
+   */
+  executeForData(params: {
+    projectId: string;
+    evaluatorType: string;
+    data: DataForEvaluation;
+    settings?: Record<string, unknown>;
+    workflowId?: string | null;
+    idempotencyKey?: string;
+  }): Promise<SingleEvaluationResult> {
+    return this.runEvaluation(params);
   }
 
   // ---------------------------------------------------------------------------

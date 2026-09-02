@@ -267,6 +267,17 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "LANGY_INTERNAL_SECRET",
   }),
   /**
+   * The operator secret the ClickHouse EXPLAIN endpoint is presented with.
+   *
+   * An unvalidated optional string for the reason every credential above is,
+   * and what blank means is again the gate's own rule: with no key the
+   * endpoint is not registered, so an operator who has not provisioned one
+   * cannot reach a cross-tenant EXPLAIN by presenting nothing.
+   */
+  opsApiKey: Config.value(optionalEnvironmentString, {
+    env: "LANGWATCH_OPS_API_KEY",
+  }),
+  /**
    * The two AuthZ switches, read raw and interpreted below.
    *
    * `AUTHZ_EPOCH_CACHE` is a legacy opt-in the platform app reads as "1 or
@@ -376,6 +387,21 @@ export const apiConfigDefinition = RuntimeConfig.define({
      */
     clickhouse: {
       url: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_URL" }),
+      /**
+       * The THIRD identity, and the one the tenant-keyed application client
+       * deliberately cannot stand in for: a dedicated `langwatch_ops` account
+       * with `GRANT SELECT ON langwatch.*`, no SOURCES grant and a readonly
+       * profile, which the operator-only EXPLAIN endpoint runs as.
+       *
+       * That endpoint is cross-tenant BY DESIGN — the optimizer agent runs
+       * EXPLAINs across the fleet — and `ApiClickHouseInfrastructure` hands
+       * out only a tenant-keyed `resolveClient` precisely so no caller can
+       * read one organization's data on another's endpoint. So this is its
+       * own connection rather than a widening of that one, and an unset value
+       * means the endpoint is not served at all rather than falling back to
+       * the application's own client.
+       */
+      opsUrl: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_OPS_URL" }),
       langwatchQl: {
         url: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_URL" }),
         username: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_USER" }),
@@ -385,8 +411,9 @@ export const apiConfigDefinition = RuntimeConfig.define({
       },
     },
     /**
-     * The two addresses the EXECUTION half needs: where the NLP engine
-     * answers, and where this deployment answers its own public API.
+     * The three addresses the EXECUTION half needs: where the NLP engine
+     * answers, where the evaluator service answers, and where this deployment
+     * answers its own public API.
      *
      * `nlpServiceUrl` is the engine every Studio run, every code evaluator and
      * the evaluator keep-alive dial. Absent means this process executes no
@@ -402,12 +429,21 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * listener's bind address, because behind a proxy those are different and
      * only the first is reachable.
      *
+     * `langevalsEndpoint` is where the evaluator service answers — the SAME
+     * `LANGEVALS_ENDPOINT` the worker reads. Absent means this process
+     * composes no evaluator runtime at all: the gateway's guardrail check, the
+     * four legacy evaluate doors and a trace re-score each refuse by name
+     * rather than answering a verdict nothing produced.
+     *
      * Read here rather than where they are used, because this module is the
      * process's only environment reader.
      */
     execution: {
       nlpServiceUrl: Config.value(optionalEnvironmentString, {
         env: "LANGWATCH_NLP_SERVICE",
+      }),
+      langevalsEndpoint: Config.value(optionalEnvironmentString, {
+        env: "LANGEVALS_ENDPOINT",
       }),
       publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
     },
@@ -602,6 +638,12 @@ export type ApiClickHouseConfigResolution = Readonly<{
   /** The restricted identity a member's own SQL runs as; absent means unprovisioned. */
   langwatchQl: ApiLangWatchQLConfigResolution | undefined;
   /**
+   * The dedicated readonly account the operator EXPLAIN endpoint runs as;
+   * absent means that endpoint is not served at all rather than falling back
+   * to the application's own connection.
+   */
+  opsUrl: string | undefined;
+  /**
    * The per-organization endpoints, keyed by organization id, from the
    * `CLICKHOUSE_URL__<label>__<organizationId>` variables every LangWatch tier
    * reads them by.
@@ -651,6 +693,8 @@ export type ApiModelProviderConfigResolution = Readonly<{
 export type ApiExecutionConfigResolution = Readonly<{
   /** Where the NLP engine answers; absent means no workflow or code evaluator runs. */
   nlpServiceUrl: string | undefined;
+  /** Where the evaluator service answers; absent composes no evaluator runtime. */
+  langevalsEndpoint: string | undefined;
   /** This deployment's public origin; absent means the studio cannot run a published workflow. */
   publicBaseUrl: string | undefined;
 }>;
@@ -821,11 +865,13 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       clickhouse: {
         url: value.infrastructure.clickhouse.url?.trim() || undefined,
         langwatchQl: resolveLangWatchQLConnection(value.infrastructure.clickhouse.langwatchQl),
+        opsUrl: value.infrastructure.clickhouse.opsUrl?.trim() || undefined,
         privateRoutes: resolvePrivateClickHouseRoutes(source),
         poolSizing: poolSizingFromEnv(environmentStrings(source)),
       },
       execution: {
         nlpServiceUrl: value.infrastructure.execution.nlpServiceUrl?.trim() || undefined,
+        langevalsEndpoint: value.infrastructure.execution.langevalsEndpoint?.trim() || undefined,
         publicBaseUrl: value.infrastructure.execution.publicBaseUrl?.trim() || undefined,
       },
       modelProvider: resolveModelProviderConfig(

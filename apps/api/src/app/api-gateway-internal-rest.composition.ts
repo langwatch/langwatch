@@ -30,9 +30,19 @@
  * this process, the other is what this process mints credentials the data
  * plane presents onward with. Neither is logged, and neither is read here —
  * both arrive from the process's one configuration reader.
+ *
+ * ## The second door on the same session
+ *
+ * A brokered voice session is BOOKED on `/realtime/session` here and SETTLED
+ * afterwards on the ElevenLabs post-call webhook, which is a public family of
+ * its own. Both are composed in this module and both take the bag
+ * {@link composeApiGatewayRealtimeSessions} builds, so the door that opens a
+ * session and the door that closes it cannot be holding two connections, two
+ * rating seams or two confirmations.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import {
+  createElevenLabsWebhookRestApp,
   createGatewayInternalRestApp,
   GatewayConfigMaterialiser,
   GatewayJwtAdapter,
@@ -43,6 +53,7 @@ import {
   type GatewayRealtimeSessionCollaborators,
   type GatewaySpendCommandSender,
   type GatewaySpendConfirmationPort,
+  type GatewaySpendRatingPort,
 } from "@langwatch/gateway-server";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -175,18 +186,11 @@ export function composeApiGatewayInternalRest(
   const monitors = options.monitors;
   const runEvaluator = options.runEvaluator;
   const spendCommands = options.spendCommands;
-  // A booked session must have somewhere to report its usage, so the whole
-  // collaborator bag stands or falls with the confirmation. The trace span is
-  // the one member that may be absent on its own: without trace storage the
-  // money still lands and the call simply carries no cost line.
-  const realtimeSessions: GatewayRealtimeSessionCollaborators | undefined =
-    options.spendConfirmation
-      ? {
-          database: prisma,
-          spendRating: rating,
-          spendConfirmation: options.spendConfirmation,
-        }
-      : undefined;
+  const realtimeSessions = composeApiGatewayRealtimeSessions({
+    prisma,
+    spendConfirmation: options.spendConfirmation,
+    rating,
+  });
 
   const ports: GatewayInternalRestPorts = {
     internalSecret: () => options.internalSecret,
@@ -206,4 +210,92 @@ export function composeApiGatewayInternalRest(
   };
 
   return createGatewayInternalRestApp({ security: options.security, ports });
+}
+
+/**
+ * The realtime collaborator bag, published so a SECOND door can settle the
+ * same session.
+ *
+ * A brokered voice session is booked here, on `/realtime/session`, and settled
+ * afterwards on the ElevenLabs post-call webhook — two doors, one session row,
+ * one money answer. Building the bag in one function is what makes that
+ * structural: the webhook cannot be handed a different connection, a different
+ * rating seam or a different confirmation than the booking used.
+ *
+ * A booked session must have somewhere to report its usage, so the whole bag
+ * stands or falls with the confirmation. The trace span is the one member that
+ * may be absent on its own: without trace storage the money still lands and the
+ * call simply carries no cost line.
+ *
+ * `rating` is an argument so the internal family passes the instance it also
+ * prices a drained spend batch with. A caller that passes none gets a fresh
+ * `ModelCatalogGatewaySpendRatingAdapter`, which is the same ANSWER — the
+ * adapter is a pure read of the static model catalogue and holds no state —
+ * and, more to the point, the same adapter class the port was declared for.
+ */
+export function composeApiGatewayRealtimeSessions(options: {
+  prisma: PrismaClient;
+  spendConfirmation: GatewaySpendConfirmationPort | undefined;
+  rating?: GatewaySpendRatingPort | undefined;
+}): GatewayRealtimeSessionCollaborators | undefined {
+  if (!options.spendConfirmation) return undefined;
+
+  return {
+    database: options.prisma,
+    spendRating: options.rating ?? ModelCatalogGatewaySpendRatingAdapter.create(),
+    spendConfirmation: options.spendConfirmation,
+  };
+}
+
+/**
+ * The ElevenLabs post-call webhook, over the SAME realtime bag the booking
+ * uses.
+ *
+ * Its own family rather than a route on the internal control plane, because
+ * the two are addressed differently and reached differently: `/api/internal/
+ * gateway` is blocked at the ingress and called in-cluster with the shared
+ * HMAC secret, and this one is the vendor's delivery target, public by
+ * protocol and verified per delivery against the secret on the provider row
+ * the path names. Customers never paste this URL anywhere — the documented one
+ * is on the gateway, which relays the raw bytes here.
+ *
+ * Absent on two counts, and both leave the door OFF rather than answering:
+ *
+ * NO CIPHER: the per-tenant webhook secret is a stored credential on the
+ * provider row. Without the cipher every delivery would fail its signature
+ * check and answer 404, which reads to the vendor as "this endpoint does not
+ * exist" and, after ten consecutive failures, disables the workspace's webhook
+ * for every tenant on it.
+ *
+ * NO SPEND CONFIRMATION: a settled session has nowhere to report what the call
+ * cost. Acknowledging the delivery anyway would consume the one report the
+ * vendor sends and bill nothing; leaving the door off lets the reconciliation
+ * worker's scheduled read remain the billing path it already is.
+ */
+export function composeApiElevenLabsWebhookRest(options: {
+  security: AppRestSecurity;
+  /** The one guarded connection the provider row and the session row are read on. */
+  prisma: PrismaClient;
+  /** The cipher the row's webhook secret was written under, if any. */
+  encryption: SecretEncryptionPort | undefined;
+  /** The confirmation a settled session's spend is reported through, if any. */
+  spendConfirmation: GatewaySpendConfirmationPort | undefined;
+}): MountableRestApp | undefined {
+  const { encryption } = options;
+  const sessions = composeApiGatewayRealtimeSessions({
+    prisma: options.prisma,
+    spendConfirmation: options.spendConfirmation,
+  });
+  if (!encryption || !sessions) return undefined;
+
+  return createElevenLabsWebhookRestApp({
+    security: options.security,
+    ports: {
+      credentials: {
+        database: options.prisma,
+        credentials: ApiGatewayModelProviderCredentials.create(encryption),
+      },
+      sessions,
+    },
+  });
 }

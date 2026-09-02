@@ -84,7 +84,11 @@ describe("API process configuration", () => {
             clientsPerProcess: undefined,
           },
         },
-        execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
+        execution: {
+          nlpServiceUrl: undefined,
+          langevalsEndpoint: undefined,
+          publicBaseUrl: undefined,
+        },
         // The gateway's own three facts, and the environment it reads a system
         // provider's credential from — which is this call's source, filtered to
         // its string entries, because that is the only environment this module
@@ -158,26 +162,33 @@ describe("API process configuration", () => {
   });
 
   describe("when the execution addresses are configured", () => {
-    it("reads the NLP engine and the deployment's public origin", () => {
+    it("reads the NLP engine, the evaluator service and the deployment's public origin", () => {
       const config = resolveApiConfig({
         LANGWATCH_NLP_SERVICE: "http://nlp.example.test:5561",
+        LANGEVALS_ENDPOINT: "http://langevals.example.test",
         BASE_HOST: "https://app.example.test",
       });
 
       expect(config.infrastructure.execution).toEqual({
         nlpServiceUrl: "http://nlp.example.test:5561",
+        langevalsEndpoint: "http://langevals.example.test",
         publicBaseUrl: "https://app.example.test",
       });
     });
 
     it("treats a blank export as unconfigured rather than as an empty address", () => {
-      const config = resolveApiConfig({ LANGWATCH_NLP_SERVICE: "  ", BASE_HOST: "" });
+      const config = resolveApiConfig({
+        LANGWATCH_NLP_SERVICE: "  ",
+        LANGEVALS_ENDPOINT: "  ",
+        BASE_HOST: "",
+      });
 
       // A blank value is not an address: composed as one it would produce a URL
       // parse failure at the first run instead of the configuration gap that
       // caused it.
       expect(config.infrastructure.execution).toEqual({
         nlpServiceUrl: undefined,
+        langevalsEndpoint: undefined,
         publicBaseUrl: undefined,
       });
     });
@@ -381,7 +392,11 @@ describe("API process configuration", () => {
           clientsPerProcess: undefined,
         },
       },
-      execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
+      execution: {
+        nlpServiceUrl: undefined,
+        langevalsEndpoint: undefined,
+        publicBaseUrl: undefined,
+      },
       modelProvider: {
         isSaas: false,
         blockLocalHttpCalls: false,

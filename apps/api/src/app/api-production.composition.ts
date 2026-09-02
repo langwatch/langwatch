@@ -70,10 +70,20 @@ import {
 } from "./api-trpc-collaborators.identity.composition";
 import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter";
 import {
+  composeApiIdentityPipelines,
+  LoggedApiIdentityPipelinesAbsence,
+} from "./api-identity-pipelines.composition";
+import {
   composeApiExecutionCollaborators,
+  ExecutionCapabilityUnavailableError,
   withApiExecutionCollaborators,
   type ApiExecutionCollaborators,
 } from "./api-trpc-collaborators.execution.composition";
+import {
+  composeApiEvaluatorExecution,
+  LoggedApiEvaluatorExecutionAbsence,
+  type ApiEvaluatorExecution,
+} from "./api-evaluator-execution.composition";
 import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
@@ -143,7 +153,10 @@ import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp, settlementGraceMs } from "@langwatch/gateway-server";
 import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition";
 import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition";
-import { composeApiGatewayInternalRest } from "./api-gateway-internal-rest.composition";
+import {
+  composeApiElevenLabsWebhookRest,
+  composeApiGatewayInternalRest,
+} from "./api-gateway-internal-rest.composition";
 import {
   ApiGatewaySpendPipelineAbsenceReport,
   composeApiGatewaySpendPipeline,
@@ -213,7 +226,6 @@ import {
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
 import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
-import type { AppRestFeaturePorts } from "../app-rest/app-rest.features";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure";
 import {
   ApiAuthAbsenceReportPort,
@@ -228,6 +240,14 @@ import type { ApiSubscriptionMount } from "../api.application";
 import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
 import { ApiHandlerManagedSession } from "./api-handler-managed-session";
 import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features";
+import {
+  composeApiPackagedRest,
+  LoggedApiPackagedRestAbsence,
+} from "./api-packaged-rest.composition";
+import {
+  composeApiOpsExplainRest,
+  type ApiOpsExplainRest,
+} from "../features/ops/ops-clickhouse-explain-rest.mount";
 import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import { apiClientAddress } from "./api-client-address";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
@@ -257,18 +277,24 @@ import type {
   GovernanceIngestTraceCollectionPort,
 } from "@langwatch/enterprise-governance-server";
 import type { GithubRestPorts } from "@langwatch/github-server";
+import type { FilesRateLimiter } from "@langwatch/stored-object-server";
 
 /**
- * The `AppRestFeaturePorts` entries the API process supplies out of its own
+ * The REST-family capabilities the API process supplies out of its own
  * configuration and its own infrastructure, rather than receiving from a host.
  *
  * Two today: the instance administrator credential, which is a value in the
  * process's validated config, and the public REST rate limiter, which is a
  * counter over the process's own Redis. Neither needed anything from the
- * legacy application to begin with — they were only there because that is
+ * retired application to begin with — they were only there because that is
  * where the environment and the Redis client used to live.
  */
-export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminKey" | "rateLimit">;
+export type ApiOwnedRestFeaturePorts = Readonly<{
+  /** The configured instance administrator credential, or undefined when unset. */
+  instanceAdminKey: () => string | undefined;
+  /** One fixed-window counter, keyed on whatever the caller is identified by. */
+  rateLimit: FilesRateLimiter;
+}>;
 
 /**
  * What a host hands the production composition, and what it may leave out.
@@ -574,11 +600,63 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   private composedQueueRedis: RedisConnection | undefined;
   /**
+   * The process's ONE evaluator runtime, resolved on first use.
+   *
+   * Lazy rather than composed in order because it closes a cycle: the studio's
+   * `evaluations.runEvaluation` needs the runtime, and the runtime needs the
+   * evaluator service the execution half publishes and the trace read stack the
+   * observability half opens — two halves composed on either side of it. Every
+   * consumer asks for it at call time, by which point both are open.
+   *
+   * Held so the three doors share one instance: the gateway's guardrail check,
+   * the four legacy evaluate doors and a trace re-score run one engine over one
+   * Langevals transport and one model environment.
+   */
+  private composedEvaluatorExecution: ApiEvaluatorExecution | undefined;
+  private resolvedEvaluatorExecution = false;
+  /**
+   * Where `LANGEVALS_ENDPOINT` was read, and this process's own name, held for
+   * the lazy composition above: it runs at a call, long after `compose` was
+   * handed the configuration.
+   */
+  private evaluatorLangevalsEndpoint: string | undefined;
+  private evaluatorProcessName = "langwatch-api";
+  /**
    * The shared bearer the Langy agent presents on its callbacks, held from
    * `compose` because the doors that read it are built by {@link composeDoors},
    * which is handed a request policy rather than a configuration.
    */
   private composedLangyInternalSecret: string | undefined;
+  /**
+   * Whether this deployment is the hosted product, held from `compose` for the
+   * same reason the Langy secret is: the instance-provisioning family reads it
+   * and {@link composeDoors} is handed services rather than a configuration.
+   */
+  private composedIsSaas = false;
+  /**
+   * The two facts the retired route file's own doors read straight off the
+   * environment: which project is the globally-readable demo, and how far this
+   * deployment lets an outbound fetch reach.
+   *
+   * Held from `compose` for the reason the Langy secret is: {@link composeDoors}
+   * is handed services rather than a configuration, and reading either a second
+   * time would let the MCP approval and the AuthZ demo grant disagree about
+   * which project is the showcase.
+   */
+  private composedRestEnvironment: Readonly<{
+    demoProjectId: string | undefined;
+    blockLocalHttpCalls: boolean;
+    allowedProxyHosts: readonly string[];
+  }> = { demoProjectId: undefined, blockLocalHttpCalls: true, allowedProxyHosts: [] };
+  /**
+   * The operator-only ClickHouse EXPLAIN family, where this deployment
+   * provisioned the dedicated readonly account it runs as.
+   *
+   * Composed in `compose` rather than in {@link composeDoors} because it opens
+   * a connection the process must release, and only `compose` holds the
+   * resource registry.
+   */
+  private composedOpsExplain: ApiOpsExplainRest | undefined;
   /**
    * The one evaluator-id slug rule on this process.
    *
@@ -639,6 +717,29 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     }
 
     this.secrets = this.resolveSecrets(encryption);
+    this.composedIsSaas = options.config.infrastructure.modelProvider.isSaas;
+    this.composedRestEnvironment = {
+      demoProjectId: options.config.authz.demoProjectId,
+      blockLocalHttpCalls: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
+      allowedProxyHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
+    };
+    // Held rather than read at the call: this process's configuration is read
+    // once, here, and the evaluator runtime is composed lazily further down.
+    this.evaluatorLangevalsEndpoint = options.config.infrastructure.execution.langevalsEndpoint;
+    this.evaluatorProcessName = options.config.serviceName;
+    // The operator EXPLAIN endpoint's own connection. Separate from
+    // `ApiClickHouseInfrastructure` on purpose: that one is tenant-keyed and
+    // hands out no shared client, and this endpoint is cross-tenant by design.
+    this.composedOpsExplain = composeApiOpsExplainRest({
+      opsClickHouseUrl: options.config.infrastructure.clickhouse.opsUrl,
+      opsApiKey: options.config.opsApiKey,
+      isProduction: options.config.nodeEnvironment === "production",
+    });
+    if (this.composedOpsExplain) {
+      options.resources?.own("api ops clickhouse explain client", () =>
+        this.composedOpsExplain!.close(),
+      );
+    }
     this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
     this.requestPolicy = ApiRequestPolicy.create({
       authentication: AuthSessionApiAuthenticationAdapter.create(auth.compose()),
@@ -1078,6 +1179,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       gatewayInternalSecret,
       gatewayJwtSecret,
     );
+    // The other half of a brokered voice call: the vendor's post-call delivery,
+    // which is the only path by which one reaches billing. Composed AFTER the
+    // internal family for the same reason it is composed beside it — both
+    // settle the SAME session row through the same confirmation — and its own
+    // family because it is public by protocol where that one is ingress-blocked.
+    const elevenLabsWebhookRest = this.composedDatabase?.connection
+      ? (composeApiElevenLabsWebhookRest({
+          security: restSecurity,
+          prisma: this.composedDatabase.connection.client,
+          encryption: this.composedEncryption,
+          spendConfirmation: this.composedGatewaySpendPipeline?.confirmation,
+        }) as Hono | undefined)
+      : undefined;
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const langyRest = this.composeLangyRest();
@@ -1346,6 +1460,29 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               reportEvaluation(input as never),
           }
         : undefined;
+    // The four evaluate doors' collaborators. They stand on the evaluator
+    // RUNTIME, which is what decides whether the doors are registered at all:
+    // a door that authenticates, validates and then has nothing to run the
+    // evaluator with is one an SDK retries forever. Everything beside it is
+    // the process's own — the same evaluator directory the studio publishes
+    // through, the same experiment service the batch log groups rows under,
+    // the same gateway a default model is resolved from, and the same slug
+    // rule and verdict command the collector uses.
+    const evaluatorExecution = this.resolveEvaluatorExecution();
+    const evaluationDatabase = this.composedDatabase?.connection;
+    const evaluationRun =
+      execution && evaluationDatabase && modelProviders && evaluatorExecution && reportEvaluation
+        ? {
+            prisma: evaluationDatabase.client,
+            execution: evaluatorExecution,
+            evaluators: execution.evaluators,
+            experiments: execution.experiments.experimentService,
+            modelProviders,
+            reportEvaluation: (input: Record<string, unknown>) =>
+              reportEvaluation(input as never),
+            deriveEvaluatorId: (name: string) => this.evaluatorIdSlug.derive(name),
+          }
+        : undefined;
     const collector = otlpIngest
       ? {
           credential: otlpIngest.collectorCredential,
@@ -1367,9 +1504,124 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           deriveEvaluatorId: (name: string) => this.evaluatorIdSlug.derive(name),
         }
       : undefined;
+    // The DSPy optimizer's step log. Its cost enrichment is what kept it in the
+    // retired route file: it prices every LLM call against the project's OWN
+    // stored rates, and a step recorded with every cost null reads as a free
+    // run. So the family is mounted only where this process composed the
+    // provider gateway the rules live behind, over the SAME service the
+    // provider surface reads them through.
+    const dspySteps =
+      execution && experimentFindOrCreate && modelProviders
+        ? {
+            authenticateCredential: (input: {
+              request: Request;
+              permission: AuthzPermission;
+            }) => handlerManagedCredentials.authenticate(input),
+            findOrCreate: () => experimentFindOrCreate,
+            experiments: () => execution.experiments.experimentService,
+            listModelCosts: async (input: { projectId: string }) =>
+              (await modelProviders.listCosts(input)).map((cost) => ({
+                model: cost.model,
+                regex: cost.regex,
+                ...(cost.inputCostPerToken !== null
+                  ? { inputCostPerToken: cost.inputCostPerToken }
+                  : {}),
+                ...(cost.outputCostPerToken !== null
+                  ? { outputCostPerToken: cost.outputCostPerToken }
+                  : {}),
+                ...(cost.cacheReadCostPerToken !== null
+                  ? { cacheReadCostPerToken: cost.cacheReadCostPerToken }
+                  : {}),
+                ...(cost.cacheCreationCostPerToken !== null
+                  ? { cacheCreationCostPerToken: cost.cacheCreationCostPerToken }
+                  : {}),
+                ...(cost.cacheCreation1hCostPerToken !== null
+                  ? { cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken }
+                  : {}),
+              })),
+          }
+        : undefined;
+    // The hosted MCP OAuth approval step. Three conditions, and each is
+    // structural: the code lives in Redis for ten minutes, it embeds the
+    // project's credential under this deployment's cipher, and it is minted
+    // for the person the consent page authenticated.
+    const mcpCipher = this.composedEncryption;
+    const mcpRedis = this.composedQueueRedis;
+    const mcpAuthorize =
+      authoringSession && mcpCipher && projects
+        ? {
+            resolveSession: (request: Request) => authoringSession.resolve(request),
+            tryGetProject: async (projectId: string) => {
+              const project = await projects.tryGetById(projectId);
+              return project
+                ? {
+                    id: project.id,
+                    apiKey: project.apiKey,
+                    archivedAt: project.archivedAt,
+                  }
+                : null;
+            },
+            probeProjectPermission: (input: {
+              session: { user: { id: string } };
+              projectId: string;
+            }) =>
+              authoringSession.permitted({
+                session: input.session,
+                projectId: input.projectId,
+                permission: "project:view",
+              }),
+            // The demo project grants `project:view` to everybody, so the
+            // permission probe above would PASS for it — which is why this is
+            // its own answer, read off the deployment's own configuration.
+            isDemoProject: (projectId: string) =>
+              !!this.composedRestEnvironment.demoProjectId &&
+              projectId === this.composedRestEnvironment.demoProjectId,
+            encrypt: (value: string) => mcpCipher.encrypt(value),
+            redis: mcpRedis ?? null,
+          }
+        : undefined;
+    // The families that live in a feature package, bound to the services this
+    // process already composed for its tRPC record. TAKEN rather than built a
+    // second time, for the reason every other row on this file gives: two
+    // applications over one project's rows let the SDK's door and the
+    // browser's door answer the same question differently.
+    const packaged = composeApiPackagedRest({
+      agents: this.composedAgents?.agents,
+      agentGroup: this.composedAgentGroup,
+      analytics: this.composedAnalytics,
+      authz,
+      authzComposition: this.composedAuthz,
+      credentials: handlerManagedCredentials,
+      encryption: this.composedEncryption,
+      execution,
+      gatewayGroup: this.composedGatewayGroup,
+      identity: this.composedIdentity,
+      orgGroup: this.composedOrgGroup,
+      productGroup: this.composedProductGroup,
+      productInfra: this.composedProductInfra,
+      plans,
+      publicBaseUrl,
+      rateLimit: (request) => this.rateLimiter.consume(request),
+      redis: this.composedQueueRedis,
+      secrets,
+      session: authoringSession,
+      apiKeys: tenancy.apiKeys,
+      organizations: tenancy.organizations,
+      projects,
+      modelProviders,
+      // The SAME ceiling the framework chain installs on a declared policy.
+      requireApiKeyPermission: (permission) => projectRestPolicy.permissionMiddleware(permission),
+      audit: this.options.audit,
+      managementAudit: this.composeManagementAudit(),
+      isSaas: this.composedIsSaas,
+      instanceAdminKey: this.composedFeaturePorts?.instanceAdminKey ?? (() => undefined),
+      logger: createLogger(serviceName),
+    });
     for (const processRestApp of createApiProcessRestFeatures({
       security: restSecurity,
+      packagedAbsence: LoggedApiPackagedRestAbsence.create(createLogger(serviceName)),
       services: {
+        packaged,
         ...(annotations ? { annotations: () => annotations } : {}),
         ...(analytics ? { analytics: () => analytics } : {}),
         ...(langWatchQL ? { langWatchQL } : {}),
@@ -1380,6 +1632,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(experimentWorkbench ? { experimentWorkbench } : {}),
         ...(experimentInit ? { experimentInit } : {}),
         ...(evaluationBatch ? { evaluationBatch } : {}),
+        ...(evaluationRun ? { evaluationRun } : {}),
         ...(workflowRun ? { workflowRun } : {}),
         ...(traceReads ? { traceReads } : {}),
         ...(traceLegacy ? { traceLegacy } : {}),
@@ -1401,6 +1654,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(governanceIngest ? { governanceIngest } : {}),
         ...(publicBaseUrl ? { publicBaseUrl } : {}),
         ...(healthProbes ? { healthProbes } : {}),
+        ...(this.composedOpsExplain
+          ? { opsClickHouseExplain: this.composedOpsExplain.ports }
+          : {}),
+        ...(dspySteps ? { dspySteps } : {}),
+        ...(mcpAuthorize ? { mcpAuthorize } : {}),
+        imageProxy: {
+          blockLocalHttpCalls: this.composedRestEnvironment.blockLocalHttpCalls,
+          allowedHosts: this.composedRestEnvironment.allowedProxyHosts,
+        },
       },
     })) {
       rest.route("/", processRestApp);
@@ -1436,7 +1698,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // The internal control plane. Its own namespace, blocked at the
         // ingress by the chart, and reached in-cluster through this process's
         // internal Service rather than through the public host.
-        .route("/", gatewayInternalRest ?? new Hono()),
+        .route("/", gatewayInternalRest ?? new Hono())
+        // The ElevenLabs post-call webhook. A literal first segment nothing
+        // else claims, so its position here is free; it is last because it is
+        // the only public gateway door that is not on `/api/gateway/v1`.
+        .route("/", elevenLabsWebhookRest ?? new Hono()),
       // The subscription lane declares its access policy on the same security
       // every REST family does, so the one streaming route on this process is
       // a registry entry rather than an unaccounted-for endpoint. It is a
@@ -1673,6 +1939,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const modelProviders = this.composedModelProviders;
     const monitors = this.composedMonitors;
     const spend = this.composedGatewaySpendPipeline;
+    // The SAME runtime the legacy evaluate doors and the studio's re-score run
+    // on. A guardrail and a monitor scoring the same evaluator two ways is
+    // exactly what one runtime prevents; where this process composed none the
+    // check keeps refusing by name rather than answering `allow`.
+    const evaluatorExecution = this.resolveEvaluatorExecution();
     return composeApiGatewayInternalRest({
       security,
       prisma: database.client,
@@ -1687,6 +1958,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? { spendCommands: spend.commands, spendConfirmation: spend.confirmation }
         : {}),
       ...(monitors ? { monitors } : {}),
+      ...(evaluatorExecution
+        ? { runEvaluator: (input) => evaluatorExecution.runEvaluation(input) }
+        : {}),
       ...(modelProviders
         ? {
             refreshCodex: (input: { providerRowId: string }) =>
@@ -2053,6 +2327,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (!database || !projects || !authz) return undefined;
 
     const session = auth.compose();
+    // The three identity definitions, registered PRODUCER-only on this
+    // process's own Eventing. Composed BEFORE the collaborator set because
+    // every ledger write below stages through them: the thirteen identifier
+    // and two-step commands, the five a join request has, and the fourteen a
+    // single sign-on connection has. Without the registration the two ledgers
+    // do not degrade — they throw, because a staged command with no sender is
+    // a write that arrived and cannot leave.
+    const identityPipelines = composeApiIdentityPipelines({
+      eventing: this.composedEventing?.eventSourcing,
+      processName: options.config.serviceName,
+      report: LoggedApiIdentityPipelinesAbsence.create(createLogger(options.config.serviceName)),
+    });
     return composeApiIdentityCollaborators({
       prisma: database.client,
       organizations: tenancy.organizations,
@@ -2067,7 +2353,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME counter the public REST surface meters through, so a budget
       // cannot be spent twice by asking on two paths.
       rateLimit: (request) => this.rateLimiter.consume(request),
-      eventing: ApiEventingIdentityAdapter.create(this.composedEventing),
+      eventing: ApiEventingIdentityAdapter.create({
+        eventSourcing: this.composedEventing?.eventSourcing,
+        pipelines: identityPipelines,
+      }),
       resources: options.resources,
       deployment: this.options.identity ?? {},
       mail: this.options.mail,
@@ -2881,10 +3170,73 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // and verified through: a run's sandbox key is a narrower key, not a
       // second kind of key.
       apiKeys: tenancy.apiKeys,
+      // The studio's own re-score, over the process's ONE evaluator runtime.
+      // Resolved at the call rather than passed as a value because the runtime
+      // is built FROM this half's evaluator service and the observability
+      // half's trace reads: at this line neither exists yet, and at the call
+      // both do. Absent runtime still refuses by name, one layer down.
+      runEvaluationForTrace: (_ctx, input) =>
+        this.requireEvaluatorExecution().runEvaluationForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          evaluatorType: input.evaluatorType,
+          settings: input.settings,
+          mappings: input.mappings,
+        }),
       experimentRunReport: LoggedApiExperimentRunAbsence.create(
         createLogger(options.config.serviceName),
       ),
     });
+  }
+
+  /**
+   * The process's evaluator runtime, composed on first use.
+   *
+   * Everything it stands on is this process's own and is named here so a second
+   * of any of them cannot appear: the evaluator service the studio publishes
+   * evaluators through, the workflow service behind a custom evaluator, the ONE
+   * model gateway, and the trace read stack a re-score renders through.
+   */
+  private resolveEvaluatorExecution(): ApiEvaluatorExecution | undefined {
+    if (this.resolvedEvaluatorExecution) return this.composedEvaluatorExecution;
+    this.resolvedEvaluatorExecution = true;
+
+    const execution = this.composedExecution;
+    const modelProviders = this.composedModelProviders;
+    if (!execution || !modelProviders) return undefined;
+
+    this.composedEvaluatorExecution = composeApiEvaluatorExecution({
+      // The observability half opens after the execution half, so the read
+      // stack is resolved at the call rather than captured here.
+      traceReads: () => this.composedTraceGroup?.traceReads?.readers().read,
+      evaluators: execution.evaluators,
+      workflows: execution.workflows.workflowService,
+      modelProviders,
+      langevalsEndpoint: this.evaluatorLangevalsEndpoint,
+      processName: this.evaluatorProcessName,
+      report: LoggedApiEvaluatorExecutionAbsence.create(
+        createLogger(this.evaluatorProcessName),
+      ),
+    });
+    return this.composedEvaluatorExecution;
+  }
+
+  /**
+   * The evaluator runtime, or the refusal a caller that cannot degrade needs.
+   *
+   * The studio's re-score is such a caller: it has already told the customer an
+   * evaluation is running. The doors that CAN degrade — the guardrail check and
+   * the four legacy evaluate doors — read {@link resolveEvaluatorExecution}
+   * instead and are left off rather than mounted over this throw.
+   */
+  private requireEvaluatorExecution(): ApiEvaluatorExecution {
+    const execution = this.resolveEvaluatorExecution();
+    if (!execution) {
+      throw new ExecutionCapabilityUnavailableError(
+        "evaluator runtime, so it cannot score a trace on demand",
+      );
+    }
+    return execution;
   }
 
   private composeQueue(options: ApiRuntimeCompositionOptions): ApiQueueInfrastructure | undefined {
