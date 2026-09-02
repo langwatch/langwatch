@@ -1,196 +1,151 @@
 ---
 title: Streaming
-description: SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
+description: Read a completion as Server-Sent Events through the gateway, and know what the caller gets when a stream stops early.
 sidebarTitle: Streaming
 ---
 
-Clients read LLM streams as Server-Sent Events: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
+## Which endpoints stream
 
-## The streaming contract
+| Endpoint | How you ask for a stream |
+|---|---|
+| `POST /v1/chat/completions` | `"stream": true` in the body |
+| `POST /v1/messages` | `"stream": true` in the body |
+| `POST /v1/responses` | `"stream": true` in the body |
+| `POST /v1beta/models/{model}:streamGenerateContent` | The method name. The Gemini SDKs call it for you |
+| `POST /v1beta/models/{model}:streamGenerateAnswer` | The method name |
 
-### Before the first chunk: mutations allowed
+`/v1/embeddings`, `/v1/audio/*` and `/v1/models` return one response and never stream.
 
-- Gateway may inject response headers (`X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
-- Pre-call guardrails may rewrite the request payload before dispatch.
-- Fallback chain may transparently switch providers if the primary fails before any chunk arrives.
+## Start a stream
 
-At this point no client-visible byte has been emitted yet, so changes are safe.
+The base URL for an OpenAI-style SDK is `https://gateway.langwatch.ai/v1`. The Anthropic and Gemini SDKs append their own version segment, so give them `https://gateway.langwatch.ai`.
 
-### After the first chunk: strict passthrough
-
-- SSE events are forwarded to the client **byte-for-byte**, in order, without merging, splitting, or reordering.
-- No header injection (except the ones already emitted on the first frame).
-- No mid-stream provider switch, even if the primary dies after chunk N, the gateway does NOT fall back to a secondary provider silently. Instead it terminates the stream.
-
-Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta`, `input_json_delta` ordering; any reformat breaks their tool-call parser.
-
-### Terminal error shapes
-
-Once the first chunk has been sent to the client, the gateway never silent-switches providers. If something goes wrong mid-stream, the stream ends with a terminal `event: error` frame. **Two shapes exist in v1**, distinguishable by `error.code`:
-
-**Upstream connection failure:**
-
-```
-event: error
-data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
-
-```
-
-**Stream-chunk guardrail block** (from [stream_chunk guardrails](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas)):
-
-```
-event: error
-data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<policy reason>","param":null}}
-
-```
-
-Both frames are byte-locked by the Go test suite, any future shape drift breaks the build. Clients that parse SSE `error` frames should key off `error.code` to distinguish provider failures (retryable after backoff) from policy blocks (retry won't help unless the input changes).
-
-Post-emission sequence for both shapes:
-
-1. Gateway emits the terminal `event: error` frame (shown above).
-2. Gateway closes the client connection.
-3. For `provider_error`: the failed provider's circuit-breaker counter increments. For `guardrail_blocked`: a verdict metric (`gateway_guardrail_verdicts_total{verdict=block}`) increments instead, the provider is healthy, policy fired.
-
-The gateway **never** silent-switches to the fallback mid-stream. Splicing chunks from two providers would produce an inconsistent response: mismatched tool-call ids, accumulated-content replay, token-accounting drift. The choice is deliberate and enforced in code.
-
-The client is free to retry the request; a fresh request will go through the fallback chain from scratch (which IS allowed to transparently switch providers, see below).
-
-### Pre-connection fallback (transparent)
-
-When the primary returns a retryable error **before** any chunk has been sent to the client (connection failures, pre-first-chunk 5xx, 429, timeout, network), the gateway walks the VK's `fallback.chain` the same way it does for non-streaming calls. The caller sees exactly one stream, from whichever credential accepted the request.
-
-`X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
-
-## `stream_chunk` guardrails
-
-Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text, role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage, skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
-
-- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so it does **not** emit `gateway_guardrail_verdicts_total{verdict="fail_open"}`; the trace attribute is the signal for degraded policy services on stream chunks. Only the `request` and `response` directions count fail-open verdicts.
-- **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
-- **Decision `modify`** is **not implemented in v1**: chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
-
-## Starting a streaming request
-
-### OpenAI-compatible
-
+<Tabs>
+  <Tab title="OpenAI">
 ```python
 from openai import OpenAI
+
 client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 for chunk in client.chat.completions.create(
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
     messages=[{"role": "user", "content": "count to 5"}],
     stream=True,
 ):
     print(chunk.choices[0].delta.content or "", end="")
 ```
-
-### Anthropic-compatible
-
+  </Tab>
+  <Tab title="Anthropic">
 ```python
 import anthropic
+
 client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="vk-lw-...")
 
 with client.messages.stream(
-    model="claude-haiku-4-5-20251001",
+    model="anthropic/claude-haiku-4-5-20251001",
     max_tokens=64,
     messages=[{"role": "user", "content": "count to 5"}],
 ) as stream:
     for text in stream.text_stream:
         print(text, end="")
 ```
+  </Tab>
+</Tabs>
 
-## Tool-call deltas: what to look for
+## What the frames look like
 
-Anthropic emits this sequence for a tool call:
+The frame shape follows the endpoint you called, not the provider that served the request.
 
-```
-event: content_block_start
-data: {"index": 1, "content_block": {"type": "tool_use", "id": "tu_01H...", "name": "read_file", "input": {}}}
-
-event: content_block_delta
-data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":"}}
-
-event: content_block_delta
-data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": " \"./README.md\"}"}}
-
-event: content_block_stop
-data: {"index": 1}
-```
-
-Claude Code reassembles `partial_json` chunks into a full JSON object. Any reordering or re-splitting breaks this. The gateway preserves the exact chunk boundaries.
-
-OpenAI emits tool-call deltas as:
+`POST /v1/chat/completions` sends OpenAI chunk objects, one per `data:` line, and closes with `data: [DONE]`.
 
 ```
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"read_file","arguments":""}}]}}]}
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":"}}]}}]}
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"./README.md\"}"}}]}}]}
+data: {"id":"chatcmpl-...","choices":[{"delta":{"content":"1"}}]}
+
+data: [DONE]
 ```
 
-Same passthrough discipline.
+`POST /v1/messages` sends the Anthropic Messages event union: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`. When an Anthropic credential serves the request, the provider's own SSE bytes reach the client unchanged. When another provider serves it, the gateway builds the same event union from that provider's response.
 
-## Observability
+`POST /v1/responses` sends the OpenAI Responses events: `response.created`, `response.output_text.delta`, `response.completed`.
 
-- `X-LangWatch-Gateway-Request-Id` on the first frame.
-- Trace span per chunk would be too expensive, the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
-- Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
+The `/v1beta` Gemini routes forward the provider's bytes unchanged.
 
-<Info>Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`, `.total_ms`, `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request model + log-line correlation is the operator signal.</Info>
+Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v1/messages` a tool call is a `content_block_start` with `"type": "tool_use"`, then `input_json_delta` frames whose `partial_json` strings concatenate into the argument object, then `content_block_stop`. On `/v1/chat/completions` the same call arrives as `delta.tool_calls[]` entries whose `function.arguments` strings concatenate.
 
-## Usage extraction (critical for streaming budgets)
+## When a stream fails after it opened
 
-Streaming responses are just as expensive as non-streaming, but the usage block (token counts, cost inputs) arrives asynchronously, typically in the terminal chunk, but providers differ:
+The HTTP status is committed to `200` the moment the first frame is written, so a failure after that point cannot change it. The gateway ends the stream with an `event: error` frame instead.
 
-| Provider | How usage is reported on a stream |
+```
+event: error
+data: {"type":"error","error":{"type":"provider_error","message":"upstream connection closed"}}
+```
+
+`error.type` carries the provider's own discriminant when the provider named one, for example `insufficient_quota` or `overloaded_error`. For a failure the gateway raised, it carries the gateway error code. When the provider sent an error event of its own, that event body is forwarded unchanged instead of the frame above.
+
+Read `error.type` to decide what to do next. A provider failure is worth a retry after a backoff. The error index for every gateway code is on [Troubleshooting](/ai-gateway/troubleshooting).
+
+## When a guardrail stops a stream
+
+A stream chunk guardrail runs on every chunk before the gateway forwards it. On a fail verdict the gateway closes the upstream stream at that chunk and forwards no further frame. The caller keeps the chunks already sent and gets no `event: error` frame, because the guardrail stops the stream rather than raising an error on it.
+
+Stream chunk guardrails always fail open. The gateway waits 50 milliseconds for the verdict; a timeout or an evaluator error lets the chunk through and records `langwatch.guardrail.stream_chunk_fail_open` with the cause on the span.
+
+A fail verdict blocks. A modify verdict does not rewrite the chunk.
+
+**Also check:** [Guardrails](/ai-gateway/guardrails) for the directions, the failure modes and the setup steps.
+
+## Fallback on a stream
+
+The gateway walks the key's fallback chain while it opens the stream. Once the provider accepts the request and the first frame is written, no other credential can take over: splicing two providers into one stream would give the caller mismatched tool-call ids and double-counted tokens.
+
+A retryable failure before the first frame is therefore invisible to the caller. One stream arrives, from whichever credential accepted the request. `X-LangWatch-Fallback-Count` reports how many credentials were tried and skipped; the header is absent when the first one worked.
+
+A failure after the first frame ends the stream with the error frame above. Send the request again to walk the chain from the start.
+
+**Also check:** [Fallback Chains](/ai-gateway/providers/fallback-chains).
+
+## Token usage on a stream
+
+Providers report usage at the end of a stream, in their own shape.
+
+| Endpoint and provider | Where the usage arrives |
 |---|---|
-| Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
-| OpenAI, Azure OpenAI | The final data-only chunk carries `usage` when the request body has `stream_options: {include_usage: true}`. **The gateway auto-injects this flag** on OpenAI/Azure streaming requests when the caller hasn't set it, see below |
-| Bedrock | Usage on the final `message_delta` event, same as Anthropic |
-| Vertex, Gemini | Usage on the terminal `candidates[].finishReason` event |
+| `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}` |
+| `/v1/messages` on Anthropic or Bedrock | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
+| `/v1beta` on Gemini or Vertex | `usageMetadata` on the chunks that carry it |
 
-The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
+The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.
 
-- **Empty deltas don't zero-stomp real numbers.** OpenAI's pre-terminal "empty usage" deltas are ignored; the real numbers arrive on the last chunk.
-- **OpenAI/Azure auto-injects `stream_options: {include_usage: true}`.** Most OpenAI SDKs don't set this flag by default, without it, OpenAI never emits usage on the SSE stream, and the gateway would have to debit `$0`. The gateway's `DispatchStream` path detects OpenAI/Azure + `stream:true` + missing flag and injects the option via `sjson.SetBytes` before the body reaches Bifrost. Other body fields round-trip byte-for-byte (so OpenAI's prompt-prefix auto-cache still hits on identical prefixes). Callers who explicitly set `stream_options: {include_usage: false}` are honoured (never overwritten).
-- **`success_no_usage` warning is now rare.** With the auto-injection above, OpenAI streams should always report usage. If you still see `span.status = success_no_usage` or the `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` header, it means either (a) the caller opted out of usage explicitly via `include_usage: false`, or (b) the provider returned a stream without a final usage frame (very rare, file a bug with the trace id).
+On `/v1/chat/completions` to OpenAI, Azure OpenAI or a custom OpenAI-compatible endpoint, the gateway sets `stream_options.include_usage` to `true` when the body does not carry it. Without the flag those providers report no usage at all, and the request debits zero tokens. A body that sets the flag itself, to `true` or to `false`, is left as sent.
 
-### Setting `stream_options.include_usage` in your client
-
-Auto-injection means you don't have to. To keep the call explicit and portable across gateways, the form is identical to direct-OpenAI usage:
+You can still set it yourself to keep the call explicit:
 
 ```python
 for chunk in client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[...],
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "count to 5"}],
     stream=True,
     stream_options={"include_usage": True},
 ):
     pass
 ```
 
-```ts
-const stream = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [...],
-  stream: true,
-  stream_options: { include_usage: true },
-});
+On `/v1/chat/completions`, a stream that closes with zero total tokens carries one more frame before `data: [DONE]`:
+
+```
+event: warning
+data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
 
-### Alerting on missing usage (residual cases)
+That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
 
-In Prometheus, Grafana:
+## Requests without `stream`
 
-```promql
-sum(rate(gateway_streaming_usage_missing_total[5m])) > 0
-```
+A request without `stream: true` returns one JSON body. The gateway runs the response guardrails on the full body, and the fallback chain stays open for the whole call because the caller sees only the response that succeeded.
 
-After the gateway-side auto-injection landed, this should sit at zero in steady state for OpenAI, Azure streaming traffic. If it spikes, capture the request body via `LW_LOG_MESSAGE_BODY=1` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) and check whether the caller is opting out of usage explicitly.
+<Warning>
+A proxy in front of a self-hosted gateway must not buffer responses. With buffering on, every frame is held until the provider finishes and the caller gets the whole stream at once. On an nginx ingress set `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, and raise the read timeout above the longest stream you allow. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
+</Warning>
 
-## Non-streaming clients
-
-Requests without `stream: true` are dispatched synchronously, accumulated upstream, and returned as a single JSON response. Pre-call guardrails run on the request; post-call guardrails run on the full response and can block/modify the final body.
-
-The "no mid-stream switch" rule doesn't apply, non-streaming calls can fall back freely because the client only ever sees the final successful response.
+**Also check:** [Parameter mapping](/ai-gateway/parameter-mapping) for what happens to a parameter the target provider has no field for, [Observability](/ai-gateway/observability) for the span attributes and the metrics.

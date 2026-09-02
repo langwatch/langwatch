@@ -71,9 +71,9 @@ An alias whose target is not reachable from the key is not listed, because a req
 
 ## Trace attributes
 
-Every gateway span records how the model was resolved:
+Two attributes on the gateway span tell you which name the client sent and which model served it:
 
-- `langwatch.model`: the model that was sent to the provider, after the alias was applied.
-- `langwatch.model_source`: `alias` when the client sent an alias name, `explicit` when it sent `provider/model` or `handle/model`, `implicit` when it sent a bare model name.
+- `gen_ai.request.model`: the model the gateway sent to the provider, after the alias was applied.
+- `langwatch.requested_model`: the name the client sent. Present only when it differs from the model that was served, so it is the mark of a request that went through an alias or a tier.
 
-Filter Trace Explorer on `langwatch.model_source = alias` to see which requests went through the mapping.
+Filter Trace Explorer on `langwatch.requested_model` to find the traffic still sending an old name.

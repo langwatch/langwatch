@@ -11,7 +11,7 @@ Every error the LangWatch AI Gateway writes itself uses one JSON envelope:
   "error": {
     "type": "budget_exceeded",
     "code": "budget_exceeded",
-    "message": "Budget exceeded for scope=project window=month",
+    "message": "The project spending limit (per month) for this request has been reached. Contact your LangWatch admin to raise it.",
     "meta": {
       "budget_id": "bgt_01HZX9K3MNN",
       "budget_scope": "project",
@@ -19,7 +19,7 @@ Every error the LangWatch AI Gateway writes itself uses one JSON envelope:
     },
     "trace_id": "0af7651916cd43dd8448eb211c80319c",
     "span_id": "b7ad6b7169203331",
-    "tips": ["Raise the project's monthly limit, or wait for the window to roll over."],
+    "tips": ["Contact your LangWatch admin to raise the project spending limit", "Switch to a cheaper model or reduce request volume to stay within the limit"],
     "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
     "fault": "customer"
   }

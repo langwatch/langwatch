@@ -4,15 +4,19 @@ description: "How every OpenAI chat-completions parameter behaves on each provid
 sidebarTitle: "Parameter mapping"
 ---
 
-The gateway speaks the OpenAI chat-completions wire format to every provider. OpenAI-compatible targets (OpenAI, Azure OpenAI, self-hosted vLLM and other custom OpenAI-compatible endpoints) bypass the policy on this page entirely: the request body is forwarded byte-for-byte apart from the gateway-only `drop_tuning_params` field, which is consumed before forwarding, so whatever the provider accepts, you get. For the translated lanes (Anthropic, Bedrock, Gemini, Vertex) the gateway builds the provider-native request itself, and every parameter follows an explicit policy:
+A lane is the wire format the gateway uses to reach one kind of provider. OpenAI, Azure OpenAI and OpenAI-compatible custom endpoints share one lane; Anthropic, Bedrock, and Gemini with Vertex have a lane each.
 
-- **mapped**: translated faithfully to the provider's native field.
-- **dropped**: a tuning parameter with no equivalent on the lane. By default it is removed, the request proceeds, and the drop is signaled (see below). It is never silently ignored.
-- **refused**: the request depends on the parameter functionally; honoring the request without it would change what you observably get. These always fail with a clear `400 unsupported_parameter` error naming the parameter, the lane, and why.
+On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body byte for byte. It removes only the gateway's own `drop_tuning_params` field. Whatever the provider accepts, you get.
+
+On the other lanes the gateway builds the provider-native request itself, so every parameter has one of three dispositions:
+
+- **mapped**: translated to the provider's own field.
+- **dropped**: a tuning parameter the lane has no field for. The gateway removes it, the request proceeds, and the drop is reported on the response and on the trace.
+- **refused**: the request depends on the parameter, and serving it without the parameter would give you a different answer than you asked for. The request fails with `400 unsupported_parameter`, naming the parameter, the lane and the reason.
 
 ## drop_tuning_params
 
-Send `"drop_tuning_params": false` in the request body to opt into strict mode: any parameter the lane cannot map then refuses instead of dropping. The default is `true`. The field itself is consumed by the gateway and never reaches a provider.
+Send `"drop_tuning_params": false` in the request body for strict mode. A parameter the lane cannot map is then refused instead of dropped. The default is `true`. The gateway removes the field before the request leaves, so no provider sees it.
 
 ```json
 {
@@ -35,11 +39,11 @@ Send `"drop_tuning_params": false` in the request body to opt into strict mode: 
 
 ## Drop signals
 
-When a parameter is dropped, the drop is visible in three places:
+A dropped parameter is reported in three places:
 
-- Response body: `extra_fields.params_dropped` lists the dropped parameter names (on streams, on the final usage-bearing chunk).
+- Response body: `extra_fields.params_dropped` lists the dropped parameter names. On a stream it is on the final usage-bearing chunk.
 - Response header: `X-LangWatch-Params-Dropped` carries the same list, comma separated.
-- Trace: the gateway span records `langwatch.gateway.params_dropped`.
+- Trace: the gateway span carries `langwatch.gateway.params_dropped`.
 
 ## The table
 
@@ -83,7 +87,13 @@ When a parameter is dropped, the drop is visible in three places:
 
 ## The codex lane
 
-Codex models (your own ChatGPT subscription, model prefix `openai_codex/`) speak the Responses API. The gateway builds the outgoing body itself, so every provider-bound field you send is mapped, dropped or refused by the table below, exactly as above. The codex backend accepts only a fixed set of fields and answers `400 Unsupported parameter` to anything else, which is why every key the table does not list is dropped rather than forwarded. The gateway also pins three invariants the backend requires: the bare model name, `stream` on, and `store` off. Dropped fields are signaled on the `X-LangWatch-Params-Dropped` header and the gateway span; the response body is the backend's own SSE stream, so `extra_fields.params_dropped` is not injected into it. `drop_tuning_params` works on this lane too.
+Codex models run on your own ChatGPT subscription under the model prefix `openai_codex/`, and they speak the Responses API. The gateway builds the outgoing body itself, so the table below gives every field the same three dispositions as above.
+
+The codex backend accepts a fixed set of fields and answers `400 Unsupported parameter` to anything else. That is why every key the table does not list is dropped instead of forwarded.
+
+The gateway pins three values the backend requires: the bare model name, `stream` on, and `store` off.
+
+Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on the gateway span. The response is the backend's own SSE stream, so `extra_fields.params_dropped` is not added to it. `drop_tuning_params` works on this lane too.
 
 {/* codex-param-table:begin generated from codexParamPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
 
@@ -122,4 +132,23 @@ Codex models (your own ChatGPT subscription, model prefix `openai_codex/`) speak
 
 ## reasoning_effort budgets
 
-On lanes that map `reasoning_effort` to a thinking budget (Anthropic models without adaptive thinking, on both the anthropic and bedrock lanes), the budget is derived from your output cap: `budget = 1024 + ratio x (max_tokens - 1024)` with ratios `minimal 0.025`, `low 0.15`, `medium 0.425`, `high 0.80`, `xhigh 0.92`, `max 1.0`. Claude Opus and Sonnet 4.6+ use the provider's adaptive thinking with your effort passed through (`minimal` maps to `low`). Gemini thinking models receive the effort natively. Thinking tokens count inside `usage.completion_tokens`.
+Anthropic and Bedrock take a thinking budget in tokens, not an effort level, so the gateway derives the budget from your output cap:
+
+```
+budget = 1024 + ratio x (max_tokens - 1024)
+```
+
+| `reasoning_effort` | ratio |
+|---|---|
+| `minimal` | 0.025 |
+| `low` | 0.15 |
+| `medium` | 0.425 |
+| `high` | 0.80 |
+| `xhigh` | 0.92 |
+| `max` | 1.0 |
+
+`"reasoning_effort": "none"` sends no thinking budget at all.
+
+Claude Opus and Sonnet from 4.6 on take the effort itself, through the provider's adaptive thinking. `minimal` is sent as `low`, because Anthropic accepts `low`, `medium`, `high` and `max`.
+
+Gemini 3 and later take the effort as a native thinking level. Earlier Gemini models get a budget from the same formula, against the model's own budget range.
