@@ -116,47 +116,49 @@ describe("rateSpendNanoUsd", () => {
   });
 
   describe("given an image generation with an image token split", () => {
-    it("prices gpt-image-2 by its text prompt and its output image tokens", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
-        model: "openai/gpt-image-2",
-        usage: usage({
-          input_tokens: 14,
-          output_tokens: 0,
-          input_image_tokens: 0,
-          output_image_tokens: 196,
-          image_count: 1,
-        }),
+    describe("when the request is rated", () => {
+      it("prices gpt-image-2 by its text prompt and its output image tokens", () => {
+        const { costNanoUsd } = rateSpendNanoUsd({
+          model: "openai/gpt-image-2",
+          usage: usage({
+            input_tokens: 14,
+            output_tokens: 0,
+            input_image_tokens: 0,
+            output_image_tokens: 196,
+            image_count: 1,
+          }),
+        });
+        // 14 * $5/M + 196 * $30/M = $0.00007 + $0.00588 = $0.00595.
+        // Metered as flat text totals instead, the same call rates $0.00007,
+        // less than two percent of what the provider charged.
+        expect(costNanoUsd).toBe(5_950_000);
       });
-      // 14 * $5/M + 196 * $30/M = $0.00007 + $0.00588 = $0.00595.
-      // Metered as flat text totals instead, the same call rates $0.00007,
-      // less than two percent of what the provider charged.
-      expect(costNanoUsd).toBe(5_950_000);
-    });
 
-    it("prices an edit for the image tokens it read as well", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
-        model: "openai/gpt-image-1",
-        usage: usage({
-          input_tokens: 20,
-          input_image_tokens: 323,
-          output_image_tokens: 1600,
-          image_count: 1,
-        }),
+      it("prices an edit for the image tokens it read as well", () => {
+        const { costNanoUsd } = rateSpendNanoUsd({
+          model: "openai/gpt-image-1",
+          usage: usage({
+            input_tokens: 20,
+            input_image_tokens: 323,
+            output_image_tokens: 1600,
+            image_count: 1,
+          }),
+        });
+        // 20 * $5/M + 323 * $10/M + 1600 * $40/M = $0.0001 + $0.00323 + $0.064.
+        expect(costNanoUsd).toBe(67_330_000);
       });
-      // 20 * $5/M + 323 * $10/M + 1600 * $40/M = $0.0001 + $0.00323 + $0.064.
-      expect(costNanoUsd).toBe(67_330_000);
-    });
 
-    it("charges the mini model less for the same image", () => {
-      const full = rateSpendNanoUsd({
-        model: "openai/gpt-image-1",
-        usage: usage({ output_image_tokens: 1600 }),
-      }).costNanoUsd;
-      const mini = rateSpendNanoUsd({
-        model: "openai/gpt-image-1-mini",
-        usage: usage({ output_image_tokens: 1600 }),
-      }).costNanoUsd;
-      expect(mini).toBeLessThan(full);
+      it("charges the mini model less for the same image", () => {
+        const full = rateSpendNanoUsd({
+          model: "openai/gpt-image-1",
+          usage: usage({ output_image_tokens: 1600 }),
+        }).costNanoUsd;
+        const mini = rateSpendNanoUsd({
+          model: "openai/gpt-image-1-mini",
+          usage: usage({ output_image_tokens: 1600 }),
+        }).costNanoUsd;
+        expect(mini).toBeLessThan(full);
+      });
     });
   });
 

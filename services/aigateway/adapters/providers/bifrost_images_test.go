@@ -286,15 +286,25 @@ func TestDispatchStream_RefusesTheImageRequestTypes(t *testing.T) {
 	require.NoError(t, err)
 	defer router.Close()
 
-	for _, reqType := range []domain.RequestType{
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
-	} {
-		_, err := router.DispatchStream(context.Background(), &domain.Request{
-			Type:  reqType,
-			Model: "gpt-image-2",
-			Body:  []byte(`{"model":"gpt-image-2","prompt":"a red bicycle"}`),
-		}, openAICredential())
-		require.Error(t, err, "%s must not fall through to the chat stream", reqType)
-		assert.Contains(t, err.Error(), "streaming image generation is not supported")
+	// Every credential, not just the OpenAI one: Codex and the other
+	// provider lanes return from DispatchStream before any lane-neutral
+	// check, so the refusal has to sit above all of them.
+	credentials := []domain.Credential{
+		openAICredential(),
+		{ID: "cred-codex", ProviderID: domain.ProviderOpenAICodex, APIKey: "sk-codex"},
+	}
+	for _, cred := range credentials {
+		for _, reqType := range []domain.RequestType{
+			domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+		} {
+			_, err := router.DispatchStream(context.Background(), &domain.Request{
+				Type:  reqType,
+				Model: "gpt-image-2",
+				Body:  []byte(`{"model":"gpt-image-2","prompt":"a red bicycle"}`),
+			}, cred)
+			require.Error(t, err, "%s on %s must not fall through to a stream lane",
+				reqType, cred.ProviderID)
+			assert.Contains(t, err.Error(), "streaming image generation is not supported")
+		}
 	}
 }

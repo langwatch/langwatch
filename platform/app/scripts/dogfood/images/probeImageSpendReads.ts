@@ -130,10 +130,13 @@ export interface ImageSpanRow {
  * `gen_ai.output.messages` instead, and older spans carry `gen_ai.prompt` and
  * `gen_ai.completion`, so all of them are read.
  */
-export async function readTraceSpans(
-  scope: ProbeScope,
-  traceId: string,
-): Promise<ImageSpanRow[]> {
+export async function readTraceSpans({
+  scope,
+  traceId,
+}: {
+  scope: ProbeScope;
+  traceId: string;
+}): Promise<ImageSpanRow[]> {
   const client = await clickhouse(scope.projectId);
   const result = await client.query({
     query: `

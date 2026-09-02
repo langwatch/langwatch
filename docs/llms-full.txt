@@ -2134,11 +2134,11 @@ description: Image generation and editing through the LangWatch AI Gateway, on O
 sidebarTitle: Images
 ---
 
-OpenAI-compatible image endpoints. Any client that speaks OpenAI's images API works with no code change: point its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Image traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+OpenAI-compatible image endpoints. Any client that speaks OpenAI's images API works with no code change for the non-streaming requests below: point its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Image traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
 
 Both routes are non-streaming. `stream: true` and `partial_images` above zero get a `400` from the gateway before any provider is contacted.
 
-Models: `openai/gpt-image-2`, `openai/gpt-image-1`, `openai/gpt-image-1-mini`, `openai/dall-e-3`. Configure the OpenAI key once in **Settings → Model Providers**; every virtual key routed to that provider can then call its image models.
+Models: `openai/gpt-image-2`, `openai/gpt-image-1` and `openai/gpt-image-1-mini` on both routes. They are the models the cost catalog carries rates for; another OpenAI image model reaches the provider but its tokens price at zero until the catalog gets an entry. Configure the OpenAI key once in **Settings → Model Providers**; every virtual key routed to that provider can then call its image models.
 
 ## Generation
 
@@ -2176,7 +2176,7 @@ const image = await client.images.generate({
 const png = Buffer.from(image.data[0].b64_json, "base64");
 ```
 
-`response_format` is forwarded only when you send it. The gpt-image family rejects the field and dall-e-3 needs it, so the gateway never sets a value of its own.
+`response_format` is forwarded only when you send it. The gpt-image family rejects the field and answers in base64; the older dall-e models take it and default to `url`. A value the gateway invented would break one family or the other, so it never sets one.
 
 ## Editing
 
@@ -2186,7 +2186,7 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://platform.openai.com/docs/api-reference/images/createEdit): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`; anything else is dropped rather than sent to the provider.
+Form matches OpenAI's [image edit schema](https://platform.openai.com/docs/api-reference/images/createEdit): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`, which the gateway reads only when the form has no `image[]` part. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`; anything else is dropped rather than sent to the provider. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \

@@ -26,8 +26,9 @@
  *      trace cost above zero for both calls, and that each trace carries its
  *      image span with the prompt on the input and no base64 on the output.
  *
- * The reads live in probeImageSpendReads.ts and the assertions in
- * probeImageSpendReport.ts; this file is the orchestrator.
+ * The command line, the local-database guard and the provisioning live in
+ * probeImageSpendSetup.ts, the reads in probeImageSpendReads.ts and the
+ * assertions in probeImageSpendReport.ts; this file is the orchestrator.
  *
  * Prerequisite: `scripts/dogfood/images/seed-images-vk.ts` has run for this
  * user, so the org carries an OpenAI provider key and a default policy that
@@ -51,13 +52,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { prisma } from "~/server/db";
 import {
   assertImageQuantityColumns,
   IMAGE_QUANTITY_COLUMNS,
-  type ProbeScope,
 } from "./probeImageSpendReads";
 import {
   assertOutcome,
@@ -66,8 +63,15 @@ import {
   log,
   printFailures,
 } from "./probeImageSpendReport";
+import {
+  type Args,
+  assertLocalDatabase,
+  type Probe,
+  parseArgs,
+  provision,
+  resolveTenant,
+} from "./probeImageSpendSetup";
 
-const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const IMAGE_SIZE = "1024x1024";
 const GENERATION_PROMPT =
   "a flat red circle centered on a plain white background, minimalist vector style";
@@ -84,173 +88,6 @@ const EDIT_SPAN = "gen_ai.image_edit";
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 const OUT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "out");
-
-interface Args {
-  email: string;
-  org: string;
-  gateway: string;
-  model: string;
-  quality: string;
-  deadlineMs: number;
-  allowRemoteDb: boolean;
-}
-
-function parseArgs(argv: string[]): Args {
-  let email = "";
-  let org = "";
-  let gateway = process.env.LW_GATEWAY_BASE_URL ?? "http://localhost:5563";
-  let model = "gpt-image-2";
-  let quality = "low";
-  let deadlineMs = 60_000;
-  let allowRemoteDb = false;
-  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--email") email = argv[++i] ?? "";
-    if (argv[i] === "--org") org = argv[++i] ?? "";
-    if (argv[i] === "--gateway") gateway = argv[++i] ?? gateway;
-    if (argv[i] === "--model") model = argv[++i] ?? model;
-    if (argv[i] === "--quality") quality = argv[++i] ?? quality;
-    if (argv[i] === "--deadline-ms") deadlineMs = Number(argv[++i] ?? 60_000);
-    if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
-  }
-  if (!email) throw new Error("--email is required");
-  // A non-numeric or missing value parses to NaN, and every deadline
-  // comparison against NaN is false, so the poll loop would run forever
-  // instead of failing.
-  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
-    throw new Error("--deadline-ms must be a positive number of milliseconds");
-  }
-  return {
-    email,
-    org,
-    gateway: gateway.replace(/\/$/, ""),
-    model,
-    quality,
-    deadlineMs,
-    allowRemoteDb,
-  };
-}
-
-/**
- * This probe issues a virtual key and a budget, so it only runs against a
- * local database by default. Pointing it at staging or prod by accident
- * would plant credentials on a shared tenant.
- */
-function assertLocalDatabase(allowRemoteDb: boolean): void {
-  if (allowRemoteDb) return;
-  const raw = process.env.DATABASE_URL ?? "";
-  let host = "";
-  try {
-    host = new URL(raw).hostname;
-  } catch {
-    throw new Error("DATABASE_URL is unset or unparseable, refusing to run");
-  }
-  if (!LOCAL_DB_HOSTS.has(host)) {
-    throw new Error(
-      `DATABASE_URL points at ${host}, not a local database. ` +
-        "Re-run with --allow-remote-db if you really mean it.",
-    );
-  }
-}
-
-interface Tenant {
-  userId: string;
-  organizationId: string;
-  projectId: string;
-  teamId: string;
-}
-
-/**
- * The user's organization and personal workspace, read and ensured before
- * anything billable exists. The workspace is idempotent; the key and the
- * budget that follow are not, which is why the schema check sits between.
- */
-async function resolveTenant(args: Args): Promise<Tenant> {
-  const user = await prisma.user.findFirst({ where: { email: args.email } });
-  if (!user) throw new Error(`no user with email ${args.email}`);
-  const orgs = await prisma.organization.findMany({
-    where: { members: { some: { userId: user.id } } },
-    select: { id: true, name: true },
-  });
-  if (orgs.length === 0) throw new Error(`${args.email} belongs to no org`);
-  const picked = args.org
-    ? orgs.find((o) => o.id === args.org || o.name === args.org)
-    : orgs.length === 1
-      ? orgs[0]
-      : undefined;
-  if (!picked) {
-    throw new Error(
-      `pass --org <id or name>, one of: ${orgs
-        .map((o) => `${o.name} [${o.id}]`)
-        .join(", ")}`,
-    );
-  }
-  const providers = await prisma.modelProvider.count({
-    where: { organizationId: picked.id, provider: "openai", enabled: true },
-  });
-  if (providers === 0) {
-    throw new Error(
-      "no enabled OpenAI provider on this org: run " +
-        "scripts/dogfood/images/seed-images-vk.ts first",
-    );
-  }
-  const workspace = await new PersonalWorkspaceService(prisma).ensure({
-    userId: user.id,
-    organizationId: picked.id,
-    displayName: null,
-    displayEmail: args.email,
-  });
-  return {
-    userId: user.id,
-    organizationId: picked.id,
-    projectId: workspace.project.id,
-    teamId: workspace.team.id,
-  };
-}
-
-interface Probe extends ProbeScope {
-  vkSecret: string;
-}
-
-/** A virtual key and a budget of this run's own, so the delta is this run's. */
-async function provision(args: Args, tenant: Tenant): Promise<Probe> {
-  const issued = await PersonalVirtualKeyService.create(prisma, {
-    gatewayBaseUrl: args.gateway,
-  }).issue({
-    userId: tenant.userId,
-    organizationId: tenant.organizationId,
-    personalProjectId: tenant.projectId,
-    personalTeamId: tenant.teamId,
-    label: `image-spend-probe-${Date.now()}`,
-  });
-
-  const budget = await prisma.gatewayBudget.create({
-    data: {
-      name: `image-spend-probe-${Date.now()}`,
-      organizationId: tenant.organizationId,
-      scopeType: "VIRTUAL_KEY",
-      scopeId: issued.id,
-      window: "MONTH",
-      limitUsd: "100",
-      // WARN, not BLOCK: the probe measures what a call costs, and a cap
-      // that refused one would measure the cap instead.
-      onBreach: "WARN",
-      createdById: tenant.userId,
-      resetsAt: new Date(Date.now() + 30 * 86_400_000),
-    },
-  });
-
-  log(`vk=${issued.id} budget=${budget.id} project=${tenant.projectId}`);
-  return {
-    vkSecret: issued.secret,
-    vkId: issued.id,
-    budgetId: budget.id,
-    projectId: tenant.projectId,
-    // Bounds every read to this run's window. Set after provisioning so the
-    // predicate is as tight as the first call allows.
-    startedAt: new Date(),
-  };
-}
 
 /**
  * The request's identity as the gateway states it on the response.
@@ -287,7 +124,13 @@ interface ImageResponse {
 }
 
 /** The first image of the response, decoded and checked for PNG bytes. */
-function decodePng(label: string, body: ImageResponse): Buffer {
+function decodePng({
+  label,
+  body,
+}: {
+  label: string;
+  body: ImageResponse;
+}): Buffer {
   const b64 = body.data?.[0]?.b64_json;
   if (!b64) throw new Error(`${label}: response carried no data[0].b64_json`);
   const bytes = Buffer.from(b64, "base64");
@@ -301,24 +144,29 @@ function decodePng(label: string, body: ImageResponse): Buffer {
 }
 
 /**
- * Image tokens as the response states them. `output_tokens_details.
- * image_tokens` is the exact figure; `output_tokens` is the fallback for a
- * provider response that does not break the total down.
+ * Image tokens as the response states them. Only the image field counts: a
+ * text `output_tokens` total read as image tokens would let the probe pass on
+ * a response that measured no image quantity at all, which is the defect it
+ * exists to catch.
  */
 function outputImageTokens(usage: ImageUsage | undefined): number {
-  return (
-    usage?.output_tokens_details?.image_tokens ?? usage?.output_tokens ?? 0
-  );
+  return usage?.output_tokens_details?.image_tokens ?? 0;
 }
 
 function inputImageTokens(usage: ImageUsage | undefined): number {
   return usage?.input_tokens_details?.image_tokens ?? 0;
 }
 
-async function readResponse(
-  label: string,
-  response: Response,
-): Promise<{ body: ImageResponse; call: Omit<Call, "prompt" | "spanName"> }> {
+async function readResponse({
+  label,
+  response,
+}: {
+  label: string;
+  response: Response;
+}): Promise<{
+  body: ImageResponse;
+  call: Omit<Call, "prompt" | "spanName" | "hasSourceImage">;
+}> {
   if (!response.ok) {
     throw new Error(
       `${label} failed: HTTP ${response.status} ${await response.text()}`,
@@ -336,10 +184,13 @@ async function readResponse(
   };
 }
 
-async function generateImage(
-  probe: Probe,
-  args: Args,
-): Promise<{ call: Call; png: Buffer }> {
+async function generateImage({
+  probe,
+  args,
+}: {
+  probe: Probe;
+  args: Args;
+}): Promise<{ call: Call; png: Buffer }> {
   const response = await fetch(`${args.gateway}/v1/images/generations`, {
     method: "POST",
     headers: {
@@ -354,8 +205,8 @@ async function generateImage(
       quality: args.quality,
     }),
   });
-  const { body, call } = await readResponse("generation", response);
-  const png = decodePng("generation", body);
+  const { body, call } = await readResponse({ label: "generation", response });
+  const png = decodePng({ label: "generation", body });
   const tokens = outputImageTokens(body.usage);
   if (tokens <= 0) {
     throw new Error(
@@ -368,16 +219,25 @@ async function generateImage(
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(path.join(OUT_DIR, "generation.png"), png);
   return {
-    call: { ...call, prompt: GENERATION_PROMPT, spanName: GENERATION_SPAN },
+    call: {
+      ...call,
+      prompt: GENERATION_PROMPT,
+      spanName: GENERATION_SPAN,
+      hasSourceImage: false,
+    },
     png,
   };
 }
 
-async function editImage(
-  probe: Probe,
-  args: Args,
-  source: Buffer,
-): Promise<Call> {
+async function editImage({
+  probe,
+  args,
+  source,
+}: {
+  probe: Probe;
+  args: Args;
+  source: Buffer;
+}): Promise<Call> {
   const form = new FormData();
   // The array field name is what the images edit route expects for the set
   // of source images, even when only one is sent.
@@ -398,8 +258,8 @@ async function editImage(
     headers: { authorization: `Bearer ${probe.vkSecret}` },
     body: form,
   });
-  const { body, call } = await readResponse("edit", response);
-  const png = decodePng("edit", body);
+  const { body, call } = await readResponse({ label: "edit", response });
+  const png = decodePng({ label: "edit", body });
   const inTokens = inputImageTokens(body.usage);
   const outTokens = outputImageTokens(body.usage);
   if (inTokens <= 0) {
@@ -421,12 +281,17 @@ async function editImage(
   );
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(path.join(OUT_DIR, "edit.png"), png);
-  return { ...call, prompt: EDIT_PROMPT, spanName: EDIT_SPAN };
+  return {
+    ...call,
+    prompt: EDIT_PROMPT,
+    spanName: EDIT_SPAN,
+    hasSourceImage: true,
+  };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertLocalDatabase(args.allowRemoteDb);
+  assertLocalDatabase(args.shouldAllowRemoteDb);
 
   // Order matters: nothing billable is created until the columns are there.
   const tenant = await resolveTenant(args);
@@ -435,10 +300,14 @@ async function main() {
     `gateway_spend carries all ${IMAGE_QUANTITY_COLUMNS.length} image quantity columns`,
   );
 
-  const probe = await provision(args, tenant);
-  const { call: generation, png } = await generateImage(probe, args);
-  const edit = await editImage(probe, args, png);
-  await assertOutcome(probe, [generation, edit], args.deadlineMs);
+  const probe = await provision({ args, tenant });
+  const { call: generation, png } = await generateImage({ probe, args });
+  const edit = await editImage({ probe, args, source: png });
+  await assertOutcome({
+    scope: probe,
+    calls: [generation, edit],
+    deadlineMs: args.deadlineMs,
+  });
 
   if (failureCount() > 0) {
     printFailures();

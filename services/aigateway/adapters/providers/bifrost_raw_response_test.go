@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -131,7 +133,7 @@ func TestRawResponseFromBifrostError_StatusAndUsage(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			raw, ok := rawResponseFromBifrostError(tc.berr)
+			raw, ok := rawResponseFromBifrostError(tc.berr, domain.RequestTypeResponses)
 			require.Equal(t, tc.wantOK, ok)
 			if !ok {
 				return
@@ -146,9 +148,10 @@ func TestRawResponseFromBifrostError_StatusAndUsage(t *testing.T) {
 
 func TestUsageFromRawJSON_CoversTheThreeOpenAIShapes(t *testing.T) {
 	cases := []struct {
-		name string
-		body string
-		want domain.Usage
+		name    string
+		body    string
+		reqType domain.RequestType
+		want    domain.Usage
 	}{
 		{
 			name: "responses shape",
@@ -180,10 +183,39 @@ func TestUsageFromRawJSON_CoversTheThreeOpenAIShapes(t *testing.T) {
 			body: `{"usage":{"input_tokens":3,"output_tokens":4}}`,
 			want: domain.Usage{PromptTokens: 3, CompletionTokens: 4, TotalTokens: 7},
 		},
+		{
+			name:    "an image request counts the images it recovered",
+			body:    `{"data":[{"b64_json":"aaa"},{"b64_json":"bbb"}],"usage":{"input_tokens":14,` + `"input_tokens_details":{"image_tokens":0,"text_tokens":14},"output_tokens":196,` + `"output_tokens_details":{"image_tokens":196,"text_tokens":0},"total_tokens":210}}`,
+			reqType: domain.RequestTypeImageGeneration,
+			want: domain.Usage{PromptTokens: 14, CompletionTokens: 0, TotalTokens: 210,
+				OutputImageTokens: 196, ImageCount: 2},
+		},
+		{
+			name:    "an image request without an output breakdown reads the total as image tokens",
+			body:    `{"data":[{"b64_json":"aaa"}],"usage":{"input_tokens":14,"output_tokens":1600,"total_tokens":1614}}`,
+			reqType: domain.RequestTypeImageEdit,
+			want: domain.Usage{PromptTokens: 14, CompletionTokens: 0, TotalTokens: 1614,
+				OutputImageTokens: 1600, ImageCount: 1},
+		},
+		{
+			name:    "an image request with no usage block still counts the images",
+			body:    `{"data":[{"b64_json":"aaa"},{"b64_json":"bbb"},{"b64_json":"ccc"}]}`,
+			reqType: domain.RequestTypeImageGeneration,
+			want:    domain.Usage{ImageCount: 3},
+		},
+		{
+			name: "a chat request never counts a data array as images",
+			body: `{"data":[{"b64_json":"aaa"}],"usage":{"prompt_tokens":3,"completion_tokens":4}}`,
+			want: domain.Usage{PromptTokens: 3, CompletionTokens: 4, TotalTokens: 7},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, usageFromRawJSON([]byte(tc.body)))
+			reqType := tc.reqType
+			if reqType == "" {
+				reqType = domain.RequestTypeResponses
+			}
+			assert.Equal(t, tc.want, usageFromRawJSON([]byte(tc.body), reqType))
 		})
 	}
 }
@@ -206,8 +238,9 @@ func TestDispatchResponses_ImageGenerationCall_Forwards200WithUsage(t *testing.T
 	}))
 	defer backend.Close()
 
+	core, logs := observer.New(zapcore.WarnLevel)
 	router, err := NewBifrostRouter(context.Background(), BifrostOptions{
-		Logger:           zap.NewNop(),
+		Logger:           zap.New(core),
 		OpenAIBackendURL: backend.URL,
 	})
 	require.NoError(t, err)
@@ -229,4 +262,9 @@ func TestDispatchResponses_ImageGenerationCall_Forwards200WithUsage(t *testing.T
 	assert.Equal(t, 1997, resp.Usage.TotalTokens)
 	assert.Equal(t, 12, resp.Usage.CacheReadTokens)
 	assert.Equal(t, 5, resp.Usage.ReasoningTokens)
+
+	decodeWarnings := logs.FilterMessage("provider 2xx body did not fit the engine schema, forwarded as-is")
+	require.Equal(t, 1, decodeWarnings.Len(),
+		"a schema gap the client never sees is only visible in this warn line")
+	assert.Equal(t, int64(1960), decodeWarnings.All()[0].ContextMap()["prompt_tokens"])
 }

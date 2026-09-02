@@ -39,6 +39,12 @@ export interface Call {
   prompt: string;
   /** The span name the trace explorer must carry for this call. */
   spanName: string;
+  /**
+   * Whether this call sent a source image, so its record must carry input
+   * image tokens. Stated by the caller that made the request rather than
+   * derived from the display label, which a rename would silently turn off.
+   */
+  hasSourceImage: boolean;
 }
 
 export function log(line: string): void {
@@ -57,18 +63,31 @@ export function printFailures(): void {
   for (const f of failures) process.stdout.write(`  - ${f}\n`);
 }
 
-function check(name: string, ok: boolean, detail: string): void {
-  if (!ok) failures.push(`${name}: ${detail}`);
-  process.stdout.write(`${ok ? "PASS" : "FAIL"}  ${name}  ${detail}\n`);
+function check({
+  name,
+  isOk,
+  detail,
+}: {
+  name: string;
+  isOk: boolean;
+  detail: string;
+}): void {
+  if (!isOk) failures.push(`${name}: ${detail}`);
+  process.stdout.write(`${isOk ? "PASS" : "FAIL"}  ${name}  ${detail}\n`);
 }
 
 /** Poll until the predicate holds or the deadline passes. */
-async function until<T>(
-  what: string,
-  deadlineMs: number,
-  read: () => Promise<T>,
-  done: (value: T) => boolean,
-): Promise<T> {
+async function until<T>({
+  what,
+  deadlineMs,
+  read,
+  done,
+}: {
+  what: string;
+  deadlineMs: number;
+  read: () => Promise<T>;
+  done: (value: T) => boolean;
+}): Promise<T> {
   const stopAt = Date.now() + deadlineMs;
   let last = await read();
   while (!done(last)) {
@@ -85,7 +104,13 @@ async function until<T>(
   return last;
 }
 
-function printTable(rows: ImageSpendRow[], calls: Call[]): void {
+function printTable({
+  rows,
+  calls,
+}: {
+  rows: ImageSpendRow[];
+  calls: Call[];
+}): void {
   const labelOf = new Map(calls.map((c) => [c.gatewayRequestId, c.label]));
   const header = [
     "CALL",
@@ -128,44 +153,64 @@ function printTable(rows: ImageSpendRow[], calls: Call[]): void {
  * The generation call has no input image, so only its output tokens must
  * move; the edit call sends a PNG, so both sides must.
  */
-function checkSpendRows(calls: Call[], rows: ImageSpendRow[]): void {
+function checkSpendRows({
+  calls,
+  rows,
+}: {
+  calls: Call[];
+  rows: ImageSpendRow[];
+}): void {
   for (const call of calls) {
     const row = rows.find((r) => r.GatewayRequestId === call.gatewayRequestId);
     if (!row) {
-      check(`spend row recorded (${call.label})`, false, "no row");
+      check({
+        name: `spend row recorded (${call.label})`,
+        isOk: false,
+        detail: "no row",
+      });
       continue;
     }
     const id = row.GatewayRequestId.slice(-12);
-    check(`spend row recorded (${call.label})`, true, `request ${id}`);
-    check(
-      `output image tokens reached the record (${call.label})`,
-      row.outputImageTokens > 0,
-      `TokensOutputImage=${row.outputImageTokens}`,
-    );
-    if (call.label === "edit") {
-      check(
-        `input image tokens reached the record (${call.label})`,
-        row.inputImageTokens > 0,
-        `TokensInputImage=${row.inputImageTokens}`,
-      );
+    check({
+      name: `spend row recorded (${call.label})`,
+      isOk: true,
+      detail: `request ${id}`,
+    });
+    check({
+      name: `output image tokens reached the record (${call.label})`,
+      isOk: row.outputImageTokens > 0,
+      detail: `TokensOutputImage=${row.outputImageTokens}`,
+    });
+    if (call.hasSourceImage) {
+      check({
+        name: `input image tokens reached the record (${call.label})`,
+        isOk: row.inputImageTokens > 0,
+        detail: `TokensInputImage=${row.inputImageTokens}`,
+      });
     }
-    check(
-      `call priced above zero (${call.label})`,
-      Number(row.CostNanoUSD) > 0,
-      `CostNanoUSD=${row.CostNanoUSD}`,
-    );
+    check({
+      name: `call priced above zero (${call.label})`,
+      isOk: Number(row.CostNanoUSD) > 0,
+      detail: `CostNanoUSD=${row.CostNanoUSD}`,
+    });
   }
 }
 
-function checkLedger(debits: LedgerDebit[], expectedCalls: number): void {
+function checkLedger({
+  debits,
+  expectedCalls,
+}: {
+  debits: LedgerDebit[];
+  expectedCalls: number;
+}): void {
   const successDebits = debits.filter(
     (d) => d.Status === "success" && Number(d.AmountNanoUSD) > 0,
   );
-  check(
-    "both image calls debited the ledger",
-    successDebits.length >= expectedCalls,
-    `${successDebits.length} positive success debits, want ${expectedCalls}`,
-  );
+  check({
+    name: "both image calls debited the ledger",
+    isOk: successDebits.length >= expectedCalls,
+    detail: `${successDebits.length} positive success debits, want ${expectedCalls}`,
+  });
 }
 
 /**
@@ -177,107 +222,120 @@ function checkLedger(debits: LedgerDebit[], expectedCalls: number): void {
  * check. A missing join key fails rather than returning quietly, because a
  * silent skip would print "All checks passed" having proved nothing.
  */
-async function checkTrace(
-  scope: ProbeScope,
-  call: Call,
-  deadlineMs: number,
-): Promise<void> {
+async function checkTrace({
+  scope,
+  call,
+  deadlineMs,
+}: {
+  scope: ProbeScope;
+  call: Call;
+  deadlineMs: number;
+}): Promise<void> {
   if (!call.traceId) {
-    check(
-      `trace recorded (${call.label})`,
-      false,
-      "the response carried no trace id to join on",
-    );
+    check({
+      name: `trace recorded (${call.label})`,
+      isOk: false,
+      detail: "the response carried no trace id to join on",
+    });
     return;
   }
-  const traceCost = await until(
-    `the trace explorer's cost for ${call.label}`,
+  const traceCost = await until({
+    what: `the trace explorer's cost for ${call.label}`,
     deadlineMs,
-    () => readTraceCostUsd(scope, call.traceId),
-    (c) => c !== null && c > 0,
-  );
-  check(
-    `trace cost above zero (${call.label})`,
-    (traceCost ?? 0) > 0,
-    `total_cost=${traceCost}`,
-  );
+    read: () => readTraceCostUsd(scope, call.traceId),
+    done: (c) => c !== null && c > 0,
+  });
+  check({
+    name: `trace cost above zero (${call.label})`,
+    isOk: (traceCost ?? 0) > 0,
+    detail: `total_cost=${traceCost}`,
+  });
 
-  const spans = await until(
-    `the ${call.spanName} span of ${call.label}`,
+  const spans = await until({
+    what: `the ${call.spanName} span of ${call.label}`,
     deadlineMs,
-    () => readTraceSpans(scope, call.traceId),
-    (s) => s.some((span) => span.SpanName === call.spanName),
-  );
+    read: () => readTraceSpans({ scope, traceId: call.traceId }),
+    done: (s) => s.some((span) => span.SpanName === call.spanName),
+  });
   const span = spans.find((s) => s.SpanName === call.spanName);
   if (!span) {
-    check(
-      `span ${call.spanName} present (${call.label})`,
-      false,
-      `spans on this trace: ${spans.map((s) => s.SpanName).join(", ") || "none"}`,
-    );
+    check({
+      name: `span ${call.spanName} present (${call.label})`,
+      isOk: false,
+      detail: `spans on this trace: ${spans.map((s) => s.SpanName).join(", ") || "none"}`,
+    });
     return;
   }
-  check(`span ${call.spanName} present (${call.label})`, true, "found");
-  check(
-    `span input carries the prompt (${call.label})`,
-    span.input.includes(call.prompt),
-    `input is ${span.input.length} bytes`,
-  );
+  check({
+    name: `span ${call.spanName} present (${call.label})`,
+    isOk: true,
+    detail: "found",
+  });
+  check({
+    name: `span input carries the prompt (${call.label})`,
+    isOk: span.input.includes(call.prompt),
+    detail: `input is ${span.input.length} bytes`,
+  });
   const outputBytes = Buffer.byteLength(span.output, "utf8");
-  check(
-    `span output carries no image payload (${call.label})`,
-    outputBytes < MAX_SPAN_OUTPUT_BYTES && !span.output.includes("b64_json"),
-    `output is ${outputBytes} bytes, limit ${MAX_SPAN_OUTPUT_BYTES}`,
-  );
+  check({
+    name: `span output carries no image payload (${call.label})`,
+    isOk:
+      outputBytes < MAX_SPAN_OUTPUT_BYTES && !span.output.includes("b64_json"),
+    detail: `output is ${outputBytes} bytes, limit ${MAX_SPAN_OUTPUT_BYTES}`,
+  });
 }
 
-export async function assertOutcome(
-  scope: ProbeScope,
-  calls: Call[],
-  deadlineMs: number,
-): Promise<void> {
+export async function assertOutcome({
+  scope,
+  calls,
+  deadlineMs,
+}: {
+  scope: ProbeScope;
+  calls: Call[];
+  deadlineMs: number;
+}): Promise<void> {
   const requestIds = new Set(calls.map((c) => c.gatewayRequestId));
 
-  const rows = await until(
-    "a spend row for every image call",
+  const rows = await until({
+    what: "a spend row for every image call",
     deadlineMs,
-    () => readImageSpendRows(scope),
-    (r) =>
+    read: () => readImageSpendRows(scope),
+    done: (r) =>
       calls.every((c) =>
         r.some((row) => row.GatewayRequestId === c.gatewayRequestId),
       ),
-  );
-  printTable(
-    rows.filter((r) => requestIds.has(r.GatewayRequestId)),
+  });
+  printTable({
+    rows: rows.filter((r) => requestIds.has(r.GatewayRequestId)),
     calls,
-  );
-  checkSpendRows(calls, rows);
+  });
+  checkSpendRows({ calls, rows });
 
-  checkLedger(
-    await until(
-      "the ledger's debits",
+  checkLedger({
+    debits: await until({
+      what: "the ledger's debits",
       deadlineMs,
-      () => readLedgerDebits(scope),
-      (d) =>
+      read: () => readLedgerDebits(scope),
+      done: (d) =>
         d.filter((x) => x.Status === "success" && Number(x.AmountNanoUSD) > 0)
           .length >= calls.length,
-    ),
-    calls.length,
-  );
+    }),
+    expectedCalls: calls.length,
+  });
 
-  const spent = await until(
-    "the budget to move",
+  const spent = await until({
+    what: "the budget to move",
     deadlineMs,
-    () => readBudgetSpendNanoUsd(scope),
-    (s) => s > 0,
-  );
-  check(
-    "budget moved by a positive amount",
-    spent > 0,
-    `spent=${spent} nanoUSD (${spent / 1e9} USD)`,
-  );
+    read: () => readBudgetSpendNanoUsd(scope),
+    done: (s) => s > 0,
+  });
+  check({
+    name: "budget moved by a positive amount",
+    isOk: spent > 0,
+    detail: `spent=${spent} nanoUSD (${spent / 1e9} USD)`,
+  });
 
   for (const call of calls) {
-    await checkTrace(scope, call, deadlineMs);
+    await checkTrace({ scope, call, deadlineMs });
   }
 }

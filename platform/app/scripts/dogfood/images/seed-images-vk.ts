@@ -46,24 +46,24 @@ import { encrypt } from "~/utils/encryption";
 interface Args {
   email: string;
   org: string;
-  allowRemoteDb: boolean;
+  shouldAllowRemoteDb: boolean;
   shouldForceKeys: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   let email = "";
   let org = "";
-  let allowRemoteDb = false;
+  let shouldAllowRemoteDb = false;
   let shouldForceKeys = false;
   // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
     if (argv[i] === "--org") org = argv[++i] ?? "";
-    if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
+    if (argv[i] === "--allow-remote-db") shouldAllowRemoteDb = true;
     if (argv[i] === "--force-keys") shouldForceKeys = true;
   }
   if (!email) throw new Error("--email is required");
-  return { email, org, allowRemoteDb, shouldForceKeys };
+  return { email, org, shouldAllowRemoteDb, shouldForceKeys };
 }
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -73,8 +73,8 @@ const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
  * policy), so it only runs against a local database by default. Pointing it
  * at staging or prod by accident would overwrite shared credentials.
  */
-function assertLocalDatabase(allowRemoteDb: boolean): void {
-  if (allowRemoteDb) return;
+function assertLocalDatabase(shouldAllowRemoteDb: boolean): void {
+  if (shouldAllowRemoteDb) return;
   const raw = process.env.DATABASE_URL ?? "";
   let host = "";
   try {
@@ -103,7 +103,7 @@ async function ensureProvider({
   /** Null when the provider's environment variable is unset on this run. */
   keys: Record<string, string> | null;
   shouldForceKeys: boolean;
-}): Promise<{ id: string; usable: boolean } | null> {
+}): Promise<{ id: string; isUsable: boolean } | null> {
   // Deterministic pick: oldest row first, and be loud when the org carries
   // more than one row for the provider, since only one is considered.
   const existingRows = await prisma.modelProvider.findMany({
@@ -142,7 +142,7 @@ async function ensureProvider({
       // materialisation on every request, which reads as the gateway being
       // broken rather than as this row needing attention.
       process.stderr.write(skipHint("seed-images", decision.reason));
-      return { id: existing.id, usable: false };
+      return { id: existing.id, isUsable: false };
     }
     if (decision.action === "keep") {
       process.stderr.write(keepHint("seed-images"));
@@ -152,7 +152,7 @@ async function ensureProvider({
         where: { id: existing.id },
         data: { enabled: true },
       });
-      return { id: existing.id, usable: true };
+      return { id: existing.id, isUsable: true };
     }
     // Only a `write` reaches here, and the rule never returns one without a
     // replacement in hand.
@@ -160,7 +160,7 @@ async function ensureProvider({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
     });
-    return { id: existing.id, usable: true };
+    return { id: existing.id, isUsable: true };
   }
 
   // No row for this provider. With no key in hand there is nothing to create,
@@ -187,12 +187,12 @@ async function ensureProvider({
   process.stderr.write(
     `[seed-images] created ${provider} provider ${created.id}\n`,
   );
-  return { id: created.id, usable: true };
+  return { id: created.id, isUsable: true };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertLocalDatabase(args.allowRemoteDb);
+  assertLocalDatabase(args.shouldAllowRemoteDb);
 
   const user = await prisma.user.findFirst({ where: { email: args.email } });
   if (!user) throw new Error(`no user with email ${args.email}, sign up first`);
@@ -255,7 +255,7 @@ async function main() {
     keys: openaiKey ? { OPENAI_API_KEY: openaiKey } : null,
     shouldForceKeys: args.shouldForceKeys,
   });
-  if (seeded) (seeded.usable ? providerIds : unusableIds).push(seeded.id);
+  if (seeded) (seeded.isUsable ? providerIds : unusableIds).push(seeded.id);
 
   if (providerIds.length === 0) {
     throw new Error(

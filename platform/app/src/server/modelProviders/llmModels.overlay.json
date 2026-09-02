@@ -152,7 +152,7 @@
 			"pricing": {
 				"inputCostPerToken": 5e-6,
 				"outputCostPerToken": 0,
-				"inputCacheReadPerToken": 2.5e-6,
+				"inputCacheReadPerToken": 1.25e-6,
 				"imageCostPerToken": 1e-5,
 				"imageOutputCostPerToken": 4e-5
 			},

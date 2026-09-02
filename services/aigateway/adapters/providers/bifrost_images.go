@@ -148,7 +148,7 @@ func (r *BifrostRouter) dispatchImageGeneration(
 
 	resp, berr := r.bf.ImageGenerationRequest(bfCtx, bfReq)
 	if berr != nil {
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -203,7 +203,7 @@ func (r *BifrostRouter) dispatchImageEdit(
 
 	resp, berr := r.bf.ImageEditRequest(bfCtx, bfReq)
 	if berr != nil {
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))

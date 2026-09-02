@@ -571,9 +571,11 @@ var imageEditFormFields = []string{
 	"output_format", "output_compression", "response_format", "user",
 }
 
-// imageEditFileFields are the form fields a source image arrives under. The
-// OpenAI Node SDK posts an array of files as "image[]"; a caller sending a
-// single file, and curl, use "image".
+// imageEditFileFields are the form fields a source image arrives under, in
+// precedence order. The OpenAI Node SDK posts an array of files as "image[]";
+// a caller sending a single file, and curl, use "image". A form that carries
+// both is read from the first field that has files, so the images keep the
+// order the caller wrote them in rather than an order this list invents.
 var imageEditFileFields = []string{"image[]", "image"}
 
 // imageEditsHandler terminates POST /v1/images/edits (OpenAI-wire multipart
@@ -689,17 +691,22 @@ func readImageEditFiles(r *http.Request) ([][]byte, error) {
 	if r.MultipartForm == nil {
 		return nil, nil
 	}
-	var images [][]byte
 	for _, field := range imageEditFileFields {
-		for _, header := range r.MultipartForm.File[field] {
+		headers := r.MultipartForm.File[field]
+		if len(headers) == 0 {
+			continue
+		}
+		images := make([][]byte, 0, len(headers))
+		for _, header := range headers {
 			data, err := readMultipartHeader(header)
 			if err != nil {
 				return nil, err
 			}
 			images = append(images, data)
 		}
+		return images, nil
 	}
-	return images, nil
+	return nil, nil
 }
 
 // readMultipartHeader reads one file part into memory.
@@ -720,8 +727,11 @@ func readMultipartHeader(header *multipart.FileHeader) ([]byte, error) {
 // none.
 func readMultipartFile(r *http.Request, field string) ([]byte, error) {
 	file, _, err := r.FormFile(field)
-	if err != nil {
+	if errors.Is(err, http.ErrMissingFile) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed reading uploaded %s: %w", field, err)
 	}
 	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(file)

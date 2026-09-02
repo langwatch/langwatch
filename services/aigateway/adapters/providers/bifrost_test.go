@@ -54,7 +54,7 @@ func TestRawResponseFromBifrostError_UnmarshalFailure(t *testing.T) {
 		},
 	}
 
-	raw, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr, domain.RequestTypeResponses)
 	if !ok {
 		t.Fatalf("rawResponseFromBifrostError returned ok=false despite populated RawResponse")
 	}

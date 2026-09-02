@@ -327,7 +327,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		// present. Clients like claude-code / OpenAI SDK need the real
 		// provider error envelope (rate-limit hints, overload signals,
 		// billing errors) to surface correctly.
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -444,7 +444,7 @@ func (r *BifrostRouter) dispatchResponses(
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -495,7 +495,7 @@ func (r *BifrostRouter) dispatchEmbeddings(
 
 	resp, berr := r.bf.EmbeddingRequest(bfCtx, bfReq)
 	if berr != nil {
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -615,6 +615,15 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		model = req.Resolved.ModelID
 	}
 
+	// The image routes answer with one JSON body, so no credential and no
+	// provider lane streams them. This sits above every provider-specific
+	// branch below, which return before any lane-neutral check further down.
+	if req.Type == domain.RequestTypeImageGeneration || req.Type == domain.RequestTypeImageEdit {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": "streaming image generation is not supported",
+		})
+	}
+
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
 	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
 	// speaks the Responses dialect only, so /v1/messages goes through the
@@ -635,15 +644,6 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
-	}
-
-	// The image routes answer with one JSON body. Without this arm an image
-	// request would fall through to buildChatRequest, which would hand the
-	// provider a chat body it never asked for.
-	if req.Type == domain.RequestTypeImageGeneration || req.Type == domain.RequestTypeImageEdit {
-		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
-			"message": "streaming image generation is not supported",
-		})
 	}
 
 	if req.Type == domain.RequestTypeMessages {
@@ -833,7 +833,7 @@ func (r *BifrostRouter) dispatchPassthrough(
 
 	resp, berr := r.bf.Passthrough(bfCtx, provider, bfReq)
 	if berr != nil {
-		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
 			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
@@ -1036,7 +1036,7 @@ type rawUpstreamBody struct {
 //     gap in the engine must not turn a good answer into a 502 with zero
 //     spend.
 //   - Anything else with no status: 502.
-func rawResponseFromBifrostError(berr *bfschemas.BifrostError) (rawUpstreamBody, bool) {
+func rawResponseFromBifrostError(berr *bfschemas.BifrostError, reqType domain.RequestType) (rawUpstreamBody, bool) {
 	if berr == nil {
 		return rawUpstreamBody{}, false
 	}
@@ -1051,7 +1051,7 @@ func rawResponseFromBifrostError(berr *bfschemas.BifrostError) (rawUpstreamBody,
 		return rawUpstreamBody{
 			body:         body,
 			status:       http.StatusOK,
-			usage:        usageFromRawJSON(body),
+			usage:        usageFromRawJSON(body, reqType),
 			parseFailure: parseFailure,
 		}, true
 	}
@@ -1081,8 +1081,9 @@ func bfSchemaParseFailure(berr *bfschemas.BifrostError) (error, bool) {
 func (r *BifrostRouter) responseFromBifrostError(
 	berr *bfschemas.BifrostError,
 	bfCtx *bfschemas.BifrostContext,
+	reqType domain.RequestType,
 ) (*domain.Response, bool) {
-	raw, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr, reqType)
 	if !ok {
 		return nil, false
 	}
@@ -1108,9 +1109,13 @@ func (r *BifrostRouter) responseFromBifrostError(
 // (prompt_tokens / completion_tokens) and images (input_tokens / output_tokens
 // with image_tokens and text_tokens details). Image counts are taken out of
 // the totals on the same terms extractImageUsage states.
-func usageFromRawJSON(body []byte) domain.Usage {
+func usageFromRawJSON(body []byte, reqType domain.RequestType) domain.Usage {
+	isImage := reqType == domain.RequestTypeImageGeneration || reqType == domain.RequestTypeImageEdit
 	usage := gjson.GetBytes(body, "usage")
 	if !usage.IsObject() {
+		if isImage {
+			return domain.Usage{ImageCount: imageCountFromRawJSON(body)}
+		}
 		return domain.Usage{}
 	}
 	u := domain.Usage{
@@ -1131,10 +1136,30 @@ func usageFromRawJSON(body []byte) domain.Usage {
 		OutputImage: int(usage.Get("output_tokens_details.image_tokens").Int()),
 		OutputText:  int(usage.Get("output_tokens_details.text_tokens").Int()),
 	}
+	if isImage {
+		u.ImageCount = imageCountFromRawJSON(body)
+		if !usage.Get("output_tokens_details").IsObject() {
+			// An image model answers in image tokens. With no breakdown
+			// stated, the whole output total is the image side, on the same
+			// terms extractImageUsage applies to a decoded response.
+			split.OutputImage = u.CompletionTokens
+		}
+	}
 	if split == (domain.ImageTokenSplit{}) {
 		return u
 	}
 	return u.SplitImageTokens(split)
+}
+
+// imageCountFromRawJSON counts the images on a provider body the engine could
+// not decode. The images ride in the "data" array of the OpenAI images shape,
+// which is what extractImageUsage counts on a decoded response.
+func imageCountFromRawJSON(body []byte) int {
+	data := gjson.GetBytes(body, "data")
+	if !data.IsArray() {
+		return 0
+	}
+	return len(data.Array())
 }
 
 // firstInt returns the first of the paths that resolves to a number under

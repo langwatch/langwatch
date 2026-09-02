@@ -57,7 +57,6 @@ func imagesRouter(capture *domain.Request) http.Handler {
 	)
 }
 
-// imageFile is one file part of an image edit form.
 type imageFile struct {
 	field    string
 	filename string
