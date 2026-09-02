@@ -8,12 +8,12 @@ import {
   PromptList,
   SkillList,
   TRACING_SKILL_ID,
-} from "../../../features/onboarding/components/sections/ViaClaudeCodeScreen";
-import { ViaMcpClientScreen } from "../../../features/onboarding/components/sections/ViaClaudeDesktopScreen";
+} from "@langwatch/onboarding-web/features/onboarding/components/sections/ViaClaudeCodeScreen";
+import { ViaMcpClientScreen } from "@langwatch/onboarding-web/features/onboarding/components/sections/ViaClaudeDesktopScreen";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
-} from "../../../features/onboarding/contexts/ActiveProjectContext";
+} from "@langwatch/onboarding-web/features/onboarding/contexts/ActiveProjectContext";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { ApiKeyIntegrationInfoCard } from "./ApiKeyIntegrationInfoCard";
 import { SdkSetup } from "./SdkSetup";

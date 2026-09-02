@@ -2,7 +2,7 @@
   "name": "@langwatch/api-key-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe API Keys settings screen and CLI device-flow authorize screen, presentation and client contracts.",
+  "description": "Browser-safe API Keys settings screen, the CLI device-flow authorize screen and the two handoff consent screens, presentation and client contracts.",
   "files": [
     "src"
   ],
@@ -11,6 +11,10 @@
     "./screens/api-key": {
       "types": "./src/screens/api-key/index.ts",
       "default": "./src/screens/api-key/index.ts"
+    },
+    "./screens/authorize": {
+      "types": "./src/screens/authorize/index.ts",
+      "default": "./src/screens/authorize/index.ts"
     }
   },
   "scripts": {

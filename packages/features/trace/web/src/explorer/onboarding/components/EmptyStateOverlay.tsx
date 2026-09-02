@@ -1,5 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
-import { OnboardingMeshBackground } from "../../../features/onboarding/components/OnboardingMeshBackground";
+import { OnboardingMeshBackground } from "@langwatch/onboarding-web/features/onboarding/components/OnboardingMeshBackground";
 import { findStageDef, type HeroLayout } from "../chapters/onboardingJourneyConfig";
 import { useEdgeGripAnchor } from "../hooks/useEdgeGripAnchor";
 import { useOnboardingStore } from "../store/onboardingStore";

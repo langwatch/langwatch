@@ -33,7 +33,7 @@ vi.mock("../../../hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
-vi.mock("../../../features/onboarding/components/sections/observability/CodePreview", () => ({
+vi.mock("@langwatch/onboarding-web/features/onboarding/components/sections/observability/CodePreview", () => ({
   CodePreview: (props: Record<string, unknown>) => {
     capturedCodePreviewProps = props;
     return <div data-testid="code-preview">{String(props.code)}</div>;

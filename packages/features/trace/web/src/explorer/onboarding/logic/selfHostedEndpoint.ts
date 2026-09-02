@@ -1,4 +1,4 @@
-import { CLOUD_ENDPOINT } from "../../../features/onboarding/components/sections/shared/build-mcp-config";
+import { CLOUD_ENDPOINT } from "@langwatch/onboarding-web/features/onboarding/components/sections/shared/build-mcp-config";
 
 /**
  * The endpoint a reader has to set, or null when the SDK's own default

@@ -14,6 +14,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./components/SetupWithAgentButton": {
+      "types": "./src/components/SetupWithAgentButton.tsx",
+      "default": "./src/components/SetupWithAgentButton.tsx"
+    },
     "./components/traces/RenderInputOutput": {
       "types": "./src/components/traces/RenderInputOutput.tsx",
       "default": "./src/components/traces/RenderInputOutput.tsx"
@@ -26,13 +30,49 @@
       "types": "./src/components/traces/TracesMapping.tsx",
       "default": "./src/components/traces/TracesMapping.tsx"
     },
+    "./components/ui/IsolatedErrorBoundary": {
+      "types": "./src/components/ui/IsolatedErrorBoundary.tsx",
+      "default": "./src/components/ui/IsolatedErrorBoundary.tsx"
+    },
     "./drawer.store": {
       "types": "./src/drawer.store.ts",
       "default": "./src/drawer.store.ts"
     },
+    "./explorer/components/TraceDrawer/Chip": {
+      "types": "./src/explorer/components/TraceDrawer/Chip.tsx",
+      "default": "./src/explorer/components/TraceDrawer/Chip.tsx"
+    },
+    "./explorer/components/TraceDrawer/conversationView": {
+      "types": "./src/explorer/components/TraceDrawer/conversationView/index.ts",
+      "default": "./src/explorer/components/TraceDrawer/conversationView/index.ts"
+    },
+    "./explorer/components/TraceDrawer/conversationView/expandContext": {
+      "types": "./src/explorer/components/TraceDrawer/conversationView/expandContext.ts",
+      "default": "./src/explorer/components/TraceDrawer/conversationView/expandContext.ts"
+    },
     "./explorer/components/TraceIdPeek": {
       "types": "./src/explorer/components/TraceIdPeek.tsx",
       "default": "./src/explorer/components/TraceIdPeek.tsx"
+    },
+    "./explorer/components/TraceTable/registry/addons/conversation/Bubble": {
+      "types": "./src/explorer/components/TraceTable/registry/addons/conversation/Bubble.tsx",
+      "default": "./src/explorer/components/TraceTable/registry/addons/conversation/Bubble.tsx"
+    },
+    "./explorer/hooks/useConversationTurns": {
+      "types": "./src/explorer/hooks/useConversationTurns.ts",
+      "default": "./src/explorer/hooks/useConversationTurns.ts"
+    },
+    "./explorer/types/trace": {
+      "types": "./src/explorer/types/trace.ts",
+      "default": "./src/explorer/types/trace.ts"
+    },
+    "./explorer/utils/legacyTraceToTurn": {
+      "types": "./src/explorer/utils/legacyTraceToTurn.ts",
+      "default": "./src/explorer/utils/legacyTraceToTurn.ts"
+    },
+    "./explorer/utils/traceEditMode": {
+      "types": "./src/explorer/utils/traceEditMode.ts",
+      "default": "./src/explorer/utils/traceEditMode.ts"
     },
     "./facet-lens.store": {
       "types": "./src/facet-lens.store.ts",
@@ -42,13 +82,33 @@
       "types": "./src/filter.store.ts",
       "default": "./src/filter.store.ts"
     },
+    "./hooks/usePageVisibility": {
+      "types": "./src/hooks/usePageVisibility.ts",
+      "default": "./src/hooks/usePageVisibility.ts"
+    },
     "./hooks/useProjectSpanNames": {
       "types": "./src/hooks/useProjectSpanNames.ts",
       "default": "./src/hooks/useProjectSpanNames.ts"
     },
+    "./hooks/useSSESubscription": {
+      "types": "./src/hooks/useSSESubscription.ts",
+      "default": "./src/hooks/useSSESubscription.ts"
+    },
+    "./model/export-types": {
+      "types": "./src/model/export-types.ts",
+      "default": "./src/model/export-types.ts"
+    },
     "./preview-trace-id": {
       "types": "./src/preview-trace-id.ts",
       "default": "./src/preview-trace-id.ts"
+    },
+    "./scenario-role": {
+      "types": "./src/scenario-role.tsx",
+      "default": "./src/scenario-role.tsx"
+    },
+    "./screens/traces": {
+      "types": "./src/screens/traces/index.ts",
+      "default": "./src/screens/traces/index.ts"
     },
     "./server/tracer/collector/rag": {
       "types": "./src/server/tracer/collector/rag.ts",
@@ -74,13 +134,13 @@
       "types": "./src/utils/trace.ts",
       "default": "./src/utils/trace.ts"
     },
+    "./utils/trpcError": {
+      "types": "./src/utils/trpcError.ts",
+      "default": "./src/utils/trpcError.ts"
+    },
     "./view.store": {
       "types": "./src/view.store.ts",
       "default": "./src/view.store.ts"
-    },
-    "./screens/traces": {
-      "types": "./src/screens/traces/index.ts",
-      "default": "./src/screens/traces/index.ts"
     }
   },
   "scripts": {
@@ -110,6 +170,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",

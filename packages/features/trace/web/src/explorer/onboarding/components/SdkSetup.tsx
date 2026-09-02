@@ -10,20 +10,20 @@
 import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { DocsLinks } from "../../../features/onboarding/components/sections/observability/DocsLinks";
-import { FrameworkGrid } from "../../../features/onboarding/components/sections/observability/FrameworkGrid";
-import { FrameworkIntegrationCode } from "../../../features/onboarding/components/sections/observability/FrameworkIntegrationCode";
-import { InstallPreview } from "../../../features/onboarding/components/sections/observability/InstallPreview";
-import { PlatformGrid } from "../../../features/onboarding/components/sections/observability/PlatformGrid";
-import { getRegistryEntry } from "../../../features/onboarding/regions/observability/codegen/registry";
+import { DocsLinks } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/DocsLinks";
+import { FrameworkGrid } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/FrameworkGrid";
+import { FrameworkIntegrationCode } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/FrameworkIntegrationCode";
+import { InstallPreview } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/InstallPreview";
+import { PlatformGrid } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/PlatformGrid";
+import { getRegistryEntry } from "@langwatch/onboarding-web/features/onboarding/regions/observability/codegen/registry";
 import type {
   FrameworkKey,
   PlatformKey,
-} from "../../../features/onboarding/regions/observability/types";
+} from "@langwatch/onboarding-web/features/onboarding/regions/observability/types";
 import {
   FRAMEWORKS_BY_PLATFORM,
   PLATFORM_OPTIONS,
-} from "../../../features/onboarding/regions/observability/ui-options";
+} from "@langwatch/onboarding-web/features/onboarding/regions/observability/ui-options";
 
 export function SdkSetup(): React.ReactElement | null {
   const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;
