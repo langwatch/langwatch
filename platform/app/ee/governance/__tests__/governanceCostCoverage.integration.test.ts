@@ -19,6 +19,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { IngestionSourceKeyCoverageRepository } from "../repositories/ingestionSourceKeyCoverage.repository";
+import {
+  CoverageStartNotAfterCurrentError,
+  GatewayKeyAlreadyCoveredError,
+} from "../services/costCoverage.errors";
 import { CostCoverageService } from "../services/costCoverage.service";
 
 const ns = `gov-coverage-${nanoid(8)}`;
@@ -368,6 +372,105 @@ describe("Feature: every dollar has one home", () => {
         .catch((error: unknown) => error);
 
       expect(sqlState(refused)).toBe(EXCLUSION_VIOLATION);
+    });
+
+    /**
+     * The two tests below are the only ones that reach the service's translation
+     * of a database refusal into words. Everything else here drives the
+     * repository, where the assertion is a SQLSTATE — which proves the
+     * constraint holds but proves nothing about what the losing administrator is
+     * shown. Without these, that translation could be deleted whole and every
+     * other test would still pass.
+     *
+     * Both simulate exactly one thing: what the losing transaction READ. The
+     * stale read is what makes a race a race, and it is not reproducible on
+     * demand from two real connections. The write it then makes, the constraint
+     * that refuses it and the error that comes back are all real.
+     */
+    /** @scenario "A second bill cannot claim a key another bill already covers" */
+    it("tells the losing administrator, in words, that another bill covers it", async () => {
+      const contestedKey = `vk_${ns}_contested`;
+      await makeKey({ id: contestedKey, organizationId });
+      await repo.open(prisma, {
+        organizationId,
+        ingestionSourceId: `bill_1_${ns}`,
+        virtualKeyId: contestedKey,
+        validFrom: utc("2026-01-01"),
+      });
+
+      // The loser's transaction read the key before the winner committed, so it
+      // finds no open row to close and goes straight to opening its own.
+      const readsNothing = Object.create(
+        repo,
+      ) as IngestionSourceKeyCoverageRepository;
+      readsNothing.findOpenForUpdate = () => Promise.resolve(null);
+
+      const refused = await new CostCoverageService(prisma, readsNothing)
+        .pointKeyAtSource({
+          organizationId,
+          virtualKeyId: contestedKey,
+          ingestionSourceId: `bill_2_${ns}`,
+          effectiveFrom: utc("2026-02-01"),
+        })
+        .catch((error: unknown) => error);
+
+      expect(refused).toBeInstanceOf(GatewayKeyAlreadyCoveredError);
+      expect((refused as GatewayKeyAlreadyCoveredError).code).toBe(
+        "ingestion_source_key_already_covered",
+      );
+      expect((refused as GatewayKeyAlreadyCoveredError).meta).toMatchObject({
+        virtualKeyId: contestedKey,
+      });
+
+      // The winner's coverage is untouched, and no second row was left behind.
+      const periods = (
+        await repo.findAllByOrganization(prisma, { organizationId })
+      ).filter((row) => row.virtualKeyId === contestedKey);
+      expect(periods).toHaveLength(1);
+      expect(periods[0]?.ingestionSourceId).toBe(`bill_1_${ns}`);
+    });
+
+    it("tells the losing administrator when the coverage it is closing already starts then", async () => {
+      const seamKey = `vk_${ns}_seam`;
+      await makeKey({ id: seamKey, organizationId });
+      const current = await repo.open(prisma, {
+        organizationId,
+        ingestionSourceId: `bill_1_${ns}`,
+        virtualKeyId: seamKey,
+        validFrom: utc("2026-06-01"),
+      });
+
+      // Here the winner moved the key to a period beginning at the very instant
+      // this transaction is moving it from. The stale read is of the row as it
+      // was BEFORE that, so the service's own "after the current start" check
+      // passes; the close it then makes leaves a period covering no time, and an
+      // empty range overlaps nothing, so the CHECK is the only thing that sees
+      // it.
+      const readsStale = Object.create(
+        repo,
+      ) as IngestionSourceKeyCoverageRepository;
+      readsStale.findOpenForUpdate = () =>
+        Promise.resolve({ ...current, validFrom: utc("2026-01-01") });
+
+      const refused = await new CostCoverageService(prisma, readsStale)
+        .pointKeyAtSource({
+          organizationId,
+          virtualKeyId: seamKey,
+          ingestionSourceId: `bill_2_${ns}`,
+          effectiveFrom: utc("2026-06-01"),
+        })
+        .catch((error: unknown) => error);
+
+      expect(refused).toBeInstanceOf(CoverageStartNotAfterCurrentError);
+      expect((refused as CoverageStartNotAfterCurrentError).code).toBe(
+        "ingestion_source_coverage_not_after_start",
+      );
+
+      const periods = (
+        await repo.findAllByOrganization(prisma, { organizationId })
+      ).filter((row) => row.virtualKeyId === seamKey);
+      expect(periods).toHaveLength(1);
+      expect(periods[0]?.validTo).toBeNull();
     });
   });
 });
