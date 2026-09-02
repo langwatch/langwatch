@@ -11,7 +11,7 @@
  *
  * `params` keys are filter FIELD ids from `src/server/filters/registry.ts`
  * (e.g. `"metadata.user_id"`, or subkeyed forms like
- * `"evaluation_run.<evaluatorId>"`) — NOT the registry's `urlKey`s. This
+ * `"evaluations.state.<evaluatorId>"`) — NOT the registry's `urlKey`s. This
  * hook translates each to its `urlKey` before pushing, because
  * `src/hooks/useFilterParams.ts` deserializes the URL by `urlKey`, which
  * frequently differs from the field id (e.g. `"metadata.user_id"` ->
@@ -32,26 +32,42 @@ import { useRouter } from "~/utils/compat/next-router";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 
+const registryKeysByLengthDesc = Object.keys(availableFilters).sort(
+  (a, b) => b.length - a.length,
+);
+const knownUrlKeys = new Set(
+  Object.values(availableFilters).map((f) => f.urlKey),
+);
+
 /**
- * Maps a filter FIELD id (registry key, e.g. "metadata.user_id") or its
- * subkeyed form (e.g. "evaluation_run.<evaluatorId>") to the URL query key
- * `useFilterParams` (src/hooks/useFilterParams.ts) actually reads —
- * `availableFilters[field].urlKey`, NOT the field id itself. A bare urlKey
- * (e.g. "user_id") is also accepted as-is so authors can copy either form
- * straight out of the registry.
+ * Maps a filter FIELD id (registry key, e.g. "metadata.user_id") to the URL
+ * query key `useFilterParams` (src/hooks/useFilterParams.ts) actually
+ * reads — `availableFilters[field].urlKey`, NOT the field id itself.
+ *
+ * Registry keys are themselves compound dotted strings ("metadata.user_id",
+ * "traces.origin") — there is no bare "metadata" or "traces" entry — so an
+ * exact full-key lookup is tried first. Some filters (the
+ * `evaluations.evaluator_id`/`evaluations.state`/`evaluations.passed`/
+ * `evaluations.label` family — see `evaluations.tsx`'s onDataPointClick,
+ * which appends `.${evaluatorId}` after the urlKey) are used with a dynamic
+ * subkey suffix beyond the registry key; for those, the LONGEST registry key
+ * that prefixes the input (followed by a dot) is matched and its urlKey gets
+ * the remaining `.subkey` appended. A bare urlKey (e.g. "user_id") is also
+ * accepted as-is, matched only against the full input string.
  */
 function resolveFilterUrlKey(key: string): string | undefined {
-  const [prefix, ...rest] = key.split(".");
-  const subkey = rest.length > 0 ? "." + rest.join(".") : "";
-
-  if (prefix && prefix in availableFilters) {
-    return availableFilters[prefix as FilterField].urlKey + subkey;
+  if (key in availableFilters) {
+    return availableFilters[key as FilterField].urlKey;
   }
 
-  const knownUrlKeys = new Set(
-    Object.values(availableFilters).map((f) => f.urlKey),
-  );
-  if (prefix && knownUrlKeys.has(prefix)) {
+  for (const registryKey of registryKeysByLengthDesc) {
+    if (key.startsWith(registryKey + ".")) {
+      const subkey = key.slice(registryKey.length);
+      return availableFilters[registryKey as FilterField].urlKey + subkey;
+    }
+  }
+
+  if (knownUrlKeys.has(key)) {
     return key;
   }
 
