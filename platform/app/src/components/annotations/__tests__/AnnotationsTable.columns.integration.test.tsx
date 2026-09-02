@@ -773,64 +773,72 @@ describe("AnnotationsTable columns and row actions", () => {
   });
 
   describe("given the reviewer wants fewer columns", () => {
-    /** @scenario "A column the reviewer hides stays hidden" */
-    it("hides a column it is told to hide and remembers the choice", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const view = renderQueuePage();
-      expect(columnHeaders()).toContain("Suggestions");
+    describe("when the reviewer turns one off in the menu", () => {
+      /** @scenario "A column the reviewer hides stays hidden" */
+      it("hides it and remembers the choice", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const view = renderQueuePage();
+        expect(columnHeaders()).toContain("Suggestions");
 
-      await user.click(
-        screen.getByRole("button", {
-          name: "Show or hide columns in the table",
-        }),
-      );
-      await user.click(
-        await screen.findByRole("checkbox", { name: "Suggestions" }),
-      );
+        await user.click(
+          screen.getByRole("button", {
+            name: "Show or hide columns in the table",
+          }),
+        );
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Suggestions" }),
+        );
 
-      expect(columnHeaders()).not.toContain("Suggestions");
+        expect(columnHeaders()).not.toContain("Suggestions");
 
-      view.unmount();
-      renderQueuePage();
+        view.unmount();
+        renderQueuePage();
 
-      expect(columnHeaders()).not.toContain("Suggestions");
-      // Input and output are what the reviewer is judging, so they are never
-      // the thing a stored choice quietly drops.
-      expect(columnHeaders()).toContain("Input");
-      expect(columnHeaders()).toContain("Output");
-    });
-
-    /** @scenario "A column added after the reviewer chose still appears" */
-    it("shows a column the stored choice never mentioned", () => {
-      // What an older build wrote: the reviewer hid one column, back when
-      // Suggestions did not exist yet. A store of the visible set would now
-      // read as "Suggestions off"; storing the choice per column instead lets
-      // the new column's own default decide.
-      window.localStorage.setItem(
-        "annotations:columns:project-1",
-        JSON.stringify({ comments: false }),
-      );
-
-      renderQueuePage();
-
-      expect(columnHeaders()).toContain("Suggestions");
-      expect(columnHeaders()).not.toContain("Comments");
-    });
-
-    /** @scenario "The columns menu keeps the button as its own trigger" */
-    it("leaves the button to the menu rather than to its tooltip", () => {
-      renderQueuePage();
-
-      const trigger = screen.getByRole("button", {
-        name: "Show or hide columns in the table",
+        expect(columnHeaders()).not.toContain("Suggestions");
+        // Input and output are what the reviewer is judging, so they are never
+        // the thing a stored choice quietly drops.
+        expect(columnHeaders()).toContain("Input");
+        expect(columnHeaders()).toContain("Output");
       });
+    });
 
-      // The tooltip and the menu trigger both clone themselves onto their
-      // child. Let the tooltip win and the menu has no anchor left to measure
-      // against, and it opens in the corner of the page instead of under the
-      // button. Where it lands needs a browser to see; whose button this is
-      // does not, and it is the half that goes wrong.
-      expect(trigger).toHaveAttribute("data-scope", "popover");
+    describe("when the project gains a column their choice never mentioned", () => {
+      /** @scenario "A column added after the reviewer chose still appears" */
+      it("shows the new column", () => {
+        // What an older build wrote: the reviewer hid one column, back when
+        // Suggestions did not exist yet. A store of the visible set would now
+        // read as "Suggestions off"; storing the choice per column instead lets
+        // the new column's own default decide.
+        window.localStorage.setItem(
+          "annotations:columns:project-1",
+          JSON.stringify({ comments: false }),
+        );
+
+        renderQueuePage();
+
+        expect(columnHeaders()).toContain("Suggestions");
+        expect(columnHeaders()).not.toContain("Comments");
+      });
+    });
+  });
+
+  describe("given the columns menu sits behind a tooltip", () => {
+    describe("when the list renders", () => {
+      /** @scenario "The columns menu keeps the button as its own trigger" */
+      it("leaves the button to the menu rather than to its tooltip", () => {
+        renderQueuePage();
+
+        const trigger = screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        });
+
+        // The tooltip and the menu trigger both clone themselves onto their
+        // child. Let the tooltip win and the menu has no anchor left to measure
+        // against, and it opens in the corner of the page instead of under the
+        // button. Where it lands needs a browser to see; whose button this is
+        // does not, and it is the half that goes wrong.
+        expect(trigger).toHaveAttribute("data-scope", "popover");
+      });
     });
   });
 
