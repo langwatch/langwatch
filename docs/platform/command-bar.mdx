@@ -10,7 +10,7 @@ keywords: command bar, command palette, cmd+k, search, shortcuts, langwatch
 Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in the top bar. `Esc` closes it. On the project home page the same shortcut focuses the search field in the page.
 
 <Frame>
-<img src="/images/platform/command-bar.png" alt="The command bar with a search term, matching pages and a recent item" />
+<img src="/images/platform/command-bar.png" alt="The command bar with prompt typed, showing the Navigation and Actions matches" />
 </Frame>
 
 ## What you can do
@@ -18,18 +18,18 @@ Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in t
 | Type | Result |
 |------|--------|
 | Any text | Pages and settings whose name matches: Trace Explorer, Experiments, Prompts, Datasets, Workflows, Members, Roles, Audit Log and every other page you can open |
-| A name, 2 characters or more | Prompts, agents, datasets, workflows and evaluators with that name. Each search also offers **Search in traces** and **Search in docs** with the same text |
-| An entity id | A **Jump to** entry that opens the entity. See the id list below |
+| A name, 2 characters or more | Prompts, agents, datasets, workflows and evaluators with that name. Every search also offers **Search "..." in traces** and **Search "..." in docs** with the same text |
+| An entity id | A **Jump to ID** entry, for example **Open trace**, that opens the entity. See the id list below |
 | A project, team or organization name, or `switch project` | The projects you can switch to. Your own project is excluded |
 | `New` | Create an agent, an evaluation, a prompt, a dataset, an automation or a scenario, or invite a teammate |
 | `Light`, `Dark`, `System` | Switch the theme |
-| An empty bar | Your last 5 opened traces, workflows, datasets, prompts and agents from the last 30 days, grouped by day, and the **Ask Langy** entry |
+| An empty bar | Your last 5 opened traces, workflows, datasets, prompts and agents from the last 30 days, grouped by day, and the **Ask Langy** entry. The recent items show only while the bar is empty |
 
 Support entries (Documentation, Discord, Report a Bug, Feature Request, Status Page) are also there.
 
 ## Jump to an id
 
-Paste an id and pick the **Jump to** entry.
+Paste an id and pick the entry under **Jump to ID**.
 
 | Id | Opens |
 |----|-------|
@@ -45,12 +45,12 @@ Paste an id and pick the **Jump to** entry.
 | `monitor_...` | The automation |
 
 <Frame>
-<img src="/images/platform/command-bar-jump-id.png" alt="The command bar with a trace id pasted and the Jump to entry" />
+<img src="/images/platform/command-bar-jump-id.png" alt="The command bar with a trace id pasted and the Open trace entry under Jump to ID" />
 </Frame>
 
 ## Ask Langy
 
-**Ask Langy** is the first entry on an empty bar and the last one when you type. Select it, or press `Tab`, to hand the text to Langy and open the Langy panel. It is available when you can start a Langy turn in the current project.
+**Ask Langy** is the first entry on an empty bar. When you type, it follows the matches and comes before the search entries. Select it, or press `Tab`, to hand the text to Langy and open the Langy panel. It is available when you can start a Langy turn in the current project.
 
 ## Keys
 

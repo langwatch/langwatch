@@ -682,7 +682,7 @@ keywords: command bar, command palette, cmd+k, search, shortcuts, langwatch
 Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in the top bar. `Esc` closes it. On the project home page the same shortcut focuses the search field in the page.
 
 <Frame>
-<img src="/images/platform/command-bar.png" alt="The command bar with a search term, matching pages and a recent item" />
+<img src="/images/platform/command-bar.png" alt="The command bar with prompt typed, showing the Navigation and Actions matches" />
 </Frame>
 
 ## What you can do
@@ -690,18 +690,18 @@ Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in t
 | Type | Result |
 |------|--------|
 | Any text | Pages and settings whose name matches: Trace Explorer, Experiments, Prompts, Datasets, Workflows, Members, Roles, Audit Log and every other page you can open |
-| A name, 2 characters or more | Prompts, agents, datasets, workflows and evaluators with that name. Each search also offers **Search in traces** and **Search in docs** with the same text |
-| An entity id | A **Jump to** entry that opens the entity. See the id list below |
+| A name, 2 characters or more | Prompts, agents, datasets, workflows and evaluators with that name. Every search also offers **Search "..." in traces** and **Search "..." in docs** with the same text |
+| An entity id | A **Jump to ID** entry, for example **Open trace**, that opens the entity. See the id list below |
 | A project, team or organization name, or `switch project` | The projects you can switch to. Your own project is excluded |
 | `New` | Create an agent, an evaluation, a prompt, a dataset, an automation or a scenario, or invite a teammate |
 | `Light`, `Dark`, `System` | Switch the theme |
-| An empty bar | Your last 5 opened traces, workflows, datasets, prompts and agents from the last 30 days, grouped by day, and the **Ask Langy** entry |
+| An empty bar | Your last 5 opened traces, workflows, datasets, prompts and agents from the last 30 days, grouped by day, and the **Ask Langy** entry. The recent items show only while the bar is empty |
 
 Support entries (Documentation, Discord, Report a Bug, Feature Request, Status Page) are also there.
 
 ## Jump to an id
 
-Paste an id and pick the **Jump to** entry.
+Paste an id and pick the entry under **Jump to ID**.
 
 | Id | Opens |
 |----|-------|
@@ -717,12 +717,12 @@ Paste an id and pick the **Jump to** entry.
 | `monitor_...` | The automation |
 
 <Frame>
-<img src="/images/platform/command-bar-jump-id.png" alt="The command bar with a trace id pasted and the Jump to entry" />
+<img src="/images/platform/command-bar-jump-id.png" alt="The command bar with a trace id pasted and the Open trace entry under Jump to ID" />
 </Frame>
 
 ## Ask Langy
 
-**Ask Langy** is the first entry on an empty bar and the last one when you type. Select it, or press `Tab`, to hand the text to Langy and open the Langy panel. It is available when you can start a Langy turn in the current project.
+**Ask Langy** is the first entry on an empty bar. When you type, it follows the matches and comes before the search entries. Select it, or press `Tab`, to hand the text to Langy and open the Langy panel. It is available when you can start a Langy turn in the current project.
 
 ## Keys
 
@@ -753,7 +753,7 @@ The data privacy policy is at **Settings > Data Privacy**. A rule at a scope dec
 The policy changes what LangWatch stores. It does not change the request your application sends to the model provider.
 
 <Frame>
-<img src="/images/platform/data-privacy.png" alt="Settings > Data Privacy with the content, PII and secrets controls" />
+<img src="/images/platform/data-privacy.png" alt="The Add privacy rule drawer with the content, audience, PII and secrets controls" />
 </Frame>
 
 ## Scopes and inheritance
@@ -869,8 +869,10 @@ The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside
 
 Write a policy at the organization, a team or a project. A project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
 
+The **Data Retention** panel at the top of the page shows the period that applies to the current project, and **Data Storage** shows how much space the projects you can see use today. The **All you can see** filter narrows the table to one scope.
+
 <Frame>
-<img src="/images/platform/data-retention.png" alt="Settings > Data Retention with one policy and the Add retention policy button" />
+<img src="/images/platform/data-retention.png" alt="Settings > Data Retention with the retention and storage panels, one organization policy and the Add retention policy button" />
 </Frame>
 
 ## Periods
@@ -1076,10 +1078,10 @@ You can save several configurations of the same vendor, for example one OpenAI a
     **Scope** is a multi-select of the organization, teams and projects. It starts on the widest scope you can manage. The helper text states who can use the configuration, for example "Only this project can use this provider." You need `organization:manage`, `team:manage` or `project:manage` for each scope you pick.
   </Step>
   <Step title="Enter the credentials">
-    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, a **Routing handle** for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
+    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, the routing handle line ("Requests reach this provider as `openai/<model>`") for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
   </Step>
   <Step title="Save and test">
-    Save, then open the row menu and click **Test Connection**. The verdict is **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
+    Save, then open the row menu and click **Test Connection**. The verdict appears under the provider name in its row: **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
   </Step>
 </Steps>
 
@@ -1088,7 +1090,7 @@ You can save several configurations of the same vendor, for example one OpenAI a
 </Frame>
 
 <Frame>
-<img src="/images/platform/model-providers-test-connection.png" alt="Test Connection on a saved provider reports Connection works" />
+<img src="/images/platform/model-providers-test-connection.png" alt="The OpenAI row with Connection works under the provider name after Test Connection" />
 </Frame>
 
 Bedrock, Vertex AI, Azure OpenAI, Azure Safety, Voyage AI and Codex cannot be tested automatically. Their settings are checked the first time a feature uses them.
@@ -1099,7 +1101,7 @@ Keys are encrypted at rest with AES-GCM. After save the drawer shows a masked pl
 
 ## Custom models
 
-Every LLM provider has a **Custom Models** section with **Add model** and **Add embeddings model**. Each entry has a model id and a display name, and appears in the model pickers next to the vendor's known models. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
+Every LLM provider has a **Custom Models** section. Click **Add**, choose a chat model or an embeddings model, and enter the model id. The entry appears in the model pickers next to the vendor's known models, which **See all models** lists. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
 
 ## Who can see and use a configuration
 
@@ -1111,7 +1113,7 @@ A project sees every configuration scoped to the project itself, to its team or 
 | Team | `team:manage` | `team:view` |
 | Project | `project:manage` | `project:view` |
 
-The scope filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
+The **All you can see** filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
 
 ## Default models
 

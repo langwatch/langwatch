@@ -48,10 +48,10 @@ You can save several configurations of the same vendor, for example one OpenAI a
     **Scope** is a multi-select of the organization, teams and projects. It starts on the widest scope you can manage. The helper text states who can use the configuration, for example "Only this project can use this provider." You need `organization:manage`, `team:manage` or `project:manage` for each scope you pick.
   </Step>
   <Step title="Enter the credentials">
-    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, a **Routing handle** for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
+    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, the routing handle line ("Requests reach this provider as `openai/<model>`") for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
   </Step>
   <Step title="Save and test">
-    Save, then open the row menu and click **Test Connection**. The verdict is **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
+    Save, then open the row menu and click **Test Connection**. The verdict appears under the provider name in its row: **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
   </Step>
 </Steps>
 
@@ -60,7 +60,7 @@ You can save several configurations of the same vendor, for example one OpenAI a
 </Frame>
 
 <Frame>
-<img src="/images/platform/model-providers-test-connection.png" alt="Test Connection on a saved provider reports Connection works" />
+<img src="/images/platform/model-providers-test-connection.png" alt="The OpenAI row with Connection works under the provider name after Test Connection" />
 </Frame>
 
 Bedrock, Vertex AI, Azure OpenAI, Azure Safety, Voyage AI and Codex cannot be tested automatically. Their settings are checked the first time a feature uses them.
@@ -71,7 +71,7 @@ Keys are encrypted at rest with AES-GCM. After save the drawer shows a masked pl
 
 ## Custom models
 
-Every LLM provider has a **Custom Models** section with **Add model** and **Add embeddings model**. Each entry has a model id and a display name, and appears in the model pickers next to the vendor's known models. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
+Every LLM provider has a **Custom Models** section. Click **Add**, choose a chat model or an embeddings model, and enter the model id. The entry appears in the model pickers next to the vendor's known models, which **See all models** lists. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
 
 ## Who can see and use a configuration
 
@@ -83,7 +83,7 @@ A project sees every configuration scoped to the project itself, to its team or 
 | Team | `team:manage` | `team:view` |
 | Project | `project:manage` | `project:view` |
 
-The scope filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
+The **All you can see** filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
 
 ## Default models
 
