@@ -46250,7 +46250,7 @@ Under **Datasets**, click **Add** and pick **Select existing dataset**. To start
 </Step>
 
 <Step title="Add a prompt column">
-Under **Prompts or Agents**, click **Add** and pick **Prompt**, then **New Prompt**. In the editor, pick the model, write the system prompt, and keep `{{input}}` as the user message so each row's question reaches the model. For example:
+Under **Prompts or Agents**, click **Add** and pick **Prompt**, then **New Prompt**. In the editor, pick the model and write the system prompt. For example:
 
 ```
 You are the customer support assistant for ACME.
@@ -46262,7 +46262,7 @@ Policies:
 - Orders can be changed or cancelled until they ship.
 ```
 
-In the **Variables** section, check that `input` maps to the dataset's `input` column. Save the prompt.
+In the **Variables** section, check that `input` maps to the dataset's `input` column, so each row's question reaches the model. Click **Apply**.
 
 <Frame>
 <img src="/images/evaluations/workbench-prompt-editor.png" alt="The prompt editor with the model selector and the Variables section mapping input to the dataset column" />
@@ -46277,7 +46277,7 @@ On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the 
 | **Exact Match** | The answer must match the expected output character for character. Case, surrounding whitespace and punctuation are ignored by default; each is a setting. |
 | **LLM Answer Match** | The answer may be worded differently and still be correct. A model compares the answer with the expected output and passes it when the meaning matches. |
 
-Name the evaluator. In **Variables**, map `output` to the prompt column's output and `expected_output` to the dataset's `expected_output` column, then save.
+Name the evaluator. In **Variables**, map `output` to the prompt column's output, `expected_output` to the dataset's `expected_output` column and `input` to the dataset's `input` column, then click **Apply**.
 
 <Frame>
 <img src="/images/evaluations/workbench-evaluator-mapping.png" alt="The LLM Answer Match editor with output mapped to the prompt output and expected_output to the dataset column" />
@@ -46354,7 +46354,7 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 </Step>
 
 <Step title="Add a prompt column">
-Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, keep `{{input}}` as the user message, and save.
+Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, check that `input` maps to the dataset's `input` column under **Variables**, and click **Apply**.
 </Step>
 
 <Step title="Create the judge">
@@ -46376,7 +46376,7 @@ Fail the output if any criterion is not met, and name the criterion that failed.
 <img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
 </Frame>
 
-In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Save the evaluator.
+In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Apply**.
 </Step>
 
 <Step title="Run">

@@ -31,7 +31,7 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 </Step>
 
 <Step title="Add a prompt column">
-Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, keep `{{input}}` as the user message, and save.
+Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, check that `input` maps to the dataset's `input` column under **Variables**, and click **Apply**.
 </Step>
 
 <Step title="Create the judge">
@@ -53,7 +53,7 @@ Fail the output if any criterion is not met, and name the criterion that failed.
 <img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
 </Frame>
 
-In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Save the evaluator.
+In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Apply**.
 </Step>
 
 <Step title="Run">
