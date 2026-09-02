@@ -3980,37 +3980,37 @@ Pipe the result through `psql -A -F$'\t'` and gzip it into `incident-<vk_id>-aud
 
 ---
 title: Grafana dashboard
-description: Importable Grafana dashboard JSON for the LangWatch AI Gateway, request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
+description: An importable Grafana dashboard for the LangWatch AI Gateway, covering request health, provider health, the auth cache, budgets, guardrails, streaming and the drain.
 sidebarTitle: Grafana dashboard
 ---
 
-A single dashboard with every panel you actually look at during an incident. Pairs with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) and [Production runbook](/ai-gateway/cookbooks/production-runbook): alerts page you, this dashboard tells you *what* is wrong, the runbook tells you *how to dig*.
+Import the JSON below to get one dashboard with every panel an on-call engineer reads during an incident. Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): the alerts say when to look, this dashboard says where, and [Troubleshooting](/ai-gateway/troubleshooting) says what to do.
 
 ## What it covers
 
-Eight rows, top to bottom:
+Nine rows, top to bottom:
 
-| Row | Panels | Why |
+| Row | Panels | What it answers |
 |---|---|---|
-| Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
-| Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
-| Auth cache | hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
-| Budgets | blocks by scope | which scope is actually rejecting traffic |
-| Guardrails | verdicts by direction, blocks by direction | catches both legit policy enforcement and regressions |
-| Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
-| Cache (passthrough) | hits, bypass, forced, Anthropic discount proxy | cache outcome vs expectation |
-| Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
-| Lifecycle | draining pods, in-flight requests | detect hung drains before SIGKILL |
+| Request health | rate, p50, p95, p99, 5xx share | Is this affecting callers? |
+| Provider health | circuit state, upstream latency, fallback events | Which credential is degrading, and is fallback covering it? |
+| Auth cache | hit rate, resolve-key round trips | Is cache pressure loading the control plane? |
+| Budgets | blocks by scope, spend records written and dropped | Which scope is rejecting traffic, and is spend reaching the ledger? |
+| Guardrails | verdicts by direction, blocks by direction | Policy enforcement against a policy regression |
+| Streaming | active streams, guardrail fail-open rate | Concurrency, and chunks passing through unchecked |
+| Prompt cache | hit and miss rate | Whether provider cache reads are happening at all |
+| Infrastructure | replicas, CPU, memory, goroutines | The Kubernetes side of everything above |
+| Lifecycle | draining pods, in-flight requests | A stuck drain, before the kubelet kills the pod |
 
 ## Prerequisites
 
-- Grafana ≥ 10.0 (uses time series panels + `$__rate_interval`).
-- A Prometheus data source scraping the gateway's `/metrics`. See [Helm → Monitoring](/ai-gateway/self-hosting/helm#monitoring).
-- The `kube-state-metrics` exporter if you want the infrastructure row, it's how we read pod CPU/memory/replica count.
+- Grafana 10.0 or later. The JSON uses time series panels and `$__rate_interval`.
+- A Prometheus data source that scrapes the gateway's `/metrics`.
+- `kube-state-metrics` and cAdvisor for the infrastructure row. Skip that row without them.
 
 ## Import
 
-Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards → New → Import → Upload JSON**. Set the data source to your Prometheus instance on first import; it propagates to every panel.
+Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboards → New → Import → Upload JSON**. Set the data source on first import; it reaches every panel.
 
 ```json
 {
@@ -5925,7 +5925,7 @@ sidebarTitle: OCSF / SIEM export
 
 ## What the export contains
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index), and one per admin view of a member's or a team's workspace (`actionName` `governance.viewWorkspaceAs`). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
 
 Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
 
@@ -38309,7 +38309,7 @@ An endpoint belongs to your **organization** and carries:
 | `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
 | `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
-| `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
+| `status` | `active` or `disabled`. Disabled endpoints receive no deliveries; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
@@ -38366,7 +38366,7 @@ Anything else is refused at create and update time with `400` and `error.code = 
 The port and credential rules apply to endpoints you already have. If an existing endpoint uses a non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move credentials into a custom header.
 </Warning>
 
-Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
+Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). The credential rule stays in force on every deployment, and redirects are never followed on any deployment.
 
 <Warning>
 The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints carry signing secrets and stream org-wide events out of the platform, so by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
@@ -38634,7 +38634,7 @@ curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
 
 | Mode | How | When |
 |---|---|---|
-| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. No long-lived credential is stored, and you revoke us by editing your own trust policy. |
 | `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
 | `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
 
@@ -38707,7 +38707,7 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
-Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. Nothing about our request is stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
+Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. The request itself is not stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
 
 ## Test fire
 

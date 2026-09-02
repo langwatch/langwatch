@@ -23,7 +23,7 @@ An endpoint belongs to your **organization** and carries:
 | `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
 | `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
-| `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
+| `status` | `active` or `disabled`. Disabled endpoints receive no deliveries; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
@@ -80,7 +80,7 @@ Anything else is refused at create and update time with `400` and `error.code = 
 The port and credential rules apply to endpoints you already have. If an existing endpoint uses a non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move credentials into a custom header.
 </Warning>
 
-Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
+Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). The credential rule stays in force on every deployment, and redirects are never followed on any deployment.
 
 <Warning>
 The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints carry signing secrets and stream org-wide events out of the platform, so by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
@@ -348,7 +348,7 @@ curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
 
 | Mode | How | When |
 |---|---|---|
-| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. No long-lived credential is stored, and you revoke us by editing your own trust policy. |
 | `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
 | `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
 
@@ -421,7 +421,7 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
-Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. Nothing about our request is stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
+Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. The request itself is not stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
 
 ## Test fire
 
