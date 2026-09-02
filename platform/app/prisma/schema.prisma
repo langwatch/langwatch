@@ -5011,3 +5011,182 @@ model SystemMigrationEnrollment {
   @@id([organizationId, migrationName])
   @@index([migrationName])
 }
+
+// ---------------------------------------------------------------------------
+// Governance identity (ADR-128 wave 2, §9/§11).
+//
+// These tables sit BESIDE login identity (ADR-101), never inside it. A row
+// here is "a provider told us this name exists on a cost row" - it is not a
+// login, it grants nothing, and no authorization code path may read it (ADR-128
+// hard constraint 3).
+//
+// All of them are keyed by `organizationId`, never by the hidden governance
+// project. That project's id is the ClickHouse `TenantId`, and it is not
+// durable: one archive/re-mint cycle would orphan every identity and erasure
+// row keyed to it, and a delete job walking that key would then miss an erased
+// person's rows entirely. `GovernanceTenantHistory` below is how an
+// organization is translated back to its tenants for reads and for erasure.
+//
+// Spec: specs/governance/governance-identity-and-erasure.feature
+// ---------------------------------------------------------------------------
+
+/// A name-text seen on a provider's cost or audit rows: "the provider told us
+/// someone called m.silva exists". One row per provider-scoped identity.
+///
+/// This is the unit of GDPR erasure (ADR-128 §9), and deliberately so: most of
+/// these people have no LangWatch login at all - contractors, seat holders who
+/// never signed in, anyone whose email a provider put on a cost row - so there
+/// is no platform user to key on and a user-deletion event can never fire for
+/// them.
+model DiscoveredPerson {
+  id              String    @id @default(nanoid())
+  organizationId  String
+  /// "anthropic" | "openai" | "databricks" | ... - the provider that named them.
+  provider        String
+  /// What the provider calls them, verbatim. The join key onto the money rows'
+  /// RawActorId. Replaced by a deterministic pseudonym on erasure, which keeps
+  /// the row addressable for spend attribution without keeping the identifier.
+  rawActorId      String
+  /// Name or email text as seen. Pseudonymized alongside rawActorId on erasure.
+  displayText     String
+  /// person | service_account - determined deterministically per ADR-128 §10
+  /// (a bare UUID in Databricks `executed_by` is a service account, never an
+  /// agent), never guessed from the shape of a name.
+  kind            String
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  /// Set when this row's identity has been erased. The row survives so its
+  /// spend stays attributable to *someone*; the identifier does not.
+  erasedAt        DateTime?
+  /// ADR-128 §12 conflict rule: automatic linking has stopped for this
+  /// identity because evidence pointed at two candidates, or contradicted an
+  /// existing link. Stored HERE rather than on the suggestion rows, because a
+  /// halt on auto-linking that a recompute or a restart clears is not a halt.
+  suspendedAt     DateTime?
+  /// What tripped the suspension, for the human who reviews it.
+  suspendedReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, provider, rawActorId])
+  // The identity screens list an organization's people newest-seen first.
+  @@index([organizationId, lastSeenAt])
+}
+
+/// The same shape as DiscoveredPerson for non-human actors - Genie spaces,
+/// Copilot bots, OpenAI projects - plus whatever provider-native metadata the
+/// source published. Discovering an agent grants it nothing either.
+model DiscoveredAgent {
+  id             String   @id @default(nanoid())
+  organizationId String
+  provider       String
+  /// Genie space / Copilot bot / OpenAI project id, verbatim.
+  rawAgentId     String
+  displayText    String
+  /// Workspace, plan, and kin - provider-native descriptive fields only. Never
+  /// credentials: this row is read by admin screens, not by any pull path.
+  metadata       Json
+  firstSeenAt    DateTime
+  lastSeenAt     DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, provider, rawAgentId])
+  @@index([organizationId, lastSeenAt])
+}
+
+/// The dated match table: "`user_abc123` on Anthropic is platform user #42,
+/// valid from March 3", closed when it stops being true.
+///
+/// Dating is what makes a re-issued email address survivable: the leaver's link
+/// closes at offboarding, the new hire gets a new link, and January's spend
+/// stays with January's person. A correction closes the old row and opens a new
+/// one; nothing is ever silently rewritten.
+model IdentityMatch {
+  id                 String    @id @default(nanoid())
+  organizationId     String
+  /// The provider-side identity this link is about.
+  discoveredPersonId String
+  /// The platform user. Nullable, and blanked by erasure (ADR-128 §9 step 2) -
+  /// the row and its dates remain, so the history of the link is not rewritten
+  /// by the erasure either.
+  userId             String?
+  /// directory_id | verified_email | human_confirmed. Exact verified-email
+  /// equality is the primary evidence; a directory id corroborates but never
+  /// stands alone (ADR-128 §12).
+  evidenceKind       String
+  validFrom          DateTime
+  /// Null means the link is open. Offboarding and corrections close it.
+  validTo            DateTime?
+  createdAt          DateTime  @default(now())
+
+  // Overlap guard, and the ONLY uniqueness rule here: no two rows for the same
+  // discoveredPersonId may have overlapping validity ranges. Raw SQL in the
+  // migration, because Prisma cannot express an exclusion constraint:
+  //   EXCLUDE USING gist ("discoveredPersonId" WITH =,
+  //     tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)
+  // Two OPEN rows both range to infinity, so they overlap and the constraint
+  // rejects the second - which is why NO partial unique index is added on top
+  // (ADR-128 §7's ruling, applied here for the same reason: a redundant index
+  // would make the common race surface as 23505 instead of 23P01, two error
+  // codes for one rule). Proved on Postgres 16.14.
+  // A CHECK rejects zero-width and inverted ranges, which an exclusion
+  // constraint cannot see: an empty range overlaps nothing, not even itself.
+  @@index([organizationId, discoveredPersonId])
+  // Offboarding and the erasure walk both ask "which links does this user hold".
+  @@index([organizationId, userId])
+}
+
+/// Every ClickHouse `TenantId` this organization has ever written governance
+/// rows under, appended on first use and never pruned.
+///
+/// The live `resolveGovProjectId` lookup cannot be this translation: it filters
+/// `archivedAt: null` and so returns null forever once someone archives the
+/// governance project, while the write path re-reads the same project by slug
+/// with no such filter and keeps landing rows under the old tenant. The
+/// organization would map to zero tenants on read and one on write - a
+/// permanent split-brain in which the cost screen reports "no governance data"
+/// and an erasure job erases nothing and reports success.
+///
+/// Reads resolve against the whole history; erasure walks all of it, because
+/// personal data does not stop existing in a tenant that stopped being current.
+model GovernanceTenantHistory {
+  id             String   @id @default(nanoid())
+  organizationId String
+  /// A hidden governance project id this organization has written rows under.
+  tenantId       String
+  firstUsedAt    DateTime
+  lastUsedAt     DateTime
+
+  @@unique([organizationId, tenantId])
+  @@index([organizationId])
+}
+
+/// Hashes of erased identifiers - the do-not-reimport list.
+///
+/// Without it the erasure is undone by the pipeline that produced it: the
+/// pullers look 30 days back, so the next day's pull re-ingests the same email
+/// and re-writes what we erased. Every write path carrying an identifier
+/// consults this list and drops a suppressed one (ADR-128 §9 step 1).
+///
+/// It stores hashes and never identifiers, so it is not itself a copy of the
+/// data it exists to keep out. The stored `identifierHash` and the pseudonym
+/// written in place of the erased value are the same function of the same
+/// input - SHA-256(secret || original) - so a write path computes that digest
+/// once and uses it twice: as the membership test, and, on a hit, as the
+/// replacement value. That is why no original-to-pseudonym mapping table
+/// exists; one would hold the erased identifier in plaintext forever.
+///
+/// Scoped to the provider as well as the organization: the same string can be a
+/// different person under a different provider.
+model ErasedIdentifierSuppression {
+  id             String   @id @default(nanoid())
+  organizationId String
+  provider       String
+  identifierHash String
+  erasedAt       DateTime
+
+  @@unique([organizationId, provider, identifierHash])
+  // The snapshot every write path reads: one organization's whole list.
+  @@index([organizationId])
+}
