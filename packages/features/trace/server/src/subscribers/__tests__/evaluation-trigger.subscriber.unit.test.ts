@@ -155,7 +155,7 @@ function subscriber(options: {
   const dispatch = options.dispatch ?? new Dispatch();
   const metrics = new LoopMetrics();
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
-  const listMonitors = vi.fn(async () => options.monitors ?? [monitor()]);
+  const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
   class Monitors extends TraceEvaluationMonitorPort {
     getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
       return listMonitors(projectId) as Promise<MonitorSummary[]>;

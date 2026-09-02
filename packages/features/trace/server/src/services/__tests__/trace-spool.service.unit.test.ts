@@ -127,7 +127,6 @@ describe("TraceSpoolService", () => {
       /** @scenario "An id that is not a safe path segment is hashed, not escaped" */
       it("hashes the offending segment instead of escaping it", async () => {
         await service().putSpool({
-          spoolRef: SPOOL_REF_V2,
           projectId: "project-1",
           traceId: "../../etc",
           spanId: "span-1",

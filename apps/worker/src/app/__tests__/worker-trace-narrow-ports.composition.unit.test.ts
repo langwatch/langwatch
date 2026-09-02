@@ -74,13 +74,16 @@ describe("createWorkerTraceNarrowPorts", () => {
         const ports = createWorkerTraceNarrowPorts({ projects, monitors, modelProviders });
 
         await ports.projects.tryGetById("project-1");
-        await ports.projects.updateMetadata({ id: "project-1", data: { firstMessage: true } });
+        await ports.projects.updateMetadata({
+          id: "project-1",
+          data: { firstMessage: true, integrated: true, language: "python" },
+        });
         await ports.projects.resolveOrgAdmin("project-1");
 
         expect(calls.tryGetById).toHaveBeenCalledWith("project-1");
         expect(calls.updateMetadata).toHaveBeenCalledWith({
           id: "project-1",
-          data: { firstMessage: true },
+          data: { firstMessage: true, integrated: true, language: "python" },
         });
         expect(calls.resolveOrgAdmin).toHaveBeenCalledWith("project-1");
       });

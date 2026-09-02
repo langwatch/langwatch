@@ -75,7 +75,7 @@ export {
   NullTraceAnalyticsRollupRepository,
   type TraceAnalyticsRollupRepository,
 } from "./repositories/trace-analytics-rollup.repository";
-export type { TraceClickHouseResolver } from "./ports/clickhouse.port";
+export type { TraceClickHouseClient, TraceClickHouseResolver } from "./ports/clickhouse.port";
 export {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
