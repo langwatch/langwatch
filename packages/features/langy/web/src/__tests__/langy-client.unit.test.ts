@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LangyClient } from "../langy-client";
+import { LangyClient } from "../model/langy-client";
 
 describe("LangyClient", () => {
   it("validates before delegating to the browser transport", async () => {

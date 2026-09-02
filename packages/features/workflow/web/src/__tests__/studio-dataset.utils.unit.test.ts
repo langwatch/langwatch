@@ -10,7 +10,7 @@ import {
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
   tryToMapPreviousColumnsToNewColumns,
-} from "../studio-dataset.utils";
+} from "../model/studio-dataset.utils";
 
 describe("studio dataset column/field type conversion", () => {
   describe("when a dataset column is typed image (URL)", () => {

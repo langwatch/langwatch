@@ -1,4 +1,4 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/types/ambient.d.ts" />
 /**
  * The simulations family, as the browser application mounts it.
  *

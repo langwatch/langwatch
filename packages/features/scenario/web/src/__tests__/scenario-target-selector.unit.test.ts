@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterScenarioTargetAgents } from "../scenario-target-selector";
+import { filterScenarioTargetAgents } from "../ui/elements/scenario-target-selector";
 
 describe("filterScenarioTargetAgents", () => {
   it("keeps supported target types, orders newest first, and narrows by name", () => {

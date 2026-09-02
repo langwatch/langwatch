@@ -6,7 +6,7 @@ import {
   CodeEvaluatorEditor,
   EvaluatorEditorActions,
   type CodeEvaluatorField,
-} from "../../../index";
+} from "../../..";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

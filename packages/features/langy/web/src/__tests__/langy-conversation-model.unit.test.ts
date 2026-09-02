@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useLangyStore } from "../langy.store";
+import { useLangyStore } from "../behavior/langy.store";
 
 const DEFAULT = "openai_codex/gpt-5.6-terra";
 

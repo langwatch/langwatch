@@ -1,0 +1,248 @@
+import {
+  Box,
+  Button,
+  Field,
+  Heading,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  useDisclosure,
+  VStack,
+} from "@chakra-ui/react";
+import { useCallback, useState } from "react";
+import { useForm } from "react-hook-form";
+import { LuArrowLeft } from "react-icons/lu";
+import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../../behavior/errors";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
+import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
+import { blankTemplate } from "@langwatch/workflow-web";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import { api } from "../../../behavior/scenario-api";
+import { useRouter } from "../../../behavior/next-router";
+import { trackEvent } from "../../../model/tracking";
+
+export type WorkflowSelectorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: (agent: AgentWithFields) => void;
+  /** Name for the new agent (optional, prompts if not provided) */
+  agentName?: string;
+};
+
+type FormData = {
+  name: string;
+  icon: string;
+  description: string;
+};
+
+/**
+ * Drawer for creating a new workflow-based agent.
+ * Features:
+ * - Creates a new workflow from the blank template
+ * - Creates an agent linked to the new workflow
+ * - Navigates to the workflow studio for editing
+ */
+export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
+  const complexProps = getComplexProps();
+  const utils = api.useUtils();
+  const router = useRouter();
+  const emojiPicker = useDisclosure();
+
+  const onClose = props.onClose ?? closeDrawer;
+  const flowCallbacks = getFlowCallbacks("workflowSelector");
+  const onSave =
+    props.onSave ??
+    flowCallbacks?.onSave ??
+    (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
+  const isOpen = props.open !== false && props.open !== undefined;
+
+  const [defaultIcon] = useState(getRandomWorkflowIcon());
+
+  const form = useForm<FormData>({
+    defaultValues: {
+      name: props.agentName ?? "",
+      icon: defaultIcon,
+      description: "",
+    },
+  });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
+
+  const icon = watch("icon");
+  const name = watch("name");
+
+  const createWorkflowMutation = api.workflow.create.useMutation();
+  const createAgentMutation = api.agents.create.useMutation({
+    onSuccess: (agent) => {
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+      onSave?.(agent);
+    },
+    // No `onError` here on purpose: the only caller awaits `mutateAsync`
+    // inside `onSubmit`, and react-query runs both, so reporting in each
+    // stacks two identical toasts for one failure. The catch owns it — it
+    // has the headline that names the whole action.
+  });
+
+  const isSaving = createWorkflowMutation.isPending || createAgentMutation.isPending;
+
+  const onSubmit = useCallback(
+    async (data: FormData) => {
+      if (!project) return;
+
+      try {
+        // Create workflow from blank template. LLM nodes without a model
+        // are materialized server-side from the project's resolved default.
+        const template = blankTemplate;
+        const newWorkflow: StudioWorkflow = {
+          ...template,
+          name: data.name,
+          description: data.description,
+          icon: data.icon ?? defaultIcon,
+        };
+
+        const createdWorkflow = await createWorkflowMutation.mutateAsync({
+          projectId: project.id,
+          dsl: newWorkflow,
+          commitMessage: "Workflow creation for agent",
+        });
+
+        trackEvent("workflow_create", { project_id: project.id });
+
+        // Build DSL-compatible Custom component config
+        const config = {
+          name: data.name.trim(),
+          isCustom: true,
+          workflow_id: createdWorkflow.workflow.id,
+        };
+
+        // Create agent linked to the new workflow
+        await createAgentMutation.mutateAsync({
+          projectId: project.id,
+          name: data.name.trim(),
+          type: "workflow",
+          config,
+          workflowId: createdWorkflow.workflow.id,
+        });
+
+        // Close drawer and navigate to workflow studio
+        onClose();
+        void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
+      } catch (error) {
+        console.error("Error creating workflow agent:", error);
+        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't create workflow agent",
+        });
+      }
+    },
+    [project, defaultIcon, createWorkflowMutation, createAgentMutation, onClose, router, form],
+  );
+
+  const isValid = name?.trim().length > 0;
+
+  return (
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && onClose()}
+        size="md"
+        modal={false}
+      >
+        <Drawer.Content bg="bg">
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <HStack gap={2}>
+              {canGoBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  padding={1}
+                  minWidth="auto"
+                  data-testid="back-button"
+                >
+                  <LuArrowLeft size={20} />
+                </Button>
+              )}
+              <Heading>Create Workflow Agent</Heading>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
+                Create a new workflow to use as a custom agent. You&apos;ll be taken to the workflow
+                editor to configure the agent logic.
+              </Text>
+
+              <Box paddingX={6}>
+                <VStack gap={4} align="stretch">
+                  <FormServerError form={form} />
+
+                  <Field.Root invalid={!!errors.name || !!errors.icon}>
+                    <EmojiPickerModal
+                      open={emojiPicker.open}
+                      onClose={emojiPicker.onClose}
+                      onChange={(emoji) => {
+                        setValue("icon", emoji);
+                        emojiPicker.onClose();
+                      }}
+                    />
+                    <Field.Label>Name and Icon</Field.Label>
+                    <HStack>
+                      <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
+                        {icon}
+                      </Button>
+                      <Input
+                        {...register("name", { required: "Name is required" })}
+                        placeholder="Enter agent name"
+                        data-testid="agent-name-input"
+                      />
+                    </HStack>
+                    <Field.ErrorText>
+                      {errors.name?.message ?? errors.icon?.message}
+                    </Field.ErrorText>
+                  </Field.Root>
+
+                  <Field.Root invalid={!!errors.description}>
+                    <Field.Label>Description (optional)</Field.Label>
+                    <Textarea {...register("description")} placeholder="What does this agent do?" />
+                    <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+                  </Field.Root>
+                </VStack>
+              </Box>
+            </VStack>
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+            <HStack gap={3}>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="blue"
+                onClick={() => void handleSubmit(onSubmit)()}
+                disabled={!isValid || isSaving}
+                loading={isSaving}
+                data-testid="save-agent-button"
+              >
+                Create & Open Editor
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
+    </>
+  );
+}

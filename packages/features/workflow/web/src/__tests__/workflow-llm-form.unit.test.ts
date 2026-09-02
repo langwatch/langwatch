@@ -1,6 +1,6 @@
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
-import { type FormLLMConfig, LLMConfigFormatUtils } from "../workflow-llm-form";
+import { type FormLLMConfig, LLMConfigFormatUtils } from "../model/workflow-llm-form";
 
 const completeForm = {
   model: "openai/gpt-5",

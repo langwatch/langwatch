@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getNodeDisplayName } from "../workflow-nodes";
+import { getNodeDisplayName } from "../ui/sections/workflow-nodes";
 
 describe("getNodeDisplayName", () => {
   it.each([

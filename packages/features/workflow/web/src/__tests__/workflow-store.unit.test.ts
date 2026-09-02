@@ -6,7 +6,7 @@ import {
   store as storeCreator,
   updateInputFields,
   type WorkflowStore,
-} from "../workflow-store";
+} from "../behavior/workflow-store";
 
 /**
  * Helper to build a minimal Node with inputs/outputs fields.

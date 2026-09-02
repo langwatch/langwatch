@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { WorkflowCardActions, WorkflowCardDisplay } from "../workflow-card";
+import { WorkflowCardActions, WorkflowCardDisplay } from "../ui/elements/workflow-card";
 
 class ResizeObserverStub {
   observe() {}

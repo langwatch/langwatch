@@ -6,7 +6,7 @@ import {
   codeEvaluatorDisabledReason,
   EvaluatorCategoryPicker,
   EvaluatorTypePicker,
-} from "../../../index";
+} from "../../..";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

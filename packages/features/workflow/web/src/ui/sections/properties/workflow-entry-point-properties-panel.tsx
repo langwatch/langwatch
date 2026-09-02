@@ -1,0 +1,224 @@
+import { Button, HStack, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useState } from "react";
+import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
+import { useShallow } from "zustand/react/shallow";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import type { Entry, Field } from "@langwatch/workflow-contract";
+import type {
+  WorkflowBasePropertiesPanelProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+} from "./workflow-properties.ports";
+
+/**
+ * Drawer for the workflow's entry point.
+ *
+ * The fields here are the workflow's INPUTS - user-owned and editable.
+ * A dataset is an optional attachment that seeds those inputs with its
+ * columns (merge + dedup, see attachEntryDataset) and provides the rows
+ * for evaluations; it is rendered as a compact card, not a data grid,
+ * so it never reads as "the inputs".
+ */
+export function EntryPointPropertiesPanel({
+  node,
+  renderBase: BasePropertiesPanel,
+  renderVariables: VariablesSection,
+  renderDatasetModal: DatasetModal,
+  datasetTotal,
+  renderPropertySectionTitle: PropertySectionTitle,
+}: {
+  node: Node<Entry>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+  renderDatasetModal: React.ComponentType<{
+    open: boolean;
+    onClose: () => void;
+    node: Node<Entry>;
+    editingDataset?: Entry["dataset"];
+  }>;
+  datasetTotal: number | undefined;
+  renderPropertySectionTitle: React.ComponentType<{
+    children: React.ReactNode;
+  }>;
+}) {
+  const { open, onOpen, onClose } = useDisclosure();
+  const [editingDataset, setEditingDataset] = useState<Entry["dataset"] | undefined>();
+  const { setNode, setSelectedNode, endNodeId } = useWorkflowStore(
+    useShallow((state) => ({
+      setNode: state.setNode,
+      setSelectedNode: state.setSelectedNode,
+      endNodeId: state.nodes.find((n) => n.type === "end")?.id,
+    })),
+  );
+
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const dataset = node.data.dataset;
+
+  // The entry fields are the workflow inputs. DSL-wise they live on the node's
+  // `outputs` (they are emitted to downstream nodes); the user-facing language
+  // is "Inputs". They are the source of the run, so there is nothing to map.
+  const inputVariables: WorkflowVariable[] = (node.data.outputs ?? []).map((field) => ({
+    identifier: field.identifier,
+    type: field.type,
+  }));
+
+  // Optional default values, keyed by identifier. A default fills the input at
+  // run time when the dataset row or API call does not provide that field.
+  const inputValues: Record<string, string> = Object.fromEntries(
+    (node.data.outputs ?? [])
+      .filter((field) => typeof field.value === "string")
+      .map((field) => [field.identifier, field.value as string]),
+  );
+
+  const handleInputsChange = useCallback(
+    (newVariables: WorkflowVariable[]) => {
+      const existing = node.data.outputs ?? [];
+      const outputs: Field[] = newVariables.map((variable) => {
+        const prev = existing.find((f) => f.identifier === variable.identifier);
+        return {
+          ...(prev ?? {}),
+          identifier: variable.identifier,
+          type: variable.type as Field["type"],
+        };
+      });
+      // Send only the changed field; setNode merges data shallowly, so an
+      // attached dataset and other entry config survive untouched.
+      setNode({ id: node.id, data: { outputs } });
+      updateNodeInternals(node.id);
+    },
+    [node.id, node.data.outputs, setNode, updateNodeInternals],
+  );
+
+  const handleValueChange = useCallback(
+    (identifier: string, value: string) => {
+      const outputs = (node.data.outputs ?? []).map((field) =>
+        field.identifier === identifier
+          ? { ...field, value: value === "" ? undefined : value }
+          : field,
+      );
+      setNode({ id: node.id, data: { outputs } });
+    },
+    [node.id, node.data.outputs, setNode],
+  );
+
+  const detachDataset = useCallback(() => {
+    setNode({
+      id: node.id,
+      data: { ...node.data, dataset: undefined },
+    });
+  }, [setNode, node.id, node.data]);
+
+  const goToEndNode = useCallback(() => {
+    if (endNodeId) {
+      setSelectedNode(endNodeId);
+    }
+  }, [endNodeId, setSelectedNode]);
+
+  return (
+    <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters paddingX={4}>
+      <VariablesSection
+        variables={inputVariables}
+        onChange={handleInputsChange}
+        showMappings={false}
+        values={inputValues}
+        onValueChange={handleValueChange}
+        canAddRemove={true}
+        readOnly={false}
+        title="Inputs"
+      />
+
+      <VStack width="full" align="start">
+        <HStack width="full">
+          <PropertySectionTitle>Attached Dataset</PropertySectionTitle>
+          <Spacer />
+          {!dataset && (
+            <Button
+              size="xs"
+              variant="ghost"
+              marginBottom={-1}
+              data-testid="attach-dataset-button"
+              onClick={() => {
+                setEditingDataset(undefined);
+                onOpen();
+              }}
+            >
+              <Folder size={14} />
+              <Text>Attach...</Text>
+            </Button>
+          )}
+        </HStack>
+        {dataset ? (
+          <HStack
+            width="full"
+            paddingX={3}
+            paddingY={2}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="border"
+            data-testid="entry-dataset-card"
+          >
+            <Database size={14} style={{ flexShrink: 0 }} />
+            <Text fontSize="13px" truncate>
+              {dataset.name ?? "Dataset"}
+            </Text>
+            {datasetTotal !== undefined && datasetTotal !== null && (
+              <Text fontSize="13px" color="fg.subtle" flexShrink={0}>
+                ({datasetTotal} {datasetTotal === 1 ? "row" : "rows"})
+              </Text>
+            )}
+            <Spacer />
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setEditingDataset(node.data.dataset);
+                onOpen();
+              }}
+            >
+              Open
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setEditingDataset(undefined);
+                onOpen();
+              }}
+            >
+              Replace
+            </Button>
+            <Tooltip content="Detach dataset (inputs are kept)">
+              <Button
+                size="xs"
+                variant="ghost"
+                data-testid="detach-dataset-button"
+                onClick={detachDataset}
+              >
+                <X size={14} />
+              </Button>
+            </Tooltip>
+          </HStack>
+        ) : (
+          <Text fontSize="13px" color="fg.muted">
+            Optional. Attaching a dataset adds its columns to the inputs and provides the rows for
+            evaluations.
+          </Text>
+        )}
+      </VStack>
+      <DatasetModal open={open} onClose={onClose} node={node} editingDataset={editingDataset} />
+      {endNodeId && (
+        <VStack align="start" gap={2} width="full">
+          <PropertySectionTitle>Workflow Outputs</PropertySectionTitle>
+          <Button size="sm" variant="outline" data-testid="go-to-end-node" onClick={goToEndNode}>
+            <Flag size={14} />
+            <Text>Go to end node</Text>
+            <ArrowRight size={14} />
+          </Button>
+        </VStack>
+      )}
+    </BasePropertiesPanel>
+  );
+}

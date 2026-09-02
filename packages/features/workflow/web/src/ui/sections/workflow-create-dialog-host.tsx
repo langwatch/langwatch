@@ -32,11 +32,11 @@ import { useForm } from "react-hook-form";
 
 import { workflowApi } from "../../behavior/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
-import { getRandomWorkflowIcon } from "../../random-workflow-icon";
+import { getRandomWorkflowIcon } from "../../model/random-workflow-icon";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,
   type WorkflowTemplateCardProps,
-} from "../../workflow-create-dialog";
+} from "../elements/workflow-create-dialog";
 import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker";
 import { WorkflowErrorBoundary } from "../elements/workflow-error-boundary";
 import { WorkflowListCard } from "./workflow-list-card";

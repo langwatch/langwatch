@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyStore } from "../langy.store";
+import { useLangyStore } from "../behavior/langy.store";
 
 /**
  * "New chat" must actually START a new chat.

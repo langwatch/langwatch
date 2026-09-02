@@ -42,26 +42,26 @@ vi.mock("@langwatch/workflow-web", () => ({
     getState: () => ({ getWorkflow: () => ({}) }),
   },
 }));
-vi.mock("../../../studio-host/use-organization-team-project", () => ({
+vi.mock("../../../behavior/studio-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { slug: "ux-review" } }),
 }));
 
-vi.mock("../../../studio-host/link", () => ({
+vi.mock("../../../ui/elements/studio-host/link", () => ({
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
 
-vi.mock("../../../optimization_studio/hooks/use-load-workflow", () => ({
+vi.mock("../../../behavior/optimization_studio/use-load-workflow", () => ({
   useLoadWorkflow: () => ({ workflow: workflowRef.current }),
 }));
 
-vi.mock("../../../optimization_studio/components/optimization-studio", () => ({
+vi.mock("../../../ui/sections/optimization_studio/optimization-studio", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 
 
-vi.mock("../../../studio-host/api", () => ({
+vi.mock("../../../behavior/studio-host/api", () => ({
   api: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },

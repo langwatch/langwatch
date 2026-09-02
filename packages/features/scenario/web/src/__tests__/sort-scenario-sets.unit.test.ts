@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ScenarioSetData } from "@langwatch/scenario-contract";
-import { sortScenarioSets } from "../sort-scenario-sets";
+import { sortScenarioSets } from "../model/sort-scenario-sets";
 
 describe("sortScenarioSets()", () => {
   describe("given a mix of internal and user sets", () => {

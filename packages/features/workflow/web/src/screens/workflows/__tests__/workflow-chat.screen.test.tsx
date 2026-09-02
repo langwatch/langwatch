@@ -13,7 +13,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { blankTemplate, entryNode as blankTemplateEntryNode } from "../../../templates/blank.template";
+import { blankTemplate, entryNode as blankTemplateEntryNode } from "../../../model/templates/blank.template";
 import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../testing";
 import WorkflowChatScreen from "../workflow-chat.screen";
 

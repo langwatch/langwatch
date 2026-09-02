@@ -1,0 +1,482 @@
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Icon,
+  Link,
+  Spinner,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
+import {
+  consumeStoredPrompt,
+  type GeneratedScenario,
+  generateScenarioWithAI,
+  type ScenarioFormController,
+} from "../../../index";
+import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { api } from "../../../behavior/scenario-api";
+import { toaster } from "@langwatch/design-system/toaster";
+import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption";
+import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error";
+import { getDefaultModelState } from "../../../model/scenarios/default-model-state";
+
+const logger = createLogger("langwatch:scenarios:ai-generation");
+
+type ScenarioAIGenerationProps = {
+  form: ScenarioFormController | null;
+};
+
+export type GenerationStatus = "idle" | "generating" | "done" | "error";
+type ViewMode = "prompt" | "input";
+
+export function usePromptHistory() {
+  const [history, setHistory] = useState<string[]>([]);
+
+  // On mount, check sessionStorage for a stored prompt from the AI Create Modal
+  useEffect(() => {
+    const storedPrompt = consumeStoredPrompt();
+    if (storedPrompt) {
+      setHistory([storedPrompt]);
+    }
+  }, []);
+
+  const addPrompt = useCallback((prompt: string) => {
+    setHistory((prev) => [...prev, prompt]);
+  }, []);
+
+  const hasHistory = history.length > 0;
+
+  return { history, addPrompt, hasHistory };
+}
+
+export function useScenarioGeneration(projectId: string | undefined) {
+  const [status, setStatus] = useState<GenerationStatus>("idle");
+
+  const generate = useCallback(
+    async (
+      prompt: string,
+      currentScenario: GeneratedScenario | null,
+    ): Promise<GeneratedScenario> => {
+      if (!projectId) {
+        throw new Error("Project ID is required");
+      }
+
+      setStatus("generating");
+
+      try {
+        const scenario = await generateScenarioWithAI(prompt, projectId, currentScenario);
+        setStatus("done");
+        return scenario;
+      } catch (error) {
+        setStatus("error");
+        throw error;
+      }
+    },
+    [projectId],
+  );
+
+  return { generate, status };
+}
+
+export function formHasContent(input: {
+  name: string;
+  situation: string;
+  criteria: string[];
+}): boolean {
+  const name = input.name.trim();
+  const situation = input.situation.trim();
+  const criteria = input.criteria;
+
+  return name.length > 0 || situation.length > 0 || criteria.length > 0;
+}
+
+const PROMPT_INPUT_ROWS = 5;
+const TOAST_DURATION_MS = 5000;
+
+export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
+  const { project } = useOrganizationTeamProject();
+
+  const [viewMode, setViewMode] = useState<ViewMode>("prompt");
+  const [input, setInput] = useState("");
+
+  const { history, addPrompt, hasHistory } = usePromptHistory();
+  const { generate, status } = useScenarioGeneration(project?.id);
+
+  // Check if any model providers are configured
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
+
+  // Cascade-resolved model for scenario generation.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
+    { enabled: !!project?.id },
+  );
+
+  const defaultModelState = getDefaultModelState({
+    hasEnabledProviders,
+    providers,
+    defaultModel: resolvedDefault.data?.model,
+  });
+
+  const isDefaultModelDisabled = !defaultModelState.ok;
+
+  const hasExistingContent = form !== null && formHasContent(form.read());
+
+  const canGenerate = Boolean(
+    input.trim() && status !== "generating" && !isDefaultModelDisabled && form,
+  );
+
+  const handleGenerate = useCallback(async () => {
+    if (!input.trim() || !project?.id || !form) return;
+
+    // Warn if form has content and no history (first generation)
+    if (hasExistingContent && !hasHistory) {
+      const confirmed = window.confirm(
+        "This will replace the current scenario content. Continue?",
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      const currentScenario = hasHistory
+        ? {
+            name: form.read("name"),
+            situation: form.read("situation"),
+            criteria: form.read("criteria"),
+          }
+        : null;
+
+      const scenario = await generate(input, currentScenario);
+
+      // Update form with generated data (defensive defaults for unexpected API responses)
+      form.update("name", scenario.name ?? "");
+      form.update("situation", scenario.situation ?? "");
+      form.update("criteria", scenario.criteria ?? []);
+
+      addPrompt(input);
+      setInput("");
+    } catch (error) {
+      logger.error({ error }, "Error generating scenario");
+      const classified = classifyGenerationError(error);
+      const needsConfiguration =
+        classified.cta === "configure" || classified.cta === "configure-and-retry";
+      toaster.create({
+        title: classified.title,
+        description: classified.copy,
+        type: "error",
+        duration: TOAST_DURATION_MS,
+        action: needsConfiguration
+          ? {
+              label: "Model settings",
+              onClick: () => window.open("/settings/model-providers", "_blank"),
+            }
+          : undefined,
+      });
+    }
+  }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const isSubmitKeyPress = e.key === "Enter" && !e.shiftKey;
+
+      if (isSubmitKeyPress && canGenerate) {
+        e.preventDefault();
+        void handleGenerate();
+      }
+    },
+    [canGenerate, handleGenerate],
+  );
+
+  // "Prompt" view - initial state with CTA
+  if (viewMode === "prompt") {
+    // Show warning when no model providers are configured
+    if (!hasEnabledProviders) {
+      return (
+        <Card.Root>
+          <Card.Body>
+            <VStack align="stretch" gap={3}>
+              <HStack gap={3}>
+                <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
+                  <Icon as={AlertTriangle} boxSize={4} />
+                </Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  Model Provider Required
+                </Text>
+              </HStack>
+
+              <Text fontSize="xs" color="fg.muted">
+                Scenarios require a model provider to run.{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Configure model provider
+                </Link>
+              </Text>
+
+              <Button colorPalette="blue" asChild size="sm">
+                <a
+                  data-testid="scenario-ai-configure-model-provider-button"
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Configure model provider
+                </a>
+              </Button>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      );
+    }
+
+    return (
+      <Card.Root overflow="hidden">
+        <Card.Body>
+          <VStack align="stretch" gap={3}>
+            <HStack gap={3}>
+              <Box
+                display="grid"
+                placeItems="center"
+                width="34px"
+                height="34px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="10px"
+              >
+                <Sparkles size={18} />
+              </Box>
+              <Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  {hasHistory ? "Refine with AI" : "Draft with AI"}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  {hasHistory
+                    ? "Your draft is ready to shape."
+                    : "Start from an idea, not a form."}
+                </Text>
+              </Box>
+            </HStack>
+
+            <Text fontSize="xs" color="fg.muted">
+              {hasHistory
+                ? "Ask for harder edge cases, clearer criteria, or a different persona."
+                : "Describe the behavior you care about and AI will draft the situation and criteria."}
+            </Text>
+
+            <Button
+              colorPalette="orange"
+              size="sm"
+              onClick={() => setViewMode("input")}
+              aria-label="Generate with AI"
+            >
+              <Sparkles size={14} />
+              {hasHistory ? "Refine the draft" : "Start a draft"}
+            </Button>
+
+            <ResolvedModelCaption model={resolvedDefault.data?.model} />
+          </VStack>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+
+  // "Input" view - AI generation interface
+  return (
+    <Card.Root overflow="hidden">
+      <Card.Body>
+        <VStack align="stretch" gap={3}>
+          <HStack justify="space-between">
+            <HStack gap={3}>
+              <Box
+                display="grid"
+                placeItems="center"
+                width="34px"
+                height="34px"
+                bg="bg.surface"
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="10px"
+              >
+                <Sparkles size={18} />
+              </Box>
+              <Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  AI draft
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  {hasHistory ? "Refine this draft" : "Draft this scenario"}
+                </Text>
+              </Box>
+            </HStack>
+            <Button variant="ghost" size="xs" onClick={() => setViewMode("prompt")}>
+              <ArrowLeft size={14} />
+              Back
+            </Button>
+          </HStack>
+
+          <Text fontSize="xs" color="fg.muted">
+            {hasHistory
+              ? "Describe what should change. The form stays editable."
+              : "Describe what your agent does and the behavior you want to test."}
+          </Text>
+
+          {defaultModelState.ok === false &&
+            defaultModelState.reason === "no-default" && (
+              <DefaultModelErrorBanner>
+                No default model set. Configure one in{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Settings → Model Providers
+                </Link>
+                .
+              </DefaultModelErrorBanner>
+            )}
+
+          {defaultModelState.ok === false &&
+            defaultModelState.reason === "stale-default" && (
+              <DefaultModelErrorBanner>
+                Your default model&apos;s provider is disabled. Configure a new default in{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Settings → Model Providers
+                </Link>
+                .
+              </DefaultModelErrorBanner>
+            )}
+
+          {status === "done" && hasHistory && (
+            <HStack
+              gap={2}
+              padding={2}
+              bg="green.50"
+              borderRadius="md"
+              fontSize="xs"
+              color="green.700"
+            >
+              <Icon as={Check} boxSize={3} />
+              <Text>Generated! Review and edit the form on the left.</Text>
+            </HStack>
+          )}
+
+          {/* Keep refinement context useful without turning the narrow sidebar into a transcript. */}
+          {hasHistory && (
+            <Box
+              borderWidth="1px"
+              borderColor="border.subtle"
+              borderRadius="md"
+              bg="bg.surface"
+              padding={2.5}
+            >
+              <Text
+                fontSize="10px"
+                fontWeight="bold"
+                color="fg.muted"
+                letterSpacing="0.08em"
+                textTransform="uppercase"
+                marginBottom={1}
+              >
+                Latest request · {history.length}{" "}
+                {history.length === 1 ? "turn" : "turns"}
+              </Text>
+              <Text fontSize="xs" color="fg.muted" lineClamp={2}>
+                {history.at(-1)}
+              </Text>
+            </Box>
+          )}
+
+          <Textarea
+            placeholder={
+              hasHistory
+                ? "Refine: e.g., Add more edge cases about escalation"
+                : "e.g., A customer support agent that handles refund requests. Test an angry customer who was charged twice."
+            }
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={status === "generating" || isDefaultModelDisabled}
+            rows={PROMPT_INPUT_ROWS}
+            fontSize="sm"
+          />
+
+          <Button
+            colorPalette="orange"
+            size="sm"
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+          >
+            {status === "generating" ? (
+              <>
+                <Spinner size="sm" />
+                Drafting…
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} />
+                {hasHistory ? "Refine with AI" : "Draft with AI"}
+              </>
+            )}
+          </Button>
+
+          <ResolvedModelCaption model={resolvedDefault.data?.model} />
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subcomponents
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <Alert.Root status="warning" fontSize="xs" alignItems="flex-start">
+      <Alert.Indicator>
+        <Icon as={AlertTriangle} boxSize={3} />
+      </Alert.Indicator>
+      <Alert.Content gap={2}>
+        <Alert.Description>{children}</Alert.Description>
+        <Button
+          colorPalette="blue"
+          color="white"
+          asChild
+          size="sm"
+          alignSelf="flex-start"
+        >
+          <a
+            data-testid="scenario-ai-configure-default-model-button"
+            href="/settings/model-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Configure default model
+          </a>
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}

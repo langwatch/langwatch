@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyStore } from "../langy.store";
+import { useLangyStore } from "../behavior/langy.store";
 
 /**
  * The id a panel-open warm mints is held as `pendingConversationId` so the

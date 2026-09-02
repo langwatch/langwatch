@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getRunStatePollInterval } from "../run-state-polling";
+import { getRunStatePollInterval } from "../model/run-state-polling";
 
 describe("getRunStatePollInterval()", () => {
   describe("given a run in a terminal status", () => {

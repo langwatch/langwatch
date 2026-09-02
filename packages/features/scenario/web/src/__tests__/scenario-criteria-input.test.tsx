@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioCriteriaInput as CriteriaInput } from "../scenario-criteria-input";
+import { ScenarioCriteriaInput as CriteriaInput } from "../ui/elements/scenario-criteria-input";
 
 class TestResizeObserver {
   observe(): void {}

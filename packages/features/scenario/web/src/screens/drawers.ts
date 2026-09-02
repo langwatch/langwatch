@@ -11,8 +11,8 @@
  * registered, and this family only ever writes its address.
  */
 
-export { ScenarioRunDetailDrawer } from "../components/simulations/scenario-run-detail-drawer";
-export { ScenarioFormDrawerFromUrl } from "../components/scenarios/scenario-form-drawer";
-export { SuiteFormDrawer } from "../components/suites/suite-form-drawer";
-export { AgentWorkflowEditorDrawer } from "../components/agents/agent-workflow-editor-drawer";
-export { ScenarioVersionHistoryDrawer } from "../components/agent-testing/drawers/scenario-version-history-drawer";
+export { ScenarioRunDetailDrawer } from "../ui/sections/simulations/scenario-run-detail-drawer";
+export { ScenarioFormDrawerFromUrl } from "../ui/sections/scenarios/scenario-form-drawer";
+export { SuiteFormDrawer } from "../ui/sections/suites/suite-form-drawer";
+export { AgentWorkflowEditorDrawer } from "../ui/sections/agents/agent-workflow-editor-drawer";
+export { ScenarioVersionHistoryDrawer } from "../ui/sections/agent-testing/drawers/scenario-version-history-drawer";

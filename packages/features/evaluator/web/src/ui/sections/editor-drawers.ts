@@ -16,6 +16,6 @@
  * re-export of `@langwatch/ui-drawer` now, so there is one stack and they open.
  */
 
-export { CodeEvaluatorEditorDrawer } from "../../components/evaluators/code-evaluator-editor-drawer";
-export { EvaluatorCategorySelectorDrawer } from "../../components/evaluators/evaluator-category-selector-drawer";
-export { EvaluatorEditorDrawer } from "../../components/evaluators/evaluator-editor-drawer";
+export { CodeEvaluatorEditorDrawer } from "./evaluators/code-evaluator-editor-drawer";
+export { EvaluatorCategorySelectorDrawer } from "./evaluators/evaluator-category-selector-drawer";
+export { EvaluatorEditorDrawer } from "./evaluators/evaluator-editor-drawer";

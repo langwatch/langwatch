@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { quantile } from "../batch-evaluation-results.metric-stats";
+import { quantile } from "../model/batch-evaluation-results.metric-stats";
 
 describe("quantile", () => {
   describe("given a position that lands between two samples", () => {

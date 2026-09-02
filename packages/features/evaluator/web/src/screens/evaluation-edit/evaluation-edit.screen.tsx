@@ -15,7 +15,7 @@ import { MoreVertical } from "react-feather";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import CheckConfigForm, {
   type CheckConfigFormData,
-} from "../../components/checks/check-config-form";
+} from "../../ui/sections/checks/check-config-form";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";

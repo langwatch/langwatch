@@ -3,7 +3,7 @@ import {
   attachedContextToChip,
   type LangyAttachedContext,
   useLangyStore,
-} from "../langy.store";
+} from "../behavior/langy.store";
 
 /**
  * The surface-driven context-attach API (task #21a): the clean, typed entry

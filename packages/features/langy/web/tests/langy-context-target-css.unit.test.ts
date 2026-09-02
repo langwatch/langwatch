@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(
-  fileURLToPath(new URL("../src/langy-context-target.css", import.meta.url)),
+  fileURLToPath(new URL("../src/behavior/langy-context-target.css", import.meta.url)),
   "utf8",
 );
 

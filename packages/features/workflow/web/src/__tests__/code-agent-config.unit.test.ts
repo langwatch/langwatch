@@ -8,7 +8,7 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "../code-agent-config";
+} from "../model/code-agent-config";
 import type { Field } from "@langwatch/workflow-contract";
 
 describe("code-agent-config", () => {

@@ -5,8 +5,8 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type SavedRecord,
-} from "../../experiments-v3/types";
-import { extractPersistedState } from "../../experiments-v3/types/persistence";
+} from "../../model/experiments-v3/types";
+import { extractPersistedState } from "../../model/experiments-v3/types/persistence";
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";

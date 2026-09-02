@@ -28,36 +28,36 @@
       "default": "./src/ui/sections/custom-graph.tsx"
     },
     "./components/PeriodSelector": {
-      "types": "./src/components/period-selector.tsx",
-      "default": "./src/components/period-selector.tsx"
+      "types": "./src/ui/elements/period-selector.tsx",
+      "default": "./src/ui/elements/period-selector.tsx"
     },
     "./components/filters/FilterSidebar": {
-      "types": "./src/components/filters/filter-sidebar.tsx",
-      "default": "./src/components/filters/filter-sidebar.tsx"
+      "types": "./src/ui/sections/filters/filter-sidebar.tsx",
+      "default": "./src/ui/sections/filters/filter-sidebar.tsx"
     },
     "./components/filters/FilterToggle": {
-      "types": "./src/components/filters/filter-toggle.tsx",
-      "default": "./src/components/filters/filter-toggle.tsx"
+      "types": "./src/ui/sections/filters/filter-toggle.tsx",
+      "default": "./src/ui/sections/filters/filter-toggle.tsx"
     },
     "./hooks/useFilterParams": {
-      "types": "./src/hooks/use-filter-params.ts",
-      "default": "./src/hooks/use-filter-params.ts"
+      "types": "./src/ui/sections/use-filter-params.ts",
+      "default": "./src/ui/sections/use-filter-params.ts"
     },
     "./screens/analytics": {
       "types": "./src/screens/analytics/index.ts",
       "default": "./src/screens/analytics/index.ts"
     },
     "./server/filters/precondition-matchers": {
-      "types": "./src/server/filters/precondition-matchers.ts",
-      "default": "./src/server/filters/precondition-matchers.ts"
+      "types": "./src/model/filters/precondition-matchers.ts",
+      "default": "./src/model/filters/precondition-matchers.ts"
     },
     "./server/filters/registry": {
-      "types": "./src/server/filters/registry.ts",
-      "default": "./src/server/filters/registry.ts"
+      "types": "./src/model/filters/registry.ts",
+      "default": "./src/model/filters/registry.ts"
     },
     "./server/filters/types": {
-      "types": "./src/server/filters/types.ts",
-      "default": "./src/server/filters/types.ts"
+      "types": "./src/model/filters/types.ts",
+      "default": "./src/model/filters/types.ts"
     },
     "./testing": {
       "types": "./src/__tests__/lwql-fixtures.ts",

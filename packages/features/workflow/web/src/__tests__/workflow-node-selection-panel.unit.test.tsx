@@ -6,14 +6,14 @@ import type { Component } from "@langwatch/workflow-contract";
 
 const captured = vi.hoisted<{ component: Component | null }>(() => ({ component: null }));
 
-vi.mock("../workflow-node-draggable", () => ({
+vi.mock("../ui/sections/workflow-node-draggable", () => ({
   NodeDraggable: ({ component }: { component: Component }) => {
     captured.component = component;
     return null;
   },
 }));
 
-import { LlmSignatureNodeDraggable } from "../workflow-node-selection-panel";
+import { LlmSignatureNodeDraggable } from "../ui/sections/workflow-node-selection-panel";
 
 describe("LlmSignatureNodeDraggable", () => {
   beforeEach(() => {
