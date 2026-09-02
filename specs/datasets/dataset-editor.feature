@@ -304,7 +304,24 @@ Feature: Dataset editor
       Then the search is refused as too large to search
       # A dataset written before its size was recorded has none. A byte limit
       # reading a missing size as zero would wave those through as the smallest
-      # datasets in the platform, so the row limit has to keep holding alone.
+      # datasets in the platform, so the row limit has to keep holding on its
+      # own terms. It is not the only thing holding — see the scenario below.
+
+    @unit
+    Scenario: A dataset that records no size is still bounded by the bytes the scan reads
+      Given a chunked dataset that records no size in bytes
+      And with few enough rows for one search to read
+      But whose rows occupy more bytes than one search will read
+      When a search is run against it
+      Then the search is refused as too large to search
+      And no partial set of matches is returned
+      # Sizes recorded against a dataset are numbers a writer wrote down, absent
+      # on rows written before sizes were kept and on offsets a half-finished
+      # migration left behind. A byte limit judged only on those holds
+      # everywhere except on the damaged and legacy rows — which is where an
+      # unbounded read is reachable at all. So the scan measures the chunks it
+      # reads and is held to the limit on those, refusing once it has gone past
+      # rather than reading on to the end.
 
     @unit
     Scenario: The refusal has its own words, not the export refusal's

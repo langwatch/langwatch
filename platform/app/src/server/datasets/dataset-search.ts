@@ -41,8 +41,11 @@ export const DATASET_SEARCH_MAX_ROWS = 50_000;
  * in use beats inventing one. If they are ever meant to move together, the
  * export constant is the one to move down here.
  *
- * Both limits apply, and neither subsumes the other: this one cannot hold where
- * no size was recorded, and the row limit cannot see how wide a row is.
+ * Both limits apply, and neither subsumes the other: the row limit cannot see
+ * how wide a row is, and this one cannot see how many rows a budget buys. It is
+ * held against bytes the scan measures as it reads, not against the sizes
+ * recorded on the dataset — those only decide how early a doomed scan can be
+ * refused, and they are missing on the very rows most likely to need the bound.
  */
 export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -54,6 +57,36 @@ export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
  * batch plus the matches kept for the page, not the whole dataset.
  */
 export const DATASET_SEARCH_SCAN_BATCH = 1_000;
+
+/**
+ * How many bytes a chunk's rows occupied, measured from the rows themselves
+ * rather than read off a field.
+ *
+ * The sizes in `chunkOffsets` are numbers a writer wrote down. They are absent
+ * on rows written before sizes were recorded and on offsets an interrupted
+ * migration left half-written, and nothing keeps them true afterwards. A byte
+ * bound that trusts them therefore holds everywhere except on the datasets with
+ * damaged or missing metadata — the only datasets where an unbounded scan is
+ * reachable in the first place.
+ *
+ * Serialised once per chunk rather than once per row: the cost is proportional
+ * to a fetch and parse the scan has already paid for.
+ *
+ * The number is the JSON encoding's byte length, not the JSONL file's — array
+ * punctuation stands in for the newlines. That is a byte or two per row against
+ * a hundred-megabyte ceiling.
+ */
+export const measureRowsBytes = (rows: unknown[]): number => {
+  try {
+    return Buffer.byteLength(JSON.stringify(rows) ?? "");
+  } catch {
+    // Rows parsed from JSONL cannot hold a cycle, so this is unreachable by the
+    // scan that calls it — but a chunk that cannot be measured still cost
+    // something to fetch, and reporting zero would make it free and buy passage
+    // for every chunk after it. One byte per row is a floor, not a reading.
+    return rows.length;
+  }
+};
 
 /**
  * Reduce a raw search input to the text to match on, or `undefined` when there

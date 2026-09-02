@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DATASET_SEARCH_MAX_ROWS,
   matchesDatasetSearch,
+  measureRowsBytes,
   normalizeDatasetSearch,
 } from "../dataset-search";
 
@@ -104,6 +105,45 @@ describe("matchesDatasetSearch()", () => {
     expect(matchesDatasetSearch({ entry: 42 as never, search: "4" })).toBe(
       false,
     );
+  });
+});
+
+describe("measureRowsBytes()", () => {
+  it("grows with the content of the rows, not their count", () => {
+    // The whole reason the byte limit exists next to the row limit: one wide
+    // row can cost more than many narrow ones, and a count cannot tell them
+    // apart.
+    const oneWideRow = [{ text: "x".repeat(10_000) }];
+    const manyNarrowRows = Array.from({ length: 20 }, () => ({ text: "x" }));
+
+    expect(measureRowsBytes(oneWideRow)).toBeGreaterThan(
+      measureRowsBytes(manyNarrowRows),
+    );
+  });
+
+  it("counts bytes rather than characters", () => {
+    // A running total compared against a byte ceiling has to be in bytes.
+    // `String.length` counts UTF-16 units, so a multi-byte character would be
+    // undercounted and a dataset of them could read past the limit.
+    const measured = measureRowsBytes([{ text: "é€𝄞" }]);
+
+    expect(measured).toBeGreaterThan(JSON.stringify([{ text: "é€𝄞" }]).length);
+  });
+
+  it("reports no rows as no bytes", () => {
+    // A chunk that came back empty cost nothing to hold, and must not push a
+    // scan any closer to a refusal.
+    expect(measureRowsBytes([])).toBe(2); // "[]"
+  });
+
+  it("still reports a cost for rows it cannot serialise", () => {
+    // Unreachable from the scan, which parses its rows out of JSONL. But zero
+    // would make an unmeasurable chunk free and buy passage for every chunk
+    // after it, so the floor is one byte a row rather than nothing.
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    expect(measureRowsBytes([cyclic, cyclic])).toBe(2);
   });
 });
 

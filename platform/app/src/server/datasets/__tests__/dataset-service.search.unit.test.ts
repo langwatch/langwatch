@@ -473,6 +473,49 @@ describe("dataset search (s3_jsonl)", () => {
 
         expect(result.pagination.total).toBe(2);
       });
+
+      /** @scenario A dataset that records no size is still bounded by the bytes the scan reads */
+      it("refuses on the bytes it reads when nothing recorded a size to judge", async () => {
+        // The case every other byte test here leaves open. `sizeBytes` is null,
+        // no offset carries a `byteSize`, and the rows are few — so the up-front
+        // fence sees nothing to refuse, the row limit is nowhere near, and the
+        // recorded total stays at zero however many chunks are read. A bound
+        // built only from what the offsets claim is not a bound at all here: it
+        // is absent on exactly the legacy and half-migrated rows the fallback
+        // path below exists to serve, which is where an unbounded scan is
+        // reachable in the first place.
+        //
+        // Rows this wide are the point — 50,000 rows of stored model responses
+        // is the read the byte limit exists to refuse, and it is a small row
+        // count.
+        const wideRow = { text: `escalation ${"x".repeat(30 * 1024 * 1024)}` };
+        const { readChunk } = mockChunks({
+          0: [wideRow],
+          1: [wideRow],
+          2: [wideRow],
+          3: [wideRow],
+        });
+        const service = makeService({});
+
+        await expect(
+          searchPage({
+            service,
+            dataset: {
+              ...baseS3Dataset,
+              rowCount: 4,
+              sizeBytes: null,
+              chunkCount: 4,
+              chunkOffsets: null, // legacy row: no offsets, so no sizes either
+            },
+            search: "escalation",
+          }),
+        ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+        // Four chunks of 30 MB pass 100 MB on the fourth, and nothing could see
+        // that coming, so the fourth is read before it is refused. Overshooting
+        // by the one chunk that carried the total over is the cost of measuring;
+        // reading all four and returning a page would be the bug.
+        expect(readChunk).toHaveBeenCalledTimes(4);
+      });
     });
   });
 

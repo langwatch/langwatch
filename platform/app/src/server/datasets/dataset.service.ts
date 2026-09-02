@@ -38,6 +38,7 @@ import {
   DATASET_SEARCH_MAX_ROWS,
   DATASET_SEARCH_SCAN_BATCH,
   matchesDatasetSearch,
+  measureRowsBytes,
   normalizeDatasetSearch,
 } from "./dataset-search";
 import { getDatasetStorage } from "./dataset-storage";
@@ -887,10 +888,14 @@ export class DatasetService {
    * window. Heap holds one unit of input plus at most `limit` matched rows,
    * whatever the dataset's size.
    *
-   * Both branches refuse BEFORE reading anything, so a refused search costs no
-   * reads and never returns a partial result, and both keep counting what they
-   * actually read so a dataset growing during the scan cannot carry it past the
-   * limit it was admitted under.
+   * Both branches refuse BEFORE reading anything when the dataset's own numbers
+   * already breach a limit, so that refusal costs no reads; neither ever returns
+   * a partial result. Those numbers are fields written when the dataset was last
+   * measured, though, so both branches also count what they actually read — the
+   * s3_jsonl branch measuring each chunk it fetches rather than trusting its
+   * recorded size. A dataset growing during the scan, or one whose recorded
+   * sizes are missing or wrong, is therefore still bounded, at the cost of
+   * overshooting by the one unit of input that carried the total past the limit.
    *
    * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
    * @throws {DatasetTooLargeToSearchError} past the row or byte limit
@@ -977,18 +982,21 @@ export class DatasetService {
   ): { index: number; byteSize: number | null }[] {
     const offsets = readValidChunkOffsets(dataset.chunkOffsets);
     if (offsets.length > 0) {
-      // `byteSize` rides along so the scan can bound what it actually fetches,
-      // not only what the dataset row claims it will. `readValidChunkOffsets`
-      // validates the index and the row bounds but not this, so an
-      // otherwise-valid entry can carry no size, or a nonsensical one; it
-      // becomes `null` — one chunk that cannot be measured — rather than a
-      // number, because arithmetic on `undefined` yields `NaN` and one such
-      // entry would silently disable the bound for the whole dataset.
+      // `byteSize` rides along so the scan can refuse a chunk it can already
+      // tell is too expensive without fetching it first. It is what the writer
+      // recorded, not a reading, so it only ever brings the refusal forward —
+      // the bound itself comes from measuring each chunk that is read.
       //
-      // Negative sizes are normalised for a sharper reason than tidiness: a
-      // running total is not merely uninformed by one, it is actively set back
-      // by it, so a single entry reading -100 MB buys passage for every chunk
-      // after it while the total still looks well inside the limit.
+      // `readValidChunkOffsets` validates the index and the row bounds but not
+      // this, so an otherwise-valid entry can carry no size, or a nonsensical
+      // one; it becomes `null` — one chunk whose cost cannot be guessed at —
+      // rather than a number, because arithmetic on `undefined` yields `NaN`,
+      // and a `NaN` estimate compares false against every limit.
+      //
+      // Negative sizes are normalised for a sharper reason than tidiness: an
+      // estimate is not merely uninformed by one, it is set back by it, so an
+      // entry reading -100 MB would hide the next 100 MB chunk from the
+      // early refusal that exists to catch it.
       //
       // No deduplication needed: a repeated index is rejected at validation, so
       // every entry here names a chunk no other entry names.
@@ -1005,9 +1013,10 @@ export class DatasetService {
     if (dataset.chunkCount == null) {
       throw new DatasetChunkCountMissingError(dataset.id);
     }
-    // No offsets means no per-chunk sizes either, so this walk is bounded by
-    // rows alone — the same gap the missing-`sizeBytes` case has, for the same
-    // reason: nothing recorded the number.
+    // No offsets means no per-chunk sizes either, so nothing here can estimate
+    // what a chunk will cost before it is fetched. The scan measures each chunk
+    // it reads, so the byte limit still holds on this path; what is lost is only
+    // the earlier refusal, not the bound.
     return Array.from({ length: dataset.chunkCount }, (_, i) => ({
       index: i,
       byteSize: null,
@@ -1068,9 +1077,10 @@ export class DatasetService {
    *
    * Those numbers are fields on a row, written when the dataset was last
    * measured — not readings taken now. A writer appending during the scan
-   * carries the dataset past a fence that has already been passed, so the two
-   * totals the scan is accumulating have to be held to the same limits, or the
-   * scan runs for as long as the writer keeps writing.
+   * carries the dataset past a fence that has already been passed, and a size
+   * that was never written, or written wrong, describes no fence at all. Either
+   * way the totals the scan accumulates as it reads have to be held to the same
+   * limits, or the scan runs for as long as the content lasts.
    *
    * @throws {DatasetTooLargeToSearchError} past either limit
    */
@@ -1118,23 +1128,42 @@ export class DatasetService {
     // `readChunk` per index, never `readChunks`: the plural form pulls every
     // chunk into the heap at once, which is exactly what the row cap and the
     // one-at-a-time read are here to prevent.
+    // Two byte totals over the same chunks, because each covers the other's
+    // blind spot and the scan is refused on whichever is larger.
+    //
+    // What the offsets RECORD can be read before a chunk is fetched, so it can
+    // refuse a doomed chunk rather than pull it down and object afterwards —
+    // but it is absent on legacy rows and on half-written offsets, and nothing
+    // re-checks it on the rest. What the scan MEASURES is always true, and
+    // covers exactly those cases, but only after the fetch it was meant to
+    // bound. Taking the larger keeps the earlier refusal where the metadata is
+    // good, and keeps the bound where it is not.
     let rowsRead = 0;
-    let bytesRead = 0;
+    let bytesRecorded = 0;
+    let bytesMeasured = 0;
     for (const { index, byteSize } of this.chunksToScan(dataset)) {
-      // Bytes are counted before the fetch, rows only after it. A chunk's size
-      // is recorded, so a limit on what a search will read can refuse the chunk
-      // that would breach it rather than pull it down first and object
-      // afterwards; how many rows are in it is only learned by reading it.
-      bytesRead += byteSize ?? 0;
-      this.refuseScanPastLimits({ rowsRead, bytesRead });
+      this.refuseScanPastLimits({
+        rowsRead,
+        bytesRead: Math.max(bytesMeasured, bytesRecorded + (byteSize ?? 0)),
+      });
 
       const rows = await storage.readChunk({
         projectId,
         datasetId: dataset.id,
         index,
       });
+
+      // Rows, like the measurement, are only knowable after the read. A chunk
+      // can therefore still be read past the ceiling when nothing recorded its
+      // size: the scan overshoots by the one chunk that carried it over, rather
+      // than by every chunk remaining.
       rowsRead += rows.length;
-      this.refuseScanPastLimits({ rowsRead, bytesRead });
+      bytesRecorded += byteSize ?? 0;
+      bytesMeasured += measureRowsBytes(rows);
+      this.refuseScanPastLimits({
+        rowsRead,
+        bytesRead: Math.max(bytesMeasured, bytesRecorded),
+      });
 
       for (const line of rows) {
         collect(adaptS3JsonlRecord(line, dataset));
