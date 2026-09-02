@@ -10,7 +10,7 @@ A rate limit is a cap on how many requests a virtual key may send: requests per 
 
 ## Set a rate limit
 
-Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension.
+Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension. The third field, `tpm`, is disabled.
 
 Over the API, set `config.rateLimits` on the key:
 

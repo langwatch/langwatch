@@ -3334,7 +3334,7 @@ sidebarTitle: Budgets
 
 A budget is a spend cap in USD on one scope over one window. The gateway checks every request against every budget that applies to it. A `block` budget at its limit rejects the request. A `warn` budget lets it through and adds a warning header.
 
-Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider do not count.
+Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider add no cost.
 
 ## Create a budget
 
@@ -3343,7 +3343,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 | Field | Values |
 |---|---|
 | **Name**, **Description** | The name is required. |
-| **Target** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
+| **Applies to** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
 | **Provider** | **All providers**, or one provider credential. Only requests served by that credential count. |
 | **Window** | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
 | **Limit (USD)** | The cap. |
@@ -3352,7 +3352,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 
 The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
 
-If no active key sends traffic to the target, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
+For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
 Per-end-user budgets are created over the API. See [Per end user](#per-end-user).
 
@@ -3361,7 +3361,7 @@ Per-end-user budgets are created over the API. See [Per end user](#per-end-user)
 | Scope | Counts |
 |---|---|
 | `organization` | Every request in the organization. |
-| `team` | Every request on the team's projects and on keys scoped to the team. |
+| `team` | Every request whose trace project belongs to the team. |
 | `project` | Every request whose traces land in the project. |
 | `virtual_key` | Every request on this key. |
 | `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
@@ -3409,7 +3409,7 @@ The 402 body is an OpenAI-shaped error with the budget in `error.meta`:
     "code": "budget_exceeded",
     "message": "...",
     "meta": {
-      "budget_id": "bgt_...",
+      "budget_id": "NtdzZ9i9EctuXAeZ1oFyr",
       "budget_scope": "virtual_key",
       "budget_window": "month"
     }
@@ -3442,7 +3442,7 @@ A reset moves the period boundary to now. Recorded spend and emitted spend event
 
 ## See the spend
 
-**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for the recent debits with amount, model, key and gateway request id.
+**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
 
 **AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
 
@@ -4714,7 +4714,7 @@ See [Model naming](/ai-gateway/model-naming).
 
 A budget is a spend cap in USD on a scope, over a window. The scope is an organization, a team, a project, a virtual key, a member, each member of a group, or each end user of your product. The window is a minute, an hour, a day, a week, a month, the total lifetime, or manual.
 
-A `block` budget rejects the request at the limit with HTTP 402 `budget_exceeded`. A `warn` budget lets the request through and sets the `X-LangWatch-Budget-Warning` header. Every budget adds that header from 80 percent of its limit.
+A `block` budget rejects the request at the limit with HTTP 402 `budget_exceeded`. A `warn` budget lets the request through and sets the `X-LangWatch-Budget-Warning` header. Every budget adds that header from 80 percent of its limit on the requests it lets through.
 
 See [Budgets](/ai-gateway/budgets).
 
@@ -11056,7 +11056,7 @@ A rate limit is a cap on how many requests a virtual key may send: requests per 
 
 ## Set a rate limit
 
-Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension.
+Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension. The third field, `tpm`, is disabled.
 
 Over the API, set `config.rateLimits` on the key:
 
@@ -11161,7 +11161,7 @@ The Organization Admin column lists what the organization role grants on its own
 
 Organization Member and External hold no gateway permission on their own. They get gateway access through a team role binding.
 
-A custom role starts with no permission. Add the ones you want from the table above.
+A custom role that lists no permission has the Team Viewer set. Add the permissions you want from the table above.
 
 ## Creating keys at a scope
 
@@ -11191,7 +11191,7 @@ A personal key needs only membership of the organization. See [Virtual keys](/ai
 | `GET /api/gateway/v1/spend-events`, `GET .../spend-summaries`, `GET .../end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
 
-A call with an API key that lacks the permission gets HTTP 403 `api_key_permission_denied`. The permission is in `error.meta.permission`:
+A call with an API key that lacks the route's permission gets HTTP 403 `api_key_permission_denied`, with the permission in `error.meta.permission`. A call that holds the route's permission but not `virtualKeys:manage` on a scope the key names gets HTTP 403 `permission_denied` with the scope in the message.
 
 ```json
 {
@@ -13896,7 +13896,7 @@ Ownership decides who can see and manage the key, which providers it reaches and
 | Ownership | Scope | Traces and costs land in |
 |---|---|---|
 | **Project** | The project | That project |
-| **Personal** | The organization, with you as the principal | Your personal workspace |
+| **Personal** | Your personal workspace project, with you as the principal | Your personal workspace |
 | **Team** | The team | A project you pick in the drawer |
 | **Organization** | The organization | A project you pick in the drawer |
 
@@ -13919,12 +13919,15 @@ Send the key in one of these headers:
 
 ## Edit a key
 
-Open the key from the list and click **Edit**. The edit drawer has the same fields as the create drawer plus **Rate limits**: requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits).
+Open the key from the list and click **Edit**. Ownership is read-only after creation. The edit drawer has the create fields plus three sections:
 
-Two settings live in the key's configuration and are set with the CLI (`vk update <id> --config-json`) or the API (`config` on `PATCH`):
+| Section | What it sets |
+|---|---|
+| **Rate limits** | Requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits). |
+| **Cache control** | The cache mode and TTL in seconds. See [Cache control](/ai-gateway/cache-control). |
+| **Realtime voice** | The maximum number of open realtime sessions. See [Realtime](/ai-gateway/api/realtime). |
 
-- `model_aliases`: a map from a name your code sends to the model the gateway calls, for example `{"gpt-4o": "azure/gpt-4o-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
-- `models_allowed`: the list of models the key may call. The drawer sets the same list per provider under **Provider access**.
+The same settings are the `config` object on the API (`PATCH /api/gateway/v1/virtual-keys/:id`) and in `vk update <id> --config-json`: `modelsAllowed`, `providersAllowed`, `rateLimits`, `cache`, `fallback`, `realtime` and `guardrailAttachments`. Model aliases are set on the routing policy, not on the key. See [Model aliases](/ai-gateway/model-aliases).
 
 Guardrails and cache rules attach to keys from their own pages. See [Guardrails](/ai-gateway/guardrails) and [Cache control](/ai-gateway/cache-control).
 
@@ -13964,7 +13967,7 @@ langwatch vk enable <vk_id>
 langwatch vk revoke <vk_id>
 ```
 
-`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the same fields, and `--config-json` sets the key's configuration.
+`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
 
 ## Manage keys over REST
 

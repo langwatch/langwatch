@@ -40,7 +40,7 @@ See [Model naming](/ai-gateway/model-naming).
 
 A budget is a spend cap in USD on a scope, over a window. The scope is an organization, a team, a project, a virtual key, a member, each member of a group, or each end user of your product. The window is a minute, an hour, a day, a week, a month, the total lifetime, or manual.
 
-A `block` budget rejects the request at the limit with HTTP 402 `budget_exceeded`. A `warn` budget lets the request through and sets the `X-LangWatch-Budget-Warning` header. Every budget adds that header from 80 percent of its limit.
+A `block` budget rejects the request at the limit with HTTP 402 `budget_exceeded`. A `warn` budget lets the request through and sets the `X-LangWatch-Budget-Warning` header. Every budget adds that header from 80 percent of its limit on the requests it lets through.
 
 See [Budgets](/ai-gateway/budgets).
 

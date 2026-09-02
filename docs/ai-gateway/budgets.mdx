@@ -8,7 +8,7 @@ sidebarTitle: Budgets
 
 A budget is a spend cap in USD on one scope over one window. The gateway checks every request against every budget that applies to it. A `block` budget at its limit rejects the request. A `warn` budget lets it through and adds a warning header.
 
-Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider do not count.
+Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider add no cost.
 
 ## Create a budget
 
@@ -17,7 +17,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 | Field | Values |
 |---|---|
 | **Name**, **Description** | The name is required. |
-| **Target** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
+| **Applies to** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
 | **Provider** | **All providers**, or one provider credential. Only requests served by that credential count. |
 | **Window** | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
 | **Limit (USD)** | The cap. |
@@ -26,7 +26,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 
 The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
 
-If no active key sends traffic to the target, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
+For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
 Per-end-user budgets are created over the API. See [Per end user](#per-end-user).
 
@@ -35,7 +35,7 @@ Per-end-user budgets are created over the API. See [Per end user](#per-end-user)
 | Scope | Counts |
 |---|---|
 | `organization` | Every request in the organization. |
-| `team` | Every request on the team's projects and on keys scoped to the team. |
+| `team` | Every request whose trace project belongs to the team. |
 | `project` | Every request whose traces land in the project. |
 | `virtual_key` | Every request on this key. |
 | `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
@@ -83,7 +83,7 @@ The 402 body is an OpenAI-shaped error with the budget in `error.meta`:
     "code": "budget_exceeded",
     "message": "...",
     "meta": {
-      "budget_id": "bgt_...",
+      "budget_id": "NtdzZ9i9EctuXAeZ1oFyr",
       "budget_scope": "virtual_key",
       "budget_window": "month"
     }
@@ -116,7 +116,7 @@ A reset moves the period boundary to now. Recorded spend and emitted spend event
 
 ## See the spend
 
-**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for the recent debits with amount, model, key and gateway request id.
+**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
 
 **AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
 
