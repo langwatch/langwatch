@@ -17,25 +17,25 @@ import { Box, Button, Tabs } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
-import { PlaygroundCodeEditor } from "./PlaygroundCodeEditor";
+import { DashboardWidgetCodeEditor } from "./DashboardWidgetCodeEditor";
 import {
-  PlaygroundQueriesPanel,
+  DashboardWidgetQueriesPanel,
   queryNamesAreValid,
-} from "./PlaygroundQueriesPanel";
-import type { QueryLastRun } from "./usePlaygroundWidgetExecutor";
+} from "./DashboardWidgetQueriesPanel";
+import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
-interface PlaygroundWidgetEditDrawerProps {
+interface DashboardWidgetEditDrawerProps {
   open: boolean;
   /** The live chart preview, already built by the card — null while closed. */
   chart: ReactNode;
   code: string;
-  queries: PlaygroundQuery[];
+  queries: DashboardWidgetQuery[];
   onCodeChange: (code: string) => void;
-  onQueriesChange: (queries: PlaygroundQuery[]) => void;
+  onQueriesChange: (queries: DashboardWidgetQuery[]) => void;
   lastRuns: Record<string, QueryLastRun>;
-  onRun: (query: PlaygroundQuery) => Promise<void>;
+  onRun: (query: DashboardWidgetQuery) => Promise<void>;
   isDirty: boolean;
   isSaving: boolean;
   onClose: () => void;
@@ -44,7 +44,7 @@ interface PlaygroundWidgetEditDrawerProps {
   onTabChange: (tab: "code" | "queries") => void;
 }
 
-export function PlaygroundWidgetEditDrawer({
+export function DashboardWidgetEditDrawer({
   open,
   chart,
   code,
@@ -59,7 +59,7 @@ export function PlaygroundWidgetEditDrawer({
   onSave,
   activeTab,
   onTabChange,
-}: PlaygroundWidgetEditDrawerProps) {
+}: DashboardWidgetEditDrawerProps) {
   const canSave = isDirty && queryNamesAreValid(queries);
 
   return (
@@ -120,7 +120,7 @@ export function PlaygroundWidgetEditDrawer({
                 borderRadius="md"
                 overflow="hidden"
               >
-                <PlaygroundCodeEditor
+                <DashboardWidgetCodeEditor
                   language="typescript"
                   value={code}
                   onChange={onCodeChange}
@@ -136,7 +136,7 @@ export function PlaygroundWidgetEditDrawer({
               flexDirection="column"
               paddingTop={3}
             >
-              <PlaygroundQueriesPanel
+              <DashboardWidgetQueriesPanel
                 queries={queries}
                 onChange={onQueriesChange}
                 lastRuns={lastRuns}

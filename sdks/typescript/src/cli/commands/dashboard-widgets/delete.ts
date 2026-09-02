@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -11,13 +11,13 @@ import type { CommandResult } from "../../utils/output";
  * The route answers `204` with no body, so the confirmation carries the id
  * the caller passed — there is no response body to read a name from.
  */
-export const deletePlaygroundWidgetCommand = async (
+export const deleteDashboardWidgetCommand = async (
   id: string,
   options?: { project?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
 
-  const service = new PlaygroundWidgetsApiService();
+  const service = new DashboardWidgetsApiService();
   const spinner = createSpinner(`Deleting widget "${id}"...`).start();
 
   try {
@@ -32,7 +32,7 @@ export const deletePlaygroundWidgetCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete playground widget" });
+    failSpinner({ spinner, error, action: "delete dashboard widget" });
     process.exit(1);
   }
 };

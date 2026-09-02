@@ -1,7 +1,7 @@
 /**
- * Runs a playground widget's queries against the real LangWatchQL endpoint.
+ * Runs a dashboard widget's queries against the real LangWatchQL endpoint.
  *
- * Two entry points, one validation gate (`validatePlaygroundQueryParams`) and
+ * Two entry points, one validation gate (`validateDashboardWidgetQueryParams`) and
  * one underlying `execute` call, so a query can never validate or run
  * differently depending on which one invoked it:
  *
@@ -26,9 +26,9 @@ import { createLangWatchQLExecute } from "~/features/analytics-query/logic/lwqlE
 import { explainAnyError, readHandledError } from "~/features/errors";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import {
-  type PlaygroundQuery,
-  validatePlaygroundQueryParams,
-} from "~/server/analytics/playgroundWidgetDefinition";
+  type DashboardWidgetQuery,
+  validateDashboardWidgetQueryParams,
+} from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
 
 import type {
@@ -59,17 +59,17 @@ function toChartQueryError(error: unknown): ChartQueryError {
   };
 }
 
-export interface PlaygroundWidgetExecutorOverrides {
+export interface DashboardWidgetExecutorOverrides {
   /** Replaces the "last 24 hours from mount" default — the dashboard's own period. */
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
-export function usePlaygroundWidgetExecutor(
+export function useDashboardWidgetExecutor(
   projectId: string,
-  queries: PlaygroundQuery[],
-  overrides?: PlaygroundWidgetExecutorOverrides,
+  queries: DashboardWidgetQuery[],
+  overrides?: DashboardWidgetExecutorOverrides,
 ) {
   const utils = api.useUtils();
   // The playground editor has no period control, so it defaults to a fixed
@@ -93,7 +93,7 @@ export function usePlaygroundWidgetExecutor(
 
   const runValidated = useCallback(
     async (
-      query: Pick<PlaygroundQuery, "sql">,
+      query: Pick<DashboardWidgetQuery, "sql">,
       params: Readonly<Record<string, unknown>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -116,14 +116,14 @@ export function usePlaygroundWidgetExecutor(
       const query = queries.find((q) => q.name === queryName);
       if (!query) {
         const error: ChartQueryError = {
-          code: "playground_query_not_found",
+          code: "dashboard_widget_query_not_found",
           title: "Unknown query",
           message: `This widget has no query named "${queryName}".`,
         };
         recordRun(queryName, { ranAt: Date.now(), error });
         throw error;
       }
-      const validation = validatePlaygroundQueryParams(query, params);
+      const validation = validateDashboardWidgetQueryParams(query, params);
       if (!validation.ok) {
         recordRun(queryName, { ranAt: Date.now(), error: validation.error });
         throw validation.error;
@@ -149,8 +149,8 @@ export function usePlaygroundWidgetExecutor(
    * instead of a second rule to keep in sync with it.
    */
   const runStandalone = useCallback(
-    async (query: PlaygroundQuery) => {
-      const validation = validatePlaygroundQueryParams(query, {});
+    async (query: DashboardWidgetQuery) => {
+      const validation = validateDashboardWidgetQueryParams(query, {});
       if (!validation.ok) {
         recordRun(query.name, { ranAt: Date.now(), error: validation.error });
         return;

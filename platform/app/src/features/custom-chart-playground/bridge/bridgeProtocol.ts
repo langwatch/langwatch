@@ -24,8 +24,8 @@ export type ChartFrameTheme = "light" | "dark";
  * Matches `analytics.lwql.query`'s own `parameterValueSchema` minus `null` —
  * a value the frame chooses to pass is always one of these three JS types,
  * checked against the query's declared parameter types before anything
- * forwards to lwql (see `PlaygroundQuery.parameters` in
- * `~/server/analytics/playgroundWidgetDefinition`).
+ * forwards to lwql (see `DashboardWidgetQuery.parameters` in
+ * `~/server/analytics/dashboardWidgetDefinition`).
  */
 export type ChartQueryParamValue = string | number | boolean;
 
@@ -111,7 +111,7 @@ export interface LwSetHeightMessage {
  * code is semi-trusted (it runs in the sandboxed frame but was written by
  * whoever has playground edit access), so a raw destination path would be an
  * open redirect. The host resolves each key to a real URL itself — see
- * `usePlaygroundChartNavigate`.
+ * `useDashboardWidgetChartNavigate`.
  */
 export const NAVIGABLE_TARGETS = ["traces", "trace"] as const;
 export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];

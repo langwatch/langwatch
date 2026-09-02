@@ -20,7 +20,7 @@
  * the row, and mounting the real Vega and tRPC stacks to prove it would test the
  * harness instead.
  *
- * A playground widget (`playground_srcdoc`) is the same shape of claim once
+ * A dashboard widget (`dashboard_srcdoc`) is the same shape of claim once
  * more: its sandboxed frame reads `{ code, queries }`, not a builder payload
  * or a saved statement, and its author code has no `series` either — the
  * alert bell has to stay excluded here for the identical reason it stays
@@ -80,9 +80,9 @@ vi.mock(
 );
 
 vi.mock(
-  "~/features/custom-chart-playground/PlaygroundDashboardWidget",
+  "~/features/custom-chart-playground/DashboardWidgetFrame",
   () => ({
-    PlaygroundDashboardWidget: ({
+    DashboardWidgetFrame: ({
       id,
       graph,
     }: {
@@ -90,7 +90,7 @@ vi.mock(
       graph: unknown;
     }) => (
       <div
-        data-testid="playground-widget"
+        data-testid="dashboard-widget"
         data-id={id}
         data-graph={JSON.stringify(graph)}
       />
@@ -99,7 +99,7 @@ vi.mock(
 );
 
 import {
-  PLAYGROUND_SRCDOC_CHART_KIND,
+  DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
 
@@ -224,27 +224,27 @@ describe("a dashboard grid card", () => {
     });
   });
 
-  describe("given a playground widget", () => {
-    const PLAYGROUND_PAYLOAD = {
+  describe("given a dashboard widget", () => {
+    const DASHBOARD_WIDGET_PAYLOAD = {
       version: 1,
       code: "export default function Widget() { return null; }",
       queries: [{ name: "main", sql: "SELECT 1" }],
     };
 
-    /** @scenario "A playground card draws the sandboxed widget, not the builder" */
-    it("draws the sandboxed playground frame rather than the builder renderer", () => {
+    /** @scenario "A dashboard widget card draws the sandboxed widget, not the builder" */
+    it("draws the sandboxed dashboard widget frame rather than the builder renderer", () => {
       render(
         <DraggableGraphCard
           graph={{
             id: "graph_1",
             name: "Error rate",
-            graph: PLAYGROUND_PAYLOAD,
+            graph: DASHBOARD_WIDGET_PAYLOAD,
             filters: {},
             gridColumn: 0,
             gridRow: 0,
             colSpan: 1,
             rowSpan: 1,
-            kind: PLAYGROUND_SRCDOC_CHART_KIND,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
             trigger: null,
           }}
           projectSlug="proj"
@@ -256,11 +256,11 @@ describe("a dashboard grid card", () => {
         { wrapper: Wrapper },
       );
 
-      const widget = screen.getByTestId("playground-widget");
+      const widget = screen.getByTestId("dashboard-widget");
       expect(widget).toBeInTheDocument();
       expect(widget).toHaveAttribute("data-id", "graph_1");
       expect(JSON.parse(widget.getAttribute("data-graph") ?? "null")).toEqual(
-        PLAYGROUND_PAYLOAD,
+        DASHBOARD_WIDGET_PAYLOAD,
       );
       expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
       expect(
@@ -268,20 +268,20 @@ describe("a dashboard grid card", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "A playground card is not offered an alert it cannot evaluate" */
+    /** @scenario "A dashboard widget card is not offered an alert it cannot evaluate" */
     it("offers no alert bell", () => {
       render(
         <DraggableGraphCard
           graph={{
             id: "graph_1",
             name: "Error rate",
-            graph: PLAYGROUND_PAYLOAD,
+            graph: DASHBOARD_WIDGET_PAYLOAD,
             filters: {},
             gridColumn: 0,
             gridRow: 0,
             colSpan: 1,
             rowSpan: 1,
-            kind: PLAYGROUND_SRCDOC_CHART_KIND,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
             trigger: null,
           }}
           projectSlug="proj"

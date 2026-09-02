@@ -6,7 +6,7 @@
  *
  * Auth and target project are read from the environment because this script
  * is meant to run against any LangWatch deployment, not just one hardcoded
- * project. See `app.playground-widgets.v1.ts` for the endpoint contract.
+ * project. See `app.dashboard-widgets.v1.ts` for the endpoint contract.
  *
  * Env vars:
  *   LW_ENDPOINT  Base URL of the LangWatch app, e.g. https://app.langwatch.ai
@@ -42,7 +42,7 @@ const endpoint = requireEnv("LW_ENDPOINT").replace(/\/+$/, "");
 const apiKey = requireEnv("LW_API_KEY");
 const projectId = requireEnv("PROJECT_ID");
 
-const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/playground-widgets`;
+const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/dashboard-widgets`;
 
 function loadWidgetDefinitions() {
   const files = fs

@@ -1,5 +1,5 @@
 /**
- * Custom-chart-playground widgets — the failures the REST endpoints name.
+ * Dashboard widgets — the failures the REST endpoints name.
  *
  * @see ~/server/analytics/lwql/errors.ts — the sibling gate this mirrors
  */
@@ -13,7 +13,7 @@ import { CUSTOM_CHART_PLAYGROUND_FLAG } from "./access";
  *
  * `customer` fault, 403 — a product decision an administrator can change,
  * not an incident. The message NAMES the flag deliberately: the CLI and
- * Langy's own `playground-widget` skill are the two callers of this route
+ * Langy's own `dashboard-widget` skill are the two callers of this route
  * outside the page itself, and both need to tell "gated off" apart from a
  * generic failure so they stop retrying and reach for lwql-charts / `chart`
  * instead.

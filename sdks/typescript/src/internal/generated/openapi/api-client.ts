@@ -908,7 +908,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/playground-widgets": {
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
         parameters: {
             query?: never;
             header?: never;
@@ -916,23 +916,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List custom-chart-playground widgets
-         * @description Lists every custom-chart-playground widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         * List dashboard widgets
+         * @description Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets"];
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
         put?: never;
         /**
-         * Create a custom-chart-playground widget
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one playground widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         * Create a dashboard widget
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
          */
-        post: operations["postApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets"];
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}": {
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -940,24 +940,44 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a custom-chart-playground widget
-         * @description Returns one playground widget with its React source and named queries. A widget saved in another project is reported as not found.
+         * Get a dashboard widget
+         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
          */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId"];
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
         put?: never;
         post?: never;
         /**
-         * Delete a custom-chart-playground widget
-         * @description Deletes one playground widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         * Delete a dashboard widget
+         * @description Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
          */
-        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId"];
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
         options?: never;
         head?: never;
         /**
-         * Update a custom-chart-playground widget
-         * @description Replaces a playground widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
+         * Update a dashboard widget
+         * @description Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
          */
-        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId"];
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a dashboard widget to a dashboard
+         * @description Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/coding-agent/sessions/{sessionId}/events": {
@@ -7170,7 +7190,7 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets: {
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
         parameters: {
             query?: never;
             header?: never;
@@ -7181,7 +7201,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The project's playground widgets */
+            /** @description The project's dashboard widgets */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7299,7 +7319,7 @@ export interface operations {
             };
         };
     };
-    postApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets: {
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
         parameters: {
             query?: never;
             header?: never;
@@ -7443,7 +7463,7 @@ export interface operations {
             };
         };
     };
-    getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId: {
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
@@ -7455,7 +7475,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The playground widget */
+            /** @description The dashboard widget */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7549,7 +7569,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No playground widget with this id in this project */
+            /** @description No dashboard widget with this id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7591,7 +7611,7 @@ export interface operations {
             };
         };
     };
-    deleteApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId: {
+    deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
@@ -7670,7 +7690,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description No playground widget with this id in this project */
+            /** @description No dashboard widget with this id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7712,7 +7732,7 @@ export interface operations {
             };
         };
     };
-    patchApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId: {
+    patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
         parameters: {
             query?: never;
             header?: never;
@@ -7835,7 +7855,161 @@ export interface operations {
                     };
                 };
             };
-            /** @description No playground widget with this id in this project */
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was added to the dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;

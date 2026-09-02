@@ -1,12 +1,12 @@
 /**
- * One persisted playground widget: a sortable card showing only its chart —
+ * One persisted dashboard widget: a sortable card showing only its chart —
  * a sandboxed frame, a title, and a size/edit/delete menu. All editing (the
- * React/TSX file, the declared queries) happens in `PlaygroundWidgetEditDrawer`,
+ * React/TSX file, the declared queries) happens in `DashboardWidgetEditDrawer`,
  * which this card owns and opens from the menu's Edit item.
  *
  * The frame never holds SQL or the projectId — the parent does. Each
  * `LW.query(name, params)` from the frame is resolved here, through the same
- * abortable LangWatchQL executor the workbench uses (`usePlaygroundWidgetExecutor`).
+ * abortable LangWatchQL executor the workbench uses (`useDashboardWidgetExecutor`).
  *
  * The chart previews the drawer's draft LIVE, not just the persisted widget —
  * that's the "save-less feedback" the drawer promises. The frame's `code` and
@@ -25,19 +25,19 @@ import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { GraphCardMenu } from "~/components/analytics/reports/GraphCardMenu";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Menu } from "~/components/ui/menu";
-import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
-import { PlaygroundWidgetEditDrawer } from "./PlaygroundWidgetEditDrawer";
+import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
-import { usePlaygroundChartNavigate } from "./usePlaygroundChartNavigate";
-import { usePlaygroundWidgetExecutor } from "./usePlaygroundWidgetExecutor";
+import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
+import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
 
-/** A playground widget as the grid renders it. */
-export interface PlaygroundWidget {
+/** A dashboard widget as the grid renders it. */
+export interface DashboardWidget {
   id: string;
   name: string;
   code: string;
-  queries: PlaygroundQuery[];
+  queries: DashboardWidgetQuery[];
   gridColumn: number;
   gridRow: number;
   colSpan: number;
@@ -60,7 +60,7 @@ const noopLog = () => {
 };
 
 /** Cheap and correct at this scale: a widget's queries are a handful of small objects. */
-function queriesEqual(a: PlaygroundQuery[], b: PlaygroundQuery[]): boolean {
+function queriesEqual(a: DashboardWidgetQuery[], b: DashboardWidgetQuery[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -79,21 +79,21 @@ const RANGE_LABEL: Record<RangeKey, string> = {
   "30d": "Last 30d",
 };
 
-interface PlaygroundWidgetCardProps {
-  widget: PlaygroundWidget;
+interface DashboardWidgetCardProps {
+  widget: DashboardWidget;
   projectId: string;
   projectSlug: string;
   onDelete: () => void;
   onSizeChange: (size: SizeOption) => void;
   onSave: (
-    input: { id: string; code: string; queries: PlaygroundQuery[] },
+    input: { id: string; code: string; queries: DashboardWidgetQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
   isDeleting: boolean;
   isSaving: boolean;
 }
 
-export function PlaygroundWidgetCard({
+export function DashboardWidgetCard({
   widget,
   projectId,
   projectSlug,
@@ -102,7 +102,7 @@ export function PlaygroundWidgetCard({
   onSave,
   isDeleting,
   isSaving,
-}: PlaygroundWidgetCardProps) {
+}: DashboardWidgetCardProps) {
   const { colorMode } = useColorMode();
   const {
     attributes,
@@ -146,8 +146,8 @@ export function PlaygroundWidgetCard({
   }, [draftCode, draftQueries]);
 
   const { executeQuery, runStandalone, params, lastRuns } =
-    usePlaygroundWidgetExecutor(projectId, previewQueries, { timeWindow });
-  const onNavigate = usePlaygroundChartNavigate(projectSlug);
+    useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
+  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   const isDirty =
     draftCode !== widget.code || !queriesEqual(draftQueries, widget.queries);
@@ -230,7 +230,7 @@ export function PlaygroundWidgetCard({
               dashboardId={widget.dashboardId ?? undefined}
               colSpan={widget.colSpan}
               rowSpan={widget.rowSpan}
-              isPlaygroundWidget
+              isDashboardWidget
               showAddToDashboard
               onEdit={openCodeTab}
               onSizeChange={onSizeChange}
@@ -260,7 +260,7 @@ export function PlaygroundWidgetCard({
         </Card.Body>
       </Card.Root>
 
-      <PlaygroundWidgetEditDrawer
+      <DashboardWidgetEditDrawer
         open={isDrawerOpen}
         code={draftCode}
         queries={draftQueries}

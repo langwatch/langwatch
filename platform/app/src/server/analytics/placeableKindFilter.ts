@@ -1,11 +1,11 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   BUILDER_CHART_KIND,
-  PLAYGROUND_SRCDOC_CHART_KIND,
+  DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
-import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widgets/access";
+import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
 
 /**
  * The kinds that can sit on a dashboard grid when EVERY optional chart
@@ -13,13 +13,13 @@ import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widg
  * subset of this — see {@link placeableKindFilter}, which asks each kind's
  * own flag independently. Workbench and playground are not mutually
  * exclusive here the way their WRITES are: a project can carry old
- * `workbench_sql` rows placed before the playground shipped and new
- * `playground_srcdoc` rows side by side, and both must keep rendering.
+ * `workbench_sql` rows placed before dashboard widgets shipped and new
+ * `dashboard_srcdoc` rows side by side, and both must keep rendering.
  */
 export const PLACEABLE_CHART_KINDS = [
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
-  PLAYGROUND_SRCDOC_CHART_KIND,
+  DASHBOARD_SRCDOC_CHART_KIND,
 ] as const;
 
 /** The `kind` clause a card-level query sends to Prisma. */
@@ -31,7 +31,7 @@ export type PlaceableKindWhere = { kind: string | { in: string[] } };
  * Asked by every card-level procedure — the graph-card read, all three
  * placement writes, and the dashboard list's card count — so that a
  * deployment with a feature off sees exactly the grid it saw before, and
- * cannot move, resize, delete or *count* a `workbench_sql`/`playground_srcdoc`
+ * cannot move, resize, delete or *count* a `workbench_sql`/`dashboard_srcdoc`
  * row left behind by a trial. Gating only the read would leave the rows
  * invisible but still mutable: a member's reflow of the charts they *can* see
  * would silently rewrite the placement of ones they cannot, a delete by id
@@ -61,7 +61,7 @@ export async function placeableKindFilter({
     kinds.push(WORKBENCH_SQL_CHART_KIND);
   }
   if (await customChartPlaygroundEnabled({ prisma, projectId })) {
-    kinds.push(PLAYGROUND_SRCDOC_CHART_KIND);
+    kinds.push(DASHBOARD_SRCDOC_CHART_KIND);
   }
   return kinds.length > 1 ? { kind: { in: kinds } } : { kind: BUILDER_CHART_KIND };
 }

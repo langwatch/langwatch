@@ -60,15 +60,15 @@ interface GraphCardMenuProps {
    */
   isWorkbenchChart?: boolean;
   /**
-   * Whether this card is a custom-chart-playground widget. Also decides
+   * Whether this card is a dashboard widget. Also decides
    * where Edit goes — the playground page, which is the only place a
-   * playground widget's sandboxed author code can be edited today.
+   * dashboard widget's sandboxed author code can be edited today.
    */
-  isPlaygroundWidget?: boolean;
+  isDashboardWidget?: boolean;
   /**
-   * Offers "Add to dashboard", which pins a playground widget straight to
+   * Offers "Add to dashboard", which pins a dashboard widget straight to
    * the project's single dashboard (no picker — there's only ever one).
-   * Only meaningful alongside `isPlaygroundWidget`.
+   * Only meaningful alongside `isDashboardWidget`.
    */
   showAddToDashboard?: boolean;
   /** The step this workbench card runs at, when it has one stored. */
@@ -92,7 +92,7 @@ export function GraphCardMenu({
   colSpan,
   rowSpan,
   isWorkbenchChart = false,
-  isPlaygroundWidget = false,
+  isDashboardWidget = false,
   showAddToDashboard = false,
   granularitySeconds,
   onEdit,
@@ -110,9 +110,9 @@ export function GraphCardMenu({
   // itself uses to pre-assign new widgets.
   const dashboard = api.dashboards.getOrCreateFirst.useQuery(
     { projectId },
-    { enabled: showAddToDashboard && isPlaygroundWidget },
+    { enabled: showAddToDashboard && isDashboardWidget },
   );
-  const assignDashboard = api.playgroundWidgets.assignDashboard.useMutation();
+  const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
   const alreadyOnDashboard =
     !!dashboard.data && dashboardId === dashboard.data.id;
 
@@ -135,7 +135,7 @@ export function GraphCardMenu({
             type: "success",
             duration: 3000,
           });
-          void utils.playgroundWidgets.list.invalidate({ projectId });
+          void utils.dashboardWidgets.list.invalidate({ projectId });
           void utils.graphs.getAll.invalidate();
         },
         onError: () => {
@@ -150,7 +150,7 @@ export function GraphCardMenu({
   };
 
   // A workbench chart is edited in the workbench that wrote it, and a
-  // playground widget in the playground that wrote it — neither the builder
+  // dashboard widget in the playground that wrote it — neither the builder
   // nor the other surface can read the other's payload shape.
   //
   // Neither surface opens through a deep-link parameter naming the card, so
@@ -160,7 +160,7 @@ export function GraphCardMenu({
   // named chart/widget directly waits on either surface accepting an id.
   const editUrl = isWorkbenchChart
     ? `/${projectSlug}/analytics/query`
-    : isPlaygroundWidget
+    : isDashboardWidget
       ? `/${projectSlug}/dev/custom-chart-playground`
       : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
@@ -187,7 +187,7 @@ export function GraphCardMenu({
             ? "Edit"
             : isWorkbenchChart
               ? "Open in workbench"
-              : isPlaygroundWidget
+              : isDashboardWidget
                 ? "Open in playground"
                 : "Edit Graph"}
         </Menu.Item>
@@ -236,7 +236,7 @@ export function GraphCardMenu({
           </Menu.Root>
         )}
 
-        {isPlaygroundWidget && showAddToDashboard && (
+        {isDashboardWidget && showAddToDashboard && (
           <Menu.Item
             value="add-to-dashboard"
             onClick={handleAddToDashboard}

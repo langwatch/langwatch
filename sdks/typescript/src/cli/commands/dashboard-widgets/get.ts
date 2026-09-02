@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -9,13 +9,13 @@ import type { CommandResult } from "../../utils/output";
  * Returns the widget rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getPlaygroundWidgetCommand = async (
+export const getDashboardWidgetCommand = async (
   id: string,
   options?: { project?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
 
-  const service = new PlaygroundWidgetsApiService();
+  const service = new DashboardWidgetsApiService();
   const spinner = createSpinner(`Fetching widget "${id}"...`).start();
 
   try {
@@ -59,7 +59,7 @@ export const getPlaygroundWidgetCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch playground widget" });
+    failSpinner({ spinner, error, action: "fetch dashboard widget" });
     process.exit(1);
   }
 };

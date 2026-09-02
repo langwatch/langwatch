@@ -78,7 +78,7 @@ export interface GeneratedSkill {
   /**
    * The feature flag gating this skill's offer, if it declares one in its
    * front-matter (`feature-flag: <key>`). Absent = always offered, the
-   * default for every skill today except `playground-widgets`.
+   * default for every skill today except `dashboard-widgets`.
    */
   featureFlag?: string;
   /**

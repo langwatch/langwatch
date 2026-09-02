@@ -1,5 +1,5 @@
 /**
- * What a persisted custom-chart-playground widget's `CustomGraph.graph`
+ * What a persisted dashboard widget's `CustomGraph.graph`
  * column actually stores.
  *
  * One React/TSX file (`code`) plus the named LangWatchQL statements it may
@@ -17,7 +17,7 @@
  * row is read only through this schema, and a shape written by a
  * disagreeing build is refused by name instead of half-understood.
  *
- * Both the playground router and the client (`CustomChartPlayground.tsx`,
+ * Both the dashboard-widgets router and the client (`CustomChartPlayground.tsx`,
  * which parses `row.graph` with this same schema) import from here, so the
  * two sides cannot drift. Safe for the client to import: this module pulls in
  * nothing but `zod` and a constant, never Prisma or any server-only code.
@@ -28,7 +28,7 @@ import { z } from "zod";
 import { MAX_LWQL_LENGTH } from "./lwql/sqlText";
 
 /** The version this build writes, and the only one it reads. */
-export const PLAYGROUND_WIDGET_DEFINITION_VERSION = 1;
+export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;
 
 /** A widget file rarely needs more than a couple of named queries. */
 const MAX_QUERIES_PER_WIDGET = 8;
@@ -97,7 +97,7 @@ const queryParameterDeclarationSchema = z
     }
   });
 
-export const playgroundQuerySchema = z.object({
+export const dashboardWidgetQuerySchema = z.object({
   name: z
     .string()
     .min(1)
@@ -113,22 +113,22 @@ export const playgroundQuerySchema = z.object({
     .optional(),
 });
 
-export const playgroundWidgetDefinitionSchema = z.object({
-  version: z.literal(PLAYGROUND_WIDGET_DEFINITION_VERSION),
+export const dashboardWidgetDefinitionSchema = z.object({
+  version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: z.string().min(1).max(MAX_CODE_LENGTH),
-  queries: z.array(playgroundQuerySchema).max(MAX_QUERIES_PER_WIDGET),
+  queries: z.array(dashboardWidgetQuerySchema).max(MAX_QUERIES_PER_WIDGET),
 });
 
-export type PlaygroundQueryParameterDeclaration = z.infer<
+export type DashboardWidgetQueryParameterDeclaration = z.infer<
   typeof queryParameterDeclarationSchema
 >;
-export type PlaygroundQuery = z.infer<typeof playgroundQuerySchema>;
-export type PlaygroundWidgetDefinition = z.infer<
-  typeof playgroundWidgetDefinitionSchema
+export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;
+export type DashboardWidgetDefinition = z.infer<
+  typeof dashboardWidgetDefinitionSchema
 >;
 
 /** A bound parameter's value, as `LW.query`'s caller may supply it. */
-export type PlaygroundQueryParamValue = string | number | boolean;
+export type DashboardWidgetQueryParamValue = string | number | boolean;
 
 /**
  * What a rejected `LW.query(name, params)` carries back to the frame. Shaped
@@ -136,18 +136,18 @@ export type PlaygroundQueryParamValue = string | number | boolean;
  * `features/custom-chart-playground/bridge/bridgeProtocol.ts`) without this,
  * a server module, importing that client one.
  */
-export interface PlaygroundQueryParamError {
+export interface DashboardWidgetQueryParamError {
   readonly code: string;
   readonly title: string;
   readonly message: string;
 }
 
-export type PlaygroundQueryParamValidation =
+export type DashboardWidgetQueryParamValidation =
   | {
       readonly ok: true;
-      readonly params: Readonly<Record<string, PlaygroundQueryParamValue>>;
+      readonly params: Readonly<Record<string, DashboardWidgetQueryParamValue>>;
     }
-  | { readonly ok: false; readonly error: PlaygroundQueryParamError };
+  | { readonly ok: false; readonly error: DashboardWidgetQueryParamError };
 
 /**
  * The validation gate `LW.query(name, params)` runs through before anything
@@ -162,10 +162,10 @@ export type PlaygroundQueryParamValidation =
  * the live `LW.query` dispatch and the Queries tab's standalone "Run" button,
  * so a query can never validate differently in one path than the other.
  */
-export function validatePlaygroundQueryParams(
-  query: Pick<PlaygroundQuery, "parameters">,
+export function validateDashboardWidgetQueryParams(
+  query: Pick<DashboardWidgetQuery, "parameters">,
   params: Readonly<Record<string, unknown>>,
-): PlaygroundQueryParamValidation {
+): DashboardWidgetQueryParamValidation {
   const declared = query.parameters ?? [];
   const declaredNames = new Set(declared.map((p) => p.name));
 
@@ -178,7 +178,7 @@ export function validatePlaygroundQueryParams(
       return {
         ok: false,
         error: {
-          code: "playground_query_reserved_param",
+          code: "dashboard_widget_query_reserved_param",
           title: "Reserved query parameter",
           message: `"${first}" is bound automatically from the page's own window and granularity — a query never sets it, and LW.query must not pass it either.`,
         },
@@ -187,7 +187,7 @@ export function validatePlaygroundQueryParams(
     return {
       ok: false,
       error: {
-        code: "playground_query_undeclared_param",
+        code: "dashboard_widget_query_undeclared_param",
         title: "Unknown query parameter",
         message: `This query does not declare a parameter named "${first}". Declared: ${
           declared.length > 0
@@ -198,7 +198,7 @@ export function validatePlaygroundQueryParams(
     };
   }
 
-  const validated: Record<string, PlaygroundQueryParamValue> = {};
+  const validated: Record<string, DashboardWidgetQueryParamValue> = {};
   for (const declaration of declared) {
     const resolved = resolveDeclaredParam(
       declaration,
@@ -213,11 +213,11 @@ export function validatePlaygroundQueryParams(
 
 /** One declared parameter's value: from `params`, its default, or a rejection. */
 function resolveDeclaredParam(
-  declaration: PlaygroundQueryParameterDeclaration,
+  declaration: DashboardWidgetQueryParameterDeclaration,
   value: unknown,
 ):
-  | { ok: true; value: PlaygroundQueryParamValue }
-  | { ok: false; error: PlaygroundQueryParamError } {
+  | { ok: true; value: DashboardWidgetQueryParamValue }
+  | { ok: false; error: DashboardWidgetQueryParamError } {
   if (value === undefined) {
     if (declaration.default !== undefined) {
       return { ok: true, value: declaration.default };
@@ -225,7 +225,7 @@ function resolveDeclaredParam(
     return {
       ok: false,
       error: {
-        code: "playground_query_missing_param",
+        code: "dashboard_widget_query_missing_param",
         title: "Missing query parameter",
         message: `"${declaration.name}" is required and has no default — pass a value for it.`,
       },
@@ -235,7 +235,7 @@ function resolveDeclaredParam(
     return {
       ok: false,
       error: {
-        code: "playground_query_mistyped_param",
+        code: "dashboard_widget_query_mistyped_param",
         title: "Wrong query parameter type",
         message: `"${declaration.name}" must be a ${declaration.type}, got ${typeof value}.`,
       },

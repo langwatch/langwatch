@@ -5,7 +5,7 @@
  * packs, in a fixed order (order = vertical layout order).
  *
  * This does NOT replace the pack seeders — it reuses their env contract and
- * fetch style, but pins pre-existing (or newly created) playground widgets
+ * fetch style, but pins pre-existing (or newly created) dashboard widgets
  * onto a dashboard. Pinning does NOT move a widget: the widget's dashboardId
  * is set so it renders on the dashboard, but it stays visible and editable
  * on the playground too. See README.md.
@@ -61,7 +61,7 @@ const apiKey = requireEnv("LW_API_KEY");
 const projectId = requireEnv("PROJECT_ID");
 
 const dashboardsUrl = `${endpoint}/api/dashboards`;
-const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/playground-widgets`;
+const widgetsUrl = `${endpoint}/api/v1/projects/${projectId}/analytics/dashboard-widgets`;
 
 async function getJson(url) {
   const res = await fetch(url, {

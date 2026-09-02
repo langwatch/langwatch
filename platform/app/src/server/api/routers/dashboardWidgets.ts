@@ -1,12 +1,12 @@
 /**
- * Persistence for custom-chart-playground widgets.
+ * Persistence for dashboard widgets.
  *
  * A thin, project-scoped CRUD router over `CustomGraph` rows of kind
- * {@link PLAYGROUND_SRCDOC_CHART_KIND}. Every read and write filters by that
- * kind alongside `projectId`, so a playground widget is never read, updated or
+ * {@link DASHBOARD_SRCDOC_CHART_KIND}. Every read and write filters by that
+ * kind alongside `projectId`, so a dashboard widget is never read, updated or
  * deleted through the builder or workbench paths — and neither of those ever
- * sees a playground row. The `graph` column holds a
- * {@link PlaygroundWidgetDefinition} — see that module for the shape and why
+ * sees one of its rows. The `graph` column holds a
+ * {@link DashboardWidgetDefinition} — see that module for the shape and why
  * it is versioned.
  *
  * Deliberately independent of `graphs.ts`: the playground stores a sandboxed
@@ -19,13 +19,13 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import type { Prisma } from "~/generated/prisma/client";
-import { PLAYGROUND_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
-import { PlaygroundWidgetService } from "~/server/analytics/playground-widgets/playgroundWidget.service";
+import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { DashboardWidgetService } from "~/server/analytics/dashboard-widgets/dashboardWidget.service";
 import {
-  PLAYGROUND_WIDGET_DEFINITION_VERSION,
-  type PlaygroundWidgetDefinition,
-  playgroundQuerySchema,
-} from "~/server/analytics/playgroundWidgetDefinition";
+  DASHBOARD_WIDGET_DEFINITION_VERSION,
+  type DashboardWidgetDefinition,
+  dashboardWidgetQuerySchema,
+} from "~/server/analytics/dashboardWidgetDefinition";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -38,14 +38,14 @@ const layoutSchema = z.object({
 
 const graphOf = (input: {
   code: string;
-  queries: PlaygroundWidgetDefinition["queries"];
+  queries: DashboardWidgetDefinition["queries"];
 }): Prisma.InputJsonValue => ({
-  version: PLAYGROUND_WIDGET_DEFINITION_VERSION,
+  version: DASHBOARD_WIDGET_DEFINITION_VERSION,
   code: input.code,
   queries: input.queries,
 });
 
-export const playgroundWidgetsRouter = createTRPCRouter({
+export const dashboardWidgetsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("analytics:view")
@@ -53,7 +53,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
       return await ctx.prisma.customGraph.findMany({
         where: {
           projectId: input.projectId,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
         orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
       });
@@ -66,16 +66,16 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         dashboardId: z.string().optional(),
         name: z.string(),
         code: z.string(),
-        queries: z.array(playgroundQuerySchema),
+        queries: z.array(dashboardWidgetQuerySchema),
       }),
     )
     .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
-      // Next free row: one below the lowest playground widget in the project.
+      // Next free row: one below the lowest dashboard widget in the project.
       const last = await ctx.prisma.customGraph.findFirst({
         where: {
           projectId: input.projectId,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
         orderBy: { gridRow: "desc" },
         select: { gridRow: true },
@@ -86,7 +86,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
           id: nanoid(),
           projectId: input.projectId,
           name: input.name,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
           graph: graphOf({ code: input.code, queries: input.queries }),
           ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
           gridColumn: 0,
@@ -104,7 +104,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().optional(),
         code: z.string(),
-        queries: z.array(playgroundQuerySchema),
+        queries: z.array(dashboardWidgetQuerySchema),
       }),
     )
     .permission("analytics:update")
@@ -113,7 +113,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         where: {
           id: input.id,
           projectId: input.projectId,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
         data: {
           graph: graphOf({ code: input.code, queries: input.queries }),
@@ -135,7 +135,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         where: {
           id: input.graphId,
           projectId: input.projectId,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
         data: {
           gridColumn: input.gridColumn,
@@ -162,7 +162,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
             where: {
               id: layout.graphId,
               projectId: input.projectId,
-              kind: PLAYGROUND_SRCDOC_CHART_KIND,
+              kind: DASHBOARD_SRCDOC_CHART_KIND,
             },
             data: {
               gridColumn: layout.gridColumn,
@@ -186,7 +186,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
-      await PlaygroundWidgetService.create(ctx.prisma).assignToDashboard({
+      await DashboardWidgetService.create(ctx.prisma).assignToDashboard({
         id: input.id,
         projectId: input.projectId,
         dashboardId: input.dashboardId,
@@ -202,7 +202,7 @@ export const playgroundWidgetsRouter = createTRPCRouter({
         where: {
           id: input.id,
           projectId: input.projectId,
-          kind: PLAYGROUND_SRCDOC_CHART_KIND,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
       });
       return { success: true };

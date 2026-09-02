@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
@@ -10,13 +10,13 @@ import type { CommandResult } from "../../utils/output";
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const listPlaygroundWidgetsCommand = async (options?: {
+export const listDashboardWidgetsCommand = async (options?: {
   project?: string;
 }): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
 
-  const service = new PlaygroundWidgetsApiService();
-  const spinner = createSpinner("Fetching playground widgets...").start();
+  const service = new DashboardWidgetsApiService();
+  const spinner = createSpinner("Fetching dashboard widgets...").start();
 
   try {
     const result = await service.list();
@@ -31,11 +31,11 @@ export const listPlaygroundWidgetsCommand = async (options?: {
       table: () => {
         if (widgets.length === 0) {
           console.log();
-          console.log(chalk.gray("No playground widgets found."));
+          console.log(chalk.gray("No dashboard widgets found."));
           console.log(chalk.gray("Create one with:"));
           console.log(
             chalk.cyan(
-              '  langwatch playground-widget create --name "My Widget" --code-file widget.tsx --queries-file queries.json',
+              '  langwatch dashboard-widget create --name "My Widget" --code-file widget.tsx --queries-file queries.json',
             ),
           );
           return;
@@ -61,13 +61,13 @@ export const listPlaygroundWidgetsCommand = async (options?: {
         console.log();
         console.log(
           chalk.gray(
-            `Use ${chalk.cyan("langwatch playground-widget get <id>")} to view widget details`,
+            `Use ${chalk.cyan("langwatch dashboard-widget get <id>")} to view widget details`,
           ),
         );
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch playground widgets" });
+    failSpinner({ spinner, error, action: "fetch dashboard widgets" });
     process.exit(1);
   }
 };

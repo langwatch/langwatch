@@ -15,7 +15,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 import type { VegaValidationError } from "~/features/analytics-query/visualization/visualization.types";
-import { CUSTOM_CHART_PLAYGROUND_FLAG } from "~/server/analytics/playground-widgets/access";
+import { CUSTOM_CHART_PLAYGROUND_FLAG } from "~/server/analytics/dashboard-widgets/access";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
@@ -161,13 +161,13 @@ export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
  * Saved workbench charts and the custom-chart-playground are mutually
  * exclusive while the playground is experimental: with
  * `release_custom_chart_playground` ON for this project, `chart` REST/CLI
- * operations refuse rather than compete with `playground-widget` as two
+ * operations refuse rather than compete with `dashboard-widget` as two
  * answers to "make me a chart." `customer` fault, 403 — a product decision
  * an administrator can change, not an incident.
  *
  * The message NAMES the flag and the alternative deliberately: this is the
  * one caller-visible signal that stops an agent from retrying the same
- * command and pushes it toward `playground-widget` instead.
+ * command and pushes it toward `dashboard-widget` instead.
  */
 export class SavedWorkbenchChartsDisabledForPlaygroundError extends HandledError {
   declare readonly code: "saved_workbench_charts_disabled_for_playground";
@@ -175,7 +175,7 @@ export class SavedWorkbenchChartsDisabledForPlaygroundError extends HandledError
   constructor() {
     super(
       "saved_workbench_charts_disabled_for_playground",
-      `Saved workbench charts are turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the playground-widgets skill / \`langwatch playground-widget\` commands instead.`,
+      `Saved workbench charts are turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the dashboard-widgets skill / \`langwatch dashboard-widget\` commands instead.`,
       {
         httpStatus: 403,
         ...remediation("saved_workbench_charts_disabled_for_playground"),

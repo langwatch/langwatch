@@ -1,10 +1,10 @@
 import { readFileSync } from "fs";
 import type {
-  PlaygroundWidgetDefinitionInput,
-  PlaygroundWidgetQueryInput,
-} from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+  DashboardWidgetDefinitionInput,
+  DashboardWidgetQueryInput,
+} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 
-/** The flags `playground-widget create` and `update` share for the definition. */
+/** The flags `dashboard-widget create` and `update` share for the definition. */
 export interface DefinitionFlags {
   code?: string;
   codeFile?: string;
@@ -27,7 +27,7 @@ export class WidgetInputError extends Error {}
  */
 export const resolveDefinitionInput = (
   flags: DefinitionFlags,
-): PlaygroundWidgetDefinitionInput | undefined => {
+): DashboardWidgetDefinitionInput | undefined => {
   const hasCodeFlag = flags.code !== undefined || flags.codeFile !== undefined;
   const hasQueriesFlag = flags.queriesFile !== undefined;
   if (!hasCodeFlag && !hasQueriesFlag) return undefined;
@@ -63,7 +63,7 @@ const readTextFile = (path: string, label: string): string => {
  * refuses input that is not an array of objects, so a plain typo (an object,
  * a bare string) fails before a request rather than as a server rejection.
  */
-const readQueriesFile = (path: string): PlaygroundWidgetQueryInput[] => {
+const readQueriesFile = (path: string): DashboardWidgetQueryInput[] => {
   const raw = readTextFile(path, "queries");
   let parsed: unknown;
   try {
@@ -76,5 +76,5 @@ const readQueriesFile = (path: string): PlaygroundWidgetQueryInput[] => {
       `Queries file must be a JSON array of { name, sql, parameters? }: ${path}`,
     );
   }
-  return parsed as PlaygroundWidgetQueryInput[];
+  return parsed as DashboardWidgetQueryInput[];
 };

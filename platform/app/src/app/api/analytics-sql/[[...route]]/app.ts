@@ -17,7 +17,7 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
-import { registerPlaygroundWidgetRoutes } from "./app.playground-widgets.v1";
+import { registerDashboardWidgetRoutes } from "./app.dashboard-widgets.v1";
 import { registerLangWatchQLRoutes } from "./app.v1";
 
 patchZodOpenapi();
@@ -31,6 +31,6 @@ const secured = createProjectApp({
 
 registerLangWatchQLRoutes(secured);
 registerSavedWorkbenchChartRoutes(secured);
-registerPlaygroundWidgetRoutes(secured);
+registerDashboardWidgetRoutes(secured);
 
 export const app = secured.hono;

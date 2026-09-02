@@ -1,6 +1,6 @@
 /**
  * Editor for one query's declared parameters — the validation contract
- * `validatePlaygroundQueryParams` checks a live `LW.query` call against. Each
+ * `validateDashboardWidgetQueryParams` checks a live `LW.query` call against. Each
  * row is a name, a JS type, and an optional default (the Run button's only
  * source of a value, since there is no separate "test values" input here).
  */
@@ -16,9 +16,9 @@ import {
 } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
 
-import type { PlaygroundQueryParameterDeclaration } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQueryParameterDeclaration } from "~/server/analytics/dashboardWidgetDefinition";
 
-const PARAM_TYPES: PlaygroundQueryParameterDeclaration["type"][] = [
+const PARAM_TYPES: DashboardWidgetQueryParameterDeclaration["type"][] = [
   "string",
   "number",
   "boolean",
@@ -27,8 +27,8 @@ const PARAM_TYPES: PlaygroundQueryParameterDeclaration["type"][] = [
 /** A parameter's default, typed for its own row's `type` at the time of edit. */
 function coerceDefault(
   raw: string,
-  type: PlaygroundQueryParameterDeclaration["type"],
-): PlaygroundQueryParameterDeclaration["default"] {
+  type: DashboardWidgetQueryParameterDeclaration["type"],
+): DashboardWidgetQueryParameterDeclaration["default"] {
   if (raw === "") return undefined;
   if (type === "number") {
     const parsed = Number(raw);
@@ -39,14 +39,14 @@ function coerceDefault(
 }
 
 function defaultInputValue(
-  value: PlaygroundQueryParameterDeclaration["default"],
+  value: DashboardWidgetQueryParameterDeclaration["default"],
 ): string {
   return value === undefined ? "" : String(value);
 }
 
 interface ParamRowProps {
-  param: PlaygroundQueryParameterDeclaration;
-  onChange: (next: PlaygroundQueryParameterDeclaration) => void;
+  param: DashboardWidgetQueryParameterDeclaration;
+  onChange: (next: DashboardWidgetQueryParameterDeclaration) => void;
   onRemove: () => void;
 }
 
@@ -67,7 +67,7 @@ function ParamRow({ param, onChange, onRemove }: ParamRowProps) {
           value={param.type}
           onChange={(e) => {
             const type = e.currentTarget
-              .value as PlaygroundQueryParameterDeclaration["type"];
+              .value as DashboardWidgetQueryParameterDeclaration["type"];
             onChange({ ...param, type, default: undefined });
           }}
         >
@@ -123,15 +123,15 @@ function ParamRow({ param, onChange, onRemove }: ParamRowProps) {
   );
 }
 
-interface PlaygroundQueryParamsEditorProps {
-  params: PlaygroundQueryParameterDeclaration[];
-  onChange: (params: PlaygroundQueryParameterDeclaration[]) => void;
+interface DashboardWidgetQueryParamsEditorProps {
+  params: DashboardWidgetQueryParameterDeclaration[];
+  onChange: (params: DashboardWidgetQueryParameterDeclaration[]) => void;
 }
 
-export function PlaygroundQueryParamsEditor({
+export function DashboardWidgetQueryParamsEditor({
   params,
   onChange,
-}: PlaygroundQueryParamsEditorProps) {
+}: DashboardWidgetQueryParamsEditorProps) {
   return (
     <Box>
       <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>

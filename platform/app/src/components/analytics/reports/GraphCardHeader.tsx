@@ -30,8 +30,8 @@ interface GraphCardHeaderProps {
   } | null;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
-  /** Whether this card is a custom-chart-playground widget. */
-  isPlaygroundWidget?: boolean;
+  /** Whether this card is a dashboard widget. */
+  isDashboardWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   isDragging: boolean;
@@ -55,7 +55,7 @@ export function GraphCardHeader({
   filters,
   trigger,
   isWorkbenchChart = false,
-  isPlaygroundWidget = false,
+  isDashboardWidget = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
@@ -112,14 +112,14 @@ export function GraphCardHeader({
 
   // Check if this is a saved graph (has valid database ID).
   //
-  // A workbench chart or playground widget is excluded on purpose rather than
+  // A workbench chart or dashboard widget is excluded on purpose rather than
   // by accident: the alert path reads a builder payload's `series` to name
   // what it is thresholding, and neither a saved statement nor a sandboxed
   // author-code widget has a series to read. Offering the bell here would
   // author an alert against a chart the threshold dispatcher cannot evaluate.
   const isSavedGraph =
     !isWorkbenchChart &&
-    !isPlaygroundWidget &&
+    !isDashboardWidget &&
     !!(graphId && graphId !== "custom" && graph);
 
   // Opens the automations drawer in edit mode for this graph's existing
@@ -224,7 +224,7 @@ export function GraphCardHeader({
         colSpan={colSpan}
         rowSpan={rowSpan}
         isWorkbenchChart={isWorkbenchChart}
-        isPlaygroundWidget={isPlaygroundWidget}
+        isDashboardWidget={isDashboardWidget}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         onSizeChange={onSizeChange}
         {...(onGranularityChange ? { onGranularityChange } : {})}

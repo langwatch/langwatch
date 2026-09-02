@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 // The schema endpoint is a project-wide LangWatchQL discovery surface, not a
-// widget-specific one — `ChartsApiService` already carries it, so playground
+// widget-specific one — `ChartsApiService` already carries it, so dashboard
 // widgets reuse it rather than duplicating the same request on a second
 // service class.
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
@@ -17,7 +17,7 @@ import type { CommandResult } from "../../utils/output";
  * a widget's queries — dataset and column names come from here, never from
  * guessing.
  */
-export const playgroundWidgetSchemaCommand = async (options?: {
+export const dashboardWidgetSchemaCommand = async (options?: {
   project?: string;
 }): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options?.project });
@@ -55,7 +55,7 @@ export const playgroundWidgetSchemaCommand = async (options?: {
         console.log();
         console.log(
           chalk.gray(
-            `Use ${chalk.cyan("langwatch playground-widget schema -o json")} for descriptions and example queries`,
+            `Use ${chalk.cyan("langwatch dashboard-widget schema -o json")} for descriptions and example queries`,
           ),
         );
       },

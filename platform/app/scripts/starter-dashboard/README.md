@@ -55,8 +55,8 @@ Pinning a widget to a dashboard does **not** move it: the widget's
 `dashboardId` is set and it renders on the dashboard, but it stays fully
 visible and editable on the custom-chart playground too — the widget now
 has a second home. There is no "create straight onto a dashboard" — the
-widget-create route deliberately sets no `dashboardId` (a playground widget
-lives on the playground page until pinned), so pin-reuse of the pack
+widget-create route deliberately sets no `dashboardId` (a dashboard widget
+lives on the custom-chart-playground page until pinned), so pin-reuse of the pack
 seeders' widgets is the simple path here.
 
 Note the pack seeders create by name-not-found, so if this script already

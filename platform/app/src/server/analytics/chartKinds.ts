@@ -30,10 +30,10 @@ export const BUILDER_CHART_KIND = "builder";
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
 
 /**
- * The kind a persisted custom-chart-playground widget carries. Its `graph`
+ * The kind a persisted dashboard widget carries. Its `graph`
  * column holds `{ srcdocHtml, sql }`: the author HTML rendered in a sandboxed
  * frame and the LangWatchQL statement the parent executes on the frame's
- * behalf. Filtered on by the playground's own reads, so a playground widget is
+ * behalf. Filtered on by the playground's own reads, so a dashboard widget is
  * never interpreted as a builder or workbench definition.
  */
-export const PLAYGROUND_SRCDOC_CHART_KIND = "playground_srcdoc";
+export const DASHBOARD_SRCDOC_CHART_KIND = "dashboard_srcdoc";

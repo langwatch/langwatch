@@ -8152,17 +8152,17 @@
         ]
       }
     },
-    "/api/v1/projects/{projectId}/analytics/playground-widgets": {
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
       "get": {
-        "operationId": "getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets",
-        "summary": "List custom-chart-playground widgets",
-        "description": "Lists every custom-chart-playground widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.",
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
+        "summary": "List dashboard widgets",
+        "description": "Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.",
         "tags": [
           "Analytics / LangWatchQL"
         ],
         "responses": {
           "200": {
-            "description": "The project's playground widgets",
+            "description": "The project's dashboard widgets",
             "content": {
               "application/json": {
                 "schema": {
@@ -8494,9 +8494,9 @@
         ]
       },
       "post": {
-        "operationId": "postApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgets",
-        "summary": "Create a custom-chart-playground widget",
-        "description": "Saves a React source file and the named LangWatchQL queries it runs as one playground widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+        "operationId": "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
+        "summary": "Create a dashboard widget",
+        "description": "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
         "tags": [
           "Analytics / LangWatchQL"
         ],
@@ -8913,17 +8913,17 @@
         ]
       }
     },
-    "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}": {
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
       "get": {
-        "operationId": "getApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
-        "summary": "Get a custom-chart-playground widget",
-        "description": "Returns one playground widget with its React source and named queries. A widget saved in another project is reported as not found.",
+        "operationId": "getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
+        "summary": "Get a dashboard widget",
+        "description": "Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.",
         "tags": [
           "Analytics / LangWatchQL"
         ],
         "responses": {
           "200": {
-            "description": "The playground widget",
+            "description": "The dashboard widget",
             "content": {
               "application/json": {
                 "schema": {
@@ -9183,7 +9183,7 @@
             }
           },
           "404": {
-            "description": "No playground widget with this id in this project",
+            "description": "No dashboard widget with this id in this project",
             "content": {
               "application/json": {
                 "schema": {
@@ -9296,9 +9296,9 @@
         ]
       },
       "patch": {
-        "operationId": "patchApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
-        "summary": "Update a custom-chart-playground widget",
-        "description": "Replaces a playground widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
+        "operationId": "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
+        "summary": "Update a dashboard widget",
+        "description": "Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
         "tags": [
           "Analytics / LangWatchQL"
         ],
@@ -9564,7 +9564,7 @@
             }
           },
           "404": {
-            "description": "No playground widget with this id in this project",
+            "description": "No dashboard widget with this id in this project",
             "content": {
               "application/json": {
                 "schema": {
@@ -9763,9 +9763,9 @@
         ]
       },
       "delete": {
-        "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsPlaygroundWidgetsByWidgetId",
-        "summary": "Delete a custom-chart-playground widget",
-        "description": "Deletes one playground widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.",
+        "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
+        "summary": "Delete a dashboard widget",
+        "description": "Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.",
         "tags": [
           "Analytics / LangWatchQL"
         ],
@@ -9906,7 +9906,7 @@
             }
           },
           "404": {
-            "description": "No playground widget with this id in this project",
+            "description": "No dashboard widget with this id in this project",
             "content": {
               "application/json": {
                 "schema": {
@@ -9990,6 +9990,408 @@
                     "error"
                   ]
                 }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "widgetId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
+      "post": {
+        "operationId": "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard",
+        "summary": "Add a dashboard widget to a dashboard",
+        "description": "Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The widget was added to the dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "sql": {
+                                "type": "string"
+                              },
+                              "parameters": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    },
+                                    "default": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "sql"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "code",
+                        "queries"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No dashboard widget with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dashboardId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "dashboardId"
+                ]
               }
             }
           }

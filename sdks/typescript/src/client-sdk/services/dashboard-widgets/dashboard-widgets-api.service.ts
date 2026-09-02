@@ -11,21 +11,21 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
-/** A custom-chart-playground widget, exactly as the REST surface answers it. */
-export type PlaygroundWidget =
-  paths["/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}"]["get"]["responses"]["200"]["content"]["application/json"];
+/** A dashboard widget, exactly as the REST surface answers it. */
+export type DashboardWidget =
+  paths["/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /** One named LangWatchQL query a widget may run, as a create/update submits it. */
-export type PlaygroundWidgetQueryInput =
-  paths["/api/v1/projects/{projectId}/analytics/playground-widgets"]["post"]["requestBody"]["content"]["application/json"]["queries"][number];
+export type DashboardWidgetQueryInput =
+  paths["/api/v1/projects/{projectId}/analytics/dashboard-widgets"]["post"]["requestBody"]["content"]["application/json"]["queries"][number];
 
 /** The `{ code, queries }` a create or update submits. */
-export interface PlaygroundWidgetDefinitionInput {
+export interface DashboardWidgetDefinitionInput {
   code: string;
-  queries: PlaygroundWidgetQueryInput[];
+  queries: DashboardWidgetQueryInput[];
 }
 
-export class PlaygroundWidgetsApiError extends Error {
+export class DashboardWidgetsApiError extends Error {
   constructor(
     message: string,
     public readonly operation: string,
@@ -38,20 +38,20 @@ export class PlaygroundWidgetsApiError extends Error {
     public readonly status?: number,
   ) {
     super(message);
-    this.name = "PlaygroundWidgetsApiError";
+    this.name = "DashboardWidgetsApiError";
   }
 }
 
 /**
- * Typed client for the custom-chart-playground widget family
- * (`/api/v1/projects/{projectId}/analytics/playground-widgets`).
+ * Typed client for the dashboard widget family
+ * (`/api/v1/projects/{projectId}/analytics/dashboard-widgets`).
  *
- * The twin of {@link ChartsApiService} for the playground's own rows: same
+ * The twin of {@link ChartsApiService} for the widget's own rows: same
  * project-in-path routes, same once-resolved project id (the CLI's
  * request-scoped project first, then `LANGWATCH_PROJECT_ID`), and the same
  * loud refusal when none is known rather than guessing.
  */
-export class PlaygroundWidgetsApiService {
+export class DashboardWidgetsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
 
@@ -76,7 +76,7 @@ export class PlaygroundWidgetsApiService {
       options: { status },
     });
     throwIfHandledError({ operation, error, response, message });
-    throw new PlaygroundWidgetsApiError(message, operation, error, status);
+    throw new DashboardWidgetsApiError(message, operation, error, status);
   }
 
   private projectId(operation: string): string {
@@ -85,7 +85,7 @@ export class PlaygroundWidgetsApiService {
       scopedProjectId() ??
       process.env.LANGWATCH_PROJECT_ID;
     if (!projectId) {
-      throw new PlaygroundWidgetsApiError(
+      throw new DashboardWidgetsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
         operation,
       );
@@ -93,34 +93,34 @@ export class PlaygroundWidgetsApiService {
     return projectId;
   }
 
-  async list(): Promise<{ data: PlaygroundWidget[] }> {
-    const projectId = this.projectId("list playground widgets");
+  async list(): Promise<{ data: DashboardWidget[] }> {
+    const projectId = this.projectId("list dashboard widgets");
     const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets",
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
       { params: { path: { projectId } } },
     );
-    if (error) this.handleApiError("list playground widgets", error, response);
-    return data as unknown as { data: PlaygroundWidget[] };
+    if (error) this.handleApiError("list dashboard widgets", error, response);
+    return data as unknown as { data: DashboardWidget[] };
   }
 
-  async get(id: string): Promise<PlaygroundWidget> {
-    const projectId = this.projectId(`get playground widget "${id}"`);
+  async get(id: string): Promise<DashboardWidget> {
+    const projectId = this.projectId(`get dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}",
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       { params: { path: { projectId, widgetId: id } } },
     );
     if (error)
-      this.handleApiError(`get playground widget "${id}"`, error, response);
-    return data as unknown as PlaygroundWidget;
+      this.handleApiError(`get dashboard widget "${id}"`, error, response);
+    return data as unknown as DashboardWidget;
   }
 
   async create(params: {
     name: string;
-    definition: PlaygroundWidgetDefinitionInput;
-  }): Promise<PlaygroundWidget> {
-    const projectId = this.projectId("create playground widget");
+    definition: DashboardWidgetDefinitionInput;
+  }): Promise<DashboardWidget> {
+    const projectId = this.projectId("create dashboard widget");
     const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets",
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
       {
         params: { path: { projectId } },
         body: {
@@ -131,17 +131,17 @@ export class PlaygroundWidgetsApiService {
       },
     );
     if (error)
-      this.handleApiError("create playground widget", error, response);
-    return data as unknown as PlaygroundWidget;
+      this.handleApiError("create dashboard widget", error, response);
+    return data as unknown as DashboardWidget;
   }
 
   async update(
     id: string,
-    params: { name?: string; definition?: PlaygroundWidgetDefinitionInput },
-  ): Promise<PlaygroundWidget> {
-    const projectId = this.projectId(`update playground widget "${id}"`);
+    params: { name?: string; definition?: DashboardWidgetDefinitionInput },
+  ): Promise<DashboardWidget> {
+    const projectId = this.projectId(`update dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.PATCH(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}",
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       {
         params: { path: { projectId, widgetId: id } },
         body: {
@@ -156,36 +156,36 @@ export class PlaygroundWidgetsApiService {
       },
     );
     if (error)
-      this.handleApiError(`update playground widget "${id}"`, error, response);
-    return data as unknown as PlaygroundWidget;
+      this.handleApiError(`update dashboard widget "${id}"`, error, response);
+    return data as unknown as DashboardWidget;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */
   async assignDashboard(
     id: string,
     params: { dashboardId: string },
-  ): Promise<PlaygroundWidget> {
-    const projectId = this.projectId(`pin playground widget "${id}"`);
+  ): Promise<DashboardWidget> {
+    const projectId = this.projectId(`pin dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}/dashboard" as any,
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard" as any,
       {
         params: { path: { projectId, widgetId: id } },
         body: { dashboardId: params.dashboardId },
       } as any,
     );
     if (error)
-      this.handleApiError(`pin playground widget "${id}"`, error, response);
-    return data as unknown as PlaygroundWidget;
+      this.handleApiError(`pin dashboard widget "${id}"`, error, response);
+    return data as unknown as DashboardWidget;
   }
 
   /** Deletes a widget. The route answers `204` with no body. */
   async delete(id: string): Promise<void> {
-    const projectId = this.projectId(`delete playground widget "${id}"`);
+    const projectId = this.projectId(`delete dashboard widget "${id}"`);
     const { error, response } = await this.apiClient.DELETE(
-      "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}",
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       { params: { path: { projectId, widgetId: id } } },
     );
     if (error)
-      this.handleApiError(`delete playground widget "${id}"`, error, response);
+      this.handleApiError(`delete dashboard widget "${id}"`, error, response);
   }
 }

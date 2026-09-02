@@ -58,7 +58,7 @@ export interface CreateFrameBridgeOptions {
   /**
    * `LW.navigate(target, params)` from the frame. Forwarded as-is —
    * allowlist checking and route resolution happen in the caller (see
-   * `usePlaygroundChartNavigate`), not here. Omitted entirely, a navigate
+   * `useDashboardWidgetChartNavigate`), not here. Omitted entirely, a navigate
    * message is silently dropped (a no-op is the correct behavior when a
    * widget host has no router to navigate with).
    */

@@ -1,7 +1,7 @@
 /**
  * Resolves an `LW.navigate(target, params)` call from a sandboxed chart
  * frame into a real page navigation, for the two widget hosts
- * (`PlaygroundWidgetCard`, `PlaygroundDashboardWidget`) that wire up
+ * (`DashboardWidgetCard`, `DashboardWidgetFrame`) that wire up
  * `SandboxedChartFrame`'s `onNavigate` prop.
  *
  * `pages/[project]/traces.tsx` renders TracesV2Page EXCLUSIVELY — there is no
@@ -190,7 +190,7 @@ function isNavigableTarget(target: string): target is NavigableTarget {
   return (NAVIGABLE_TARGETS as readonly string[]).includes(target);
 }
 
-export function usePlaygroundChartNavigate(
+export function useDashboardWidgetChartNavigate(
   projectSlug: string,
 ): (target: string, params: Readonly<Record<string, unknown>>) => void {
   const router = useRouter();

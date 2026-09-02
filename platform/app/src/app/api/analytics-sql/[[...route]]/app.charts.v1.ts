@@ -38,7 +38,7 @@ import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaL
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
 
-import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widgets/access";
+import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
 import { SavedWorkbenchChartsDisabledForPlaygroundError } from "~/server/analytics/saved-workbench-charts/errors";
 import {
   type SavedWorkbenchChart,
@@ -229,10 +229,10 @@ function chartService(): SavedWorkbenchChartService {
 
 /**
  * The project this saved-chart request runs for: `lwqlProject`'s usual pair
- * of checks, plus the INVERSE of the playground-widgets gate — saved
+ * of checks, plus the INVERSE of the dashboard-widgets gate — saved
  * workbench charts and the custom-chart-playground are mutually exclusive
  * while the playground is experimental, so this route refuses instead of
- * competing with `playground-widget` as two answers to "make me a chart."
+ * competing with `dashboard-widget` as two answers to "make me a chart."
  *
  * @throws {SavedWorkbenchChartsDisabledForPlaygroundError} when
  *   `release_custom_chart_playground` is ON for this project.
