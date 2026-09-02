@@ -570,6 +570,20 @@ export function DatasetEditorTable({
   // and leaving them under a search box reads as "here is what matched" — a
   // complete, confident, false answer. Withdraw them and say what happened.
   const searchFailed = isSearching && !!databaseDatasetError;
+  // A number of matches is the search's OWN answer, so it can only be reported
+  // once the search's own read has settled. Two states have no such answer and
+  // both used to report one anyway:
+  //
+  //   - a refusal, which never produces a count at all;
+  //   - a read still in flight, where `keepPreviousData` is serving the last
+  //     unsearched page and the `count` riding with it is the DATASET's size.
+  //     Fed to the two-number chip that renders "54,000 of 54,000 records" —
+  //     every row matched — over rows that were never searched. On a large
+  //     dataset that read takes seconds.
+  //
+  // In both, fall back to the dataset's own size, which is what the chip says
+  // with no search in effect and is true either way.
+  const matchCountKnown = !searchFailed && !holdingPreviousData;
   const displayRowCount = searchFailed
     ? 0
     : showAddRow
@@ -831,21 +845,20 @@ export function DatasetEditorTable({
           title
         )}
         <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
-          {/* A refused search has no match count to report, and the count it
-              would otherwise fall back to is the stale store's row count — the
-              rows read before the search. Reporting either passes unsearched
-              rows off as the result, so it reports the dataset's own size when
-              that is known and says nothing when it is not. */}
-          {searchFailed
-            ? unsearchedRecordCount.current === undefined
-              ? ""
-              : plainRecordCount(unsearchedRecordCount.current)
-            : isSearching
+          {/* With no match count to report (see `matchCountKnown`), the count
+              on hand describes unsearched rows, so reporting it as the result
+              of the search would be false. Report the dataset's own size
+              instead, and say nothing at all when even that is not known. */}
+          {isSearching
+            ? matchCountKnown
               ? formatSearchRecordCount({
                   matched: totalRecordCount,
                   total: unsearchedRecordCount.current,
                 })
-              : plainRecordCount(totalRecordCount)}
+              : unsearchedRecordCount.current === undefined
+                ? ""
+                : plainRecordCount(unsearchedRecordCount.current)
+            : plainRecordCount(totalRecordCount)}
         </Text>
         {datasetId && (
           <SaveStatusChip state={autosave.state} error={autosave.error} />

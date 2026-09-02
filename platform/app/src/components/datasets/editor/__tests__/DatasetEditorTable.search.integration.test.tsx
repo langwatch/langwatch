@@ -556,6 +556,53 @@ describe("given the dataset's own total is not known yet", () => {
   });
 });
 
+describe("given the search's own read has not come back yet", () => {
+  /** @scenario The record count reports the matches, not the whole dataset */
+  it("does not report the held-over rows as the matches", async () => {
+    // While the search's read is in flight, `keepPreviousData` keeps serving
+    // the last unsearched page, and the `count` that comes with it is the
+    // DATASET's size, not a number of matches. Rendered through the two-number
+    // chip that becomes "120 of 120 records" — every row matched — over rows
+    // that were never searched at all. On a large dataset that read takes
+    // seconds, and a refused one used to hold this state for the whole retry
+    // backoff.
+    const user = userEvent.setup();
+    const unsearched = {
+      data: {
+        id: "ds",
+        name: "ds",
+        columnTypes,
+        count: 120,
+        totalPages: 3,
+        page: 1,
+        datasetRecords: manyRecords.slice(0, 50),
+      },
+      isLoading: false,
+      refetch: vi.fn(),
+    };
+    // What react-query serves during a key change: the previous key's result,
+    // flagged as a placeholder, with the new key's read still in flight.
+    const inFlight = { ...unsearched, isPlaceholderData: true };
+    listPaginatedQuery.mockImplementation(
+      (input: { search?: string } | undefined) =>
+        input?.search ? inFlight : unsearched,
+    );
+    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+
+    await screen.findByText("question 0");
+    await typeSearch(user, "escalation");
+
+    // The self-check: without it, an editor that never ran the search at all
+    // would satisfy the assertion below by simply never entering search mode.
+    await waitFor(() =>
+      expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+      "120 of 120",
+    );
+  });
+});
+
 describe("given I have typed a search term that has not run yet", () => {
   /** @scenario The ways to add a row go the moment I start typing */
   it("withdraws every way of adding a row on the keystroke, not on the debounce", async () => {
