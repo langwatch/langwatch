@@ -855,7 +855,7 @@ keywords: data retention, retention policy, delete data, ttl, retention period, 
 
 ## What retention covers
 
-A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data:
+A retention policy sets a number of days for one scope. Every stored row carries the period it was ingested under, and LangWatch deletes the row after that many days. Changing a period leaves the rows already stored on their old period, unless you apply the change to existing data. The policy covers three categories of data:
 
 | Category | Data |
 |----------|------|
@@ -922,7 +922,7 @@ Open **Settings > Data Retention**. Reading the page needs `project:view`. Writi
 
 ## How deletion runs
 
-Every stored row carries its retention period. ClickHouse deletes expired rows during its background merges through a TTL expression, so a row disappears some time after its period ends, not at the exact second.
+ClickHouse deletes expired rows during its background merges through a TTL expression, so a row disappears some time after its period ends, not at the exact second.
 
 Shortening a period without **Apply this change to existing data** leaves stored rows on their old period. Lengthening a period never brings back deleted rows.
 
