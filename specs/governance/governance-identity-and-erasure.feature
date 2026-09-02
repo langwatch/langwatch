@@ -158,6 +158,22 @@ Feature: Erasing a person from the governance data, and making it stick
     Then no row carries the original identifier
     And the stand-in carries the same total the original did
 
+  @unit
+  Scenario: The rebuilt money rows carry the stand-in, not the identifier
+    Given an organization that has erased somebody
+    When their spend is summarized again
+    Then the summary is filed under the stand-in
+    And everybody else's spend is still filed under their own identifier
+
+  @unit
+  Scenario: The rebuild the erasure asks for cannot re-derive the identifier
+    Given a person being erased
+    When the erasure asks for the affected days to be rebuilt
+    Then the summarizer is already substituting the stand-in
+    # The rebuild reads the raw records, which still hold the identifier. If the
+    # substitution is not already live at that moment, the rebuild faithfully
+    # writes the erased identifier back and the erasure reports success.
+
   @integration
   Scenario: Rebuilding twice lands on the same stand-in
     Given an erased person whose days have been rebuilt once
