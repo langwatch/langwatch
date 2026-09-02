@@ -12,6 +12,7 @@
 import numeral from "numeral";
 import Parse from "papaparse";
 
+import { neutralizeFormula, neutralizeRows } from "~/utils/csvFormulaGuard";
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
@@ -338,13 +339,19 @@ export const buildCsvData = (
 };
 
 /**
- * Generate CSV content string from BatchEvaluationData
+ * Generate CSV content string from BatchEvaluationData.
+ *
+ * The formula guard is applied here rather than in `buildCsvData`: the builders
+ * return the values as they are so callers can assert on content, and the
+ * apostrophe belongs to the file, not to the data. Both halves need it — the
+ * dataset columns and the evaluator names in the header row are named by
+ * whoever set the experiment up.
  */
 export const generateCsvContent = (data: BatchEvaluationData): string => {
   const { headers, rows } = buildCsvData(data);
   return Parse.unparse({
-    fields: headers,
-    data: rows,
+    fields: headers.map(neutralizeFormula),
+    data: neutralizeRows(rows),
   });
 };
 

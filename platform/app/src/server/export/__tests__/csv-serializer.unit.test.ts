@@ -643,3 +643,67 @@ describe("when an export spans several batches", () => {
     expect(csv.endsWith("\r\n")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spreadsheet formula injection
+// ---------------------------------------------------------------------------
+
+/**
+ * These files exist to be opened in a spreadsheet, and a cell opening with `=`
+ * is a formula Excel and Sheets run on the reader's machine. RFC 4180 quoting
+ * does not stop it — quoting protects the CSV grammar, not the reader — so the
+ * cell has to carry a leading apostrophe, which both tools strip on display.
+ *
+ * Everything asserted here is a value somebody typed: a trace's input and
+ * output arrive from the instrumented application, labels are set on the trace,
+ * and an evaluator's display name is chosen in the project and reaches the
+ * header row.
+ *
+ * @see src/utils/csvFormulaGuard.ts
+ */
+describe("spreadsheet formula injection", () => {
+  const FORMULA = "=cmd|' /c calc'!A1";
+
+  it("defuses a formula in a trace input cell", () => {
+    const csv = serializeTracesToSummaryCsv({
+      traces: [buildTrace({ input: { value: FORMULA } })],
+      evaluatorNames: [],
+    });
+
+    const rows = parseCsv(csv).data as Record<string, string>[];
+    expect(rows[0]?.input).toBe(`'${FORMULA}`);
+  });
+
+  it("defuses a formula in a column heading the project named", () => {
+    const csv = serializeTracesToSummaryCsv({
+      traces: [buildTrace()],
+      evaluatorNames: [FORMULA],
+    });
+
+    expect(csv.split("\r\n")[0]).toContain(`'${FORMULA}_score`);
+  });
+
+  it("leaves a negative number alone so a number column stays numeric", () => {
+    const csv = serializeTracesToSummaryCsv({
+      traces: [buildTrace({ output: { value: "-5" } })],
+      evaluatorNames: [],
+    });
+
+    const rows = parseCsv(csv).data as Record<string, string>[];
+    expect(rows[0]?.output).toBe("-5");
+  });
+
+  it("defuses a formula in a span cell in full mode", () => {
+    const csv = serializeTracesToFullCsv({
+      traces: [
+        buildTrace({
+          spans: [buildLLMSpan({ output: { type: "text", value: FORMULA } })],
+        }),
+      ],
+      evaluatorNames: [],
+    });
+
+    const rows = parseCsv(csv).data as Record<string, string>[];
+    expect(rows[0]?.span_output).toBe(`'${FORMULA}`);
+  });
+});
