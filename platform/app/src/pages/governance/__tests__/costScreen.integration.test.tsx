@@ -90,15 +90,28 @@ vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div>loading</div>,
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    governanceCost: {
-      summary: {
-        useQuery: () => harness.query,
+vi.mock("~/utils/api", () => {
+  // The breakdown panels below the lanes read the activity monitor. They are
+  // not what these tests are about, so they answer with nothing — which is
+  // also the shape a viewer without `activityMonitor:view` sees. Leaving them
+  // out entirely would crash the render before a single lane assertion ran.
+  const empty = { useQuery: () => ({ data: undefined }) };
+  return {
+    api: {
+      governanceCost: {
+        summary: {
+          useQuery: () => harness.query,
+        },
+      },
+      activityMonitor: {
+        summary: empty,
+        spendByDepartment: empty,
+        spendByUser: empty,
+        spendOverTime: empty,
       },
     },
-  },
-}));
+  };
+});
 
 import CostsPage from "../costs";
 
@@ -153,6 +166,8 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
       },
     ],
     windowDays: 30,
+    // Every source still pulling, so the figures need no caveat.
+    staleSources: null,
     ...overrides,
   };
 }
@@ -444,6 +459,75 @@ describe("the governance cost screen", () => {
       renderScreen();
 
       expect(screen.queryByTestId("cost-lane-billed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the per-day lane chart", () => {
+    // Both testids shipped unasserted, so nothing caught the chart swapping
+    // its populated and empty states.
+    it("draws the chart when the window holds days", () => {
+      renderScreen();
+
+      expect(screen.getByTestId("cost-lanes-chart")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("cost-lanes-chart-empty"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says the window is empty rather than drawing an empty chart", () => {
+      harness.query = {
+        data: summaryFixture({ series: [] }),
+        isLoading: false,
+        isError: false,
+      };
+
+      renderScreen();
+
+      expect(screen.getByTestId("cost-lanes-chart-empty")).toBeInTheDocument();
+      expect(screen.queryByTestId("cost-lanes-chart")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a source whose pulls have been failing", () => {
+    /** @scenario "The cost screen says where its numbers stop being complete" */
+    it("names the source and the day, next to the lanes it undercounts", () => {
+      harness.query = {
+        data: summaryFixture({
+          staleSources: {
+            oldestLastSuccessIso: "2026-08-20T09:00:00.000Z",
+            sourceNames: ["Azure Billing"],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+
+      renderScreen();
+
+      const notice = screen.getByTestId("cost-stale-sources");
+      expect(within(notice).getByText(/Azure Billing/)).toBeInTheDocument();
+      expect(
+        within(notice).getByText(/unknown rather than zero/i),
+      ).toBeInTheDocument();
+      // The day itself, not merely the words around it. Asserting only the
+      // phrase let a title that had lost its date pass. Matching the digits
+      // rather than a formatted string keeps this locale-independent: every
+      // locale renders a numeric day and year as those numerals.
+      const since = within(notice).getByText(/^No data since /);
+      expect(since.textContent).toMatch(/\b20\b/);
+      expect(since.textContent).toMatch(/\b2026\b/);
+      // The lanes still render. A stalled pull caveats the figures; it does
+      // not withdraw them.
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
+    });
+
+    /** @scenario "A screen whose sources are all pulling carries no warning" */
+    it("stays silent while every source is still pulling", () => {
+      renderScreen();
+
+      expect(
+        screen.queryByTestId("cost-stale-sources"),
+      ).not.toBeInTheDocument();
     });
   });
 });
