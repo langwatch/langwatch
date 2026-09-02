@@ -231,8 +231,11 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
         reachableOnly: true,
       });
 
-      // The same reach the item read applies, so every queue on offer has
-      // rows behind it: picking one can never empty the list on its own.
+      // The same reach the item read applies, so nothing on offer is a queue
+      // the read would narrow straight back out. It is reach, not row count:
+      // a queue the reviewer belongs to that holds nothing pending is still
+      // offered, and picking it still shows an empty list. That empty is the
+      // status filter answering honestly, not the page failing.
       expect(mockQueueFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -246,11 +249,12 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
       );
     });
 
-    /** @scenario "Choosing a queue for a trace still offers every queue" */
+    /** @scenario "A caller that does not ask to be narrowed is not narrowed" */
     it("leaves every project queue on offer for callers that do not ask", async () => {
-      // The dialogs that add a trace to a queue, or invite people to one,
-      // target any queue in the project: narrowing those would hide choices
-      // the reviewer is entitled to make.
+      // Narrowing is opt-in because the other callers genuinely target any
+      // queue in the project — putting a trace into one, inviting people to
+      // one. This proves the default only; that those two callers leave the
+      // flag off is a fact about their own call sites, not about this read.
       await caller.getQueues({ projectId: "project_123" });
 
       expect(mockQueueFindMany).toHaveBeenCalledWith(

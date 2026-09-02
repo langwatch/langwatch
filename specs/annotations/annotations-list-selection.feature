@@ -344,16 +344,21 @@ Rule: The inbox can be narrowed to the queues being worked on
 
   # The read narrows to the reviewer's reach whatever the filter asks for, so a
   # queue they cannot read is a pick that empties the list and reads as broken.
+  # Reach, not row count: a queue they are in that holds nothing pending is
+  # still offered, and picking it still shows an empty list. That empty is the
+  # status filter answering honestly.
   @unit
   Scenario: The queue filter only offers queues the reviewer can read
     Given the project holds a queue the reviewer is not in
     When the filter asks which queues it may offer
     Then it is told only the queues whose items the reviewer can read
 
+  # Narrowing is opt-in because the pickers that put a trace into a queue, or
+  # invite people to one, target any queue the project has.
   @unit
-  Scenario: Choosing a queue for a trace still offers every queue
-    Given the reviewer is putting a trace into a queue
-    When that picker asks which queues it may offer
+  Scenario: A caller that does not ask to be narrowed is not narrowed
+    Given a caller that has not asked for the reviewer's queues only
+    When it asks which queues it may offer
     Then it is told every queue the project has
 
 Rule: The reviewer chooses which columns the list shows
