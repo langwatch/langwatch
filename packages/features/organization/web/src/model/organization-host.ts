@@ -25,6 +25,21 @@ import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 
 /** The organization and project the current page is about. */
+/** Who is signed in, as the members table and the team form need them. */
+export type OrganizationActor = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+};
+
+/** A short confirmation of something the administrator just did. */
+export type OrganizationSuccessNotice = {
+  title: string;
+  description?: string;
+  id?: string;
+};
+
 export type OrganizationScope = {
   organizationId: string | undefined;
   projectId: string | undefined;
@@ -36,20 +51,22 @@ export type OrganizationScope = {
 export type OrganizationProjectReading = {
   id: string;
   name: string;
+  slug: string;
 };
 
 /** One team, as the filter dropdown groups projects under it. */
 export type OrganizationTeamReading = {
   id: string;
   name: string;
-  projects: readonly OrganizationProjectReading[];
+  slug: string;
+  projects: OrganizationProjectReading[];
 };
 
 /** The organization graph, as much of it as this family reads. */
 export type OrganizationReading = {
   id: string;
   name: string;
-  teams: readonly OrganizationTeamReading[];
+  teams: OrganizationTeamReading[];
 };
 
 /** The path parameters and query string the screen was opened with. */
@@ -93,6 +110,62 @@ export abstract class OrganizationHostPort {
 
   /** Whether the reader holds a grant, answered synchronously and fail-closed. */
   abstract hasPermission(permission: string): boolean;
+
+  /**
+   * The same question asked of the ORGANIZATION rather than of the page's scope.
+   *
+   * `hasPermission` answers for whatever scope the reader is in, which on a
+   * project-scoped address is the project. The team form offers an
+   * organization-wide control and has to know whether the reader holds the
+   * grant THERE, which is a different answer whenever a project binding
+   * narrowed them.
+   */
+  abstract hasOrganizationPermission(permission: string): boolean;
+
+  /** Who is signed in, or undefined before the session resolves. */
+  abstract currentUser(): OrganizationActor | undefined;
+
+  /**
+   * The project in scope, or undefined when the address names none.
+   *
+   * The teams page reads exactly one thing off it: whether a row is the project
+   * the reader is currently inside, which is the one project it refuses to
+   * offer a delete for.
+   */
+  abstract activeProject(): OrganizationProjectReading | undefined;
+
+  /**
+   * Whether the organization is on the Enterprise plan.
+   *
+   * A PAIR with `isPlanLoading`, because still-arriving is a third state: the
+   * groups page gates its whole table on this, and collapsing "not yet" into
+   * "no" pitches an upgrade at a customer who already bought it for the length
+   * of a round trip.
+   */
+  abstract isEnterprise(): boolean;
+
+  abstract isPlanLoading(): boolean;
+
+  /**
+   * Whether this deployment can send email.
+   *
+   * Without it an invitation cannot be delivered, so the members page offers a
+   * copyable link instead of pretending a message went out. Fail-safe is
+   * FALSE — offering the link when mail would in fact have worked costs a
+   * click; the other way round loses the invitation.
+   */
+  abstract hasEmailProvider(): boolean;
+
+  /** Whether a feature flag is on. Fail-closed while it is still arriving. */
+  abstract isFeatureEnabled(flag: string): boolean;
+
+  /** Opens one of the application's overlays, by the name its address uses. */
+  abstract openOverlay(name: string, props?: Record<string, unknown>): void;
+
+  /** Closes whatever overlay is open. */
+  abstract closeOverlay(): void;
+
+  abstract succeeded(notice: OrganizationSuccessNotice): void;
 
   abstract route(): OrganizationRouteReading;
 

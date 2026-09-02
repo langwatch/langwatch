@@ -1,8 +1,8 @@
 /**
  * Which page key the Audit Log address answers, and what it is wrapped in.
  *
- * ONE KEY, ONE SCREEN. The key still reads `pages/settings/audit-log`, kept
- * rather than renamed: the route transcript in `apps/ui/tests` is the parity bar
+ * FIVE KEYS, FIVE SCREENS. Every key still reads the address the platform page
+ * served, kept rather than renamed: the route transcript in `apps/ui/tests` is the parity bar
  * for the URL surface and fails the moment a page key changes, so renaming one
  * would spend that guard's signal on a cosmetic edit.
  *
@@ -31,7 +31,13 @@ import {
 } from "../../../../ui/elements/ui-page-fallbacks";
 import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
 import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
-import { AUDIT_LOG_PAGE_PERMISSION } from "../../behavior/organization-host.adapter";
+import {
+  AUDIT_LOG_PAGE_PERMISSION,
+  GROUPS_PAGE_PERMISSION,
+  MEMBERS_PAGE_PERMISSION,
+  TEAMS_PAGE_PERMISSION,
+  TEAM_DETAIL_PAGE_PERMISSION,
+} from "../../behavior/organization-host.adapter";
 import { withOrganizationHost } from "./organization-host-provider";
 
 const FALLBACKS = {
@@ -40,15 +46,46 @@ const FALLBACKS = {
   forbidden: UiPageForbidden,
 };
 
-const auditLogPage: UiPageLoader = async () => {
-  const module = await organizationScreens.auditLog();
-  const guarded = withUiPageGuard({
-    permission: AUDIT_LOG_PAGE_PERMISSION,
-    fallbacks: FALLBACKS,
-  })(module.default as ComponentType);
-  return { default: withOrganizationHost(withUiSettingsLayout(guarded)) };
-};
+function organizationPage(
+  screen: () => Promise<{ default: ComponentType }>,
+  displayName: string,
+  permission: string,
+): UiPageLoader {
+  return async () => {
+    const module = await screen();
+    const guarded = withUiPageGuard({
+      permission,
+      fallbacks: FALLBACKS,
+    })(module.default as ComponentType);
+    guarded.displayName = displayName;
+    return { default: withOrganizationHost(withUiSettingsLayout(guarded)) };
+  };
+}
 
 export const organizationPageLoaders: UiPageLoaderRegistry = {
-  "pages/settings/audit-log": auditLogPage,
+  "pages/settings/audit-log": organizationPage(
+    organizationScreens.auditLog,
+    "AuditLogPage",
+    AUDIT_LOG_PAGE_PERMISSION,
+  ),
+  "pages/settings/members": organizationPage(
+    organizationScreens.members,
+    "MembersPage",
+    MEMBERS_PAGE_PERMISSION,
+  ),
+  "pages/settings/teams": organizationPage(
+    organizationScreens.teams,
+    "TeamsPage",
+    TEAMS_PAGE_PERMISSION,
+  ),
+  "pages/settings/teams/[team]": organizationPage(
+    organizationScreens.teamDetail,
+    "TeamDetailPage",
+    TEAM_DETAIL_PAGE_PERMISSION,
+  ),
+  "pages/settings/groups": organizationPage(
+    organizationScreens.groups,
+    "GroupsPage",
+    GROUPS_PAGE_PERMISSION,
+  ),
 };

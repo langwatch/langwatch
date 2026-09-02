@@ -14,6 +14,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import {
+  type OrganizationActor,
+  type OrganizationProjectReading,
+  type OrganizationSuccessNotice,
   OrganizationHostPort,
   OrganizationHostProvider,
   type OrganizationDownload,
@@ -23,6 +26,13 @@ import {
   type OrganizationScope,
 } from "./model/organization-host";
 
+const DEFAULT_ACTOR: OrganizationActor = {
+  id: "user-1",
+  name: "Ada",
+  email: "ada@example.com",
+  image: null,
+};
+
 const DEFAULT_ORGANIZATION: OrganizationReading = {
   id: "org-1",
   name: "Acme",
@@ -30,9 +40,10 @@ const DEFAULT_ORGANIZATION: OrganizationReading = {
     {
       id: "team-1",
       name: "Engineering",
+      slug: "engineering",
       projects: [
-        { id: "proj-1", name: "Web App" },
-        { id: "proj-2", name: "Batch" },
+        { id: "proj-1", name: "Web App", slug: "web-app" },
+        { id: "proj-2", name: "Batch", slug: "batch" },
       ],
     },
   ],
@@ -40,6 +51,8 @@ const DEFAULT_ORGANIZATION: OrganizationReading = {
 
 export class FakeOrganizationHost extends OrganizationHostPort {
   readonly downloads: OrganizationDownload[] = [];
+  readonly successes: OrganizationSuccessNotice[] = [];
+  readonly overlays: { name: string | null; props?: Record<string, unknown> }[] = [];
   readonly failures: OrganizationFailureNotice[] = [];
   readonly navigations: string[] = [];
   readonly queries: Record<string, string | undefined>[] = [];
@@ -51,6 +64,12 @@ export class FakeOrganizationHost extends OrganizationHostPort {
       grants?: ReadonlySet<string>;
       query?: Readonly<Record<string, string | undefined>>;
       projectSwitcher?: ReactNode | null;
+      currentUser?: OrganizationActor | undefined;
+      activeProject?: OrganizationProjectReading | undefined;
+      isEnterprise?: boolean;
+      isPlanLoading?: boolean;
+      hasEmailProvider?: boolean;
+      flags?: ReadonlySet<string>;
     } = {},
   ) {
     super();
@@ -73,6 +92,52 @@ export class FakeOrganizationHost extends OrganizationHostPort {
     return (this.options.grants ?? new Set(["organization:view", "organization:manage"])).has(
       permission,
     );
+  }
+
+  /**
+   * The settings addresses are all the organization's own, so the fake answers
+   * both questions the same way — which is exactly what the browser adapter
+   * does, and what makes the port's split a statement about the future rather
+   * than about today.
+   */
+  hasOrganizationPermission(permission: string): boolean {
+    return this.hasPermission(permission);
+  }
+
+  currentUser(): OrganizationActor | undefined {
+    return this.options.currentUser ?? DEFAULT_ACTOR;
+  }
+
+  activeProject(): OrganizationProjectReading | undefined {
+    return this.options.activeProject;
+  }
+
+  isEnterprise(): boolean {
+    return this.options.isEnterprise ?? false;
+  }
+
+  isPlanLoading(): boolean {
+    return this.options.isPlanLoading ?? false;
+  }
+
+  hasEmailProvider(): boolean {
+    return this.options.hasEmailProvider ?? true;
+  }
+
+  isFeatureEnabled(flag: string): boolean {
+    return (this.options.flags ?? new Set<string>()).has(flag);
+  }
+
+  openOverlay(name: string, props?: Record<string, unknown>): void {
+    this.overlays.push({ name, props });
+  }
+
+  closeOverlay(): void {
+    this.overlays.push({ name: null });
+  }
+
+  succeeded(notice: OrganizationSuccessNotice): void {
+    this.successes.push(notice);
   }
 
   route(): OrganizationRouteReading {

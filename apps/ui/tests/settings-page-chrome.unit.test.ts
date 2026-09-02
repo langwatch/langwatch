@@ -93,15 +93,22 @@ function legacySourceOf(moduleSpecifier: string): string {
 function settingsRouteSections(): Map<string, string> {
   const sections = new Map<string, string>();
   for (const feature of [
+    "annotation-scores",
     "api-key",
     "authz",
+    "billing",
     "data-retention",
     "data-privacy",
     "github",
+    "licensing",
     "model-provider",
+    "notification",
     "organization",
     "personal-workspace",
+    "project",
+    "scim",
     "secret",
+    "topic",
   ]) {
     sections.set(
       feature,

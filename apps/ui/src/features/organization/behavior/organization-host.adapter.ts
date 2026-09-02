@@ -14,11 +14,14 @@
 
 import {
   OrganizationHostPort,
+  type OrganizationActor,
   type OrganizationDownload,
   type OrganizationFailureNotice,
+  type OrganizationProjectReading,
   type OrganizationReading,
   type OrganizationRouteReading,
   type OrganizationScope,
+  type OrganizationSuccessNotice,
 } from "@langwatch/organization-web/screens/organization";
 import type { ReactNode } from "react";
 
@@ -33,15 +36,39 @@ import type { ReactNode } from "react";
  */
 export const AUDIT_LOG_PAGE_PERMISSION = "organization:manage";
 
+/**
+ * The grants the four settings keys carry, one for one with the platform pages.
+ *
+ * They are NOT all the same, and the asymmetry is carried rather than tidied:
+ * members, teams and groups were `organization:manage`, and the team detail
+ * page was `team:view` — a reader who may see a team may open it, and every
+ * write on it states its own policy. Inventing a guard is a change to who can
+ * reach an address, and a page move does not own that decision.
+ */
+export const MEMBERS_PAGE_PERMISSION = "organization:manage";
+export const TEAMS_PAGE_PERMISSION = "organization:manage";
+export const GROUPS_PAGE_PERMISSION = "organization:manage";
+export const TEAM_DETAIL_PAGE_PERMISSION = "team:view";
+
 export type OrganizationHostReadings = {
   scope: OrganizationScope;
   organization: OrganizationReading | undefined;
+  activeProject: OrganizationProjectReading | undefined;
+  currentUser: OrganizationActor | undefined;
+  isEnterprise: boolean;
+  isPlanLoading: boolean;
+  hasEmailProvider: boolean;
   route: OrganizationRouteReading;
   projectSwitcher: ReactNode | null;
 };
 
 export type OrganizationHostActions = {
   hasPermission: (permission: string) => boolean;
+  hasOrganizationPermission: (permission: string) => boolean;
+  isFeatureEnabled: (flag: string) => boolean;
+  openOverlay: (name: string, props?: Record<string, unknown>) => void;
+  closeOverlay: () => void;
+  succeeded: (notice: OrganizationSuccessNotice) => void;
   setQuery: (
     next: Readonly<Record<string, string | undefined>>,
     options?: { replace?: boolean },
@@ -76,6 +103,46 @@ export class UiOrganizationHost extends OrganizationHostPort {
 
   hasPermission(permission: string): boolean {
     return this.actions.hasPermission(permission);
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
+    return this.actions.hasOrganizationPermission(permission);
+  }
+
+  currentUser(): OrganizationActor | undefined {
+    return this.readings.currentUser;
+  }
+
+  activeProject(): OrganizationProjectReading | undefined {
+    return this.readings.activeProject;
+  }
+
+  isEnterprise(): boolean {
+    return this.readings.isEnterprise;
+  }
+
+  isPlanLoading(): boolean {
+    return this.readings.isPlanLoading;
+  }
+
+  hasEmailProvider(): boolean {
+    return this.readings.hasEmailProvider;
+  }
+
+  isFeatureEnabled(flag: string): boolean {
+    return this.actions.isFeatureEnabled(flag);
+  }
+
+  openOverlay(name: string, props?: Record<string, unknown>): void {
+    this.actions.openOverlay(name, props);
+  }
+
+  closeOverlay(): void {
+    this.actions.closeOverlay();
+  }
+
+  succeeded(notice: OrganizationSuccessNotice): void {
+    this.actions.succeeded(notice);
   }
 
   route(): OrganizationRouteReading {

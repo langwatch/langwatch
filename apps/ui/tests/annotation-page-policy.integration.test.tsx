@@ -141,6 +141,7 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 const INBOX_KEY = "pages/[project]/annotations";
 const MINE_KEY = "pages/[project]/annotations/me";
 const ALL_KEY = "pages/[project]/annotations/all";
+const WALKER_KEY = "pages/[project]/annotations/my-queue";
 const QUEUE_KEY = "pages/[project]/annotations/[slug]";
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
@@ -231,11 +232,17 @@ describe("given the four keys map to four views", () => {
       expect(screen.getByText(`the annotations page: ${view}`)).toBeDefined();
     });
 
-    it("registers the four moved keys and leaves the queue walker to the host", () => {
+    /**
+     * FIVE KEYS NOW, not four. The queue walker was the one address of the
+     * family that stayed in `platform/app`, because it mounts the trace
+     * family's conversation view; that view is `@langwatch/trace-web`'s since
+     * the traces move, so the walker came too and this registry answers the
+     * whole family.
+     */
+    it("registers every annotations key, the queue walker included", () => {
       expect(Object.keys(annotationPageLoaders).sort()).toEqual(
-        [INBOX_KEY, QUEUE_KEY, ALL_KEY, MINE_KEY].sort(),
+        [INBOX_KEY, QUEUE_KEY, ALL_KEY, MINE_KEY, WALKER_KEY].sort(),
       );
-      expect(annotationPageLoaders["pages/[project]/annotations/my-queue"]).toBeUndefined();
     });
   });
 });

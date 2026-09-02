@@ -14,6 +14,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./screens/billing": {
+      "types": "./src/screens/billing/index.ts",
+      "default": "./src/screens/billing/index.ts"
     }
   },
   "scripts": {
@@ -22,8 +26,13 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-web": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
     "lucide-react": "^1.22.0",
     "numeral": "^2.0.6",
     "zod": "^4.4.3"

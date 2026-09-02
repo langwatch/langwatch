@@ -17,9 +17,10 @@ import {
   NavigationHostPort,
   type LastVisitedHomeKind,
   type NavigationAccountMenu,
-  type NavigationCommandBar,
   type NavigationDeployment,
   type NavigationFlagReading,
+  type NavigationLangy,
+  type NavigationCommandBar,
   type NavigationOpsAccess,
   type NavigationOrganization,
   type NavigationPlanReading,
@@ -51,6 +52,10 @@ export type NavigationHostReadings = {
   deployment: NavigationDeployment;
   plan: NavigationPlanReading;
   opsAccess: NavigationOpsAccess;
+  /** The search palette this application mounts, or nothing when it has none. */
+  commandBar: NavigationCommandBar | null;
+  /** The assistant, or nothing when this reader may not start a turn with it. */
+  langy: NavigationLangy | null;
 };
 
 export type NavigationHostActions = {
@@ -62,6 +67,7 @@ export type NavigationHostActions = {
   rememberScope: (write: NavigationScopeWrite) => void;
   signOut: () => void;
   setDocumentTitle: (title: string) => () => void;
+  openDrawer: (drawer: string, params?: Record<string, string>) => void;
 };
 
 export class UiNavigationHost extends NavigationHostPort {
@@ -193,18 +199,40 @@ export class UiNavigationHost extends NavigationHostPort {
   }
 
   /**
-   * NO SEARCH PALETTE ON THIS SIDE, and the answer is `null` rather than a
-   * control that opens nothing.
+   * THE SEARCH PALETTE, ANSWERED FOR REAL. The shell's two entries — the
+   * sidebar's Quick Search row and the header's trigger — read this, and both
+   * light up because `features/chrome` mounts `CommandBarProvider` inside the
+   * host it builds here.
    *
-   * `platform/app/src/features/command-bar` is thirty-three modules with a
-   * command catalogue of its own, five procedures, a Langy handoff and a
-   * drawer preloader — a family-sized move, and still MOUNTED over there, so
-   * the deletes-only rule does not reach it. The shell's two entries (the
-   * Quick Search row and the header trigger) light up the day a host answers
-   * this with one.
+   * The answer is `null` before that provider has mounted, which is the same
+   * honest answer this returned while the palette was still in `platform/app`:
+   * no row, no trigger, rather than a control that opens nothing.
    */
   commandBar(): NavigationCommandBar | null {
-    return null;
+    return this.readings.commandBar;
+  }
+
+  /**
+   * Opens a drawer by name against this application's composed registry.
+   *
+   * The command catalogue names eight other families' drawers. None of them is
+   * the navigation package's to import and none has to be: the catalogue
+   * carries the name, `installed-ui-drawers` carries the components, and this
+   * is where the two meet.
+   */
+  openDrawer(drawer: string, params?: Record<string, string>): void {
+    this.actions.openDrawer(drawer, params);
+  }
+
+  /**
+   * The assistant, when this reader may start a turn with it.
+   *
+   * `null` is the gate rather than a flag the palette reads for itself: a
+   * reader holding only `langy:view` is never offered the hand-off, because
+   * the hand-off queues a prompt that auto-sends and would come back 403.
+   */
+  langy(): NavigationLangy | null {
+    return this.readings.langy;
   }
 
   /**

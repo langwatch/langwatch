@@ -11,19 +11,30 @@
     "@langwatch/data-privacy-web",
     "@langwatch/data-retention-web",
     "@langwatch/dataset-web",
+    "@langwatch/enterprise-billing-web",
     "@langwatch/enterprise-governance-web",
+    "@langwatch/enterprise-licensing-web",
+    "@langwatch/enterprise-scim-web",
     "@langwatch/evaluator-web",
+    "@langwatch/experiment-web",
     "@langwatch/gateway-web",
     "@langwatch/github-web",
+    "@langwatch/langy-web",
     "@langwatch/model-provider-web",
     "@langwatch/monitor-web",
     "@langwatch/navigation-web",
+    "@langwatch/notification-web",
+    "@langwatch/onboarding-web",
     "@langwatch/ops-web",
     "@langwatch/organization-web",
+    "@langwatch/project-web",
     "@langwatch/prompt-web",
+    "@langwatch/scenario-web",
     "@langwatch/secret-web",
+    "@langwatch/topic-web",
     "@langwatch/trace-web",
-    "@langwatch/user-web"
+    "@langwatch/user-web",
+    "@langwatch/workflow-web"
   ],
   "features": [
     {
@@ -49,11 +60,22 @@
       }
     },
     {
+      "id": "annotation-scores",
+      "root": "annotation-scores",
+      "uses": {
+        "screens": [
+          "@langwatch/annotation-web/screens/annotation-scores"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "annotations",
       "root": "annotation",
       "uses": {
         "screens": [
-          "@langwatch/annotation-web/screens/annotations"
+          "@langwatch/annotation-web/screens/annotations",
+          "@langwatch/annotation-web/screens/my-queue"
         ],
         "surfaces": []
       }
@@ -79,6 +101,16 @@
       }
     },
     {
+      "id": "authorize",
+      "root": "authorize",
+      "uses": {
+        "screens": [
+          "@langwatch/api-key-web/screens/authorize"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "authz",
       "root": "authz",
       "uses": {
@@ -95,6 +127,16 @@
         "screens": [
           "@langwatch/automation-web/screens/automations",
           "@langwatch/automation-web/screens/unsubscribe"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "billing",
+      "root": "billing",
+      "uses": {
+        "screens": [
+          "@langwatch/enterprise-billing-web/screens/billing"
         ],
         "surfaces": []
       }
@@ -150,6 +192,26 @@
       }
     },
     {
+      "id": "email-suppressions",
+      "root": "notification",
+      "uses": {
+        "screens": [
+          "@langwatch/notification-web/screens/email-suppressions"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "evaluation-edit",
+      "root": "evaluations",
+      "uses": {
+        "screens": [
+          "@langwatch/evaluator-web/screens/evaluation-edit"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "evaluators",
       "root": "evaluator",
       "uses": {
@@ -159,6 +221,16 @@
         "surfaces": [
           "@langwatch/evaluator-web/drawers"
         ]
+      }
+    },
+    {
+      "id": "experiments",
+      "root": "experiments",
+      "uses": {
+        "screens": [
+          "@langwatch/experiment-web/screens/experiments"
+        ],
+        "surfaces": []
       }
     },
     {
@@ -182,11 +254,41 @@
       }
     },
     {
+      "id": "home",
+      "root": "home",
+      "uses": {
+        "screens": [
+          "@langwatch/project-web/screens/home"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "integrations",
       "root": "github",
       "uses": {
         "screens": [
           "@langwatch/github-web/screens/integrations"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "langy",
+      "root": "langy",
+      "uses": {
+        "screens": [
+          "@langwatch/langy-web/screens/langy-layout"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "licensing",
+      "root": "licensing",
+      "uses": {
+        "screens": [
+          "@langwatch/enterprise-licensing-web/screens/license"
         ],
         "surfaces": []
       }
@@ -207,6 +309,16 @@
       "uses": {
         "screens": [
           "@langwatch/navigation-web/screens/landing"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "onboarding",
+      "root": "onboarding",
+      "uses": {
+        "screens": [
+          "@langwatch/onboarding-web/screens/onboarding"
         ],
         "surfaces": []
       }
@@ -252,6 +364,16 @@
       }
     },
     {
+      "id": "project-settings",
+      "root": "project",
+      "uses": {
+        "screens": [
+          "@langwatch/project-web/screens/project"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "prompt-studio",
       "root": "prompt",
       "uses": {
@@ -264,11 +386,43 @@
       }
     },
     {
+      "id": "scim",
+      "root": "scim",
+      "uses": {
+        "screens": [
+          "@langwatch/enterprise-scim-web/screens/scim"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "secret",
       "root": "secret",
       "uses": {
         "screens": [
           "@langwatch/secret-web/screens/secret"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "simulations",
+      "root": "simulations",
+      "uses": {
+        "screens": [
+          "@langwatch/scenario-web/screens/simulations"
+        ],
+        "surfaces": [
+          "@langwatch/scenario-web/drawers"
+        ]
+      }
+    },
+    {
+      "id": "topic-clustering",
+      "root": "topic",
+      "uses": {
+        "screens": [
+          "@langwatch/topic-web/screens/topic-clustering"
         ],
         "surfaces": []
       }

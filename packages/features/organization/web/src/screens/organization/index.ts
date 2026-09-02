@@ -1,7 +1,12 @@
 /**
  * The organization settings family, as the browser application mounts it.
  *
- * ONE SCREEN, ONE ADDRESS: `/settings/audit-log`.
+ * FIVE SCREENS, FIVE ADDRESSES: `/settings/audit-log`, `/settings/members`,
+ * `/settings/teams`, `/settings/teams/:team` and `/settings/groups`.
+ *
+ * The audit trail arrived first and the other four followed with the settings
+ * family; they share a transport, a host port and a set of role vocabularies,
+ * which is what makes them one package rather than four.
  *
  * WHY THIS IS ITS OWN PACKAGE. The credentials family's rule, read strictly: a
  * key belongs to the family that owns its TRANSPORT, and `organization.*` is
@@ -24,11 +29,19 @@ export type OrganizationScreenLoader = () => Promise<{ default: ComponentType }>
 
 export const organizationScreens = {
   auditLog: () => import("./audit-log.screen"),
+  groups: () => import("./groups.screen"),
+  members: () => import("./members.screen"),
+  teams: () => import("./teams.screen"),
+  teamDetail: () => import("./team-detail.screen"),
 } as const satisfies Record<string, OrganizationScreenLoader>;
 
 export type OrganizationScreenName = keyof typeof organizationScreens;
 
 export { AUDIT_LOG_PAGE_PERMISSION } from "./audit-log.screen";
+export { GROUPS_PAGE_PERMISSION } from "./groups.screen";
+export { MEMBERS_PAGE_PERMISSION } from "./members.screen";
+export { TEAMS_PAGE_PERMISSION } from "./teams.screen";
+export { TEAM_DETAIL_PAGE_PERMISSION } from "./team-detail.screen";
 export { organizationApi } from "../../behavior/organization-api";
 export type {
   AuditLogFilters,
@@ -39,6 +52,8 @@ export type {
 export {
   OrganizationHostPort,
   OrganizationHostProvider,
+  type OrganizationActor,
+  type OrganizationSuccessNotice,
   type OrganizationDownload,
   type OrganizationFailureNotice,
   type OrganizationProjectReading,
@@ -47,3 +62,15 @@ export {
   type OrganizationScope,
   type OrganizationTeamReading,
 } from "../../model/organization-host";
+
+/**
+ * The department picker and its column, published for `@langwatch/project-web`.
+ *
+ * A web-to-web edge, and a deliberate one: the general settings page assigns a
+ * project to a department with the SAME control the teams and members pages
+ * assign a team or a person with, and a second copy of a picker over the same
+ * `departments.*` transport would be a second opinion about what an assignment
+ * is. The edge is the finding every family since governance carries one of.
+ */
+export { DepartmentPicker } from "../../ui/elements/department-picker";
+export { useDepartmentColumn } from "../../behavior/use-department-column";

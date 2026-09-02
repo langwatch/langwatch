@@ -148,21 +148,27 @@ describe("when the reader may only view the organization", () => {
 });
 
 describe("when the reader holds the lite membership seat", () => {
-  it("offers no way to save, because the seat does not carry the change", () => {
+  /**
+   * The ORGANIZATION half only. A lite seat does not carry an organization
+   * change, and the project form keeps its own save — the two halves of this
+   * address are two forms with two submits, exactly as the platform page had
+   * them.
+   */
+  it("takes the organization form's save away and leaves the project's", () => {
     renderWithProjectHost(
       <ProjectSettingsScreen />,
       new FakeProjectHost({ isLiteMember: true }),
     );
 
-    expect(screen.queryByRole("button", { name: "Save Changes" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
   });
 });
 
-describe("when the reader may manage the organization", () => {
-  it("offers to save", () => {
+describe("when the reader may manage the organization and holds a full seat", () => {
+  it("offers a save on each half", () => {
     renderWithProjectHost(<ProjectSettingsScreen />);
 
-    expect(screen.getByRole("button", { name: "Save Changes" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(2);
   });
 });
 

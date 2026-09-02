@@ -33,6 +33,12 @@
  * now (`installed-ui-drawers.ts`) and the mount is here, once, above the
  * outlet, which is the only place a drawer opened from any page can render.
  *
+ * IT CARRIES THE SEARCH PALETTE, which is what lit the shell's Quick Search
+ * row and the header's trigger. `commandBar` on the host section is what mounts
+ * it, and it is asked for HERE and nowhere else: the palette is one document's
+ * one Cmd+K, and the three addresses outside this layout mount their own host
+ * without one rather than risk two dialogs where the two nest.
+ *
  * OUTSIDE THE SHELL BRANCH ON PURPOSE. The shell is drawn only over pages this
  * application serves, because a legacy page brings its own. A DRAWER is not
  * chrome in that sense: it is addressed by the query string, it renders through
@@ -51,7 +57,7 @@ import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
 
 export default function UiAppChrome() {
   return (
-    <NavigationHostSection>
+    <NavigationHostSection commandBar>
       <UiAppChromeBody />
       <CurrentDrawer drawers={installedUiDrawers} />
     </NavigationHostSection>

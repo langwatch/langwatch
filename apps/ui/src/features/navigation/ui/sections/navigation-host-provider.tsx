@@ -26,11 +26,20 @@ import {
   navigationApi,
   NavigationHostProvider,
   type NavigationDeployment,
+  type NavigationLangy,
   type NavigationOrganization,
   type NavigationScopeWrite,
   type NavigationTeam,
   type NavigationUser,
 } from "@langwatch/navigation-web/screens/landing";
+import {
+  CommandBarProvider,
+  CommandBarTrigger,
+  getCommandBarShortcut,
+  openCommandBar,
+} from "@langwatch/navigation-web/command-bar";
+import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-web";
+import { useDrawer } from "@langwatch/ui-drawer";
 import { useCallback, useMemo, type ComponentType, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiAddress } from "../../../../behavior/ui-address";
@@ -50,6 +59,21 @@ import { UiNavigationHost } from "../../behavior/navigation-host.adapter";
 /** The two grants that decide how far a reader gets into the operations pages. */
 const OPS_VIEW_PERMISSION = "ops:view";
 const OPS_MANAGE_PERMISSION = "ops:manage";
+
+/**
+ * The grant that STARTS a Langy turn, and the rollout that reveals Langy at all.
+ *
+ * `langy:view` is the read grant the panel needs; `langy:create` is what a
+ * hand-off from the palette needs, because the hand-off queues a prompt that
+ * auto-sends. Offering the hand-off on the read grant would be an invitation
+ * into a 403, so the palette is told "no assistant" rather than "an assistant
+ * you may not talk to".
+ */
+const LANGY_CREATE_PERMISSION = "langy:create";
+const LANGY_RELEASE_FLAG = "release_langy_enabled";
+
+/** The gradient the palette's own Langy mark paints with. */
+const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 /** The organization graph, narrowed to what the navigation package reads. */
 type OrganizationsRead = ReadonlyArray<{
@@ -139,7 +163,26 @@ function readDeployment(): NavigationDeployment {
  * below them have to be looking at the same workspace graph, and one provider
  * is what makes them.
  */
-export function NavigationHostSection({ children }: { children: ReactNode }) {
+export function NavigationHostSection({
+  children,
+  commandBar = false,
+}: {
+  children: ReactNode;
+  /**
+   * Whether this mount is the one that carries the search palette.
+   *
+   * THE PALETTE IS A SINGLETON — one document, one Cmd+K, one dialog — and
+   * this section is mounted in two places: once by the chrome layout route,
+   * above every page this application serves, and once per screen by
+   * `withNavigationHost` for the three addresses that sit OUTSIDE that layout.
+   * Mounting the provider unconditionally would put two dialogs on any page
+   * where those nest. So the chrome asks for it and nothing else does, and the
+   * host's `commandBar()` answers `null` wherever it was not asked for — which
+   * is the same honest answer it gave while the palette was still in
+   * `platform/app`: no Quick Search row, no header trigger.
+   */
+  commandBar?: boolean;
+}) {
   const { session, navigation, documentTitle } = useUiCapabilities();
   const activeScope = session.activeScope();
   const memory = useUiScopeMemory();
@@ -214,6 +257,63 @@ export function NavigationHostSection({ children }: { children: ReactNode }) {
   }, [organization, currentUserId, organizationRole]);
 
   const deployment = useMemo(readDeployment, []);
+
+  /**
+   * The assistant, as the palette's hand-off needs it: may this reader start a
+   * turn, the way to hand a question over, the way to tell a minimised panel to
+   * stand down while an inline field is in use, and the mark the composer
+   * draws. `null` is the gate — see the two constants above.
+   */
+  const askLangy = useLangyStore((store) => store.askLangy);
+  const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
+  const canAskLangy =
+    session.hasPermission(LANGY_CREATE_PERMISSION) &&
+    session.featureFlag(LANGY_RELEASE_FLAG) === true;
+  const langy: NavigationLangy | null = useMemo(
+    () =>
+      canAskLangy
+        ? {
+            ask: askLangy,
+            setHomeAskOpen,
+            mark: (
+              <>
+                <LangyMarkGradientDefs id={COMMAND_BAR_LANGY_GRADIENT_ID} />
+                <LangyMark size={23} gradientId={COMMAND_BAR_LANGY_GRADIENT_ID} />
+              </>
+            ),
+          }
+        : null,
+    [canAskLangy, askLangy, setHomeAskOpen],
+  );
+
+  /**
+   * The palette's two shell entries, and the door into it.
+   *
+   * `open` goes through the package's own module-scope control rather than its
+   * context, because this object is built ABOVE the provider that owns the
+   * state — the provider asks this host who the reader is. The trigger is a
+   * node, so it reads the context at the point the top bar draws it.
+   */
+  const commandBarAnswer = useMemo(
+    () =>
+      commandBar
+        ? {
+            shortcut: getCommandBarShortcut(),
+            open: openCommandBar,
+            trigger: <CommandBarTrigger />,
+          }
+        : null,
+    [commandBar],
+  );
+
+  /** Opening a drawer is an ADDRESS, resolved against this application's registry. */
+  const { openDrawer } = useDrawer();
+  const openDrawerByName = useCallback(
+    (drawer: string, params?: Record<string, string>) => {
+      openDrawer(drawer, params ?? {});
+    },
+    [openDrawer],
+  );
 
   /** The address, split the way the chrome reads it. */
   const [pathname = "/", search = ""] = useMemo(() => {
@@ -293,6 +393,8 @@ export function NavigationHostSection({ children }: { children: ReactNode }) {
             hasAccess: session.hasPermission(OPS_VIEW_PERMISSION),
             isAdmin: session.hasPermission(OPS_MANAGE_PERMISSION),
           },
+          commandBar: commandBarAnswer,
+          langy,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),
@@ -306,6 +408,7 @@ export function NavigationHostSection({ children }: { children: ReactNode }) {
           rememberScope,
           signOut,
           setDocumentTitle,
+          openDrawer: openDrawerByName,
         },
       ),
     [
@@ -329,10 +432,17 @@ export function NavigationHostSection({ children }: { children: ReactNode }) {
       rememberScope,
       signOut,
       setDocumentTitle,
+      commandBarAnswer,
+      langy,
+      openDrawerByName,
     ],
   );
 
-  return <NavigationHostProvider value={host}>{children}</NavigationHostProvider>;
+  return (
+    <NavigationHostProvider value={host}>
+      {commandBar ? <CommandBarProvider>{children}</CommandBarProvider> : children}
+    </NavigationHostProvider>
+  );
 }
 
 /** Wraps a screen in the host the navigation package asks for. */

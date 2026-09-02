@@ -45,13 +45,40 @@ const ANNOTATION_PAGE_KEYS = [
   // handed one table, so the feature maps each key to the VIEW it shows and the
   // screen is told rather than reading the address.
   //
-  // The fifth annotations address, `/annotations/my-queue`, is deliberately
-  // absent: the queue walker mounts the trace family's conversation view, which
-  // no package publishes, so `platform/app` still serves that key.
+  // THE FIFTH ADDRESS IS HERE NOW. `/annotations/my-queue` was the one key of
+  // the family that stayed behind, because the queue walker mounts the trace
+  // family's conversation view; that view is `@langwatch/trace-web`'s since the
+  // traces move, so the walker came with it — and it takes its own screen
+  // rather than a view of the list's.
   "pages/[project]/annotations",
   "pages/[project]/annotations/me",
   "pages/[project]/annotations/all",
   "pages/[project]/annotations/[slug]",
+  "pages/[project]/annotations/my-queue",
+];
+
+const EXPERIMENT_PAGE_KEYS = [
+  // FIVE keys, four screens. `/experiments` used to resolve a NAMED export of
+  // the evaluations module, because the guard wrapper was what that address
+  // served; the guard is the route's now, so the key names a plain default.
+  //
+  // The last of them is the retired evaluation wizard's forward, and it lives
+  // with the experiments rather than with the evaluations: its only read is
+  // `experiments.getExperimentBySlugOrId` and its branch turns on
+  // `ExperimentType`, so ownership put it here.
+  "pages/[project]/experiments/index",
+  "pages/[project]/experiments/[experiment]",
+  "pages/[project]/experiments/workbench/index",
+  "pages/[project]/experiments/workbench/[slug]",
+  "pages/[project]/evaluations/wizard/[slug]",
+];
+
+const EVALUATION_EDIT_PAGE_KEYS = [
+  // TWO keys, ONE screen, exactly as `platform/app` registered them: the
+  // `.../edit/choose` address predates the drawer that superseded this form and
+  // has always resolved the same module.
+  "pages/[project]/evaluations/[id]/edit",
+  "pages/[project]/evaluations/[id]/edit/choose",
 ];
 
 const API_KEY_PAGE_KEYS = [
@@ -63,6 +90,35 @@ const API_KEY_PAGE_KEYS = [
   // asserts that in both directions.
   "pages/settings/api-keys",
   "pages/cli/auth",
+];
+
+const AUTHORIZE_PAGE_KEYS = [
+  // The two handoff addresses, and the last pages the manifests held back. They
+  // are screens of `@langwatch/api-key-web` rather than a package of their own:
+  // `/authorize` prints the same legacy project key the API Keys table renders,
+  // off the same procedure under the same permission check, so splitting them
+  // would have meant two packages asking `organization.getAll` for one key.
+  //
+  // NEITHER CARRIES A PAGE-LEVEL GRANT, which is the platform pages' policy one
+  // for one: `/authorize` refuses nobody — a reader without `project:update`
+  // gets the server's own empty key — and `/mcp/authorize` does its own session
+  // redirect, which a guard would pre-empt.
+  "pages/authorize",
+  "pages/mcp/authorize",
+];
+
+const ONBOARDING_PAGE_KEYS = [
+  // Five keys, one package, TWO frames. The four `/onboarding/*` addresses sit
+  // OUTSIDE the application chrome exactly where the route table puts them —
+  // there is no project to switch between yet — and carry no page-level grant,
+  // because a grant is resolved against a scope and these readers have none.
+  // `/:project/setup` is inside the chrome like every project-scoped address and
+  // keeps the `project:view` grant its platform page carried.
+  "pages/onboarding",
+  "pages/onboarding/welcome",
+  "pages/onboarding/product/index",
+  "pages/onboarding/[team]/project",
+  "pages/[project]/setup",
 ];
 
 const SECRET_PAGE_KEYS = [
@@ -106,7 +162,11 @@ const CHROME_PAGE_KEYS = ["features/chrome/UiAppChrome"];
  * The root address, `/`. Its whole body is the landing redirect, and it carries
  * no page guard for the same reason the front door carries none.
  */
-const NAVIGATION_PAGE_KEYS = ["pages/index"];
+const NAVIGATION_PAGE_KEYS = [
+  "pages/@project/[...path]/index",
+  "pages/index",
+  "pages/not-found",
+];
 
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
@@ -195,11 +255,66 @@ const GITHUB_PAGE_KEYS = [
 ];
 
 const ORGANIZATION_PAGE_KEYS = [
-  // One key, its own package, and its own new one. `organization.getAuditLogs`
+  // Five keys now, and the same rule chose all five. `organization.getAuditLogs`
   // is `@langwatch/organization-server`'s transport and `EnrichedAuditLog` is
   // `@langwatch/organization-contract`'s, so the credentials family's rule —
-  // a key belongs to the family that owns its transport — puts it here.
+  // a key belongs to the family that owns its transport — puts the audit log
+  // here; members, teams, the one team and groups arrived behind it, off the
+  // same `organization`, `team` and `group` routers.
   "pages/settings/audit-log",
+  "pages/settings/groups",
+  "pages/settings/members",
+  "pages/settings/teams",
+  "pages/settings/teams/[team]",
+];
+
+const ANNOTATION_SCORES_PAGE_KEYS = [
+  // Its own feature root rather than part of the annotations family, because
+  // the four list keys moved as a family of their own and this settings page
+  // arrived after them. The screen is the annotation package's second screen
+  // scope, so the two share one React Query cache.
+  "pages/settings/annotation-scores",
+];
+
+const BILLING_PAGE_KEYS = [
+  // Three keys, one Enterprise package. Plans, the subscription it buys and
+  // the usage it is measured against all read `plan`, `limits` and
+  // `subscription`, which are `@langwatch/enterprise-billing-server`'s.
+  "pages/settings/plans",
+  "pages/settings/subscription",
+  "pages/settings/usage",
+];
+
+const LICENSING_PAGE_KEYS = [
+  // `license.getStatus`/`upload`/`remove`/`generate` are the licensing
+  // package's own transport, so the page that drives them belongs to it.
+  "pages/settings/license",
+];
+
+const NOTIFICATION_PAGE_KEYS = [
+  // THE ONE KEY WHOSE TRANSPORT AND SUBJECT DISAGREE, recorded rather than
+  // hidden: `emailSuppression.*` is mounted from `@langwatch/automation-server`
+  // because a suppression is what a trigger's email hit, but the page is about
+  // notification delivery and reads as notification to the customer. Subject
+  // won; the tension is written down in the screens index.
+  "pages/settings/email-suppressions",
+];
+
+const PROJECT_PAGE_KEYS = [
+  // The general settings page, which edits the organization AND the project in
+  // scope. `organization.update` and `project.update` are its two mutations.
+  "pages/settings",
+];
+
+const SCIM_PAGE_KEYS = [
+  // `scimToken.list`/`generate`/`revoke` are the SCIM package's transport.
+  "pages/settings/scim",
+];
+
+const TOPIC_PAGE_KEYS = [
+  // `topics.getClusteringStatus` and `project.triggerTopicClustering`, which
+  // is the topic family's own transport.
+  "pages/settings/topic-clustering",
 ];
 
 const PERSONAL_WORKSPACE_PAGE_KEYS = [
@@ -235,6 +350,26 @@ const WORKFLOW_PAGE_KEYS = [
   "pages/[project]/workflows",
   "pages/[project]/chat/[workflow]",
   "pages/[project]/studio/[workflow]",
+];
+
+/**
+ * The Langy dock's LAYOUT key, which is a key and not a page for the same
+ * reason the chrome's is: the two route-table entries that name it carry
+ * children and no path, so the dock stays mounted while the pages below it
+ * swap and one conversation survives a navigation.
+ */
+const LANGY_PAGE_KEYS = ["features/langy/ProjectLangyLayout"];
+
+/**
+ * The run board, the Scenario Library and Agent Testing — one product surface
+ * over one transport, so one package and one frontend feature. The board's key
+ * answers three route-table rows, because a catch-all page serves All Runs, a
+ * run plan and an external set without a page transition.
+ */
+const SIMULATION_PAGE_KEYS = [
+  "pages/[project]/simulations/[[...path]]",
+  "pages/[project]/simulations/scenarios/index",
+  "pages/[project]/agent-testing/[[...path]]",
 ];
 
 const TRACE_PAGE_KEYS = [
@@ -285,6 +420,23 @@ const GOVERNANCE_PAGE_KEYS = [
   "pages/governance/users/[id]",
 ];
 
+/**
+ * The project home, at `/[project]`.
+ *
+ * ONE KEY, and it is the LAST legacy loader `platform/app` held: its registry
+ * is empty now, so nothing is left that only that application can serve.
+ *
+ * The key still names the platform module path it was born with, the way every
+ * other family's does. The route transcript is the parity bar for the URL
+ * surface and fails on any page-key change, so a cosmetic rename would spend
+ * that guard's signal for nothing.
+ *
+ * It carries NO page-level grant, and the platform page carried none either:
+ * reaching a project at all is what the scope resolution already decided, and
+ * every section of the home gates its own reads.
+ */
+const HOME_PAGE_KEYS = ["pages/[project]/index"];
+
 class RecordingFeedback extends UiFeedbackPort {
   succeeded(): void {}
   failed(): void {}
@@ -316,24 +468,38 @@ describe("given what apps/ui serves itself", () => {
           ...AGENT_PAGE_KEYS,
           ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
+          ...ANNOTATION_SCORES_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
           ...AUTH_PAGE_KEYS,
+          ...AUTHORIZE_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...BILLING_PAGE_KEYS,
           ...CHROME_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
+          ...EVALUATION_EDIT_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
+          ...EXPERIMENT_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GITHUB_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...HOME_PAGE_KEYS,
+          ...LICENSING_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
           ...NAVIGATION_PAGE_KEYS,
+          ...NOTIFICATION_PAGE_KEYS,
+          ...ONBOARDING_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
+          ...PROJECT_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
+          ...SCIM_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...LANGY_PAGE_KEYS,
+          ...SIMULATION_PAGE_KEYS,
+          ...TOPIC_PAGE_KEYS,
           ...TRACE_PAGE_KEYS,
           ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
@@ -349,10 +515,12 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/agent-web",
         "@langwatch/analytics-web",
         "@langwatch/annotation-web",
+        "@langwatch/annotation-web/screens/annotation-scores",
         "@langwatch/api-key-web",
         "@langwatch/auth-web",
         "@langwatch/authz-web",
         "@langwatch/automation-web",
+        "@langwatch/enterprise-billing-web",
         "@langwatch/data-privacy-web",
         "@langwatch/data-retention-web",
         "@langwatch/dataset-web",
@@ -360,13 +528,26 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/gateway-web",
         "@langwatch/github-web",
         "@langwatch/enterprise-governance-web",
+        // The project home. `@langwatch/project-web` appears TWICE in this list
+        // and that is right: the package publishes two screens with two host
+        // ports — `/[project]` and `/settings` — and each frontend feature
+        // mounts the Provider its own hooks run on.
+        "@langwatch/project-web",
+        "@langwatch/langy-web",
+        "@langwatch/enterprise-licensing-web",
         "@langwatch/model-provider-web",
         "@langwatch/monitor-web",
         "@langwatch/navigation-web",
+        "@langwatch/notification-web",
+        "@langwatch/onboarding-web",
         "@langwatch/ops-web",
         "@langwatch/organization-web",
+        "@langwatch/project-web/screens/project",
         "@langwatch/prompt-web",
+        "@langwatch/enterprise-scim-web",
         "@langwatch/secret-web",
+        "@langwatch/scenario-web",
+        "@langwatch/topic-web",
         "@langwatch/trace-web",
         "@langwatch/workflow-web",
         "@langwatch/user-web",
@@ -419,30 +600,44 @@ describe("given what apps/ui serves itself", () => {
           ...AGENT_PAGE_KEYS,
           ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
+          ...ANNOTATION_SCORES_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
           ...AUTH_PAGE_KEYS,
+          ...AUTHORIZE_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
+          ...BILLING_PAGE_KEYS,
           ...CHROME_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
+          ...EVALUATION_EDIT_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
+          ...EXPERIMENT_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GITHUB_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
+          ...HOME_PAGE_KEYS,
+          ...LICENSING_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
           ...NAVIGATION_PAGE_KEYS,
+          ...NOTIFICATION_PAGE_KEYS,
+          ...ONBOARDING_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
+          ...PROJECT_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
+          ...SCIM_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...LANGY_PAGE_KEYS,
+          ...SIMULATION_PAGE_KEYS,
+          ...TOPIC_PAGE_KEYS,
           ...TRACE_PAGE_KEYS,
           ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(25);
+      expect(merged.apis).toHaveLength(36);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });
