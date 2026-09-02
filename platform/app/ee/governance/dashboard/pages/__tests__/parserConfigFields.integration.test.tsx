@@ -281,7 +281,7 @@ describe("given the Copilot Studio licence switch", () => {
 
 describe("given the Copilot Studio create form", () => {
   describe("when the form first renders", () => {
-    /** @scenario "Copilot Studio setup reads as three purposes, in the order admins care" */
+    /** @scenario "The fields stand in three labelled groups" */
     it("stands in three labelled groups, connection then cost then conversation", () => {
       renderFields("copilot_studio_dataverse");
 
