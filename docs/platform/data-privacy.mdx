@@ -1,0 +1,97 @@
+---
+title: "Data Privacy"
+description: "One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level."
+sidebarTitle: Data Privacy
+keywords: data privacy, pii, redaction, secrets, content drop, langwatch
+---
+
+## What the policy controls
+
+The data privacy policy is at **Settings > Data Privacy**. A rule at a scope decides, for every trace that arrives in that scope, what LangWatch stores and who can read it. It has four controls: content, custom attributes, PII redaction and secrets redaction.
+
+The policy changes what LangWatch stores. It does not change the request your application sends to the model provider.
+
+<Frame>
+<img src="/images/platform/data-privacy.png" alt="Settings > Data Privacy with the content, PII and secrets controls" />
+</Frame>
+
+## Scopes and inheritance
+
+Write a rule at the organization, a department, a team or a project. Every control in a new rule starts on **Inherit**, so a rule only changes the controls you set. An organization or department rule can be limited to personal projects.
+
+For each control, the most specific rule that sets it wins, in this order: project, department (personal projects), department, team, organization (personal projects), organization. A control no rule sets uses the platform default: content **Captured**, PII **Essential**, secrets **On**.
+
+Two lists add up across scopes instead of overriding: the PII exceptions and the custom secret patterns. The **Effective for** table on the page shows the result of the cascade for the scope you are looking at.
+
+## Content
+
+Content has four categories: **Input**, **Output**, **System instructions** and **Tool calls**. Set each one to:
+
+| Choice | What LangWatch does |
+|--------|---------------------|
+| **Captured** | Stores the content and shows it to everyone with access to the project |
+| **Restricted** | Stores the content and shows it only to the audience you pick. Everyone else sees a placeholder that names who can see it |
+| **Dropped** | Removes the content at ingestion. It is never stored and cannot be recovered |
+
+**Dropped** applies on every ingestion path: OTLP, the REST collector, the LangWatch AI Gateway, ingestion keys and coding agent logs. It removes the input, output, system and tool call attributes from the span and its events, and strips the matching roles from chat message arrays. A dropped span keeps its tokens, cost, model, latency, ids, names and status, and carries the marker `langwatch.privacy.dropped` so the trace view can explain the gap.
+
+**Restricted** is enforced when the content is read, in the Trace Explorer, the trace API, analytics, evaluations and annotations. A public share link shows captured content only.
+
+**Dropped** and both redactions apply to new traces only. A trace stored before the rule keeps its content. **Restricted** applies to stored traces too, because it is checked at read time.
+
+## Audience
+
+When a category or an attribute is **Restricted**, the **Restricted content is visible to** section appears. One audience applies to every restricted item in the rule:
+
+| Option | Who can read the content |
+|--------|--------------------------|
+| **All members** | Everyone with access to the project |
+| **Project owners** | The owner of a personal project, on their own personal projects |
+| **Admins**, **Members**, **Viewers** | Everyone holding that built-in team role |
+| A custom group | The members of that group |
+
+An empty audience means no one can read the restricted content. A department limits where a rule applies. It cannot be picked as an audience.
+
+## Custom attributes
+
+Add a row per span attribute key pattern, with `*` as a wildcard, for example `gen_ai.prompt.*`. Each row is **Restricted** or **Dropped**. A pattern matches the attribute key. It does not match a path inside a JSON value. A rule holds up to 50 rows of up to 256 characters, and a pattern made only of wildcards is refused.
+
+## PII redaction
+
+PII redaction masks personal data in stored content and replaces each value with a typed marker such as `[EMAIL_ADDRESS]`. It runs at ingestion, before the span is stored.
+
+| Level | What is redacted |
+|-------|------------------|
+| **Off** | No personal data |
+| **Essential** | Emails, phone numbers, card numbers, IP addresses and national ids, detected as the data arrives |
+| **Strict** | Essential plus names, locations and more, through deeper detection that can add latency |
+| **Custom** | Exactly the entities you tick, from both lists |
+
+Card numbers and Brazilian CPF are checksum-validated before redaction. Attribute values over 250,000 characters are skipped. When the deep detection service cannot be reached, LangWatch applies the Essential level and marks the span with `langwatch.privacy.pii_incomplete`.
+
+**Exceptions** are regular expressions that must not be redacted, for example an internal id format like `00[0-9]{12}`. A rule holds up to 50. LangWatch refuses a pattern that would also match ordinary data such as a card number, an email or a phone number.
+
+## Secrets redaction
+
+Secrets redaction scrubs API keys, tokens, private keys and database URLs from stored content and replaces them with `[SECRET]`. It is **On** by default and runs at ingestion.
+
+The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor style prefix with a high entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
+
+**Custom patterns** add your own regular expressions on top, for example `acme_live_[a-z0-9]+`. LangWatch refuses a pattern that also matches ordinary text, and tells you which sample it matched.
+
+## Who can change the policy
+
+| Rule scope | Permission to write |
+|------------|---------------------|
+| Organization, department | `organization:manage` |
+| Team | `team:manage` |
+| Project | `project:update` |
+
+Anyone with `project:view` can open the page for a project. Organization and department rules are listed only to people with `organization:manage`.
+
+## Boundaries
+
+- The policy governs traces. Content already copied elsewhere, for example into a dataset row or an exported file, is not covered.
+- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns the ingestion-time drop off. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
+
+**Also check:** [Data Retention](/platform/data-retention) for how long traces are kept, and [Access Control (RBAC)](/platform/rbac) for the roles named in the audience.

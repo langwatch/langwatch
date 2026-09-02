@@ -270,13 +270,17 @@
               {
                 "group": "Administration",
                 "pages": [
-                  "platform/api-keys",
+                  "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/api-keys",
                   "platform/audit-log",
+                  "platform/data-privacy",
+                  "platform/data-retention",
+                  "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
                   "platform/model-providers",
-                  "platform/data-retention"
+                  "platform/command-bar"
                 ]
               }
             ]

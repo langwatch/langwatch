@@ -158,13 +158,17 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Administration
 
+- [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
+- [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
-- [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments.
-- [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Track user actions and changes in LangWatch
+- [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed.
+- [Data Privacy](https://langwatch.ai/docs/platform/data-privacy.md): One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level.
+- [Data Retention](https://langwatch.ai/docs/platform/data-retention.md): Control how long LangWatch keeps your event data before it's deleted.
+- [Secrets](https://langwatch.ai/docs/platform/secrets.md): Encrypted, write-only credentials stored per project and referenced by name from workflow code blocks and HTTP agents.
 - [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Automatically provision and deprovision users in LangWatch using SCIM 2.0 with your identity provider (Okta, Azure AD, etc.).
 - [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Automatically assign roles to users in LangWatch based on groups pushed from your identity provider.
 - [Model Providers](https://langwatch.ai/docs/platform/model-providers.md): Configure LLM credentials once at the organisation, team, or project scope, and let every project that needs them inherit.
-- [Data Retention](https://langwatch.ai/docs/platform/data-retention.md): Control how long LangWatch keeps your event data before it's deleted.
+- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
 
 ## Examples & Cookbooks
 
