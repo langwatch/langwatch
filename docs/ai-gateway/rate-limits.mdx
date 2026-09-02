@@ -34,10 +34,13 @@ A rejected request gets HTTP 429 with the code `rate_limited`:
   "error": {
     "type": "rate_limited",
     "code": "rate_limited",
-    "message": "rpm 60 exceeded"
+    "message": "rate_limited",
+    "fault": "customer"
   }
 }
 ```
+
+The response also carries `X-LangWatch-Handled-Error: rate_limited`. It carries no `Retry-After` header and does not say whether the minute or the day limit fired.
 
 A 429 that comes from the provider is forwarded as the provider sent it, with the provider's `Retry-After` header and `X-LangWatch-Provider` naming the provider.
 

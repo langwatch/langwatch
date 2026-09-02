@@ -45,7 +45,7 @@ The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and
 | Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
 | Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
 | ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
-| Models | `GET /v1/models` | Lists the models the key can call. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
+| Models | `GET /v1/models` | Lists the models the key can call, as bare names without a provider prefix. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
 
 A request to an endpoint the provider does not serve gets the provider's own error back. For example, `POST /v1/embeddings` with an Anthropic model returns Anthropic's rejection.
 

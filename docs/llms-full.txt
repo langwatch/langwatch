@@ -3350,7 +3350,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 | **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
 | **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
 
-The budget is in force at once: the next request counts against it.
+The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
 
 If no active key sends traffic to the target, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
@@ -10115,7 +10115,7 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **A
 |---|---|
 | `AZURE_OPENAI_API_KEY` | The key of your Azure OpenAI resource. |
 | `AZURE_OPENAI_ENDPOINT` | The resource endpoint, for example `https://acme-eu.openai.azure.com`. |
-| `AZURE_OPENAI_API_VERSION` | Optional. The `api-version` query parameter. The default is `2025-04-01-preview`. |
+| `AZURE_OPENAI_API_VERSION` | The `api-version` query parameter. Set a version that serves your models, for example `2025-01-01-preview`. With an older version Azure answers `404 Resource not found`. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
@@ -10125,7 +10125,7 @@ Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure 
 
 Azure serves models through deployments that you name yourself. The gateway uses the model id as the deployment name: `azure/gpt-5-mini` calls the deployment named `gpt-5-mini` on the resource.
 
-Add each deployment name under **Custom Models** on the row so that `GET /v1/models` lists it.
+Add each deployment name under **Custom Models** on the row. A request for a model that is not on the row's list is rejected before it reaches Azure with `400 provider_config_invalid` and the message `This model provider is not configured to serve "gpt-5-mini"`.
 
 To keep application code on generic names when your deployment names differ, map them on the key with `model_aliases`, for example `{"gpt-5-mini": "azure/acme-mini-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -10183,7 +10183,9 @@ All three fields are required.
 
 ## Model names
 
-Write `bedrock/<model id>` with the Bedrock model id or inference profile id, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0`. The gateway does not infer Bedrock from a bare name. Add the ids you use under **Custom Models** on the row so that `GET /v1/models` lists them.
+Write `bedrock/<inference profile id>`, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0` or `bedrock/eu.amazon.nova-lite-v1:0`. The region prefix of the profile (`us.`, `eu.`) must match the region of the credential. A plain model id such as `anthropic.claude-haiku-4-5-20251001-v1:0` is refused by Bedrock for on-demand models, and the gateway forwards that `400 provider_error` unchanged.
+
+The gateway does not infer Bedrock from a bare name. Add the ids you use under **Custom Models** on the row.
 
 Map friendly names on the key with `model_aliases`, for example `{"claude-haiku": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"}`. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -10778,7 +10780,7 @@ The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and
 | Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
 | Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
 | ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
-| Models | `GET /v1/models` | Lists the models the key can call. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
+| Models | `GET /v1/models` | Lists the models the key can call, as bare names without a provider prefix. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
 
 A request to an endpoint the provider does not serve gets the provider's own error back. For example, `POST /v1/embeddings` with an Anthropic model returns Anthropic's rejection.
 
@@ -10814,7 +10816,7 @@ Save the row. Every virtual key whose scope can see the row can now dispatch to 
 
 ## Model names
 
-Write `vertex/<model>`, for example `vertex/gemini-2.5-pro`. The gateway does not infer Vertex AI from a bare name. Add the models you use under **Custom Models** on the row so that `GET /v1/models` lists them.
+Write `vertex/<model>`, for example `vertex/gemini-2.5-flash`. `vertex_ai/` is accepted as an alias. The gateway does not infer Vertex AI from a bare name. Add the models you use under **Custom Models** on the row.
 
 ## Send a request
 
@@ -11070,10 +11072,13 @@ A rejected request gets HTTP 429 with the code `rate_limited`:
   "error": {
     "type": "rate_limited",
     "code": "rate_limited",
-    "message": "rpm 60 exceeded"
+    "message": "rate_limited",
+    "fault": "customer"
   }
 }
 ```
+
+The response also carries `X-LangWatch-Handled-Error: rate_limited`. It carries no `Retry-After` header and does not say whether the minute or the day limit fired.
 
 A 429 that comes from the provider is forwarded as the provider sent it, with the provider's `Retry-After` header and `X-LangWatch-Provider` naming the provider.
 

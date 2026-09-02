@@ -20,7 +20,9 @@ All three fields are required.
 
 ## Model names
 
-Write `bedrock/<model id>` with the Bedrock model id or inference profile id, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0`. The gateway does not infer Bedrock from a bare name. Add the ids you use under **Custom Models** on the row so that `GET /v1/models` lists them.
+Write `bedrock/<inference profile id>`, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0` or `bedrock/eu.amazon.nova-lite-v1:0`. The region prefix of the profile (`us.`, `eu.`) must match the region of the credential. A plain model id such as `anthropic.claude-haiku-4-5-20251001-v1:0` is refused by Bedrock for on-demand models, and the gateway forwards that `400 provider_error` unchanged.
+
+The gateway does not infer Bedrock from a bare name. Add the ids you use under **Custom Models** on the row.
 
 Map friendly names on the key with `model_aliases`, for example `{"claude-haiku": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"}`. See [Model aliases](/ai-gateway/model-aliases).
 
