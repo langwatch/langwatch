@@ -33,12 +33,12 @@
  * design removes; `ON CONFLICT DO UPDATE ... WHERE` is atomic.
  */
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "../../projections/authz-grant.projection";
 import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration";
-import type { AuthzDatabase } from "../authz-read.repository";
 import { AuthzGrantMapper } from "./prisma.authz-grant.mapper";
 
 const logger = createLogger("langwatch:authz:projection-compat");
@@ -135,8 +135,25 @@ class AuthzProjectionResultMapper {
   }
 }
 
+/**
+ * Exactly the five models this writer touches, and the two client-level calls
+ * the guard needs, named off the generated client rather than restated.
+ *
+ * `Grant` and `Role` are the authoritative heads; `RoleBinding`, `CustomRole`
+ * and `ShareLink` are the legacy heads a grant expands onto. `$transaction`
+ * keeps one batch from leaving the model half-written and `$executeRaw` is
+ * what makes the `occurredAt` guard part of the same statement as the write.
+ *
+ * A composition root hands its own typed client down to this slice, so no
+ * caller has to name a model this repository never reads.
+ */
+export type AuthzProjectionDatabase = Pick<
+  PrismaClient,
+  "grant" | "role" | "roleBinding" | "customRole" | "shareLink" | "$transaction" | "$executeRaw"
+>;
+
 export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
-  static create(database: AuthzDatabase): PrismaAuthzProjectionRepository {
+  static create(database: AuthzProjectionDatabase): PrismaAuthzProjectionRepository {
     return new PrismaAuthzProjectionRepository(database as unknown as ProjectionDatabase);
   }
 

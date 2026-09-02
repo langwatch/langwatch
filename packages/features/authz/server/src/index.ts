@@ -10,6 +10,11 @@ export {
   type PostgresAuthzBuild,
 } from "./adapters/postgres.authz.adapter";
 export {
+  PostgresAuthzPipelineAdapter,
+  type AuthzGrantPipelineDatabase,
+  type PostgresAuthzPipelineOptions,
+} from "./adapters/postgres.authz-pipeline.adapter";
+export {
   AuthzGrantsCommandDispatcher,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,

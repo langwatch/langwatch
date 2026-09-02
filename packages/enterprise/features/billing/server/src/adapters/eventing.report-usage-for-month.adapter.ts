@@ -7,6 +7,10 @@ import {
   type ReportUsageForMonthCommandData,
 } from "@langwatch/enterprise-billing-contract";
 import type { BillingErrorReporter } from "../ports/error-reporter.port";
+import type {
+  BillingReportOrganization,
+  BillingReportOrganizationPort,
+} from "../ports/billing-report-organization.port";
 import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port";
 import type { BillableEventsQueryService } from "../services/billable-events-query.service";
 import type { UsageReportingService } from "../services/usage-reporting.service";
@@ -27,12 +31,6 @@ function toError(value: unknown): Error {
   return new Error(typeof value === "string" ? value : JSON.stringify(value));
 }
 
-type CachedOrgData = {
-  id: string;
-  stripeCustomerId: string | null;
-  subscriptions: { id: string }[];
-};
-
 /**
  * How long a billing organization read stays good, and the key prefix it is
  * stored under. Both were the constructor arguments of the process-wide cache
@@ -50,23 +48,12 @@ export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:";
  * and writes one key per organization.
  */
 export interface BillingOrganizationCache {
-  get(key: string): Promise<CachedOrgData | undefined>;
-  set(key: string, value: CachedOrgData): Promise<void>;
-}
-
-/**
- * The one organization read this command makes.
- *
- * Narrow and structural so Billing does not take a dependency on the whole
- * organization service to answer "is this org on SEAT_EVENT pricing, and does
- * it have a Stripe customer and a live subscription".
- */
-export interface BillingReportOrganizationReader {
-  getOrganizationForBilling(organizationId: string): Promise<CachedOrgData | null>;
+  get(key: string): Promise<BillingReportOrganization | undefined>;
+  set(key: string, value: BillingReportOrganization): Promise<void>;
 }
 
 export interface ReportUsageForMonthCommandDeps {
-  organizations: BillingReportOrganizationReader;
+  organizations: BillingReportOrganizationPort;
   billingCheckpoints: BillingCheckpointPort;
   getUsageReportingService: () => UsageReportingService | undefined;
   /** Nullable by contract: `null` means ClickHouse was unavailable, and the

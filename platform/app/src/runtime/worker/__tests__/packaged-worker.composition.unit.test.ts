@@ -376,11 +376,7 @@ describe("packaged worker composition root", () => {
         capabilities.gatewaySpend?.spend.connectSettlement,
         capabilities.scenario?.installer.connect,
         capabilities.langyConversation?.installer.connectCommands,
-        capabilities.billingReporting?.installer.connectSelfDispatch,
-        capabilities.authz?.installer.connect,
       ]).toEqual([
-        workerCapabilityAlreadyConnected,
-        workerCapabilityAlreadyConnected,
         workerCapabilityAlreadyConnected,
         workerCapabilityAlreadyConnected,
         workerCapabilityAlreadyConnected,

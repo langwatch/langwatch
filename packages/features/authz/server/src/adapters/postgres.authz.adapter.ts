@@ -22,7 +22,10 @@ import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz
 import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository";
-import { PrismaAuthzProjectionRepository } from "../repositories/prisma/prisma.authz-projection.repository";
+import {
+  type AuthzProjectionDatabase,
+  PrismaAuthzProjectionRepository,
+} from "../repositories/prisma/prisma.authz-projection.repository";
 import {
   type AuthzBindingDatabase,
   PrismaAuthzBindingRepository,
@@ -54,7 +57,8 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
-  AuthzBindingDatabase;
+  AuthzBindingDatabase &
+  AuthzProjectionDatabase;
 
 export type PostgresAuthzAdapterOptions = {
   database: PostgresAuthzDatabase;

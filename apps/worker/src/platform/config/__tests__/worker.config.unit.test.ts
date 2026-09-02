@@ -25,6 +25,7 @@ describe("resolveWorkerConfig", () => {
       },
       shutdown: { processDeadlineMs: 25_000 },
       deployment: { saas: false },
+      stripe: { secretKey: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },
       processing: { metricShards: undefined, logShards: undefined },

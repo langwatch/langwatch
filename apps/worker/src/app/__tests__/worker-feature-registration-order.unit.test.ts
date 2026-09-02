@@ -286,10 +286,7 @@ function createComposition(registered: string[]) {
       eventing,
     }),
     authz: AuthzWorkerFeatureInstaller.create({
-      installer: {
-        pipeline: namedDefinition("authz_grants"),
-        connect: vi.fn(),
-      },
+      installer: { pipeline: namedDefinition("authz_grants") },
       eventing,
     }),
     identity: IdentityWorkerFeatureInstaller.create({

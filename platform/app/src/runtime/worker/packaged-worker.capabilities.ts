@@ -192,18 +192,6 @@ export function packagedWorkerCapabilities(options: {
           ).register(),
       },
     },
-    billingReporting: {
-      installer: {
-        buildProcessing: () => definition("billing_reporting"),
-        connectSelfDispatch: workerCapabilityAlreadyConnected,
-      },
-    },
-    authz: {
-      installer: {
-        pipeline: definition("authz_grant"),
-        connect: workerCapabilityAlreadyConnected,
-      },
-    },
     identity: {
       ssoConnection: { pipeline: definition("sso-connections") },
       joinRequest: { pipeline: definition("join-requests") },

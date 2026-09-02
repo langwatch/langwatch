@@ -14,6 +14,10 @@ import {
   PostgresAgentSandboxKeyReapAdapter,
 } from "@langwatch/api-key-server";
 import {
+  type AuthzGrantPipelineDatabase,
+  PostgresAuthzPipelineAdapter,
+} from "@langwatch/authz-server";
+import {
   type GithubBranchMaintenanceDatabase,
   PostgresGithubBranchMaintenanceAdapter,
 } from "@langwatch/github-server";
@@ -39,12 +43,20 @@ import {
 } from "@langwatch/metric-server";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import {
+  BillableEventsQueryService,
   ClickHouseBillableEventsMeterAdapter,
+  ClickHouseBillingAdapter,
   EventingBillableEventsMeterAdapter,
   EventingBillingMeterDispatchAdapter,
+  EventingBillingReportingAdapter,
+  ObservabilityBillingErrorAdapter,
+  PostgresBillingReportingAdapter,
   PostgresBillingTenantOrganizationAdapter,
+  RedisBillingOrganizationCacheAdapter,
   RedisBillingTenantOrganizationCacheAdapter,
+  StripeUsageReportingAdapter,
   BillingTenantOrganizationService,
+  type BillingReportingDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
@@ -57,18 +69,12 @@ import {
   TraceProcessingInstallerPort,
 } from "@langwatch/trace-server";
 import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer";
-import {
-  AuthzWorkerFeatureInstaller,
-  type AuthzWorkerCapability,
-} from "../features/authz/authz-worker-feature.installer";
+import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer";
 import {
   AutomationWorkerFeatureInstaller,
   type AutomationWorkerCapability,
 } from "../features/automation/automation-worker-feature.installer";
-import {
-  BillingReportingWorkerFeatureInstaller,
-  type BillingReportingWorkerCapability,
-} from "../features/billing/billing-reporting-worker-feature.installer";
+import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer";
 import {
   CodingAgentWorkerFeatureInstaller,
   type CodingAgentWorkerCapability,
@@ -180,6 +186,8 @@ export type WorkerLangyConversationCompositionOptions = {
  * another feature's option, and the fallback goes when the platform root does.
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
+  AuthzGrantPipelineDatabase &
+  BillingReportingDatabase &
   BillingTenantOrganizationDatabase &
   GithubBranchMaintenanceDatabase &
   IdentityPipelineDatabase &
@@ -284,16 +292,6 @@ export type WorkerGovernanceIngestionCompositionOptions = {
   installer: GovernanceIngestionWorkerCapability;
 };
 
-/** The monthly billing roll-up, whose command re-dispatches itself forward. */
-export type WorkerBillingReportingCompositionOptions = {
-  installer: BillingReportingWorkerCapability;
-};
-
-/** The AuthZ grants ledger, mounted last so every producer exists first. */
-export type WorkerAuthzCompositionOptions = {
-  installer: AuthzWorkerCapability;
-};
-
 /** Resolved technical inputs for the Worker-owned transport foundation. */
 export type WorkerInfrastructureCompositionOptions = Omit<
   WorkerInfrastructureAdapterOptions,
@@ -334,8 +332,6 @@ type WorkerProductionCompositionBaseOptions = {
   scenario?: WorkerScenarioCompositionOptions;
   experiment?: WorkerExperimentCompositionOptions;
   governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
-  billingReporting?: WorkerBillingReportingCompositionOptions;
-  authz?: WorkerAuthzCompositionOptions;
   identity?: WorkerIdentityCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
@@ -397,12 +393,11 @@ export class WorkerProductionComposition {
     // A SaaS worker that metered without composing the pipeline its reports
     // are sent through would count every billable event correctly and report
     // none of them — revenue that is present in ClickHouse, absent from
-    // Stripe, and visible nowhere else. Refuse at composition instead.
-    if (options.config.deployment.saas && !options.billingReporting) {
-      throw new Error(
-        "A SaaS worker mounts the billable-events meter, whose usage reports are sent by the billing reporting pipeline; compose that pipeline or do not declare this process SaaS.",
-      );
-    }
+    // Stripe, and visible nowhere else. This graph composes that pipeline
+    // itself, unconditionally, so the pairing is structural rather than
+    // checked; what is left to get wrong is ORDER, and the guard below is what
+    // says so — the meter is configured on the runtime's construction, which
+    // is before any installer exists.
     let billingReportingInstaller: BillingReportingWorkerFeatureInstaller | undefined;
     const saasMeter = options.config.deployment.saas
       ? saasBillableEventsMeter({
@@ -623,19 +618,72 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const billingReporting = options.billingReporting
-      ? BillingReportingWorkerFeatureInstaller.create({
-          installer: options.billingReporting.installer,
-          eventing,
-        })
+    // Unconditional, exactly as the legacy registry registers it, and for the
+    // same reason the sweeps above are: every dependency is composed from this
+    // package over substrates this process already holds. The roll-up is a
+    // command-only pipeline — no projections, no subscribers — so on a
+    // self-hosted install nothing dispatches into it; registering it either
+    // way is what keeps producer and consumer routing one key set off the
+    // shared `event-sourcing/jobs` queue.
+    //
+    // The ClickHouse read is asked for by ORGANIZATION, which the tenant-keyed
+    // resolver answers because the routing directory treats an organization id
+    // as a tenant of itself — the same equivalence the meter rides. Asking for
+    // the project instead would still return a client and still count, off the
+    // shared instance, for a customer whose data is on their own cluster.
+    //
+    // The organization cache rides the queue's one Redis under the prefix and
+    // lifetime the App's own `TtlCache` uses, so neither graph expires the
+    // other's entries early or reads a cache the other never writes.
+    //
+    // The Stripe sender is the half that IS deployment-shaped, and it is built
+    // on the same leaf the App builds its own on: a SaaS process resolves one
+    // and refuses without a key — the refusal `AppStripeRuntime.create`
+    // already makes — while a self-hosted process composes none at all, which
+    // is what `usageReportingService` is on the App side of the same install.
+    const billingReportingPersistence = PostgresBillingReportingAdapter.create({
+      database: options.database ?? options.topic.database,
+    }).build();
+    const billableEvents = BillableEventsQueryService.create(
+      ClickHouseBillingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        resolveOrganizationClient: options.eventing.resolveClickHouseClient,
+      }).build(),
+    );
+    const usageReporting = options.config.deployment.saas
+      ? StripeUsageReportingAdapter.create({
+          secretKey: options.config.stripe.secretKey,
+          nodeEnvironment: options.config.nodeEnvironment,
+        }).build()
       : undefined;
+    const billingReporting = BillingReportingWorkerFeatureInstaller.create({
+      installer: EventingBillingReportingAdapter.create({
+        organizations: billingReportingPersistence.organizations,
+        billingCheckpoints: billingReportingPersistence.checkpoints,
+        getUsageReportingService: () => usageReporting,
+        queryBillableEventsTotal: (input) => billableEvents.tryQueryBillableEventsTotal(input),
+        organizationCache: RedisBillingOrganizationCacheAdapter.create({
+          redis: eventingOptions.groupQueue.redis,
+        }),
+        errorReporter: ObservabilityBillingErrorAdapter.create(),
+      }),
+      eventing,
+    });
     billingReportingInstaller = billingReporting;
-    const authz = options.authz
-      ? AuthzWorkerFeatureInstaller.create({
-          installer: options.authz.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as the identity ledgers below: the
+    // grants ledger's CONSUMER half takes exactly two Postgres bindings — the
+    // read model's guarded writer and the insert-only audit trail — over the
+    // one Prisma client this process opened, so there is no graph in which it
+    // is present but unbuildable. Its producer half stays with the
+    // application, which is the process that writes grants.
+    const authz = AuthzWorkerFeatureInstaller.create({
+      installer: {
+        pipeline: PostgresAuthzPipelineAdapter.create({
+          database: options.database ?? options.topic.database,
+        }).build(),
+      },
+      eventing,
+    });
     // Unconditional, on the same footing as the sweeps and the two processing
     // pipelines above: both ledgers are composed from their own feature
     // package over the one Prisma client this process opened, so there is no
@@ -818,7 +866,6 @@ export class WorkerProductionComposition {
       experiment: options.experiment,
       governanceIngestion: options.governanceIngestion,
       billingReporting: options.billingReporting,
-      authz: options.authz,
     });
   }
 
@@ -847,7 +894,6 @@ export class WorkerProductionComposition {
   readonly experiment: ExperimentWorkerFeatureInstaller | undefined;
   readonly governanceIngestion: GovernanceIngestionWorkerFeatureInstaller | undefined;
   readonly billingReporting: BillingReportingWorkerFeatureInstaller | undefined;
-  readonly authz: AuthzWorkerFeatureInstaller | undefined;
 
   private constructor(parts: {
     application: WorkerApplication;
@@ -867,7 +913,6 @@ export class WorkerProductionComposition {
     experiment: ExperimentWorkerFeatureInstaller | undefined;
     governanceIngestion: GovernanceIngestionWorkerFeatureInstaller | undefined;
     billingReporting: BillingReportingWorkerFeatureInstaller | undefined;
-    authz: AuthzWorkerFeatureInstaller | undefined;
   }) {
     this.application = parts.application;
     this.eventing = parts.eventing;
@@ -886,7 +931,6 @@ export class WorkerProductionComposition {
     this.experiment = parts.experiment;
     this.governanceIngestion = parts.governanceIngestion;
     this.billingReporting = parts.billingReporting;
-    this.authz = parts.authz;
   }
 }
 
@@ -930,8 +974,8 @@ export class WorkerProductionComposition {
  *   topic
  *   governance-ingestion Enterprise pulled-usage and ingestion-pull
  *   billing-reporting
- *   authz                the grants ledger opens its durable write path only
- *                        once every producer is registered
+ *   authz                the grants ledger, registered after every pipeline
+ *                        that can emit a grant change
  *   identity             the four ADR-101 ledgers, after AuthZ exactly as the
  *   sso-connection       legacy registry mounts them. Their relative order is
  *   scim-sync            free — none subscribes to another's events — but the

@@ -310,10 +310,7 @@ describe("WorkerProductionComposition", () => {
         .sort();
     }
 
-    function compositionFor(
-      source: Record<string, unknown>,
-      options: { billingReporting?: boolean } = {},
-    ): WorkerProductionComposition {
+    function compositionFor(source: Record<string, unknown>): WorkerProductionComposition {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
         eventing: {
@@ -334,21 +331,6 @@ describe("WorkerProductionComposition", () => {
           execution: {} as never,
           metrics: {} as never,
         },
-        ...(options.billingReporting === false
-          ? {}
-          : {
-              billingReporting: {
-                // Never built: these cases read what the runtime's own
-                // construction registers, and the reporting pipeline registers
-                // at install time.
-                installer: {
-                  buildProcessing: () => {
-                    throw new Error("billing reporting is not installed in this case");
-                  },
-                  connectSelfDispatch: () => void 0,
-                },
-              },
-            }),
       });
     }
 
@@ -369,9 +351,9 @@ describe("WorkerProductionComposition", () => {
      */
     /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
     it("mounts the billable-events meter pair a SaaS install produces into", () => {
-      expect(globalRoutingKeys(compositionFor({ IS_SAAS: "true" }))).toEqual(
-        expectedGlobalRoutingKeys(),
-      );
+      expect(
+        globalRoutingKeys(compositionFor({ IS_SAAS: "true", STRIPE_SECRET_KEY: "sk_test_worker" })),
+      ).toEqual(expectedGlobalRoutingKeys());
     });
 
     /**
@@ -419,16 +401,34 @@ describe("WorkerProductionComposition", () => {
 
     /**
      * The reports the meter's dispatch subscriber asks for are sent by the
-     * billing reporting pipeline, which this same composition registers. A
-     * SaaS graph without it would count every billable event correctly and
-     * report none of them: revenue present in ClickHouse, absent from Stripe,
-     * and visible nowhere else.
+     * billing reporting pipeline, which this same composition now registers
+     * unconditionally — so the pairing is structural rather than checked. What
+     * a SaaS graph can still be missing is the credential the reports are SENT
+     * with, and it is refused for the same reason: a process that counted
+     * every billable event correctly and reported none of them would leave
+     * revenue present in ClickHouse, absent from Stripe, and visible nowhere
+     * else. This is the refusal `AppStripeRuntime.create` already makes, so
+     * the App and the worker fail the same misconfiguration identically.
      */
-    /** @scenario "A SaaS worker refuses to meter without a pipeline to report through" */
-    it("refuses to meter where it composed no pipeline to report through", () => {
-      expect(() => compositionFor({ IS_SAAS: "true" }, { billingReporting: false })).toThrow(
-        /billing reporting pipeline/,
-      );
+    /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
+    it("refuses to compose a SaaS graph with no Stripe secret to report through", () => {
+      expect(() => compositionFor({ IS_SAAS: "true" })).toThrow(/Stripe secret key is required/);
+    });
+
+    /**
+     * The other direction, and the reason the pipeline is NOT gated on the
+     * deployment leaf the meter is gated on: the legacy registry registers the
+     * roll-up on every install, and the two graphs share one
+     * `event-sourcing/jobs` queue. A consumer that skipped it on a self-hosted
+     * install would reject the App's own `billing_reporting` jobs for
+     * redelivery forever while every health signal stayed green.
+     */
+    /** @scenario "The monthly roll-up is registered on every install" */
+    it("mounts the reporting pipeline on a self-hosted install too, with no sender", () => {
+      const features = compositionFor({}).featureInstallers.map((installer) => installer.name);
+
+      expect(features).toContain("billing-reporting");
+      expect(globalRoutingKeys(compositionFor({}))).toEqual([]);
     });
   });
 
@@ -1372,6 +1372,274 @@ describe("WorkerProductionComposition", () => {
       );
 
       expect(recording.scimUpsert).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the monthly billing roll-up is composed", () => {
+    function reportingSubstrate() {
+      const organizationFindFirst = vi.fn(async () => ({
+        id: "organization_acme",
+        stripeCustomerId: "cus_1",
+        subscriptions: [{ id: "sub_1" }],
+      }));
+      const checkpointFindUnique = vi.fn(async () => null);
+      const redisGet = vi.fn(async () => null);
+      const redisSetex = vi.fn(async () => "OK");
+      const resolveClickHouseClient = vi.fn(async () => ({
+        insert: async () => undefined,
+        query: async () => ({ json: async () => [{ total: "0" }] }),
+      }));
+      const database = {
+        organization: { findFirst: organizationFindFirst },
+        billingMeterCheckpoint: {
+          findUnique: checkpointFindUnique,
+          upsert: vi.fn(async () => undefined),
+        },
+      };
+      return {
+        database,
+        organizationFindFirst,
+        checkpointFindUnique,
+        redisGet,
+        redisSetex,
+        resolveClickHouseClient,
+        redis: { get: redisGet, setex: redisSetex },
+      };
+    }
+
+    function compositionWith(
+      substrate: ReturnType<typeof reportingSubstrate>,
+    ): WorkerProductionComposition {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: substrate.resolveClickHouseClient as never,
+          groupQueue: { redis: substrate.redis as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: substrate.database as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+    }
+
+    async function reportOneMonth(substrate: ReturnType<typeof reportingSubstrate>): Promise<void> {
+      const composition = compositionWith(substrate);
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "billing-reporting",
+      );
+      expect(installer, "the composition mounted no billing-reporting feature").toBeDefined();
+      const definitions: Record<string, unknown>[] = [];
+      vi.spyOn(composition.eventing.eventSourcing, "register").mockImplementation((definition) => {
+        definitions.push(definition as unknown as Record<string, unknown>);
+        return { commands: { reportUsageForMonth: { send: async () => undefined } } } as never;
+      });
+      await installer!.install();
+
+      const command = (
+        definitions[0] as unknown as {
+          commands: {
+            name: string;
+            handlerInstance?: { handle(command: unknown): Promise<void> };
+          }[];
+        }
+      ).commands.find((candidate) => candidate.name === "reportUsageForMonth");
+      expect(command?.handlerInstance, "the roll-up registered no handler").toBeDefined();
+
+      await command!.handlerInstance!.handle({
+        data: {
+          organizationId: "organization_acme",
+          billingMonth: "2026-08",
+          tenantId: "project_alpha",
+          occurredAt: 1_700_000_000_000,
+        },
+      });
+    }
+
+    /**
+     * The billable-events table is keyed by ORGANIZATION, and the tenant-keyed
+     * resolver this process already holds answers it because the routing
+     * directory treats an organization id as a tenant of itself. Asking for the
+     * project instead would still return a client and still return a number —
+     * off the shared instance, for a customer whose data is on their own
+     * cluster — and a wrong total is reported to Stripe rather than noticed.
+     */
+    /** @scenario "The worker reads the month's total by organization, not by tenant" */
+    it("resolves the roll-up's ClickHouse client for the organization, not the tenant", async () => {
+      const substrate = reportingSubstrate();
+
+      await reportOneMonth(substrate);
+
+      expect(substrate.resolveClickHouseClient).toHaveBeenCalledWith("organization_acme");
+      expect(substrate.resolveClickHouseClient).not.toHaveBeenCalledWith("project_alpha");
+    });
+
+    /**
+     * The organization read and the checkpoint both ride the one Prisma client
+     * this process opened, and the read-through cache rides the queue's one
+     * Redis under the keyspace the App's own `TtlCache` writes.
+     */
+    /** @scenario "The worker builds the monthly roll-up from its own client" */
+    it("reads the organization, the cache and the checkpoint off this process's own substrates", async () => {
+      const substrate = reportingSubstrate();
+
+      await reportOneMonth(substrate);
+
+      expect(substrate.redisGet).toHaveBeenCalledWith("ttlcache:billing:orgData:organization_acme");
+      expect(substrate.organizationFindFirst).toHaveBeenCalledTimes(1);
+      expect(substrate.redisSetex).toHaveBeenCalledWith(
+        "ttlcache:billing:orgData:organization_acme",
+        60,
+        expect.any(String),
+      );
+      expect(substrate.checkpointFindUnique).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the AuthZ grants ledger is composed", () => {
+    function grantsDatabase() {
+      const executeRaw = vi.fn(async () => 1);
+      const roleBindingUpsert = vi.fn(async () => undefined);
+      const auditCreateMany = vi.fn(async () => ({ count: 1 }));
+      const delegate = () => ({
+        findUnique: vi.fn(async () => null),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
+        upsert: vi.fn(async () => undefined),
+      });
+      const database = {
+        grant: delegate(),
+        role: delegate(),
+        roleBinding: { ...delegate(), upsert: roleBindingUpsert },
+        customRole: delegate(),
+        shareLink: delegate(),
+        auditLog: { createMany: auditCreateMany },
+        $transaction: vi.fn(async (writes: Promise<unknown>[]) => Promise.all(writes)),
+        $executeRaw: executeRaw,
+      };
+      return { database, executeRaw, roleBindingUpsert, auditCreateMany };
+    }
+
+    function compositionWith(database: object = {}): WorkerProductionComposition {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: database as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+    }
+
+    async function registeredGrantsPipeline(
+      composition: WorkerProductionComposition,
+    ): Promise<{ names: string[]; definition: Record<string, unknown> }> {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "authz",
+      );
+      expect(installer, "the composition mounted no authz feature").toBeDefined();
+      const names: string[] = [];
+      const definitions: Record<string, unknown>[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        names.push(definition.metadata.name);
+        definitions.push(definition as unknown as Record<string, unknown>);
+        return {} as never;
+      });
+      await installer!.install();
+      return { names, definition: definitions[0]! };
+    }
+
+    /**
+     * The consumer half of the ledger takes exactly two Postgres bindings, so
+     * this process builds it rather than receiving a definition the App
+     * assembled. Its producer half stays with the application: `connect` hands
+     * a WRITER the senders a registration produced, and this process writes no
+     * grants.
+     */
+    /** @scenario "The worker mounts the grants ledger itself" */
+    it("mounts the grants ledger without being handed a capability", async () => {
+      const composition = compositionWith(grantsDatabase().database);
+
+      expect(await registeredGrantsPipeline(composition)).toMatchObject({
+        names: ["authz_grant"],
+      });
+    });
+
+    /**
+     * One grant event expands onto BOTH heads through one client: the
+     * authoritative `Grant` row behind its own `occurredAt` guard, and the
+     * legacy `RoleBinding` the legacy resolver and the settings screens still
+     * read. A graph wired to a second client would register identical routing
+     * keys and write half the expansion somewhere else.
+     */
+    /** @scenario "The worker builds the grants ledger from its own client" */
+    it("expands a grant onto the one Prisma client this process opened", async () => {
+      const recording = grantsDatabase();
+      const composition = compositionWith(recording.database);
+      const { definition } = await registeredGrantsPipeline(composition);
+      const projection = (
+        definition as unknown as {
+          mapProjections: Map<
+            string,
+            {
+              definition: {
+                map(event: unknown): unknown;
+                store: { append(write: unknown, context: unknown): Promise<void> };
+              };
+            }
+          >;
+        }
+      ).mapProjections.get("authzGrantsWrite")!.definition;
+
+      await projection.store.append(
+        projection.map({
+          id: "event_1",
+          aggregateId: "grant_1",
+          aggregateType: "authz_grant",
+          tenantId: createTenantId("organization_acme"),
+          createdAt: 1_700_000_000_000,
+          occurredAt: 1_700_000_000_000,
+          type: "lw.authz.grant.attached",
+          version: "1",
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_sam" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "grants-service",
+            actor: { type: "user", id: "user_admin" },
+          },
+        }),
+        {} as never,
+      );
+
+      expect(recording.executeRaw).toHaveBeenCalledTimes(1);
+      expect(recording.roleBindingUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: "organization_acme", id: "grant_1" },
+        }),
+      );
     });
   });
 

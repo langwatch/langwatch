@@ -1,16 +1,14 @@
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,
 } from "../../adapters/eventing.authz-audit.adapter";
 
-type AuthzAuditDelegate = {
-  createMany(args: { data: AuthzAuditRow[]; skipDuplicates: boolean }): Promise<unknown>;
-};
-
-/** Structural database capability for the insert-only AuthZ audit trail. */
-export type AuthzAuditDatabase = Readonly<{
-  auditLog: AuthzAuditDelegate;
-}>;
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type AuthzAuditDatabase = Pick<PrismaClient, "auditLog">;
 
 /**
  * Idempotent Postgres implementation keyed by the event-derived audit row ID.
@@ -22,11 +20,17 @@ export class PrismaAuthzAuditRepository extends AuthzAuditTrailStore {
     return new PrismaAuthzAuditRepository(database.auditLog);
   }
 
-  private constructor(private readonly auditLog: AuthzAuditDelegate) {
+  private constructor(private readonly auditLog: AuthzAuditDatabase["auditLog"]) {
     super();
   }
 
   async insert(row: AuthzAuditRow): Promise<void> {
-    await this.auditLog.createMany({ data: [row], skipDuplicates: true });
+    await this.auditLog.createMany({
+      // The audit mapper builds `metadata` by copying named scalar fields off
+      // the event, so it is a plain JSON object by construction and the column
+      // it lands in is `Json`.
+      data: [{ ...row, metadata: row.metadata as Prisma.InputJsonValue }],
+      skipDuplicates: true,
+    });
   }
 }

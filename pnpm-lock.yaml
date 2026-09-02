@@ -445,6 +445,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract
+      '@langwatch/authz-web':
+        specifier: workspace:*
+        version: link:../../packages/features/authz/web
       '@langwatch/automation-web':
         specifier: workspace:*
         version: link:../../packages/features/automation/web

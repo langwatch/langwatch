@@ -1,10 +1,12 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import { BillableEventsClickHouseRepository } from "../repositories/clickhouse/clickhouse.billable-events.repository";
+import {
+  BillableEventsClickHouseRepository,
+  type BillableEventsClickHouseClient,
+} from "../repositories/clickhouse/clickhouse.billable-events.repository";
 import type { BillableEventsRepository } from "../ports/billable-events.port";
 
 export type BillingClickHouseClientResolver = (
   tenantId: string,
-) => Promise<ClickHouseClient>;
+) => Promise<BillableEventsClickHouseClient>;
 
 /** Constructs the feature's ClickHouse reader without exposing it. */
 export class ClickHouseBillingAdapter {
@@ -17,10 +19,7 @@ export class ClickHouseBillingAdapter {
     resolveClient: BillingClickHouseClientResolver;
     resolveOrganizationClient: BillingClickHouseClientResolver;
   }): ClickHouseBillingAdapter {
-    return new ClickHouseBillingAdapter(
-      options.resolveClient,
-      options.resolveOrganizationClient,
-    );
+    return new ClickHouseBillingAdapter(options.resolveClient, options.resolveOrganizationClient);
   }
 
   build(): BillableEventsRepository {

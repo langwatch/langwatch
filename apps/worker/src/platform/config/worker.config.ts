@@ -93,6 +93,19 @@ export const workerConfigDefinition = RuntimeConfig.define({
     saas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
   },
   /**
+   * The Stripe secret the monthly usage report is sent with.
+   *
+   * Optional in exactly the way the application's own environment schema has
+   * it, and read from the same variable. A self-hosted worker composes no
+   * sender and never asks for one; a SaaS worker resolves one and refuses to
+   * compose without a key, which is the refusal the App already makes at
+   * `AppStripeRuntime.create`. A SaaS process that metered without a sender
+   * would count every billable event correctly and report none of them.
+   */
+  stripe: {
+    secretKey: Config.secret({ optional: true, env: "STRIPE_SECRET_KEY" }),
+  },
+  /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
    *
    * The raw string is carried rather than a number: `settlementGraceMs` in
@@ -241,6 +254,11 @@ export type WorkerDeploymentConfig = Readonly<{
   saas: boolean;
 }>;
 
+/** The Stripe credentials the SaaS monthly usage report is sent with. */
+export type WorkerStripeConfig = Readonly<{
+  secretKey?: string;
+}>;
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -263,6 +281,7 @@ export type WorkerConfig = Readonly<{
   observability: WorkerConfigProjection["observability"];
   shutdown: WorkerShutdownConfig;
   deployment: WorkerDeploymentConfig;
+  stripe: WorkerStripeConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
   processing: WorkerProcessingConfig;
@@ -291,6 +310,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
     deployment: value.deployment,
+    stripe: value.stripe,
     gateway: value.gateway,
     github: value.github,
     processing: value.processing,

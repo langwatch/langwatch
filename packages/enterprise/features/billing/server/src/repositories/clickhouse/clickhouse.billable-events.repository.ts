@@ -14,13 +14,37 @@
  *     is picked via the first of those projects with `resolveClient`
  *     (per-tenant routing lands on the same org's instance either way).
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { DataFormat } from "@clickhouse/client";
 import {
   BillableEventsRepository,
   type BillableEventsWindow,
 } from "../../ports/billable-events.port";
 
-export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
+/**
+ * The one read shape these queries issue, rather than a vendor client.
+ *
+ * Structural for the reason the meter's write port is: a background worker
+ * runs these rollups over the Eventing substrate's own ClickHouse client,
+ * which types `format` as the literal it always sends. Naming the driver class
+ * refused that client for no behavioural reason, while a driver client still
+ * satisfies this shape.
+ *
+ * `json()` is deliberately untyped: the driver answers a union of row array,
+ * keyed object and response envelope, the substrate's client answers rows, and
+ * the two parsers below take `unknown` and validate anyway. Promising rows here
+ * would refuse the driver over a shape neither caller relies on.
+ */
+export interface BillableEventsClickHouseClient {
+  query(params: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format?: DataFormat;
+  }): Promise<{ json(): Promise<unknown> }>;
+}
+
+export type ClickHouseClientResolver = (
+  tenantId: string,
+) => Promise<BillableEventsClickHouseClient>;
 
 export class BillableEventsClickHouseRepository extends BillableEventsRepository {
   private constructor(
@@ -41,9 +65,7 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
   }
 
   /** Exact distinct billable-event count for the org in the window. */
-  async findTotal(
-    input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<number> {
+  async findTotal(input: { organizationId: string } & BillableEventsWindow): Promise<number> {
     const client = await this.resolveOrganizationClient(input.organizationId);
     const result = await client.query({
       query: `
@@ -67,9 +89,7 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
    * Approximate distinct billable-event count (HyperLogLog, ~1% error,
    * constant memory) for the org in the window.
    */
-  async findTotalUniq(
-    input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<number> {
+  async findTotalUniq(input: { organizationId: string } & BillableEventsWindow): Promise<number> {
     const client = await this.resolveOrganizationClient(input.organizationId);
     const result = await client.query({
       query: `
@@ -175,9 +195,7 @@ function parseTotal(jsonResult: unknown): number {
   return parseInt(firstRow?.total ?? "0", 10);
 }
 
-function parseByProject(
-  jsonResult: unknown,
-): Array<{ projectId: string; count: number }> {
+function parseByProject(jsonResult: unknown): Array<{ projectId: string; count: number }> {
   const rows = Array.isArray(jsonResult) ? jsonResult : [];
   return (rows as Array<{ projectId: string; total: string }>).map((row) => ({
     projectId: row.projectId,

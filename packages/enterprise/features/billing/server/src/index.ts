@@ -8,6 +8,7 @@ export {
   ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
 } from "./adapters/clickhouse.clickhouse.adapter";
+export type { BillableEventsClickHouseClient } from "./repositories/clickhouse/clickhouse.billable-events.repository";
 export {
   PostgresBillingAdapter,
   type PostgresBillingPersistence,
@@ -19,9 +20,26 @@ export {
   BILLING_ORG_CACHE_TTL_MS,
   EventingReportUsageForMonthAdapter,
   type BillingOrganizationCache,
-  type BillingReportOrganizationReader,
   type ReportUsageForMonthCommandDeps,
 } from "./adapters/eventing.report-usage-for-month.adapter";
+export {
+  BillingReportOrganizationPort,
+  type BillingReportOrganization,
+} from "./ports/billing-report-organization.port";
+export {
+  PostgresBillingReportingAdapter,
+  type BillingReportingDatabase,
+  type BillingReportingPersistence,
+} from "./adapters/postgres.billing-reporting.adapter";
+export {
+  RedisBillingOrganizationCacheAdapter,
+  type BillingOrganizationCacheRedis,
+} from "./adapters/redis.billing-organization-cache.adapter";
+export {
+  StripeUsageReportingAdapter,
+  StripeUsageReportingUnavailable,
+} from "./adapters/stripe.usage-reporting.adapter";
+export { ObservabilityBillingErrorAdapter } from "./adapters/observability.billing-error.adapter";
 export { EventingBillingReportingAdapter } from "./adapters/eventing.billing-reporting.adapter";
 export { BillingErrorReporter, NullBillingErrorReporter } from "./ports/error-reporter.port";
 export { BillingOrganizationPort } from "./ports/organization.port";
