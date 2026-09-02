@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Regression pin for the post-merge dogfood P0 RBAC closure (commit
- * `bca6e0422`). The five legacy admin pages below leaked full org data
+ * `bca6e0422`). The legacy admin pages below leaked full org data
  * to MEMBER persona because their `withPermissionGuard` wrapping checked
  * permissions MEMBER inherits by default (`auditLog:view`, `team:view`,
  * `organization:view`). They must require `organization:manage` so the
@@ -22,7 +22,6 @@ const PAGES_REQUIRING_ORG_MANAGE = [
   "audit-log.tsx",
   "teams.tsx",
   "members.tsx",
-  "roles.tsx",
   "groups.tsx",
 ] as const;
 

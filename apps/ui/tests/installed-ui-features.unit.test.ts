@@ -20,6 +20,14 @@ const AGENT_PAGE_KEYS = [
   "runtime/ui/features/agent-ui-host.adapter",
 ];
 
+const AUTHZ_PAGE_KEYS = [
+  // Two settings keys, one package, one frontend feature. BOTH carry a
+  // page-level grant — `organization:manage` — because both pages read
+  // audit-grade RBAC data: who holds which role, and where.
+  "pages/settings/roles",
+  "pages/settings/role-bindings",
+];
+
 const AUTOMATION_PAGE_KEYS = [
   // Five keys for ONE screen: the four tabs are four URLs of the same page, and
   // `/activity` is a fifth address that has shown the overview since the
@@ -160,6 +168,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
@@ -174,11 +183,12 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Eleven for ten features: the personal workspace mounts two, because the
-      // coding-agent tables its screens render call procedures of their own and
-      // `apps/ui` may not import the package they live in.
+      // Thirteen for twelve features: the personal workspace mounts two,
+      // because the coding-agent tables its screens render call procedures of
+      // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
+        "@langwatch/authz-web",
         "@langwatch/automation-web",
         "@langwatch/data-privacy-web",
         "@langwatch/data-retention-web",
@@ -236,6 +246,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
@@ -247,7 +258,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(12);
+      expect(merged.apis).toHaveLength(13);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

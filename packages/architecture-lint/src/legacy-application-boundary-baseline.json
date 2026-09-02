@@ -349,8 +349,6 @@
       "platform/app/src/components/settings/ProviderModelSelector.tsx": [
         "../../server/modelProviders/customModelDisplayNames"
       ],
-      "platform/app/src/components/settings/RoleCard.tsx": ["../../server/api/rbac"],
-      "platform/app/src/components/settings/RoleFormDialog.tsx": ["../../server/api/rbac"],
       "platform/app/src/components/settings/TeamForm.tsx": [
         "../../server/app-layer/organizations/repositories/organization.repository"
       ],
@@ -796,7 +794,6 @@
       "platform/app/src/pages/settings/members.tsx": [
         "../../server/app-layer/organizations/repositories/organization.repository"
       ],
-      "platform/app/src/pages/settings/roles.tsx": ["../../server/api/rbac"],
       "platform/app/src/pages/settings/teams/[team].tsx": [
         "../../../server/app-layer/organizations/repositories/organization.repository"
       ],

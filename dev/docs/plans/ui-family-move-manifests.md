@@ -1525,6 +1525,248 @@ by this move**, the second family after datasets with none.
   already made. Narrowing a copy means narrowing what it is wired to, not only
   what it renders.
 
+### settings S2 RBAC — MOVED. 2 keys, 8 platform files, 1 insertion, 1,422 deletions
+
+Moved eleventh, and the third settings family: the chrome is `withUiSettingsLayout`,
+one import and one wrapper, and this move changed nothing about it. What this
+family adds is the first move into a web package that ALREADY EXISTED and was
+NOT governed, and the first `~/server/api/rbac` rebuild done for a whole page
+rather than for one picker.
+
+The one insertion is the token-subset edit named under the page guard below;
+every other platform line in this change is a deletion.
+
+`@langwatch/authz-web` is not created here — it has held
+`surfaces/scope-picker` since the data-governance move — so this family adds
+`screens/authz`, a host port, a procedure map, a `vitest.setup.ts` and a
+`testing.tsx` to a package that had none of them, and puts the whole thing under
+`governedWebPackages`.
+
+#### Governing an existing package clears NOTHING, and the ranking row was wrong
+
+The re-ranking promised that "governing authz-web clears 14 findings
+governance+gateway carry". It does not, and the mechanism is worth writing down
+so nobody costs the next family on the same promise.
+
+`ui-screen-closure` rejects `@langwatch/<anything>-web` UNCONDITIONALLY —
+`forbiddenWebPresentationImport` matches `/^@langwatch\/[^/]+-web(?:\/|$)/`
+before any catalogue is consulted — and `cross-feature` fires on a package.json
+dependency between two features whenever the target is not a contract. Neither
+rule reads `governedWebPackages`. That list decides only which packages the
+lint WALKS: `lintWebPublicExports`, `lintWebPrivateStructure`,
+`lintWebScreenClosures` and `lintWebSurfaceClosures` run over the governed set
+and skip everything else. So governing a package can only ever ADD findings
+about that package, never remove one a consumer carries.
+
+Measured, not argued: the twenty-five findings naming `@langwatch/authz-web`
+before this move (governance 3, gateway 15, data-privacy 2, data-retention 2,
+model-provider 3) are all twenty-five of them still there afterwards.
+
+**Governing it cost zero all the same**, which is the part worth keeping: the
+existing scope-picker surface was already ADR-004-shaped — one `surfaces/<id>`
+export resolving to a local module, no local escape, no browser capability — so
+the four new walks it now runs raised nothing on it. A package written to the
+layout before it was governed passes the day it is governed.
+
+#### The `~/server/api/rbac` rebuild
+
+Both pages named that module and one of them called into it. It is 2,239 lines,
+it reaches the engine gate and through it a Node-only logger, and `apps/ui` bans
+`~/server` outright — so the import had to go, and the deletes-only ruling
+forbids repointing the platform copy.
+
+- **`Permission` was a bare alias.** `export type Permission = AuthzPermission`,
+  deprecated in its own docblock. Three components and both pages named it; all
+  of them now name `AuthzPermission` from `@langwatch/authz-contract` directly.
+- **`getTeamRolePermissions(role)` became `builtinRolePermissions(roleKeyForTeamRole(role))`**,
+  the fix the agents family made for the copy-target picker, applied to a whole
+  page. The contract's docblock records that the two are parity-tested cell for
+  cell by `platform/app/src/server/app-layer/authz/__tests__/roles-parity.unit.test.ts`,
+  which is the ADR-092 stage-A characterisation suite.
+- **THE TWO SETS ARE NOT CHARACTER-IDENTICAL, and it does not show.** A textual
+  diff of the two role bags found exactly three differences: the contract's
+  `admin` set lists `langy:create`, `langy:update` and `langy:delete` explicitly
+  where the legacy bag left them to `langy:manage` and the hierarchy rule.
+  `langy` is not a resource the permission catalogue offers, so no built-in role
+  dialog has ever rendered a row for any of the three.
+- **The pin that makes raw membership safe.** The dialog reads membership RAW —
+  a permission appears because the bag lists it, not because the engine would
+  grant it — and the bags DO lean on the hierarchy (every built-in role holds
+  `annotations:manage` with no `annotations:create` beside it). The first
+  attempt at a pin asserted bag ≡ grants and went red on twenty-one cells, which
+  is the test doing its job. What it says now is the invariant the READER
+  depends on: nothing the engine grants is missing from the dialog unless the
+  resource's `manage` is there to say it, and nothing appears that the engine
+  would refuse.
+
+#### The permission matrix, and how "moved exactly" was measured
+
+The five implication rules — manage covers its resource, a write pulls in the
+read, unticking the read withdraws the writes, a click on an implied row goes to
+the manage that implies it, nothing outside the registry is ever offered — lived
+as closures over a `useMemo` inside `PermissionSelector`, and had no test. They
+are `model/permission-matrix.ts` now, and the move was MEASURED rather than
+asserted:
+
+A temporary differential harness in the package rendered `platform/app`'s
+selector and the moved one side by side (a `~` alias to `platform/app/src` in
+the package's vitest config, deleted with the harness) and drove both through
+fifty-two click sequences over four resource shapes — full CRUD plus manage,
+view-only, view plus share, view plus manage — comparing the reported lists. It
+passed; sabotaging the moved copy's "a write pulls in the read" rule produced
+twelve disagreements; restoring it went green. Then the harness and the alias
+were deleted, because keeping it means keeping the platform component.
+
+**RULES 2 AND 3 ARE DELIBERATELY NOT INVERSES,** and the round-trip test is
+where that shows. Ticking `create` adds `view`; unticking `create` does NOT take
+`view` away. The first version of the test asserted a clean round trip and was
+wrong — the code was right. Whoever moves a matrix like this should expect the
+asymmetry rather than "fix" it.
+
+#### The contract move is a REAL repoint, and it needed no new declaration
+
+`RouterOutputs["roleBinding"]["listForOrg"][number]` is
+`AuthzManagedOrganizationBinding`, which `@langwatch/authz-contract` ALREADY
+declares. The procedure is mounted from `@langwatch/role-server`, whose handler
+answers `AuthzListManagedBindingsForOrganizationOutput`, so this is the
+model-config family's "real repoint" case at its cheapest: zero inserted lines
+in any contract, and both halves now checked against one statement of the row.
+`role.getAll` and `role.getById` needed nothing either — they already answer
+`Role` from `@langwatch/role-contract`.
+
+#### The ownership tension, recorded rather than forced
+
+The data-governance family's rule is "a key belongs to the family that owns its
+transport", and by that rule these two keys are the ROLE feature's:
+`role.*` and `roleBinding.*` are mounted from `@langwatch/role-server`, and
+`packages/features/role` has no web package.
+
+They went to `@langwatch/authz-web` anyway, and the reason is that the transport
+is a door rather than an owner: `RoleApp.listBindingsForOrganization` delegates
+straight to `permissions.listManagedBindingsForOrganization`, the answer is
+typed by `@langwatch/authz-contract`, and the roles page is a permission-matrix
+editor over authz vocabulary from end to end. The alternative was creating a
+twelfth web package for two pages whose every type comes from authz.
+
+WHAT THIS COSTS is one thing and it is written into the procedure map's
+docblock: **the segment names stay `role` and `roleBinding`**, because tRPC
+hashes the path into the React Query key and the members page, the teams page
+and the group binding editor all still read `api.role.getAll`. A package named
+for one feature calling procedures mounted under another's name is the honest
+shape of this, and renaming either segment would silently split the cache.
+
+#### What the closure cost
+
+- **Four components were EXCLUSIVE and moved**: `RoleCard`, `RoleFormDialog`,
+  `PermissionSelector`, `PermissionViewer` — page plus nothing else.
+- **`permissionsConfig.ts` and `rbacVocabulary.ts` did NOT travel** and came over
+  as one family-local copy (`model/permission-catalogue.ts`). The first keeps
+  three server-side test consumers; the second keeps ten callers across the
+  server, `apps/api` and the Langy contract. The copy is bounded by the registry
+  — every string it produces is filtered through `isRegistryPermission` — so it
+  can only ever be a SUBSET of the engine's vocabulary, never a second opinion
+  about it. That is what makes a restatement of a vocabulary safe.
+- **`RandomColorAvatar` did not travel** (sixteen platform callers) and neither
+  did the `UserAvatar` under it. `ui/elements/principal-avatar.tsx` is the
+  family-local copy; the automation family's `ParticipantAvatar` could not be
+  reused because it renders initials only and these rows carry `userImage`.
+- **Three Design System substitutions, all precedented, one with a behaviour
+  difference**: `~/components/gateway/ConfirmDialog` and `~/components/ui/checkbox`
+  are byte-identical to their Design System twins (the checkbox is literally a
+  re-export), and `~/components/ui/dialog` is NOT — the platform wrapper adds an
+  inline error boundary around the body and stands `trapFocus` and
+  `preventScroll` down. Ten package dialogs already made that substitution, so
+  it is precedent; it is recorded because it is real.
+- **`ScopeChipPicker` was not needed and not used.** The surface next door WRITES
+  which scopes a rule applies to; these pages only read which tier a binding
+  sits at. A family moving into a package with a surface already in it should
+  check whether it actually wants it.
+
+#### Two deliberate additions, named because a move should not have any
+
+- **Three icon-only buttons gained `aria-label`.** Edit, delete and view on a
+  custom role card had no accessible name at all — a screen reader announced
+  three unlabelled buttons. Nothing visible changed. Recorded as an addition
+  rather than slipped in.
+- **The two permission dialogs became one component.** The platform page carried
+  eighty lines of dialog twice, differing only in whether the description fell
+  back to a sentence, and `getDefaultRoleDescription` was a second switch over
+  the same three descriptions the cards already held. One component, one table.
+
+#### The page guard, and the regression pin it inherits
+
+BOTH keys carry `organization:manage`, and that is not a detail:
+`platform/app/src/pages/settings/__tests__/admin-page-guards.unit.test.ts` is a
+regression pin written after five legacy administration pages guarded themselves
+on permissions a MEMBER inherits and leaked full organization data. It worked by
+READING PAGE SOURCE, and `roles.tsx` was one of its five.
+
+So the seventh family's pre-flight — grep for tests that read
+`platform/app/src/<your keys>` before deleting anything — caught its second
+victim. The row was deleted (a pure deletion) and the line is now held by
+`apps/ui/tests/authz-page-policy.integration.test.tsx`, which MOUNTS the refusal
+under a session holding `organization:view` and reads the result. That is
+strictly stronger than a source match. The docblock's "The five legacy admin
+pages below" became "The legacy admin pages below" — a strict token subset of
+the line, which is the only kind of edit the deletes-only ruling admits.
+
+#### Known costs, all reported rather than suppressed
+
+- 4 new architecture-lint findings and 1 retired (809 → 820 overall, of which
+  +8 belong to the identity worker lane running concurrently). Mine, line by
+  line: `cross-feature` and `enterprise-direction` on
+  `packages/features/authz/web/package.json` for `@langwatch/enterprise-billing-web`,
+  one `ui-screen-closure` for `@langwatch/platform-api-client` in the procedure
+  map (the line every family carries), and one `ui-screen-closure` for the
+  enterprise package in `ui/elements/enterprise-upsell.tsx`. Retired:
+  `legacy-feature-fragment` on `pages/settings/roles.tsx`, with the file.
+- **THE ENTERPRISE UPSELL IS THE STRUCTURAL BLOCK AGAIN.** Both pages show
+  `ContactSalesBlock` to an organization that is not on Enterprise. Neither
+  `@langwatch/authz-web` nor `apps/ui` may import an enterprise package — both
+  are core — and a family-local copy of the sales copy would drift from
+  `ENTERPRISE_PLAN_FEATURES`, which lives in the billing package. So this family
+  takes the same import `@langwatch/gateway-web` already takes on its webhooks
+  screen, and carries the same three findings plus the same two
+  `langwatch(package-boundaries)` oxlint errors. It clears when
+  `packages/enterprise/composition/ui` exists — the gate that blocks the billing
+  settings family outright.
+- **ONE MODULE NAMES THE ENTERPRISE PACKAGE, not two.** `ui-screen-closure`
+  counts import lines, so routing both screens through
+  `ui/elements/enterprise-upsell.tsx` is one finding where naming it twice would
+  be two. The model-config lesson, applied to a component rather than a type.
+- Three `legacy-application-boundary-baseline` rows went with their files
+  (`RoleCard`, `RoleFormDialog`, `roles.tsx`, all naming `../../server/api/rbac`);
+  leaving them would have raised three "baseline retains removed occurrence"
+  findings on the migration lane, which is where they were measured: 1,130 → 1,127.
+- ZERO new `platform/app` typecheck errors. Nothing outside the family imported
+  either page, any of the four components, or the two loader keys.
+- Two spec files were WRITTEN, not moved: `specs/rbac/custom-role-permission-editing.feature`
+  (23 scenarios) and `specs/rbac/role-binding-audit.feature` (5). Neither page
+  had a spec, and the permission matrix — the part of this family most worth
+  being sure about — had no test of any kind. Both files report fully bound.
+
+#### The eleventh family's own additions, for whoever moves the twelfth
+
+- **A NINTH HOST PORT OF THE SAME SHAPE.** Deferred a ninth time, for the ninth
+  reason. What this one asks that none before it did is `plan()`, and it asks it
+  as a PAIR: `isEnterprise` and `isLoading`, because still-arriving is a third
+  state and collapsing it into not-Enterprise pitches Enterprise at an
+  Enterprise customer for the length of one round trip.
+- **CHECK WHAT "GOVERNING A PACKAGE" ACTUALLY DOES BEFORE COSTING A MOVE ON IT.**
+  `governedWebPackages` selects what the lint WALKS. It does not change what any
+  rule says about an import. A ranking row that promises a finding count will
+  fall is a claim to verify, not a budget to spend.
+- **A DIFFERENTIAL HARNESS IS THE HONEST WAY TO SAY "MOVED EXACTLY"** for logic
+  that had no test. Alias the platform source into the package's vitest config,
+  drive both copies, compare, sabotage to prove the harness bites, then delete
+  the harness and the alias with the same commit that deletes the original.
+- **A vocabulary copy is safe when something narrows it.** `permissionsConfig`
+  and `rbacVocabulary` could not travel, and a second copy of a permission
+  vocabulary is exactly the kind of restatement that drifts — except that every
+  string it produces passes through `isRegistryPermission` first, so the copy
+  can only shrink the offer, never widen it. Look for the narrowing before
+  accepting the copy.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -1543,7 +1785,7 @@ closures are computed net of that.
 | 4 | settings S4 model config | 2 | 7+6 | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect. |
 | 5 | prompts | 1 | 44+14 | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39. |
 | 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
-| 7 | settings S2 RBAC | 2 | 8+4 | ~/server/api/rbac fix (shared with governance's baseline suppression); governing authz-web clears 14 findings governance+gateway carry |
+| 7 | settings S2 RBAC | 2 | 8+4 | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract. |
 | 8 | annotations | 5 | 12+7 | traceV2Details chrome gap; relayout annotation-web; tab-as-prop |
 | 9 | settings S6 credentials + /cli/auth | 3 | 14+12 | MUST ship together (cli imports api-keys files); create api-key-web; rbac fix |
 | 10 | analytics | 9 | 49+17 | six ~/server modules; retires 4 of automations' 7 platform breaks; custom/[id] is tab-as-prop |

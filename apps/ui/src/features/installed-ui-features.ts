@@ -17,6 +17,7 @@ import { BrowserUiFeedback } from "../behavior/ui-feedback";
 import { useBrowserUiSession } from "../behavior/ui-session";
 import type { UiFeatureInstall } from "../ui/sections/ui-application";
 import { agentApiBinding, agentPageLoaders } from "./agent";
+import { authzApiBinding, authzPageLoaders } from "./authz";
 import { automationsApiBinding, automationsPageLoaders } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
 import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
@@ -31,6 +32,7 @@ import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./pe
 export const installedUiFeatures: UiFeatureInstall = {
   loaders: {
     ...agentPageLoaders,
+    ...authzPageLoaders,
     ...automationsPageLoaders,
     ...dataPrivacyPageLoaders,
     ...dataRetentionPageLoaders,
@@ -44,6 +46,7 @@ export const installedUiFeatures: UiFeatureInstall = {
   },
   apis: [
     agentApiBinding,
+    authzApiBinding,
     automationsApiBinding,
     dataPrivacyApiBinding,
     dataRetentionApiBinding,
