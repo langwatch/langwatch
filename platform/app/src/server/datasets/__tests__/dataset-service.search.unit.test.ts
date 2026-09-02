@@ -190,6 +190,7 @@ describe("dataset search (s3_jsonl)", () => {
     ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
   });
 
+  /** @scenario A dataset too large to search is refused before any of it is read */
   it("refuses before reading any chunk, rather than part-way through", async () => {
     const { readChunk } = mockChunks();
     const service = makeService({});
@@ -204,6 +205,7 @@ describe("dataset search (s3_jsonl)", () => {
     expect(readChunk).not.toHaveBeenCalled();
   });
 
+  /** @scenario A dataset within the row limit but over the byte limit refuses the search */
   it("refuses a dataset whose rows occupy more bytes than one search will read", async () => {
     // Well inside the row cap, and the most expensive scan the search could be
     // asked to run: rows are as wide as the columns they were given, so a row
@@ -266,6 +268,78 @@ describe("dataset search (s3_jsonl)", () => {
     expect(result.pagination.total).toBe(2);
   });
 
+  /** @scenario A scan that outgrows the limit while it runs is stopped part-way */
+  it("refuses when the chunks it reads outweigh the size the dataset recorded", async () => {
+    // `sizeBytes` is a field on the dataset row, not a measurement taken at
+    // read time. Appends land in new chunks and the field does not always move
+    // with them, so a stale one passes the up-front fence and the scan then
+    // fetches and parses however much is really there, with nothing bounding
+    // it. The row backstop immediately above still stops the scan eventually,
+    // which is why this is the smaller of the two holes — but it stops it on
+    // the wrong dimension: 50,000 rows of stored model responses is exactly the
+    // read the byte limit exists to refuse.
+    //
+    // Two of the three chunks are enough to pass the limit, so a scan that
+    // counts what it reads stops on reaching the second.
+    const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
+    const { readChunk } = mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          rowCount: 6,
+          // Stale by three orders of magnitude — the fence sees a tiny dataset.
+          sizeBytes: BigInt(1_000),
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: halfTheLimitEach },
+            { index: 1, startRow: 2, endRow: 4, byteSize: halfTheLimitEach },
+            { index: 2, startRow: 4, endRow: 6, byteSize: halfTheLimitEach },
+          ],
+        },
+        search: "escalation",
+      }),
+    ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+    // One, not zero and not three: zero would mean the up-front fence fired and
+    // this test proved nothing about the scan, three would mean the whole
+    // dataset was read before anyone objected. One is the chunk that fit — the
+    // one that would have breached the limit is refused rather than fetched
+    // and then complained about.
+    expect(readChunk).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps counting bytes across a chunk whose size was never recorded", async () => {
+    // `readValidChunkOffsets` checks the row bounds and not `byteSize`, so a
+    // valid offsets array can carry an entry without one. Added to a running
+    // total that value poisons it — every later comparison against `NaN` is
+    // false — and the backstop silently stops existing for the whole dataset,
+    // with every other test in this file still green. An unrecorded size is one
+    // chunk this cannot measure, not permission to stop measuring.
+    const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
+    mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          rowCount: 6,
+          sizeBytes: null,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2 }, // byteSize never written
+            { index: 1, startRow: 2, endRow: 4, byteSize: halfTheLimitEach },
+            { index: 2, startRow: 4, endRow: 6, byteSize: halfTheLimitEach },
+          ],
+        },
+        search: "escalation",
+      }),
+    ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+  });
+
+  /** @scenario A chunked dataset that records no size is bounded by the row limit alone */
   it("still refuses on rows alone when the dataset records no size", async () => {
     // A dataset written before its size was recorded has none. Read as zero it
     // would be the smallest dataset in the platform and sail through the byte
