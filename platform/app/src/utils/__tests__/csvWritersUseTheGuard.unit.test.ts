@@ -16,11 +16,13 @@
  * `noRawErrorToasts.unit.test.ts` catches a raw-message toast — by reading the
  * tree and asking which files call the raw serializer at all.
  *
- * Adding a file to {@link GUARDED_WRITERS} is a claim that it applies
- * {@link neutralizeFormula} (or delegates to something that does) to both the
- * header row and every data cell. Nothing here verifies that claim; the
- * per-writer tests do. What this file guarantees is that the list of places
- * where the claim has to hold stays short and deliberate.
+ * Adding a file to {@link GUARDED_WRITERS} is a claim that it applies the guard
+ * to both the header row and every data cell. This file checks the weak half of
+ * that claim — the file does reach for the guard at all — and the per-writer
+ * tests check the strong half, that the apostrophe reaches the bytes. The weak
+ * half is here because it is the failure this guard was built for: deleting the
+ * `neutralizeRows` call while leaving the file on the list would otherwise pass
+ * both.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -40,6 +42,18 @@ const ROOTS = ["src", "ee"];
  * stdlib signature quoted inside the Monaco autocomplete table.
  */
 const UNPARSE_CALL = /\.unparse\s*\(/;
+
+/**
+ * An import of the guard module, by either path shape the codebase uses.
+ *
+ * Deliberately weaker than "the guard is applied to the right arguments": a
+ * regex cannot tell those apart, and pretending otherwise would make this file
+ * look like it verifies more than it does. It catches the one regression a
+ * reader would otherwise miss entirely — the guard call deleted while the file
+ * stays on the allow-list.
+ */
+const GUARD_IMPORT =
+  /from\s+["'](?:~\/utils|\.{1,2}(?:\/[^"']*)?)\/csvFormulaGuard["']/;
 
 /**
  * The writers allowed to call the raw serializer, and what each one does about
@@ -121,6 +135,15 @@ describe("every CSV the product writes goes through the formula guard", () => {
     );
 
     expect(stale).toEqual([]);
+  });
+
+  it("has every listed writer actually reaching for the guard", () => {
+    const notReaching = Object.keys(GUARDED_WRITERS).filter(
+      (path) =>
+        !GUARD_IMPORT.test(readFileSync(join(PACKAGE_ROOT, path), "utf8")),
+    );
+
+    expect(notReaching).toEqual([]);
   });
 });
 
