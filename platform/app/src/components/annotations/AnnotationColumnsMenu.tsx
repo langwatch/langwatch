@@ -3,6 +3,7 @@ import { ChevronDown, Columns3, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
+import { TriggerAnchor } from "../ui/TriggerAnchor";
 import { Tooltip } from "../ui/tooltip";
 import {
   type AnnotationColumnChoices,
@@ -66,17 +67,22 @@ export function AnnotationColumnsMenu({
         content="Show or hide columns"
         positioning={{ placement: "top" }}
       >
-        <Popover.Trigger asChild>
-          <Button
-            variant="outline"
-            aria-label="Show or hide columns in the table"
-            gap={1}
-          >
-            <Columns3 size={16} />
-            Columns
-            <ChevronDown size={16} />
-          </Button>
-        </Popover.Trigger>
+        {/* Tooltip and Popover.Trigger both clone their id onto the child, so
+            the trigger needs its own node or the menu loses its anchor and
+            opens at the page's top-left corner. */}
+        <TriggerAnchor>
+          <Popover.Trigger asChild>
+            <Button
+              variant="outline"
+              aria-label="Show or hide columns in the table"
+              gap={1}
+            >
+              <Columns3 size={16} />
+              Columns
+              <ChevronDown size={16} />
+            </Button>
+          </Popover.Trigger>
+        </TriggerAnchor>
       </Tooltip>
       <Popover.Content width="auto" padding={0}>
         <Stack

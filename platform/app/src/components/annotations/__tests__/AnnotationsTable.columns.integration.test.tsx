@@ -787,6 +787,22 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(columnHeaders()).toContain("Suggestions");
       expect(columnHeaders()).not.toContain("Comments");
     });
+
+    /** @scenario "The columns menu opens against its own button" */
+    it("keeps the menu's own identity on the button its tooltip wraps", () => {
+      renderQueuePage();
+
+      const trigger = screen.getByRole("button", {
+        name: "Show or hide columns in the table",
+      });
+
+      // The tooltip and the menu trigger both clone an id onto their child. Let
+      // the tooltip win and the menu has no anchor left to measure against, so
+      // it opens in the page's top-left corner instead of under the button —
+      // which no layout-free test can see, but this attribute can.
+      expect(trigger).toHaveAttribute("data-scope", "popover");
+      expect(trigger.id).toMatch(/^popover:/);
+    });
   });
 
   describe("given a row carries suggestions", () => {

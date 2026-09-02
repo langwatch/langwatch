@@ -356,6 +356,14 @@ Rule: The reviewer chooses which columns the list shows
     When the project gains a column that shows by default
     Then that new column shows
 
+  # The button carries a tooltip as well as the menu. Both want to name the
+  # button as their own, and if the tooltip wins the menu has nothing left to
+  # measure against: it opens in the corner of the page, over the navigation.
+  @integration
+  Scenario: The columns menu opens against its own button
+    When the reviewer opens the columns menu
+    Then it is the menu's own button that it opens against
+
 Rule: The row's actions are always within reach
 
   Background:
