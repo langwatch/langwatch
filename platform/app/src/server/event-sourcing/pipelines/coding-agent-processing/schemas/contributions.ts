@@ -84,6 +84,18 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
   scopeName: z.string().nullable(),
   /** The lifted scalar vocabulary (`CODING_AGENT_CONTRIBUTION_KEYS`). */
   facts: contributionFactsSchema,
+  /**
+   * The working context active when the record happened, stamped onto the
+   * EVENT by the contribute command from the session's last `session_context`
+   * declaration (see `services/session-context-memo.ts`). Absent on the
+   * contribution the dispatcher enqueues and on events from before the stamp
+   * existed; the fact table stores absence as '' and the usage read prices
+   * those rows under the legacy whole-session rule.
+   */
+  repositoryHost: z.string().optional(),
+  repositoryOwner: z.string().optional(),
+  repositoryName: z.string().optional(),
+  branch: z.string().optional(),
 });
 export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 
