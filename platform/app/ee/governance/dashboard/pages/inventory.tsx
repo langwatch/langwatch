@@ -52,7 +52,7 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
@@ -1756,6 +1756,22 @@ interface FieldDef {
    */
   advanced?: boolean;
   /**
+   * The sub-heading this field renders under, for a source whose fields
+   * serve more than one purpose. Consecutive fields sharing a group get one
+   * heading; a field without one renders as before. Purely presentational —
+   * grouping never changes what is saved, only the order it is asked in.
+   */
+  group?: string;
+  /**
+   * Whether the field is shown at all, given the sibling values. Absent means
+   * always. A hidden field's HELD value is deliberately not cleared (see
+   * `reconcileParserValues` — clearing a switch's siblings would discard what
+   * the admin typed on a mis-flip), so a builder reading a conditionally
+   * hidden field must decide from the controlling field, never from whether
+   * the hidden one still holds something.
+   */
+  visibleWhen?: (values: Record<string, string>) => boolean;
+  /**
    * How the field is rendered. Absent means a text input.
    *
    * A field only earns a `select` when its domain is closed and small enough
@@ -1974,6 +1990,28 @@ function anthropicBucketWidthOptions(
  */
 const READ_SEATS_DEFAULT_ON = true;
 
+/**
+ * Whether a new Copilot Studio source uses one app registration for both the
+ * conversation read and the bill, when nobody has said either way.
+ *
+ * On, because most admins set up one app and stop there (issue #7775). The
+ * split-credential arrangement stays the recommendation for tenants whose
+ * finance approval is separate (ADR-128 §21.1) — it is one switch away, not
+ * the price of entry. Same one-constant rule as `READ_SEATS_DEFAULT_ON`:
+ * the switch renders from it, the billing fields hide from it, and the
+ * builder saves from it, so an untouched form cannot show one arrangement
+ * and store another.
+ */
+const AZURE_ONE_APP_DEFAULT_ON = true;
+
+/** Whether the form's held values choose one app registration for everything. */
+function azureOneAppChosen(values: Record<string, string>): boolean {
+  return switchFieldIsOn({
+    value: values.azureBillingUsesSameApp,
+    defaultOn: AZURE_ONE_APP_DEFAULT_ON,
+  });
+}
+
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
@@ -2031,6 +2069,10 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "How often to call Purview Audit. Default 300s.",
     },
   ],
+  // Three groups, in the order admins care (issue #7775): where the
+  // environment lives, what it costs, and who may read its conversations.
+  // Grouping is presentational only — every key, secret flag and builder
+  // below is unchanged by it.
   copilot_studio_dataverse: [
     {
       key: "environmentUrl",
@@ -2038,6 +2080,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "https://org12345.crm.dynamics.com",
       hint: "From Power Platform admin centre → your environment → Environment URL. Environments served from a custom domain are not supported yet.",
       required: true,
+      group: "Connection",
     },
     {
       // Named `credentials*` on purpose, like the Databricks fields: the
@@ -2049,49 +2092,57 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      group: "Connection",
     },
     {
-      key: "credentialsClientId",
-      label: "App registration client ID",
-      placeholder: "00000000-0000-0000-0000-000000000000",
-      required: true,
-      secret: true,
-    },
-    {
-      key: "credentialsClientSecret",
-      label: "App registration client secret",
-      placeholder: "(value pasted from the Azure portal)",
-      hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
-      required: true,
-      secret: true,
-    },
-    {
-      // NOT a `credentials*` field, unlike the three above. A subscription id
-      // is a coordinate rather than a secret, and the adapter reads it off the
-      // config itself; naming it `credentialsAzureSubscriptionId` would bury
-      // it in the encrypted subtree where the config schema never looks.
+      // NOT a `credentials*` field, unlike the tenant id above. A
+      // subscription id is a coordinate rather than a secret, and the adapter
+      // reads it off the config itself; naming it
+      // `credentialsAzureSubscriptionId` would bury it in the encrypted
+      // subtree where the config schema never looks.
       key: "azureSubscriptionId",
       label: "Azure subscription ID (optional)",
       placeholder: "00000000-0000-0000-0000-000000000000",
-      hint: "Add this to also record what the environment costs each day, and fill in the billing app registration below. Leave it empty to record conversations only.",
+      hint: "Add this to also record what the environment costs each day. Leave it empty to record conversations only.",
+      group: "Cost",
     },
     {
-      // The bill's OWN app registration (ADR-128 §21.1): it holds Cost
-      // Management Reader on the subscription and nothing else, so the person
-      // who approves the finance grant hands out a permission that reads money
-      // and cannot read a conversation. The conversation credential above is
-      // never used for the bill — there is no fallback.
+      // One app for both reads is what most admins actually set up; the
+      // split-credential arrangement (ADR-128 §21.1) stays one flip away for
+      // tenants whose finance approval is separate. The choice itself is
+      // persisted by the builder (`azureBillingUsesSameApp`), because it
+      // cannot be reconstructed from the stored credentials once they are
+      // sealed.
+      key: "azureBillingUsesSameApp",
+      label: "Use one app registration for everything",
+      placeholder: "",
+      hint: "On, the app registration under Conversation access also reads the subscription's bill — grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
+      control: "switch",
+      defaultOn: AZURE_ONE_APP_DEFAULT_ON,
+      group: "Cost",
+    },
+    {
+      // The bill's OWN app registration: it holds Cost Management Reader on
+      // the subscription and nothing else, so the person who approves the
+      // finance grant hands out a permission that reads money and cannot read
+      // a conversation. Only offered once the admin has turned the one-app
+      // switch off — hidden, the copy in `copilotAzureBillingFrom` answers
+      // instead.
       key: "credentialsBillingClientId",
       label: "Billing app registration client ID",
       placeholder: "00000000-0000-0000-0000-000000000000",
       hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
       secret: true,
+      group: "Cost",
+      visibleWhen: (values) => !azureOneAppChosen(values),
     },
     {
       key: "credentialsBillingClientSecret",
       label: "Billing app registration client secret",
       placeholder: "(value pasted from the Azure portal)",
       secret: true,
+      group: "Cost",
+      visibleWhen: (values) => !azureOneAppChosen(values),
     },
     {
       // Declared by the customer, never inferred (ADR-128 §21.4): prepaid
@@ -2104,6 +2155,24 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "Prepaid message packs never appear on the Azure bill. Turn this on and the spend panel will say so instead of showing an empty bill as if nothing ran.",
       control: "switch",
       defaultOn: false,
+      group: "Cost",
+    },
+    {
+      key: "credentialsClientId",
+      label: "App registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      required: true,
+      secret: true,
+      group: "Conversation access",
+    },
+    {
+      key: "credentialsClientSecret",
+      label: "App registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
+      required: true,
+      secret: true,
+      group: "Conversation access",
     },
     {
       key: "readSeats",
@@ -2692,14 +2761,22 @@ export function buildCopilotStudioDataversePullConfig(
  * COMPLETE is judged server-side (`assertAzureBillHasItsOwnCredential`),
  * whose refusal names what is missing; the builder's job is only to not
  * manufacture values.
+ *
+ * With one app chosen (the form's default), the billing slots are COPIES of
+ * the conversation pair, decided here at save time from the switch alone —
+ * never from leftover billing values the form may still hold from a two-app
+ * detour, which the form deliberately never clears. The choice itself is
+ * written as `azureBillingUsesSameApp`, and only beside a subscription (same
+ * rule as the prepaid flag): it is the only durable record — once the
+ * credentials are sealed, equal-looking pairs cannot be told apart from a
+ * deliberate second app with the same values.
  */
 function copilotAzureBillingFrom(p: Record<string, string>): {
   config: Record<string, unknown>;
   credentials: Record<string, string>;
 } {
   const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
-  const billingClientId = (p.credentialsBillingClientId ?? "").trim();
-  const billingClientSecret = (p.credentialsBillingClientSecret ?? "").trim();
+  const oneApp = azureOneAppChosen(p);
 
   const config: Record<string, unknown> = {};
   if (azureSubscriptionId) {
@@ -2708,14 +2785,49 @@ function copilotAzureBillingFrom(p: Record<string, string>): {
       value: p.azureBillingIsPrepaid,
       defaultOn: false,
     });
+    config.azureBillingUsesSameApp = oneApp;
   }
 
+  return {
+    config,
+    credentials: copilotBillingCredentialsFrom({
+      p,
+      oneApp,
+      hasBillToRead: azureSubscriptionId.length > 0,
+    }),
+  };
+}
+
+/**
+ * Which values land in the billing credential slots, given the one-app
+ * choice. One app: the conversation pair, and only when there is a bill to
+ * read — never a speculative credential, and never the leftover billing
+ * values a two-app detour may have left in form state. Two apps: what the
+ * admin typed in the billing fields, exactly as before the switch existed.
+ */
+function copilotBillingCredentialsFrom({
+  p,
+  oneApp,
+  hasBillToRead,
+}: {
+  p: Record<string, string>;
+  oneApp: boolean;
+  hasBillToRead: boolean;
+}): Record<string, string> {
+  if (oneApp && !hasBillToRead) return {};
+  const source = oneApp
+    ? { id: p.credentialsClientId, secret: p.credentialsClientSecret }
+    : {
+        id: p.credentialsBillingClientId,
+        secret: p.credentialsBillingClientSecret,
+      };
+
+  const id = (source.id ?? "").trim();
+  const secret = (source.secret ?? "").trim();
   const credentials: Record<string, string> = {};
-  if (billingClientId) credentials.billingClientId = billingClientId;
-  if (billingClientSecret) {
-    credentials.billingClientSecret = billingClientSecret;
-  }
-  return { config, credentials };
+  if (id) credentials.billingClientId = id;
+  if (secret) credentials.billingClientSecret = secret;
+  return credentials;
 }
 
 /**
@@ -3126,8 +3238,9 @@ export function ParserConfigFields({
   }, [sourceType, values, onChange]);
 
   const fields = PARSER_FIELDS[sourceType];
-  const primaryFields = fields.filter((f) => !f.advanced);
-  const advancedFields = fields.filter((f) => f.advanced);
+  const isVisible = (f: FieldDef) => f.visibleWhen?.(values) ?? true;
+  const primaryFields = fields.filter((f) => !f.advanced && isVisible(f));
+  const advancedFields = fields.filter((f) => f.advanced && isVisible(f));
   // Extras alone are reason enough to render: a source type with no
   // parser fields of its own still has a cadence to offer.
   if (fields.length === 0 && !advancedExtras) return null;
@@ -3139,15 +3252,26 @@ export function ParserConfigFields({
           Source-specific configuration
         </Text>
       )}
-      {primaryFields.map((f) => (
-        <ParserConfigField
-          key={f.key}
-          field={f}
-          values={values}
-          onChange={onChange}
-          mode={mode}
-          readOnly={isReadOnly(f.key)}
-        />
+      {primaryFields.map((f, i) => (
+        <Fragment key={f.key}>
+          {f.group && f.group !== primaryFields[i - 1]?.group && (
+            <Text
+              fontSize="xs"
+              fontWeight="semibold"
+              color="fg.muted"
+              pt={i > 0 ? 2 : 0}
+            >
+              {f.group}
+            </Text>
+          )}
+          <ParserConfigField
+            field={f}
+            values={values}
+            onChange={onChange}
+            mode={mode}
+            readOnly={isReadOnly(f.key)}
+          />
+        </Fragment>
       ))}
       {(advancedFields.length > 0 || advancedExtras) && (
         <AdvancedSettingsGroup>
@@ -3216,11 +3340,16 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // the builder converts the switch's string to the boolean the adapter's
     // schema demands, and it also OMITS the field when no subscription is
     // named — the raw form string winning the merge would undo both.
+    // `azureBillingUsesSameApp` is owned for both of those reasons AND
+    // because an untouched switch holds nothing at all: the flag is the only
+    // durable record of the one-app choice, so it must come from the builder,
+    // which writes the declared default explicitly.
     copilot_studio_dataverse: [
       "environmentUrl",
       "botIds",
       "azureSubscriptionId",
       "azureBillingIsPrepaid",
+      "azureBillingUsesSameApp",
       "readSeats",
     ],
   };

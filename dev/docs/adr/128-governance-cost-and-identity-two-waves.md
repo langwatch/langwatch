@@ -763,6 +763,21 @@ credentials are absent. A fallback silently re-creates the exact grant
 this section exists to break, and it does so in the one case nobody is
 watching — the customer who declined to give billing access.
 
+*Form default (v3.7).* The create form defaults to **one app
+registration for both reads**: the switch "Use one app registration for
+everything" starts on, and the builder copies the bot pair into the
+billing keys at save time. This is not a fallback — the billing keys are
+always present when a subscription is claimed, written deliberately, and
+the token paths stay separate. The split arrangement remains the
+*recommendation* for tenants whose finance approval is separate, one
+flip away; the guard never required the pairs to differ, so the default
+codifies what most admins were going to do anyway rather than weakening
+an enforced boundary. The choice is recorded as
+`azureBillingUsesSameApp` (a non-secret config key), because once the
+credentials are sealed, equal pairs cannot be told apart from a
+deliberate second app with equal values. Spec:
+`specs/governance/copilot-studio-form-controls.feature`.
+
 **21.2 No schema change, and no new secret-handling path.** Credentials
 are already `Record<string, string>`
 (`pullers/pullerAdapter.ts:164-168`), decrypted by the worker before an
@@ -903,6 +918,7 @@ the third lane.
 | Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
 | Billing credential keys (§21.1) | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId` | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret` |
 | Prepaid declaration (§21.4) | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false` | the only thing that licenses the prepaid sentence; never inferred |
+| One-app choice (§21.1 form default, v3.7) | `azureBillingUsesSameApp: boolean`, written by the create form's builder beside a claimed subscription, default `true` | the only durable record of whether the billing pair is a copy of the bot's or a second app; nothing reads it at run time — the edit path (#7777) will |
 | Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
 | Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
 
@@ -1172,6 +1188,20 @@ money tables, only the identity tables and read paths.
 | Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
+
+- **v3.7 (2026-09-03, captain: Sergio Esteban).** The create form's
+  default flipped to one app registration for both reads (issue #7775).
+  §21.1 gains the *Form default* paragraph: the builder copies the bot
+  pair into the billing keys when the switch is on, the split
+  arrangement stays the recommendation one flip away, and the choice is
+  persisted as `azureBillingUsesSameApp` because sealed credentials
+  cannot answer it later. Without this note the ADR and
+  `copilot-studio-form-controls.feature` would assert opposite defaults.
+  Nothing §21 enforces changed: the guard never compared the pairs, the
+  no-fallback invariant holds (the copy is written at save, not
+  substituted at read), and no reason list or health rule moved. The
+  edit path deliberately ships separately (#7777) — today's form cannot
+  edit this source type at all.
 
 - **v3.6 (2026-09-02, captain: Sergio Esteban).** The subscription claim
   becomes fixed once the bill has been read. Review of the sealed-envelope

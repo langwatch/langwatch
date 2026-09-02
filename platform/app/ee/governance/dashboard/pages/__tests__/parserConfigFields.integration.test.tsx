@@ -278,3 +278,54 @@ describe("given the Copilot Studio licence switch", () => {
     });
   });
 });
+
+describe("given the Copilot Studio create form", () => {
+  describe("when the form first renders", () => {
+    /** @scenario "Copilot Studio setup reads as three purposes, in the order admins care" */
+    it("stands in three labelled groups, connection then cost then conversation", () => {
+      renderFields("copilot_studio_dataverse");
+
+      const headings = screen
+        .getAllByText(/^(Connection|Cost|Conversation access)$/)
+        .map((el) => el.textContent);
+      expect(headings).toEqual(["Connection", "Cost", "Conversation access"]);
+    });
+
+    /** @scenario "A new source starts with one app registration for everything" */
+    it("starts with the one-app switch on and no billing fields in sight", () => {
+      renderFields("copilot_studio_dataverse");
+
+      const oneApp = screen.getByTestId(
+        "parser-switch-azureBillingUsesSameApp",
+      ) as HTMLInputElement;
+      expect(oneApp.checked).toBe(true);
+      expect(
+        screen.queryByText(/Billing app registration client ID/),
+      ).toBeNull();
+      expect(
+        screen.queryByText(/Billing app registration client secret/),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the admin turns the one-app switch off", () => {
+    /** @scenario "Turning the switch off reveals the billing credential fields" */
+    it("reveals the billing credential fields", async () => {
+      renderFields("copilot_studio_dataverse");
+      const user = userEvent.setup();
+
+      await user.click(
+        screen.getByTestId("parser-switch-azureBillingUsesSameApp"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Billing app registration client ID/),
+        ).toBeTruthy();
+      });
+      expect(
+        screen.getByText(/Billing app registration client secret/),
+      ).toBeTruthy();
+    });
+  });
+});
