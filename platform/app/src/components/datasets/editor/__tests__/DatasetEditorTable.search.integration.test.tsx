@@ -161,10 +161,13 @@ const singlePageRecords = [
  * Serves a different set of records per `datasetId`, so a switch between
  * datasets on a still-mounted editor can be observed.
  */
-const serveDatasetsById = (
-  byId: Record<string, { id: string; entry: Record<string, string> }[]>,
-  { pageSize = 50 }: { pageSize?: number } = {},
-) => {
+const serveDatasetsById = ({
+  byId,
+  pageSize = 50,
+}: {
+  byId: Record<string, { id: string; entry: Record<string, string> }[]>;
+  pageSize?: number;
+}) => {
   const requests: { datasetId?: string; page?: number; search?: string }[] = [];
   const cache = new Map<string, unknown>();
 
@@ -265,6 +268,7 @@ describe("given a saved dataset", () => {
       expect(requests.at(-1)?.page).toBe(1);
     });
 
+    /** @scenario Searching returns me to the first page of results */
     it("never asks for a page of matches the search has not been applied to", async () => {
       // The page must be reset BEFORE the search reaches the query, not after.
       // Resetting it afterwards fires a real request for (old page, new search)
@@ -520,337 +524,361 @@ describe("given a saved dataset", () => {
 });
 
 describe("given the dataset's own total is not known yet", () => {
-  /** @scenario The record count reports the matches, not the whole dataset */
-  it("does not pass the match count off as the dataset's total", async () => {
-    // The two-number chip remembers the total from the last UNSEARCHED read. If
-    // no unsearched read has settled — a slow whole-dataset read, or a remount
-    // while a search is active — there is no total to report, and reusing the
-    // match count for both halves would state "1 of 1 records" for a dataset of
-    // 120: precisely the "the dataset has shrunk" misreading the two numbers
-    // exist to prevent. Saying less is the only honest option.
-    const user = userEvent.setup();
-    // Stable refs per branch — a fresh object each render feeds the editor's
-    // data-keyed effects a new value every time and spins it into an update
-    // loop, as the note on `serveDataset` describes.
-    const pending = { data: undefined, isLoading: true };
-    const matched = {
-      data: {
-        id: "ds",
-        name: "ds",
-        columnTypes,
-        count: 1,
-        totalPages: 1,
-        page: 1,
-        datasetRecords: [{ id: "r119", entry: { input: "needs escalation" } }],
-      },
-      isLoading: false,
-      refetch: vi.fn(),
-    };
-    listPaginatedQuery.mockImplementation(
-      (input: { search?: string } | undefined) =>
-        input?.search ? matched : pending,
-    );
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+  describe("when a search takes effect", () => {
+    /** @scenario The record count reports the matches, not the whole dataset */
+    it("does not pass the match count off as the dataset's total", async () => {
+      // The two-number chip remembers the total from the last UNSEARCHED read. If
+      // no unsearched read has settled — a slow whole-dataset read, or a remount
+      // while a search is active — there is no total to report, and reusing the
+      // match count for both halves would state "1 of 1 records" for a dataset of
+      // 120: precisely the "the dataset has shrunk" misreading the two numbers
+      // exist to prevent. Saying less is the only honest option.
+      const user = userEvent.setup();
+      // Stable refs per branch — a fresh object each render feeds the editor's
+      // data-keyed effects a new value every time and spins it into an update
+      // loop, as the note on `serveDataset` describes.
+      const pending = { data: undefined, isLoading: true };
+      const matched = {
+        data: {
+          id: "ds",
+          name: "ds",
+          columnTypes,
+          count: 1,
+          totalPages: 1,
+          page: 1,
+          datasetRecords: [
+            { id: "r119", entry: { input: "needs escalation" } },
+          ],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      listPaginatedQuery.mockImplementation(
+        (input: { search?: string } | undefined) =>
+          input?.search ? matched : pending,
+      );
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    await typeSearch(user, "escalation");
+      await typeSearch(user, "escalation");
 
-    await waitFor(() =>
-      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-        /matching/,
-      ),
-    );
-    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-      "1 of 1",
-    );
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+          /matching/,
+        ),
+      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "1 of 1",
+      );
+    });
   });
 });
 
 describe("given the search's own read has not come back yet", () => {
-  /** @scenario The record count reports the matches, not the whole dataset */
-  it("does not report the held-over rows as the matches", async () => {
-    // While the search's read is in flight, `keepPreviousData` keeps serving
-    // the last unsearched page, and the `count` that comes with it is the
-    // DATASET's size, not a number of matches. Rendered through the two-number
-    // chip that becomes "120 of 120 records" — every row matched — over rows
-    // that were never searched at all. On a large dataset that read takes
-    // seconds, and a refused one used to hold this state for the whole retry
-    // backoff.
-    const user = userEvent.setup();
-    const unsearched = {
-      data: {
-        id: "ds",
-        name: "ds",
-        columnTypes,
-        count: 120,
-        totalPages: 3,
-        page: 1,
-        datasetRecords: manyRecords.slice(0, 50),
-      },
-      isLoading: false,
-      refetch: vi.fn(),
-    };
-    // What react-query serves during a key change: the previous key's result,
-    // flagged as a placeholder, with the new key's read still in flight.
-    const inFlight = { ...unsearched, isPlaceholderData: true };
-    listPaginatedQuery.mockImplementation(
-      (input: { search?: string } | undefined) =>
-        input?.search ? inFlight : unsearched,
-    );
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+  describe("when the count chip is rendered", () => {
+    /** @scenario The record count reports the matches, not the whole dataset */
+    it("does not report the held-over rows as the matches", async () => {
+      // While the search's read is in flight, `keepPreviousData` keeps serving
+      // the last unsearched page, and the `count` that comes with it is the
+      // DATASET's size, not a number of matches. Rendered through the two-number
+      // chip that becomes "120 of 120 records" — every row matched — over rows
+      // that were never searched at all. On a large dataset that read takes
+      // seconds, and a refused one used to hold this state for the whole retry
+      // backoff.
+      const user = userEvent.setup();
+      const unsearched = {
+        data: {
+          id: "ds",
+          name: "ds",
+          columnTypes,
+          count: 120,
+          totalPages: 3,
+          page: 1,
+          datasetRecords: manyRecords.slice(0, 50),
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      // What react-query serves during a key change: the previous key's result,
+      // flagged as a placeholder, with the new key's read still in flight.
+      const inFlight = { ...unsearched, isPlaceholderData: true };
+      listPaginatedQuery.mockImplementation(
+        (input: { search?: string } | undefined) =>
+          input?.search ? inFlight : unsearched,
+      );
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    await screen.findByText("question 0");
-    await typeSearch(user, "escalation");
+      await screen.findByText("question 0");
+      await typeSearch(user, "escalation");
 
-    // The self-check: without it, an editor that never ran the search at all
-    // would satisfy the assertion below by simply never entering search mode.
-    await waitFor(() =>
-      expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-      "120 of 120",
-    );
+      // The self-check: without it, an editor that never ran the search at all
+      // would satisfy the assertion below by simply never entering search mode.
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("add-rows-from-csv"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "120 of 120",
+      );
+    });
   });
 });
 
 describe("given I have typed a search term that has not run yet", () => {
-  /** @scenario The ways to add a row go the moment I start typing */
-  it("withdraws every way of adding a row on the keystroke, not on the debounce", async () => {
-    // The gate used to read the DEBOUNCED term, so for the 300ms between the
-    // keystroke and the search running, the add-row button, the trailing row
-    // and the CSV import were all still offered. A row added in that window is
-    // empty, so the search arriving a moment later removes it from the grid.
-    const requests = serveDataset(singlePageRecords);
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+  describe("when the toolbar and the grid are rendered", () => {
+    /** @scenario The ways to add a row go the moment I start typing */
+    it("withdraws every way of adding a row on the keystroke, not on the debounce", async () => {
+      // The gate used to read the DEBOUNCED term, so for the 300ms between the
+      // keystroke and the search running, the add-row button, the trailing row
+      // and the CSV import were all still offered. A row added in that window is
+      // empty, so the search arriving a moment later removes it from the grid.
+      const requests = serveDataset(singlePageRecords);
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    expect(await screen.findByTestId("add-row")).toBeInTheDocument();
-    expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
+      expect(await screen.findByTestId("add-row")).toBeInTheDocument();
+      expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("dataset-row-search"), {
-      target: { value: "escalation" },
+      fireEvent.change(screen.getByTestId("dataset-row-search"), {
+        target: { value: "escalation" },
+      });
+
+      // Asserted outright rather than waited for: waiting would let the debounce
+      // fire and the test would pass on the old behaviour too.
+      expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument();
+      // The self-check that keeps the two assertions above honest: if the search
+      // had already run, they would hold for the wrong reason. No searched read
+      // has gone out, so the debounce is still pending.
+      expect(requests.at(-1)?.search).toBeUndefined();
     });
-
-    // Asserted outright rather than waited for: waiting would let the debounce
-    // fire and the test would pass on the old behaviour too.
-    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument();
-    // The self-check that keeps the two assertions above honest: if the search
-    // had already run, they would hold for the wrong reason. No searched read
-    // has gone out, so the debounce is still pending.
-    expect(requests.at(-1)?.search).toBeUndefined();
   });
 });
 
-describe("given the CSV import was open when a search landed", () => {
-  /** @scenario An import already open when the search lands is withdrawn too */
-  it("withdraws the import dialog too, not just the button", async () => {
-    // Rows imported here land at the end of the dataset, outside the matches on
-    // screen. Withdrawing only the toolbar button leaves the door open behind
-    // it for an import the user started before they started searching.
-    const user = userEvent.setup();
-    serveDataset(singlePageRecords);
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+describe("given I had opened the CSV import", () => {
+  describe("when a search takes effect", () => {
+    /** @scenario An import already open when the search lands is withdrawn too */
+    it("withdraws the import dialog too, not just the button", async () => {
+      // Rows imported here land at the end of the dataset, outside the matches on
+      // screen. Withdrawing only the toolbar button leaves the door open behind
+      // it for an import the user started before they started searching.
+      const user = userEvent.setup();
+      serveDataset(singlePageRecords);
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    await screen.findByText("billing question");
-    await user.click(await screen.findByTestId("add-rows-from-csv"));
-    await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
+      await screen.findByText("billing question");
+      await user.click(await screen.findByTestId("add-rows-from-csv"));
+      await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
 
-    // The dialog traps focus, so the search box cannot be typed into while it
-    // is open — a change event is how this ordering is reachable at all.
-    fireEvent.change(screen.getByTestId("dataset-row-search"), {
-      target: { value: "escalation" },
+      // The dialog traps focus, so the search box cannot be typed into while it
+      // is open — a change event is how this ordering is reachable at all.
+      fireEvent.change(screen.getByTestId("dataset-row-search"), {
+        target: { value: "escalation" },
+      });
+
+      // Waited for, not asserted outright: the dialog's unmount is animated, so a
+      // bare assertion here races the exit transition and fails intermittently.
+      await waitFor(() =>
+        expect(screen.queryAllByRole("dialog")).toHaveLength(0),
+      );
     });
-
-    // Waited for, not asserted outright: the dialog's unmount is animated, so a
-    // bare assertion here races the exit transition and fails intermittently.
-    await waitFor(() =>
-      expect(screen.queryAllByRole("dialog")).toHaveLength(0),
-    );
   });
 
-  /** @scenario An import withdrawn by a search does not reopen when I clear it */
-  it("leaves it closed when the search is cleared, rather than reopening it", async () => {
-    // Withdrawing the import unmounted the dialog without telling the
-    // disclosure it had closed, so the "open" flag outlived it. Clearing the
-    // search then remounted the dialog on its own — seconds after the user last
-    // touched it, and empty of whatever file they had chosen in it.
-    const user = userEvent.setup();
-    serveDataset(singlePageRecords);
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+  describe("when I then clear the search", () => {
+    /** @scenario An import withdrawn by a search does not reopen when I clear it */
+    it("leaves it closed when the search is cleared, rather than reopening it", async () => {
+      // Withdrawing the import unmounted the dialog without telling the
+      // disclosure it had closed, so the "open" flag outlived it. Clearing the
+      // search then remounted the dialog on its own — seconds after the user last
+      // touched it, and empty of whatever file they had chosen in it.
+      const user = userEvent.setup();
+      serveDataset(singlePageRecords);
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    await screen.findByText("billing question");
-    await user.click(await screen.findByTestId("add-rows-from-csv"));
-    await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
+      await screen.findByText("billing question");
+      await user.click(await screen.findByTestId("add-rows-from-csv"));
+      await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
 
-    fireEvent.change(screen.getByTestId("dataset-row-search"), {
-      target: { value: "escalation" },
+      fireEvent.change(screen.getByTestId("dataset-row-search"), {
+        target: { value: "escalation" },
+      });
+      await waitFor(() =>
+        expect(screen.queryAllByRole("dialog")).toHaveLength(0),
+      );
+
+      fireEvent.change(screen.getByTestId("dataset-row-search"), {
+        target: { value: "" },
+      });
+
+      // The import button coming back is the witness that the search really has
+      // been cleared — without it this could pass on a search that never lifted.
+      await waitFor(() =>
+        expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument(),
+      );
+      expect(screen.queryAllByRole("dialog")).toHaveLength(0);
     });
-    await waitFor(() =>
-      expect(screen.queryAllByRole("dialog")).toHaveLength(0),
-    );
-
-    fireEvent.change(screen.getByTestId("dataset-row-search"), {
-      target: { value: "" },
-    });
-
-    // The import button coming back is the witness that the search really has
-    // been cleared — without it this could pass on a search that never lifted.
-    await waitFor(() =>
-      expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument(),
-    );
-    expect(screen.queryAllByRole("dialog")).toHaveLength(0);
   });
 });
 
 describe("given the server refuses the search", () => {
-  /** @scenario A refused search does not leave unsearched rows on screen as if they matched */
-  it("stops presenting the pre-search rows as the result", async () => {
-    // The rows on screen were read before the search and never matched against
-    // it. The store is only written from a settled `data`, so on error it keeps
-    // them — and the chip, fed by the same stale count, labels them as the
-    // matches. "50 of 60,000 records" under a search box containing
-    // "escalation" is a complete, confident, false answer; the toast that
-    // explains it dismisses after 12s and leaves only the falsehood.
-    const user = userEvent.setup();
-    const loaded = {
-      data: {
-        id: "ds",
-        name: "ds",
-        columnTypes,
-        count: 120,
-        totalPages: 3,
-        page: 1,
-        datasetRecords: manyRecords.slice(0, 50),
-      },
-      isLoading: false,
-      refetch: vi.fn(),
-    };
-    const refused = {
-      data: undefined,
-      error: { message: "This dataset is too large to search" },
-      isLoading: false,
-      refetch: vi.fn(),
-    };
-    listPaginatedQuery.mockImplementation(
-      (input: { search?: string } | undefined) =>
-        input?.search ? refused : loaded,
-    );
-    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+  describe("when the refusal comes back", () => {
+    /** @scenario A refused search does not leave unsearched rows on screen as if they matched */
+    it("stops presenting the pre-search rows as the result", async () => {
+      // The rows on screen were read before the search and never matched against
+      // it. The store is only written from a settled `data`, so on error it keeps
+      // them — and the chip, fed by the same stale count, labels them as the
+      // matches. "50 of 60,000 records" under a search box containing
+      // "escalation" is a complete, confident, false answer; the toast that
+      // explains it dismisses after 12s and leaves only the falsehood.
+      const user = userEvent.setup();
+      const loaded = {
+        data: {
+          id: "ds",
+          name: "ds",
+          columnTypes,
+          count: 120,
+          totalPages: 3,
+          page: 1,
+          datasetRecords: manyRecords.slice(0, 50),
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      const refused = {
+        data: undefined,
+        error: { message: "This dataset is too large to search" },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      listPaginatedQuery.mockImplementation(
+        (input: { search?: string } | undefined) =>
+          input?.search ? refused : loaded,
+      );
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-    await screen.findByText("question 0");
-    await typeSearch(user, "escalation");
+      await screen.findByText("question 0");
+      await typeSearch(user, "escalation");
 
-    await waitFor(() =>
-      expect(screen.getByTestId("dataset-search-failed")).toBeInTheDocument(),
-    );
-    // No match claim: the chip must not report a count of matches it never got.
-    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-      /\bof\b|matching/,
-    );
-    expect(screen.queryByText("question 0")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-search-failed")).toBeInTheDocument(),
+      );
+      // No match claim: the chip must not report a count of matches it never got.
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        /\bof\b|matching/,
+      );
+      expect(screen.queryByText("question 0")).not.toBeInTheDocument();
+    });
   });
 });
 
 describe("given I open another dataset without leaving the editor", () => {
-  /** @scenario Opening another dataset starts it unsearched */
-  it("drops the previous dataset's search rather than applying it to the new one", async () => {
-    // The editor stays mounted across a client-side move between datasets, so
-    // every piece of search state is carried over unless it is reset. Carried
-    // over, the new dataset is fetched already narrowed by a word the user
-    // typed against a different dataset — rows are missing and nothing on
-    // screen says why.
-    const user = userEvent.setup();
-    const requests = serveDatasetsById({
-      "ds-a": manyRecords,
-      "ds-b": singlePageRecords,
-    });
-    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-      wrapper: Wrapper,
-    });
+  describe("when the new dataset is read", () => {
+    /** @scenario Opening another dataset starts it unsearched */
+    it("drops the previous dataset's search rather than applying it to the new one", async () => {
+      // The editor stays mounted across a client-side move between datasets, so
+      // every piece of search state is carried over unless it is reset. Carried
+      // over, the new dataset is fetched already narrowed by a word the user
+      // typed against a different dataset — rows are missing and nothing on
+      // screen says why.
+      const user = userEvent.setup();
+      const requests = serveDatasetsById({
+        byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
+      });
+      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+        wrapper: Wrapper,
+      });
 
-    await typeSearch(user, "escalation");
-    await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
+      await typeSearch(user, "escalation");
+      await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
 
-    rerender(<DatasetEditorTable datasetId="ds-b" />);
+      rerender(<DatasetEditorTable datasetId="ds-b" />);
 
-    await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
-    expect(requests.filter((r) => r.datasetId === "ds-b" && r.search)).toEqual(
-      [],
-    );
-    expect(screen.getByTestId("dataset-row-search")).toHaveValue("");
-  });
-
-  /** @scenario Opening another dataset starts it unsearched */
-  it("does not report the new dataset's size as the previous one's", async () => {
-    // `unsearchedRecordCount` is remembered so a search can say "3 of 679". Kept
-    // across a dataset switch it says "3 of 679" about a dataset that holds 3
-    // rows in total — a number the user has no way to recognise as stale.
-    const user = userEvent.setup();
-    serveDatasetsById({ "ds-a": manyRecords, "ds-b": singlePageRecords });
-    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-      wrapper: Wrapper,
+      await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
+      expect(
+        requests.filter((r) => r.datasetId === "ds-b" && r.search),
+      ).toEqual([]);
+      expect(screen.getByTestId("dataset-row-search")).toHaveValue("");
     });
 
-    await typeSearch(user, "escalation");
-    await waitFor(() =>
-      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-        "1 of 120",
-      ),
-    );
+    /** @scenario Opening another dataset starts it unsearched */
+    it("does not report the new dataset's size as the previous one's", async () => {
+      // `unsearchedRecordCount` is remembered so a search can say "3 of 679". Kept
+      // across a dataset switch it says "3 of 679" about a dataset that holds 3
+      // rows in total — a number the user has no way to recognise as stale.
+      const user = userEvent.setup();
+      serveDatasetsById({
+        byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
+      });
+      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+        wrapper: Wrapper,
+      });
 
-    rerender(<DatasetEditorTable datasetId="ds-b" />);
+      await typeSearch(user, "escalation");
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+          "1 of 120",
+        ),
+      );
 
-    await waitFor(() =>
-      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-        "3 records",
-      ),
-    );
-    expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-      "120",
-    );
-  });
+      rerender(<DatasetEditorTable datasetId="ds-b" />);
 
-  /** @scenario Opening another dataset starts it unsearched */
-  it("starts the new dataset at its first page", async () => {
-    // Page is per-dataset too: page 3 of a 120-row dataset is past the end of a
-    // 3-row one, and the clamp only corrects it after a request for a page that
-    // does not exist has already gone out.
-    const user = userEvent.setup();
-    const requests = serveDatasetsById({
-      "ds-a": manyRecords,
-      "ds-b": singlePageRecords,
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+          "3 records",
+        ),
+      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "120",
+      );
     });
-    const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-      wrapper: Wrapper,
+
+    /** @scenario Opening another dataset starts it unsearched */
+    it("starts the new dataset at its first page", async () => {
+      // Page is per-dataset too: page 3 of a 120-row dataset is past the end of a
+      // 3-row one, and the clamp only corrects it after a request for a page that
+      // does not exist has already gone out.
+      const user = userEvent.setup();
+      const requests = serveDatasetsById({
+        byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
+      });
+      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(await screen.findByTestId("pagination-next"));
+      await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
+
+      rerender(<DatasetEditorTable datasetId="ds-b" />);
+
+      await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
+      expect(
+        requests.filter((r) => r.datasetId === "ds-b" && (r.page ?? 1) > 1),
+      ).toEqual([]);
     });
-
-    await user.click(await screen.findByTestId("pagination-next"));
-    await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
-
-    rerender(<DatasetEditorTable datasetId="ds-b" />);
-
-    await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
-    expect(
-      requests.filter((r) => r.datasetId === "ds-b" && (r.page ?? 1) > 1),
-    ).toEqual([]);
   });
 });
 
 describe("given a draft dataset that has not been saved", () => {
-  /** @scenario A draft dataset offers no search */
-  it("offers no search, and still offers the ways to add a row", () => {
-    render(
-      <DatasetEditorTable
-        inMemoryDataset={{
-          name: "My Draft",
-          columnTypes,
-          datasetRecords: [{ id: "r1", input: "hello", expected_output: "x" }],
-        }}
-        onUpdateDataset={vi.fn()}
-      />,
-      { wrapper: Wrapper },
-    );
+  describe("when the editor is rendered", () => {
+    /** @scenario A draft dataset offers no search */
+    it("offers no search, and still offers the ways to add a row", () => {
+      render(
+        <DatasetEditorTable
+          inMemoryDataset={{
+            name: "My Draft",
+            columnTypes,
+            datasetRecords: [
+              { id: "r1", input: "hello", expected_output: "x" },
+            ],
+          }}
+          onUpdateDataset={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
 
-    expect(screen.queryByTestId("dataset-row-search")).not.toBeInTheDocument();
-    expect(screen.getByTestId("add-row")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("dataset-row-search"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("add-row")).toBeInTheDocument();
+    });
   });
 });

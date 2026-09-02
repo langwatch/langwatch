@@ -30,13 +30,19 @@ describe("matchesDatasetSearch()", () => {
   };
 
   it("matches a cell value", () => {
-    expect(matchesDatasetSearch(entry, "manager")).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "manager" })).toBe(
+      true,
+    );
   });
 
   /** @scenario Search matches regardless of letter case */
   it("matches regardless of letter case", () => {
-    expect(matchesDatasetSearch(entry, "escalation")).toBe(true);
-    expect(matchesDatasetSearch(entry, "ESCALATION")).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "escalation" })).toBe(
+      true,
+    );
+    expect(matchesDatasetSearch({ entry: entry, search: "ESCALATION" })).toBe(
+      true,
+    );
   });
 
   /** @scenario A word that only appears in a column name matches nothing */
@@ -44,23 +50,33 @@ describe("matchesDatasetSearch()", () => {
     // Matching column names too would make "id" return every row of a dataset
     // with a `conversation_id` column — a result the user cannot explain from
     // what is on screen.
-    expect(matchesDatasetSearch({ escalation: "none" }, "escalation")).toBe(
-      false,
-    );
+    expect(
+      matchesDatasetSearch({
+        entry: { escalation: "none" },
+        search: "escalation",
+      }),
+    ).toBe(false);
   });
 
   it("matches inside non-string values rather than skipping them", () => {
-    expect(matchesDatasetSearch(entry, "4")).toBe(true);
-    expect(matchesDatasetSearch(entry, "false")).toBe(true);
-    expect(matchesDatasetSearch(entry, "email")).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "4" })).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "false" })).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "email" })).toBe(true);
   });
 
   it("does not match null or missing values", () => {
-    expect(matchesDatasetSearch({ a: null, b: undefined }, "null")).toBe(false);
+    expect(
+      matchesDatasetSearch({
+        entry: { a: null, b: undefined },
+        search: "null",
+      }),
+    ).toBe(false);
   });
 
   it("reports no match when nothing contains the text", () => {
-    expect(matchesDatasetSearch(entry, "refund")).toBe(false);
+    expect(matchesDatasetSearch({ entry: entry, search: "refund" })).toBe(
+      false,
+    );
   });
 
   it("survives an entry that is not an object", () => {
@@ -71,14 +87,23 @@ describe("matchesDatasetSearch()", () => {
     // the rest of the editor survives, because it fails the WHOLE search, not
     // the one row.
     expect(() =>
-      matchesDatasetSearch(null as never, "escalation"),
+      matchesDatasetSearch({ entry: null as never, search: "escalation" }),
     ).not.toThrow();
-    expect(matchesDatasetSearch(null as never, "escalation")).toBe(false);
-    expect(matchesDatasetSearch(undefined as never, "escalation")).toBe(false);
-    expect(matchesDatasetSearch("escalation" as never, "escalation")).toBe(
+    expect(
+      matchesDatasetSearch({ entry: null as never, search: "escalation" }),
+    ).toBe(false);
+    expect(
+      matchesDatasetSearch({ entry: undefined as never, search: "escalation" }),
+    ).toBe(false);
+    expect(
+      matchesDatasetSearch({
+        entry: "escalation" as never,
+        search: "escalation",
+      }),
+    ).toBe(false);
+    expect(matchesDatasetSearch({ entry: 42 as never, search: "4" })).toBe(
       false,
     );
-    expect(matchesDatasetSearch(42 as never, "4")).toBe(false);
   });
 });
 

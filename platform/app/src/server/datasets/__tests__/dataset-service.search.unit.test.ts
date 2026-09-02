@@ -62,13 +62,19 @@ const mockChunks = (byIndex: Record<number, unknown[]> = chunks) => {
   return { readChunks, readChunk };
 };
 
-const searchPage = (
-  service: DatasetService,
-  dataset: Record<string, unknown>,
-  search: string,
+const searchPage = ({
+  service,
+  dataset,
+  search,
   page = 1,
   limit = 50,
-) =>
+}: {
+  service: DatasetService;
+  dataset: Record<string, unknown>;
+  search: string;
+  page?: number;
+  limit?: number;
+}) =>
   (
     service as unknown as {
       paginateResolvedDataset: (p: Record<string, unknown>) => Promise<{
@@ -94,7 +100,11 @@ describe("dataset search (s3_jsonl)", () => {
     mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(service, baseS3Dataset, "escalation");
+    const result = await searchPage({
+      service,
+      dataset: baseS3Dataset,
+      search: "escalation",
+    });
 
     expect(result.data.map((r) => r.entry.text)).toEqual([
       "needs Escalation",
@@ -106,7 +116,11 @@ describe("dataset search (s3_jsonl)", () => {
     mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(service, baseS3Dataset, "escalation");
+    const result = await searchPage({
+      service,
+      dataset: baseS3Dataset,
+      search: "escalation",
+    });
 
     expect(result.pagination.total).toBe(2);
     expect(result.pagination.totalPages).toBe(1);
@@ -116,7 +130,13 @@ describe("dataset search (s3_jsonl)", () => {
     mockChunks();
     const service = makeService({});
 
-    const second = await searchPage(service, baseS3Dataset, "escalation", 2, 1);
+    const second = await searchPage({
+      service,
+      dataset: baseS3Dataset,
+      search: "escalation",
+      page: 2,
+      limit: 1,
+    });
 
     expect(second.data.map((r) => r.entry.text)).toEqual([
       "escalation follow-up",
@@ -132,7 +152,7 @@ describe("dataset search (s3_jsonl)", () => {
     const { readChunks, readChunk } = mockChunks();
     const service = makeService({});
 
-    await searchPage(service, baseS3Dataset, "escalation");
+    await searchPage({ service, dataset: baseS3Dataset, search: "escalation" });
 
     expect(readChunks).not.toHaveBeenCalled();
     expect(readChunk).toHaveBeenCalledTimes(3);
@@ -142,7 +162,11 @@ describe("dataset search (s3_jsonl)", () => {
     mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(service, baseS3Dataset, "text");
+    const result = await searchPage({
+      service,
+      dataset: baseS3Dataset,
+      search: "text",
+    });
 
     expect(result.data).toEqual([]);
     expect(result.pagination.total).toBe(0);
@@ -154,11 +178,11 @@ describe("dataset search (s3_jsonl)", () => {
     const service = makeService({});
 
     await expect(
-      searchPage(
+      searchPage({
         service,
-        { ...baseS3Dataset, rowCount: DATASET_SEARCH_MAX_ROWS + 1 },
-        "escalation",
-      ),
+        dataset: { ...baseS3Dataset, rowCount: DATASET_SEARCH_MAX_ROWS + 1 },
+        search: "escalation",
+      }),
     ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
   });
 
@@ -167,11 +191,11 @@ describe("dataset search (s3_jsonl)", () => {
     const service = makeService({});
 
     await expect(
-      searchPage(
+      searchPage({
         service,
-        { ...baseS3Dataset, rowCount: DATASET_SEARCH_MAX_ROWS + 1 },
-        "escalation",
-      ),
+        dataset: { ...baseS3Dataset, rowCount: DATASET_SEARCH_MAX_ROWS + 1 },
+        search: "escalation",
+      }),
     ).rejects.toThrow();
     expect(readChunk).not.toHaveBeenCalled();
   });
@@ -184,11 +208,11 @@ describe("dataset search (s3_jsonl)", () => {
     mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(
+    const result = await searchPage({
       service,
-      { ...baseS3Dataset, chunkCount: 2 },
-      "escalation",
-    );
+      dataset: { ...baseS3Dataset, chunkCount: 2 },
+      search: "escalation",
+    });
 
     expect(result.pagination.total).toBe(2);
   });
@@ -204,9 +228,9 @@ describe("dataset search (s3_jsonl)", () => {
     const { readChunk } = mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(
+    const result = await searchPage({
       service,
-      {
+      dataset: {
         ...baseS3Dataset,
         chunkOffsets: [
           { index: 0, startRow: 0, endRow: 2 },
@@ -214,8 +238,8 @@ describe("dataset search (s3_jsonl)", () => {
           null,
         ],
       },
-      "escalation",
-    );
+      search: "escalation",
+    });
 
     expect(readChunk).toHaveBeenCalledTimes(3);
     expect(result.pagination.total).toBe(2);
@@ -247,7 +271,13 @@ describe("dataset search (s3_jsonl)", () => {
     const { readChunk } = mockChunks();
     const service = makeService({});
 
-    const result = await searchPage(service, baseS3Dataset, "   ", 1, 2);
+    const result = await searchPage({
+      service,
+      dataset: baseS3Dataset,
+      search: "   ",
+      page: 1,
+      limit: 2,
+    });
 
     // Whole dataset, windowed read — not a scan for rows containing a space.
     expect(result.pagination.total).toBe(6);
@@ -295,7 +325,11 @@ describe("dataset search (postgres-backed)", () => {
     ]);
     const service = makeService({ recordRepository });
 
-    const result = await searchPage(service, pgDataset, "escalation");
+    const result = await searchPage({
+      service,
+      dataset: pgDataset,
+      search: "escalation",
+    });
 
     expect(result.data.map((r) => r.entry.text)).toEqual(["needs Escalation"]);
     expect(result.pagination.total).toBe(1);
@@ -314,7 +348,7 @@ describe("dataset search (postgres-backed)", () => {
     const service = makeService({ recordRepository });
 
     await expect(
-      searchPage(service, pgDataset, "escalation"),
+      searchPage({ service, dataset: pgDataset, search: "escalation" }),
     ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
     // Refused before reading, not part-way through.
     expect(recordRepository.findDatasetRecordsPage).not.toHaveBeenCalled();
@@ -330,7 +364,11 @@ describe("dataset search (postgres-backed)", () => {
     const recordRepository = makeRecordRepository(entries);
     const service = makeService({ recordRepository });
 
-    const result = await searchPage(service, pgDataset, "escalation");
+    const result = await searchPage({
+      service,
+      dataset: pgDataset,
+      search: "escalation",
+    });
 
     expect(result.pagination.total).toBe(1);
     expect(recordRepository.countAndMaxUpdatedAt).toHaveBeenCalledTimes(1);

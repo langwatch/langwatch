@@ -55,10 +55,13 @@ export const normalizeDatasetSearch = (
  *
  * `search` is expected to have been through `normalizeDatasetSearch`.
  */
-export const matchesDatasetSearch = (
-  entry: Record<string, unknown>,
-  search: string,
-): boolean => {
+export const matchesDatasetSearch = ({
+  entry,
+  search,
+}: {
+  entry: Record<string, unknown>;
+  search: string;
+}): boolean => {
   // `entry` is whatever was stored: `adaptS3JsonlRecord` assigns it straight
   // from a JSONL line with no shape check, so a line of `null` or a bare scalar
   // reaches here. Ordinary paging tolerates such a row and renders it blank —
