@@ -19,7 +19,6 @@ import {
 import {
   WorkerProductionComposition,
   type WorkerTopicCompositionOptions,
-  type WorkerTraceCompositionOptions,
 } from "./worker-production.composition";
 
 /**
@@ -49,7 +48,6 @@ export type WorkerDurableCompositionOptions = Readonly<{
   persistence: WorkerDurablePersistencePorts;
   /** Project BYOC and Azure capabilities for the Group Queue's blob offload. */
   storage: WorkerPrivateInfrastructurePorts;
-  trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
@@ -96,7 +94,6 @@ export function createWorkerDurableComposition(
         ? { retentionPolicyResolver: options.persistence.retentionPolicyResolver }
         : {}),
     },
-    trace: options.trace,
     topic: options.topic,
     ...(options.enterprise ? { enterprise: options.enterprise } : {}),
     ...(options.observability ? { observability: options.observability } : {}),

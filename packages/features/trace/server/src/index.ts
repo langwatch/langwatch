@@ -118,6 +118,14 @@ export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-s
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port";
 export { TraceSpanStoragePort } from "./ports/trace-span-storage.port";
 export { ClickHouseTraceSpanStorageAdapter } from "./adapters/clickhouse.trace-span-storage.adapter";
+export { TraceStoredSpanReaderPort } from "./ports/trace-stored-span-reader.port";
+export { TraceSpanCollectionService } from "./services/trace-ingestion.service";
+export { TrackedEventSpanService } from "./services/tracked-event-span.service";
+export {
+  ClickHouseTraceProjectionStorageAdapter,
+  type ClickHouseTraceProjectionStorageOptions,
+} from "./adapters/clickhouse.trace-projection-storage.adapter";
+export { ClickHouseTraceStoredSpanReaderAdapter } from "./adapters/clickhouse.trace-stored-span-reader.adapter";
 export {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,

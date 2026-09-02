@@ -40,29 +40,18 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 
 import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
 import { TopicServerInstaller } from "@langwatch/topic-server";
-import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
-import { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { WorkerProductionComposition } from "../worker-production.composition";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
   WorkerLifecyclePort,
   WorkerTransportPort,
 } from "../../platform/lifecycle/worker-runtime.port";
+import { createWorkerProcessDatabase } from "./support/worker-database.double";
 
 class NoProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
-}
-
-class TraceInstaller extends TraceProcessingInstallerPort {
-  install() {
-    return { traceAssignments: new Assignments() };
-  }
-}
-
-class Assignments extends TraceTopicAssignmentPort {
-  async assignTopic() {}
 }
 
 class Lifecycle extends WorkerLifecyclePort {
@@ -121,9 +110,8 @@ describe("WorkerProductionComposition infrastructure seam", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller() },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,

@@ -1,3 +1,4 @@
+import { Deferred } from "@langwatch/eventing";
 import type { TopicClusteringCommandsPort } from "@langwatch/topic-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
@@ -9,7 +10,7 @@ export interface TopicWorkerCapability {
   install(options: {
     eventSourcing: WorkerEventingRuntime["eventSourcing"];
     traceAssignments: TraceTopicAssignmentPort;
-  }): unknown;
+  }): { claimAndBootstrap: (projectId: string) => Promise<void> };
   startBootSeeds(): void;
 }
 
@@ -28,6 +29,29 @@ export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   }
 
   readonly name = "topic";
+
+  private readonly bootstrapTopicClustering = new Deferred<(projectId: string) => Promise<void>>(
+    "topic.bootstrapTopicClustering",
+  );
+
+  /**
+   * Callable proxy for Trace's `projectMetadata` subscriber.
+   *
+   * Late-bound because the two features mount in the opposite order to the one
+   * this dependency runs in: Topic installs AFTER Trace, so the subscriber that
+   * calls this is built before the function exists. Installation is fully
+   * sequential and finishes before the consumer claims a job, so the proxy is
+   * resolved by the time any project's first ingest reaches it.
+   *
+   * It is `claimAndBootstrap` and NOT `commandDispatch.requestClustering`. The
+   * claim is what limits a project to one bootstrap an hour; dispatching the
+   * command directly would run the ungated path, and the subscriber that calls
+   * this fires on every first-ingest event a fresh project produces.
+   */
+  readonly commands: { bootstrapTopicClustering: (projectId: string) => Promise<void> } = {
+    bootstrapTopicClustering: this.bootstrapTopicClustering.fn,
+  };
+
   private installed = false;
 
   private constructor(
@@ -40,10 +64,11 @@ export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
 
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
-      this.installer.install({
+      const installed = this.installer.install({
         eventSourcing: this.eventing.eventSourcing,
         traceAssignments: this.traceAssignments,
       });
+      this.bootstrapTopicClustering.resolve(installed.claimAndBootstrap);
       this.installer.startBootSeeds();
       this.installed = true;
     }

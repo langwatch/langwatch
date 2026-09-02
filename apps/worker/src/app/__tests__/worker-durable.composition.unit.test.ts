@@ -37,8 +37,6 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 });
 
 import { EventingServerRuntime } from "@langwatch/eventing/server";
-import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
-import { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { createWorkerDurableComposition } from "../worker-durable.composition";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
@@ -46,16 +44,7 @@ import {
   WorkerTransportPort,
 } from "../../platform/lifecycle/worker-runtime.port";
 import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter";
-
-class TraceInstaller extends TraceProcessingInstallerPort {
-  install() {
-    return { traceAssignments: new Assignments() };
-  }
-}
-
-class Assignments extends TraceTopicAssignmentPort {
-  async assignTopic() {}
-}
+import { createWorkerProcessDatabase } from "./support/worker-database.double";
 
 class Lifecycle extends WorkerLifecyclePort {
   async close() {}
@@ -104,9 +93,8 @@ function compose(resources: ResourceScope, overrides?: { defaultRetentionDays?: 
       defaultRetentionDays: overrides?.defaultRetentionDays ?? 30,
     },
     storage: { projects: new NoProjectBuckets() },
-    trace: { installer: new TraceInstaller() },
     topic: {
-      database: {} as never,
+      database: createWorkerProcessDatabase() as never,
       redis: null,
       execution: {} as never,
       metrics: {} as never,

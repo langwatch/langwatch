@@ -28,6 +28,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   saasBillableEventsMeter,
   WorkerProductionComposition,
+  type WorkerAutomationCompositionOptions,
+  type WorkerEvaluationCompositionOptions,
+  type WorkerScenarioCompositionOptions,
 } from "../worker-production.composition";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
@@ -42,6 +45,7 @@ import {
   WorkerLifecyclePort,
   WorkerTransportPort,
 } from "../../platform/lifecycle/worker-runtime.port";
+import { createWorkerProcessDatabase } from "./support/worker-database.double";
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);
@@ -64,7 +68,8 @@ class Lifecycle extends WorkerLifecyclePort {
 }
 
 class TopicCapability implements TopicWorkerCapability {
-  readonly install = vi.fn();
+  readonly claimAndBootstrap = vi.fn(async (_projectId: string) => undefined);
+  readonly install = vi.fn(() => ({ claimAndBootstrap: this.claimAndBootstrap }));
   readonly startBootSeeds = vi.fn();
   readonly commandDispatch = {
     recordTopics: vi.fn(async () => undefined),
@@ -73,7 +78,8 @@ class TopicCapability implements TopicWorkerCapability {
 }
 
 class EventingTopicCapability implements TopicWorkerCapability {
-  readonly install = vi.fn();
+  readonly claimAndBootstrap = vi.fn(async (_projectId: string) => undefined);
+  readonly install = vi.fn(() => ({ claimAndBootstrap: this.claimAndBootstrap }));
   readonly startBootSeeds = vi.fn();
   readonly commandDispatch: TopicWorkerCapability["commandDispatch"];
 
@@ -92,25 +98,14 @@ class TraceAssignments extends TraceTopicAssignmentPort {
 class TraceInstaller {
   readonly install = vi.fn((_eventSourcing: EventSourcing) => ({
     traceAssignments: this.traceAssignments,
+    commands: { recordSpan: async () => undefined },
   }));
 
   constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {}
 }
 
 function createProcessPersistenceDatabase() {
-  return {
-    $executeRaw: async () => 0,
-    $queryRaw: async () => [],
-    $transaction: async <Result>(callback: (transaction: object) => Promise<Result>) =>
-      callback({}),
-    processManagerInbox: {},
-    processManagerInstance: {},
-    processManagerOutbox: {},
-    processManagerOutboxAttempt: {},
-    // The one client this process opens carries every model its features
-    // name, and the coding-agent fold stamps this one behind each commit.
-    project: { updateMany: async () => ({ count: 0 }) },
-  };
+  return createWorkerProcessDatabase();
 }
 
 function createTraceFeature(eventing: WorkerEventingRuntime): {
@@ -280,9 +275,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(assignments) },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -330,9 +324,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -648,14 +641,15 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: topicDatabase as never,
+          database: createWorkerProcessDatabase(topicDatabase) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
         },
-        ...(Object.keys(database).length > 0 ? { database: database as never } : {}),
+        ...(Object.keys(database).length > 0
+          ? { database: createWorkerProcessDatabase(database) as never }
+          : {}),
       });
     }
 
@@ -734,9 +728,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: (input.database ?? {}) as never,
+          database: createWorkerProcessDatabase(input.database ?? {}) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -842,14 +835,15 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: topicDatabase as never,
+          database: createWorkerProcessDatabase(topicDatabase) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
         },
-        ...(Object.keys(database).length > 0 ? { database: database as never } : {}),
+        ...(Object.keys(database).length > 0
+          ? { database: createWorkerProcessDatabase(database) as never }
+          : {}),
       });
     }
 
@@ -947,9 +941,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -1179,9 +1172,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: (input.database ?? {}) as never,
+          database: createWorkerProcessDatabase(input.database ?? {}) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -1398,9 +1390,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: substrate.database as never,
+          database: createWorkerProcessDatabase(substrate.database) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -1519,9 +1510,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: database as never,
+          database: createWorkerProcessDatabase(database) as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -1645,9 +1635,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -1825,7 +1814,6 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
           database: (input.database ?? createProcessPersistenceDatabase()) as never,
           redis: null,
@@ -2009,9 +1997,8 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        trace: { installer: new TraceInstaller(new TraceAssignments()) },
         topic: {
-          database: {} as never,
+          database: createWorkerProcessDatabase() as never,
           redis: null,
           execution: {} as never,
           metrics: {} as never,
@@ -2192,6 +2179,31 @@ describe("given a worker that composes the join-request ledger", () => {
     return entry!.jobs.map((job) => `${entry!.name}:${job}`).sort();
   }
 
+  /**
+   * The three producers trace processing dispatches into.
+   *
+   * A graph that claims `event-sourcing/jobs` must have all three, so a
+   * consuming fixture supplies them: without one, the composition refuses by
+   * name — which is the behaviour these mail tests are NOT about.
+   */
+  function traceProducerCapabilities() {
+    const definition = (name: string) => ({ metadata: { name, aggregateType: "global" } }) as never;
+    return {
+      automation: { installer: { buildPipeline: () => definition("automations") } },
+      evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
+      scenario: {
+        installer: {
+          buildProcessing: () => definition("simulation_processing"),
+          connect: () => undefined,
+        },
+      },
+    } as never as {
+      automation: WorkerAutomationCompositionOptions;
+      evaluation: WorkerEvaluationCompositionOptions;
+      scenario: WorkerScenarioCompositionOptions;
+    };
+  }
+
   function compositionFor(
     input: {
       source?: Record<string, unknown>;
@@ -2200,6 +2212,7 @@ describe("given a worker that composes the join-request ledger", () => {
     } = {},
   ): WorkerProductionComposition {
     return WorkerProductionComposition.create({
+      ...traceProducerCapabilities(),
       config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
       eventing: {
         database: createProcessPersistenceDatabase(),
@@ -2213,9 +2226,8 @@ describe("given a worker that composes the join-request ledger", () => {
       },
       lifecycle: new Lifecycle(),
       transport: new Transport(),
-      trace: { installer: new TraceInstaller(new TraceAssignments()) },
       topic: {
-        database: {} as never,
+        database: createWorkerProcessDatabase() as never,
         redis: null,
         execution: {} as never,
         metrics: {} as never,

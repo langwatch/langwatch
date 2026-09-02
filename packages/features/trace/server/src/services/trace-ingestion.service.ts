@@ -118,9 +118,7 @@ export class TraceIngestionService {
   private constructor(
     private readonly codingAgents: CodingAgentService,
     private readonly codingAgentSpanFilterEnabled: boolean,
-    private readonly dedup: TraceSpanDedupPort,
-    private readonly commands: TraceIngressCommandPort,
-    private readonly payloads: TraceIngressPayloadPort | undefined,
+    private readonly collection: TraceSpanCollectionService,
   ) {}
 
   static create(options: {
@@ -133,9 +131,11 @@ export class TraceIngestionService {
     return new TraceIngestionService(
       options.codingAgents,
       options.codingAgentSpanFilterEnabled,
-      options.dedup,
-      options.commands,
-      options.payloads,
+      TraceSpanCollectionService.create({
+        dedup: options.dedup,
+        commands: options.commands,
+        ...(options.payloads ? { payloads: options.payloads } : {}),
+      }),
     );
   }
 
@@ -207,7 +207,15 @@ export class TraceIngestionService {
     return result.data ?? null;
   }
 
-  async ingestNormalizedSpan(input: {
+  /**
+   * One already-normalized span, collected.
+   *
+   * Kept on this class because the OTLP request path calls it and because the
+   * REST tracked-event path reaches it by name; the work itself belongs to
+   * {@link TraceSpanCollectionService}, which is what a process holding only a
+   * queue and a Redis can compose.
+   */
+  ingestNormalizedSpan(input: {
     tenantId: string;
     span: OtlpSpan;
     resource: OtlpResource | null;
@@ -215,61 +223,7 @@ export class TraceIngestionService {
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef?: OtelSpan;
   }): Promise<SpanIngestionResult> {
-    let lockAcquired = false;
-
-    try {
-      const lockResult = await this.dedup.tryAcquireProcessingLock({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
-      if (lockResult === false) {
-        return { status: "deduped" };
-      }
-
-      lockAcquired = lockResult === true;
-
-      const commandData: RecordSpanCommandData = {
-        tenantId: input.tenantId,
-        span: input.span,
-        resource: input.resource,
-        instrumentationScope: input.instrumentationScope,
-        piiRedactionLevel: input.piiRedactionLevel,
-        occurredAt: Date.now(),
-      };
-      const prepared = this.payloads ? await this.payloads.prepare(commandData) : commandData;
-
-      await this.commands.recordSpan(prepared);
-      await this.dedup.confirmProcessed({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
-
-      return { status: "collected" };
-    } catch (error) {
-      if (lockAcquired) {
-        await this.dedup.releaseOnFailure({
-          tenantId: input.tenantId,
-          traceId: input.span.traceId,
-          spanId: input.span.spanId,
-        });
-      }
-
-      input.otelSpanRef?.addEvent("span_ingestion_error", {
-        "error.message": error instanceof Error ? error.message : String(error),
-        "tenant.id": input.tenantId,
-      });
-      this.logger.error(
-        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
-        "Error dispatching span to the trace processing pipeline",
-      );
-
-      return {
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
+    return this.collection.ingestNormalizedSpan(input);
   }
 
   private async processSpan(input: {
@@ -342,5 +296,108 @@ export class TraceIngestionService {
         spanId: hex(link.spanId),
       })),
     };
+  }
+}
+
+
+/**
+ * The span-collection half of ingestion: dedup, optional payload preparation,
+ * and the one command handoff.
+ *
+ * SPLIT OUT OF {@link TraceIngestionService} AT THE WORKER CONVERSION, and the
+ * split is what the reach shows rather than a tidy-up. `ingestNormalizedSpan`
+ * touches three collaborators; the class around it additionally holds the
+ * coding-agent span filter and the flag that arms it, and BOTH are reachable
+ * only from the OTLP-request path — the tracked-event reactor, which is the
+ * caller a background process needs, can never reach either. Composing the
+ * whole class for it would have meant a process building a `CodingAgentService`
+ * (and through it a `ProjectService`) to satisfy two arguments that are
+ * provably never read on the path it uses.
+ *
+ * `TraceIngestionService.create` still takes the same five options and builds
+ * this itself, so nothing outside this file changed shape.
+ */
+export class TraceSpanCollectionService {
+  private readonly logger = createLogger("langwatch:trace-processing:span-collection");
+
+  private constructor(
+    private readonly options: {
+      dedup: TraceSpanDedupPort;
+      commands: TraceIngressCommandPort;
+      payloads?: TraceIngressPayloadPort;
+    },
+  ) {}
+
+  static create(options: {
+    dedup: TraceSpanDedupPort;
+    commands: TraceIngressCommandPort;
+    payloads?: TraceIngressPayloadPort;
+  }): TraceSpanCollectionService {
+    return new TraceSpanCollectionService(options);
+  }
+
+  async ingestNormalizedSpan(input: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef?: OtelSpan;
+  }): Promise<SpanIngestionResult> {
+    let lockAcquired = false;
+
+    try {
+      const lockResult = await this.options.dedup.tryAcquireProcessingLock({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
+      if (lockResult === false) {
+        return { status: "deduped" };
+      }
+
+      lockAcquired = lockResult === true;
+
+      const commandData: RecordSpanCommandData = {
+        tenantId: input.tenantId,
+        span: input.span,
+        resource: input.resource,
+        instrumentationScope: input.instrumentationScope,
+        piiRedactionLevel: input.piiRedactionLevel,
+        occurredAt: Date.now(),
+      };
+      const prepared = this.options.payloads ? await this.options.payloads.prepare(commandData) : commandData;
+
+      await this.options.commands.recordSpan(prepared);
+      await this.options.dedup.confirmProcessed({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
+
+      return { status: "collected" };
+    } catch (error) {
+      if (lockAcquired) {
+        await this.options.dedup.releaseOnFailure({
+          tenantId: input.tenantId,
+          traceId: input.span.traceId,
+          spanId: input.span.spanId,
+        });
+      }
+
+      input.otelSpanRef?.addEvent("span_ingestion_error", {
+        "error.message": error instanceof Error ? error.message : String(error),
+        "tenant.id": input.tenantId,
+      });
+      this.logger.error(
+        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
+        "Error dispatching span to the trace processing pipeline",
+      );
+
+      return {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }

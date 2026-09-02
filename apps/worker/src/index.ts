@@ -3,7 +3,6 @@ export {
   WorkerProductionComposition,
   type WorkerInfrastructureCompositionOptions,
   type WorkerProductionCompositionOptions,
-  type WorkerTraceCompositionOptions,
   type WorkerTopicCompositionOptions,
 } from "./app/worker-production.composition";
 export {

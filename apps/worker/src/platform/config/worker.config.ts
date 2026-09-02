@@ -319,6 +319,15 @@ export const workerConfigDefinition = RuntimeConfig.define({
   processing: {
     metricShards: Config.value(optionalEnvironmentString, { env: "METRIC_PROCESSING_SHARDS" }),
     logShards: Config.value(optionalEnvironmentString, { env: "LOG_PROCESSING_SHARDS" }),
+    /**
+     * How many GroupQueue lanes a hot trace's `recordSpan` commands spread
+     * across. Read from the variable the App already reads: producer and
+     * consumer must clamp the lane count identically or a span is staged onto a
+     * group nothing claims.
+     */
+    traceSpanShards: Config.value(optionalEnvironmentString, {
+      env: "TRACE_SPAN_PROCESSING_SHARDS",
+    }),
   },
   /**
    * The Eventing fold cache's consistency TTL (ADR-066).
@@ -421,6 +430,21 @@ export type WorkerOutboundProxyConfig = Readonly<{
   noProxy?: string;
 }>;
 
+/**
+ * One organization's own S3, for a deployment that routes some tenants to
+ * their own bucket rather than the shared one (BYOC).
+ *
+ * Every field is required together, because a half-configured route is worse
+ * than none: a bucket without credentials would fall back to the shared
+ * identity and write one tenant's objects into another tenant's account.
+ */
+export type WorkerDataplaneS3Config = Readonly<{
+  endpoint: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}>;
+
 export type WorkerStorageConfig = Readonly<{
   backend: "azure" | "s3";
   localFilesystemRoot: string;
@@ -434,6 +458,17 @@ export type WorkerStorageConfig = Readonly<{
     secretAccessKey?: string;
     sessionToken?: string;
   }>;
+  /**
+   * Organization id to that organization's own S3, keyed exactly as the
+   * application keys it.
+   *
+   * Read here rather than declared as one variable per tenant because the
+   * names carry the data: `DATAPLANE_S3__<label>__<organizationId>`. A process
+   * that did not read them would resolve every project to the shared bucket
+   * and write a BYOC customer's objects into the wrong account — silently, and
+   * for as long as it ran.
+   */
+  dataplaneS3: ReadonlyMap<string, WorkerDataplaneS3Config>;
 }>;
 
 export type WorkerInfrastructureConfig = Readonly<{
@@ -451,6 +486,7 @@ export type WorkerShutdownConfig = Readonly<{
 export type WorkerProcessingConfig = Readonly<{
   metricShards?: string;
   logShards?: string;
+  traceSpanShards?: string;
 }>;
 
 /** The Eventing substrate's own knobs, as this process resolved them. */
@@ -663,6 +699,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
           ...value.infrastructure.storage.s3,
           region: resolveS3Region(value.infrastructure.storage.s3),
         },
+        dataplaneS3: resolveWorkerDataplaneS3Config(source),
       },
       outboundProxy: value.infrastructure.outboundProxy,
     },
@@ -827,4 +864,61 @@ function resolveWorkerShutdownConfig(input: {
   const parsed = Number(input.queueDrainTimeoutMs);
   const queueDrainMs = Number.isFinite(parsed) && parsed > 0 ? parsed : defaultDrainMs;
   return { processDeadlineMs: queueDrainMs + APP_CLOSE_SLACK_MS + PROCESS_CLOSE_SLACK_MS };
+}
+
+const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
+
+const dataplaneS3ConfigSchema = z.object({
+  endpoint: z.string().min(1),
+  bucket: z.string().min(1),
+  accessKeyId: z.string().min(1),
+  secretAccessKey: z.string().min(1),
+});
+
+/**
+ * The per-organization S3 routes this deployment declares.
+ *
+ * Read straight off the source, like the feature-flag overrides above, because
+ * the variable NAMES carry the organization id and the declarative projection
+ * can only name variables it knows in advance.
+ *
+ * A malformed entry is skipped rather than failing the boot, matching the
+ * application byte for byte: one customer's bad JSON must not stop the process
+ * that serves everyone else. A DUPLICATE organization id does fail, also
+ * matching, because two routes for one tenant is a question this process
+ * cannot answer and answering it wrong writes their data somewhere they cannot
+ * read it.
+ */
+export function resolveWorkerDataplaneS3Config(
+  source: Readonly<Record<string, unknown>>,
+): ReadonlyMap<string, WorkerDataplaneS3Config> {
+  const routes = new Map<string, WorkerDataplaneS3Config>();
+
+  for (const [key, raw] of Object.entries(source)) {
+    if (!key.startsWith(DATAPLANE_S3_ENV_PREFIX) || typeof raw !== "string" || !raw) continue;
+
+    const suffix = key.slice(DATAPLANE_S3_ENV_PREFIX.length);
+    const separator = suffix.lastIndexOf("__");
+    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
+    if (!organizationId) continue;
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+
+    const parsed = dataplaneS3ConfigSchema.safeParse(decoded);
+    if (!parsed.success) continue;
+
+    if (routes.has(organizationId)) {
+      throw new Error(
+        `Duplicate private S3 config for organization "${organizationId}": "${key}" conflicts with an earlier definition.`,
+      );
+    }
+    routes.set(organizationId, parsed.data);
+  }
+
+  return routes;
 }

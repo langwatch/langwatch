@@ -85,9 +85,11 @@ class TraceAssignments extends TraceTopicAssignmentPort {
 }
 
 class TopicCapability implements TopicWorkerCapability {
-  readonly install = vi.fn(({ eventSourcing }: { eventSourcing: EventSourcing }) =>
-    eventSourcing.register(namedDefinition("topic_clustering")),
-  );
+  readonly claimAndBootstrap = vi.fn(async (_projectId: string) => undefined);
+  readonly install = vi.fn(({ eventSourcing }: { eventSourcing: EventSourcing }) => {
+    eventSourcing.register(namedDefinition("topic_clustering"));
+    return { claimAndBootstrap: this.claimAndBootstrap };
+  });
   readonly startBootSeeds = vi.fn();
   readonly commandDispatch = {
     recordTopics: vi.fn(async () => undefined),
@@ -186,7 +188,7 @@ function createComposition(registered: string[]) {
     installer: {
       install: vi.fn((eventSourcing: EventSourcing) => {
         eventSourcing.register(namedDefinition("trace_processing"));
-        return { traceAssignments };
+        return { traceAssignments, commands: { recordSpan: async () => undefined } };
       }),
     },
     eventing,
@@ -433,7 +435,7 @@ describe("worker feature registration order", () => {
           installer: {
             install: vi.fn((eventSourcing: EventSourcing) => {
               eventSourcing.register(namedDefinition("trace_processing"));
-              return { traceAssignments };
+              return { traceAssignments, commands: { recordSpan: async () => undefined } };
             }),
           },
           eventing,

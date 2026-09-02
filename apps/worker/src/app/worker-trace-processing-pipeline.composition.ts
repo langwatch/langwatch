@@ -51,51 +51,97 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import {
+  createExperimentMetricsSyncHandler,
+  createSimulationMetricsSyncHandler,
+  createSpanStorageBroadcastHandler,
+  createTraceUpdateBroadcastHandler,
+  resolveSpanCommandShardCount,
+  TraceTenantBroadcastPort,
+  type TraceEvaluationLoopMetricsPort,
+  type TraceProductAnalyticsPort,
+  type TraceSpanSpoolPort,
+} from "@langwatch/trace-server";
+import {
+  createGraphTriggerActivityHandler,
+  type AutomationGraphActivityPort,
+  type AutomationTraceTriggerCataloguePort,
+  type AutomationTriggerMatchRecorderPort,
+} from "@langwatch/automation-server";
+import {
+  createCodingAgentSpanFactsDispatchSubscriber,
+  type CodingAgentTraceProcessingPort,
+} from "@langwatch/coding-agent-server";
+import type {
+  ExecuteEvaluationCommandData,
+  ReportEvaluationCommandData,
+} from "@langwatch/evaluation-contract";
+import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
+import type { QueueSendOptions } from "@langwatch/eventing";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { Logger } from "@langwatch/observability";
+import type { WorkerConfig } from "../platform/config/worker.config";
+import { createWorkerRecordSpanCommand } from "./worker-record-span.composition";
+import { createWorkerTraceAlertTriggerHandler } from "./worker-trace-alert-trigger.composition";
+import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
+import { createWorkerTraceEvaluationTrigger } from "./worker-trace-evaluation-trigger.composition";
+import { createWorkerTraceNarrowPorts } from "./worker-trace-narrow-ports.composition";
+import type { WorkerTrackedEventComposition } from "./worker-tracked-event.composition";
 
 /**
- * The trace processing pipeline, composed in this process out of packages
- * alone.
+ * The trace processing pipeline, composed and MOUNTED in this process out of
+ * packages alone.
  *
- * STAGED, NOT MOUNTED. The application still assembles `capabilities.trace`
- * and still registers all twenty-nine of `trace_processing`'s routing keys, so
- * nothing here runs in production and no production caller reaches it. What
- * has to be true today is the thing the step-(g) attempt discovered was not:
- * that this process can build the pipeline DEFINITION. It could not, because
- * four of its collaborators were application-only and were never in the census
- * — the input/output extraction, the media references, the fold-time cost and
- * the lean projection payload — and the two modules that register the keys
- * (`AppTraceProjectionsAdapter` and `createTraceProcessingPipeline`) were
- * application-only on top of them. All four are now package code, and this is
- * the two modules as one.
+ * ALL TWENTY-NINE ROUTING KEYS. The definition below registers every key
+ * `trace_processing` declares in the byte-frozen `job-registry.json`, and the
+ * two it does not register directly — `job:deferredOriginResolution` and
+ * `job:datasetNormalize` — are the installer's own, registered as durable jobs
+ * beside the pipeline. A definition short of one key is not a smaller
+ * deployment: the queue rejects an unroutable job for redelivery rather than
+ * dropping it, so that kind of work redelivers forever while the pods stay up,
+ * the liveness probe answers and the queue depth grows.
  *
- * WHAT IT AWAITED WAS `command:recordSpan`'s service cascade, and (g2) has
- * cleared it. `recordSpanCommand` is now buildable in this process:
- * `createWorkerRecordSpanCommand` composes the whole command from the one
- * Prisma client, this deployment's own variables and the stored-object runtime,
- * because each of the four features publishes the READ half the record path
- * uses — `ProjectMetadataService`, `DataPrivacyResolutionService`,
- * `ModelCostCatalogService` and `MonitorCatalogService` — rather than only the
- * wide service its write half needs. It stays a parameter here for the same
- * reason every store does: this composition owns the DEFINITION, not the graph.
- *
- * WHAT IS STILL OUTSTANDING for the conversion, none of it this file's:
- * `reactor:trackedEventSync`'s `getApp()` (g4),
- * `subscriber:codingAgentSpanFactsDispatch`'s normalized-span read (g3),
- * `job:datasetNormalize`'s composition (g7), `reactor:triggerMatch` (g5), the
- * two EE governance rollups (g6), and `AnalyticsService`, which the graph
- * subscriber reads through and which was never a wall.
+ * WHAT THIS FILE OWNS. It owns the DEFINITION — the names, the delays, the
+ * dedup windows, the group keys and the `runIn` scopes — and, since the
+ * conversion, the CONSTRUCTION of every handler behind those names.
+ * `recordSpanCommand` and the fifteen subscriber handlers used to be
+ * parameters, which was honest while the application still supplied them and
+ * dishonest the moment this process became the one that routes the work: a
+ * handler passed in is a handler this composition cannot promise exists.
+ * Everything is now built here from substrates — a Prisma client, the queue's
+ * Redis, a tenant-keyed ClickHouse client, this deployment's own variables,
+ * object storage — and from the command proxies the sibling installers publish.
  *
  *     WorkerTraceProcessingPipeline
- *       |- EventingTracePipelineAdapter        (trace-server owns it)
- *       |    |- TraceIoExtractionAdapter       harvested by (g1)
- *       |    |- TraceMediaReferenceAdapter     harvested by (g1)
- *       |    |- ModelCatalogTraceModelCostAdapter   harvested by (g1)
- *       |    |- TraceSpanNormalizationAdapter  harvested by (g1)
- *       |    `- leanForProjection              harvested by (g1)
- *       `- the fifteen subscriber registrations, taken by parameter
+ *       |- EventingTracePipelineAdapter          the four projections
+ *       |    |- TraceIoExtractionAdapter               (g1)
+ *       |    |- TraceMediaReferenceAdapter             (g1)
+ *       |    |- ModelCatalogTraceModelCostAdapter      (g1)
+ *       |    |- TraceSpanNormalizationAdapter          (g1)
+ *       |    |- leanForProjection                      (g1)
+ *       |    `- RecordSpanCommand                      (g2)
+ *       `- fifteen subscribers, each over a named collaborator
+ *            |- originGate            the installer's deferred scheduler
+ *            |- evaluationTrigger     monitors + flags + the evaluation queue
+ *            |- customEvaluationSync  evaluation's reportEvaluation proxy
+ *            |- trackedEventSync      the harvested span builder        (g4)
+ *            |- traceUpdateBroadcast  the tenant pub/sub bridge
+ *            |- projectMetadata       project write + product analytics +
+ *            |                        topic's claimAndBootstrap proxy
+ *            |- simulationMetricsSync scenario's computeRunMetrics proxy
+ *            |- experimentMetricsSync experiment's proxy + its id lookup
+ *            |- triggerMatch          the trace-alert subscriber         (g5)
+ *            |- graphTriggerActivity  the graph vertical + analytics
+ *            |- spanStorageBroadcast  the same pub/sub bridge
+ *            |- governanceKpisSync    EE, supplied or declared absent    (g6)
+ *            |- governanceOcsfEventsSync                                 (g6)
+ *            `- codingAgentSpanFactsDispatch  normalization + the stored-span
+ *                                             read                       (g3)
  *
- * The stores, the record-span command and every subscriber handler stay
- * parameters. This composition owns the DEFINITION, not the graph.
+ * THE STORES STAY PARAMETERS and that is not an inconsistency. A store is
+ * where the projection COMMITS, and the same three stores are read back by the
+ * trace read path; the composition root that opens the ClickHouse client owns
+ * them so both readers and this writer hold one instance.
  */
 
 /** A subscriber handler on the committed traceSummary fold state. */
@@ -104,14 +150,109 @@ export type WorkerTraceSummaryHandler = (
   context: TriggerContext<TraceSummaryData>,
 ) => Promise<void>;
 
-export interface WorkerTraceProcessingPipelineDeps {
-  recordSpanCommand: RecordSpanCommand;
-  traceCanonicalisation: TraceCanonicalisationService;
+/**
+ * The three cross-pipeline payloads, taken from the subscriber that sends them
+ * rather than from the owning feature's contract package.
+ *
+ * Deliberate: what this composition must agree with is the shape the SUBSCRIBER
+ * dispatches, and taking it from there means a change to that shape is a
+ * typecheck failure here instead of three packages that agree with each other
+ * and not with the caller. It also keeps three contract packages off this
+ * process's dependency list for three type aliases.
+ */
+type ComputeRunMetricsData = Parameters<
+  Parameters<typeof createSimulationMetricsSyncHandler>[0]["computeRunMetrics"]
+>[0];
+type ComputeExperimentRunMetricsData = Parameters<
+  Parameters<typeof createExperimentMetricsSyncHandler>[0]["computeExperimentRunMetrics"]
+>[0];
+type ContributeSpanFactsData = Parameters<
+  Parameters<typeof createCodingAgentSpanFactsDispatchSubscriber>[0]["contributeSpanFacts"]
+>[0];
+
+/**
+ * The cross-feature command proxies this pipeline's subscribers dispatch
+ * through.
+ *
+ * Every one of them is a LATE-BOUND proxy published by a sibling installer,
+ * not a command: the pipelines register in a fixed order and each of these
+ * belongs to a pipeline that registers after this one. A `Deferred` resolves
+ * during installation, which completes before the consumer claims its first
+ * job.
+ */
+export type WorkerTraceProcessingCommands = Readonly<{
+  /** Evaluation's dispatch, for the online-evaluation trigger. */
+  executeEvaluation: (
+    data: ExecuteEvaluationCommandData,
+    sendOptions?: QueueSendOptions<ExecuteEvaluationCommandData>,
+  ) => Promise<void>;
+  /** Evaluation's result write, for evaluations an SDK reported on a span. */
+  reportEvaluation: (data: ReportEvaluationCommandData) => Promise<void>;
+  /** Scenario's per-run metrics, published once a simulation trace settles. */
+  computeRunMetrics: (data: ComputeRunMetricsData) => Promise<void>;
+  /** Experiment's per-run metrics, and the run-id to experiment-id lookup. */
+  computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsData) => Promise<void>;
+  lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
+  /** Topic's rate-limited clustering claim, on a project's first real ingest. */
+  bootstrapTopicClustering: (projectId: string) => Promise<void>;
+  /** Coding agent's bounded span facts (ADR-056/069). */
+  contributeSpanFacts: (data: ContributeSpanFactsData) => Promise<void>;
+  /** Automation's durable trigger match, behind its own late-bound recorder. */
+  triggerMatches: AutomationTriggerMatchRecorderPort;
+}>;
+
+/** The projection and rollup writers, owned by the root that opens ClickHouse. */
+export type WorkerTraceProcessingStores = Readonly<{
   spanAppendStore: AppendStore<NormalizedSpan>;
   /** ADR-034 Phase 1: per-span rollup writer. */
   traceAnalyticsRollupAppendStore: EventingTracePipelineAdapterOptions["rollupStore"];
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer. */
+  traceAnalyticsStore: EventingTracePipelineAdapterOptions["derivedStore"];
+}>;
+
+export type WorkerTraceProcessingCompositionOptions = Readonly<{
+  config: WorkerConfig;
+  /** The four read-side capability services, over the one Prisma client. */
+  services: WorkerTraceCapabilityServices;
+  featureFlags: FeatureFlagService;
+  traceCanonicalisation: TraceCanonicalisationService;
+  stores: WorkerTraceProcessingStores;
+  commands: WorkerTraceProcessingCommands;
+  /** The project's trace automations, for `reactor:triggerMatch`. */
+  traceTriggers: AutomationTraceTriggerCataloguePort;
+  /** The graph-alert vertical, absent on a deployment that can send no mail. */
+  graphActivity?: AutomationGraphActivityPort;
+  /** The one product-usage sink, for `first_trace_integrated`. */
+  productAnalytics: TraceProductAnalyticsPort;
+  /** The tenant pub/sub bridge; absent disables the two broadcast subscribers. */
+  broadcast?: TraceTenantBroadcastPort;
+  /** The ADR-022 claim check, for a span whose payload travelled out of band. */
+  spool?: TraceSpanSpoolPort;
+  /** `subscriber:codingAgentSpanFactsDispatch`'s normalization and span read. */
+  codingAgentTraces: CodingAgentTraceProcessingPort;
+  /** `reactor:trackedEventSync`'s builder, plus the late bind to `recordSpan`. */
+  trackedEvents: WorkerTrackedEventComposition;
+  /** EE governance rollups, composed as full subscriber specs by the caller so
+   *  this OSS pipeline stays free of `@ee` imports. */
+  governanceKpisSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
+  governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
+  /** Where the evaluation-trigger loop guard reports itself. */
+  evaluationLoopMetrics?: TraceEvaluationLoopMetricsPort;
+  logger?: Logger;
+}>;
+
+/**
+ * Everything `createWorkerTraceProcessingPipeline` needs, once the handlers
+ * exist. `originGateHandler` is absent by design: it is built from the
+ * deferred-origin scheduler, which only exists at `build` time.
+ */
+export interface WorkerTraceProcessingPipelineDeps {
+  recordSpanCommand: RecordSpanCommand;
+  traceCanonicalisation: TraceCanonicalisationService;
+  spanAppendStore: AppendStore<NormalizedSpan>;
+  traceAnalyticsRollupAppendStore: EventingTracePipelineAdapterOptions["rollupStore"];
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   traceAnalyticsStore: EventingTracePipelineAdapterOptions["derivedStore"];
   originGateHandler: WorkerTraceSummaryHandler;
   evaluationTrigger: TraceSummarySubscriber;
@@ -146,23 +287,15 @@ export interface WorkerTraceProcessingPipelineDeps {
    * `traceId:<shard>` groups so a hot trace drains in parallel.
    */
   spanCommandShardCount?: number;
-  /** EE governance rollups, composed as full subscriber specs by the caller so
-   *  this OSS pipeline stays free of `@ee` imports. */
-  governanceKpisSync?: SubscriberSpec<TraceProcessingEvent> & {
-    fold: "traceSummary";
-  };
-  governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent> & {
-    fold: "traceSummary";
-  };
+  governanceKpisSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
+  governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
 /**
- * Everything the composition root supplies. `originGateHandler` is absent by
- * design: it is built from the deferred-origin scheduler, which only exists at
- * `build` time, so requiring it here would ask the caller for something it
- * cannot have yet.
+ * Everything `createWorkerTraceProcessingPipeline` is handed by the class
+ * above, minus the one thing only `build` can supply.
  */
 export type WorkerTraceProcessingPipelineOptions = Omit<
   WorkerTraceProcessingPipelineDeps,
@@ -170,20 +303,124 @@ export type WorkerTraceProcessingPipelineOptions = Omit<
 >;
 
 export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
-  static create(options: WorkerTraceProcessingPipelineOptions): WorkerTraceProcessingPipeline {
-    return new WorkerTraceProcessingPipeline(options);
+  static create(
+    options: WorkerTraceProcessingCompositionOptions,
+  ): WorkerTraceProcessingPipeline {
+    return new WorkerTraceProcessingPipeline(composeWorkerTraceProcessingDeps(options));
   }
 
-  private constructor(private readonly options: WorkerTraceProcessingPipelineOptions) {
+  private constructor(private readonly deps: WorkerTraceProcessingPipelineOptions) {
     super();
   }
 
   build(options: { deferredOrigins: TraceDeferredOriginSchedulerPort }) {
     return createWorkerTraceProcessingPipeline({
-      ...this.options,
+      ...this.deps,
       originGateHandler: createOriginGateHandler(options.deferredOrigins),
     });
   }
+}
+
+/**
+ * Every collaborator behind the fifteen names, built from substrates.
+ *
+ * Read this as the answer to "what does one trace actually touch": four
+ * capability services over Postgres, one ClickHouse client, one Redis, this
+ * deployment's own variables, its object storage, and seven command proxies
+ * belonging to six other features.
+ */
+function composeWorkerTraceProcessingDeps(
+  options: WorkerTraceProcessingCompositionOptions,
+): WorkerTraceProcessingPipelineOptions {
+  const ports = createWorkerTraceNarrowPorts({
+    projects: options.services.projects,
+    monitors: options.services.monitors,
+    modelProviders: options.services.modelCosts,
+    productAnalytics: options.productAnalytics,
+  });
+
+  const evaluationTrigger = createWorkerTraceEvaluationTrigger({
+    monitors: options.services.monitors,
+    featureFlags: options.featureFlags,
+    sendEvaluation: options.commands.executeEvaluation,
+    ...(options.evaluationLoopMetrics ? { metrics: options.evaluationLoopMetrics } : {}),
+  }).subscriber();
+
+  const trackedEvents = options.trackedEvents;
+
+  return {
+    recordSpanCommand: createWorkerRecordSpanCommand({
+      config: options.config,
+      services: options.services,
+      featureFlags: options.featureFlags,
+      ...(options.spool ? { spool: options.spool } : {}),
+    }),
+    traceCanonicalisation: options.traceCanonicalisation,
+    spanAppendStore: options.stores.spanAppendStore,
+    traceAnalyticsRollupAppendStore: options.stores.traceAnalyticsRollupAppendStore,
+    traceSummaryStore: options.stores.traceSummaryStore,
+    traceAnalyticsStore: options.stores.traceAnalyticsStore,
+    evaluationTrigger,
+    customEvaluationSyncHandler: CustomEvaluationSync.createCustomEvaluationSyncHandler({
+      reportEvaluation: options.commands.reportEvaluation,
+      // Evaluation's own slug derivation, not a second one: the id it produces
+      // is the row key an SDK-reported evaluation is upserted under, and two
+      // spellings would file the same evaluator's results under two evaluators.
+      deriveEvaluatorId: (name: string) => EvaluationNameAutoslugService.create().derive(name),
+    }),
+    trackedEventSyncHandler: trackedEvents.handler,
+    traceUpdateBroadcastHandler: createTraceUpdateBroadcastHandler({
+      broadcast: options.broadcast ?? new WorkerInertTraceBroadcast(),
+    }),
+    projectMetadataHandler: ProjectMetadataSync.createProjectMetadataHandler({
+      projects: ports.projects,
+      recordProductEvent: (input) => ports.productAnalytics.record(input),
+      bootstrapTopicClustering: options.commands.bootstrapTopicClustering,
+    }),
+    simulationMetricsSyncHandler: createSimulationMetricsSyncHandler({
+      computeRunMetrics: options.commands.computeRunMetrics,
+    }),
+    experimentMetricsSyncHandler: createExperimentMetricsSyncHandler({
+      computeExperimentRunMetrics: options.commands.computeExperimentRunMetrics,
+      lookupExperimentId: options.commands.lookupExperimentId,
+    }),
+    automations: {
+      triggerMatchHandler: createWorkerTraceAlertTriggerHandler({
+        triggers: options.traceTriggers,
+        matches: options.commands.triggerMatches,
+      }),
+      graphActivityHandler: options.graphActivity
+        ? createGraphTriggerActivityHandler(options.graphActivity)
+        : async () => void 0,
+    },
+    spanStorageBroadcastHandler: createSpanStorageBroadcastHandler({
+      broadcast: options.broadcast ?? new WorkerInertTraceBroadcast(),
+    }),
+    broadcastDisabled: !options.broadcast,
+    spanCommandShardCount: resolveSpanCommandShardCount(options.config.processing.traceSpanShards),
+    ...(options.governanceKpisSync ? { governanceKpisSync: options.governanceKpisSync } : {}),
+    ...(options.governanceOcsfEventsSync
+      ? { governanceOcsfEventsSync: options.governanceOcsfEventsSync }
+      : {}),
+    subscribers: [
+      createCodingAgentSpanFactsDispatchSubscriber({
+        contributeSpanFacts: options.commands.contributeSpanFacts,
+        traces: options.codingAgentTraces,
+      }),
+    ],
+  };
+}
+
+/**
+ * The publisher a process with no Redis hands the two broadcast subscribers.
+ *
+ * They stay REGISTERED and become inert, which is the difference that matters:
+ * `disabled` keeps the routing key claimed so a broadcast job staged by the
+ * other graph is still routed and dropped here, rather than redelivered
+ * forever by a consumer that does not know the name.
+ */
+class WorkerInertTraceBroadcast extends TraceTenantBroadcastPort {
+  async broadcastToTenant(): Promise<void> {}
 }
 
 /**

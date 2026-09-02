@@ -1,5 +1,4 @@
 import { AppGovernanceEventingAdapter } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
-import { TraceProcessingServerInstaller } from "@langwatch/trace-server";
 import type { WorkerProductionCompositionOptions } from "@langwatch/worker";
 import type {
   WorkerEventingHandoff,
@@ -167,7 +166,6 @@ export function packagedWorkerCapabilities(options: {
         connectSettlement: workerCapabilityAlreadyConnected,
       },
     },
-    trace: { installer: TraceProcessingServerInstaller.create(capabilities.trace) },
     scenario: {
       installer: {
         buildProcessing: () => definition("simulation_processing"),

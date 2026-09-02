@@ -115,7 +115,7 @@ Feature: The trace projection runtime composes outside the application
         payload preparation it was handed are the ones the pipeline runs
 
     @unit
-    Scenario: the staged pipeline is not mounted
-      Given the worker's frozen job registry and feature catalogues
-      When the composition is added
-      Then no routing key changes and no production caller reaches it
+    Scenario: the converted pipeline is mounted by the production composition
+      Given the worker's own source tree
+      When every module that names the trace pipeline composition is listed
+      Then the production composition is the only caller outside its tests

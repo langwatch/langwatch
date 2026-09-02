@@ -384,3 +384,228 @@ describe("TraceSpanStorageClickHouseRepository", () => {
     });
   });
 });
+
+/**
+ * The read half, harvested at the conversion.
+ *
+ * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
+ *
+ * These pins are not stylistic. The read backs a REDELIVERY path: the
+ * coding-agent span-facts dispatcher is handed a span reference and has to
+ * resolve it, and it re-runs on the queue's backoff until it can. Every literal
+ * below is a way that loop turns from one cheap probe per retry into an
+ * unbounded scan of every weekly partition, cold S3 tier included, per retry.
+ */
+class QueryingClickHouse {
+  readonly queries: { query: string; params: Record<string, unknown>; settings?: unknown }[] = [];
+  rows: Row[] = [];
+  refuseWith: Error | null = null;
+
+  readonly resolve: TraceClickHouseWriteResolver = async () => ({
+    query: async (input) => {
+      if (this.refuseWith) throw this.refuseWith;
+      this.queries.push({
+        query: input.query,
+        params: input.query_params ?? {},
+        settings: input.clickhouse_settings,
+      });
+      return { json: async () => this.rows as never[] };
+    },
+    insert: async () => undefined,
+  });
+}
+
+function storedRow(overrides: Record<string, unknown> = {}): Row {
+  return {
+    SpanId: "span-1",
+    TraceId: "trace-1",
+    TenantId: "project-1",
+    ParentSpanId: null,
+    ParentTraceId: null,
+    ParentIsRemote: null,
+    Sampled: true,
+    StartTimeMs: 1_700_000_000_000,
+    EndTimeMs: 1_700_000_000_250,
+    DurationMs: 250,
+    SpanName: "session_task.turn",
+    SpanKind: 1,
+    ResourceAttributes: {},
+    SpanAttributes: { "gen_ai.request.model": "gpt-5-mini" },
+    StatusCode: 1,
+    StatusMessage: null,
+    ScopeName: "codex",
+    ScopeVersion: null,
+    Cost: 0.25,
+    NonBilledCost: null,
+    ...overrides,
+  };
+}
+
+function readRepository() {
+  const clickhouse = new QueryingClickHouse();
+  const repo = TraceSpanStorageClickHouseRepository.create({
+    resolveClient: clickhouse.resolve,
+    defaultRetentionDays: 49,
+  });
+  return { clickhouse, repo };
+}
+
+describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
+  describe("given a span reference with the span's own start time", () => {
+    /** @scenario "The referenced span is read back inside its own partition window" */
+    it("bounds the read to a window centred on the hint rather than scanning every partition", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries).toHaveLength(1);
+      const [read] = clickhouse.queries;
+      expect(read?.query).toContain("StartTime BETWEEN");
+      expect(read?.params.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
+      expect(read?.params.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
+    });
+
+    /** @scenario "The referenced span is read back inside its own partition window" */
+    it("pins the key triple so the read hits the primary key prefix", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      const read = clickhouse.queries[0];
+      expect(read?.query).toContain("TenantId = {tenantId:String}");
+      expect(read?.query).toContain("TraceId = {traceId:String}");
+      expect(read?.query).toContain("SpanId = {spanId:String}");
+      expect(read?.params).toMatchObject({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+      });
+    });
+
+    /** @scenario "The derivation read never asks for the nested columns" */
+    it("omits the Events and Links columns the derivation consumer never reads", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      const span = await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      const read = clickhouse.queries[0];
+      expect(read?.query).not.toContain("Events.");
+      expect(read?.query).not.toContain("Links.");
+      expect(read?.query).toContain("SpanAttributes");
+      expect(span?.events).toEqual([]);
+      expect(span?.links).toEqual([]);
+    });
+
+    /** @scenario "The derivation read never asks for the nested columns" */
+    it("keeps the lazy-materialization lock on the single-span fetch", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries[0]?.settings).toMatchObject({
+        query_plan_optimize_lazy_materialization: "1",
+      });
+      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
+      expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
+    });
+
+    /** @scenario "The referenced span is read back inside its own partition window" */
+    it("maps the row onto the canonical span the derivation consumer expects", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [storedRow()];
+
+      const span = await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(span).toMatchObject({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        name: "session_task.turn",
+        cost: 0.25,
+        spanAttributes: { "gen_ai.request.model": "gpt-5-mini" },
+      });
+    });
+  });
+
+  describe("given the span has not landed inside its window yet", () => {
+    /** @scenario "A span that has not landed is a miss, not an unbounded scan" */
+    it("answers absent after exactly one probe rather than widening to every partition", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [];
+
+      const span = await repo.findNormalizedSpanById({
+        tenantId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(span).toBeNull();
+      expect(clickhouse.queries).toHaveLength(1);
+      expect(clickhouse.queries[0]?.query).toContain("StartTime BETWEEN");
+    });
+  });
+
+  describe("given a read with no tenant", () => {
+    /** @scenario "A tenantless read is refused before it reaches ClickHouse" */
+    it("refuses before resolving a client", async () => {
+      const { clickhouse, repo } = readRepository();
+
+      await expect(
+        repo.findNormalizedSpanById({
+          tenantId: "",
+          traceId: "trace-1",
+          spanId: "span-1",
+          occurredAtMs: 1_700_000_000_000,
+        }),
+      ).rejects.toThrow();
+      expect(clickhouse.queries).toHaveLength(0);
+    });
+  });
+
+  describe("given ClickHouse refuses the read", () => {
+    /** @scenario "A refused read is reported rather than answered as absent" */
+    it("lets the failure reach the caller so the queue redelivers", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.refuseWith = new Error("Attempt to read after eof");
+
+      await expect(
+        repo.findNormalizedSpanById({
+          tenantId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          occurredAtMs: 1_700_000_000_000,
+        }),
+      ).rejects.toThrow("Attempt to read after eof");
+    });
+  });
+});

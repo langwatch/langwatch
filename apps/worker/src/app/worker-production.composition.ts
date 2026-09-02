@@ -150,6 +150,42 @@ import {
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
 import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer";
 import { WorkerApplication } from "./worker.application";
+import type { DatasetContentDatabase } from "@langwatch/dataset-server";
+import {
+  AutomationTriggerMatchRecorderPort,
+  PostgresAutomationTraceTriggerCatalogueAdapter,
+  type AutomationGraphActivityDatabase,
+  type AutomationTraceTriggerCatalogueDatabase,
+} from "@langwatch/automation-server";
+import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
+import {
+  ClickHouseTraceStoredSpanReaderAdapter,
+  TraceProcessingServerInstaller,
+} from "@langwatch/trace-server";
+import { createWorkerAnalytics } from "./worker-analytics.composition";
+import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition";
+import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition";
+import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition";
+import { createWorkerDatasetNormalization } from "./worker-dataset-normalization.composition";
+import { createWorkerFeatureFlags } from "./worker-feature-flags.composition";
+import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition";
+import { createWorkerObjectStorage } from "./worker-object-storage.composition";
+import { createWorkerSpanStorage } from "./worker-span-storage.composition";
+import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter";
+import {
+  tryCreateWorkerAutomationGraphComposition,
+  WorkerAutomationClock,
+} from "./worker-automation-graph.composition";
+import { createWorkerTraceSpool } from "./worker-trace-blob.composition";
+import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition";
+import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
+import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition";
+import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition";
+import {
+  WorkerTraceProcessingPipeline,
+  type WorkerTraceProcessingCommands,
+} from "./worker-trace-processing-pipeline.composition";
+import { createWorkerTrackedEvents } from "./worker-tracked-event.composition";
 import {
   tryCreateWorkerMailComposition,
   type WorkerMailComposition,
@@ -163,10 +199,19 @@ export type WorkerTopicCompositionOptions = {
   metrics: TopicServerInstallerDependencies["metrics"];
 };
 
-/** Trace's package-owned processing registration, mounted before Topic. */
-export type WorkerTraceCompositionOptions = {
-  installer: TraceProcessingInstallerPort;
-};
+/**
+ * Reports the composition decisions Trace's own storage would otherwise hide.
+ *
+ * Both are decisions a deployment should read in its own logs at boot rather
+ * than infer from work that quietly never completes.
+ */
+export abstract class WorkerTraceAbsenceReportPort {
+  /** No pub/sub bridge: the two broadcast subscribers register and stay inert. */
+  abstract withoutBroadcast(): void;
+
+  /** Azure object storage: dataset normalization has no backend in this process. */
+  abstract withoutDatasetStorage(): void;
+}
 
 /** Automation's package-owned pipeline, mounted before every match producer. */
 export type WorkerAutomationCompositionOptions = {
@@ -196,15 +241,21 @@ export type WorkerLangyConversationCompositionOptions = {
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   AuthzGrantPipelineDatabase &
+  AutomationGraphActivityDatabase &
+  AutomationTraceTriggerCatalogueDatabase &
   BillingReportingDatabase &
   BillingTenantOrganizationDatabase &
   CodingAgentActivityDatabase &
+  DatasetContentDatabase &
   GithubBranchDemandDatabase &
   GithubBranchMaintenanceDatabase &
   IdentityPipelineDatabase &
   JoinRequestPipelineDatabase &
   LangySessionKeyReapDatabase &
-  ScimSyncPipelineDatabase;
+  ScimSyncPipelineDatabase &
+  WorkerFeatureFlagDatabase &
+  WorkerProjectStorageDatabase &
+  WorkerTraceCapabilityDatabase;
 
 /**
  * The ONE identity ledger this graph still RECEIVES (ADR-101).
@@ -291,7 +342,6 @@ type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
-  trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
   /** The process's Prisma client; taken from `topic` when a root omits it. */
   database?: WorkerDatabaseCompositionOptions;
@@ -583,22 +633,6 @@ export class WorkerProductionComposition {
         }),
       ],
     });
-    const trace = TraceWorkerFeatureInstaller.create({
-      installer: options.trace.installer,
-      eventing,
-    });
-    const topicServer = TopicServerInstaller.create({
-      database: options.topic.database,
-      processStore: eventing.processStore,
-      redis: infrastructure?.redis ?? options.topic.redis,
-      execution: options.topic.execution,
-      metrics: options.topic.metrics,
-    });
-    const topic = TopicWorkerFeatureInstaller.create({
-      installer: topicServer,
-      eventing,
-      traceAssignments: trace.traceAssignments,
-    });
     // Unconditional, on the same footing as metric and log: the pipeline is
     // composed from its own feature package over the tenant-keyed ClickHouse
     // client this graph already resolves its event store through, so there is
@@ -649,6 +683,168 @@ export class WorkerProductionComposition {
           ? {}
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
+    });
+    // TRACE, COMPOSED HERE RATHER THAN RECEIVED. This is the conversion the
+    // step-(g) attempt halted on: the pipeline definition, `command:recordSpan`
+    // and all fifteen subscriber handlers are now built from substrates this
+    // process holds — the one Prisma client, the queue's Redis, the tenant-keyed
+    // ClickHouse client, this deployment's own variables and its object storage
+    // — plus the command proxies the sibling installers publish above.
+    //
+    // It is UNCONDITIONAL, and it has to be: `trace_processing` owns
+    // twenty-nine of the shared registry's routing keys, and a consumer that
+    // claimed `event-sourcing/jobs` without them would leave every kind of
+    // trace work redelivering forever while the pods stayed up.
+    const traceDatabase = options.database ?? options.topic.database;
+    const traceAbsence = WorkerProductionComposition.traceAbsence(options);
+    const objectStorage = createWorkerObjectStorage({
+      config: options.config,
+      database: traceDatabase,
+      ...(options.resources ? { resources: options.resources } : {}),
+    });
+    const traceServices = createWorkerTraceCapabilityServices({ database: traceDatabase });
+    const traceFeatureFlags = createWorkerFeatureFlags({
+      database: traceDatabase,
+      config: options.config,
+      redis: eventingOptions.groupQueue.redis,
+    });
+    const traceBroadcast = tryCreateWorkerTraceBroadcast({
+      redis: infrastructure?.redis ?? options.topic.redis,
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
+    if (!traceBroadcast) traceAbsence?.withoutBroadcast();
+    if (options.config.infrastructure.storage.backend === "azure") {
+      traceAbsence?.withoutDatasetStorage();
+    }
+    const trackedEvents = createWorkerTrackedEvents({
+      redis: eventingOptions.groupQueue.redis,
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
+    const traceStores = createWorkerTraceProjectionStores({
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+      redis: eventingOptions.groupQueue.redis,
+      ...(options.config.eventing.foldCacheTtlSeconds === undefined
+        ? {}
+        : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+    });
+    // The graph-alert vertical `subscriber:graphTriggerActivity` re-evaluates
+    // through. Absent exactly when this deployment named no `BASE_HOST`: every
+    // alert it sends carries links back to the deployment and a sender address
+    // derived from the same host, so a vertical composed without one would
+    // evaluate correctly and then send mail nobody can act on.
+    const graphActivity = mail
+      ? tryCreateWorkerAutomationGraphComposition({
+          config: options.config,
+          prisma: traceDatabase,
+          mail,
+          dependencies: {
+            projects: traceServices.projects,
+            analytics: createWorkerAnalytics({
+              // The deployment's real ClickHouse client, which `@langwatch/eventing`
+              // narrows to the two methods its event store uses and Analytics has
+              // not been narrowed to. The composition root is the one place that
+              // holds both shapes of the same object.
+              resolveClickHouseClient: options.eventing
+                .resolveClickHouseClient as unknown as Parameters<
+                typeof createWorkerAnalytics
+              >[0]["resolveClickHouseClient"],
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+            }),
+          },
+          redis: infrastructure?.redis ?? options.topic.redis,
+          ...(options.observability ? { logger: options.observability.logger } : {}),
+        })
+      : undefined;
+    const experimentIdLookup = ExperimentEventingAdapter.createIdLookup({
+      resolveClient: options.eventing.resolveClickHouseClient,
+      clickhouseEnabled: true,
+    });
+    const traceProducers = WorkerProductionComposition.requireTraceProducers({
+      automation,
+      evaluation,
+      scenario,
+      consumers: options.eventing.consumers,
+    });
+    const trace = TraceWorkerFeatureInstaller.create({
+      installer: TraceProcessingServerInstaller.create({
+        pipeline: WorkerTraceProcessingPipeline.create({
+          config: options.config,
+          services: traceServices,
+          featureFlags: traceFeatureFlags,
+          traceCanonicalisation,
+          stores: {
+            spanAppendStore: createWorkerSpanStorage({
+              resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+            }),
+            ...traceStores,
+          },
+          commands: {
+            executeEvaluation: traceProducers.executeEvaluation,
+            reportEvaluation: traceProducers.reportEvaluation,
+            computeRunMetrics: traceProducers.computeRunMetrics,
+            computeExperimentRunMetrics: experiment.commands.computeExperimentRunMetrics,
+            lookupExperimentId: (tenantId, runId) =>
+              experimentIdLookup.findExperimentId({ tenantId, runId }),
+            bootstrapTopicClustering: (projectId) =>
+              topic.commands.bootstrapTopicClustering(projectId),
+            contributeSpanFacts: codingAgent.commands.contributeSpanFacts,
+            triggerMatches: traceProducers.triggerMatches,
+          },
+          traceTriggers: PostgresAutomationTraceTriggerCatalogueAdapter.create({
+            prisma: traceDatabase,
+            clock: new WorkerAutomationClock(),
+          }),
+          ...(graphActivity ? { graphActivity } : {}),
+          productAnalytics: createWorkerTraceProductAnalytics({
+            config: options.config.productAnalytics,
+            ...(options.resources ? { resources: options.resources } : {}),
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          }),
+          ...(traceBroadcast ? { broadcast: traceBroadcast } : {}),
+          spool: createWorkerTraceSpool({
+            runtime: objectStorage.runtime,
+            aws: objectStorage.aws,
+            azureRetentionConfirmed:
+              options.config.infrastructure.storage.azureSpoolRetentionConfirmed,
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          }),
+          ...createWorkerGovernanceRollups({
+            resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          }),
+          codingAgentTraces: WorkerCodingAgentTraceProcessingAdapter.create({
+            traceCanonicalisation,
+            spans: ClickHouseTraceStoredSpanReaderAdapter.create({
+              resolveClient: options.eventing.resolveClickHouseClient,
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+            }),
+          }),
+          trackedEvents,
+        }),
+        datasetNormalization: createWorkerDatasetNormalization({
+          database: traceDatabase,
+          storage: objectStorage,
+        }),
+      }),
+      eventing,
+    });
+    // The one dispatch Trace makes into itself: the tracked-event reactor mints
+    // a synthetic span and sends it the way an SDK export would, so it can only
+    // be wired once the definition that contains the reactor is registered.
+    trackedEvents.connect(trace.commands.recordSpan);
+    const topicServer = TopicServerInstaller.create({
+      database: options.topic.database,
+      processStore: eventing.processStore,
+      redis: infrastructure?.redis ?? options.topic.redis,
+      execution: options.topic.execution,
+      metrics: options.topic.metrics,
+    });
+    const topic = TopicWorkerFeatureInstaller.create({
+      installer: topicServer,
+      eventing,
+      traceAssignments: trace.traceAssignments,
     });
     const governanceIngestion = options.governanceIngestion
       ? GovernanceIngestionWorkerFeatureInstaller.create({
@@ -868,6 +1064,81 @@ export class WorkerProductionComposition {
     throw new Error(
       "The worker composition will not claim event-sourcing/jobs without outbound mail: the join-request pipeline's routing keys are in the job registry and its two wakes are notifications. Set BASE_HOST so the mail capability composes.",
     );
+  }
+
+  /**
+   * The three producers Trace's own subscribers dispatch into.
+   *
+   * A GRAPH THAT CONSUMES MUST HAVE ALL THREE. `reactor:evaluationTrigger` and
+   * `reactor:customEvaluationSync` send into Evaluation,
+   * `reactor:simulationMetricsSync` into Scenario, and `reactor:triggerMatch`
+   * into Automation. A consumer that claimed `event-sourcing/jobs` without one
+   * of them would route the trace side of that work and then throw on every
+   * dispatch — an online evaluation that never runs, a simulation whose metrics
+   * never settle, an alert that never fires — with the queue redelivering each
+   * one forever.
+   *
+   * A graph that does NOT consume may omit them, and that is not a loophole:
+   * it composes the definition so the registry can be inspected and tested, and
+   * nothing ever calls a handler. The proxies it gets refuse BY NAME rather
+   * than resolving to a no-op, so a graph that started consuming without the
+   * producers fails on the first dispatch instead of silently dropping it.
+   */
+  private static requireTraceProducers(input: {
+    automation: AutomationWorkerFeatureInstaller | undefined;
+    evaluation: EvaluationWorkerFeatureInstaller | undefined;
+    scenario: ScenarioWorkerFeatureInstaller | undefined;
+    consumers: WorkerEventingConsumerOptions | undefined;
+  }): Pick<
+    WorkerTraceProcessingCommands,
+    "executeEvaluation" | "reportEvaluation" | "computeRunMetrics" | "triggerMatches"
+  > {
+    const missing = [
+      input.automation ? undefined : "automation",
+      input.evaluation ? undefined : "evaluation",
+      input.scenario ? undefined : "scenario",
+    ].filter((name): name is string => name !== undefined);
+
+    if (missing.length > 0 && input.consumers?.enabled) {
+      throw new Error(
+        `The worker composition will not claim event-sourcing/jobs without ${missing.join(", ")}: trace processing dispatches into all three, and their work would redeliver forever.`,
+      );
+    }
+
+    const refuse = (feature: string) => (): Promise<never> => {
+      throw new Error(
+        `Trace processing dispatched into ${feature}, which this graph did not compose.`,
+      );
+    };
+
+    const evaluationCommands = input.evaluation?.commands;
+    const scenarioCommands = input.scenario?.commands;
+
+    return {
+      executeEvaluation: evaluationCommands
+        ? (data, sendOptions) =>
+            evaluationCommands.executeEvaluation(
+              data,
+              sendOptions as Parameters<typeof evaluationCommands.executeEvaluation>[1],
+            )
+        : refuse("evaluation"),
+      reportEvaluation: evaluationCommands
+        ? (data) => evaluationCommands.reportEvaluation(data)
+        : refuse("evaluation"),
+      computeRunMetrics: scenarioCommands
+        ? (data) => scenarioCommands.computeRunMetrics(data)
+        : refuse("scenario"),
+      triggerMatches: input.automation?.triggerMatches ?? new AbsentTraceTriggerMatches(),
+    };
+  }
+
+  /** The boot logger, as the one place Trace's storage absences are declared. */
+  private static traceAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerTraceAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerTraceAbsence.create(options.observability.logger)
+      : undefined;
   }
 
   /** The boot logger, as the one place a composition absence is declared. */
@@ -1242,5 +1513,44 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
       { reason: "no-github-app-credentials" },
       "worker composed GitHub branch maintenance without App credentials: pull-request linkage is not re-checked, and only its retention half runs",
     );
+  }
+}
+
+/** Names Trace's two storage absences once, at boot, rather than leaving them inferred. */
+export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerTraceAbsence {
+    return new LoggedWorkerTraceAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutBroadcast(): void {
+    this.logger.warn(
+      { reason: "no-tenant-broadcast" },
+      "worker composed trace processing without a tenant broadcast bridge: both broadcast subscribers stay registered and inert, so an open trace list will not update until it is reloaded",
+    );
+  }
+
+  withoutDatasetStorage(): void {
+    this.logger.warn(
+      { reason: "azure-dataset-storage-unsupported" },
+      "worker composed dataset normalization on an Azure-backed deployment: this process has no Azure blob driver for datasets, so a normalize job fails by name rather than writing chunks somewhere unreadable",
+    );
+  }
+}
+
+/**
+ * The trigger-match recorder a non-consuming graph gets.
+ *
+ * It refuses rather than swallowing, because the only way to reach it is a
+ * graph that started consuming without Automation — and a trigger match that
+ * silently vanished is a customer's alert that never arrives with nothing to
+ * show for it.
+ */
+class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorderPort {
+  async send(): Promise<void> {
+    throw new Error("Trace processing recorded a trigger match, but Automation is not composed.");
   }
 }

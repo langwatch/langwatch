@@ -14,17 +14,16 @@ import {
 
 /**
  * Spec: specs/trace-processing/worker-trace-projection-runtime.feature
+ * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
  *
- * A COMPOSITION-CAPABILITY test. Trace has not converted: the application
- * still assembles the trace bundle and still registers every routing key, and
- * this composition has no production caller. What has to be true today is the
- * thing the step-(g) attempt found was not — that this process can build the
- * pipeline DEFINITION out of packages, with no application module anywhere in
- * the graph.
+ * THE DEFINITION, driven through the function the installer registers. Trace
+ * has converted: this process composes and mounts the pipeline, so these tests
+ * assert what it REGISTERS and what a real span folds to, and read the
+ * byte-frozen job registry rather than a list retyped here — a key that stops
+ * being registered fails against the registry the queue routes on.
  *
- * It is driven through the definition the conversion installs, and it reads
- * the byte-frozen job registry rather than a list retyped here, so a key that
- * stops being registered fails against the registry the queue routes on.
+ * The composition that builds the handlers behind those names is asserted in
+ * `worker-trace-processing-mount.composition.unit.test.ts`.
  */
 
 const noop = async () => {};
@@ -275,16 +274,18 @@ describe("given the worker composition root and no application module", () => {
     });
   });
 
-  describe("when the frozen registry and the process's own modules are read", () => {
+  describe("when the process's own modules are read", () => {
     /**
-     * STAGED means exactly two things, and both are asserted rather than
-     * asserted about: nothing outside a test reaches this composition, and the
-     * pipeline it would install is still the application's. The first is what
-     * keeps a half-converted graph from mounting fifteen of twenty-nine keys
-     * and redelivering the other fourteen forever.
+     * MOUNTED means the production composition is the caller. The staged-slice
+     * assertion this replaces said the opposite — that nothing outside a test
+     * reached this composition — and inverting it is the conversion. A test
+     * that kept asserting "no caller" would have gone red on the change it was
+     * written to guard, so it is replaced rather than deleted: what must not
+     * happen now is the pipeline losing its caller and the process quietly
+     * routing nothing.
      *
-     * @scenario "the staged pipeline is not mounted" */
-    it("has no caller anywhere in this process but its own tests", () => {
+     * @scenario "the converted pipeline is mounted by the production composition" */
+    it("is reached by the production composition and not only by its tests", () => {
       const sourceRoot = fileURLToPath(new URL("../..", import.meta.url));
       const files: string[] = [];
       const walk = (directory: string) => {
@@ -306,20 +307,9 @@ describe("given the worker composition root and no application module", () => {
           readFileSync(file, "utf8").includes("worker-trace-processing-pipeline.composition"),
       );
 
-      expect(callers).toEqual([]);
-    });
-  });
-
-  describe("when the port the conversion will call is used", () => {
-    /** @scenario "the pipeline is composed from packages alone" */
-    it("builds through the pipeline port with the deferred-origin scheduler", () => {
-      const pipeline = WorkerTraceProcessingPipeline.create(options());
-      const definition = pipeline.build({
-        deferredOrigins: { schedule: noop } as never,
-      });
-
-      expect(definition.metadata.name).toBe("trace_processing");
-      expect(registeredKeys(definition).has("reactor:originGate")).toBe(true);
+      expect(callers.map((file) => file.slice(sourceRoot.length))).toEqual([
+        "app/worker-production.composition.ts",
+      ]);
     });
   });
 });

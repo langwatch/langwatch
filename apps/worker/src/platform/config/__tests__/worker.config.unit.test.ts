@@ -61,6 +61,7 @@ describe("resolveWorkerConfig", () => {
         storage: {
           backend: "s3",
           azureSpoolRetentionConfirmed: false,
+          dataplaneS3: new Map(),
           localFilesystemRoot: "/var/lib/langwatch/objects",
           s3: {
             bucket: undefined,
@@ -214,6 +215,7 @@ describe("resolveWorkerConfig", () => {
       storage: {
         backend: "s3",
         azureSpoolRetentionConfirmed: false,
+        dataplaneS3: new Map(),
         localFilesystemRoot: "/worker/objects",
         s3: {
           bucket: "worker-bucket",

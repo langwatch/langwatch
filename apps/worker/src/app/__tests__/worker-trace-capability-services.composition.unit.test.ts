@@ -362,14 +362,17 @@ describe("createWorkerTraceCapabilityServices", () => {
 
     describe("when this process's own modules are read", () => {
       /**
-       * STAGED means the same two things it meant for the pipeline: nothing
-       * outside a test reaches these compositions, and the record path they
-       * would build is still the application's. A capability service that
-       * composes is not a capability service that runs, and mounting one half
-       * of the record path is exactly what the halt refused.
+       * MOUNTED, and the caller list is the assertion. These three used to have
+       * no production caller at all — that was the staged slice — and each one
+       * now has exactly the caller the conversion gives it: the record command
+       * and the flag store are reached by the pipeline composition, and the
+       * capability services by both. Naming them rather than counting them is
+       * what would catch a SECOND graph composing its own copy: two flag
+       * services in one process halve the cache hit rate and can disagree for a
+       * TTL about whether a kill switch is thrown.
        *
        * @scenario "The record path's capability services compose from a database alone" */
-      it("has no production caller but the record-span composition", () => {
+      it("is reached only by the compositions the conversion gives it", () => {
         const sourceRoot = fileURLToPath(new URL("../..", import.meta.url));
         const files: string[] = [];
         const walk = (directory: string) => {
@@ -392,10 +395,16 @@ describe("createWorkerTraceCapabilityServices", () => {
             )
             .map((file) => file.slice(sourceRoot.length));
 
-        expect(callersOf("worker-record-span.composition")).toEqual([]);
-        expect(callersOf("worker-feature-flags.composition")).toEqual([]);
-        expect(callersOf("worker-trace-capability-services.composition")).toEqual([
+        expect(callersOf("worker-record-span.composition")).toEqual([
+          "app/worker-trace-processing-pipeline.composition.ts",
+        ]);
+        expect(callersOf("worker-feature-flags.composition")).toEqual([
+          "app/worker-production.composition.ts",
+        ]);
+        expect(callersOf("worker-trace-capability-services.composition").sort()).toEqual([
+          "app/worker-production.composition.ts",
           "app/worker-record-span.composition.ts",
+          "app/worker-trace-processing-pipeline.composition.ts",
         ]);
       });
     });

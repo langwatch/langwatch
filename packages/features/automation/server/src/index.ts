@@ -126,6 +126,11 @@ export {
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
 } from "./adapters/postgres.automation-graph-activity.adapter";
+export { AutomationTraceTriggerCataloguePort } from "./ports/automation-trace-trigger-catalogue.port";
+export {
+  PostgresAutomationTraceTriggerCatalogueAdapter,
+  type AutomationTraceTriggerCatalogueDatabase,
+} from "./adapters/postgres.automation-trace-trigger-catalogue.adapter";
 export { HmacUnsubscribeTokenAdapter } from "./adapters/hmac.unsubscribe-token.adapter";
 export { ActiveTriggerCacheService } from "./services/active-trigger-cache.service";
 export { UnsubscribeTokenService } from "./services/unsubscribe-token.service";

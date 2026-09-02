@@ -171,7 +171,15 @@ class UnconfiguredAutomationCrypto implements AutomationSecretCrypto {
   }
 }
 
-class WorkerAutomationClock extends AutomationClockPort {
+/**
+ * The one clock this process's automation reads.
+ *
+ * Exported because two verticals share it and must: the graph evaluator's
+ * debounce and the trace-trigger cache's window are both measured against it,
+ * and two clocks in one process is how a cache expires against a time the
+ * evaluator has not reached.
+ */
+export class WorkerAutomationClock extends AutomationClockPort {
   now(): Date {
     return new Date();
   }
