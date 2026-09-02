@@ -1,11 +1,20 @@
 import { Button } from "@chakra-ui/react";
-import { Clock, Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
+import {
+  Clock,
+  Edit,
+  Grid,
+  LayoutDashboard,
+  MoreVertical,
+  Trash2,
+} from "lucide-react";
 import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
 } from "~/server/analytics/lwql/timeWindow";
+import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
 type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";
@@ -39,6 +48,7 @@ const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
 
 interface GraphCardMenuProps {
   graphId: string;
+  projectId: string;
   projectSlug: string;
   dashboardId?: string;
   colSpan: number;
@@ -55,6 +65,12 @@ interface GraphCardMenuProps {
    * playground widget's sandboxed author code can be edited today.
    */
   isPlaygroundWidget?: boolean;
+  /**
+   * Offers "Add to dashboard", which pins a playground widget straight to
+   * the project's single dashboard (no picker — there's only ever one).
+   * Only meaningful alongside `isPlaygroundWidget`.
+   */
+  showAddToDashboard?: boolean;
   /** The step this workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   /**
@@ -70,12 +86,14 @@ interface GraphCardMenuProps {
 
 export function GraphCardMenu({
   graphId,
+  projectId,
   projectSlug,
   dashboardId,
   colSpan,
   rowSpan,
   isWorkbenchChart = false,
   isPlaygroundWidget = false,
+  showAddToDashboard = false,
   granularitySeconds,
   onEdit,
   onSizeChange,
@@ -85,6 +103,51 @@ export function GraphCardMenu({
 }: GraphCardMenuProps) {
   const router = useRouter();
   const currentSize = getCurrentSize(colSpan, rowSpan);
+  const utils = api.useUtils();
+
+  // Resolved lazily (only when the item can actually be shown) — the same
+  // "every project has exactly one dashboard" lookup the playground page
+  // itself uses to pre-assign new widgets.
+  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
+    { projectId },
+    { enabled: showAddToDashboard && isPlaygroundWidget },
+  );
+  const assignDashboard = api.playgroundWidgets.assignDashboard.useMutation();
+  const alreadyOnDashboard =
+    !!dashboard.data && dashboardId === dashboard.data.id;
+
+  const handleAddToDashboard = () => {
+    if (!dashboard.data) return;
+    if (alreadyOnDashboard) {
+      toaster.create({
+        title: "Already on the dashboard",
+        type: "info",
+        duration: 3000,
+      });
+      return;
+    }
+    assignDashboard.mutate(
+      { projectId, id: graphId, dashboardId: dashboard.data.id },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: `Added to ${dashboard.data!.name}`,
+            type: "success",
+            duration: 3000,
+          });
+          void utils.playgroundWidgets.list.invalidate({ projectId });
+          void utils.graphs.getAll.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error adding to dashboard",
+            type: "error",
+            duration: 3000,
+          });
+        },
+      },
+    );
+  };
 
   // A workbench chart is edited in the workbench that wrote it, and a
   // playground widget in the playground that wrote it — neither the builder
@@ -171,6 +234,16 @@ export function GraphCardMenu({
               ))}
             </Menu.Content>
           </Menu.Root>
+        )}
+
+        {isPlaygroundWidget && showAddToDashboard && (
+          <Menu.Item
+            value="add-to-dashboard"
+            onClick={handleAddToDashboard}
+            disabled={!dashboard.data || assignDashboard.isPending}
+          >
+            <LayoutDashboard /> Add to dashboard
+          </Menu.Item>
         )}
 
         <Menu.Item value="delete" color="red.600" onClick={onDelete}>

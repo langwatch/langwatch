@@ -98,6 +98,7 @@ export function DraggableGraphCard({
             graphId={graph.id}
             name={graph.name}
             graph={graph.graph}
+            projectId={projectId}
             projectSlug={projectSlug}
             dashboardId={dashboardId}
             colSpan={graph.colSpan}

@@ -40,6 +40,7 @@ function toWidget(row: {
   gridRow: number;
   colSpan: number;
   rowSpan: number;
+  dashboardId?: string | null;
 }): PlaygroundWidget {
   const parsed = playgroundWidgetDefinitionSchema.safeParse(row.graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
@@ -52,6 +53,7 @@ function toWidget(row: {
     gridRow: row.gridRow,
     colSpan: row.colSpan,
     rowSpan: row.rowSpan,
+    dashboardId: row.dashboardId,
   };
 }
 

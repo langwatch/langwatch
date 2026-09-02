@@ -42,6 +42,7 @@ export interface PlaygroundWidget {
   gridRow: number;
   colSpan: number;
   rowSpan: number;
+  dashboardId?: string | null;
 }
 
 /** The height a card's row span grants its frame — mirrors the report grid. */
@@ -224,9 +225,13 @@ export function PlaygroundWidgetCard({
 
             <GraphCardMenu
               graphId={widget.id}
+              projectId={projectId}
               projectSlug={projectSlug}
+              dashboardId={widget.dashboardId ?? undefined}
               colSpan={widget.colSpan}
               rowSpan={widget.rowSpan}
+              isPlaygroundWidget
+              showAddToDashboard
               onEdit={openCodeTab}
               onSizeChange={onSizeChange}
               onDelete={onDelete}
