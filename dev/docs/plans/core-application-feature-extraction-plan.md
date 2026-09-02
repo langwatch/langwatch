@@ -2581,6 +2581,23 @@ green.
 
 ### Strict-layout lint ledger
 
+**Refreshed 2026-09-02 at d1a64c529e:** 3,419 findings, 3,210 of them outside
+`platform/app`, up from ~823 this morning. This is the lift-and-shift working
+as intended: the moved bodies arrive in their legacy shape and the lint now
+counts what platform hid. Three kinds. Mechanical (relayout wave, one per
+package, lint count as the only-shrinks gate): `feature-source-filename` 1,052,
+`ui-web-private-layout` 849, `feature-source-layout` 257, `ui-web-root-components`
+115, `ui-web-root-flat` 68; trace-web alone carries 1,558 because traces-v2
+arrived whole as `src/explorer`. Structural (decisions): `cross-feature` 57,
+`package-cycle` 12 (the eight web packages the studio move made mutually
+dependent; resolve by pulling shared studio/trace vocabulary into contract or a
+shared ui package), `private-runtime-export` 38, `prisma-containment` 25,
+`ui-web-layer-direction` 18. Stale: `legacy-feature-fragment-baseline` 233
+entries naming deleted platform files. The relayout wave starts when the loader
+keys and the tRPC collaborators are done; the table below is the older per-policy
+inventory.
+
+
 The strict layout only means something if its lint is enforceable, and until
 `6ec280aec8` a large share of the reported total was drift rather than work.
 This is the standing inventory, refreshed from
