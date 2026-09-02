@@ -1275,7 +1275,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "Both graphs cache the run-state fold under one keyspace" */
     it("caches through the Redis its own queue substrate runs on", async () => {
-      const set = vi.fn(async () => "OK");
+      const set = vi.fn(async (..._args: unknown[]) => "OK");
       const redis = { get: vi.fn(async () => null), set };
 
       await storeFoldedRunState(compositionWith({ redis }));
@@ -1289,7 +1289,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("honours the fold cache TTL the environment names", async () => {
-      const set = vi.fn(async () => "OK");
+      const set = vi.fn(async (..._args: unknown[]) => "OK");
       const redis = { get: vi.fn(async () => null), set };
 
       await storeFoldedRunState(
