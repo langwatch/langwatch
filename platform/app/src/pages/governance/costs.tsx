@@ -269,13 +269,21 @@ function CostsBody({
 /**
  * Where the numbers below stop being complete (ADR-128 §4a).
  *
- * A source that has stopped pulling still has a lane on this screen; it just
+ * A source that is failing to pull still has a lane on this screen; it just
  * contributes nothing to it, so the totals fall and nothing says why. Without
  * this line a broken credential reads as a cheap month, which is the one
  * reading of a cost screen that is worse than no cost screen.
  *
- * The sources are named because "something stopped" is not actionable and
- * "Azure Billing stopped" is.
+ * The wording says "failing to pull" rather than "stopped pulling" because
+ * that is the whole of what the check behind it detects: a run of consecutive
+ * pull failures. A source whose worker is never scheduled keeps a zero failure
+ * count and is never named here, though its figures are just as incomplete —
+ * see the known gap recorded on the Rule in
+ * `specs/governance/governance-cost-screen.feature`. Claiming "stopped" would
+ * promise a guarantee this line cannot keep.
+ *
+ * The sources are named because "something is failing" is not actionable and
+ * "Azure Billing is failing" is.
  */
 function StaleSourcesNotice({
   staleSources,
@@ -296,8 +304,8 @@ function StaleSourcesNotice({
         <Alert.Title>No data since {since}</Alert.Title>
         <Alert.Description>
           {staleSources.sourceNames.join(", ")}{" "}
-          {staleSources.sourceNames.length === 1 ? "has" : "have"} stopped
-          pulling, so spend after that point is unknown rather than zero.
+          {staleSources.sourceNames.length === 1 ? "is" : "are"} failing to
+          pull, so spend after that point is unknown rather than zero.
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>
