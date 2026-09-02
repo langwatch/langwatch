@@ -76,7 +76,7 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
     Open the key under **AI Gateway, Virtual Keys** and tick the guardrail under the direction you want. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
   </Step>
   <Step title="Verify">
-    Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span carries `langwatch.guardrail.verdict` and `langwatch.guardrail.direction`.
+    Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.
   </Step>
 </Steps>
 

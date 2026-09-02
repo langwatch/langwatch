@@ -79,7 +79,7 @@ curl -sS -D - -o /dev/null https://gateway.langwatch.ai/v1/messages \
 X-LangWatch-Cache-Mode: force
 ```
 
-The span for the request carries `langwatch.cache.rule_id`, `langwatch.cache.rule_priority` and `langwatch.cache.mode_applied`, so you can filter Trace Explorer by the rule that fired.
+The response header is the only per-request signal of which action fired. The span carries no cache rule attribute; the provider-reported cache token counts are on it as `gen_ai.usage.cache_read.input_tokens` and `gen_ai.usage.cache_creation.input_tokens`.
 
 On the response side, Anthropic reports `cache_read_input_tokens` and `cache_creation_input_tokens` in `usage`. The gateway forwards these counts unchanged and records them on the span and in the spend record, so cached and uncached input tokens are priced separately.
 
