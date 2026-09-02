@@ -8,10 +8,12 @@
  */
 
 import { Box } from "@chakra-ui/react";
-import type { BeforeMount } from "@monaco-editor/react";
+import type { BeforeMount, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
+import { useEffect, useRef } from "react";
 
 import { useColorMode } from "~/components/ui/color-mode";
+import { RESERVED_PARAMETERS } from "~/server/analytics/dashboardWidgetDefinition";
 import dynamic from "~/utils/compat/next-dynamic";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -57,19 +59,108 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   });
 };
 
+/** Matches ClickHouse bound-param tokens like `{period_start:DateTime}`. */
+const BOUND_PARAM_PATTERN = /\{([A-Za-z_][A-Za-z0-9_]*):[A-Za-z0-9_]+\}/g;
+
+const RESERVED_PARAM_NAMES = new Set(RESERVED_PARAMETERS.map((p) => p.name));
+
+const PARAM_TOKEN_CLASS_RESERVED = "lw-sql-param-reserved";
+const PARAM_TOKEN_CLASS_DECLARED = "lw-sql-param-declared";
+const PARAM_TOKEN_CLASS_UNDECLARED = "lw-sql-param-undeclared";
+
+/**
+ * One shared stylesheet for the three token classes below — injected once,
+ * since decorations only carry a className, not inline colors. Colors are
+ * fixed (not theme-derived) because they must read clearly on both the
+ * `vs` and `vs-dark` Monaco themes this editor switches between.
+ */
+function ensureParamTokenStyles() {
+  const id = "lw-sql-param-token-styles";
+  if (document.getElementById(id)) return;
+  const style = document.createElement("style");
+  style.id = id;
+  style.textContent = `
+    .${PARAM_TOKEN_CLASS_RESERVED} { color: #3182CE; font-weight: 600; }
+    .${PARAM_TOKEN_CLASS_DECLARED} { color: #805AD5; font-weight: 600; }
+    .${PARAM_TOKEN_CLASS_UNDECLARED} { color: #DD6B20; font-weight: 600; text-decoration: underline wavy; }
+  `;
+  document.head.appendChild(style);
+}
+
 interface DashboardWidgetCodeEditorProps {
   /** Monaco's "typescript" language id highlights JSX/TSX too. */
   language: "typescript" | "sql";
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Names of this query's user-declared parameters — only used for `sql` to
+   * color `{name:Type}` tokens as reserved / declared / undeclared. Reserved
+   * names always come from `RESERVED_PARAMETERS`, not this list.
+   */
+  declaredParamNames?: string[];
 }
 
 export function DashboardWidgetCodeEditor({
   language,
   value,
   onChange,
+  declaredParamNames,
 }: DashboardWidgetCodeEditorProps) {
   const { colorMode } = useColorMode();
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
+    null,
+  );
+
+  const updateDecorations = useRef(() => {});
+  updateDecorations.current = () => {
+    const ed = editorRef.current;
+    if (!ed || language !== "sql") return;
+    const model = ed.getModel();
+    if (!model) return;
+
+    const declared = new Set(declaredParamNames ?? []);
+    const text = model.getValue();
+    const newDecorations: editor.IModelDeltaDecoration[] = [];
+    for (const match of text.matchAll(BOUND_PARAM_PATTERN)) {
+      const name = match[1];
+      if (!name || match.index === undefined) continue;
+      const startPos = model.getPositionAt(match.index);
+      const endPos = model.getPositionAt(match.index + match[0].length);
+      const className = RESERVED_PARAM_NAMES.has(name)
+        ? PARAM_TOKEN_CLASS_RESERVED
+        : declared.has(name)
+          ? PARAM_TOKEN_CLASS_DECLARED
+          : PARAM_TOKEN_CLASS_UNDECLARED;
+      newDecorations.push({
+        range: {
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column,
+        },
+        options: { inlineClassName: className },
+      });
+    }
+
+    if (!decorationsRef.current) {
+      decorationsRef.current = ed.createDecorationsCollection(newDecorations);
+    } else {
+      decorationsRef.current.set(newDecorations);
+    }
+  };
+
+  // Re-run whenever the value or the declared-param list changes (typing a
+  // param name in the params editor should recolor tokens without an edit).
+  useEffect(() => {
+    updateDecorations.current();
+  }, [value, declaredParamNames, language]);
+
+  const handleMount: OnMount = (mountedEditor) => {
+    ensureParamTokenStyles();
+    editorRef.current = mountedEditor;
+    updateDecorations.current();
+  };
 
   return (
     <MonacoEditor
@@ -78,6 +169,7 @@ export function DashboardWidgetCodeEditor({
       value={value}
       theme={colorMode === "dark" ? "vs-dark" : "vs"}
       onChange={(v: string | undefined) => onChange(v ?? "")}
+      onMount={handleMount}
       options={EDITOR_OPTIONS}
       beforeMount={
         language === "typescript" ? configureTypeScriptDefaults : undefined
