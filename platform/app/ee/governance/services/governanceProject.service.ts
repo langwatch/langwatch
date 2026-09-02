@@ -36,6 +36,7 @@ import {
 } from "~/generated/prisma/client";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+import { recordGovernanceTenantUse } from "./governanceTenantHistory.service";
 
 /** Canonical Project.kind values. Free-form string in the DB column for
  *  extensibility; this constant is the source of truth in TS. */
@@ -88,6 +89,24 @@ export async function findHiddenGovernanceProject({
  * any user-visible flow).
  */
 export async function ensureHiddenGovernanceProject(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<Project> {
+  const project = await resolveHiddenGovernanceProject(prisma, organizationId);
+  // Every route to a governance TenantId passes through here, so this is the
+  // one place that can promise the history is complete (ADR-128 §11). Recording
+  // it at the point of USE rather than only at creation is what covers the row
+  // this function can hand back from the archived-by-slug branch below — a
+  // tenant the read-side resolver has already gone blind to.
+  await recordGovernanceTenantUse({
+    prisma,
+    organizationId,
+    tenantId: project.id,
+  });
+  return project;
+}
+
+async function resolveHiddenGovernanceProject(
   prisma: PrismaClient,
   organizationId: string,
 ): Promise<Project> {
