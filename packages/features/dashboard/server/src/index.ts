@@ -48,3 +48,23 @@ export {
  */
 export { createGraphsRestApp } from "./transport/api-rest/graph.api";
 export { createDashboardsRestApp } from "./transport/api-rest/dashboard.api";
+
+/**
+ * The two policies a process used to compose by hand.
+ *
+ * Both are Dashboard's own decisions expressed against collaborators it does
+ * not own — the LangWatchQL validator over a saved chart's SQL, and the
+ * workbench rollout flag over which graph kinds a project may place — so they
+ * live here as adapters a composition root binds, rather than as a shape every
+ * deployment restates.
+ */
+export { AnalyticsSavedWorkbenchChartPolicy } from "./adapters/saved-workbench-chart-policy.adapter";
+export { mapDashboardSavedWorkbenchChartError } from "./adapters/saved-workbench-chart-policy.adapter";
+export { WorkbenchAwareGraphVisibilityPolicy } from "./adapters/graph-visibility-policy.adapter";
+export {
+  SavedWorkbenchChartAlreadyExistsError,
+  SavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartDefinitionInvalidError,
+  SavedWorkbenchChartNotFoundError,
+  SavedWorkbenchChartSpecificationRefusedError,
+} from "./transport/api-trpc/saved-workbench-chart.transport-errors";

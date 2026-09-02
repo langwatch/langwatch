@@ -44,7 +44,16 @@ import {
   ApiEventingAbsenceReportPort,
   ApiEventingInfrastructure,
 } from "../platform/infrastructure/api-eventing.infrastructure";
+import {
+  ApiClickHouseAbsenceReportPort,
+  ApiClickHouseInfrastructure,
+} from "../platform/infrastructure/api-clickhouse.infrastructure";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
+import {
+  composeApiAnalyticsCollaborators,
+  withApiAnalyticsCollaborators,
+  type ApiAnalyticsCollaborators,
+} from "./api-trpc-collaborators.analytics.composition";
 import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
@@ -219,6 +228,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedTenancy: ApiTenancyComposition | undefined;
   private composedAgents: ApiAgentsComposition | undefined;
   private composedAuth: ApiAuthComposition | undefined;
+  private composedClickHouse: ApiClickHouseInfrastructure | undefined;
+  private composedAnalytics: ApiAnalyticsCollaborators | undefined;
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -275,6 +286,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.options.audit,
     });
     const agents = this.resolveAgents(options);
+    // The charted reads, the workbench and the dashboards, composed over this
+    // process's OWN ClickHouse and the second, restricted identity a member's
+    // submitted SQL runs as. Both are this composition's to open, so the record
+    // below can be satisfied without a host handing them in.
+    this.composedAnalytics = this.composeAnalytics(options, authz);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: this.composedDatabase?.connection,
       // The SAME AuthZ service the REST doors authorize through: a permission
@@ -282,7 +298,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // same procedure would have.
       authz,
       audit: this.options.audit,
-      collaborators: this.options.trpcCollaborators,
+      collaborators: withApiAnalyticsCollaborators(
+        this.options.trpcCollaborators,
+        this.composedAnalytics,
+      ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
     });
     const process = ApiProcess.create({
@@ -732,6 +751,54 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     };
   }
 
+  /**
+   * Opens this process's ClickHouse and composes the analytics half of the
+   * collaborator set over it.
+   *
+   * ClickHouse is optional and analytics is not conditional on it: a process
+   * without one still composes the applications, and the charted reads refuse
+   * at the call with the message they always had rather than the namespace
+   * disappearing. What a missing ClickHouse must never do is leave the record
+   * unmountable, because the same namespace also carries the workbench, whose
+   * database is a different one entirely.
+   */
+  private composeAnalytics(
+    options: ApiRuntimeCompositionOptions,
+    authz: AuthzService,
+  ): ApiAnalyticsCollaborators | undefined {
+    const database = this.composedDatabase?.connection;
+    // The project service, and this process's OWN: three of the four things
+    // below are project row reads — which organization a tenant routes to,
+    // which organization a rollout flag targets, and which team a data-privacy
+    // policy is inherited down from. A host that injected its own api-key and
+    // organization pair composed no tenancy here, so it holds the collaborator
+    // set whole and hands it in rather than having this half built for it.
+    const projects = this.composedTenancy?.projects;
+    if (!database || !projects) return undefined;
+
+    this.composedClickHouse = ApiClickHouseInfrastructure.tryCreate({
+      resources: options.resources,
+      clickhouse: options.config.infrastructure.clickhouse,
+      // The routing directory is the project service: which organization a
+      // tenant belongs to is a project row, and it is the one question the
+      // tenant router asks.
+      directory: {
+        organizationForTenant: async (tenantId) => await projects.getOrganizationId(tenantId),
+      },
+      report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
+    });
+
+    return composeApiAnalyticsCollaborators({
+      prisma: database.client,
+      authz,
+      projects,
+      featureFlags: options.config.featureFlags,
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
+      resources: options.resources,
+    });
+  }
+
   private composeQueue(options: ApiRuntimeCompositionOptions): ApiQueueInfrastructure | undefined {
     const logger = createLogger(options.config.serviceName);
     return ApiQueueInfrastructure.tryCreate({
@@ -865,6 +932,24 @@ export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReportPort {
     this.logger.info(
       { reason: "unconfigured" },
       "API composed without Postgres: no guarded Prisma client exists in this process",
+    );
+  }
+}
+
+/** Names the absent analytics store once, at boot, with what it costs. */
+export class LoggedApiClickHouseAbsence extends ApiClickHouseAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiClickHouseAbsence {
+    return new LoggedApiClickHouseAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(): void {
+    this.logger.info(
+      { reason: "unconfigured" },
+      "API composed without ClickHouse: the charted analytics reads and the filter pickers refuse at the call. The LangWatchQL workbench is unaffected — it runs on its own restricted identity.",
     );
   }
 }

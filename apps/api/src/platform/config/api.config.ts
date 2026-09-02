@@ -5,13 +5,30 @@ import {
   portSchema,
   type ConfigValue,
 } from "@langwatch/config";
-import { loggerConfigurationFrom, type LoggerConfiguration } from "@langwatch/observability";
+import {
+  createLogger,
+  loggerConfigurationFrom,
+  type Logger,
+  type LoggerConfiguration,
+} from "@langwatch/observability";
+import { parseRoutingTable, poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
+import {
+  resolveFeatureFlagConfig,
+  type FeatureFlagConfig,
+} from "@langwatch/feature-flag-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
+
+/**
+ * Built on demand rather than at module load: this module runs before the
+ * process has configured its logging, so a logger held in a constant would be
+ * the one that was created first rather than the one the deployment asked for.
+ */
+const configLogger = (): Pick<Logger, "warn"> => createLogger("langwatch:api:config");
 
 /**
  * Telemetry flush and infrastructure release still have to finish after the
@@ -187,6 +204,36 @@ export const apiConfigDefinition = RuntimeConfig.define({
     database: {
       url: Config.value(optionalEnvironmentString, { env: "DATABASE_URL" }),
     },
+    /**
+     * The TWO ClickHouse identities this process reads analytics through, and
+     * they are deliberately separate values.
+     *
+     * `url` is the application's own connection: it is the identity every
+     * charted read, every filter picker and every dashboard graph runs as, and
+     * it can read whatever the schema holds because the queries built over it
+     * are ours.
+     *
+     * `langwatchQl` is the RESTRICTED identity a member's own submitted SQL
+     * runs as. It is a different database user with a row policy and a
+     * read-only profile, so a statement a customer wrote cannot reach past its
+     * own tenant even if every layer above it were wrong. Composing one from
+     * the other — or defaulting the second to the first — would hand customer
+     * SQL the administrative client, which is the one thing this split exists
+     * to prevent, so they never share a variable and neither implies the other.
+     *
+     * Both optional: a process given neither composes no analytics and says so
+     * once at boot, rather than refusing to start.
+     */
+    clickhouse: {
+      url: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_URL" }),
+      langwatchQl: {
+        url: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_URL" }),
+        username: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_USER" }),
+        password: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_PASSWORD" }),
+        database: Config.value(optionalEnvironmentString, { env: "LWQL_DATABASE" }),
+        tenantSetting: Config.value(optionalEnvironmentString, { env: "LWQL_TENANT_SETTING" }),
+      },
+    },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
       clusterEndpoints: Config.value(optionalEnvironmentString, {
@@ -221,8 +268,43 @@ export type ApiDatabaseConfigResolution = Readonly<{
   url: string | undefined;
 }>;
 
+/**
+ * The restricted LangWatchQL identity, present only when the deployment
+ * configured ALL of it.
+ *
+ * All-or-nothing on purpose: a partial credential is not a weaker identity, it
+ * is one that cannot connect, and a workbench composed over it would answer
+ * every statement with a connection failure instead of reporting that the
+ * surface is unprovisioned. {@link resolveApiConfig} names what was missing
+ * when some but not all of it was set.
+ */
+export type ApiLangWatchQLConfigResolution = Readonly<{
+  url: string;
+  username: string;
+  password: string;
+  database: string;
+  tenantSetting: string;
+}>;
+
+/** The ClickHouse identities a process was configured with, if it was given any. */
+export type ApiClickHouseConfigResolution = Readonly<{
+  /** The application's own connection; absent means this process reads no analytics. */
+  url: string | undefined;
+  /** The restricted identity a member's own SQL runs as; absent means unprovisioned. */
+  langwatchQl: ApiLangWatchQLConfigResolution | undefined;
+  /**
+   * The per-organization endpoints, keyed by organization id, from the
+   * `CLICKHOUSE_URL__<label>__<organizationId>` variables every LangWatch tier
+   * reads them by.
+   */
+  privateRoutes: readonly Readonly<{ organizationId: string; url: string; cluster: string }>[];
+  /** Connection-pool sizing inputs, as the shared client resolves them. */
+  poolSizing: PoolSizingInput;
+}>;
+
 export type ApiInfrastructureConfig = Readonly<{
   database: ApiDatabaseConfigResolution;
+  clickhouse: ApiClickHouseConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
 }>;
@@ -243,6 +325,15 @@ export type ApiShutdownConfig = Readonly<{
 export type ApiConfig = Readonly<
   Omit<ApiConfigProjection, "authz" | "infrastructure" | "shutdown"> & {
     authz: ApiAuthzConfig;
+    /**
+     * This deployment's rollout switches, as every LangWatch tier reads them.
+     *
+     * Resolved from the same environment source as everything else here, and
+     * folded through the flag registry's own resolver, so a flag forced on for
+     * one process is forced on for all of them rather than for whichever tier
+     * remembered to read the variable.
+     */
+    featureFlags: FeatureFlagConfig;
     infrastructure: ApiInfrastructureConfig;
     shutdown: ApiShutdownConfig;
   }
@@ -262,6 +353,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   }).value;
   return {
     ...value,
+    featureFlags: resolveFeatureFlagConfig(source),
     authz: {
       // The platform app's exact rule, so one variable means one thing across
       // the deployment rather than one thing per tier.
@@ -274,10 +366,101 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     },
     infrastructure: {
       database: { url: value.infrastructure.database.url },
+      clickhouse: {
+        url: value.infrastructure.clickhouse.url?.trim() || undefined,
+        langwatchQl: resolveLangWatchQLConnection(value.infrastructure.clickhouse.langwatchQl),
+        privateRoutes: resolvePrivateClickHouseRoutes(source),
+        poolSizing: poolSizingFromEnv(environmentStrings(source)),
+      },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
   };
+}
+
+/**
+ * The restricted identity, or nothing — never half of one.
+ *
+ * A deployment that set SOME of the five meant to switch the workbench on and
+ * would otherwise get a silent refusal on every statement, so the omission is
+ * named. One that set none is simply not running the surface and says nothing.
+ * Variable names only, never their values: one of these is a password.
+ */
+function resolveLangWatchQLConnection(
+  value: Readonly<{
+    url: string | undefined;
+    username: string | undefined;
+    password: string | undefined;
+    database: string | undefined;
+    tenantSetting: string | undefined;
+  }>,
+): ApiLangWatchQLConfigResolution | undefined {
+  const required = [
+    ["LWQL_CLICKHOUSE_URL", value.url],
+    ["LWQL_CLICKHOUSE_USER", value.username],
+    ["LWQL_CLICKHOUSE_PASSWORD", value.password],
+    ["LWQL_DATABASE", value.database],
+    ["LWQL_TENANT_SETTING", value.tenantSetting],
+  ] as const;
+  const absent = required.filter(([, entry]) => !entry?.trim()).map(([name]) => name);
+
+  if (absent.length > 0) {
+    if (absent.length < required.length) {
+      configLogger().warn(
+        { absent },
+        "LangWatchQL is partially configured, so every statement will be refused",
+      );
+    }
+    return undefined;
+  }
+  // Re-checked rather than asserted: `absent` is computed by a callback, which
+  // TypeScript cannot use to narrow these five.
+  const { url, username, password, database, tenantSetting } = value;
+  if (!url || !username || !password || !database || !tenantSetting) return undefined;
+  return { url, username, password, database, tenantSetting };
+}
+
+/**
+ * The per-organization ClickHouse endpoints, parsed by the shared client's own
+ * rule so this process routes a tenant exactly as every other tier does.
+ *
+ * A malformed variable is skipped rather than fatal, and an ambiguous
+ * `<label>__<organizationId>` split is reported: guessing wrong is a silent
+ * fail-open, in which the intended organization's tenants read the shared
+ * instance instead.
+ */
+function resolvePrivateClickHouseRoutes(
+  source: Readonly<Record<string, unknown>>,
+): readonly Readonly<{ organizationId: string; url: string; cluster: string }>[] {
+  const table = parseRoutingTable(environmentStrings(source));
+  for (const skipped of table.skipped) {
+    configLogger().warn(
+      { envVar: skipped.envVar, reason: skipped.reason },
+      "Ignoring a malformed ClickHouse route variable",
+    );
+  }
+  for (const guess of table.ambiguous) {
+    configLogger().warn(
+      { envVar: guess.envVar, organizationId: guess.organizationId },
+      "A ClickHouse route variable was split by guess; rename it if that is not the intent",
+    );
+  }
+  return [...table.routes].map(([organizationId, url]) => ({
+    organizationId,
+    url,
+    cluster: organizationId,
+  }));
+}
+
+/** The environment bag as the shared ClickHouse helpers read it. */
+function environmentStrings(
+  source: Readonly<Record<string, unknown>>,
+): Record<string, string | undefined> {
+  const strings: Record<string, string | undefined> = {};
+  for (const [name, value] of Object.entries(source)) {
+    if (typeof value === "string") strings[name] = value;
+  }
+  return strings;
 }
 
 /**

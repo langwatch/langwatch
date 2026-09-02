@@ -38,8 +38,24 @@ describe("API process configuration", () => {
       instanceAdminApiKey: undefined,
       apiKeyPepper: undefined,
       authz: { epochCacheEnabled: false, demoProjectId: undefined },
+      // The rollout switches this deployment set, which is none: an empty
+      // override map and an empty force-enable set, so every flag answers from
+      // the registry default.
+      featureFlags: { overrides: new Map(), forceEnabled: new Set() },
       infrastructure: {
         database: { url: undefined },
+        clickhouse: {
+          url: undefined,
+          langwatchQl: undefined,
+          privateRoutes: [],
+          poolSizing: {
+            override: undefined,
+            replicas: undefined,
+            serverMaxConcurrentQueries: undefined,
+            serverNodes: undefined,
+            clientsPerProcess: undefined,
+          },
+        },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
           globalConcurrency: undefined,
@@ -238,6 +254,18 @@ describe("API process configuration", () => {
 
     expect(config.infrastructure).toEqual({
       database: { url: undefined },
+      clickhouse: {
+        url: undefined,
+        langwatchQl: undefined,
+        privateRoutes: [],
+        poolSizing: {
+          override: undefined,
+          replicas: undefined,
+          serverMaxConcurrentQueries: undefined,
+          serverNodes: undefined,
+          clientsPerProcess: undefined,
+        },
+      },
       redis: {
         configured: true,
         mode: "standalone",
