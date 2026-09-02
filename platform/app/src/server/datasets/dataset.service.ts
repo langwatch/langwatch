@@ -886,7 +886,9 @@ export class DatasetService {
    * rows. Both branches therefore read incrementally — one chunk, or one batch,
    * at a time — keeping only the matches that fall inside the requested page
    * window. Heap holds one unit of input plus at most `limit` matched rows,
-   * whatever the dataset's size.
+   * whatever the dataset's size — and, while a chunk is being measured, a
+   * second copy of that one chunk, because measuring re-serialises it. Peak is
+   * therefore twice a chunk, not twice the scan; see `measureRowsBytes`.
    *
    * Both branches refuse BEFORE reading anything when the dataset's own numbers
    * already breach a limit, so that refusal costs no reads; neither ever returns

@@ -69,8 +69,14 @@ export const DATASET_SEARCH_SCAN_BATCH = 1_000;
  * damaged or missing metadata — the only datasets where an unbounded scan is
  * reachable in the first place.
  *
- * Serialised once per chunk rather than once per row: the cost is proportional
- * to a fetch and parse the scan has already paid for.
+ * Serialised once per chunk rather than once per row. That is not free: on a
+ * 16 MB chunk it measures at roughly the parse and match it rides along with
+ * put together, and it holds a second copy of the chunk as a string while it
+ * runs. Both are worth paying — tens of milliseconds and one chunk of heap,
+ * against fetching that chunk over the network — but the cheaper measure is a
+ * real one: `readChunk` already holds the raw JSONL it parsed, so returning its
+ * byte length would be exact and cost nothing. That is a change to the storage
+ * interface and all three of its implementations, so it is not made here.
  *
  * The number is the JSON encoding's byte length, not the JSONL file's — array
  * punctuation stands in for the newlines. That is a byte or two per row against
