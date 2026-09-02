@@ -118,9 +118,7 @@ function modelPattern(modelId: string): string {
     return `^${escapedModel}`;
   }
 
-  const escapedVendor = escapeStringRegexp(vendor)
-    .replaceAll("\\x2d", "-")
-    .replaceAll("\\-", "-");
+  const escapedVendor = escapeStringRegexp(vendor).replaceAll("\\x2d", "-").replaceAll("\\-", "-");
   return `^(${escapedVendor}\\/)?${escapedModel}`;
 }
 

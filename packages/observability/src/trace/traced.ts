@@ -25,20 +25,13 @@ import { getLangWatchTracer } from "langwatch";
  */
 export function traced<T extends object>(instance: T, className: string): T {
   const tracer = getLangWatchTracer(`langwatch.${className.toLowerCase()}`);
-  const wrapperCache = new Map<
-    string | symbol,
-    (this: unknown, ...args: unknown[]) => unknown
-  >();
+  const wrapperCache = new Map<string | symbol, (this: unknown, ...args: unknown[]) => unknown>();
 
   return new Proxy(instance, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver) as unknown;
 
-      if (
-        typeof value !== "function" ||
-        prop === "constructor" ||
-        typeof prop === "symbol"
-      ) {
+      if (typeof value !== "function" || prop === "constructor" || typeof prop === "symbol") {
         return value;
       }
 
@@ -110,7 +103,5 @@ export function traced<T extends object>(instance: T, className: string): T {
  * AsyncGeneratorFunction constructor is not a global binding.
  */
 function isAsyncGeneratorFunction(value: unknown): boolean {
-  return (
-    typeof value === "function" && value.constructor?.name === "AsyncGeneratorFunction"
-  );
+  return typeof value === "function" && value.constructor?.name === "AsyncGeneratorFunction";
 }

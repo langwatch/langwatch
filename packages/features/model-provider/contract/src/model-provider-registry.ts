@@ -295,9 +295,7 @@ export const modelProviders = {
   },
 } satisfies Record<string, ModelProviderDefinition>;
 
-export function tryGetModelProviderDefinition(
-  provider: string,
-): ModelProviderDefinition | null {
+export function tryGetModelProviderDefinition(provider: string): ModelProviderDefinition | null {
   const registry: Record<string, ModelProviderDefinition> = modelProviders;
   return registry[provider] ?? null;
 }
@@ -307,19 +305,13 @@ export function isDispatchableProvider(providerId: string): boolean {
   return !definition || definition.type === "llm";
 }
 
-export function providerDeprecation(
-  provider: string,
-): { replacedBy: string } | undefined {
+export function providerDeprecation(provider: string): { replacedBy: string } | undefined {
   return (
-    modelProviders[provider as keyof typeof modelProviders] as
-      | ModelProviderDefinition
-      | undefined
+    modelProviders[provider as keyof typeof modelProviders] as ModelProviderDefinition | undefined
   )?.deprecated;
 }
 
-export function getParameterConstraints(
-  modelId: string,
-): ParameterConstraints | undefined {
+export function getParameterConstraints(modelId: string): ParameterConstraints | undefined {
   const provider = modelId.split("/")[0];
   if (!provider) {
     return undefined;

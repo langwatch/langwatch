@@ -5531,3 +5531,197 @@ unsubscribe door needed an answer before that move landed; whoever lands
 `getClientIp.ts` should delete `api-client-address.ts` and bind
 `UnsubscribeRestPorts.clientAddress` to `getClientIpFromHonoContext`. The file
 says so in its own docblock.
+
+## The remaining platform server verticals, 2026-09-02
+
+The five subtrees nobody else owned: the Better Auth instance, the mailer
+remainder, the tracer collector, the loose `utils`/`server` leaves, and the
+test harness. Every one is a MOVE with its imports fixed, or a DELETE of a
+module that already has a live successor elsewhere; nothing was copied.
+
+| Subtree | Lines | Went to | Shape |
+| --- | --- | --- | --- |
+| `server/better-auth/**` | 2,557 | `@langwatch/auth-server` (`transport/better-auth/**`, `ports/better-auth.port.ts`) | moved whole, collaborators became named parameters |
+| `server/mailer/**` | 1,340 | `@langwatch/mail` (3 templates) | 3 moved, 3 + 2 suites deleted as superseded |
+| `server/tracer/collector/**` | 2,391 | `@langwatch/model-provider-contract` (2 suites) | 3 modules + 5 suites deleted as superseded |
+| `server/{auth0,role-bindings,utils}` | 601 | `@langwatch/auth-server`, `@langwatch/prisma-client` | 2 moved, 1 deleted as superseded |
+| `utils/**` | 2,320 | 6 packages + `apps/{ui,api}` | 7 moved, 6 deleted as superseded |
+| `features/errors/logic/**` | 7,800 | `apps/ui` (`src/model/errors/**`) | moved whole |
+| `components/__tests__` | 9 files | `packages/design-system`, `experiment-web`, `apps/ui` | 7 moved, 2 deleted |
+| `test-utils/**` | 3,077 | **new** `@langwatch/test-harness` + 3 feature packages | 12 modules + 10 suites moved, 5 deleted |
+
+### The identity seam
+
+The deployment's ONE Better Auth instance is now
+`createBetterAuthTransport` in `@langwatch/auth-server`, and it is the same
+instance — the model mapping, the 30-day session with `storeSessionInDatabase`,
+the credentials gate, the ADR-027 request hook, the rate-limit rules, the
+account-linking policy and every database hook travelled unchanged. What
+changed is where its collaborators come from: twelve `~/env.mjs` reads at
+module load became one `BetterAuthDeploymentConfiguration`, and the six things
+it reached into the application for became abstract ports
+(`BetterAuthStoragePort`, `BetterAuthFederationPort`,
+`BetterAuthIdentityCeremoniesPort`, `BetterAuthPendingInvitePort`,
+`BetterAuthAnnouncementsPort`, `SignInRouterShadowPort`). No second instance
+was created anywhere.
+
+`apps/api` composes it (`api-better-auth.composition.ts`) and no longer has to
+be handed one: `ApiAuthComposition` builds the transport itself when the
+deployment named a browser-session identity, and an injected transport still
+wins. `api.config.ts` gained one anchored block — `browserSession`, read
+all-or-nothing from `NEXTAUTH_SECRET` + `NEXTAUTH_URL`, with `BASE_HOST` taken
+from the existing `infrastructure.execution.publicBaseUrl` leaf rather than
+bound a second time (the configuration framework refuses two bindings on one
+variable, which is how that was caught).
+
+### What each move had to decide
+
+- **The trigger digest, the no-reply address and the unsubscribe token did not
+  move — they were deleted.** `apps/worker` already renders the digest
+  (`trigger-digest-mail.template.ts`) and `@langwatch/automation-server` already
+  holds `TriggerNoReplyService` and `UnsubscribeTokenService`, whose suite pins
+  the recorded bytes of a token the platform module signed. Three modules and
+  two suites with live twins are three modules and two suites too many.
+- **`cost.ts`, `piiCheck.ts` and `evaluationNameAutoslug.ts` were deleted for
+  the same reason.** `@langwatch/model-provider-contract`'s `model-cost.ts`
+  says of itself that a second implementation of the cascade "would bill a span
+  at a different rate than the fold projection prices it"; `apps/worker`'s
+  `worker-pii-analysis.adapter.ts` names itself the harvest of `piiCheck.ts`;
+  `@langwatch/evaluation-server` holds the autoslug service.
+- **The two cost suites came with the arithmetic.** `cost.unit.test.ts` is the
+  only body of coverage over `estimateCost`'s cache, audio, character and
+  second rates, and the catalogue price-coverage guard is the one that caught a
+  transcription model priced per second while it reports tokens. Both were
+  repointed at the package's signature (`rate:` rather than `llmModelCost:`,
+  `matchModelCost` rather than `matchModelCostWithFallbacks`,
+  `getStaticModelCostRates`), which meant exporting `normalizeModelName` and
+  `normalizeBedrockModelId` — the two rules a customer-visible price depends on,
+  now pinned by the suite that travelled with them.
+- **`getClientIp.ts` was deleted and its suite kept.** The REST lane's
+  follow-up asked for the opposite (delete `api-client-address.ts` when
+  `getClientIp.ts` lands), and the opposite is what happened, because
+  `apiClientAddress` is the better reading: same header order, same socket
+  fallback, and no `NextApiRequest` branch for a request shape this process
+  never sees. `__tests__/api-client-address.unit.test.ts` — already committed
+  against a module that did not exist — now drives the function it is named for.
+- **`ssrfProtection.ts`, `ssrfConstants.ts`, `encryption.ts` and
+  `compat/next-router.ts` were deleted as frozen twins.** `packages/egress`,
+  `AesGcmSecretEncryptionAdapter` and the three per-family router shims each say
+  in their own docblock that they are the twin; with the application gone they
+  are simply the copy.
+- **`rbacVocabulary.ts` landed as `permission-vocabulary.ts`, not
+  `vocabulary.ts`.** `@langwatch/authz-contract` already has a `vocabulary.ts`
+  — the scope tiers and principal kinds — and the first attempt overwrote it.
+  It is restored; the permission table is its own module beside it.
+- **The errors registry went to `apps/ui`, which is `@langwatch/ui`.** No
+  package imports it: every web family that needed error copy already carries
+  its own (`packages/features/trace/web/src/behavior/errors/**` is the largest),
+  and the matches in `packages/` are docblock references and one `vi.mock` of a
+  specifier that resolves nowhere.
+
+### Named absences and recorded coverage losses
+
+- **`apps/api` composes Better Auth over the STOCK Prisma adapter.** The
+  event-sourced identity storage branch, the identity ceremonies, the
+  pending-invitation lookup and the sign-in router shadow are absences this
+  process announces by name at boot (`announceApiBetterAuthAbsences`). The
+  first of them is the load-bearing one and it is honest: the identity
+  branch's per-user gate ships CLOSED, so every user takes the legacy branch —
+  the stock engine, byte for byte — which is what the platform application
+  runs today. What is absent is the ROUTING, and with it the ability to enrol
+  a user from this process. The ceremonies absence follows from it: nothing on
+  the identity branch to pin an account id for, so Better Auth mints its own,
+  exactly as before ADR-101.
+- **Password-reset mail is a PORT with a refusing default.**
+  `ApiPasswordResetMailPort` refuses rather than resolving quietly, because a
+  reset that reports success and sends nothing leaves someone waiting on an
+  inbox. It is a port rather than a call into `@langwatch/mail` for the reason
+  `ApiIdentityMailPort` already gives: rendering a message is react-email, and
+  `frontend-boundary.unit.test.ts` exists to stop a value-import chain from a
+  backend process to React.
+- **`apps/api` answers `platformSsoAllowed()` with `false`.** It composes no
+  licensing store, which is the same answer `signInMethodPolicyPortOver`
+  already gives from the same reasoning. The consequence is stated rather than
+  discovered: `ssoDomain` auto-join and every `ssoDomain` enforcement are off in
+  that process, and the grant writer and invite lookup underneath them are
+  unreachable while it stands.
+- **`cost.module-load.unit.test.ts`, `typecheckProjects.unit.test.ts`,
+  `privateRouteOrgId.unit.test.ts`, `shardFailureReporter.unit.test.ts` and
+  `cleanupTestRows.integration.test.ts` were deleted, not moved.** Each guards
+  a subject that is the platform application's own and is going: a module-load
+  side effect in a deleted module, `platform/app`'s three TypeScript projects,
+  `server/clickhouse/privateRouteKey`, `platform/app/src/test-unit-global-setup`
+  and the `~/server/db` singleton. The last is a real loss on `cleanupTestRows`'
+  SQL, the same call the identity and organizations slices recorded.
+- **`useDatasetSlugValidation.test.tsx` was deleted: every case was `it.todo`.**
+  A file of eleven todos binds nothing and reads as coverage.
+  `global-dialog-cleanup.regression.test.tsx` went with it — it proves
+  `platform/app`'s `test-setup.ts` registers a global `afterEach(cleanup)`, and
+  no surviving app has that setup file to prove it about.
+- **`appPermissionsMock.ts` was deleted.** It builds its mock over
+  `~/runtime/app/features/authz`, which is the platform runtime's.
+
+### The three guards that stopped being masked
+
+Repointing scanning guards at their new homes revealed pre-existing failures
+that a broken root had been hiding. None is this lane's, and all three are
+recorded rather than re-masked — a guard that aborts reports no offenders
+forever, which is the failure mode this repository keeps paying for.
+
+- `codes.unit.test.ts` (now `apps/ui/src/model/errors/__tests__/`) walks
+  `apps/{ui,api,worker}/src`, `packages/` and `platform/app/src` while the last
+  exists, `existsSync`-filtered so it narrows rather than throws. Two codes
+  raised with no copy were given it — `service_unavailable` (raised by the OTLP
+  ingest door and three `apps/api` compositions) and `forbidden` — and two whose
+  raiser is already gone had their dead copy removed
+  (`evaluation_not_found`, `malformed_custom_role_permissions`).
+- `no-raw-error-toasts.unit.test.ts` was scanning ELEVEN files, because its one
+  root followed the registry to `apps/ui`. It now walks `apps/ui/src`,
+  `packages/` and `platform/app/src`; the packages carry UI now, which the
+  docblock's "the workspace packages carry no UI" no longer describes.
+- `teardown-scan.unit.test.ts` named an `ee/` root deleted in `4faa77c658`.
+  While it failed on that root the `packages/` root's own findings were never
+  asserted: **43 test teardowns across `packages/` delete by a reassignable
+  id**. `typescript-compiler-api.unit.test.ts` aborted on an ENOENT for a
+  tracked-but-deleted file (a rename in flight); with the listing narrowed to
+  what is on disk it reports **18 value imports of the `typescript` root
+  export**, `packages/architecture-lint` declaring `6.0.3`, and
+  `@typescript/native-preview` still in the root manifest. All four counts are
+  debt this lane surfaced and did not create; they want a baseline file or a
+  sweep, and both are somebody's decision rather than a silent re-masking.
+
+### Gates
+
+`tsc --noEmit` clean, whole suite green: `@langwatch/auth-server` 6 files / 57,
+`@langwatch/mail` 4 / 36, `@langwatch/model-provider-contract` 26 / 343,
+`@langwatch/authz-contract` 8 / 96, `@langwatch/config` 4 / 28,
+`@langwatch/observability` 18 / 179, `@langwatch/prisma-client` 5 / 88,
+`@langwatch/design-system` 20 / 109, `@langwatch/experiment-web`
+(elements) 3 / 9, `apps/ui` (`src/model`) 9 / 216 with 0 typecheck errors under
+`apps/ui/src`, and the annotation, coding-agent and github server packages
+typecheck clean over their new fixtures. `@langwatch/test-harness` is 7 / 113
+with the four un-masked guards above red on other lanes' debt.
+
+`apps/api` typechecks with no error in this lane's files and reached
+**580 passing / 2 failing across 69 files** once `@langwatch/auth-server`
+declared the three dependencies another lane's in-flight
+`auth-cli-device-flow.api.ts` needs — before that one unresolved import failed
+17 suites outright. A later run of the same command reports 32 failures from
+`ReferenceError: options is not defined` at
+`api-production.composition.ts:974`, which is the gateway lane's `composeDoors`
+mid-edit; this lane's edit to that file is the anchored `resolveAuth` block at
+line 1295, and `api-production.composition.unit.test.ts` was 37/37 on its own.
+
+`git diff --numstat -- platform/app`: **0 insertions** on all 189 rows.
+
+### What is left under `platform/app/src`
+
+Outside `app-layer`, `routes`, `app/api`, `tasks`, `mcp` and `runtime`, this
+lane leaves: `server/{agents,analytics,annotations,api,api-key,auth,context,
+data-privacy,data-retention,evaluations,evaluators,event-sourcing,export,
+filters,health-probes,invites,langevals,license-enforcement,metrics.ts,
+middleware,modelProviders,nlpgo,ops,organizations,posthog.ts,profiling,...}`,
+`src/{__tests__,factories,features,hooks,pages,prompts}` and the loose
+`src/*.ts` boot files. `src/{utils,test-utils,components}`,
+`server/{better-auth,mailer,tracer,auth0,role-bindings,teams,utils,otel}` and
+`src/features/errors` are **gone**.

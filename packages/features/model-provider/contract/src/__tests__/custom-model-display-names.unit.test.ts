@@ -80,9 +80,7 @@ describe("buildCustomModelDisplayNames()", () => {
         const result = buildCustomModelDisplayNames([
           makeProvider({
             provider: "openai",
-            customModels: [
-              { modelId: "org-tune", displayName: "Org Tune", mode: "chat" },
-            ],
+            customModels: [{ modelId: "org-tune", displayName: "Org Tune", mode: "chat" }],
           }),
           makeProvider({
             provider: "openai",
@@ -116,15 +114,9 @@ describe("buildCustomModelDisplayNames()", () => {
       it("resolves each entry that has a model id to that model id", () => {
         const displayNames = buildCustomModelDisplayNames(providers);
 
-        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe(
-          "gpt-5.1",
-        );
-        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.2", displayNames })).toBe(
-          "gpt-5.2",
-        );
-        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.3", displayNames })).toBe(
-          "gpt-5.3",
-        );
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe("gpt-5.1");
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.2", displayNames })).toBe("gpt-5.2");
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.3", displayNames })).toBe("gpt-5.3");
       });
 
       it("skips the entry with no model id", () => {
@@ -208,9 +200,7 @@ describe("modelDisplayLabel()", () => {
           makeProvider({ provider: "custom", customModels: legacyEntries }),
         ]);
 
-        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe(
-          "gpt-5.1",
-        );
+        expect(modelDisplayLabel({ fullModelId: "custom/gpt-5.1", displayNames })).toBe("gpt-5.1");
       });
     });
   });

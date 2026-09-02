@@ -176,9 +176,7 @@ describe("isLegacyCustomModels", () => {
 
   describe("when given an object array", () => {
     it("returns false", () => {
-      const models = [
-        { modelId: "model-a", displayName: "Model A", mode: "chat" as const },
-      ];
+      const models = [{ modelId: "model-a", displayName: "Model A", mode: "chat" as const }];
       expect(isLegacyCustomModels(models)).toBe(false);
     });
   });
@@ -224,9 +222,7 @@ describe("toLegacyCompatibleCustomModels", () => {
 
   describe("when input is already CustomModelEntry objects", () => {
     it("returns them unchanged", () => {
-      const entries = [
-        { modelId: "model-a", displayName: "Model A", mode: "chat" as const },
-      ];
+      const entries = [{ modelId: "model-a", displayName: "Model A", mode: "chat" as const }];
 
       const result = toLegacyCompatibleCustomModels(entries, "chat");
 

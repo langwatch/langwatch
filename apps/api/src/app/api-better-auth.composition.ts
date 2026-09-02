@@ -333,9 +333,7 @@ export class UnavailableApiBetterAuthGrants {
     return new Proxy({} as AuthzGrantsService, {
       get() {
         return () => {
-          throw new Error(
-            "This process composes no grant writer for the Better Auth transport",
-          );
+          throw new Error("This process composes no grant writer for the Better Auth transport");
         };
       },
     });
@@ -410,8 +408,7 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
     announcements: LoggedApiBetterAuthAnnouncements.create(logger),
     shadow: OffApiSignInRouterShadow.create(),
     authzGrants: options.authzGrants ?? UnavailableApiBetterAuthGrants.create(),
-    signUpVerification:
-      options.signUpVerification ?? AbsentApiSignUpVerification.create(logger),
+    signUpVerification: options.signUpVerification ?? AbsentApiSignUpVerification.create(logger),
     sendResetPassword: (input) =>
       (options.mail ?? UnavailableApiPasswordResetMail.create()).sendResetPassword(input),
   });

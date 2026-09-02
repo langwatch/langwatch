@@ -38,9 +38,7 @@ describe("resolveSupportedParameters", () => {
           },
         ] as CustomModelEntry[],
       };
-      expect(resolveSupportedParameters("openai/custom/embed-model", provider)).toEqual(
-        [],
-      );
+      expect(resolveSupportedParameters("openai/custom/embed-model", provider)).toEqual([]);
     });
   });
 

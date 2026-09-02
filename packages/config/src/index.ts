@@ -582,3 +582,12 @@ export function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): numb
   const parsed = Number(raw);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
+
+export {
+  getZodIssueMessage,
+  mapZodIssuesToLogContext,
+  parseZodFieldErrors,
+  type ZodErrorStructure,
+  type ZodIssue,
+} from "./zod-issues";
+export { zodErrorMessage } from "./zod-error-message";

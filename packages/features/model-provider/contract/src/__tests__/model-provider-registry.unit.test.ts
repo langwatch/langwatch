@@ -51,9 +51,7 @@ describe("Model Provider registry", () => {
     expect(modelProviders.azure.type).toBe("llm");
 
     for (const [providerId, provider] of Object.entries(modelProviders)) {
-      expect(provider.type, `${providerId} must have a provider type`).toMatch(
-        /^(llm|safety)$/,
-      );
+      expect(provider.type, `${providerId} must have a provider type`).toMatch(/^(llm|safety)$/);
     }
   });
 });

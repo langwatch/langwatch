@@ -32,8 +32,6 @@ describe("static model cost ordering", () => {
     const rates = getStaticModelCostRates();
 
     expect(rates.map((rate) => rate.model)).toEqual(["x/abc-def", "verylongvendor/abc"]);
-    expect(rates.find((rate) => new RegExp(rate.regex).test("abc-def"))?.model).toBe(
-      "x/abc-def",
-    );
+    expect(rates.find((rate) => new RegExp(rate.regex).test("abc-def"))?.model).toBe("x/abc-def");
   });
 });

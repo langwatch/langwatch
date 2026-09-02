@@ -31,9 +31,7 @@ describe("routing handle", () => {
       expect(sanitizeRoutingHandleInput("OpenRouter EU")).toBe("openroutereu");
       expect(sanitizeRoutingHandleInput("eu/west")).toBe("euwest");
       expect(sanitizeRoutingHandleInput("--leading")).toBe("leading");
-      expect(sanitizeRoutingHandleInput("a".repeat(40))).toHaveLength(
-        ROUTING_HANDLE_MAX_LENGTH,
-      );
+      expect(sanitizeRoutingHandleInput("a".repeat(40))).toHaveLength(ROUTING_HANDLE_MAX_LENGTH);
     });
 
     it("never leaves the field holding a handle the write would refuse", () => {

@@ -88,8 +88,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "scenarios.agent_under_test",
     role: "DEFAULT",
     displayName: "Scenario prompt model",
-    description:
-      "Model used when a scenario tests a prompt that doesn't already have one set.",
+    description: "Model used when a scenario tests a prompt that doesn't already have one set.",
   },
   {
     key: "workflows.create_default",
@@ -148,8 +147,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "langy.conversation_title",
     role: "FAST",
     displayName: "Langy chat titles",
-    description:
-      "Names each Langy conversation from its messages. Point this at a cheap model.",
+    description: "Names each Langy conversation from its messages. Point this at a cheap model.",
   },
 
   // EMBEDDINGS — single line, no per-feature expand surfaced in the UI.
@@ -173,9 +171,7 @@ export function assertUniqueFeatureKeys(features: readonly FeatureDescriptor[]):
   const seen = new Set<string>();
   for (const f of features) {
     if (seen.has(f.key)) {
-      throw new Error(
-        `Duplicate feature registry key: "${f.key}". Feature keys must be unique.`,
-      );
+      throw new Error(`Duplicate feature registry key: "${f.key}". Feature keys must be unique.`);
     }
     seen.add(f.key);
   }

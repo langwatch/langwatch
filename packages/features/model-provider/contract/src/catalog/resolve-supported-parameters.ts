@@ -31,9 +31,7 @@ export function resolveSupportedParameters(
   modelProvider: ProviderWithCustomModels | null | undefined,
 ): SupportedParameter[] | null {
   const modelName = modelId.split("/").slice(1).join("/");
-  const custom = modelProvider?.customModels?.find(
-    (entry) => entry.modelId === modelName,
-  );
+  const custom = modelProvider?.customModels?.find((entry) => entry.modelId === modelName);
   if (custom?.supportedParameters !== undefined) {
     return custom.supportedParameters;
   }

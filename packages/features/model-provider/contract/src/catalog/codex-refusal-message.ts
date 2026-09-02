@@ -11,5 +11,4 @@
  * Consumed by canonical model execution, Codex gateway, default writes, and
  * feature-default resolution.
  */
-export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE =
-  "serves the coding-assistant surfaces only";
+export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE = "serves the coding-assistant surfaces only";

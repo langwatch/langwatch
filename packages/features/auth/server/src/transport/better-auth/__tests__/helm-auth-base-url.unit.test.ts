@@ -65,9 +65,7 @@ describe("helm chart auth base URL", () => {
   describe("when the install names no separate public URL", () => {
     /** @scenario "An install that only names an internal address still agrees with itself" */
     it("falls back from publicUrl to baseHost on the shared entry", () => {
-      const entry = sharedEnvBlock()
-        .split("- name: NEXTAUTH_URL")[1]!
-        .split("- name:")[0]!;
+      const entry = sharedEnvBlock().split("- name: NEXTAUTH_URL")[1]!.split("- name:")[0]!;
       expect(entry).toContain(".Values.app.http.publicUrl");
       expect(entry).toContain(".Values.app.http.baseHost");
     });

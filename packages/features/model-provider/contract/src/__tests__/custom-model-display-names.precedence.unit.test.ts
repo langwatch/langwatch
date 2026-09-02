@@ -44,9 +44,7 @@ import { makeProvider } from "./model-provider.test-helpers";
 describe("given a real display name and a legacy identity row that collide on the same model id", () => {
   const realRow = makeProvider({
     provider: "custom",
-    customModels: [
-      { modelId: "gpt-5.1", displayName: "Marketing GPT-5.1", mode: "chat" },
-    ],
+    customModels: [{ modelId: "gpt-5.1", displayName: "Marketing GPT-5.1", mode: "chat" }],
   });
   const legacyRow = makeProvider({
     provider: "custom",
@@ -98,9 +96,7 @@ describe("given an enabled row and a disabled row that both define the same mode
         enabled: true,
         id: "zzz-enabled",
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
-        customModels: [
-          { modelId: "vault-9", displayName: "Verified Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "vault-9", displayName: "Verified Label", mode: "chat" }],
       });
       const disabledRow = makeProvider({
         provider: "vendorE",
@@ -134,9 +130,7 @@ describe("given an enabled row and a disabled row whose winning row is returned 
         enabled: true,
         id: "zzz-enabled",
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_4" }],
-        customModels: [
-          { modelId: "sigma-4", displayName: "Verified Label", mode: "chat" },
-        ],
+        customModels: [{ modelId: "sigma-4", displayName: "Verified Label", mode: "chat" }],
       });
       const disabledRow = makeProvider({
         provider: "vendorM",

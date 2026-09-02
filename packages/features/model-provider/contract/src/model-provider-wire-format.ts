@@ -73,9 +73,7 @@ export function resolveModelProviderWireValue(
     };
   }
 
-  const candidates = accessibleProviders.filter(
-    (item) => item.provider === parsed.provider,
-  );
+  const candidates = accessibleProviders.filter((item) => item.provider === parsed.provider);
   if (candidates.length === 0) {
     return {
       ok: false,

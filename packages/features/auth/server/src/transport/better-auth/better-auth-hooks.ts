@@ -1,7 +1,4 @@
-import {
-  extractEmailDomain,
-  isSsoProviderMatch,
-} from "@langwatch/enterprise-sso-contract";
+import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/enterprise-sso-contract";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
@@ -71,10 +68,7 @@ const reconcileSsoAccounts = async ({
       where: {
         userId,
         provider: { not: "credential" },
-        OR: [
-          { provider: { not: providerId } },
-          { providerAccountId: { not: accountId } },
-        ],
+        OR: [{ provider: { not: providerId } }, { providerAccountId: { not: accountId } }],
       },
     }),
     prisma.user.update({
@@ -666,9 +660,6 @@ export const afterSessionCreate = async ({
       announcements.sessionNurturing({ userId, hasOrganization });
     })
     .catch((err) => {
-      logger.error(
-        { err, userId },
-        "Failed to fire nurturing hooks after session create",
-      );
+      logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
     });
 };

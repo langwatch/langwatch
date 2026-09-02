@@ -27,10 +27,7 @@ function precedence(row: ModelProviderEditorValue) {
   return [row.enabled ? 0 : 1, scopeRank(row), row.id ? 0 : 1, row.id ?? ""] as const;
 }
 
-function compareRows(
-  left: ModelProviderEditorValue,
-  right: ModelProviderEditorValue,
-): number {
+function compareRows(left: ModelProviderEditorValue, right: ModelProviderEditorValue): number {
   const [enabled, scope, persisted, id] = precedence(left);
   const [theirEnabled, theirScope, theirPersisted, theirId] = precedence(right);
   return (
@@ -41,9 +38,7 @@ function compareRows(
   );
 }
 
-function customEntriesOf(
-  value: CustomModelEntry[] | null | undefined,
-): CustomModelEntry[] {
+function customEntriesOf(value: CustomModelEntry[] | null | undefined): CustomModelEntry[] {
   return Array.isArray(value) ? value : [];
 }
 

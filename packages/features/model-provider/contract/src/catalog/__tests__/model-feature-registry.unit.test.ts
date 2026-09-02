@@ -60,18 +60,10 @@ describe("feature registry", () => {
         // Copy rules (dev/docs/best_practices/copywriting.md): no internal
         // service names, no abbreviations, no code-shaped identifiers.
         const copy = `${feature?.displayName} ${feature?.description}`.toLowerCase();
-        for (const forbidden of [
-          "prefetch",
-          "adapter",
-          "litellm",
-          "nlpgo",
-          "resolver",
-          "codex",
-        ]) {
-          expect(
-            copy,
-            `copy must not mention internal term "${forbidden}"`,
-          ).not.toContain(forbidden);
+        for (const forbidden of ["prefetch", "adapter", "litellm", "nlpgo", "resolver", "codex"]) {
+          expect(copy, `copy must not mention internal term "${forbidden}"`).not.toContain(
+            forbidden,
+          );
         }
       });
     });
@@ -107,8 +99,6 @@ describe("feature registry", () => {
         description: "",
       },
     ];
-    expect(() => assertUniqueFeatureKeys(features)).toThrow(
-      /Duplicate feature registry key/,
-    );
+    expect(() => assertUniqueFeatureKeys(features)).toThrow(/Duplicate feature registry key/);
   });
 });

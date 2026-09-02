@@ -14,11 +14,7 @@
  * anthropic, gemini. Azure/Bedrock customers pin specific deployment
  * names, so they are intentionally excluded.
  */
-import {
-  compareModelSortKeys,
-  type ModelSortKey,
-  rankOpenAIChatModel,
-} from "./model-tiers";
+import { compareModelSortKeys, type ModelSortKey, rankOpenAIChatModel } from "./model-tiers";
 import { llmModels } from "./model-catalog";
 
 const REGISTRY = llmModels.models;

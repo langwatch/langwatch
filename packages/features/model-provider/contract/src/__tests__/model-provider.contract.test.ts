@@ -37,12 +37,9 @@ describe("Model Provider contract", () => {
   });
 
   it("bounds translation input at the contract boundary", () => {
+    expect(translateInputSchema.safeParse({ projectId: "p1", text: "hello" }).success).toBe(true);
     expect(
-      translateInputSchema.safeParse({ projectId: "p1", text: "hello" }).success,
-    ).toBe(true);
-    expect(
-      translateInputSchema.safeParse({ projectId: "p1", text: "x".repeat(100_001) })
-        .success,
+      translateInputSchema.safeParse({ projectId: "p1", text: "x".repeat(100_001) }).success,
     ).toBe(false);
   });
 

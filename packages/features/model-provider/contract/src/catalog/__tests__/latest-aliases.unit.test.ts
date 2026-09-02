@@ -141,9 +141,7 @@ describe("given latest-alias model resolution", () => {
       expect(resolveLatestAlias("anthropic/latest")).toBe("anthropic/claude-opus-4-5");
     });
     it("resolves anthropic/latest-mini to the newest claude-sonnet model (not haiku, parallel to gpt-mini ≠ nano)", () => {
-      expect(resolveLatestAlias("anthropic/latest-mini")).toBe(
-        "anthropic/claude-sonnet-4-5",
-      );
+      expect(resolveLatestAlias("anthropic/latest-mini")).toBe("anthropic/claude-sonnet-4-5");
     });
     it("resolves gemini/latest to the newest gemini pro model", () => {
       expect(resolveLatestAlias("gemini/latest")).toBe("gemini/gemini-2.5-pro");
@@ -161,9 +159,7 @@ describe("given latest-alias model resolution", () => {
       expect(expandLatestAlias("openai/latest")).toBe("openai/gpt-5.6-sol");
     });
     it("returns the input unchanged for a concrete model id", () => {
-      expect(expandLatestAlias("azure/gpt-5.5-deployment")).toBe(
-        "azure/gpt-5.5-deployment",
-      );
+      expect(expandLatestAlias("azure/gpt-5.5-deployment")).toBe("azure/gpt-5.5-deployment");
     });
   });
 

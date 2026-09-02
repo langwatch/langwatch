@@ -232,580 +232,580 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   {
     page: "features/chrome/UiAppChrome",
     children: [
-  // Settings, wrapped in the same Langy layout as the project routes
-  // (keyed by the AMBIENT project), so the panel survives hopping between
-  // a project page and settings instead of vanishing.
-  {
-    page: "features/langy/ProjectLangyLayout",
-    children: [
-      { path: "/settings", page: "pages/settings" },
-      {
-        path: "/settings/role-bindings",
-        page: "pages/settings/role-bindings",
-      },
-      {
-        path: "/settings/annotation-scores",
-        page: "pages/settings/annotation-scores",
-      },
-      {
-        path: "/settings/data-retention",
-        page: "pages/settings/data-retention",
-      },
-      {
-        path: "/settings/integrations",
-        page: "pages/settings/integrations",
-      },
-      {
-        path: "/settings/data-privacy",
-        page: "pages/settings/data-privacy",
-      },
-      {
-        path: "/settings/audit-log",
-        page: "pages/settings/audit-log",
-      },
-      {
-        path: "/settings/authentication",
-        page: "pages/settings/authentication",
-      },
-      {
-        path: "/settings/groups",
-        page: "pages/settings/groups",
-      },
-      {
-        path: "/settings/license",
-        page: "pages/settings/license",
-      },
-      {
-        path: "/settings/members",
-        page: "pages/settings/members",
-      },
-      {
-        path: "/settings/model-costs",
-        page: "pages/settings/model-costs",
-      },
-      {
-        path: "/settings/model-providers",
-        page: "pages/settings/model-providers",
-      },
-      {
-        path: "/settings/plans",
-        page: "pages/settings/plans",
-      },
-      {
-        path: "/settings/roles",
-        page: "pages/settings/roles",
-      },
-      {
-        path: "/settings/api-keys",
-        page: "pages/settings/api-keys",
-      },
-      {
-        path: "/settings/scim",
-        page: "pages/settings/scim",
-      },
-      {
-        path: "/settings/secrets",
-        page: "pages/settings/secrets",
-      },
-      {
-        path: "/settings/subscription",
-        page: "pages/settings/subscription",
-      },
-      {
-        path: "/settings/teams",
-        page: "pages/settings/teams",
-      },
-      {
-        path: "/settings/teams/:team",
-        page: "pages/settings/teams/[team]",
-      },
-      {
-        path: "/settings/topic-clustering",
-        page: "pages/settings/topic-clustering",
-      },
-      {
-        path: "/settings/usage",
-        page: "pages/settings/usage",
-      },
-      {
-        path: "/settings/email-suppressions",
-        page: "pages/settings/email-suppressions",
-      },
-      {
-        // Governance home (admin oversight dashboard). The whole family
-        // lives at the top level: it is org-scoped, not a settings page.
-        path: "/governance",
-        page: "pages/governance/index",
-      },
-      {
-        path: "/governance/inventory",
-        page: "pages/governance/inventory.enterprise",
-      },
-      {
-        path: "/governance/inventory/:id",
-        page: "pages/governance/ingestion-source-detail.enterprise",
-      },
-      {
-        path: "/governance/anomaly-rules",
-        page: "pages/governance/anomaly-rules.enterprise",
-      },
-      {
-        path: "/governance/people",
-        page: "pages/governance/people",
-      },
-      {
-        // Behind release_ui_governance_billed_cost_enabled (the pages
-        // guard themselves); the nav items are filtered on the same flag.
-        path: "/governance/costs",
-        page: "pages/governance/costs",
-      },
-      {
-        path: "/governance/billed",
-        page: "pages/governance/billed",
-      },
-      {
-        // The people page has been cost centers and then departments; old
-        // bookmarks land on the newest name in one hop (the legacy
-        // /settings/governance/cost-centers address chains through here,
-        // and /governance/departments redirects via legacyRedirectRoutes).
-        path: "/governance/cost-centers",
-        redirect: { from: "/governance/cost-centers", to: "/governance/people" },
-      },
-      {
-        // View-all teams listing - bird's-eye `View all teams →` lands here.
-        // 500-row paginated list with sort chips for spend / requests /
-        // last-activity. Per-row click-through routes to the team detail
-        // page below.
-        path: "/governance/teams",
-        page: "pages/governance/teams",
-      },
-      {
-        // Per-team detail - single-row scoped view of `spendByTeam` filtered
-        // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
-        // to the listing. Detail-data depth (per-day trend, per-user
-        // breakdown, model mix) defers to a follow-up.
-        path: "/governance/teams/:id",
-        page: "pages/governance/teams/[id]",
-      },
-      {
-        // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/governance/users",
-        page: "pages/governance/users",
-      },
-      {
-        // Per-user detail - single-row scoped view keyed off the
-        // URL-encoded actor id (email / sub claim).
-        path: "/governance/users/:id",
-        page: "pages/governance/users/[id]",
-      },
-
-      // Personal-scope governance routes (must precede the /:project catch-all
-      // so "me" doesn't get treated as a project slug)
-      {
-        path: "/me",
-        page: "pages/me/index",
-      },
-      {
-        path: "/me/configure",
-        page: "pages/me/configure",
-      },
-      {
-        // The devices inventory moved into a tab of /me/configure, and this
-        // path keeps resolving so old links do not dead-end.
-        path: "/me/devices",
-        redirect: {
-          from: "/me/devices",
-          to: "/me/configure",
-          pinParams: { tab: "devices" },
-        },
-      },
-      {
-        path: "/me/pull-requests",
-        page: "pages/me/pull-requests",
-      },
-      {
-        path: "/me/sessions",
-        page: "pages/me/sessions",
-      },
-      {
-        // Budget-increase request page that the CLI's `langwatch request-increase`
-        // opens. The page file existed but routes.tsx is explicit (Vite migration)
-        // - without this entry the URL 404'd, breaking the per-spec
-        // budget-exceeded → request flow Ariana caught in dogfood.
-        path: "/me/budget/request",
-        page: "pages/me/budget/request",
-      },
-
-      // CLI device-flow approval (RFC 8628 user-facing screen)
-      {
-        path: "/cli/auth",
-        page: "pages/cli/auth",
-      },
-
-      // AI Gateway: org-scoped admin pages live under /gateway/** at the top
-      // level, like /governance. Every gateway resource (VirtualKey /
-      // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
-      // chrome reflects that. Kept OUT of the project layout route below:
-      // these are not /:project/* routes, so Langy must not mount on them.
-      // The static /gateway segment always wins over the /:project catch-all,
-      // and project slug minting refuses reserved top-level names.
-      {
-        // The bare address is a redirect and never a page. `platform/app`
-        // said the same thing with a component whose whole body was a
-        // `router.replace`, which meant a chunk load, a mount and a render
-        // before the browser moved; the table can say it without any of that.
-        // Spec: specs/navigation/gateway-url-move.feature
-        // (The bare gateway address lands on the virtual keys list).
-        path: "/gateway",
-        redirect: { from: "/gateway", to: "/gateway/virtual-keys" },
-      },
-      {
-        path: "/gateway/virtual-keys",
-        page: "pages/gateway/virtual-keys",
-      },
-      {
-        path: "/gateway/virtual-keys/:id",
-        page: "pages/gateway/virtual-keys/[id]",
-      },
-      {
-        path: "/gateway/budgets",
-        page: "pages/gateway/budgets",
-      },
-      {
-        path: "/gateway/budgets/:id",
-        page: "pages/gateway/budgets/[id]",
-      },
-      {
-        path: "/gateway/routing-policies",
-        page: "pages/gateway/routing-policies",
-      },
-      {
-        path: "/gateway/usage",
-        page: "pages/gateway/usage",
-      },
-      {
-        path: "/gateway/cache-rules",
-        page: "pages/gateway/cache-rules",
-      },
-      {
-        path: "/gateway/guardrails",
-        page: "pages/gateway/guardrails",
-      },
-      {
-        path: "/gateway/billing-events",
-        page: "pages/gateway/billing-events",
-      },
-      {
-        path: "/gateway/webhooks",
-        page: "pages/gateway/webhooks",
-      },
-      ...uiLegacyRedirectRoutes,
-    ],
-  },
-
-  // Project routes — wrapped in a layout route that mounts Langy ONCE per
-  // project, above the swapping page, so the panel + composer draft + any
-  // in-flight response survive navigation between project pages. The layout
-  // component is keyed by :project, so Langy resets on project switch. Loaded
-  // lazily via page() so Langy's chat bundle stays out of the initial load.
-  // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
-  {
-    page: "features/langy/ProjectLangyLayout",
-    children: [
-      {
-        path: "/:project",
-        page: "pages/[project]/index",
-      },
-      {
-        path: "/:project/agents",
-        page: "runtime/ui/features/agent-ui-host.adapter",
-      },
-
-      // Coding-agent activity, project scope
-      {
-        path: "/:project/sessions",
-        page: "pages/[project]/sessions",
-      },
-      {
-        path: "/:project/pull-requests",
-        page: "pages/[project]/pull-requests",
-      },
-
-      {
-        path: "/:project/automations",
-        page: "pages/[project]/automations",
-      },
-      {
-        path: "/:project/automations/automations",
-        page: "pages/[project]/automations/automations",
-      },
-      {
-        path: "/:project/automations/alerts",
-        page: "pages/[project]/automations/alerts",
-      },
-      {
-        path: "/:project/automations/schedules",
-        page: "pages/[project]/automations/schedules",
-      },
-      {
-        path: "/:project/automations/activity",
-        page: "pages/[project]/automations/activity",
-      },
-      {
-        path: "/:project/datasets",
-        page: "pages/[project]/datasets",
-      },
-      {
-        path: "/:project/datasets/:id",
-        page: "pages/[project]/datasets/[id]",
-      },
-      {
-        path: "/:project/evaluators",
-        page: "pages/[project]/evaluators",
-      },
-      {
-        // The page's default export was nothing but this replace; a table row
-        // says the same thing without a loader.
-        path: "/:project/evaluations",
-        redirect: {
-          from: "/:project/evaluations",
-          to: "/:project/experiments",
-        },
-      },
-      {
-        path: "/:project/online-evaluations",
-        page: "pages/[project]/online-evaluations",
-      },
-      {
-        // Creating an evaluation is a drawer on the online-evaluations page;
-        // both retired addresses served the same forward, so both open it.
-        path: "/:project/evaluations/new",
-        redirect: {
-          from: "/:project/evaluations/new",
-          to: "/:project/online-evaluations",
-          pinParams: { "drawer.open": "evaluatorCategorySelector" },
-        },
-      },
-      {
-        path: "/:project/evaluations/new/choose",
-        redirect: {
-          from: "/:project/evaluations/new/choose",
-          to: "/:project/online-evaluations",
-          pinParams: { "drawer.open": "evaluatorCategorySelector" },
-        },
-      },
-      {
-        // The evaluation wizard was retired in favour of the experiments
-        // workbench, and a brand-new evaluation always opened it. The page's
-        // no-slug branch was nothing but that replace, so a table row says the
-        // same thing without a loader — the same retirement `/:project/evaluations`
-        // above already had. The `:slug` row below is NOT this: with a slug the
-        // destination depends on what kind of experiment it names, which is a
-        // read, not a rewrite.
-        path: "/:project/evaluations/wizard",
-        redirect: {
-          from: "/:project/evaluations/wizard",
-          to: "/:project/experiments/workbench",
-        },
-      },
-      {
-        path: "/:project/evaluations/wizard/:slug",
-        page: "pages/[project]/evaluations/wizard/[slug]",
-      },
-      {
-        path: "/:project/evaluations/:id/edit",
-        page: "pages/[project]/evaluations/[id]/edit",
-      },
-      {
-        path: "/:project/evaluations/:id/edit/choose",
-        page: "pages/[project]/evaluations/[id]/edit/choose",
-      },
-      {
-        path: "/:project/traces",
-        page: "pages/[project]/traces",
-      },
-      {
-        // The canonical short link to one trace — notification links, emails,
-        // webhooks and API responses all mint it. Trace Explorer shows a
-        // trace in a drawer, so the id travels as the drawer's parameter.
-        path: "/:project/traces/:trace",
-        redirect: {
-          from: "/:project/traces/:trace",
-          to: "/:project/traces",
-          pinParams: {
-            "drawer.open": "traceV2Details",
-            "drawer.traceId": ":trace",
+      // Settings, wrapped in the same Langy layout as the project routes
+      // (keyed by the AMBIENT project), so the panel survives hopping between
+      // a project page and settings instead of vanishing.
+      {
+        page: "features/langy/ProjectLangyLayout",
+        children: [
+          { path: "/settings", page: "pages/settings" },
+          {
+            path: "/settings/role-bindings",
+            page: "pages/settings/role-bindings",
           },
-        },
-      },
-
-      // Legacy /messages paths. The legacy Traces page is gone; these are
-      // redirects only, so old bookmarks and notification links keep working.
-      {
-        // The bare legacy index keeps every filter and date range the saved
-        // link carried; the Trace Explorer ignores what it does not know.
-        path: "/:project/messages",
-        redirect: { from: "/:project/messages", to: "/:project/traces" },
-      },
-      {
-        path: "/:project/messages/:trace",
-        redirect: {
-          from: "/:project/messages/:trace",
-          to: "/:project/traces",
-          pinParams: {
-            "drawer.open": "traceV2Details",
-            "drawer.traceId": ":trace",
+          {
+            path: "/settings/annotation-scores",
+            page: "pages/settings/annotation-scores",
           },
-        },
-      },
-      {
-        // The legacy tab has no Trace Explorer equivalent, so it is dropped.
-        path: "/:project/messages/:trace/:openTab",
-        redirect: {
-          from: "/:project/messages/:trace/:openTab",
-          to: "/:project/traces",
-          pinParams: {
-            "drawer.open": "traceV2Details",
-            "drawer.traceId": ":trace",
+          {
+            path: "/settings/data-retention",
+            page: "pages/settings/data-retention",
           },
-        },
-      },
-      {
-        path: "/:project/messages/:trace/:openTab/:span",
-        redirect: {
-          from: "/:project/messages/:trace/:openTab/:span",
-          to: "/:project/traces",
-          pinParams: {
-            "drawer.open": "traceV2Details",
-            "drawer.traceId": ":trace",
-            "drawer.span": ":span",
+          {
+            path: "/settings/integrations",
+            page: "pages/settings/integrations",
           },
-        },
-      },
-      {
-        path: "/:project/prompts",
-        page: "pages/[project]/prompts",
-      },
-      {
-        path: "/:project/setup",
-        page: "pages/[project]/setup",
-      },
-      {
-        path: "/:project/workflows",
-        page: "pages/[project]/workflows",
-      },
-      {
-        path: "/:project/chat/:workflow",
-        page: "pages/[project]/chat/[workflow]",
-      },
-      {
-        path: "/:project/studio/:workflow",
-        page: "pages/[project]/studio/[workflow]",
+          {
+            path: "/settings/data-privacy",
+            page: "pages/settings/data-privacy",
+          },
+          {
+            path: "/settings/audit-log",
+            page: "pages/settings/audit-log",
+          },
+          {
+            path: "/settings/authentication",
+            page: "pages/settings/authentication",
+          },
+          {
+            path: "/settings/groups",
+            page: "pages/settings/groups",
+          },
+          {
+            path: "/settings/license",
+            page: "pages/settings/license",
+          },
+          {
+            path: "/settings/members",
+            page: "pages/settings/members",
+          },
+          {
+            path: "/settings/model-costs",
+            page: "pages/settings/model-costs",
+          },
+          {
+            path: "/settings/model-providers",
+            page: "pages/settings/model-providers",
+          },
+          {
+            path: "/settings/plans",
+            page: "pages/settings/plans",
+          },
+          {
+            path: "/settings/roles",
+            page: "pages/settings/roles",
+          },
+          {
+            path: "/settings/api-keys",
+            page: "pages/settings/api-keys",
+          },
+          {
+            path: "/settings/scim",
+            page: "pages/settings/scim",
+          },
+          {
+            path: "/settings/secrets",
+            page: "pages/settings/secrets",
+          },
+          {
+            path: "/settings/subscription",
+            page: "pages/settings/subscription",
+          },
+          {
+            path: "/settings/teams",
+            page: "pages/settings/teams",
+          },
+          {
+            path: "/settings/teams/:team",
+            page: "pages/settings/teams/[team]",
+          },
+          {
+            path: "/settings/topic-clustering",
+            page: "pages/settings/topic-clustering",
+          },
+          {
+            path: "/settings/usage",
+            page: "pages/settings/usage",
+          },
+          {
+            path: "/settings/email-suppressions",
+            page: "pages/settings/email-suppressions",
+          },
+          {
+            // Governance home (admin oversight dashboard). The whole family
+            // lives at the top level: it is org-scoped, not a settings page.
+            path: "/governance",
+            page: "pages/governance/index",
+          },
+          {
+            path: "/governance/inventory",
+            page: "pages/governance/inventory.enterprise",
+          },
+          {
+            path: "/governance/inventory/:id",
+            page: "pages/governance/ingestion-source-detail.enterprise",
+          },
+          {
+            path: "/governance/anomaly-rules",
+            page: "pages/governance/anomaly-rules.enterprise",
+          },
+          {
+            path: "/governance/people",
+            page: "pages/governance/people",
+          },
+          {
+            // Behind release_ui_governance_billed_cost_enabled (the pages
+            // guard themselves); the nav items are filtered on the same flag.
+            path: "/governance/costs",
+            page: "pages/governance/costs",
+          },
+          {
+            path: "/governance/billed",
+            page: "pages/governance/billed",
+          },
+          {
+            // The people page has been cost centers and then departments; old
+            // bookmarks land on the newest name in one hop (the legacy
+            // /settings/governance/cost-centers address chains through here,
+            // and /governance/departments redirects via legacyRedirectRoutes).
+            path: "/governance/cost-centers",
+            redirect: { from: "/governance/cost-centers", to: "/governance/people" },
+          },
+          {
+            // View-all teams listing - bird's-eye `View all teams →` lands here.
+            // 500-row paginated list with sort chips for spend / requests /
+            // last-activity. Per-row click-through routes to the team detail
+            // page below.
+            path: "/governance/teams",
+            page: "pages/governance/teams",
+          },
+          {
+            // Per-team detail - single-row scoped view of `spendByTeam` filtered
+            // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
+            // to the listing. Detail-data depth (per-day trend, per-user
+            // breakdown, model mix) defers to a follow-up.
+            path: "/governance/teams/:id",
+            page: "pages/governance/teams/[id]",
+          },
+          {
+            // View-all users listing - bird's-eye `View all users →` lands here.
+            path: "/governance/users",
+            page: "pages/governance/users",
+          },
+          {
+            // Per-user detail - single-row scoped view keyed off the
+            // URL-encoded actor id (email / sub claim).
+            path: "/governance/users/:id",
+            page: "pages/governance/users/[id]",
+          },
+
+          // Personal-scope governance routes (must precede the /:project catch-all
+          // so "me" doesn't get treated as a project slug)
+          {
+            path: "/me",
+            page: "pages/me/index",
+          },
+          {
+            path: "/me/configure",
+            page: "pages/me/configure",
+          },
+          {
+            // The devices inventory moved into a tab of /me/configure, and this
+            // path keeps resolving so old links do not dead-end.
+            path: "/me/devices",
+            redirect: {
+              from: "/me/devices",
+              to: "/me/configure",
+              pinParams: { tab: "devices" },
+            },
+          },
+          {
+            path: "/me/pull-requests",
+            page: "pages/me/pull-requests",
+          },
+          {
+            path: "/me/sessions",
+            page: "pages/me/sessions",
+          },
+          {
+            // Budget-increase request page that the CLI's `langwatch request-increase`
+            // opens. The page file existed but routes.tsx is explicit (Vite migration)
+            // - without this entry the URL 404'd, breaking the per-spec
+            // budget-exceeded → request flow Ariana caught in dogfood.
+            path: "/me/budget/request",
+            page: "pages/me/budget/request",
+          },
+
+          // CLI device-flow approval (RFC 8628 user-facing screen)
+          {
+            path: "/cli/auth",
+            page: "pages/cli/auth",
+          },
+
+          // AI Gateway: org-scoped admin pages live under /gateway/** at the top
+          // level, like /governance. Every gateway resource (VirtualKey /
+          // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
+          // chrome reflects that. Kept OUT of the project layout route below:
+          // these are not /:project/* routes, so Langy must not mount on them.
+          // The static /gateway segment always wins over the /:project catch-all,
+          // and project slug minting refuses reserved top-level names.
+          {
+            // The bare address is a redirect and never a page. `platform/app`
+            // said the same thing with a component whose whole body was a
+            // `router.replace`, which meant a chunk load, a mount and a render
+            // before the browser moved; the table can say it without any of that.
+            // Spec: specs/navigation/gateway-url-move.feature
+            // (The bare gateway address lands on the virtual keys list).
+            path: "/gateway",
+            redirect: { from: "/gateway", to: "/gateway/virtual-keys" },
+          },
+          {
+            path: "/gateway/virtual-keys",
+            page: "pages/gateway/virtual-keys",
+          },
+          {
+            path: "/gateway/virtual-keys/:id",
+            page: "pages/gateway/virtual-keys/[id]",
+          },
+          {
+            path: "/gateway/budgets",
+            page: "pages/gateway/budgets",
+          },
+          {
+            path: "/gateway/budgets/:id",
+            page: "pages/gateway/budgets/[id]",
+          },
+          {
+            path: "/gateway/routing-policies",
+            page: "pages/gateway/routing-policies",
+          },
+          {
+            path: "/gateway/usage",
+            page: "pages/gateway/usage",
+          },
+          {
+            path: "/gateway/cache-rules",
+            page: "pages/gateway/cache-rules",
+          },
+          {
+            path: "/gateway/guardrails",
+            page: "pages/gateway/guardrails",
+          },
+          {
+            path: "/gateway/billing-events",
+            page: "pages/gateway/billing-events",
+          },
+          {
+            path: "/gateway/webhooks",
+            page: "pages/gateway/webhooks",
+          },
+          ...uiLegacyRedirectRoutes,
+        ],
       },
 
-      // Annotations
+      // Project routes — wrapped in a layout route that mounts Langy ONCE per
+      // project, above the swapping page, so the panel + composer draft + any
+      // in-flight response survive navigation between project pages. The layout
+      // component is keyed by :project, so Langy resets on project switch. Loaded
+      // lazily via page() so Langy's chat bundle stays out of the initial load.
+      // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
       {
-        path: "/:project/annotations",
-        page: "pages/[project]/annotations",
-      },
-      {
-        path: "/:project/annotations/all",
-        page: "pages/[project]/annotations/all",
-      },
-      {
-        path: "/:project/annotations/me",
-        page: "pages/[project]/annotations/me",
-      },
-      {
-        path: "/:project/annotations/my-queue",
-        page: "pages/[project]/annotations/my-queue",
-      },
-      {
-        path: "/:project/annotations/:slug",
-        page: "pages/[project]/annotations/[slug]",
-      },
+        page: "features/langy/ProjectLangyLayout",
+        children: [
+          {
+            path: "/:project",
+            page: "pages/[project]/index",
+          },
+          {
+            path: "/:project/agents",
+            page: "runtime/ui/features/agent-ui-host.adapter",
+          },
 
-      // Analytics
-      {
-        path: "/:project/analytics",
-        page: "pages/[project]/analytics/index",
-      },
-      {
-        path: "/:project/analytics/evaluations",
-        page: "pages/[project]/analytics/evaluations",
-      },
-      {
-        path: "/:project/analytics/metrics",
-        page: "pages/[project]/analytics/metrics",
-      },
-      {
-        path: "/:project/analytics/reports",
-        page: "pages/[project]/analytics/reports",
-      },
-      {
-        path: "/:project/analytics/topics",
-        page: "pages/[project]/analytics/topics",
-      },
-      {
-        path: "/:project/analytics/users",
-        page: "pages/[project]/analytics/users",
-      },
-      {
-        path: "/:project/analytics/query",
-        page: "pages/[project]/analytics/query",
-      },
-      {
-        path: "/:project/analytics/custom",
-        page: "pages/[project]/analytics/custom/index",
-      },
-      {
-        path: "/:project/analytics/custom/:id",
-        page: "pages/[project]/analytics/custom/[id]",
-      },
+          // Coding-agent activity, project scope
+          {
+            path: "/:project/sessions",
+            page: "pages/[project]/sessions",
+          },
+          {
+            path: "/:project/pull-requests",
+            page: "pages/[project]/pull-requests",
+          },
 
-      // Experiments
-      {
-        path: "/:project/experiments",
-        page: "pages/[project]/experiments/index",
-      },
-      {
-        path: "/:project/experiments/workbench",
-        page: "pages/[project]/experiments/workbench/index",
-      },
-      {
-        path: "/:project/experiments/workbench/:slug",
-        page: "pages/[project]/experiments/workbench/[slug]",
-      },
-      {
-        path: "/:project/experiments/:experiment",
-        page: "pages/[project]/experiments/[experiment]",
-      },
+          {
+            path: "/:project/automations",
+            page: "pages/[project]/automations",
+          },
+          {
+            path: "/:project/automations/automations",
+            page: "pages/[project]/automations/automations",
+          },
+          {
+            path: "/:project/automations/alerts",
+            page: "pages/[project]/automations/alerts",
+          },
+          {
+            path: "/:project/automations/schedules",
+            page: "pages/[project]/automations/schedules",
+          },
+          {
+            path: "/:project/automations/activity",
+            page: "pages/[project]/automations/activity",
+          },
+          {
+            path: "/:project/datasets",
+            page: "pages/[project]/datasets",
+          },
+          {
+            path: "/:project/datasets/:id",
+            page: "pages/[project]/datasets/[id]",
+          },
+          {
+            path: "/:project/evaluators",
+            page: "pages/[project]/evaluators",
+          },
+          {
+            // The page's default export was nothing but this replace; a table row
+            // says the same thing without a loader.
+            path: "/:project/evaluations",
+            redirect: {
+              from: "/:project/evaluations",
+              to: "/:project/experiments",
+            },
+          },
+          {
+            path: "/:project/online-evaluations",
+            page: "pages/[project]/online-evaluations",
+          },
+          {
+            // Creating an evaluation is a drawer on the online-evaluations page;
+            // both retired addresses served the same forward, so both open it.
+            path: "/:project/evaluations/new",
+            redirect: {
+              from: "/:project/evaluations/new",
+              to: "/:project/online-evaluations",
+              pinParams: { "drawer.open": "evaluatorCategorySelector" },
+            },
+          },
+          {
+            path: "/:project/evaluations/new/choose",
+            redirect: {
+              from: "/:project/evaluations/new/choose",
+              to: "/:project/online-evaluations",
+              pinParams: { "drawer.open": "evaluatorCategorySelector" },
+            },
+          },
+          {
+            // The evaluation wizard was retired in favour of the experiments
+            // workbench, and a brand-new evaluation always opened it. The page's
+            // no-slug branch was nothing but that replace, so a table row says the
+            // same thing without a loader — the same retirement `/:project/evaluations`
+            // above already had. The `:slug` row below is NOT this: with a slug the
+            // destination depends on what kind of experiment it names, which is a
+            // read, not a rewrite.
+            path: "/:project/evaluations/wizard",
+            redirect: {
+              from: "/:project/evaluations/wizard",
+              to: "/:project/experiments/workbench",
+            },
+          },
+          {
+            path: "/:project/evaluations/wizard/:slug",
+            page: "pages/[project]/evaluations/wizard/[slug]",
+          },
+          {
+            path: "/:project/evaluations/:id/edit",
+            page: "pages/[project]/evaluations/[id]/edit",
+          },
+          {
+            path: "/:project/evaluations/:id/edit/choose",
+            page: "pages/[project]/evaluations/[id]/edit/choose",
+          },
+          {
+            path: "/:project/traces",
+            page: "pages/[project]/traces",
+          },
+          {
+            // The canonical short link to one trace — notification links, emails,
+            // webhooks and API responses all mint it. Trace Explorer shows a
+            // trace in a drawer, so the id travels as the drawer's parameter.
+            path: "/:project/traces/:trace",
+            redirect: {
+              from: "/:project/traces/:trace",
+              to: "/:project/traces",
+              pinParams: {
+                "drawer.open": "traceV2Details",
+                "drawer.traceId": ":trace",
+              },
+            },
+          },
 
-      // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
-      {
-        path: "/:project/agent-testing",
-        page: "pages/[project]/agent-testing/[[...path]]",
-      },
-      {
-        path: "/:project/agent-testing/*",
-        page: "pages/[project]/agent-testing/[[...path]]",
-      },
+          // Legacy /messages paths. The legacy Traces page is gone; these are
+          // redirects only, so old bookmarks and notification links keep working.
+          {
+            // The bare legacy index keeps every filter and date range the saved
+            // link carried; the Trace Explorer ignores what it does not know.
+            path: "/:project/messages",
+            redirect: { from: "/:project/messages", to: "/:project/traces" },
+          },
+          {
+            path: "/:project/messages/:trace",
+            redirect: {
+              from: "/:project/messages/:trace",
+              to: "/:project/traces",
+              pinParams: {
+                "drawer.open": "traceV2Details",
+                "drawer.traceId": ":trace",
+              },
+            },
+          },
+          {
+            // The legacy tab has no Trace Explorer equivalent, so it is dropped.
+            path: "/:project/messages/:trace/:openTab",
+            redirect: {
+              from: "/:project/messages/:trace/:openTab",
+              to: "/:project/traces",
+              pinParams: {
+                "drawer.open": "traceV2Details",
+                "drawer.traceId": ":trace",
+              },
+            },
+          },
+          {
+            path: "/:project/messages/:trace/:openTab/:span",
+            redirect: {
+              from: "/:project/messages/:trace/:openTab/:span",
+              to: "/:project/traces",
+              pinParams: {
+                "drawer.open": "traceV2Details",
+                "drawer.traceId": ":trace",
+                "drawer.span": ":span",
+              },
+            },
+          },
+          {
+            path: "/:project/prompts",
+            page: "pages/[project]/prompts",
+          },
+          {
+            path: "/:project/setup",
+            page: "pages/[project]/setup",
+          },
+          {
+            path: "/:project/workflows",
+            page: "pages/[project]/workflows",
+          },
+          {
+            path: "/:project/chat/:workflow",
+            page: "pages/[project]/chat/[workflow]",
+          },
+          {
+            path: "/:project/studio/:workflow",
+            page: "pages/[project]/studio/[workflow]",
+          },
 
-      // Simulations (catch-all)
-      {
-        path: "/:project/simulations/scenarios",
-        page: "pages/[project]/simulations/scenarios/index",
+          // Annotations
+          {
+            path: "/:project/annotations",
+            page: "pages/[project]/annotations",
+          },
+          {
+            path: "/:project/annotations/all",
+            page: "pages/[project]/annotations/all",
+          },
+          {
+            path: "/:project/annotations/me",
+            page: "pages/[project]/annotations/me",
+          },
+          {
+            path: "/:project/annotations/my-queue",
+            page: "pages/[project]/annotations/my-queue",
+          },
+          {
+            path: "/:project/annotations/:slug",
+            page: "pages/[project]/annotations/[slug]",
+          },
+
+          // Analytics
+          {
+            path: "/:project/analytics",
+            page: "pages/[project]/analytics/index",
+          },
+          {
+            path: "/:project/analytics/evaluations",
+            page: "pages/[project]/analytics/evaluations",
+          },
+          {
+            path: "/:project/analytics/metrics",
+            page: "pages/[project]/analytics/metrics",
+          },
+          {
+            path: "/:project/analytics/reports",
+            page: "pages/[project]/analytics/reports",
+          },
+          {
+            path: "/:project/analytics/topics",
+            page: "pages/[project]/analytics/topics",
+          },
+          {
+            path: "/:project/analytics/users",
+            page: "pages/[project]/analytics/users",
+          },
+          {
+            path: "/:project/analytics/query",
+            page: "pages/[project]/analytics/query",
+          },
+          {
+            path: "/:project/analytics/custom",
+            page: "pages/[project]/analytics/custom/index",
+          },
+          {
+            path: "/:project/analytics/custom/:id",
+            page: "pages/[project]/analytics/custom/[id]",
+          },
+
+          // Experiments
+          {
+            path: "/:project/experiments",
+            page: "pages/[project]/experiments/index",
+          },
+          {
+            path: "/:project/experiments/workbench",
+            page: "pages/[project]/experiments/workbench/index",
+          },
+          {
+            path: "/:project/experiments/workbench/:slug",
+            page: "pages/[project]/experiments/workbench/[slug]",
+          },
+          {
+            path: "/:project/experiments/:experiment",
+            page: "pages/[project]/experiments/[experiment]",
+          },
+
+          // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
+          {
+            path: "/:project/agent-testing",
+            page: "pages/[project]/agent-testing/[[...path]]",
+          },
+          {
+            path: "/:project/agent-testing/*",
+            page: "pages/[project]/agent-testing/[[...path]]",
+          },
+
+          // Simulations (catch-all)
+          {
+            path: "/:project/simulations/scenarios",
+            page: "pages/[project]/simulations/scenarios/index",
+          },
+          {
+            path: "/:project/simulations/*",
+            page: "pages/[project]/simulations/[[...path]]",
+          },
+          {
+            path: "/:project/simulations",
+            page: "pages/[project]/simulations/[[...path]]",
+          },
+        ],
       },
-      {
-        path: "/:project/simulations/*",
-        page: "pages/[project]/simulations/[[...path]]",
-      },
-      {
-        path: "/:project/simulations",
-        page: "pages/[project]/simulations/[[...path]]",
-      },
-    ],
-  },
     ],
   },
 

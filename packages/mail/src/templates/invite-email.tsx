@@ -23,7 +23,6 @@ export const sendInviteEmail = async ({
   acceptInviteUrl: string;
   mailer: EmailDeliveryPort;
 }) => {
-
   const emailHtml = await render(
     <Html lang="en" dir="ltr">
       <Container

@@ -153,9 +153,7 @@ export function getModelsForProvider(provider: string): LLMModelEntry[] {
 }
 
 export function getAllProviders(): string[] {
-  const providers = new Set(
-    Object.values(llmModels.models).map((model) => model.provider),
-  );
+  const providers = new Set(Object.values(llmModels.models).map((model) => model.provider));
   return [...providers].sort();
 }
 

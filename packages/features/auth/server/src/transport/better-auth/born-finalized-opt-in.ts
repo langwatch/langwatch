@@ -88,9 +88,7 @@ export async function isBornFinalizedSignUp({
     // default (off) stands — which is the safe direction this gate wants.
     return await featureFlags.isEnabled(
       BORN_FINALIZED_SIGNUP_FLAG,
-      organizationId === null
-        ? { kind: "system" }
-        : { kind: "organization", organizationId },
+      organizationId === null ? { kind: "system" } : { kind: "organization", organizationId },
     );
   } catch (error) {
     // Never fail the sign-up over the flag itself: an unreadable flag means

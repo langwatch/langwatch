@@ -154,9 +154,7 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
         enabled: true,
         id: "zzz-project",
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_8" }],
-        customModels: [
-          { modelId: "photon-9", displayName: "Scoped Winner", mode: "chat" },
-        ],
+        customModels: [{ modelId: "photon-9", displayName: "Scoped Winner", mode: "chat" }],
       });
       const prototypeTierRow = makeProvider({
         provider: "vendorR",
@@ -168,9 +166,7 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
             scopeId: "proto_8",
           },
         ],
-        customModels: [
-          { modelId: "photon-9", displayName: "Prototype Leak", mode: "chat" },
-        ],
+        customModels: [{ modelId: "photon-9", displayName: "Prototype Leak", mode: "chat" }],
       });
 
       const result = buildCustomModelDisplayNames([prototypeTierRow, projectRow]);

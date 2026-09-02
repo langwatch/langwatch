@@ -1,7 +1,4 @@
-import {
-  compareToLegacy,
-  type RoutingDecision,
-} from "@langwatch/identity-contract";
+import { compareToLegacy, type RoutingDecision } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
 /**

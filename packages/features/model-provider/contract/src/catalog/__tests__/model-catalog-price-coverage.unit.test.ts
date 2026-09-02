@@ -219,9 +219,7 @@ describe("catalog price coverage", () => {
           if (!entry) continue; // covered by the coverage tests above
           const units = pricedUnits(entry);
           if (!units.has(unit)) {
-            wrong.push(
-              `${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`,
-            );
+            wrong.push(`${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`);
           }
         }
         expect(
@@ -296,9 +294,7 @@ describe("overlay precedence", () => {
         // reachable through the gateway. It survives only because the overlay
         // carries it. Without it the id prefix-matches openai/gpt-5 and bills
         // 29 percent under, which is what this asserts against.
-        const overlayOnly = Object.keys(overlayModels).filter(
-          (id) => !(id in baseModels),
-        );
+        const overlayOnly = Object.keys(overlayModels).filter((id) => !(id in baseModels));
         expect(
           overlayOnly,
           "expected at least one overlay-only model to test the wiring with",

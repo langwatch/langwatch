@@ -72,8 +72,7 @@ export function translateModelIdForLitellm(modelId: string): string {
   // Only translate providers that need it
   // Models without a provider prefix are treated as needing translation
   // (they could be Anthropic models referenced without the prefix)
-  const needsTranslation =
-    provider === "" || PROVIDERS_NEEDING_TRANSLATION.includes(provider);
+  const needsTranslation = provider === "" || PROVIDERS_NEEDING_TRANSLATION.includes(provider);
 
   if (!needsTranslation) {
     return modelId;

@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/test-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The test harness every LangWatch process shares: which lane a test file belongs in, how a shard is weighted, the one TypeScript compiler session a static scan runs through, and the datastores an integration suite is handed.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.14.0",
+    "@langwatch/prisma-client": "workspace:*",
+    "@testcontainers/clickhouse": "^12.1.0",
+    "nanoid": "^5.1.6",
+    "picomatch": "^4.0.4",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/picomatch": "^4.0.2",
+    "vitest": "^4.1.9"
+  }
+}

@@ -19,14 +19,14 @@ import type { Context } from "hono";
  * listener populates — Hono's own `app.request()` helper and other adapters
  * leave `c.env` empty — so it is guarded rather than assumed.
  *
- * COLLAPSE THIS WITH `src/app/getClientIp.ts` WHEN THAT MODULE LANDS. Another
- * lane is moving `platform/app/src/utils/getClientIp.ts` here, and its
- * `getClientIpFromHonoContext` answers exactly this question — its test
- * (`__tests__/api-client-address.unit.test.ts`) is already committed against a
- * module that does not exist yet. This one exists because the unsubscribe door
- * needed an answer before that move landed, not because the deployment wants
- * two readings of one header list. Whoever lands `getClientIp.ts` should delete
- * this file and bind `UnsubscribeRestPorts.clientAddress` to it.
+ * This IS the collapse. `platform/app/src/utils/getClientIp.ts` was the other
+ * reading of the same header list, and it was deleted rather than moved here:
+ * its Hono half answered this exact question with the same header order and
+ * the same socket fallback, and its `NextApiRequest` half reads a request
+ * shape this process never sees. Its suite came with it —
+ * `__tests__/api-client-address.unit.test.ts` now drives this function — so
+ * the header order, the fallback and the two ways it can answer nothing are
+ * pinned here rather than in a module that no longer exists.
  */
 export function apiClientAddress(c: Context): string | undefined {
   for (const header of ADDRESS_HEADERS) {

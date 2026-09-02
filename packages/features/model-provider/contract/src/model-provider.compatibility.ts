@@ -1,15 +1,8 @@
 import { z } from "zod";
 import { modelCatalogEntrySchema, getAllModels } from "./catalog/model-catalog";
 import { customModelEntrySchema, type CustomModelEntry } from "./custom-model";
-import {
-  getParameterConstraints,
-  parameterConstraintsSchema,
-} from "./model-provider-registry";
-import {
-  modelProviderScopeSchema,
-  type Model,
-  type ModelProviderSummary,
-} from "./model-provider";
+import { getParameterConstraints, parameterConstraintsSchema } from "./model-provider-registry";
+import { modelProviderScopeSchema, type Model, type ModelProviderSummary } from "./model-provider";
 
 const extraHeaderSchema = z.object({ key: z.string(), value: z.string() }).strict();
 
@@ -69,10 +62,7 @@ export const modelMetadataForFrontendSchema = modelCatalogEntrySchema
   .strict();
 export type ModelMetadataForFrontend = z.infer<typeof modelMetadataForFrontendSchema>;
 
-export const legacyModelProviderMapSchema = z.record(
-  z.string(),
-  legacyModelProviderSchema,
-);
+export const legacyModelProviderMapSchema = z.record(z.string(), legacyModelProviderSchema);
 export const modelMetadataForFrontendMapSchema = z.record(
   z.string(),
   modelMetadataForFrontendSchema,
@@ -107,10 +97,7 @@ function narrowestScope(scopes: ModelProviderSummary["scopes"]): {
   return scope ? { scopeType: scope.scopeType, scopeId: scope.scopeId } : {};
 }
 
-function toLegacyCustomModel(
-  model: Model,
-  mode: CustomModelEntry["mode"],
-): CustomModelEntry {
+function toLegacyCustomModel(model: Model, mode: CustomModelEntry["mode"]): CustomModelEntry {
   return customModelEntrySchema.parse({
     modelId: model.id,
     displayName: model.label,
@@ -119,16 +106,12 @@ function toLegacyCustomModel(
     ...(model.supportedParameters === undefined
       ? {}
       : { supportedParameters: model.supportedParameters }),
-    ...(model.multimodalInputs === undefined
-      ? {}
-      : { multimodalInputs: model.multimodalInputs }),
+    ...(model.multimodalInputs === undefined ? {} : { multimodalInputs: model.multimodalInputs }),
   });
 }
 
 /** Lossless compatibility mapper for existing Model Provider transports. */
-export function toLegacyModelProvider(
-  provider: ModelProviderSummary,
-): LegacyModelProvider {
+export function toLegacyModelProvider(provider: ModelProviderSummary): LegacyModelProvider {
   const scopes = provider.scopes.map(({ scopeType, scopeId }) => ({
     scopeType,
     scopeId,
@@ -144,9 +127,7 @@ export function toLegacyModelProvider(
     defaultModel: provider.defaultModel,
     customKeys: provider.customKeys,
     extraHeaders: provider.extraHeaders,
-    customModels: provider.customModels.map((model) =>
-      toLegacyCustomModel(model, "chat"),
-    ),
+    customModels: provider.customModels.map((model) => toLegacyCustomModel(model, "chat")),
     customEmbeddingsModels: provider.customEmbeddingsModels.map((model) =>
       toLegacyCustomModel(model, "embedding"),
     ),
@@ -177,10 +158,7 @@ export function toLegacyModelProviderMap(
   providers: Record<string, ModelProviderSummary>,
 ): Record<string, LegacyModelProvider> {
   return Object.fromEntries(
-    Object.entries(providers).map(([key, provider]) => [
-      key,
-      toLegacyModelProvider(provider),
-    ]),
+    Object.entries(providers).map(([key, provider]) => [key, toLegacyModelProvider(provider)]),
   );
 }
 
@@ -188,10 +166,7 @@ export function toLegacyModelProviderMapResponse(
   providers: Record<string, ModelProviderSummary>,
 ): z.infer<typeof legacyModelProviderMapResponseSchema> {
   const legacyProviders = toLegacyModelProviderMap(providers);
-  const modelMetadata = mergeCustomModelMetadata(
-    getModelMetadataForFrontend(),
-    legacyProviders,
-  );
+  const modelMetadata = mergeCustomModelMetadata(getModelMetadataForFrontend(), legacyProviders);
 
   return legacyModelProviderMapResponseSchema.parse({
     providers: legacyProviders,
@@ -204,15 +179,9 @@ export function toLegacyModelProviderListResponse(
 ): z.infer<typeof legacyModelProviderListResponseSchema> {
   const legacyProviders = providers.map(toLegacyModelProvider);
   const providersById = Object.fromEntries(
-    legacyProviders.map((provider) => [
-      provider.id ?? `system-${provider.provider}`,
-      provider,
-    ]),
+    legacyProviders.map((provider) => [provider.id ?? `system-${provider.provider}`, provider]),
   );
-  const modelMetadata = mergeCustomModelMetadata(
-    getModelMetadataForFrontend(),
-    providersById,
-  );
+  const modelMetadata = mergeCustomModelMetadata(getModelMetadataForFrontend(), providersById);
 
   return legacyModelProviderListResponseSchema.parse({
     providers: legacyProviders,

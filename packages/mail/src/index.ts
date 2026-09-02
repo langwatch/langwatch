@@ -18,9 +18,14 @@
  *    reads an environment variable, so a credential is stable for the lifetime
  *    of the process that composed it.
  *
- * The trigger, usage-limit, automation-limit and licence messages did NOT
- * move: they belong to the automation and billing verticals, and they are
- * still the platform application's.
+ * The trace-settlement digest did NOT come here: the worker renders it
+ * beside the transports that send it
+ * (`apps/worker/src/features/automation/trigger-digest-mail.template.ts`),
+ * because the footer, the no-reply `To` and the BCC fan-out are one envelope
+ * decision with the unsubscribe token that signs it. The usage-limit,
+ * automation-limit and licence messages ARE here: each is a rendered message
+ * with no transport of its own, and the vertical that decides when to send it
+ * holds only a port.
  */
 export {
   EmailDeliveryPort,
@@ -59,5 +64,13 @@ export {
   sendJoinRequestReminderEmail,
   sendJoinRequestRejectedEmail,
 } from "./templates/join-request-emails";
+export {
+  automationLimitEmailSubject,
+  renderAutomationLimitEmail,
+  sendAutomationLimitEmail,
+  type AutomationLimitKind,
+} from "./templates/automation-limit-email";
+export { sendLicenseEmail } from "./templates/license-email";
 export { sendResetPasswordEmail } from "./templates/reset-password-email";
 export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email";
+export { sendUsageLimitEmail } from "./templates/usage-limit-email";

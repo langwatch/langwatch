@@ -22,17 +22,30 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.1",
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "bcrypt": "^6.0.0",
+    "better-auth": "^1.7.1",
+    "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

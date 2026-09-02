@@ -20,7 +20,8 @@
     "./request": "./src/request/requestLogging.ts",
     "./tracing": "./src/trace/traceContext.ts",
     "./metrics": "./src/metrics/index.ts",
-    "./metrics/testing": "./src/metrics/testing.ts"
+    "./metrics/testing": "./src/metrics/testing.ts",
+    "./grafana-links": "./src/trace/grafana-links.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

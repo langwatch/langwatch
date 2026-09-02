@@ -37,10 +37,7 @@ import {
   type BetterAuthHookCollaborators,
 } from "./better-auth-hooks";
 import { passkeySignUpRegistration, type SignUpVerificationPort } from "./passkey-sign-up";
-import {
-  runSignInRouterShadow,
-  type SignInRouterShadowPort,
-} from "./sign-in-router-shadow";
+import { runSignInRouterShadow, type SignInRouterShadowPort } from "./sign-in-router-shadow";
 
 const logger = createLogger("langwatch:better-auth");
 

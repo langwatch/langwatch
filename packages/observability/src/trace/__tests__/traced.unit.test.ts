@@ -296,9 +296,7 @@ describe("traced()", () => {
         })(),
       ).rejects.toThrow("boom");
 
-      expect(spanNamed("ExampleService.streamThatThrows")?.status.code).toBe(
-        SpanStatusCode.ERROR,
-      );
+      expect(spanNamed("ExampleService.streamThatThrows")?.status.code).toBe(SpanStatusCode.ERROR);
     });
 
     /**

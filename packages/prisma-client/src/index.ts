@@ -39,3 +39,8 @@ export {
 export { PrismaReadinessService, type PrismaReadinessOptions } from "./readiness";
 export { PrismaSeed, PrismaSeedService } from "./seed";
 export { PrismaShutdownService } from "./shutdown";
+export {
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+  uniqueConstraintTargets,
+} from "./prisma-error-codes";

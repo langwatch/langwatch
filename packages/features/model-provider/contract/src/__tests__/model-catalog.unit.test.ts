@@ -164,9 +164,7 @@ describe("Backward Compatibility", () => {
     });
 
     it("includes OpenAI models with full ID", () => {
-      const openaiModels = Object.keys(allLitellmModels).filter((k) =>
-        k.startsWith("openai/"),
-      );
+      const openaiModels = Object.keys(allLitellmModels).filter((k) => k.startsWith("openai/"));
       expect(openaiModels.length).toBeGreaterThan(0);
     });
 
@@ -179,9 +177,7 @@ describe("Backward Compatibility", () => {
     it("includes models with numeric suffixes like Bedrock version numbers", () => {
       // Bedrock models use :0 suffix for versions, not variants
       expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
-      expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(
-        false,
-      );
+      expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(false);
     });
 
     it("includes standard models without suffixes", () => {
@@ -380,9 +376,7 @@ describe("Model Provider Definitions", () => {
 describe("Model Pricing", () => {
   it("models have valid pricing", () => {
     const models = getAllModels();
-    const modelWithPricing = Object.values(models).find(
-      (m) => m.pricing.inputCostPerToken > 0,
-    );
+    const modelWithPricing = Object.values(models).find((m) => m.pricing.inputCostPerToken > 0);
 
     expect(modelWithPricing).toBeDefined();
     expect(modelWithPricing?.pricing.inputCostPerToken).toBeGreaterThan(0);
@@ -401,9 +395,7 @@ describe("Model Pricing", () => {
 describe("Model Parameters", () => {
   it("models have supportedParameters array", () => {
     const models = getAllModels();
-    const modelWithParams = Object.values(models).find(
-      (m) => m.supportedParameters.length > 0,
-    );
+    const modelWithParams = Object.values(models).find((m) => m.supportedParameters.length > 0);
 
     expect(modelWithParams).toBeDefined();
     expect(modelWithParams?.supportedParameters).toBeInstanceOf(Array);

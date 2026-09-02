@@ -5184,13 +5184,7 @@
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "max_tokens",
-        "response_format",
-        "seed",
-        "temperature",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "response_format", "seed", "temperature", "top_p"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -5214,13 +5208,7 @@
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "max_tokens",
-        "response_format",
-        "seed",
-        "temperature",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "response_format", "seed", "temperature", "top_p"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -8559,14 +8547,7 @@
       },
       "contextLength": 1000000,
       "maxCompletionTokens": 32000,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature", "tools", "top_k", "top_p"],
       "defaultParameters": {
         "temperature": null,
         "topP": null,
@@ -13833,14 +13814,7 @@
       },
       "contextLength": 300000,
       "maxCompletionTokens": 5120,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature", "tools", "top_k", "top_p"],
       "defaultParameters": {},
       "modality": "text+image->text",
       "mode": "chat",
@@ -13860,14 +13834,7 @@
       },
       "contextLength": 128000,
       "maxCompletionTokens": 5120,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature", "tools", "top_k", "top_p"],
       "defaultParameters": {},
       "modality": "text->text",
       "mode": "chat",
@@ -13887,14 +13854,7 @@
       },
       "contextLength": 300000,
       "maxCompletionTokens": 5120,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
+      "supportedParameters": ["max_tokens", "stop", "temperature", "tools", "top_k", "top_p"],
       "defaultParameters": {},
       "modality": "text+image->text",
       "mode": "chat",

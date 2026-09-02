@@ -31,9 +31,7 @@ describe("given a custom model row identified by its row id", () => {
   const row = makeProvider({
     provider: "custom",
     id: "mp_123",
-    customModels: [
-      { modelId: "nightly-42", displayName: "Priority Alpha", mode: "chat" },
-    ],
+    customModels: [{ modelId: "nightly-42", displayName: "Priority Alpha", mode: "chat" }],
   });
 
   describe("when display names are built for it", () => {
@@ -63,10 +61,7 @@ describe("given a provider with only a legacy-converted custom model", () => {
   describe("when the display name is resolved", () => {
     /** @scenario A legacy-only provider renders the same label as before display names existed */
     it("resolves to the model id's family part", () => {
-      const legacyEntries = toLegacyCompatibleCustomModels(
-        ["research-preview-7"],
-        "chat",
-      );
+      const legacyEntries = toLegacyCompatibleCustomModels(["research-preview-7"], "chat");
       const displayNames = buildCustomModelDisplayNames([
         makeProvider({
           provider: "legacyVendor",

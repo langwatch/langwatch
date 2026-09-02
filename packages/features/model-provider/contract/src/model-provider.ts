@@ -152,9 +152,7 @@ export type ModelProviderDeleteInput = z.infer<typeof modelProviderDeleteInputSc
 export const modelProviderListProjectInputSchema = z
   .object({ projectId: z.string().min(1) })
   .strict();
-export type ModelProviderListProjectInput = z.infer<
-  typeof modelProviderListProjectInputSchema
->;
+export type ModelProviderListProjectInput = z.infer<typeof modelProviderListProjectInputSchema>;
 export const modelDefaultSnapshotInputSchema = z
   .object({ projectId: z.string().min(1), actorId: z.string().min(1).optional() })
   .strict();
@@ -244,9 +242,7 @@ export const modelProviderCodexStatusInputSchema = z
     projectId: z.string().min(1),
   })
   .strict();
-export type ModelProviderCodexStatusInput = z.infer<
-  typeof modelProviderCodexStatusInputSchema
->;
+export type ModelProviderCodexStatusInput = z.infer<typeof modelProviderCodexStatusInputSchema>;
 
 export const modelProviderCodexStatusSchema = z.discriminatedUnion("connected", [
   z.object({ connected: z.literal(false) }).strict(),
@@ -296,9 +292,7 @@ export type ModelProviderApiKeyValidationInput = z.infer<
 export const modelProviderApiKeyValidationSchema = z
   .object({ valid: z.boolean(), message: z.string().optional() })
   .strict();
-export type ModelProviderApiKeyValidation = z.infer<
-  typeof modelProviderApiKeyValidationSchema
->;
+export type ModelProviderApiKeyValidation = z.infer<typeof modelProviderApiKeyValidationSchema>;
 
 export const modelDefaultScopeSchema = modelProviderScopeSchema;
 export type ModelDefaultScope = ModelProviderScope;
@@ -349,14 +343,10 @@ export const modelDefaultAvailableScopesSchema = z
   .object({
     organization: z.object({ id: z.string(), name: z.string() }).nullable(),
     teams: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
-    projects: z.array(
-      z.object({ id: z.string(), name: z.string(), teamId: z.string() }).strict(),
-    ),
+    projects: z.array(z.object({ id: z.string(), name: z.string(), teamId: z.string() }).strict()),
   })
   .strict();
-export type ModelDefaultAvailableScopes = z.infer<
-  typeof modelDefaultAvailableScopesSchema
->;
+export type ModelDefaultAvailableScopes = z.infer<typeof modelDefaultAvailableScopesSchema>;
 
 export const modelDefaultFeatureSchema = z
   .object({
@@ -387,21 +377,10 @@ export const modelDefaultResolveInputSchema = z
   .strict();
 export type ModelDefaultResolveInput = z.infer<typeof modelDefaultResolveInputSchema>;
 
-export const modelProviderResolutionScopeSchema = z.enum([
-  "project",
-  "team",
-  "organization",
-]);
-export type ModelProviderResolutionScope = z.infer<
-  typeof modelProviderResolutionScopeSchema
->;
-export const modelProviderResolutionSourceSchema = z.enum([
-  "feature_override",
-  "role_default",
-]);
-export type ModelProviderResolutionSource = z.infer<
-  typeof modelProviderResolutionSourceSchema
->;
+export const modelProviderResolutionScopeSchema = z.enum(["project", "team", "organization"]);
+export type ModelProviderResolutionScope = z.infer<typeof modelProviderResolutionScopeSchema>;
+export const modelProviderResolutionSourceSchema = z.enum(["feature_override", "role_default"]);
+export type ModelProviderResolutionSource = z.infer<typeof modelProviderResolutionSourceSchema>;
 export const modelProviderResolutionFeatureSchema = z
   .object({
     key: z.string().min(1),
@@ -430,9 +409,7 @@ export const modelDefaultAssignmentInputSchema = z
     actorId: z.string().min(1).optional(),
   })
   .strict();
-export type ModelDefaultAssignmentInput = z.infer<
-  typeof modelDefaultAssignmentInputSchema
->;
+export type ModelDefaultAssignmentInput = z.infer<typeof modelDefaultAssignmentInputSchema>;
 export const modelDefaultConfigWriteInputSchema = z
   .object({
     id: z.string().min(1).optional(),
@@ -442,9 +419,7 @@ export const modelDefaultConfigWriteInputSchema = z
     actorId: z.string().min(1).optional(),
   })
   .strict();
-export type ModelDefaultConfigWriteInput = z.infer<
-  typeof modelDefaultConfigWriteInputSchema
->;
+export type ModelDefaultConfigWriteInput = z.infer<typeof modelDefaultConfigWriteInputSchema>;
 
 export const modelDefaultDeleteInputSchema = z
   .object({ id: z.string().min(1), actorId: z.string().min(1).optional() })
@@ -457,9 +432,7 @@ export const modelDefaultInheritedValuesSchema = z
     referenceScope: modelDefaultScopeSchema,
   })
   .strict();
-export type ModelDefaultInheritedValues = z.infer<
-  typeof modelDefaultInheritedValuesSchema
->;
+export type ModelDefaultInheritedValues = z.infer<typeof modelDefaultInheritedValuesSchema>;
 
 export const modelCostSchema = z
   .object({
@@ -509,9 +482,7 @@ export const modelCostEstimateInputSchema = z
   })
   .strict();
 export type ModelCostEstimateInput = z.infer<typeof modelCostEstimateInputSchema>;
-export const modelCostListInputSchema = z
-  .object({ projectId: z.string().min(1) })
-  .strict();
+export const modelCostListInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type ModelCostListInput = z.infer<typeof modelCostListInputSchema>;
 export const modelCostWriteInputSchema = z
   .object({

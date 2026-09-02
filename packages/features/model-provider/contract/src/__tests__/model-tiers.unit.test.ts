@@ -83,9 +83,7 @@ describe("given the OpenAI chat model tier grammar", () => {
 
     it("compares minor versions numerically, not as text", () => {
       // A lexical sort would rank "5.9" above "5.10".
-      expect(sorted(["openai/gpt-5.9", "openai/gpt-5.10"], "flagship")[0]).toBe(
-        "openai/gpt-5.10",
-      );
+      expect(sorted(["openai/gpt-5.9", "openai/gpt-5.10"], "flagship")[0]).toBe("openai/gpt-5.10");
     });
 
     /** @scenario A generation shipping both an unsuffixed model and a named flagship */

@@ -52,11 +52,7 @@ describe("Model Provider wire values", () => {
   it("encodes each explicit provider selection with its id", () => {
     expect(encodeModelProviderWireValue("mp_abc", "gpt-5")).toBe("mp_abc/gpt-5");
     expect(
-      enumerateModelProviderWireValues("openai", "gpt-5", [
-        openaiShared,
-        openaiProd,
-        anthropic,
-      ]),
+      enumerateModelProviderWireValues("openai", "gpt-5", [openaiShared, openaiProd, anthropic]),
     ).toEqual(["mp_openai_shared/gpt-5", "mp_openai_prod/gpt-5"]);
   });
 
@@ -67,12 +63,12 @@ describe("Model Provider wire values", () => {
   });
 
   it("retains legacy single-provider routing and reports ambiguity", () => {
-    expect(
-      resolveModelProviderWireValue("openai/gpt-5", [openaiShared, anthropic]),
-    ).toEqual({ ok: true, mp: openaiShared, model: "gpt-5" });
-    expect(
-      resolveModelProviderWireValue("openai/gpt-5", [openaiShared, openaiProd]),
-    ).toEqual({
+    expect(resolveModelProviderWireValue("openai/gpt-5", [openaiShared, anthropic])).toEqual({
+      ok: true,
+      mp: openaiShared,
+      model: "gpt-5",
+    });
+    expect(resolveModelProviderWireValue("openai/gpt-5", [openaiShared, openaiProd])).toEqual({
       ok: false,
       reason: "ambiguous",
       value: "openai/gpt-5",
@@ -99,8 +95,6 @@ describe("Model Provider wire values", () => {
       value: "garbage",
       hint: "Unrecognised model reference — re-select a model.",
     });
-    expect(
-      enumerateModelProviderWireValues("cohere", "command-r", [openaiShared]),
-    ).toEqual([]);
+    expect(enumerateModelProviderWireValues("cohere", "command-r", [openaiShared])).toEqual([]);
   });
 });

@@ -1,14 +1,21 @@
 /**
  * @vitest-environment node
  *
- * Regression guard: `getClientIpFromHonoContext` used to build a
- * `NextApiRequest` stub with headers only, so its `req.socket?.remoteAddress`
- * fallback was permanently dead for every Hono caller. When no proxy header
- * was present (a caller behind no CDN/LB, or one that stripped them), the
- * resolved IP silently collapsed to "unknown" for every such caller, merging
- * them into a single shared rate-limit bucket. The fix falls back to
- * `getConnInfo` (the raw socket address `@hono/node-server` attaches to
- * `c.env.incoming`).
+ * Which address a request came from, and the fallback that stops every
+ * header-less caller sharing one rate-limit bucket.
+ *
+ * Regression guard: the application's reader used to build a request stub with
+ * headers only, so its socket fallback was permanently dead for every Hono
+ * caller. With no proxy header present — a caller behind no CDN or load
+ * balancer, or one that stripped them — the resolved address silently
+ * collapsed to "unknown" for all of them, merging every such caller into a
+ * single bucket so the first to spend the window locked out the rest. The
+ * fallback is `getConnInfo`, the raw socket address `@hono/node-server`
+ * attaches to `c.env.incoming`.
+ *
+ * The `NextApiRequest` half of the old module did not come with it: this
+ * process serves Hono and nothing else, and a reader for a request shape it
+ * never sees would be an untested branch pretending to be coverage.
  *
  * @regression
  */
@@ -18,69 +25,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getConnInfo } = vi.hoisted(() => ({ getConnInfo: vi.fn() }));
 vi.mock("@hono/node-server/conninfo", () => ({ getConnInfo }));
 
-import { getClientIp, getClientIpFromHonoContext } from "../getClientIp";
+import { apiClientAddress } from "../api-client-address";
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("getClientIp()", () => {
-  describe("when a trusted proxy header carries a valid IP", () => {
-    it("prefers cf-connecting-ip over x-forwarded-for", () => {
-      const ip = getClientIp({
-        headers: {
-          "cf-connecting-ip": "203.0.113.7",
-          "x-forwarded-for": "198.51.100.1",
-        },
-      } as any);
-      expect(ip).toBe("203.0.113.7");
-    });
-
-    it("takes the first entry of a comma-separated x-forwarded-for chain", () => {
-      const ip = getClientIp({
-        headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
-      } as any);
-      expect(ip).toBe("203.0.113.7");
-    });
-  });
-
-  describe("when the header value is not a valid IP", () => {
-    it("falls through instead of returning garbage", () => {
-      const ip = getClientIp({
-        headers: { "x-forwarded-for": "not-an-ip" },
-      } as any);
-      expect(ip).toBeUndefined();
-    });
-  });
-
-  describe("when no proxy header is present", () => {
-    it("falls back to the request socket", () => {
-      const ip = getClientIp({
-        headers: {},
-        socket: { remoteAddress: "203.0.113.9" },
-      } as any);
-      expect(ip).toBe("203.0.113.9");
-    });
-
-    it("returns undefined when the socket has no address either", () => {
-      const ip = getClientIp({ headers: {}, socket: {} } as any);
-      expect(ip).toBeUndefined();
-    });
-  });
-
-  describe("when req is undefined", () => {
-    it("returns undefined", () => {
-      expect(getClientIp(undefined)).toBeUndefined();
-    });
-  });
-});
-
-describe("getClientIpFromHonoContext()", () => {
+describe("apiClientAddress()", () => {
   async function contextFrom(headers: Record<string, string>) {
     let captured: unknown;
     const app = new Hono();
     app.get("/", (c) => {
-      captured = getClientIpFromHonoContext(c);
+      captured = apiClientAddress(c);
       return c.json({ ok: true });
     });
     await app.request("/", { headers });

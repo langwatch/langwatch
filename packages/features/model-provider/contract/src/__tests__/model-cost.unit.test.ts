@@ -269,9 +269,7 @@ describe("normalizeModelName", () => {
 
   describe("when given vendor aliases", () => {
     it("normalizes deepseek-ai/ to deepseek/", () => {
-      expect(normalizeModelName("deepseek-ai/deepseek-v3.2")).toBe(
-        "deepseek/deepseek-v3.2",
-      );
+      expect(normalizeModelName("deepseek-ai/deepseek-v3.2")).toBe("deepseek/deepseek-v3.2");
     });
 
     it("normalizes minimaxai/ to minimax/", () => {
@@ -345,9 +343,9 @@ describe("normalizeBedrockModelId", () => {
     });
 
     it("strips the bedrock/ envelope on versioned ids", () => {
-      expect(
-        normalizeBedrockModelId("bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"),
-      ).toBe("anthropic/claude-haiku-4-5-20251001");
+      expect(normalizeBedrockModelId("bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0")).toBe(
+        "anthropic/claude-haiku-4-5-20251001",
+      );
     });
 
     it("strips the bedrock/ envelope when no region prefix is present", () => {
@@ -371,9 +369,7 @@ describe("normalizeBedrockModelId", () => {
 describe("matchModelCostWithFallbacks", () => {
   describe("when model name matches exactly", () => {
     it("finds cost for model name without vendor prefix", () => {
-      expect(matchModelCostWithFallbacks("gpt-4o", fakeModelCosts)?.model).toBe(
-        "openai/gpt-4o",
-      );
+      expect(matchModelCostWithFallbacks("gpt-4o", fakeModelCosts)?.model).toBe("openai/gpt-4o");
     });
 
     it("finds cost for model name with vendor prefix", () => {
@@ -385,9 +381,7 @@ describe("matchModelCostWithFallbacks", () => {
 
   describe("when model name uses uppercase letters", () => {
     it("normalizes to lowercase before matching", () => {
-      expect(matchModelCostWithFallbacks("GPT-4O", fakeModelCosts)?.model).toBe(
-        "openai/gpt-4o",
-      );
+      expect(matchModelCostWithFallbacks("GPT-4O", fakeModelCosts)?.model).toBe("openai/gpt-4o");
     });
 
     it("normalizes mixed-case vendor prefix to lowercase", () => {
@@ -425,29 +419,29 @@ describe("matchModelCostWithFallbacks", () => {
 
   describe("when model name has an extra vendor prefix from a proxy", () => {
     it("strips one prefix level and retries", () => {
-      expect(
-        matchModelCostWithFallbacks("together_ai/gpt-4o", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("together_ai/gpt-4o", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
 
     it("strips multiple prefix levels for multi-segment names", () => {
-      expect(
-        matchModelCostWithFallbacks("together_ai/openai/gpt-4o", fakeModelCosts)?.model,
-      ).toBe("openai/gpt-4o");
+      expect(matchModelCostWithFallbacks("together_ai/openai/gpt-4o", fakeModelCosts)?.model).toBe(
+        "openai/gpt-4o",
+      );
     });
   });
 
   describe("when model name uses a known vendor alias", () => {
     it("normalizes deepseek-ai/ to deepseek/ before matching", () => {
-      expect(
-        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", fakeModelCosts)?.model,
-      ).toBe("deepseek/deepseek-v3.2");
+      expect(matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", fakeModelCosts)?.model).toBe(
+        "deepseek/deepseek-v3.2",
+      );
     });
 
     it("normalizes minimaxai/ to minimax/ before matching", () => {
-      expect(
-        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", fakeModelCosts)?.model,
-      ).toBe("minimax/minimax-m2.1");
+      expect(matchModelCostWithFallbacks("minimaxai/minimax-m2.1", fakeModelCosts)?.model).toBe(
+        "minimax/minimax-m2.1",
+      );
     });
   });
 
@@ -479,9 +473,7 @@ describe("matchModelCostWithFallbacks", () => {
 
   describe("when model name has no match", () => {
     it("returns undefined for an unknown model", () => {
-      expect(
-        matchModelCostWithFallbacks("made-up-model-xyz", fakeModelCosts),
-      ).toBeUndefined();
+      expect(matchModelCostWithFallbacks("made-up-model-xyz", fakeModelCosts)).toBeUndefined();
     });
 
     it("returns undefined for an empty string", () => {
@@ -499,9 +491,7 @@ describe("matchModelCostWithFallbacks", () => {
     const realCosts = getStaticModelCosts();
 
     it("matches real openai/gpt-4o entry by bare model name", () => {
-      expect(matchModelCostWithFallbacks("gpt-4o", realCosts)?.model).toBe(
-        "openai/gpt-4o",
-      );
+      expect(matchModelCostWithFallbacks("gpt-4o", realCosts)?.model).toBe("openai/gpt-4o");
     });
 
     it("matches real anthropic/claude-opus-4-5 entry by dotted version", () => {
@@ -517,15 +507,15 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("matches real deepseek/deepseek-v3.2 via deepseek-ai/ alias", () => {
-      expect(
-        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", realCosts)?.model,
-      ).toBe("deepseek/deepseek-v3.2");
+      expect(matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", realCosts)?.model).toBe(
+        "deepseek/deepseek-v3.2",
+      );
     });
 
     it("matches real minimax/minimax-m2.1 via minimaxai/ alias", () => {
-      expect(
-        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", realCosts)?.model,
-      ).toBe("minimax/minimax-m2.1");
+      expect(matchModelCostWithFallbacks("minimaxai/minimax-m2.1", realCosts)?.model).toBe(
+        "minimax/minimax-m2.1",
+      );
     });
   });
 
@@ -534,16 +524,15 @@ describe("matchModelCostWithFallbacks", () => {
 
     /** @scenario A bare regional Bedrock model id keeps resolving registry pricing */
     it("matches eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
-      expect(
-        matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)?.model,
-      ).toBe("anthropic/claude-sonnet-4-6");
+      expect(matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)?.model).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
     });
 
     /** @scenario A bedrock/-prefixed regional model id resolves registry pricing */
     it("matches bedrock/eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
       expect(
-        matchModelCostWithFallbacks("bedrock/eu.anthropic.claude-sonnet-4-6", realCosts)
-          ?.model,
+        matchModelCostWithFallbacks("bedrock/eu.anthropic.claude-sonnet-4-6", realCosts)?.model,
       ).toBe("anthropic/claude-sonnet-4-6");
     });
 
@@ -579,9 +568,9 @@ describe("matchModelCostWithFallbacks", () => {
 
     /** @scenario A codex-prefixed model id prices from the underlying OpenAI entry */
     it("matches openai_codex/gpt-5.6-terra to openai/gpt-5.6-terra", () => {
-      expect(
-        matchModelCostWithFallbacks("openai_codex/gpt-5.6-terra", realCosts)?.model,
-      ).toBe("openai/gpt-5.6-terra");
+      expect(matchModelCostWithFallbacks("openai_codex/gpt-5.6-terra", realCosts)?.model).toBe(
+        "openai/gpt-5.6-terra",
+      );
     });
 
     /** @scenario The bare model id behind the codex provider prices from the OpenAI entry */
@@ -593,9 +582,7 @@ describe("matchModelCostWithFallbacks", () => {
     });
 
     it("keeps every codex catalog entry out of the cost registry", () => {
-      expect(
-        realCosts.filter((entry) => entry.model.startsWith("openai_codex/")),
-      ).toEqual([]);
+      expect(realCosts.filter((entry) => entry.model.startsWith("openai_codex/"))).toEqual([]);
     });
   });
 
@@ -725,9 +712,10 @@ describe("cache write TTL pricing", () => {
 
       /** @scenario "Each cache write bucket is priced at its own rate" */
       it("prices the hour-long portion when no total came with it", () => {
-        expect(
-          estimateCost({ llmModelCost: model, cacheCreation1hTokens: 400 }),
-        ).toBeCloseTo(400 * 0.00001, 10);
+        expect(estimateCost({ llmModelCost: model, cacheCreation1hTokens: 400 })).toBeCloseTo(
+          400 * 0.00001,
+          10,
+        );
       });
 
       /** @scenario "Each cache write bucket is priced at its own rate" */
@@ -747,9 +735,10 @@ describe("cache write TTL pricing", () => {
     describe("when the cost is estimated", () => {
       /** @scenario "A call that does not say how long its cache lives is priced as before" */
       it("prices every write at the short-lived rate", () => {
-        expect(
-          estimateCost({ llmModelCost: model, cacheCreationTokens: 17854 }),
-        ).toBeCloseTo(17854 * 0.00000625, 10);
+        expect(estimateCost({ llmModelCost: model, cacheCreationTokens: 17854 })).toBeCloseTo(
+          17854 * 0.00000625,
+          10,
+        );
       });
     });
   });

@@ -185,6 +185,54 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "LW_VIRTUAL_KEY_PEPPER",
   }),
   /**
+   * The HMAC secret the Go data plane signs its control-plane calls with.
+   *
+   * Read here because THIS process now serves them: `/api/internal/gateway`
+   * verifies the signature before any handler runs, and the verifier takes the
+   * secret as an argument rather than reading an environment of its own.
+   *
+   * An unvalidated optional string for the reason every credential above is:
+   * an operator who exports it blank has NOT configured a secret, and
+   * `Config.secret` would refuse the whole boot over it — including a
+   * deployment that runs no gateway. What blank means is the gate's own rule
+   * and lives with it: the internal family answers 500
+   * `gateway_internal_secret_missing` rather than falling open, which is the
+   * behaviour the retired application had. It is never logged.
+   */
+  gatewayInternalSecret: Config.value(optionalEnvironmentString, {
+    env: "LW_GATEWAY_INTERNAL_SECRET",
+  }),
+  /**
+   * The key the short-lived JWTs handed to the Go data plane are signed under.
+   *
+   * Its own leaf beside the HMAC secret above and NOT the same value: one
+   * authenticates the data plane's calls INTO this process, the other is what
+   * this process mints credentials the data plane presents onward with. They
+   * are rotated independently, and a process that signed with the wrong one
+   * would hand out tokens the gateway refuses.
+   *
+   * Optional for the same reason, and its absence is likewise the adapter's
+   * rule: `GatewayJwtAdapter` refuses to sign without a secret, so
+   * `/resolve-key` fails loudly rather than minting an unverifiable token. It
+   * is never logged.
+   */
+  gatewayJwtSecret: Config.value(optionalEnvironmentString, {
+    env: "LW_GATEWAY_JWT_SECRET",
+  }),
+  /**
+   * How long after a request an outcome may still arrive, in milliseconds.
+   *
+   * An operator override read here because the billing reconciliation REST
+   * family is what reads it on this process: it decides which recent groupings
+   * are stable enough to page through. The parse and its floor belong to the
+   * gateway package (`settlementGraceMs`), which is handed this raw value, so
+   * the REST policy and the settlement sweeper cannot disagree about what the
+   * operator asked for.
+   */
+  spendSettlementGraceMs: Config.value(optionalEnvironmentString, {
+    env: "LW_SPEND_SETTLEMENT_GRACE_MS",
+  }),
+  /**
    * The bearer credential a caller must present to scrape this process's
    * metrics, under the name every other LangWatch tier reads it by.
    *
