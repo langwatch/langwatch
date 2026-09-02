@@ -218,20 +218,55 @@ const modelTable = (breakdown: ModelBreakdownRow[]): string[] => {
   return out;
 };
 
+/** An empty report is a finding, not a non-event: an agent almost certainly
+ * did the work, and nothing recorded it. Saying only "no sessions" leaves the
+ * reader to guess whether the work was manual or the wiring is broken, so the
+ * comment carries what to check, folded away so it costs a line until someone
+ * wants it. */
+const nothingAttributed = (): string[] => [
+  "No coding agent usage was attributed to this pull request.",
+  "",
+  "<details>",
+  "<summary>If an agent did work here, something is not reporting</summary>",
+  "",
+  "Usage is attributed by the repository and branch a session declares.",
+  "Check these in order:",
+  "",
+  "1. **Telemetry wiring.** Run `langwatch instrument claude` once per machine",
+  "   (`langwatch claude` does it too). It writes the settings a plain agent",
+  "   run needs to report at all.",
+  "2. **The declared checkout.** A session declares the directory it started",
+  "   in. Work in a git worktree other than the one the session opened lands",
+  "   on *that* worktree's branch instead. Run `langwatch ingest context` from",
+  "   the checkout you are editing to move it.",
+  "3. **The agent.** Only agents that report to LangWatch appear here. A review",
+  "   bot that is not instrumented spends tokens that nothing records.",
+  "",
+  "`langwatch ingest context` prints the repository and branch it declared, so",
+  "it is the quickest way to see what a session is attributed to.",
+  "",
+  "</details>",
+];
+
 export const buildCommentBody = ({
   usage,
   shortSha,
   updatedAtIso,
+  final = false,
 }: {
   usage: PullRequestUsage;
   shortSha: string;
   updatedAtIso: string;
+  /** A merged pull request accrues nothing further, so its last refresh says
+   * so. Without this the reader cannot tell a settled number from one that is
+   * simply waiting for the next push. */
+  final?: boolean;
 }): string => {
   const updated = updatedAtIso.replace("T", " ").slice(0, 16);
   const parts = [MARKER, "### Coding agent usage on this pull request", ""];
 
   if (usage.totals.sessionsCount === 0) {
-    parts.push("No coding agent sessions recorded for this pull request.");
+    parts.push(...nothingAttributed());
   } else {
     parts.push(...usageTable(usage.rows, usage.totals));
     const details: string[] = [];
@@ -262,12 +297,15 @@ export const buildCommentBody = ({
     parts.push(...details);
   }
 
+  const stamp = final
+    ? `Final, at the merge of \`${shortSha}\``
+    : `Updated for \`${shortSha}\``;
   parts.push(
     "",
     "<sub>Tokens as reported by the agents to " +
       "[LangWatch](https://app.langwatch.ai); cost estimated from model list " +
-      "prices, over the pull request's whole lifetime. Updated for " +
-      `\`${shortSha}\` · ${updated} UTC</sub>`,
+      "prices, over the pull request's whole lifetime. " +
+      `${stamp} · ${updated} UTC</sub>`,
   );
   return parts.join("\n");
 };
@@ -481,6 +519,69 @@ const requireEnv = (name: string): string => {
   return value;
 };
 
+/** Reads the rollup for one pull request and brings its comment in step.
+ * Shared by the per-pull-request entry point below and by the final refresh
+ * that runs once a pull request is merged, so the two can never drift into
+ * reporting the same numbers differently. */
+export const reportUsage = async ({
+  repository,
+  prNumber,
+  shortSha,
+  endpoint,
+  apiKey,
+  apiUrl,
+  token,
+  dryRun = false,
+  final = false,
+}: {
+  repository: string;
+  prNumber: number;
+  shortSha: string;
+  endpoint: string;
+  apiKey: string;
+  apiUrl: string;
+  token?: string;
+  dryRun?: boolean;
+  final?: boolean;
+}): Promise<void> => {
+  const outcome = await fetchUsage({ endpoint, apiKey, repository, prNumber });
+
+  // Reporting must never block the pull request: a LangWatch failure is a
+  // warning annotation and a green job, and the comment is left as it was.
+  if (outcome.kind === "error") {
+    console.log(`::warning title=pr-token-usage::${outcome.message}`);
+    return;
+  }
+
+  const usage: PullRequestUsage =
+    outcome.kind === "usage"
+      ? outcome.usage
+      : { rows: [], totals: emptyTotals(), modelBreakdown: [] };
+
+  const body = buildCommentBody({
+    usage,
+    shortSha,
+    updatedAtIso: new Date().toISOString(),
+    final,
+  });
+
+  if (dryRun) {
+    console.log(body);
+    return;
+  }
+
+  if (!token) throw new Error("Missing required env var GITHUB_TOKEN");
+  const existing = await findExistingComment({ apiUrl, token, repository, prNumber });
+
+  // An empty report is posted too. Staying silent made a broken pipeline look
+  // exactly like a pull request nobody used an agent on, and the difference
+  // is the whole point: the empty comment says what to check.
+  await upsertComment({ apiUrl, token, repository, prNumber, body, existing });
+  console.log(
+    `${existing ? "Updated" : "Created"} usage comment on ${repository}#${prNumber}.`,
+  );
+};
+
 const run = async (): Promise<void> => {
   const dryRun = process.argv.includes("--dry-run");
   const repository = requireEnv("PR_REPOSITORY");
@@ -508,53 +609,17 @@ const run = async (): Promise<void> => {
     }
     headSha = head.headSha;
   }
-  const shortSha = headSha.slice(0, 7);
 
-  const outcome = await fetchUsage({
-    endpoint,
-    apiKey: requireEnv("LANGWATCH_API_KEY"),
+  await reportUsage({
     repository,
     prNumber,
+    shortSha: headSha.slice(0, 7),
+    endpoint,
+    apiKey: requireEnv("LANGWATCH_API_KEY"),
+    apiUrl,
+    token: dryRun ? process.env.GITHUB_TOKEN : requireEnv("GITHUB_TOKEN"),
+    dryRun,
   });
-
-  // Reporting must never block the pull request: a LangWatch failure is a
-  // warning annotation and a green job, and the comment is left as it was.
-  if (outcome.kind === "error") {
-    console.log(`::warning title=pr-token-usage::${outcome.message}`);
-    return;
-  }
-
-  const usage: PullRequestUsage =
-    outcome.kind === "usage"
-      ? outcome.usage
-      : { rows: [], totals: emptyTotals(), modelBreakdown: [] };
-
-  const body = buildCommentBody({
-    usage,
-    shortSha,
-    updatedAtIso: new Date().toISOString(),
-  });
-
-  if (dryRun) {
-    console.log(body);
-    return;
-  }
-
-  const token = requireEnv("GITHUB_TOKEN");
-  const existing = await findExistingComment({ apiUrl, token, repository, prNumber });
-
-  // No usage and no comment: stay silent rather than stamp every dependency
-  // bump with an empty table. An existing comment is still refreshed, so a
-  // rollup that empties never leaves stale numbers behind.
-  if (usage.totals.sessionsCount === 0 && !existing) {
-    console.log(`No usage recorded for ${repository}#${prNumber}; skipping.`);
-    return;
-  }
-
-  await upsertComment({ apiUrl, token, repository, prNumber, body, existing });
-  console.log(
-    `${existing ? "Updated" : "Created"} usage comment on ${repository}#${prNumber}.`,
-  );
 };
 
 const emptyTotals = (): UsageTotals => ({

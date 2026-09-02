@@ -237,7 +237,8 @@ Feature: The test suites rail
     Given the Agent Testing page is open
     When the period picker is opened
     Then its list opens above the control
-    And it stays inside the page
+    And it offers the same ranges as the shared period control
+    And a free start and end date reaches any window, older than thirty days included
 
   @integration
   Scenario: Changing the period reloads the last results and the runs

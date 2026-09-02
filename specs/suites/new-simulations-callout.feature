@@ -10,6 +10,16 @@ Feature: The new-simulations callout offers the way back
   The card has its own dismissal key, so a person who dismissed the earlier
   voice announcement still sees this one.
 
+  The card retires on its own three weeks after the new screens shipped. The
+  `simulations-welcome=1` address parameter brings it back past the
+  retirement, the dismissal and the recorded preference, so the way back to
+  the previous screens stays reachable.
+
+  The previous screens carry the way forward: a banner in their header row
+  shows on the browser that recorded the preference, while the release flag
+  is on, and a click clears the preference and the dismissal so the person
+  reads the new screens again with the offer intact.
+
   Background:
     Given a project that reads Agent Testing through the release flag
 
@@ -58,3 +68,36 @@ Feature: The new-simulations callout offers the way back
     Given the previous-screens preference is recorded for the project
     When the main menu renders with the release flag on
     Then the menu offers the Simulations group instead of Agent Testing
+
+  @unit
+  Scenario: The callout retires three weeks after the new screens shipped
+    Given three weeks passed since the new screens shipped
+    When the Agent Testing sidebar renders
+    Then the new-simulations callout is not visible
+
+  @unit
+  Scenario: The simulations-welcome address parameter brings the callout back
+    Given the callout retired, was dismissed, or the preference is recorded
+    When the address carries "simulations-welcome=1"
+    Then the new-simulations callout is visible
+
+  @unit
+  Scenario: The previous screens carry a banner back to the new ones
+    Given the previous-screens preference is recorded for the project
+    And the release flag is on
+    When the scenario library or the simulations page renders
+    Then a banner offers the way to the new simulations screen
+    And its link points at the matching Agent Testing address
+
+  @unit
+  Scenario: The return banner clears the preference on click
+    Given the return banner is visible
+    When the person clicks it
+    Then the previous-screens preference is cleared
+    And the welcome callout dismissal is cleared
+
+  @unit
+  Scenario: The return banner shows only with the release flag and the preference
+    Given the release flag is off, or the preference is not recorded
+    When the previous screens render
+    Then no return banner is shown

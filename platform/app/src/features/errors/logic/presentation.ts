@@ -326,6 +326,19 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  lwql_unknown_identifier: {
+    title: "This query names a column that doesn't exist",
+    // The name is the whole value of this message, so it is quoted back when
+    // the server's refusal carried it. It may not: the extractor that reads it
+    // fails closed rather than relaying the raw refusal, so the fallback has
+    // to stand on its own and still tell the reader what to do.
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `There's no column called "${identifier}". Check the spelling against the dataset's columns.`
+        : "Check the column names against the dataset's columns.";
+    },
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",

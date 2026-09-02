@@ -130,7 +130,12 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         }
 
         const late = eventAt(1_000);
-        const history = [late, eventAt(2_000), eventAt(3_000)];
+        const history = [
+          late,
+          eventAt(2_000),
+          eventAt(3_000),
+          eventAt(CHECKPOINT_MS),
+        ];
         const store = createMockFoldProjectionStore<OrderState>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
           sequence: [5_000],
@@ -148,7 +153,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
 
         const result = await executor.execute(fold, late, context);
 
-        expect(result.sequence).toEqual([1_000, 2_000, 3_000]);
+        expect(result.sequence).toEqual([1_000, 2_000, 3_000, CHECKPOINT_MS]);
         expect(fold.eventLoader).toHaveBeenCalledOnce();
         expect(refoldMetric).toHaveBeenCalledWith("evaluation", "performed");
       });
@@ -218,6 +223,154 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
           4_000,
           CHECKPOINT_MS,
         ]);
+      });
+    });
+
+    describe("when the history read cannot account for the loaded state", () => {
+      interface OrderState {
+        sequence: number[];
+        LastEventOccurredAt: number;
+      }
+
+      /**
+       * A state committed with applied ids: `getWithApplied` is what carries
+       * them, so the fence has the previous commit to check the read against.
+       */
+      function makeAppliedFold({
+        historyReads,
+        appliedEventIds,
+      }: {
+        /** One history per read; the last one answers every later read. */
+        historyReads: Event[][];
+        appliedEventIds: string[];
+      }) {
+        const store = createMockFoldProjectionStore<OrderState>();
+        (
+          store as unknown as {
+            getWithApplied: ReturnType<typeof vi.fn>;
+          }
+        ).getWithApplied = vi.fn().mockResolvedValue({
+          state: {
+            sequence: [1_000, 2_000, CHECKPOINT_MS],
+            LastEventOccurredAt: CHECKPOINT_MS,
+          },
+          appliedEventIds,
+        });
+        const fold = createMockFoldProjectionDefinition("run", {
+          store,
+          init: () => ({ sequence: [], LastEventOccurredAt: 0 }),
+          apply: (state: OrderState, event: Event): OrderState => ({
+            sequence: [...state.sequence, event.occurredAt ?? 0],
+            LastEventOccurredAt: Math.max(
+              state.LastEventOccurredAt,
+              event.occurredAt ?? 0,
+            ),
+          }),
+        }) as FoldProjectionDefinition<OrderState, Event>;
+        const eventLoader = vi.fn();
+        for (const history of historyReads) {
+          eventLoader.mockResolvedValueOnce(history);
+        }
+        eventLoader.mockResolvedValue(historyReads[historyReads.length - 1]);
+        fold.eventLoader = eventLoader;
+        return { fold, store, eventLoader };
+      }
+
+      /** @scenario "A re-fold never replaces state from a history read missing an applied event" */
+      it("keeps the loaded state and applies the event on top when an applied event never appears", async () => {
+        vi.useRealTimers();
+        // No retry budget: the read stays incomplete for the whole call.
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
+        const checkpointEvent = eventAt(CHECKPOINT_MS);
+        // The read returns the checkpoint but not the applied event "evt-a".
+        const { fold, store } = makeAppliedFold({
+          historyReads: [[eventAt(2_000), checkpointEvent]],
+          appliedEventIds: ["evt-a", checkpointEvent.id],
+        });
+        const late = eventAt(3_000);
+
+        const result = await strictExecutor.execute(fold, late, context);
+
+        // The loaded sequence survives whole; the late event lands on top,
+        // out of order but not lost, and the replayed-from-init overwrite
+        // never happens.
+        expect(result.sequence).toEqual([1_000, 2_000, CHECKPOINT_MS, 3_000]);
+        expect(store.store).toHaveBeenCalledOnce();
+        expect(refoldMetric).toHaveBeenCalledWith("run", "incomplete");
+      });
+
+      /** @scenario "A re-fold retries a history read that has not caught up yet" */
+      it("replays the full history when a retry read returns it", async () => {
+        vi.useRealTimers();
+        const retryingExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [1],
+        });
+        const checkpointEvent = eventAt(CHECKPOINT_MS);
+        const appliedEvent = { ...eventAt(4_000), id: "evt-a" };
+        const fullHistory = [eventAt(2_000), appliedEvent, checkpointEvent];
+        const { fold, eventLoader } = makeAppliedFold({
+          historyReads: [[eventAt(2_000), checkpointEvent], fullHistory],
+          appliedEventIds: ["evt-a", checkpointEvent.id],
+        });
+        const late = eventAt(3_000);
+
+        const result = await retryingExecutor.execute(fold, late, context);
+
+        expect(eventLoader).toHaveBeenCalledTimes(2);
+        expect(result.sequence).toEqual([2_000, 3_000, 4_000, CHECKPOINT_MS]);
+        expect(refoldMetric).not.toHaveBeenCalledWith("run", "incomplete");
+      });
+
+      /** @scenario "A re-fold never replaces state from a history read behind the checkpoint" */
+      it("keeps the loaded state when nothing read reaches the occurred-at checkpoint", async () => {
+        vi.useRealTimers();
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
+        // The applied set is empty (a get()-only store), so only the
+        // checkpoint fence can see that the read is missing the event that
+        // set the state's high-water mark at CHECKPOINT_MS.
+        const { fold, store } = makeAppliedFold({
+          historyReads: [[eventAt(1_000), eventAt(2_000)]],
+          appliedEventIds: [],
+        });
+        const late = eventAt(3_000);
+
+        const result = await strictExecutor.execute(fold, late, context);
+
+        expect(result.sequence).toEqual([1_000, 2_000, CHECKPOINT_MS, 3_000]);
+        expect(store.store).toHaveBeenCalledOnce();
+        expect(refoldMetric).toHaveBeenCalledWith("run", "incomplete");
+      });
+
+      /** @scenario "A re-fold never replaces state from a history read missing an applied event" */
+      it("keeps the loaded state for an out-of-order batch too", async () => {
+        vi.useRealTimers();
+        const strictExecutor = new FoldProjectionExecutor({
+          refoldHistoryRetryDelaysMs: [],
+        });
+        const checkpointEvent = eventAt(CHECKPOINT_MS);
+        const { fold } = makeAppliedFold({
+          historyReads: [[eventAt(2_000), checkpointEvent]],
+          appliedEventIds: ["evt-a", checkpointEvent.id],
+        });
+
+        const result = await strictExecutor.executeBatch(
+          fold,
+          [eventAt(3_000), eventAt(4_000)],
+          context,
+        );
+
+        expect(result.sequence).toEqual([
+          1_000,
+          2_000,
+          CHECKPOINT_MS,
+          3_000,
+          4_000,
+        ]);
+        expect(refoldMetric).toHaveBeenCalledWith("run", "incomplete");
       });
     });
 

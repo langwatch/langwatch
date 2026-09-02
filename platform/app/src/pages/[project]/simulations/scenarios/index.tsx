@@ -16,6 +16,7 @@ import {
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
 } from "~/components/scenarios/ScenarioWelcomeScreen";
+import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
 import { useAgentTestingRedirect } from "~/components/suites/useAgentTestingRedirect";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -172,10 +173,12 @@ function ScenarioLibraryPage() {
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
           <Spacer />
+          <ReturnToNewSimulationsBanner target="scenarios" />
           <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}
             onToggle={handleLabelToggle}
+            triggerSize="header"
           />
           <PageLayout.HeaderButton onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario
