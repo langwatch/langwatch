@@ -16,12 +16,15 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { RUM_SESSION_HEADER, RUM_TRACES_PATH } from "@langwatch/react-rum/constants";
+import { publicEndpoint } from "@langwatch/api";
+import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { Context } from "hono";
-import { createServiceApp } from "~/server/api/security";
-import { publicEndpoint } from "@langwatch/platform-api/app-rest";
-import { ingestBrowserTraces, readCappedBody } from "~/server/rum/rum-ingest.service";
 
-const secured = createServiceApp({ basePath: "/api/rum" });
+import {
+  ingestBrowserTraces,
+  readCappedBody,
+  type RumRateLimiter,
+} from "./rum-ingest.service";
 
 /**
  * Names the caller for the per-caller rate-limit bucket.
@@ -41,27 +44,35 @@ export const rateLimitKey = (c: Context): string => {
   return `ip:${nearest ?? "unknown"}`;
 };
 
-secured
-  .access(
-    publicEndpoint(
-      "Browser telemetry ingest; the browser has no credential to present and the payload is treated as untrusted",
-    ),
-  )
-  .post(RUM_TRACES_PATH.replace("/api/rum", ""), async (c) => {
-    try {
-      const body = await readCappedBody(c.req.raw);
-      await ingestBrowserTraces({ body, callerKey: rateLimitKey(c) });
-    } catch (error) {
-      if (HandledError.isHandled(error)) {
-        return c.json(
-          { error: error.message, code: error.code },
-          error.httpStatus as 400 | 404 | 413 | 429 | 500,
-        );
+export function createRumRestApp(options: {
+  security: AppRestSecurity;
+  rateLimit: RumRateLimiter;
+}): MountableRestApp {
+  const { rateLimit } = options;
+  const secured = options.security.createServiceApp({ basePath: "/api/rum" });
+
+  secured
+    .access(
+      publicEndpoint(
+        "Browser telemetry ingest; the browser has no credential to present and the payload is treated as untrusted",
+      ),
+    )
+    .post(RUM_TRACES_PATH.replace("/api/rum", ""), async (c) => {
+      try {
+        const body = await readCappedBody(c.req.raw);
+        await ingestBrowserTraces({ body, callerKey: rateLimitKey(c), rateLimit });
+      } catch (error) {
+        if (HandledError.isHandled(error)) {
+          return c.json(
+            { error: error.message, code: error.code },
+            error.httpStatus as 400 | 404 | 413 | 429 | 500,
+          );
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    return c.body(null, 202);
-  });
+      return c.body(null, 202);
+    });
 
-export const app = secured.hono;
+  return secured.hono;
+}

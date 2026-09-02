@@ -29,3 +29,9 @@ export {
   createOrUpdateQueueItems,
   type FindExistingTraceIds,
 } from "./services/annotation-queueing.service";
+export {
+  createAnnotationsRestApp,
+  type AnnotationRestCredential,
+  type AnnotationRestCredentialPort,
+  type AnnotationRestPermission,
+} from "./transport/api-rest/annotation.api";

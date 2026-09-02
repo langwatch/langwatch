@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -34,6 +35,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "nanoid": "^5.1.5",
     "zod": "^4.4.3"
   },

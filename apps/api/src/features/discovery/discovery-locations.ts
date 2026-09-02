@@ -3,7 +3,7 @@
  * says why reading it needs no credential.
  *
  * Shared by the two discovery route modules so the copy in `/llms.txt` and the
- * paths `start.ts` routes to the API are the same strings rather than two that
+ * paths a host routes to the API are the same strings rather than two that
  * agree today.
  */
 
@@ -17,10 +17,10 @@ export const API_OPENAPI_PATH = "/api/openapi.json";
 export const LLMS_TXT_PATH = "/llms.txt";
 
 /**
- * The discovery paths that sit outside `/api`. `start.ts` dispatches on this,
- * and `vite.config.ts` proxies the same two in dev; miss either and the
- * single-page-app fallback answers with the HTML shell and a 200 that a caller
- * reads as success.
+ * The discovery paths that sit outside `/api`. A host that only dispatches
+ * `/api/*` into this process's Hono app dispatches on this as well; miss it and
+ * the single-page-app fallback answers with the HTML shell and a 200 that a
+ * caller reads as success.
  */
 export const ROOT_DISCOVERY_PATHS: readonly string[] = [WELL_KNOWN_OPENAPI_PATH, LLMS_TXT_PATH];
 
@@ -42,9 +42,9 @@ export function isRootDiscoveryPath(pathname: string): boolean {
 const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * The dev proxy rule matching exactly these paths, built here so `vite.config.ts`
- * cannot fall behind the list. A path added above but missed there would reach
- * Hono in production and the SPA in development — the worst shape of bug,
+ * The dev proxy rule matching exactly these paths, built here so a dev server
+ * config cannot fall behind the list. A path added above but missed there would
+ * reach Hono in production and the SPA in development — the worst shape of bug,
  * because it only appears where nobody is testing.
  *
  * Vite matches `server.proxy` regex keys against the full request URL, path and

@@ -29,8 +29,6 @@ import { organizationRestApp } from "./api/management/organization-rest";
 import { buildPromptsRestApp } from "./api/prompts-rest";
 import { secretPublicRestApp } from "../runtime/app/features/secret";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as annotationsApp } from "./routes/annotations";
-import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
@@ -44,7 +42,6 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
-import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
 import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
@@ -58,8 +55,6 @@ import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
-import { app as rootDiscoveryApp } from "./routes/root-discovery";
-import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -237,18 +232,6 @@ export function createApiRouter(app: App) {
     }).hono,
   );
   api.route("/", createScenarioRunExportApp(app));
-  // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
-  // namespace with the credentialed resource routes, so it is mounted first
-  // and cannot be shadowed by a sibling that later grows a parameterised
-  // segment at the root of that namespace.
-  api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
-  // The same document at the two locations a caller tries first, plus the RPC
-  // catalogue and /llms.txt. Two apps because the route-coverage gate only
-  // reads files declaring an `/api` basePath — see api-discovery.ts. The
-  // root-level pair only arrives here at all because start.ts consults
-  // `isRootDiscoveryPath`; without that they meet the SPA fallback.
-  api.route("/", apiDiscoveryApp); // /api/openapi.json
-  api.route("/", rootDiscoveryApp); // /.well-known/openapi, /llms.txt
   // Most REST families now live in `@langwatch/platform-api` and are mounted by
   // factory rather than by import. `createAppRestFeatures` is their single
   // enumeration — the same one the route-registry audits build from — so a
@@ -367,7 +350,6 @@ export function createApiRouter(app: App) {
 
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
-  api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
@@ -381,7 +363,6 @@ export function createApiRouter(app: App) {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would
   // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.

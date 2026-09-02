@@ -9,10 +9,8 @@
  * written from the attacker's side: what does a hostile payload cost us, and
  * what can it claim to be?
  */
-import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum";
+import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { _getMemoryStoreSize, _resetMemoryRateLimitStore } from "~/server/rateLimit";
 
 import {
   collectorHeaders,
@@ -25,8 +23,29 @@ import {
   RumPayloadTooLargeError,
   RumRateLimitedError,
   readCappedBody,
+  type RumRateLimiter,
   stampIdentity,
 } from "../rum-ingest.service";
+
+/**
+ * A fixed-window counter in a Map, standing in for the process's Redis one.
+ *
+ * It is the counter itself rather than a stub of the service, because two of
+ * these scenarios are about WHICH key the limiter is asked for and in what
+ * order — a stub that always answers "allowed" would pass both while the route
+ * churned a key per request.
+ */
+function memoryRateLimiter(): RumRateLimiter & { keyCount: () => number } {
+  const buckets = new Map<string, number>();
+  const limiter = async ({ key, max }: { key: string; max: number }) => {
+    const spent = (buckets.get(key) ?? 0) + 1;
+    buckets.set(key, spent);
+    return { allowed: spent <= max };
+  };
+  return Object.assign(limiter, { keyCount: () => buckets.size });
+}
+
+let rateLimit: RumRateLimiter & { keyCount: () => number };
 
 const attribute = (key: string, value: string) => ({
   key,
@@ -59,7 +78,7 @@ describe("given a browser posting telemetry", () => {
     delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
     // The limiter's buckets outlive a single test, so without this a test that
     // deliberately spends one leaves every test after it throttled.
-    _resetMemoryRateLimitStore();
+    rateLimit = memoryRateLimiter();
     vi.restoreAllMocks();
     vi.stubGlobal(
       "fetch",
@@ -106,7 +125,7 @@ describe("given a browser posting telemetry", () => {
       expect(many.length).toBeLessThan(RUM_MAX_BODY_BYTES);
 
       await expect(
-        ingestBrowserTraces({ body: many, callerKey: "spans" }),
+        ingestBrowserTraces({ body: many, callerKey: "spans", rateLimit }),
       ).rejects.toBeInstanceOf(RumPayloadTooLargeError);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -124,6 +143,7 @@ describe("given a browser posting telemetry", () => {
       await ingestBrowserTraces({
         body: exportWith(1, forged),
         callerKey: "forger",
+        rateLimit,
       });
 
       const forwarded = JSON.parse(
@@ -167,6 +187,7 @@ describe("given a browser posting telemetry", () => {
           await ingestBrowserTraces({
             body: exportWith(1),
             callerKey: "flood",
+            rateLimit,
           });
           accepted++;
         } catch (error) {
@@ -192,6 +213,7 @@ describe("given a browser posting telemetry", () => {
         await ingestBrowserTraces({
           body: exportWith(1),
           callerKey: `rotating-${i}`,
+          rateLimit,
         });
       }
 
@@ -199,6 +221,7 @@ describe("given a browser posting telemetry", () => {
         ingestBrowserTraces({
           body: exportWith(1),
           callerKey: "rotating-one-more",
+          rateLimit,
         }),
       ).rejects.toBeInstanceOf(RumRateLimitedError);
     });
@@ -212,18 +235,20 @@ describe("given a browser posting telemetry", () => {
         await ingestBrowserTraces({
           body: exportWith(1),
           callerKey: `rotating-${i}`,
+          rateLimit,
         });
       }
-      const keysBefore = _getMemoryStoreSize();
+      const keysBefore = rateLimit.keyCount();
 
       await expect(
         ingestBrowserTraces({
           body: exportWith(1),
           callerKey: "an-identity-never-seen-before",
+          rateLimit,
         }),
       ).rejects.toBeInstanceOf(RumRateLimitedError);
 
-      expect(_getMemoryStoreSize()).toBe(keysBefore);
+      expect(rateLimit.keyCount()).toBe(keysBefore);
     });
   });
 
@@ -235,7 +260,7 @@ describe("given a browser posting telemetry", () => {
       ["resourceSpans carrying no spans", '{"resourceSpans":[{"resource":{}}]}'],
     ])("refuses %s", async (_case, body) => {
       await expect(
-        ingestBrowserTraces({ body, callerKey: `invalid-${_case}` }),
+        ingestBrowserTraces({ body, callerKey: `invalid-${_case}`, rateLimit }),
       ).rejects.toBeInstanceOf(RumPayloadInvalidError);
     });
   });
@@ -264,6 +289,7 @@ describe("given a browser posting telemetry", () => {
       const ingest = ingestBrowserTraces({
         body,
         callerKey: `unwalkable-${_case}`,
+        rateLimit,
       });
 
       await expect(ingest).rejects.toBeInstanceOf(RumPayloadInvalidError);
@@ -283,7 +309,7 @@ describe("given a browser posting telemetry", () => {
       // A 5xx here is retryable to an OTLP exporter, so surfacing the failure
       // would turn a collector outage into a retry storm against our own app.
       await expect(
-        ingestBrowserTraces({ body: exportWith(1), callerKey: "unreachable" }),
+        ingestBrowserTraces({ body: exportWith(1), callerKey: "unreachable", rateLimit }),
       ).resolves.toBeUndefined();
     });
   });

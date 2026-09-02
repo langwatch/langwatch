@@ -24,7 +24,19 @@ import {
   RUM_MAX_SPANS,
   RUM_SERVICE_NAME,
 } from "@langwatch/react-rum/constants";
-import { rateLimit } from "~/server/rateLimit";
+
+/**
+ * One fixed-window counter, keyed on whatever the caller is identified by.
+ *
+ * A port rather than an import: the counter lives on the process's own Redis
+ * and is SHARED with every other throttle this process meters through, so a
+ * second instance here would give one caller two budgets for one rule.
+ */
+export type RumRateLimiter = (input: {
+  key: string;
+  windowSeconds: number;
+  max: number;
+}) => Promise<{ allowed: boolean }>;
 
 const logger = createLogger("langwatch:rum:ingest");
 
@@ -253,7 +265,10 @@ export function assertWalkableExport(resourceSpans: unknown[]): void {
 export const RUM_PER_CALLER_PER_MINUTE = 120;
 export const RUM_GLOBAL_PER_MINUTE = 6_000;
 
-export async function enforceRateLimits(callerKey: string): Promise<void> {
+export async function enforceRateLimits(
+  callerKey: string,
+  rateLimit: RumRateLimiter,
+): Promise<void> {
   // The global bucket is checked first because the per-caller key is built from
   // a value the caller chooses. Checking that one first means every request
   // writes a fresh 60s key whenever the caller rotates its session header — so
@@ -282,14 +297,16 @@ export async function enforceRateLimits(callerKey: string): Promise<void> {
 export async function ingestBrowserTraces({
   body,
   callerKey,
+  rateLimit,
 }: {
   body: string;
   callerKey: string;
+  rateLimit: RumRateLimiter;
 }): Promise<void> {
   const forwardTo = collectorTracesUrl();
   if (!forwardTo) throw new RumIngestDisabledError();
 
-  await enforceRateLimits(callerKey);
+  await enforceRateLimits(callerKey, rateLimit);
 
   let parsed: unknown;
   try {
