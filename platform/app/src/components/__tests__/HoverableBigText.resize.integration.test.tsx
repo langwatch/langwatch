@@ -60,7 +60,7 @@ class TestResizeObserver implements ResizeObserver {
 }
 
 /** Make the box report more content than it can show, as clamping does. */
-const clipContent = (element: HTMLElement) => {
+const clipContent = ({ element }: { element: HTMLElement }) => {
   Object.defineProperty(element, "offsetHeight", {
     value: 40,
     configurable: true,
@@ -88,7 +88,7 @@ const settleFirstMeasurement = async () => {
   );
 };
 
-const resizeBox = (box: HTMLElement) => {
+const resizeBox = ({ box }: { box: HTMLElement }) => {
   const watch = watches.find((candidate) => candidate.element === box);
   // A box nobody watches would make every test here pass for the wrong reason,
   // so say so rather than firing nothing.
@@ -124,11 +124,26 @@ describe("HoverableBigText overflow measurement", () => {
           screen.queryByText("Formatted"),
           "text that fits offers nothing to expand",
         ).not.toBeInTheDocument();
+        expect(
+          box,
+          "text that fits is not a tooltip trigger either",
+        ).not.toHaveAttribute("data-scope", "tooltip");
 
-        clipContent(box);
-        resizeBox(box);
+        clipContent({ element: box });
+        resizeBox({ box });
 
-        fireEvent.click(screen.getByText(TEXT));
+        // The scenario asks for the full text on hover as well as on click.
+        // Hover is the tooltip, and the tooltip is disabled until the component
+        // measures itself as clipped — disabled means the wrapper renders the
+        // bare text with no trigger wiring at all, so becoming a trigger IS the
+        // affordance appearing. Asserted on the wiring rather than by hovering
+        // because the tooltip opens on a 420ms delay through a portal that
+        // jsdom cannot position.
+        const clipped = screen.getByText(TEXT);
+        expect(clipped).toHaveAttribute("data-scope", "tooltip");
+        expect(clipped).toHaveAttribute("data-part", "trigger");
+
+        fireEvent.click(clipped);
         expect(await screen.findByText("Formatted")).toBeInTheDocument();
       });
     });

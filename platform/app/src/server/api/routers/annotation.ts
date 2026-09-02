@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type {
   AnnotationQueueItem,
+  Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
 import { AnnotationService } from "~/server/annotations/annotation.service";
@@ -288,6 +289,15 @@ const queuedAtRangeFilter = ({
 };
 
 /**
+ * A queue-item `where` whose `AND` is always a list, so clauses can be stacked
+ * onto it. Prisma allows a single object there too, which would make every
+ * push a type error for a shape this code never builds.
+ */
+type QueueItemWhere = Prisma.AnnotationQueueItemWhereInput & {
+  AND: Prisma.AnnotationQueueItemWhereInput[];
+};
+
+/**
  * Which queue items the optimized list reads. The clauses stack rather than
  * replace: the caller's reach is settled first, and the reviewer's own pick of
  * queues is applied last, so a queue id from anywhere else can subtract rows
@@ -311,8 +321,8 @@ const optimizedQueueItemsWhere = ({
   organizationId: string;
   /** The queues the caller belongs to, where those were looked up. */
   userQueueIds: string[];
-}) => {
-  const whereCondition: any = {
+}): QueueItemWhere => {
+  const whereCondition: QueueItemWhere = {
     ...queueItemReferenceFilter({
       projectId: input.projectId,
       organizationId,
@@ -337,7 +347,9 @@ const optimizedQueueItemsWhere = ({
       OR: [{ annotationQueueId: { in: userQueueIds } }, { userId }],
     });
   } else {
-    // Default case - just user's items
+    // Nothing else has narrowed the read, so it is the caller's own items or
+    // nothing: without this the reference filter alone would return the
+    // project's whole queue.
     whereCondition.userId = userId;
   }
 

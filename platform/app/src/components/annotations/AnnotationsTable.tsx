@@ -238,17 +238,20 @@ const givenScores = ({
   activeScoreTypes: ActiveScoreType[];
 }) =>
   activeScoreTypes.flatMap((scoreType) =>
-    scoreValuesFor(annotations, scoreType.id).map((score) => ({
+    scoreValuesFor({ annotations, scoreTypeId: scoreType.id }).map((score) => ({
       ...score,
       key: `${score.annotationId}-${scoreType.id}`,
       name: scoreType.name,
     })),
   );
 
-const scoreValuesFor = (
-  annotations: AnnotationWithUser[],
-  scoreTypeId: string,
-): { annotationId: string; value: string[]; reason?: string | null }[] =>
+const scoreValuesFor = ({
+  annotations,
+  scoreTypeId,
+}: {
+  annotations: AnnotationWithUser[];
+  scoreTypeId: string;
+}): { annotationId: string; value: string[]; reason?: string | null }[] =>
   annotations.flatMap((annotation) => {
     const scores = annotation.scoreOptions as Record<string, ScoreValue> | null;
     const score = scores?.[scoreTypeId];
@@ -328,6 +331,17 @@ export const AnnotationsTable = ({
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [selectedQueueIds, setSelectedQueueIds] = useState<string[]>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  // Narrowing the queues narrows the rows, so the page the reviewer was on may
+  // no longer exist: picking a small queue from page three would otherwise show
+  // them the empty state for a queue that has items.
+  const changeSelectedQueueIds = useCallback(
+    (queueIds: string[]) => {
+      setSelectedQueueIds(queueIds);
+      paging.setPage(1);
+    },
+    [paging.setPage],
+  );
 
   const isPageProvidedRows = providedRows !== undefined;
 
@@ -640,20 +654,21 @@ export const AnnotationsTable = ({
           header: scoreType.name,
           cell: ({ row }) => (
             <VStack align="start" gap={2}>
-              {scoreValuesFor(row.original.annotations, scoreType.id).map(
-                (score) => (
-                  <HStack key={score.annotationId} gap={1} wrap="wrap">
-                    {score.value.map((value) => (
-                      <Badge key={value}>{value}</Badge>
-                    ))}
-                    {score.reason && (
-                      <Tooltip content={score.reason}>
-                        <MessageCircle size={14} />
-                      </Tooltip>
-                    )}
-                  </HStack>
-                ),
-              )}
+              {scoreValuesFor({
+                annotations: row.original.annotations,
+                scoreTypeId: scoreType.id,
+              }).map((score) => (
+                <HStack key={score.annotationId} gap={1} wrap="wrap">
+                  {score.value.map((value) => (
+                    <Badge key={value}>{value}</Badge>
+                  ))}
+                  {score.reason && (
+                    <Tooltip content={score.reason}>
+                      <MessageCircle size={14} />
+                    </Tooltip>
+                  )}
+                </HStack>
+              ))}
             </VStack>
           ),
         }),
@@ -778,7 +793,10 @@ export const AnnotationsTable = ({
         .filter(Boolean)
         .join("\n"),
       ...activeScoreTypes.map((scoreType) =>
-        scoreValuesFor(row.annotations, scoreType.id)
+        scoreValuesFor({
+          annotations: row.annotations,
+          scoreTypeId: scoreType.id,
+        })
           .map((score) =>
             score.reason
               ? `${score.value.join(", ")} (${score.reason})`
@@ -815,7 +833,7 @@ export const AnnotationsTable = ({
           <AnnotationQueueFilter
             queues={queues.data ?? []}
             selectedQueueIds={selectedQueueIds}
-            onSelectedQueueIdsChange={setSelectedQueueIds}
+            onSelectedQueueIdsChange={changeSelectedQueueIds}
           />
         )}
         {showStatusFilter && (
