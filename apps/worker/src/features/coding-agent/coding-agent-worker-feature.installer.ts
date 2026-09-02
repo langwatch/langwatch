@@ -1,9 +1,7 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import type { CodingAgentProcessingPipeline } from "@langwatch/coding-agent-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /**
  * The three contribution senders the source pipelines dispatch into (ADR-056).
@@ -24,7 +22,7 @@ export interface CodingAgentWorkerCommands<
 
 /** Coding Agent's worker-facing capability after its server graph is composed. */
 export interface CodingAgentWorkerCapability {
-  buildProcessing(): WorkerPipelineDefinition;
+  buildProcessing(): CodingAgentProcessingPipeline;
 }
 
 /**

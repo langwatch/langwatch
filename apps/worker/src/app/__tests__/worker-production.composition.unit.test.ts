@@ -9,6 +9,7 @@ import {
   type EventSourcing,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
+import { codingAgentSessionFoldState } from "@langwatch/coding-agent-server/testing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   createBlobMaintenancePipeline,
@@ -104,6 +105,9 @@ function createProcessPersistenceDatabase() {
     processManagerInstance: {},
     processManagerOutbox: {},
     processManagerOutboxAttempt: {},
+    // The one client this process opens carries every model its features
+    // name, and the coding-agent fold stamps this one behind each commit.
+    project: { updateMany: async () => ({ count: 0 }) },
   };
 }
 
@@ -920,7 +924,6 @@ describe("WorkerProductionComposition", () => {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
         source?: Record<string, unknown>;
         observability?: object;
-        codingAgent?: boolean;
       } = {},
     ) {
       const commands = {
@@ -949,20 +952,6 @@ describe("WorkerProductionComposition", () => {
           execution: {} as never,
           metrics: {} as never,
         },
-        ...(input.codingAgent
-          ? {
-              codingAgent: {
-                installer: {
-                  buildProcessing: () =>
-                    ({
-                      metadata: { name: "coding_agent_processing", aggregateType: "codingAgent" },
-                      commands: [],
-                      processManagers: new Map(),
-                    }) as never,
-                },
-              },
-            }
-          : {}),
         ...(input.observability ? { observability: input.observability as never } : {}),
       });
       return { composition, commands };
@@ -1036,48 +1025,37 @@ describe("WorkerProductionComposition", () => {
       },
     );
 
-    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
-    it("mounts the coding-agent dispatch subscribers when that pipeline is present", async () => {
-      const { composition } = compositionWith({ codingAgent: true });
+    /** @scenario "The ADR-056 edge is mounted rather than declared missing" */
+    it("mounts the coding-agent dispatch subscribers, because the pipeline is always there", async () => {
+      const { composition } = compositionWith();
 
       const metric = definitionsFrom(composition, "metric");
       await metric.installer.install();
       const log = definitionsFrom(composition, "log");
       await log.installer.install();
 
+      // Unconditional since the Coding Agent pipeline became this graph's own
+      // to compose. There is no longer a graph in which the two source
+      // pipelines mount and the session pipeline they contribute into does
+      // not, so there is no absence left to report.
       expect(metric.registered[0]!.subscribers).toEqual(["codingAgentMetricFactsDispatch"]);
       expect(log.registered[0]!.subscribers).toEqual(["codingAgentLogFactsDispatch"]);
     });
 
-    /** @scenario "A worker without the Coding Agent pipeline names the missing edge" */
-    it("names the absent Coding Agent pipeline, and mounts both anyway", async () => {
+    /** @scenario "The ADR-056 edge is mounted rather than declared missing" */
+    it("says nothing at boot about a missing Coding Agent pipeline", () => {
       const warn = vi.fn();
 
       const { composition } = compositionWith({
         observability: { logger: { info: vi.fn(), warn } },
       });
 
-      expect(warn).toHaveBeenCalledWith(
-        { reason: "no-coding-agent-pipeline" },
-        expect.stringContaining("without the Coding Agent pipeline"),
-      );
-      expect(composition.featureInstallers.map((installer) => installer.name)).toEqual(
-        expect.arrayContaining(["metric", "log"]),
-      );
-    });
-
-    /** @scenario "A worker without the Coding Agent pipeline names the missing edge" */
-    it("says nothing about the edge when the Coding Agent pipeline is present", () => {
-      const warn = vi.fn();
-
-      compositionWith({
-        codingAgent: true,
-        observability: { logger: { info: vi.fn(), warn } },
-      });
-
       expect(warn).not.toHaveBeenCalledWith(
         { reason: "no-coding-agent-pipeline" },
         expect.anything(),
+      );
+      expect(composition.featureInstallers.map((installer) => installer.name)).toEqual(
+        expect.arrayContaining(["metric", "log", "coding-agent"]),
       );
     });
 
@@ -1792,6 +1770,379 @@ describe("WorkerProductionComposition", () => {
       // drifted prefix would not fail — each side would simply read a cache
       // the other never wrote, which is a stale read rather than an error.
       expect(set.mock.calls[0]![0]).toBe("fold:suite_runs:project_alpha:batch_1");
+    });
+
+    /** @scenario "Producer and consumer honour one fold cache TTL" */
+    it("honours the fold cache TTL the environment names", async () => {
+      const set = vi.fn(async (..._args: unknown[]) => "OK");
+      const redis = { get: vi.fn(async () => null), set };
+
+      await storeFoldedRunState(
+        compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
+      );
+
+      // The same variable the App reads. Two graphs caching one keyspace under
+      // different TTLs expire each other's entries early, and a fold-cache miss
+      // is treated as authoritative.
+      expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
+    });
+  });
+
+  /**
+   * The ADR-056 session pipeline, composed here rather than handed over built.
+   *
+   * It was the App's to build for one reason that turned out to be two
+   * misreadings: pricing a model call looked like it needed the provider
+   * stack, and stamping a project looked like it needed the project service.
+   * Neither is true — the first is a pure function over the platform catalog,
+   * the second one throttled UPDATE — so what these cases hold is that this
+   * graph composes the pipeline from its own ClickHouse client, its own Redis
+   * and its own Prisma client, and that the GitHub demand path the mapping
+   * subscriber needs is composed alongside it.
+   */
+  describe("when coding-agent session processing is composed", () => {
+    function compositionWith(
+      input: {
+        resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        redis?: object;
+        database?: object;
+        source?: Record<string, unknown>;
+      } = {},
+    ) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        eventing: {
+          database: (input.database ?? createProcessPersistenceDatabase()) as never,
+          resolveClickHouseClient: (input.resolveClickHouseClient ??
+            (async () => ({
+              insert: async () => undefined,
+              query: async () => ({ json: async () => [] }),
+            }))) as never,
+          groupQueue: {
+            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+          },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: (input.database ?? createProcessPersistenceDatabase()) as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+    }
+
+    /**
+     * What `eventSourcing.register` hands back for this pipeline. The installer
+     * resolves three deferred contribution senders out of the returned commands
+     * and refuses a registration missing any, so a bare `{ commands: {} }`
+     * would fail these cases for a reason none of them is about.
+     */
+    function registeredCodingAgentPipeline() {
+      return {
+        commands: {
+          contributeSpanFacts: { send: async () => undefined },
+          contributeMetricFacts: { send: async () => undefined },
+          contributeLogFacts: { send: async () => undefined },
+        },
+      } as never;
+    }
+
+    async function storeFoldedSession(
+      composition: WorkerProductionComposition,
+    ): Promise<void> {
+      const stores: FoldProjectionStore<Record<string, unknown>>[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        if (definition.metadata.name !== "coding_agent_processing") {
+          return registeredCodingAgentPipeline();
+        }
+        for (const fold of definition.foldProjections.values()) {
+          stores.push(
+            (
+              fold.definition as unknown as {
+                store: FoldProjectionStore<Record<string, unknown>>;
+              }
+            ).store,
+          );
+        }
+        return registeredCodingAgentPipeline();
+      });
+      await composition.featureInstallers
+        .find((candidate) => candidate.name === "coding-agent")!
+        .install();
+
+      await stores[0]!.store(codingAgentSessionFoldState() as never, {
+        aggregateId: "session_1",
+        tenantId: createTenantId("project_alpha"),
+      });
+    }
+
+    /** @scenario "The worker mounts the pipeline rather than being handed one" */
+    it("mounts coding-agent without being handed a capability, and registers its pipeline", async () => {
+      const composition = compositionWith();
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "coding-agent",
+      );
+      expect(installer, "the composition mounted no coding-agent feature").toBeDefined();
+      const registered: string[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push(definition.metadata.name);
+        return registeredCodingAgentPipeline();
+      });
+
+      await installer!.install();
+
+      expect(registered).toEqual(["coding_agent_processing"]);
+    });
+
+    /** @scenario "The worker mounts the pipeline rather than being handed one" */
+    it("wires the GitHub demand path into the definition it registers", async () => {
+      const composition = compositionWith();
+      const subscribers: string[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        if (definition.metadata.name === "coding_agent_processing") {
+          subscribers.push(...definition.foldSubscribers.keys());
+        }
+        return registeredCodingAgentPipeline();
+      });
+
+      await composition.featureInstallers
+        .find((candidate) => candidate.name === "coding-agent")!
+        .install();
+
+      // `reactor:pullRequestMapping` exists only because a demand path was
+      // passed in. Composing one and forgetting to hand it over registers one
+      // routing key fewer than the producer stages jobs against, and the queue
+      // rejects an unroutable job for redelivery rather than dropping it.
+      expect(subscribers).toEqual(["pullRequestMapping"]);
+    });
+
+    /** @scenario "The worker mounts the pipeline rather than being handed one" */
+    it("mounts it before metric, log and trace, whose subscribers dispatch into it", () => {
+      const names = compositionWith().featureInstallers.map((installer) => installer.name);
+      const codingAgent = names.indexOf("coding-agent");
+
+      // Not a preference: the dispatch subscribers Metric, Log and Trace mount
+      // close over this pipeline's contribution senders, and those senders are
+      // proxies that refuse until this registration resolves them.
+      for (const later of ["metric", "log", "trace"]) {
+        expect(codingAgent, `coding-agent must precede ${later}`).toBeLessThan(
+          names.indexOf(later),
+        );
+      }
+    });
+
+    /** @scenario "Session rows are written through the client this graph resolved" */
+    it("writes session rows through the ClickHouse client this graph resolved", async () => {
+      const insert = vi.fn(
+        async (_request: { table: string; values: readonly unknown[] }) => undefined,
+      );
+      const resolveClickHouseClient = vi.fn(async () => ({
+        insert,
+        query: async () => ({ json: async () => [] }),
+      }));
+
+      await storeFoldedSession(compositionWith({ resolveClickHouseClient }));
+
+      expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
+      // 49 is the substrate's own `retention.defaultRetentionDays` above, not
+      // a number configured a second time here. Two graphs stamping different
+      // retentions on the same table expire each other's rows.
+      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+        TenantId: "project_alpha",
+        SessionId: "session_1",
+        _retention_days: 49,
+      });
+    });
+
+    /** @scenario "Both graphs cache the session fold under one keyspace" */
+    it("caches through the Redis its own queue substrate runs on", async () => {
+      const set = vi.fn(async (..._args: unknown[]) => "OK");
+      const redis = { get: vi.fn(async () => null), set };
+
+      await storeFoldedSession(compositionWith({ redis }));
+
+      expect(set.mock.calls[0]![0]).toBe("fold:coding_agent_sessions:project_alpha:session_1");
+    });
+
+    /** @scenario "Storing a session stamps its project's activity" */
+    it("stamps the project through the one Prisma client this process opened", async () => {
+      const updateMany = vi.fn(async () => ({ count: 1 }));
+      const database = { ...createProcessPersistenceDatabase(), project: { updateMany } };
+
+      await storeFoldedSession(compositionWith({ database }));
+
+      // The stamp is fire-and-forget behind the commit; what this holds is
+      // that it lands on this process's own client rather than on a project
+      // service this graph does not have.
+      expect(updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { lastCodingAgentSessionAt: expect.any(Date) } }),
+      );
+    });
+  });
+
+  describe("when experiment-run processing is composed", () => {
+    function compositionWith(
+      input: {
+        resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        redis?: object;
+        source?: Record<string, unknown>;
+      } = {},
+    ) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: (input.resolveClickHouseClient ??
+            (async () => ({
+              insert: async () => undefined,
+              query: async () => ({ json: async () => [] }),
+            }))) as never,
+          groupQueue: {
+            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+          },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: {} as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+    }
+
+    /**
+     * What `eventSourcing.register` hands back for this pipeline.
+     *
+     * The installer resolves Trace's `computeExperimentRunMetrics` proxy out of
+     * the returned commands and refuses a registration missing it, so a bare
+     * `{ commands: {} }` would fail these cases for a reason neither is about.
+     */
+    function registeredExperimentPipeline() {
+      return {
+        commands: { computeExperimentRunMetrics: { send: async () => undefined } },
+      } as never;
+    }
+
+    async function storeFoldedRunState(composition: WorkerProductionComposition): Promise<void> {
+      const stores: FoldProjectionStore<Record<string, unknown>>[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        if (definition.metadata.name !== "experiment_run_processing") {
+          return registeredExperimentPipeline();
+        }
+        for (const fold of definition.foldProjections.values()) {
+          stores.push(
+            (
+              fold.definition as unknown as {
+                store: FoldProjectionStore<Record<string, unknown>>;
+              }
+            ).store,
+          );
+        }
+        return registeredExperimentPipeline();
+      });
+      await composition.featureInstallers
+        .find((candidate) => candidate.name === "experiment")!
+        .install();
+
+      await stores[0]!.store(
+        {
+          RunId: "run_1",
+          ExperimentId: "experiment_1",
+          WorkflowVersionId: null,
+          Total: 2,
+          Progress: 1,
+          CompletedCount: 1,
+          FailedCount: 0,
+          TotalCost: 0.25,
+          TotalDurationMs: 1200,
+          AvgScoreBps: 7500,
+          PassRateBps: 5000,
+          Targets: "[]",
+          CreatedAt: 100,
+          UpdatedAt: 200,
+          LastEventOccurredAt: 190,
+          StartedAt: 110,
+          FinishedAt: null,
+          StoppedAt: null,
+          TotalScoreSum: 0.75,
+          ScoreCount: 1,
+          PassedCount: 1,
+          GradedCount: 2,
+          TraceMetrics: {},
+        },
+        {
+          aggregateId: "experiment_1:run_1",
+          tenantId: createTenantId("project_alpha"),
+        },
+      );
+    }
+
+    /** @scenario "The worker mounts the pipeline rather than being handed one" */
+    it("mounts experiment without being handed a capability, and registers its pipeline", async () => {
+      const composition = compositionWith();
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "experiment",
+      );
+      expect(installer, "the composition mounted no experiment feature").toBeDefined();
+      const registered: string[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push(definition.metadata.name);
+        return registeredExperimentPipeline();
+      });
+
+      await installer!.install();
+
+      expect(registered).toEqual(["experiment_run_processing"]);
+    });
+
+    /** @scenario "Run state is written through the client this graph resolved" */
+    it("writes run state through the ClickHouse client this graph resolved", async () => {
+      const insert = vi.fn(
+        async (_request: { table: string; values: readonly unknown[] }) => undefined,
+      );
+      const resolveClickHouseClient = vi.fn(async () => ({
+        insert,
+        query: async () => ({ json: async () => [] }),
+      }));
+
+      await storeFoldedRunState(compositionWith({ resolveClickHouseClient }));
+
+      expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
+      // 49 is the substrate's own `retention.defaultRetentionDays` above, not
+      // a number configured a second time here. Two graphs stamping different
+      // retentions on the same table expire each other's rows.
+      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+        TenantId: "project_alpha",
+        RunId: "run_1",
+        _retention_days: 49,
+      });
+    });
+
+    /** @scenario "Both graphs cache the run-state fold under one keyspace" */
+    it("caches through the Redis its own queue substrate runs on", async () => {
+      const set = vi.fn(async (..._args: unknown[]) => "OK");
+      const redis = { get: vi.fn(async () => null), set };
+
+      await storeFoldedRunState(compositionWith({ redis }));
+
+      // The connection this graph's queue already holds, under the prefix the
+      // App's registry also caches by. A second connection would work and a
+      // drifted prefix would not fail — each side would simply read a cache
+      // the other never wrote, which is a stale read rather than an error.
+      expect(set.mock.calls[0]![0]).toBe("fold:experiment_runs:project_alpha:experiment_1:run_1");
     });
 
     /** @scenario "Producer and consumer honour one fold cache TTL" */

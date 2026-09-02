@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
 
 const logger = createLogger("langwatch:coding-agent-processing:session-seen-touch");
@@ -11,12 +11,12 @@ export class CodingAgentSessionSeenService {
   private readonly heldUntil = new Map<string, number>();
 
   private constructor(
-    private readonly projects: ProjectService,
+    private readonly projects: CodingAgentProjectActivityPort,
     private readonly clock: CodingAgentClockPort,
   ) {}
 
   static create(input: {
-    projects: ProjectService;
+    projects: CodingAgentProjectActivityPort;
     clock: CodingAgentClockPort;
   }): CodingAgentSessionSeenService {
     return new CodingAgentSessionSeenService(input.projects, input.clock);

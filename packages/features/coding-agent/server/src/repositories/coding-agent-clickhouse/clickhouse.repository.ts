@@ -1,5 +1,7 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
+import type {
+  CodingAgentClickHouseClient,
+  CodingAgentClickHousePort,
+} from "../../ports/coding-agent-clickhouse.port";
 
 export const asNumber = (value: unknown): number => {
   const parsed = Number(value);
@@ -19,10 +21,10 @@ export const parseClickHouseDateTimeMs = (value: string): number => {
 export async function groupTenantsByClient(input: {
   tenantIds: string[];
   clickHouse: CodingAgentClickHousePort;
-}): Promise<Array<{ client: ClickHouseClient; tenantIds: string[] }>> {
+}): Promise<Array<{ client: CodingAgentClickHouseClient; tenantIds: string[] }>> {
   const groups = new Map<
-    ClickHouseClient,
-    { client: ClickHouseClient; tenantIds: string[] }
+    CodingAgentClickHouseClient,
+    { client: CodingAgentClickHouseClient; tenantIds: string[] }
   >();
   for (const tenantId of new Set(input.tenantIds)) {
     const client = await input.clickHouse.resolve(tenantId);

@@ -2,8 +2,13 @@ export * from "./adapters/postgres.experiment.adapter";
 export { ExperimentDspyRetentionPort } from "./ports/experiment-dspy-retention.port";
 export { ExperimentWorkbenchUpdatesPort } from "./ports/experiment-workbench-updates.port";
 export {
+  ClickHouseExperimentRunProcessingAdapter,
+  type ClickHouseExperimentRunProcessingAdapterOptions,
+} from "./adapters/clickhouse.experiment-run-processing.adapter";
+export {
   ExperimentEventingAdapter,
   createExperimentRunProcessingPipeline,
+  type ExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,
   type ExperimentRunEventingResultRecord,
   type ExperimentRunEventingState,

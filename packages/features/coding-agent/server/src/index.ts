@@ -8,9 +8,18 @@ export {
 export { CodingAgentBillingPolicyPort } from "./ports/coding-agent-billing.port";
 export { CodingAgentClickHousePort } from "./ports/coding-agent-clickhouse.port";
 export { CodingAgentClockPort } from "./ports/coding-agent-clock.port";
+export { CodingAgentCostEstimatorPort } from "./ports/coding-agent-cost-estimator.port";
+export { CodingAgentProjectActivityPort } from "./ports/coding-agent-project-activity.port";
+export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-request-mapping.port";
 export { SystemCodingAgentClock } from "./adapters/coding-agent-clock.adapter";
+export { ModelCatalogCostEstimatorAdapter } from "./adapters/model-catalog.cost-estimator.adapter";
+export {
+  ClickHouseCodingAgentProcessingAdapter,
+  type ClickHouseCodingAgentProcessingAdapterOptions,
+} from "./adapters/clickhouse.coding-agent-processing.adapter";
 export {
   EventingCodingAgentProcessingAdapter,
+  type CodingAgentProcessingPipeline,
   type CodingAgentProcessingPipelineDeps,
 } from "./adapters/eventing.coding-agent-processing.adapter";
 export { OtelCodingAgentCostMetricsAdapter } from "./adapters/otel.coding-agent-cost-metrics.adapter";

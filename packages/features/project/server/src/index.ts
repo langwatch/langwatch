@@ -1,4 +1,8 @@
 export {
+  PostgresCodingAgentActivityAdapter,
+  type CodingAgentActivityDatabase,
+} from "./adapters/postgres.coding-agent-activity.adapter";
+export {
   PostgresProjectAdapter,
   type PostgresProjectAdapterOptions,
 } from "./adapters/postgres.project.adapter";

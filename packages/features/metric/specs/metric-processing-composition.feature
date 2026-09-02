@@ -39,11 +39,11 @@ Feature: Composing durable metric processing
     Then the same append path runs for both
 
   @unit
-  Scenario: A worker without the Coding Agent pipeline names the missing edge
-    Given a worker graph composed without the Coding Agent pipeline
+  Scenario: The ADR-056 edge is mounted rather than declared missing
+    Given a worker graph composed from its own substrate
     When the graph is composed
-    Then the absence is reported by name
-    And both pipelines are still mounted, because storage needs no other feature
+    Then both pipelines mount their coding-agent dispatch subscriber
+    And nothing is reported at boot about a missing Coding Agent pipeline
 
   @unit
   Scenario: Producer and consumer clamp one lane count

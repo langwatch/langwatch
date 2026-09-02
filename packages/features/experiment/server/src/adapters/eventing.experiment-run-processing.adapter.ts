@@ -139,3 +139,11 @@ export function createExperimentRunProcessingPipeline(
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }
+
+/**
+ * The definition this feature registers, named so a composition root can hold
+ * one without restating its shape.
+ */
+export type ExperimentRunProcessingPipeline = ReturnType<
+  typeof createExperimentRunProcessingPipeline
+>;

@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
-
 import type { GithubHostPort } from "../ports/github-host.port";
+import type { GithubProjectActivityPort } from "../ports/github-project-activity.port";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
@@ -22,7 +21,7 @@ type BranchMappingOperations = Pick<GithubBranchMappingService, "bringRecheckFor
 
 type GithubBranchDemandDeps = {
   mapping: BranchMappingOperations;
-  project: ProjectService;
+  project: GithubProjectActivityPort;
   host: GithubHostPort;
   now?: () => number;
 };

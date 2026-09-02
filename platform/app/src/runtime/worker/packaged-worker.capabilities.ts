@@ -160,7 +160,6 @@ export function packagedWorkerCapabilities(options: {
     automation: { installer: { buildPipeline: () => definition("automations") } },
     eventingMaintenance: capabilities.eventingMaintenance,
     evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
-    codingAgent: { installer: { buildProcessing: () => definition("coding_agent_processing") } },
     gatewaySpend: {
       governance: { buildProcessing: () => definition("governance_events_processing") },
       spend: {
@@ -175,7 +174,6 @@ export function packagedWorkerCapabilities(options: {
         connect: workerCapabilityAlreadyConnected,
       },
     },
-    experiment: { installer: { buildProcessing: () => definition("experiment_run_processing") } },
     langyConversation: {
       installer: {
         buildProcessing: () => definition("langy_conversation_processing"),

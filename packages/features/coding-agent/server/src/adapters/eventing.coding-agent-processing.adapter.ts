@@ -5,13 +5,13 @@ import {
   RedisCachedFoldStore,
 } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
-import type { GithubService } from "@langwatch/github-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
+import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port";
 import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port";
+import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port";
+import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port";
 import { createCodingAgentCostDriftSubscriber } from "../subscribers/coding-agent-cost-drift.subscriber";
 import { EventingContributeLogFactsAdapter } from "./eventing.contribute-log-facts.adapter";
 import { EventingContributeMetricFactsAdapter } from "./eventing.contribute-metric-facts.adapter";
@@ -39,10 +39,10 @@ import { EventingCodingAgentSessionStoreAdapter } from "./eventing.coding-agent-
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: TraceCanonicalisationService;
-  modelProviders: ModelProviderService;
+  modelProviders: CodingAgentCostEstimatorPort;
   costMetrics: CodingAgentCostMetricsPort;
   projections: CodingAgentProjectionPersistence;
-  projects: ProjectService;
+  projects: CodingAgentProjectActivityPort;
   clock: CodingAgentClockPort;
   redis: Redis | Cluster;
   defaultRetentionDays: number;
@@ -53,7 +53,7 @@ export interface CodingAgentProcessingPipelineDeps {
    * session's branch has hosted. Absent where there is no GitHub connection to
    * ask (the test app), in which case the pipeline mounts no subscriber at all.
    */
-  github?: GithubService;
+  github?: CodingAgentPullRequestMappingPort;
 }
 
 /**
@@ -168,3 +168,11 @@ export class EventingCodingAgentProcessingAdapter {
     return configured.build();
   }
 }
+
+/**
+ * The definition this feature registers, named so a composition root can hold
+ * one without restating its shape.
+ */
+export type CodingAgentProcessingPipeline = ReturnType<
+  EventingCodingAgentProcessingAdapter["build"]
+>;

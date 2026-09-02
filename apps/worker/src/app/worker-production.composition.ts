@@ -18,7 +18,9 @@ import {
   PostgresAuthzPipelineAdapter,
 } from "@langwatch/authz-server";
 import {
+  type GithubBranchDemandDatabase,
   type GithubBranchMaintenanceDatabase,
+  PostgresGithubBranchDemandAdapter,
   PostgresGithubBranchMaintenanceAdapter,
 } from "@langwatch/github-server";
 import {
@@ -33,6 +35,7 @@ import {
   PostgresLangySessionKeyReapAdapter,
 } from "@langwatch/langy-server";
 import {
+  ClickHouseCodingAgentProcessingAdapter,
   createCodingAgentLogFactsDispatchSubscriber,
   createCodingAgentMetricFactsDispatchSubscriber,
 } from "@langwatch/coding-agent-server";
@@ -59,6 +62,11 @@ import {
   type BillingReportingDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
+import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
+import {
+  type CodingAgentActivityDatabase,
+  PostgresCodingAgentActivityAdapter,
+} from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
   TopicServerInstaller,
@@ -75,10 +83,7 @@ import {
   type AutomationWorkerCapability,
 } from "../features/automation/automation-worker-feature.installer";
 import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer";
-import {
-  CodingAgentWorkerFeatureInstaller,
-  type CodingAgentWorkerCapability,
-} from "../features/coding-agent/coding-agent-worker-feature.installer";
+import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/coding-agent-worker-feature.installer";
 import {
   EvaluationWorkerFeatureInstaller,
   type EvaluationWorkerCapability,
@@ -87,10 +92,7 @@ import {
   EventingMaintenanceWorkerFeatureInstaller,
   type WorkerBlobSweepPort,
 } from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
-import {
-  ExperimentWorkerFeatureInstaller,
-  type ExperimentWorkerCapability,
-} from "../features/experiment/experiment-worker-feature.installer";
+import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer";
 import {
   GatewaySpendWorkerFeatureInstaller,
   type GatewaySpendWorkerCapability,
@@ -189,6 +191,8 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   AuthzGrantPipelineDatabase &
   BillingReportingDatabase &
   BillingTenantOrganizationDatabase &
+  CodingAgentActivityDatabase &
+  GithubBranchDemandDatabase &
   GithubBranchMaintenanceDatabase &
   IdentityPipelineDatabase &
   LangySessionKeyReapDatabase &
@@ -236,30 +240,9 @@ export abstract class WorkerGithubAbsenceReportPort {
   abstract withoutAppCredentials(): void;
 }
 
-/**
- * Reports the composition decision an absent Coding Agent pipeline would
- * otherwise hide.
- *
- * Metric and Log mount either way: canonical points and records are stored by
- * their own projections and need nothing from another feature. What changes is
- * the ADR-056 edge — the two dispatch subscribers that lift a coding agent's
- * session-keyed facts out of those events and contribute them — because a
- * subscriber cannot dispatch into a pipeline this graph never registered. A
- * deployment should read that in its own logs at boot rather than infer it
- * from coding-agent sessions that stay empty.
- */
-export abstract class WorkerCodingAgentFactsAbsenceReportPort {
-  abstract withoutCodingAgentPipeline(): void;
-}
-
 /** Evaluation's durable processing pipeline, mounted before its dispatchers. */
 export type WorkerEvaluationCompositionOptions = {
   installer: EvaluationWorkerCapability;
-};
-
-/** The ADR-056 Coding Agent session pipeline, mounted before its fact sources. */
-export type WorkerCodingAgentCompositionOptions = {
-  installer: CodingAgentWorkerCapability;
 };
 
 /**
@@ -280,11 +263,6 @@ export type WorkerGatewaySpendCompositionOptions = {
 /** The Scenario (simulation run) pipeline and its durable metrics retry. */
 export type WorkerScenarioCompositionOptions = {
   installer: ScenarioWorkerCapability;
-};
-
-/** The Experiment run pipeline, whose metrics command Trace dispatches. */
-export type WorkerExperimentCompositionOptions = {
-  installer: ExperimentWorkerCapability;
 };
 
 /** Enterprise Governance's pulled-usage and ingestion-pull pipelines. */
@@ -327,10 +305,8 @@ type WorkerProductionCompositionBaseOptions = {
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
   langyConversation?: WorkerLangyConversationCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
-  codingAgent?: WorkerCodingAgentCompositionOptions;
   gatewaySpend?: WorkerGatewaySpendCompositionOptions;
   scenario?: WorkerScenarioCompositionOptions;
-  experiment?: WorkerExperimentCompositionOptions;
   governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
   identity?: WorkerIdentityCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
@@ -461,6 +437,11 @@ export class WorkerProductionComposition {
         database: options.database ?? options.topic.database,
       }).build(),
     });
+    // Stateless derivation over one span or log record: it reads nothing and
+    // holds nothing, so this graph builds its own rather than taking the App's.
+    // One instance, because the coding-agent fold and the Log pipeline's
+    // dispatch subscriber ask it the same questions.
+    const traceCanonicalisation = TraceCanonicalisationService.create();
     // Unconditional, on the same footing as the API-key sweep: the sweep is
     // composed from this package and the feature's own service, so there is no
     // graph in which it is present but unbuildable. Credentials are a different
@@ -489,12 +470,56 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const codingAgent = options.codingAgent
-      ? CodingAgentWorkerFeatureInstaller.create({
-          installer: options.codingAgent.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as the sweeps above: every dependency
+    // is composed from a feature package over substrates this process already
+    // holds — the tenant-keyed ClickHouse client the event store resolves
+    // through, the queue's own Redis, and the one Prisma client this process
+    // opened. So there is no graph in which it is present but unbuildable.
+    //
+    // Two of its collaborators used to be why nothing outside the App could
+    // build it, and neither is a service graph after all. Session cost is
+    // priced from the platform's immutable model catalog — the identical pure
+    // function `ModelProviderService.estimateCost` calls, over the identical
+    // static rates, with per-tenant overrides still travelling on the span
+    // attributes — so the App's provider stack was never being asked anything.
+    // And the project write is one throttled `UPDATE` of one column, behind a
+    // one-method port, rather than the whole `ProjectService`.
+    //
+    // The pull-request mapping subscriber gets the GitHub demand half composed
+    // from this process's own database, on the same credentials the sweep
+    // above uses and with the same declared absence when there are none:
+    // without an App the mapping call resolves no installation and maps
+    // nothing, exactly as the recheck half asks GitHub nothing. It is passed
+    // unconditionally because it is what registers `reactor:pullRequestMapping`
+    // — a consumer that composed the pipeline without it would route one key
+    // fewer than the producer stages, and the queue rejects an unroutable job
+    // for redelivery rather than dropping it.
+    const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
+      database: options.database ?? options.topic.database,
+    }).build();
+    const codingAgent = CodingAgentWorkerFeatureInstaller.create({
+      eventing,
+      installer: ClickHouseCodingAgentProcessingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        redis: eventingOptions.groupQueue.redis,
+        traceCanonicalisation,
+        projectActivity: codingAgentActivity,
+        pullRequestMapping: PostgresGithubBranchDemandAdapter.create({
+          database: options.database ?? options.topic.database,
+          config: {
+            appId: githubConfig.appId ?? "",
+            privateKey: githubConfig.privateKey ?? "",
+          },
+          redis: infrastructure?.redis ?? options.topic.redis,
+          ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
+          project: codingAgentActivity,
+        }).build(),
+        ...(options.config.eventing.foldCacheTtlSeconds === undefined
+          ? {}
+          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      }),
+    });
     const governanceEvents = options.gatewaySpend
       ? GovernanceEventsWorkerFeatureInstaller.create({
           installer: options.gatewaySpend.governance,
@@ -517,9 +542,6 @@ export class WorkerProductionComposition {
     // and the two shard counts come from the same environment variables the
     // App reads (worker.config `processing`) so producer and consumer clamp a
     // lane count identically.
-    if (!codingAgent) {
-      WorkerProductionComposition.codingAgentFactsAbsence(options)?.withoutCodingAgentPipeline();
-    }
     const metric = MetricWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseMetricProcessingAdapter.create({
@@ -529,15 +551,11 @@ export class WorkerProductionComposition {
           options.config.processing.metricShards,
         ),
       }),
-      ...(codingAgent
-        ? {
-            subscribers: [
-              createCodingAgentMetricFactsDispatchSubscriber({
-                contributeMetricFacts: codingAgent.commands.contributeMetricFacts,
-              }),
-            ],
-          }
-        : {}),
+      subscribers: [
+        createCodingAgentMetricFactsDispatchSubscriber({
+          contributeMetricFacts: codingAgent.commands.contributeMetricFacts,
+        }),
+      ],
     });
     const log = LogWorkerFeatureInstaller.create({
       eventing,
@@ -548,19 +566,12 @@ export class WorkerProductionComposition {
           options.config.processing.logShards,
         ),
       }),
-      ...(codingAgent
-        ? {
-            subscribers: [
-              createCodingAgentLogFactsDispatchSubscriber({
-                contributeLogFacts: codingAgent.commands.contributeLogFacts,
-                // Stateless derivation of the generated session title out of
-                // one response body; it reads nothing and holds nothing, so
-                // this graph builds its own rather than taking the App's.
-                traceCanonicalisation: TraceCanonicalisationService.create(),
-              }),
-            ],
-          }
-        : {}),
+      subscribers: [
+        createCodingAgentLogFactsDispatchSubscriber({
+          contributeLogFacts: codingAgent.commands.contributeLogFacts,
+          traceCanonicalisation,
+        }),
+      ],
     });
     const trace = TraceWorkerFeatureInstaller.create({
       installer: options.trace.installer,
@@ -606,12 +617,29 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const experiment = options.experiment
-      ? ExperimentWorkerFeatureInstaller.create({
-          installer: options.experiment.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as suite above: the pipeline is
+    // composed from its own feature package over the tenant-keyed ClickHouse
+    // client this graph already resolves its event store through, so there is
+    // no graph in which it is present but unbuildable.
+    //
+    // The fold cache rides `eventingOptions.groupQueue.redis` — the one Redis
+    // this process's queue substrate runs on, rather than a second connection
+    // — because the cache is not optional here either: it carries the
+    // applied-event ids a redelivered result is dropped on, and the run-state
+    // fold accumulates by addition across every target and evaluator result.
+    // Its TTL comes from the same variable the App reads, so the two graphs
+    // cannot expire each other's entries early.
+    const experiment = ExperimentWorkerFeatureInstaller.create({
+      eventing,
+      installer: ClickHouseExperimentRunProcessingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        redis: eventingOptions.groupQueue.redis,
+        ...(options.config.eventing.foldCacheTtlSeconds === undefined
+          ? {}
+          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      }),
+    });
     const governanceIngestion = options.governanceIngestion
       ? GovernanceIngestionWorkerFeatureInstaller.create({
           installer: options.governanceIngestion.installer,
@@ -770,15 +798,6 @@ export class WorkerProductionComposition {
   ): WorkerGithubAbsenceReportPort | undefined {
     return options.observability
       ? LoggedWorkerGithubAbsence.create(options.observability.logger)
-      : undefined;
-  }
-
-  /** The same logger, for the ADR-056 edge Metric and Log mount without. */
-  private static codingAgentFactsAbsence(
-    options: WorkerProductionCompositionOptions,
-  ): WorkerCodingAgentFactsAbsenceReportPort | undefined {
-    return options.observability
-      ? LoggedWorkerCodingAgentFactsAbsence.create(options.observability.logger)
       : undefined;
   }
 
@@ -1148,20 +1167,3 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
   }
 }
 
-/** Names the missing Coding Agent pipeline once, at boot, rather than leaving it inferred. */
-export class LoggedWorkerCodingAgentFactsAbsence extends WorkerCodingAgentFactsAbsenceReportPort {
-  static create(logger: Pick<Logger, "warn">): LoggedWorkerCodingAgentFactsAbsence {
-    return new LoggedWorkerCodingAgentFactsAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  withoutCodingAgentPipeline(): void {
-    this.logger.warn(
-      { reason: "no-coding-agent-pipeline" },
-      "worker composed metric and log processing without the Coding Agent pipeline: canonical points and records are still stored, and no coding-agent session facts are contributed from them",
-    );
-  }
-}

@@ -1,5 +1,4 @@
 import { performance } from "node:perf_hooks";
-import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
@@ -7,7 +6,10 @@ import type {
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
+import type {
+  CodingAgentClickHouseClient,
+  CodingAgentClickHousePort,
+} from "../../ports/coding-agent-clickhouse.port";
 import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port";
 import {
   type CodingAgentReadMetricsPort,
@@ -654,7 +656,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     branches,
     startedAtFromMs,
   }: {
-    client: ClickHouseClient;
+    client: CodingAgentClickHouseClient;
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;

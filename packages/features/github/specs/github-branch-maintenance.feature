@@ -92,3 +92,17 @@ Feature: GitHub branch linkage maintenance
     When the graph is composed
     Then the absence is reported by name
     And the sweep is still mounted, because its retention half needs no credentials
+
+  @unit
+  Scenario: Branch demand runs on two project facts rather than a project service
+    Given a process holding a database, GitHub App credentials and a project seam
+    When a folded coding-agent session asks about a branch somebody is looking at
+    Then the organization is resolved from the tenant through that seam
+    And the pull request GitHub reports is stored
+    And the project is recorded as having had a pull request mapped
+
+  @unit
+  Scenario: Demand declines a repository host this instance cannot answer for
+    Given branch demand composed for this instance's own GitHub host
+    When a caller asks about a repository on another host
+    Then it is refused before any organization is resolved

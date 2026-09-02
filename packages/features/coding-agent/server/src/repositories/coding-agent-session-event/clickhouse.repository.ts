@@ -1,11 +1,13 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
+import type {
+  CodingAgentClickHouseClient,
+  CodingAgentClickHousePort,
+} from "../../ports/coding-agent-clickhouse.port";
 import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository";
 import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.repository";
 
@@ -377,7 +379,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     sessionIds,
     fromMs,
   }: {
-    client: ClickHouseClient;
+    client: CodingAgentClickHouseClient;
     tenantIds: string[];
     sessionIds: string[];
     fromMs: number;
