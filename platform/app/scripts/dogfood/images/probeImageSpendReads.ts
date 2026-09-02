@@ -29,7 +29,7 @@ export {
   readTraceCostUsd,
 };
 
-/** The image quantity columns migration 00088 adds. */
+/** The image quantity columns migration 00089 adds. */
 export const IMAGE_QUANTITY_COLUMNS = [
   "TokensInputImage",
   "TokensOutputImage",
@@ -68,7 +68,7 @@ export async function assertImageQuantityColumns(
   if (missing.length > 0) {
     throw new Error(
       `gateway_spend is missing ${missing.join(", ")}. Apply migration ` +
-        "00088_gateway_spend_image_quantities.sql before probing.",
+        "00089_gateway_spend_image_quantities.sql before probing.",
     );
   }
 }

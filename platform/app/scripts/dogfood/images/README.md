@@ -26,7 +26,7 @@ pnpm tsx scripts/dogfood/images/probe-image-spend.ts --email admin@haven.localho
 ```
 
 The probe refuses to start when `gateway_spend` does not carry the image
-quantity columns of migration 00088. It issues its own virtual key and its own
+quantity columns of migration 00089. It issues its own virtual key and its own
 budget, so the spend it measures is its own. It writes the two images it made
 to `out/`, which is git ignored.
 
