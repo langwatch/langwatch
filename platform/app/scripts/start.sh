@@ -201,7 +201,6 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
   fi
 fi
 
-pnpm run start:prepare:db
 
 COMMANDS=()
 NAMES=()

@@ -43,6 +43,13 @@ export {
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
 } from "./webhook/signature";
+export { buildVectors, serializeVectors, VECTORS_RELATIVE_PATH } from "./webhook/signature-vectors";
+export type {
+  SignatureVectorFile,
+  SigningVector,
+  VectorOutcome,
+  VerificationVector,
+} from "./webhook/signature-vectors";
 export {
   assertWebhookUrlAllowed,
   inspectWebhookUrl,

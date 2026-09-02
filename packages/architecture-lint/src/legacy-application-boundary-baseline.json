@@ -791,19 +791,11 @@
       "platform/app/src/prompts/VersionHistoryListPopover.tsx": ["~/server/prompt-config"],
       "platform/app/src/stores/upgradeModalStore.ts": ["../server/license-enforcement/types"],
       "platform/app/src/tasks.generated.ts": [
-        "./tasks/backfillAnnotationsToClickhouse",
-        "./tasks/backfillDatasetContentToS3",
-        "./tasks/backfillStalledSimulationRuns",
-        "./tasks/cleanupOldLambdas",
-        "./tasks/clickhouseMigrate",
         "./tasks/generateOpenAPISpec",
-        "./tasks/generateWebhookSignatureVectors",
         "./tasks/migrateCustomModels",
         "./tasks/migrateModelProviderKeys",
         "./tasks/migrateObjectStorage",
-        "./tasks/provisionLwql",
-        "./tasks/runTopicClustering",
-        "./tasks/sendSlackAlert"
+        "./tasks/provisionLwql"
       ]
     },
     "ee-alias": {},

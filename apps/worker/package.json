@@ -34,6 +34,7 @@
   "scripts": {
     "start": "tsx --env-file-if-exists=../../.env src/worker.entrypoint.ts",
     "dev": "tsx watch --env-file-if-exists=../../.env src/worker.entrypoint.ts",
+    "task:webhook-signature-vectors": "tsx src/tasks/webhook-signature-vectors.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"

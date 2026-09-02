@@ -35,6 +35,17 @@ describe("API process configuration", () => {
         endpoint: undefined,
         processorType: "batch",
       },
+      // The OTLP collector this process pushes its own metrics to, which this
+      // deployment named none of: no endpoint and the switch off, which is
+      // what makes the export absent rather than a reader pointed nowhere.
+      otlpMetrics: {
+        endpoint: undefined,
+        enabled: false,
+        headers: {},
+        resourceAttributes: {},
+        serviceName: "langwatch-api",
+        deploymentEnvironment: "production",
+      },
       instanceAdminApiKey: undefined,
       apiKeyPepper: undefined,
       authz: {

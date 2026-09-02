@@ -274,8 +274,8 @@ jobs:
         run: pnpm prisma:migrate
 
       - name: Setup ClickHouse
-        working-directory: platform/app
-        run: pnpm clickhouse:migrate
+        working-directory: apps/api
+        run: pnpm task:clickhouse-migrate
 
       - name: Build app
         working-directory: platform/app

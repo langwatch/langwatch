@@ -33,7 +33,8 @@ import {
  * origin (scheme and port) and the local-address block; it relaxes nothing else
  * — no redirects, no size or timeout budget, and no credentials.
  *
- * FROZEN TWIN of `platform/app/src/server/webhooks/urlPolicy.ts`. The shape
+ * THE implementation, since 2026-09-02: the platform copy it was frozen
+ * against was deleted with the webhook lane. The shape
  * half is not re-implemented but IMPORTED from `@langwatch/automation-contract`,
  * the same `inspectWebhookUrlShape` the authoring drawer validates with: a
  * second copy of these rules is exactly how a URL comes to be accepted by the

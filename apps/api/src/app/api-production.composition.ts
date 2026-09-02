@@ -29,6 +29,7 @@ import {
   closeApiProcessResources,
 } from "../api.process";
 import { ApiHttpListener } from "../api-http.listener";
+import { tryCreateHostedMcpSurface } from "../features/mcp/hosted-mcp.mount";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -616,6 +617,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
     });
+    // The hosted Model Context Protocol endpoint, served off the Node server
+    // ahead of the Hono application because its Streamable HTTP and
+    // Server-Sent Events transports hold the raw response for a session's
+    // life. Absent when this process has no cipher or no database: the
+    // endpoint would then have no way to store the API key a session was
+    // minted from, or to tell whose key a bearer token is.
+    const hostedMcp = tryCreateHostedMcpSurface({
+      prisma: this.composedDatabase?.connection.client,
+      encryption,
+      redis: queueInfrastructure?.redis ?? null,
+      baseHost:
+        options.config.infrastructure.execution.publicBaseUrl ?? "https://app.langwatch.ai",
+    });
     const process = ApiProcess.create({
       agents,
       ...(features ? { features } : {}),
@@ -631,6 +645,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         host: options.config.host,
         port: options.config.port,
         drainGraceMs: options.config.httpDrainGraceMs,
+        ...(hostedMcp ? { rawSurface: hostedMcp } : {}),
       },
     });
 
@@ -1391,6 +1406,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME routed ClickHouse the charted reads and the trace half use.
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       redis: queueInfrastructure?.redis ?? null,
+      // The SAME producer-only Eventing the trace and evaluation halves send
+      // on. This half registers three more definitions against it — simulation,
+      // suite run and Langy conversation — so a scenario run and a Langy write
+      // reach the worker that drains them.
+      eventing: this.composedEventing?.eventSourcing,
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
       demoProjectId: options.config.authz.demoProjectId,
       // The SAME allow-list the identity half already parsed and published as

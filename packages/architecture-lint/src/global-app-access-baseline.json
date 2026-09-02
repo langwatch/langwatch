@@ -14,60 +14,6 @@
       "24a54e562090c6a9"
     ],
     [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "import",
-      "180354a11fe5951a"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "39ded4a1e25b4fbc"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "a0e9c92dcd02d7c9"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "a1f79fd5e475af23"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "tryGetApp",
-      "import",
-      "f3d391e5e45984a2"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "tryGetApp",
-      "reference",
-      "55e26e76b8651e15"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "import",
-      "4bac244fb7d9afbf"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "reference",
-      "55e26e76b8651e15"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "reference",
-      "e17425a0d2d08de6"
-    ],
-    [
       "platform/app/src/pages/api/experiment/init.ts",
       "getApp",
       "import",

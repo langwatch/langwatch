@@ -4126,6 +4126,200 @@ failures in the same three files the same concurrent lane owns (every one is
 `git diff --numstat -- platform/app` shows zero insertions on all 355 rows.
 
 
+### Operational scripts, hosted MCP and instrumentation, 2026-09-02 (bucket 5)
+
+**`platform/app/src/tasks`, `src/mcp`, `src/runtime/task` and the OTLP metrics
+push.** Nine platform modules moved, four were deleted outright, and five are
+recorded below as blocked with named causes. `git diff --numstat -- platform/app`
+shows zero insertions on every row.
+
+| Platform file | New home |
+| --- | --- |
+| `src/tasks/clickhouseMigrate.ts` | `apps/api/src/tasks/clickhouse-migrate/clickhouse-migrate.task.ts` (+ `.entrypoint.ts`) |
+| `src/server/clickhouse/goose.ts` | `apps/api/src/tasks/clickhouse-migrate/goose.migration-runner.ts` |
+| `src/server/clickhouse/ttlReconciler.ts` | `apps/api/src/tasks/clickhouse-migrate/ttl.reconciler.ts` |
+| `src/server/clickhouse/migrations/**` (78 files) | `apps/api/src/tasks/clickhouse-migrate/migrations/**` |
+| `src/tasks/generateWebhookSignatureVectors.ts` | `packages/egress/src/webhook/signature-vectors.ts` (data) + `apps/worker/src/tasks/webhook-signature-vectors.entrypoint.ts` (writer) |
+| `src/tasks/backfillStalledSimulationRuns.ts` | `apps/worker/src/tasks/backfill-stalled-simulation-runs.task.ts` |
+| `src/tasks/backfillAnnotationsToClickhouse.ts` | `apps/worker/src/tasks/backfill-annotations-to-clickhouse.task.ts` (+ `prisma.annotation-backfill.adapter.ts`) |
+| `src/tasks/backfillDatasetContentToS3.ts` | `apps/worker/src/tasks/backfill-dataset-content-to-object-storage.task.ts` |
+| `src/mcp/handler.ts` | `packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts` |
+| `src/mcp/oauthClientRegistry.ts` | `.../src/repositories/redis/redis.oauth-client.repository.ts` |
+| `src/mcp/governance-tools.ts` | `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts` |
+| `src/instrumentation.node.ts` metrics block (lines 271-364, 405-465) | `packages/observability/src/node/otlp-metrics.ts` + `otlp-configuration.ts` |
+
+Deleted, not moved: `src/tasks/cleanupOldLambdas.ts`, `src/tasks/sendSlackAlert.ts`,
+`src/tasks/runTopicClustering.ts`, `src/runtime/task-nlp-lambda.lifecycle.ts`
+(and its test), `scripts/dogfood/mcp-sse-multipod-probe.ts`, `vitest.mcp.config.ts`.
+
+**The ClickHouse migration is deploy-critical and the evidence names `apps/api`,
+not `apps/worker`.** The chart has no migration Job: `charts/langwatch/templates/app/deployment.yaml`
+overrides no command, so the app pod runs the image `CMD`, which ran
+`platform/app/scripts/start.sh` → `start:prepare:db` → `prisma:migrate`,
+`clickhouse:migrate`, `lwql:provision`. The workers Deployment already overrides
+`workingDir: /app/apps/worker` with `pnpm run start` and runs no migration, and
+`charts/langwatch/values.yaml` ships `cronjobs.jobs: {}`. So the API image is the
+migration's owner. Four invocations were repointed rather than left dangling:
+`infra/docker/Dockerfile`'s `CMD` (same three steps, same order, ClickHouse now
+from `/app/apps/api`), `.github/workflows/{langwatch-app-ci,e2e-ci,sdk-javascript-ci}.yml`
+(`working-directory: apps/api`, `pnpm task:clickhouse-migrate`), the root
+`package.json`'s new `clickhouse:migrate` proxy, and `apps/server`'s npx CLI
+(`services/migrate.ts` runs it from a new `locateApiDir()`; `apps/api/` already
+ships in `distribution-files.json`). The Dockerfile also gained
+`--filter "@langwatch/platform-api..."` on both installs and the `apps/api` copies,
+and `tsx` moved from `apps/api`'s devDependencies to its dependencies, because the
+production image prunes devDependencies and the task runs from source.
+`SKIP_CLICKHOUSE_MIGRATE=true` survives the move as a parsed `skipped` leaf on
+the task's config, still matching exactly `"true"`.
+
+**Judgment call: the goose runner and the SQL live in `apps/api`, not in
+`@langwatch/clickhouse-client`.** The client package is the connection layer and
+declares no runtime dependencies; the TTL reconciler needs
+`@langwatch/data-retention-server`'s managed-table catalogue, so putting it there
+would make an infrastructure package depend on a feature package. `apps/api`
+already depends on both. Six migration-guard suites moved with the SQL
+(`canonical-logs-migration`, `canonical-metrics-migration`, `clickhouse-migrations`,
+`retention-ttl`, `ttl-reconciler`, `ttl-reconciler.regression`), repointed from
+`process.cwd()` to `import.meta.dirname`. `replicatedEngineGuard.unit.test.ts` did
+not move: it reads source through `~/test-utils/tsAst`, which has no owner yet.
+`__dirname` became `import.meta.dirname` because `apps/api` is `"type": "module"`.
+The task now reads private routes through `@langwatch/clickhouse-client`'s
+`parseRoutingTable` instead of platform's `parseRouteKey`, which is a strict
+superset — it also refuses two URLs for one organisation, which the moved suite
+now asserts.
+
+**The webhook signature vectors gained the drift test their own docstring had
+always promised.** `packages/egress/src/webhook/signature.ts` was already a
+byte-identical twin of the platform module the generator imported, so the move was
+an import swap. Three suites (egress, the TypeScript SDK, the Python SDK) assert
+against the committed `specs/webhooks/signature-vectors.json` and none of them tied
+it back to the signer, so the generator and the fixture could diverge silently.
+`packages/egress/src/webhook/__tests__/signature-vectors.unit.test.ts` compares
+`serializeVectors()` to the committed bytes. Regenerating changed exactly three
+provenance strings and no vector, which is the proof the move preserved the
+algorithm.
+
+**`cleanupOldLambdas` is deleted because nothing operational reached it.** No
+chart, workflow, Makefile target or dev script names it; `charts/langwatch/values.yaml`
+ships `cronjobs.jobs: {}` with the note that first-party sweeps run on the workers'
+event-sourced path, and the one HTTP route that called it
+(`/api/cron/old_lambdas_cleanup`) has no scheduler pointed at it. Deleting it also
+retired `runStandaloneNlpLambdaTask` and the executor's bespoke 25-line NLP-lambda
+composition — which was already broken, since it imported the deleted
+`~/server/outboundProxy`. `sendSlackAlert` was a hand-run smoke harness of
+hardcoded fixture data, and `runTopicClustering` an eight-line transport over a
+durable Eventing command the worker already registers.
+
+**The three backfills moved as port-driven tasks; their runners are blocked on
+composed collaborators, and each blocker is named in the file.**
+`backfill-stalled-simulation-runs` needs `ScenarioExecutionService.finishUnsuccessfulRun`,
+which `apps/worker/src/app/worker-scenario-processing.composition.ts` rejects by
+name ("Scenario failure handling is not composed in this process"), so a runner
+wired today would fail every row it found. `backfill-annotations-to-clickhouse`
+needs a `bulkSyncAnnotations` dispatcher off the worker's Eventing graph, and
+`backfill-dataset-content-to-object-storage` needs the `DatasetStorageResolver`
+that composition builds privately. All three take their collaborators as
+parameters and are unit-tested with fakes, so each runner is a handful of lines
+once its collaborator is reachable.
+
+**The OTLP metrics push is a package service both processes call at boot.**
+`platform/app/src/instrumentation.node.ts` was the only place OTel metrics were
+exported anywhere in the repository; `apps/api` served a Prometheus registry and
+`apps/worker` served a deliberately EMPTY exposition
+(`worker-standalone.composition.ts`: "every metric it records goes out over OTLP")
+over a MeterProvider nothing constructed — so the worker's instruments were
+writing into a no-op meter. `startOtlpMetricsExport` now lives in
+`packages/observability/src/node/otlp-metrics.ts` with the header-authoritative
+`createAuthoritativeOtlpConfiguration` beside it, and both processes call it from
+their own config leaf (`config.otlpMetrics`, folded by
+`otlpMetricsExportOptionsFrom` from `@langwatch/config`'s `resolveTelemetryConfiguration`)
+and hand the result to `createProcessObservability` as a shutdown flusher rather
+than a signal handler. The platform block and the duplicated OTLP configuration
+helper were deleted (127 lines), which leaves platform's traces half referencing a
+function that is gone — the no-copies rule taken literally. `packages/observability`
+gained six `@opentelemetry/*` dependencies at the versions `platform/app` pinned,
+and the gated `require()` idiom became static imports because the package is ESM.
+
+**The hosted MCP endpoint is `@langwatch/hosted-mcp-server`, not
+`@langwatch/mcp-server`.** That name is taken by the published standalone server in
+`mcp/typescript`, and `packages/architecture-lint` derives a feature package's name
+from its directory, so `packages/features/mcp/server` would have collided in the
+workspace. The two share no code: `mcp/typescript` is the tool registry (~78 tools,
+all `platform_*` and friends), the moved handler is the multi-tenant HTTP/session/OAuth
+transport around it, and it consumes the published package through the narrowed
+`config` and `create-mcp-server` declarations. Catalogue id `hosted-mcp`, subjects
+`hosted-mcp` and `mcp-oauth`.
+
+Six platform reaches became injected ports (`ports/hosted-mcp.port.ts`):
+`tryGetApp()?.redis` → `HostedMcpRedis | null`, `prisma.project.findUnique` →
+`McpProjectLookupPort`, `encrypt`/`decrypt` → `McpApiKeyCipherPort` (satisfied by
+`@langwatch/secret-server`'s `AesGcmSecretEncryptionAdapter`, whose at-rest format
+is byte-identical to `platform/app/src/utils/encryption.ts` — verified line by
+line, so no stored token changes meaning), `getClientIp` →
+`HeaderMcpClientAddressAdapter` inside the package (the header priority is the rate
+limit's own correctness, and the suite asserts two callers behind one proxy are
+counted apart), and `getApp().governance` → `McpSessionToolRegistrarPort`. That
+last one is what keeps the package core: a core feature package may not depend on
+an Enterprise one, so `registerGovernanceMcpTools` moved to
+`@langwatch/enterprise-governance-server` and takes an injected
+`GovernanceMcpPermissionProbePort` in place of `probeOrganizationPermission`'s
+faked session object.
+
+`apps/api` mounts it as a raw Node surface, because the Streamable HTTP and
+Server-Sent Events transports hold the response object for a session's life:
+`ApiRawRequestSurfacePort` on `api-http.listener.ts` gets first refusal by
+pathname (parsed against a fixed base, so a caller-supplied `Host` cannot route),
+and `api-production.composition.ts` passes `tryCreateHostedMcpSurface(...)` through
+the existing `listener` options. A process with no cipher or no database composes
+no MCP rather than an endpoint whose every session fails.
+
+**Still in `platform/app/src/tasks`, with causes.** `generateOpenAPISpec.ts` reads
+eleven platform-only modules (`~/server/enterprise/scim/routes`,
+`../server/api/{security,management/rbac-vocabulary,management/organization-rest,openapi-response-required,prompts-rest}`,
+`../server/analytics/analytics-rest`, `../app/api/analytics-sql/**`,
+`../app/api/middleware/enterprise-gate`, `../server/tracer/tracesMapping`,
+`../server/routes/{evaluations-legacy,experiments-v3,misc}`); moving it before those
+have owners would put a file that cannot compile into `apps/api` and turn the
+typecheck red for every other lane. `provisionLwql.ts` needs
+`@langwatch/analytics-server` to export nine `productionProvisioning` symbols and
+two from `provisioning` — the code is in the package, the barrel exports none of
+it — plus a home for `LWQL_KEY_MAP_INSERT_SETTINGS`. The object-storage migration
+set (`migrateObjectStorage.ts`, `objectStorageMigration.ts`, both
+`migrate-object-storage.*.adapter.ts`, `groupQueueMigrationAudit.ts`) is blocked on
+`AzureBlobDriver` (601 lines) and `azure-credentials.ts` (396 lines), which exist
+only under `platform/app/src/server/stored-objects/` and have no equivalent in
+`@langwatch/stored-object-server` — that package models Azure as a port neither
+process supplies. Splitting the set would have left a live operator tool broken
+across two trees, so it stays whole. `migrateCustomModels.ts` and
+`migrateModelProviderKeys.ts` need only a Prisma client and platform's `encrypt`.
+`src/runtime/task/`, `scripts/run-task.sh` and `scripts/generate-task-registry.mjs`
+therefore survive: they are the only way those five still run. The executor lost
+its `appComposingTasks` set and the `initializeDefaultApp` branch, because none of
+the five needs a composed App.
+
+**Gates.** `apps/api` 495/495 and `apps/worker` 419/419 (both after repairing the
+config-shape and `@langwatch/observability/node` mock assertions this lane's new
+`otlpMetrics` leaf broke); `@langwatch/hosted-mcp-server` 47/47 — the whole moved
+MCP suite, now composing the handler with real fakes instead of three `vi.mock`
+calls on platform paths; `@langwatch/enterprise-governance-server` 591/591;
+`packages/observability` 167/167; `packages/egress` 112/112. Every one of those six
+typechecks clean with `tsc --noEmit`, except `apps/api`, whose only ten errors are
+`src/app/api-gateway.composition.ts` importing four symbols
+`@langwatch/gateway-server` does not currently export — a concurrent lane's
+in-flight edit, in a file this lane does not touch. Stale entries pruned: nine
+`platform/app/src/mcp/**` rows from `global-app-access-baseline.json` and eight
+deleted task specifiers from `legacy-application-boundary-baseline.json`.
+
+**Two dev-loop regressions worth knowing about.** `platform/app`'s
+`start:prepare:db` script and its call in `scripts/start.sh` are deleted, so
+`pnpm dev` from `platform/app` no longer migrates anything — run
+`pnpm clickhouse:migrate` and `pnpm prisma:migrate` from the repository root
+instead. And `pnpm install` has not been run for the whole workspace since the six
+`@opentelemetry/*` declarations, `tsx`, `@langwatch/hosted-mcp-server` and the new
+package were added; filtered installs linked what this lane needed, and `C-01` owns
+the lockfile reconciliation.
+
+
 ## Progress accounting
 
 Only committed deletions count. After each migration commit, record the hash in

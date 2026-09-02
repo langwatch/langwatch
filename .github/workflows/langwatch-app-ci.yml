@@ -1149,7 +1149,7 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: platform/app
+        working-directory: apps/api
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
@@ -1157,11 +1157,11 @@ jobs:
         # cold-start window. Observed flake: run 24930819915 shard 3.
         run: |
           for i in 1 2 3; do
-            if pnpm clickhouse:migrate; then
+            if pnpm task:clickhouse-migrate; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
-              echo "clickhouse:migrate attempt $i failed; sleeping 5s and retrying"
+              echo "task:clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
               sleep 5
             fi
           done

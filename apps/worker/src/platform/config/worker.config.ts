@@ -2,9 +2,14 @@ import {
   Config,
   environmentBooleanSchema,
   environmentOneOrTrueSchema,
+  resolveTelemetryConfiguration,
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
+import {
+  otlpMetricsExportOptionsFrom,
+  type OtlpMetricsExportOptions,
+} from "@langwatch/observability/node";
 import {
   parseRoutingTable,
   poolSizingFromEnv,
@@ -799,6 +804,15 @@ export type WorkerConfig = Readonly<{
   serviceVersion?: string;
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
+  /**
+   * Where this process pushes its own metrics, if it was told to push any.
+   *
+   * This process serves an empty Prometheus exposition on purpose — every
+   * series it records goes out over OTLP — so until something starts this
+   * export the worker's instruments write into a no-op meter and its metrics
+   * exist nowhere at all.
+   */
+  otlpMetrics: OtlpMetricsExportOptions;
   shutdown: WorkerShutdownConfig;
   deployment: WorkerDeploymentConfig;
   /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
@@ -858,6 +872,10 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     serviceVersion: value.serviceVersion,
     logger: value.logger,
     observability: value.observability,
+    otlpMetrics: otlpMetricsExportOptionsFrom({
+      telemetry: resolveTelemetryConfiguration(source),
+      serviceName: value.serviceName,
+    }),
     shutdown: resolveWorkerShutdownConfig({
       nodeEnvironment: value.nodeEnvironment,
       environment: value.environment,

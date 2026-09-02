@@ -73,12 +73,18 @@ COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app
 COPY platform/app/vendor ./platform/app/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 COPY apps/worker/package.json ./apps/worker/package.json
+# The interactive API process. It is in the image for the ClickHouse schema
+# migration the boot below runs from it — `@langwatch/platform-api` owns the
+# goose runner, the TTL reconciler and the migration SQL since they left
+# `platform/app`.
+COPY apps/api/package.json ./apps/api/package.json
 # `@langwatch/worker...` alongside the app: the background worker is its own
 # executable in this image now, and its dependency subtree is not a subset of
 # the app's.
-RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..." --filter "@langwatch/worker..."
+RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..." --filter "@langwatch/worker..." --filter "@langwatch/platform-api..."
 COPY platform/app ./platform/app
 COPY apps/worker ./apps/worker
+COPY apps/api ./apps/api
 # `--filter "@langwatch/web..."` rather than a bare `pnpm run build` in the app
 # directory: the trailing `...` makes pnpm build the app's workspace
 # DEPENDENCIES first, in topological order. The app imports `langwatch` from the
@@ -103,7 +109,7 @@ RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/web..." run
 # openapi-typescript, a devDependency this very command is removing. Nothing
 # needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
-RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/web..." --filter "@langwatch/worker..."
+RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/web..." --filter "@langwatch/worker..." --filter "@langwatch/platform-api..."
 
 # ...and then actually reclaim the disk. The step above rewrites each member's
 # node_modules — the devDependency symlinks go — but it does NOT touch the
@@ -176,6 +182,9 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 COPY --from=builder /app/packages ./packages
 # The worker executable runs from source through tsx, the way apps/api does.
 COPY --from=builder /app/apps/worker ./apps/worker
+# Same: run from source through tsx. The boot command below runs its ClickHouse
+# migration before anything serves.
+COPY --from=builder /app/apps/api ./apps/api
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
@@ -185,4 +194,11 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-CMD cd platform/app && pnpm start
+# What `platform/app`'s `start:prepare:db` used to run, in the SAME order, with
+# the ClickHouse half now run from `apps/api` — which owns the goose runner,
+# the TTL reconciler and the migration SQL since they left `platform/app`. The
+# order is load-bearing: LangWatchQL provisioning reads both the Postgres
+# schema and the ClickHouse one, so it cannot run before either. Sequenced with
+# `&&` so a failed migration stops the boot rather than serving against a
+# schema that was never applied.
+CMD cd /app/platform/app && pnpm -s run prisma:migrate && cd /app/apps/api && pnpm -s run task:clickhouse-migrate && cd /app/platform/app && pnpm -s run lwql:provision && pnpm start

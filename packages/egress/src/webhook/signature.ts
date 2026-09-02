@@ -18,8 +18,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * what lets it swap secrets on its own schedule instead of dropping deliveries
  * during the swap.
  *
- * FROZEN TWIN of `platform/app/src/server/webhooks/signature.ts`. This one is
- * pinned not by reading that file but against
+ * THE implementation, since 2026-09-02: the platform copy it was frozen
+ * against was deleted with the OTLP/webhook lane. It stays pinned not by
+ * reading any file but against
  * `specs/webhooks/signature-vectors.json` — the vectors the TypeScript SDK and
  * the Python SDK also verify against, generated from the application's signer.
  * Four implementations agreeing pairwise is agreement only until one is edited;

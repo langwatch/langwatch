@@ -5,7 +5,8 @@ import type { SsrfUrlValidator } from "../ssrf/url-validator";
 /**
  * The one fenced outbound HTTP utility every customer-endpoint dispatch shares.
  *
- * FROZEN TWIN of `platform/app/src/server/webhooks/httpDestination.ts`. All
+ * THE implementation, since 2026-09-02: the platform copy it was frozen
+ * against was deleted with the webhook lane. All
  * outbound goes through the audited fence — metadata denylist, private-address
  * blocking, DNS-rebinding defeat via IP pinning, redirect refusal — never a
  * hand-rolled `fetch`. A total-request timeout bounds slow receivers (enforced

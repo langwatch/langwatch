@@ -1,10 +1,33 @@
 import { getRequestListener } from "@hono/node-server";
-import { createServer, type Server } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Logger } from "@langwatch/observability";
 import type { Hono } from "hono";
 
 export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
+
+/**
+ * A surface served straight off the Node server, ahead of the Hono
+ * application.
+ *
+ * One surface needs this and it is not a preference: the hosted Model Context
+ * Protocol endpoint is Streamable HTTP and Server-Sent Events over the raw
+ * request and response objects, and its transports hold the socket for the
+ * life of a session. Re-expressing it as fetch-style handlers would mean
+ * rewriting the transports the MCP SDK owns.
+ *
+ * `handles` is asked first, with the pathname alone, so a surface that says no
+ * costs one string comparison and everything else reaches Hono untouched.
+ */
+export abstract class ApiRawRequestSurfacePort {
+  abstract handles(pathname: string): boolean;
+  abstract handle(request: IncomingMessage, response: ServerResponse): void;
+}
 
 export type ApiHttpListenerOptions = Readonly<{
   application: Hono;
@@ -12,6 +35,8 @@ export type ApiHttpListenerOptions = Readonly<{
   port: number;
   drainGraceMs?: number;
   logger?: Pick<Logger, "error" | "info">;
+  /** Served before the Hono application; see {@link ApiRawRequestSurfacePort}. */
+  rawSurface?: ApiRawRequestSurfacePort | undefined;
 }>;
 
 /**
@@ -34,7 +59,22 @@ export class ApiHttpListener {
     const listener = getRequestListener(options.application.fetch, {
       overrideGlobalObjects: false,
     });
-    this.server = createServer(listener);
+    const rawSurface = options.rawSurface;
+    this.server = createServer(
+      rawSurface
+        ? (request, response) => {
+            // The pathname alone, because that is all the surface is asked
+            // about. Parsing against a fixed base rather than the Host header
+            // keeps a caller-supplied Host out of the routing decision.
+            const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+            if (rawSurface.handles(pathname)) {
+              rawSurface.handle(request, response);
+              return;
+            }
+            listener(request, response);
+          }
+        : listener,
+    );
     this.server.on("error", (error) => {
       this.options.logger?.error({ error }, "API HTTP listener failed");
     });

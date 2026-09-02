@@ -23,6 +23,19 @@ describe("resolveWorkerConfig", () => {
         endpoint: undefined,
         processorType: "batch",
       },
+      // The OTLP collector this process pushes its own metrics to, which this
+      // deployment named none of. It matters more here than in the API: this
+      // process serves an empty Prometheus exposition on purpose, so an absent
+      // export is the difference between its metrics going somewhere and
+      // nowhere.
+      otlpMetrics: {
+        endpoint: undefined,
+        enabled: false,
+        headers: {},
+        resourceAttributes: {},
+        serviceName: "langwatch:worker",
+        deploymentEnvironment: undefined,
+      },
       shutdown: { processDeadlineMs: 25_000 },
       deployment: { saas: false, adminEmails: undefined },
       // No `credentialsEncryptionKey`: an install that stored no encrypted

@@ -39,6 +39,7 @@
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "start:prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
+    "clickhouse:migrate": "pnpm --filter @langwatch/platform-api task:clickhouse-migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50",

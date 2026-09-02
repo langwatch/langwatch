@@ -298,8 +298,8 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: platform/app
-        run: pnpm clickhouse:migrate
+        working-directory: apps/api
+        run: pnpm task:clickhouse-migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under

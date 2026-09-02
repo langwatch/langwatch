@@ -1,4 +1,16 @@
 export { GovernanceService } from "@langwatch/enterprise-governance-contract";
+/**
+ * The landing decision, re-exported beside the service it gathers signals from.
+ *
+ * A pure function of the contract's, surfaced through this package because the
+ * process that gathers those signals reaches this vertical through one seam and
+ * a second import path for the same decision is a second answer waiting to
+ * happen.
+ */
+export {
+  PersonaHomeResolverService,
+  type PersonaResolution,
+} from "@langwatch/enterprise-governance-contract";
 export {
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
@@ -196,3 +208,16 @@ export {
  * the feature's.
  */
 export { createGovernanceRestApp } from "./transport/api-rest/governance.api";
+
+/**
+ * The governance tools installed on a hosted MCP session.
+ *
+ * Exported from here, and not from the hosted MCP endpoint, because a core
+ * feature package may not depend on an Enterprise one. The process that has
+ * both registers these through the endpoint's session-tool seam.
+ */
+export {
+  GovernanceMcpPermissionProbePort,
+  registerGovernanceMcpTools,
+  type GovernanceMcpContext,
+} from "./transport/api-mcp/governance-tools.api";

@@ -1,7 +1,6 @@
 import { LocalTaskExecutorPort, type LocalTaskExecution } from "@langwatch/server/task";
 import { createLogger } from "@langwatch/observability";
 import { createProcessPrismaConnection } from "../app/prisma-process.composition";
-import { runStandaloneNlpLambdaTask } from "../task-nlp-lambda.lifecycle";
 import { runStandaloneTaskWithPrisma } from "../task-prisma.lifecycle";
 import { closePrismaConnection, configurePrismaConnection } from "~/server/db";
 
@@ -34,12 +33,6 @@ export interface LegacyPlatformTaskExecutorOptions {
  * and App composition until those tasks have canonical owners.
  */
 export class LegacyPlatformTaskExecutor extends LocalTaskExecutorPort {
-  private static readonly appComposingTasks = new Set([
-    "backfillAnnotationsToClickhouse",
-    "backfillStalledSimulationRuns",
-    "runTopicClustering",
-  ]);
-
   private readonly logger = createLogger("langwatch:task");
 
   constructor(private readonly options: LegacyPlatformTaskExecutorOptions) {
@@ -88,41 +81,6 @@ export class LegacyPlatformTaskExecutor extends LocalTaskExecutorPort {
 
     this.logger.info({ taskName: input.taskName }, "running");
     const script = await load();
-    if (LegacyPlatformTaskExecutor.appComposingTasks.has(input.taskName)) {
-      const { initializeDefaultApp } = await import("~/server/app-layer/presets");
-      initializeDefaultApp({ prismaConnection: connection });
-    }
-
-    if (input.taskName === "cleanupOldLambdas") {
-      await this.executeCleanupOldLambdas();
-      return;
-    }
-
     await script.default(...input.args);
-  }
-
-  private async executeCleanupOldLambdas(): Promise<void> {
-    const { default: cleanupOldLambdas } = await import("~/tasks/cleanupOldLambdas");
-    const { resolveNlpLambdaRuntimeConfig } = await import("~/runtime/api/nlp-lambda");
-    const { AppAwsClientConfiguration } = await import("~/runtime/app/aws-client.composition");
-    const { createProcessNlpLambdaRuntime } = await import("~/server/app-layer/nlp-lambda.runtime");
-    const { parseOutboundProxyConfig } = await import("~/server/outboundProxy");
-    const aws = AppAwsClientConfiguration.create(parseOutboundProxyConfig(this.options.source));
-    const nlpLambda = createProcessNlpLambdaRuntime({
-      config: resolveNlpLambdaRuntimeConfig(this.options.environment),
-      redis: null,
-      aws,
-    });
-    await runStandaloneNlpLambdaTask({
-      execute: async () => await cleanupOldLambdas(nlpLambda),
-      closeNlpLambda: () => nlpLambda.close(),
-      closeAws: () => aws.close(),
-      reportCloseError: ({ target, error }) => {
-        this.logger.error(
-          { error, taskName: "cleanupOldLambdas" },
-          `failed to close the ${target}`,
-        );
-      },
-    });
   }
 }

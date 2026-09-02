@@ -6,12 +6,9 @@
 
 import "./langwatchPlatformGuard.boot";
 
-import { metrics } from "@opentelemetry/api";
-import { activateMetrics, metricHistogramViews } from "@langwatch/observability/metrics";
 import type { TelemetryConfig } from "@langwatch/config";
 import type { ExportResult } from "@opentelemetry/core";
 import type { Sampler } from "@opentelemetry/sdk-trace-base";
-import type { PushMetricExporter } from "@opentelemetry/sdk-metrics";
 
 import { redisInstrumentationConfig } from "./instrumentation.redis";
 import { assertPlatformHasNoLangwatchApiKey } from "./langwatchPlatformGuard";
@@ -41,10 +38,6 @@ type OtlpBaseModule = {
 type OtlpNodeHttpModule = {
   createOtlpHttpExportDelegate: (...args: unknown[]) => unknown;
   httpAgentFactoryFromOptions: (options: { keepAlive: boolean }) => (protocol: string) => unknown;
-};
-
-type OtlpMetricsModule = {
-  OTLPMetricExporterBase: new (delegate: unknown) => PushMetricExporter;
 };
 
 type OtlpTransformerModule = {
@@ -268,101 +261,6 @@ export function initializeInstrumentation(config: TelemetryConfig): void {
     );
   }
 
-  // Metrics are a separate global MeterProvider (setupObservability only wires
-  // traces + logs). Gated on OTEL_METRICS_ENABLED so it stays off by default and
-  // only pushes to a collector that's actually configured. Emits Node/host
-  // runtime metrics (CPU, memory, event loop, GC) — enough to correlate with the
-  // traces + logs when debugging local dev in Grafana. Same gated-dynamic-import
-  // treatment: the metrics SDK + host-metrics only load when this path is live.
-  if (explicitEndpoint && config.metricsEnabled) {
-    const { createOtlpHttpExportDelegate, httpAgentFactoryFromOptions } =
-      require("@opentelemetry/otlp-exporter-base/node-http") as OtlpNodeHttpModule;
-    const { getSharedConfigurationDefaults } =
-      require("@opentelemetry/otlp-exporter-base") as OtlpBaseModule;
-    const { OTLPMetricExporterBase } =
-      require("@opentelemetry/exporter-metrics-otlp-http") as OtlpMetricsModule;
-    const { MetricsExporterMetricsHelper, ProtobufMetricsSerializer } =
-      require("@opentelemetry/otlp-transformer-telemetry") as OtlpTransformerModule;
-    const { HostMetrics } =
-      require("@opentelemetry/host-metrics") as typeof import("@opentelemetry/host-metrics");
-    const { resourceFromAttributes } =
-      require("@opentelemetry/resources") as typeof import("@opentelemetry/resources");
-    const { AggregationType, MeterProvider, PeriodicExportingMetricReader } =
-      require("@opentelemetry/sdk-metrics") as typeof import("@opentelemetry/sdk-metrics");
-
-    const metricAttrs: Record<string, string> = {
-      ...config.resourceAttributesMap,
-      "service.name": config.serviceName ?? "langwatch-app",
-    };
-    if (config.deploymentEnvironment) {
-      metricAttrs["deployment.environment.name"] = config.deploymentEnvironment;
-    }
-
-    const meterProvider = new MeterProvider({
-      resource: resourceFromAttributes(metricAttrs),
-      // Bucket boundaries are a property of the provider in OpenTelemetry, not
-      // of the instrument the way prom-client's `buckets` were. Without these
-      // views every histogram would silently take the SDK's generic 0…10000
-      // boundaries, and `histogram_quantile` over payload sizes, span counts
-      // or multi-minute jobs would return plausible nonsense. The boundaries
-      // themselves live in @langwatch/observability/metrics, which is also
-      // what the instruments read, so the two cannot drift.
-      views: metricHistogramViews().map(({ instrumentName, boundaries }) => ({
-        instrumentName,
-        aggregation: {
-          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-          options: { boundaries: [...boundaries], recordMinMax: true },
-        },
-      })),
-      readers: [
-        new PeriodicExportingMetricReader({
-          exporter: new OTLPMetricExporterBase(
-            createOtlpHttpExportDelegate(
-              createAuthoritativeOtlpConfiguration(
-                `${explicitEndpoint}/v1/metrics`,
-                {
-                  ...config.otlpHeaders,
-                  ...config.otlpMetricsHeaders,
-                },
-                "application/x-protobuf",
-                getSharedConfigurationDefaults,
-                httpAgentFactoryFromOptions,
-              ),
-              ProtobufMetricsSerializer,
-              "otlp_http_metric_exporter",
-              MetricsExporterMetricsHelper,
-              void 0,
-            ),
-          ),
-          exportIntervalMillis: 15_000,
-        }),
-      ],
-    });
-    metrics.setGlobalMeterProvider(meterProvider);
-    // Instruments declared at module scope resolved a no-op meter until now —
-    // `metrics.getMeter()` has no upgrading proxy the way `trace.getTracer()`
-    // does. This point them at the provider above and installs the observable
-    // gauges that had nowhere to register.
-    activateMetrics();
-
-    new HostMetrics({
-      meterProvider,
-      name: config.serviceName ?? "langwatch-app",
-    }).start();
-
-    // Registered as a shutdown phase rather than a signal handler of its own.
-    // Node runs every listener for a signal, so handling SIGTERM here raced the
-    // graceful-shutdown path instead of participating in it, and the last
-    // periodic export was dropped whenever the exit won. Now the runner flushes
-    // this after the work has drained. See server/shutdown/telemetry.ts.
-    registerTelemetryFlush({
-      name: "metrics",
-      run: async () => {
-        await meterProvider.forceFlush();
-      },
-    });
-  }
-
   // Continuous profiling. Gated on its own endpoint rather than on the OTLP one:
   // profiles go to Pyroscope over Pyroscope's own protocol, not through the
   // collector, so the two can be configured — and fail — independently. In local
@@ -437,29 +335,4 @@ function createSampler(
 function parseSamplerRatio(value: string | undefined): number {
   const ratio = Number(value);
   return Number.isFinite(ratio) && ratio >= 0 && ratio <= 1 ? ratio : 1;
-}
-
-type OtlpAgentFactoryFromOptions = OtlpNodeHttpModule["httpAgentFactoryFromOptions"];
-
-export function createAuthoritativeOtlpConfiguration(
-  url: string,
-  headers: Record<string, string>,
-  contentType: string,
-  getDefaults: () => OtlpDefaults,
-  agentFactoryFromOptions: OtlpAgentFactoryFromOptions,
-) {
-  return {
-    ...getDefaults(),
-    url,
-    // Do not delegate header resolution to an OTLP exporter constructor. Its
-    // compatibility converter merges OTEL_EXPORTER_OTLP_*_HEADERS from the
-    // ambient process even when callers supplied headers. This factory is
-    // intentionally a complete projection, with the required content type
-    // applied last just as the exporter defaults would do.
-    headers: async () => ({
-      ...headers,
-      "Content-Type": contentType,
-    }),
-    agentFactory: agentFactoryFromOptions({ keepAlive: true }),
-  };
 }

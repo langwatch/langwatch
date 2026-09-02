@@ -486,3 +486,15 @@ export function locateLangwatchDir(): string | null {
   const dir = join(appRoot(), "platform", "app");
   return existsSync(join(dir, "package.json")) ? dir : null;
 }
+
+/**
+ * The interactive API process, in the same relocated tree.
+ *
+ * It is located separately because it owns work the app used to run: the
+ * ClickHouse schema migration is its task now, so the migration step runs
+ * from here while the Prisma one still runs from the app directory above.
+ */
+export function locateApiDir(): string | null {
+  const dir = join(appRoot(), "apps", "api");
+  return existsSync(join(dir, "package.json")) ? dir : null;
+}

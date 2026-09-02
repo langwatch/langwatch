@@ -6,11 +6,12 @@ import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-r
  * immediate-cadence automation firing per match and turning the worker fleet
  * into an outbound flood. A safety limit, not a billing knob.
  *
- * FROZEN TWIN of `platform/app/src/server/webhooks/dispatchBudget.ts`. The
- * number, the window, and the key it counts under are all pinned as literals,
- * because both graphs count into ONE Redis keyspace while the pipelines are
- * twinned: a second process counting under a different key spends a budget the
- * first one was protecting, and a different ceiling lets the higher one through.
+ * THE implementation, since 2026-09-02: the platform copy it was frozen
+ * against was deleted with the webhook lane. The number, the window and the key
+ * it counts under stay pinned as literals, because every process that dispatches
+ * counts into ONE Redis keyspace: a second one counting under a different key
+ * spends a budget the first was protecting, and a different ceiling lets the
+ * higher one through.
  */
 export const WEBHOOK_DISPATCH_HOURLY_CAP = 1000;
 

@@ -1,6 +1,6 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
+import { locateApiDir, locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
@@ -29,6 +29,12 @@ export async function runMigrations(
       "could not locate langwatch app directory — expected next to apps/server (monorepo) or under @langwatch/server install root",
     );
   }
+  const apiDir = locateApiDir();
+  if (!apiDir) {
+    throw new Error(
+      "could not locate the langwatch api directory — expected apps/api next to apps/server (monorepo) or under @langwatch/server install root",
+    );
+  }
 
   bus.emit({ type: "starting", service: "postgres" }); // re-emitted as a "phase 2" marker
   const start = Date.now();
@@ -36,7 +42,7 @@ export async function runMigrations(
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...envFromFile,
-    // Prepend ~/.langwatch/bin so the langwatch app's clickhouse:migrate
+    // Prepend ~/.langwatch/bin so the api's task:clickhouse-migrate
     // task (which shells out to `which goose`) finds the predep-installed
     // goose binary. Postgres + redis don't need this — they're spawned by
     // absolute path from the supervisor — but goose is the one tool the
@@ -65,8 +71,8 @@ export async function runMigrations(
     bus,
     "migrate:clickhouse",
     pnpm.command,
-    [...pnpm.args, "run", "clickhouse:migrate"],
-    { cwd: langwatchDir, env },
+    [...pnpm.args, "run", "task:clickhouse-migrate"],
+    { cwd: apiDir, env },
   );
 
   bus.emit({

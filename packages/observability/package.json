@@ -29,6 +29,12 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
+    "@opentelemetry/host-metrics": "^0.39.0",
+    "@opentelemetry/otlp-exporter-base": "0.221.0",
+    "@opentelemetry/otlp-transformer-telemetry": "npm:@opentelemetry/otlp-transformer@0.221.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-metrics": "^2.8.0",
     "langwatch": "workspace:*",
     "pino": "^10.3.1",
     "pino-opentelemetry-transport": "^4.0.2",
@@ -36,6 +42,8 @@
     "superjson": "^2.2.6"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/sdk-trace-node": "2.10.0",
     "@types/node": "^26.0.1",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",

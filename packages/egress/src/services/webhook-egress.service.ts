@@ -25,10 +25,11 @@ import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-pol
  * parsing, the signature, and the dispatch-identity header, whose NAME is the
  * single parameter the two channels differ on.
  *
- * FROZEN TWIN of `platform/app/src/server/webhooks/sendWebhook.ts`. The
- * application keeps its copy while both graphs send; a difference between them
- * is a customer whose endpoint receives two different envelopes depending on
- * which process fired.
+ * THE implementation, since 2026-09-02: the platform copy it was frozen
+ * against was deleted with the webhook lane, so there is one sender and one
+ * envelope again. While there were two, a difference between them was a
+ * customer whose endpoint received different envelopes depending on which
+ * process fired.
  *
  * WHAT DID NOT COME ACROSS AS A MODULE-LEVEL READ: the application's sender
  * reaches for its app's Redis (the dispatch cap) and its environment (the TLS

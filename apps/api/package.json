@@ -91,6 +91,7 @@
     "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/hosted-mcp-server": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
