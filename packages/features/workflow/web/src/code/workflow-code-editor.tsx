@@ -125,6 +125,11 @@ export function WorkflowCodeEditorModal({
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    // Nothing was subscribed while the editor is closed, so there is nothing to
+    // tear down. Stated rather than fallen through: `apps/ui` compiles this
+    // source under `noImplicitReturns`, and an effect that returns on one branch
+    // and not the other is exactly the shape that rule is looking for.
+    return undefined;
   }, [handleSave, handleSaveAndClose, open, localCode]);
 
   const insertAtCursor = useCallback((text: string) => {

@@ -14,5 +14,5 @@
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/prompt-web.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }

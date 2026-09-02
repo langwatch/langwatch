@@ -6,7 +6,7 @@
 
 import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import { parameterRegistry as defaultRegistry } from "./parameter-registry";
-import { FALLBACK_MAX_TOKENS } from "../../model/token-limits";
+import { getMaxTokenLimit } from "../../model/token-limits";
 import type { LLMConfigValues } from "./llm-config-values.types";
 
 /**
@@ -145,15 +145,5 @@ export function normalizeMaxTokens(
   return result;
 }
 
-/**
- * Calculate the max token limit for a model.
- */
-export function getMaxTokenLimit(
-  modelMetadata: ModelMetadataForFrontend | undefined,
-): number {
-  return (
-    modelMetadata?.maxCompletionTokens ??
-    modelMetadata?.contextLength ??
-    FALLBACK_MAX_TOKENS
-  );
-}
+/** Re-exported from the package model, where `behavior` can reach it too. */
+export { getMaxTokenLimit };

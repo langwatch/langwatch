@@ -18,6 +18,7 @@ import {
   handleSchema,
   inputsSchema,
   messageSchema,
+  nodeDatasetSchema,
   outputsSchema,
   responseFormatSchema,
   runtimeParametersSchema,
@@ -170,3 +171,27 @@ export const promptAssignTagTrpcInputSchema = z.object({
   versionId: z.string(),
   tag: z.string().min(1),
 });
+
+/**
+ * The two write payloads a browser sends, as declared types.
+ *
+ * `platform/app`'s prompt surfaces read these off
+ * `RouterInputs["prompts"]["create"]["data"]`, which is an inference through
+ * the whole application router and is exactly what a browser package may not
+ * name. The producer is PACKAGED — `@langwatch/prompt-server`'s tRPC transport
+ * builds `createInputSchema` and `updateInputSchema` from the two factories
+ * above — so this is a real declaration rather than a restatement: both halves
+ * of the wire now resolve to the same schema.
+ *
+ * The demonstrations schema is this contract's own `nodeDatasetSchema`. The
+ * transport hands `@langwatch/workflow-contract`'s, and the two are the same
+ * shape; taking the workflow one here would close a package cycle, which is the
+ * reason the factories take it as an argument in the first place.
+ */
+export type PromptCreateTrpcInput = z.infer<
+  ReturnType<typeof createPromptCreateTrpcInputSchema<typeof nodeDatasetSchema>>
+>;
+
+export type PromptUpdateTrpcInput = z.infer<
+  ReturnType<typeof createPromptUpdateTrpcInputSchema<typeof nodeDatasetSchema>>
+>;

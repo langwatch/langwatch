@@ -73,7 +73,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/evaluations/[id]/edit/choose": () =>
     import("~/pages/[project]/evaluations/[id]/edit"),
   "pages/[project]/traces": () => import("~/pages/[project]/traces"),
-  "pages/[project]/prompts": () => import("~/pages/[project]/prompts"),
   "pages/[project]/setup": () => import("~/pages/[project]/setup"),
   "pages/[project]/workflows": () => import("~/pages/[project]/workflows"),
   "pages/[project]/chat/[workflow]": () => import("~/pages/[project]/chat/[workflow]"),

@@ -25,6 +25,7 @@ import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
 import { opsApiBinding, opsPageLoaders } from "./ops";
+import { promptApiBinding, promptPageLoaders } from "./prompt";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
 export const installedUiFeatures: UiFeatureInstall = {
@@ -38,6 +39,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...governancePageLoaders,
     ...modelProviderPageLoaders,
     ...opsPageLoaders,
+    ...promptPageLoaders,
     ...personalWorkspacePageLoaders,
   },
   apis: [
@@ -50,6 +52,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     governanceApiBinding,
     modelProviderApiBinding,
     opsApiBinding,
+    promptApiBinding,
     ...personalWorkspaceApiBindings,
   ],
   capabilities: { feedback: BrowserUiFeedback.create() },

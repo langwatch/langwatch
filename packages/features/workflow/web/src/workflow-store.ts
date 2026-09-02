@@ -575,6 +575,10 @@ export const store = (
         type: edge.type ?? "default",
       })),
     });
+    // The connection was made, so there is no error to report. Stated rather
+    // than fallen through: every other exit from this function returns, and
+    // `apps/ui` compiles this source under `noImplicitReturns`.
+    return undefined;
   },
   onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => {
     const node = get().nodes.find((n) => n.id === params.nodeId);

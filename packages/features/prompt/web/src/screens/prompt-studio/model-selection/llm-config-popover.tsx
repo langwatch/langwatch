@@ -1,0 +1,335 @@
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings";
+import { usePromptProject } from "../../../behavior/use-prompt-project";
+import { clampMaxTokens } from "../../../model/clamp-max-tokens";
+import { allModelOptions, ModelSelector } from "./model-selector";
+import { type Output, OutputsSection, type OutputType } from "./outputs-section";
+import { Popover } from "@langwatch/design-system/popover";
+import {
+  buildModelChangeValues,
+  DEFAULT_SUPPORTED_PARAMETERS,
+  getDisplayParameters,
+  getMaxTokenLimit,
+  getParameterConfigWithModelOverrides,
+  getParamValue,
+  type LLMConfigValues,
+  normalizeMaxTokens,
+  ParameterRow,
+  toFormKey,
+} from "../../../surfaces/llm-parameters";
+
+// Default output when structured outputs is disabled
+const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };
+
+// ============================================================================
+// Component Props
+// ============================================================================
+
+type LLMConfigPopoverProps = {
+  values: LLMConfigValues;
+  onChange: (params: LLMConfigValues) => void;
+  errors?: {
+    temperature?: { message?: string };
+    maxTokens?: { message?: string };
+  };
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+/**
+ * LLM Config Popover Content
+ *
+ * Renders the popover content for LLM configuration with dynamic parameters
+ * based on the selected model's capabilities.
+ *
+ * Features:
+ * - Model selector with provider icons
+ * - Dynamic parameter display based on model's supportedParameters
+ * - Max tokens slider with model-specific limits
+ * - Reasoning parameters (reasoning, verbosity) for reasoning models
+ * - Traditional parameters (temperature, top_p, penalties) for other models
+ * - Structured outputs toggle and configuration
+ */
+export function LLMConfigPopover({
+  values,
+  onChange,
+  errors,
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
+}: LLMConfigPopoverProps) {
+  const { project } = usePromptProject();
+
+  // State for tracking which parameter popover is open
+  const [openParameter, setOpenParameter] = useState<string | null>(null);
+  const { modelMetadata } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
+
+  // Get metadata for the currently selected model
+  const currentModelMetadata = values.model ? modelMetadata?.[values.model] : undefined;
+
+  // Get reasoning config for the model
+  const reasoningConfig = currentModelMetadata?.reasoningConfig;
+
+  // Determine which parameters to display
+  // Uses unified 'reasoning' parameter - no provider-specific substitution needed
+  const displayParameters = useMemo(() => {
+    const supportedParams =
+      currentModelMetadata?.supportedParameters ?? DEFAULT_SUPPORTED_PARAMETERS;
+    return getDisplayParameters(supportedParams);
+  }, [currentModelMetadata?.supportedParameters]);
+
+  // Get max token limit for the model
+  const maxTokenLimit = useMemo(() => {
+    return getMaxTokenLimit(currentModelMetadata);
+  }, [currentModelMetadata]);
+
+  // Clamp saved maxTokens against the configured model ceiling.
+  // The configured max (from the custom-model dialog / model metadata) is the
+  // source of truth — a stale form value above it would otherwise display raw
+  // in the collapsed row while the popover silently clamps it, and get persisted
+  // out of bounds on save.
+  useEffect(() => {
+    if (!currentModelMetadata) return;
+    const currentMaxTokens = getParamValue(values, "max_tokens");
+    if (typeof currentMaxTokens !== "number") return;
+    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
+    if (clamped !== undefined && clamped !== currentMaxTokens) {
+      onChange(normalizeMaxTokens(values, clamped));
+    }
+  }, [currentModelMetadata, maxTokenLimit, values, onChange]);
+
+  // Handle parameter change - outputs camelCase keys for form compatibility
+  const handleParamChange = (paramName: string, value: number | string) => {
+    const formKey = toFormKey(paramName);
+
+    if (paramName === "max_tokens") {
+      onChange(normalizeMaxTokens(values, value as number));
+    } else {
+      // Remove BOTH potential keys (snake_case and camelCase) to avoid duplicates
+      // This ensures the new value replaces the old regardless of key format
+      const { [paramName]: _snake, [formKey]: _camel, ...rest } = values as Record<string, unknown>;
+      onChange({ ...rest, [formKey]: value } as LLMConfigValues);
+    }
+  };
+
+  // Structured outputs state
+  const hasNonDefaultOutputs =
+    outputs &&
+    (outputs.length !== 1 || outputs[0]?.identifier !== "output" || outputs[0]?.type !== "str");
+
+  const [isStructuredOutputsEnabled, setIsStructuredOutputsEnabled] = useState(
+    hasNonDefaultOutputs ?? false,
+  );
+
+  // Track user-initiated toggle to prevent race condition with sync effect
+  const userInitiatedToggleRef = useRef(false);
+
+  // Sync state when outputs change externally (e.g., loading a prompt)
+  useEffect(() => {
+    // Skip sync if user just toggled - let the outputs update first
+    if (userInitiatedToggleRef.current) {
+      userInitiatedToggleRef.current = false;
+      return;
+    }
+    if (hasNonDefaultOutputs && !isStructuredOutputsEnabled) {
+      setIsStructuredOutputsEnabled(true);
+    }
+  }, [hasNonDefaultOutputs, isStructuredOutputsEnabled]);
+
+  const handleStructuredOutputsToggle = (checked: boolean) => {
+    if (!onOutputsChange) return;
+    // Guard against duplicate calls from nested click handlers
+    if (checked === isStructuredOutputsEnabled) return;
+
+    userInitiatedToggleRef.current = true;
+    setIsStructuredOutputsEnabled(checked);
+    if (!checked) {
+      onOutputsChange([DEFAULT_OUTPUT]);
+    }
+  };
+
+  return (
+    <Popover.Content minWidth="260px" maxWidth="100%">
+      <VStack paddingY={2} paddingX={2} width="full" align="start" gap={3}>
+        {/* Model Selector */}
+        <Box width="full">
+          <Text
+            fontSize="13px"
+            fontWeight="medium"
+            color="fg.subtle"
+            paddingLeft={2}
+            paddingBottom={1}
+          >
+            Model
+          </Text>
+          <ModelSelector
+            model={values?.model ?? ""}
+            options={allModelOptions}
+            onChange={(model) => {
+              const newModelMetadata = modelMetadata?.[model];
+              onChange(
+                buildModelChangeValues(
+                  model,
+                  undefined,
+                  newModelMetadata,
+                  values,
+                  currentModelMetadata,
+                ),
+              );
+            }}
+            mode="chat"
+            size="full"
+            showConfigureAction={true}
+          />
+        </Box>
+
+        {/* Dynamic Parameters */}
+        <VStack width="full" gap={1} align="stretch">
+          <Text
+            fontSize="13px"
+            fontWeight="medium"
+            color="fg.subtle"
+            paddingLeft={2}
+            paddingBottom={1}
+          >
+            Parameters
+          </Text>
+          {displayParameters.map((paramName) => {
+            // Get effective config (with dynamic options for reasoning)
+            const config = getParameterConfigWithModelOverrides(
+              paramName,
+              reasoningConfig ?? undefined,
+            );
+            if (!config) return null;
+
+            const value = getParamValue(values, paramName);
+
+            // Get provider-level parameter constraints
+            const paramConstraints = currentModelMetadata?.parameterConstraints?.[paramName];
+
+            // Determine effective max override:
+            // - For max_tokens: use model's maxCompletionTokens
+            // - For other params: use provider constraints if available
+            const maxOverride = paramName === "max_tokens" ? maxTokenLimit : paramConstraints?.max;
+
+            // Determine effective min override from provider constraints
+            const minOverride = paramConstraints?.min;
+
+            return (
+              <ParameterRow
+                key={paramName}
+                name={paramName}
+                config={config}
+                value={value}
+                onChange={(newValue) => handleParamChange(paramName, newValue)}
+                maxOverride={maxOverride}
+                minOverride={minOverride}
+                isOpen={openParameter === paramName}
+                onOpenChange={(open) => setOpenParameter(open ? paramName : null)}
+              />
+            );
+          })}
+
+          {/* Show model info if no supported params */}
+          {displayParameters.length === 0 && (
+            <Text fontSize="xs" color="fg.muted">
+              No configurable parameters for this model
+            </Text>
+          )}
+        </VStack>
+
+        {/* Error messages */}
+        {errors?.temperature?.message && (
+          <Text color="red.500" fontSize="12px">
+            {errors.temperature.message}
+          </Text>
+        )}
+        {errors?.maxTokens?.message && (
+          <Text color="red.500" fontSize="12px">
+            {errors.maxTokens.message}
+          </Text>
+        )}
+
+        {/* Structured Outputs Section */}
+        {showStructuredOutputs && onOutputsChange && (
+          <VStack width="full" gap={2}>
+            <HStack
+              width="full"
+              justify="space-between"
+              paddingX={2}
+              paddingBottom={isStructuredOutputsEnabled ? 0 : 2}
+            >
+              <HStack
+                width="full"
+                align="start"
+                gap={0}
+                justify="space-between"
+                cursor="pointer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => handleStructuredOutputsToggle(!isStructuredOutputsEnabled)}
+              >
+                <Text fontSize="13px" fontWeight="medium" color="fg.subtle">
+                  Structured Outputs
+                </Text>
+                <Box
+                  as="button"
+                  role="switch"
+                  aria-checked={isStructuredOutputsEnabled}
+                  data-testid="structured-outputs-switch"
+                  data-state={isStructuredOutputsEnabled ? "checked" : "unchecked"}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent={isStructuredOutputsEnabled ? "flex-end" : "flex-start"}
+                  width="34px"
+                  height="20px"
+                  borderRadius="full"
+                  bg={isStructuredOutputsEnabled ? "blue.500" : "gray.300"}
+                  padding="2px"
+                  cursor="pointer"
+                  transition="background 0.2s"
+                  flexShrink={0}
+                >
+                  <Box
+                    width="16px"
+                    height="16px"
+                    borderRadius="full"
+                    bg="white"
+                    boxShadow="sm"
+                    transition="all 0.2s"
+                  />
+                </Box>
+              </HStack>
+            </HStack>
+
+            {isStructuredOutputsEnabled && outputs && (
+              <Box
+                width="full"
+                padding={2}
+                paddingLeft={3}
+                border="1px solid"
+                borderColor="border"
+                borderRadius="lg"
+                background="bg"
+              >
+                <OutputsSection outputs={outputs} onChange={onOutputsChange} title="Outputs" />
+              </Box>
+            )}
+          </VStack>
+        )}
+      </VStack>
+    </Popover.Content>
+  );
+}
+
+export type { Output, OutputType };

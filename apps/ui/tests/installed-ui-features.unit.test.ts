@@ -84,6 +84,13 @@ const PERSONAL_WORKSPACE_PAGE_KEYS = [
   "pages/[project]/pull-requests",
 ];
 
+const PROMPT_PAGE_KEYS = [
+  // One key, one screen. `prompts:view` travelled with it; the
+  // `layoutComponent: DashboardLayout` half of the platform guard's call did
+  // not — chrome belongs to the route tree.
+  "pages/[project]/prompts",
+];
+
 const OPS_PAGE_KEYS = [
   "pages/ops/index",
   "pages/ops/dejaview",
@@ -160,6 +167,7 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
+          ...PROMPT_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
@@ -179,6 +187,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/enterprise-governance-web",
         "@langwatch/model-provider-web",
         "@langwatch/ops-web",
+        "@langwatch/prompt-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
       ]);
@@ -234,10 +243,11 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
+          ...PROMPT_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(11);
+      expect(merged.apis).toHaveLength(12);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

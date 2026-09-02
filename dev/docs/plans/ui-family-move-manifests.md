@@ -579,9 +579,11 @@ Known costs, all reported rather than suppressed:
   `[project]` page-shell rows its keys took; automations deleted 27, the whole
   `features/automations/` inventory plus the page; datasets deleted six — its two
   pages under both the `dataset` and the `project` feature, plus the bulk upload
-  drawer and the replicate dialog), `components/drawerRegistry.ts`
-  (automations deleted three entries; gateway and me one each; datasets touched
-  none — its overlays were never registry entries),
+  drawer and the replicate dialog; prompts deleted 39 and LEFT 41, because the
+  prompt form and its fields are what every other prompt surface in the product
+  imports), `components/drawerRegistry.ts`
+  (automations deleted three entries; gateway and me one each; datasets and
+  prompts touched none — their overlays were never registry entries),
   `apps/ui/src/features/installed-ui-features.ts`
   (+ `tests/installed-ui-features.unit.test.ts`), `pnpm-lock.yaml` —
   coordinator split-stages; one family commit at a time.
@@ -1296,6 +1298,233 @@ here would have refused readers the product admits today.
   registry harvest is still owed, but "degrade everything to the generic line" is
   only free on a surface where the specific sentence was a nicety.
 
+### prompts — MOVED. 1 key, 56 platform files, 0 insertions, 8,094 deletions
+
+Moved tenth, and the first family whose PAGE was three lines and whose CLOSURE
+was two thirds shared. `platform/app/src/pages/[project]/prompts.tsx` is 16
+lines; what it renders is Prompt Studio, and the studio's closure is 63 files
+under `platform/app/src/prompts/` — of which **fourteen have callers outside the
+family** (the prompt editor drawer, the workflow studio's signature panel, the
+experiments workbench, agent testing, the scenario target selector and the trace
+explorer between them). Deletes-only forbids repointing any of those, so the
+shared fourteen stayed in `platform/app` WITH their tests and travelled as
+narrowed family-local copies, and only 56 files could actually be deleted.
+
+**THE RE-RANKING'S "44+14" COUNTED THE CLOSURE, NOT THE DELETABLE SET.** A
+family whose feature directory is also the library every other surface imports
+its prompt form from moves as copies, not as a move. Whoever surveys the next
+one should compute the deletable set the way this move did: take the files with
+an outside importer as roots, close them transitively, and delete the
+complement. Everything in the closure of a root stays, even when it looks like
+page code.
+
+`@langwatch/prompt-web` was already governed, already declared in the catalogue
+and already held the prompt form, ten surfaces and a third of the studio's
+components — the ops family's "relayout first" lesson, arrived at from the other
+direction: the relayout had happened over months of earlier prompt work, and the
+move cost a host port, a procedure map, one `apps/ui` feature and a great deal
+of narrowing.
+
+#### The nine model-selection copies, and why they are copies
+
+The survey's "model out first" prerequisite resolved exactly as predicted:
+family-local copies, no shared promotion. `ModelSelectFieldMini` — the compact
+model chip on every prompt tab — pulls a subtree whose other consumers are the
+evaluator config field, the workflow studio's LLM field and Langy's model pill,
+none of which this move may repoint. All nine went into
+`screens/prompt-studio/model-selection/` or `model/`:
+
+| # | platform module | package module | other platform consumers |
+|---|---|---|---|
+| 1 | `components/ModelSelector.tsx` | `screens/prompt-studio/model-selection/model-selector.tsx` | 26 |
+| 2 | `components/llmPromptConfigs/LLMConfigPopover.tsx` | `…/model-selection/llm-config-popover.tsx` | 5 |
+| 3 | `components/llmPromptConfigs/LLMModelDisplay.tsx` | `…/model-selection/llm-model-display.tsx` | 5 |
+| 4 | `components/NoModelsConfiguredCallout.tsx` | `…/model-selection/no-models-configured-callout.tsx` | 4 |
+| 5 | `components/outputs/OutputsSection.tsx` | `…/model-selection/outputs-section.tsx` | 1 |
+| 6 | `components/OverflownText.tsx` | `…/model-selection/overflown-text.tsx` | 1 |
+| 7 | `components/modelProviders/iconsMap.tsx` | `…/model-selection/model-provider-icons.tsx` | 10 |
+| 8 | `components/llmPromptConfigs/constants.ts` | `model/model-selection-constants.ts` | 5 |
+| 9 | `utils/clampMaxTokens.ts` | `model/clamp-max-tokens.ts` | 1 |
+| — | `hooks/useModelProvidersSettings.ts` | `behavior/use-model-providers-settings.ts` | 28 |
+| — | `hooks/useModelLimits.ts` | `behavior/use-model-limits.ts` | 0 — a real move |
+
+The nine narrowed in three ways. `ModelSelector` lost its dev-only
+`?__no_models=1` escape hatch, which was gated on `import.meta.env.PROD` — a
+build-time environment a feature-web package may not read, and a case the
+screen's own suites construct directly. `OutputsSection`'s JSON-schema editor
+takes `WorkflowCodeEditor` from `@langwatch/workflow-web` with `secretNames={[]}`
+rather than the application's transport wrapper, because a schema names no
+secrets. And the provider marks are a **FOURTH COPY**, taken verbatim from
+`@langwatch/model-provider-web`'s so the two cannot disagree — with
+`ProviderIconGlyph` and the monochrome set added back, because the
+published-prompt rows render them and the model-config copy had dropped them.
+The model-config family recorded a third copy as the signal to promote these
+into a surface on the model-provider feature; this is the fourth, and it is
+recorded again rather than acted on.
+
+#### The contract moves, and the two live defects they found
+
+Four real repoints, all of them possible because the producer is PACKAGED:
+
+- **`PromptCreateTrpcInput` / `PromptUpdateTrpcInput`** in
+  `@langwatch/prompt-contract`. `platform/app/src/prompts/providers/types.ts`
+  read `RouterInputs["prompts"]["create"]["data"]` — an inference through the
+  whole application router. The contract already owned the two input schema
+  FACTORIES that `@langwatch/prompt-server`'s transport builds from, so the DTOs
+  are `z.infer` over them and both halves of the wire now resolve to one
+  declaration.
+- **`LlmConfigInputTypes` / `LlmConfigOutputTypes`** were already in
+  `prompt.field-schemas.ts` and simply unexported; `platform/app/src/types.ts`
+  carried an identical hand-kept copy the type picker read. Exporting them is
+  four lines and there is now one list.
+- **`PromptScope` AS A VALUE.** The dialogs compared against
+  `PromptScope.PROJECT` off the generated Prisma client. Stated in the contract
+  off the schema's own members.
+- **`PromptStudioSpanResult`** — the span hand-off's payload — is already
+  published by `@langwatch/trace-contract`, so the builder names it instead of
+  `RouterOutputs["spans"]["getForPromptStudio"]`.
+
+Writing the third of those is what surfaced **the span hand-off has been
+throwing outright**. `formSchema`'s `version.parameters` had its schema default
+removed ("the form always provides this field") and
+`createDefaultPromptFormValues` never provided it, so `formSchema.parse` threw on
+every "Open in Prompts" from a trace that did not resolve to a managed prompt.
+FIXED, one line in a package the ruling allows repointing — the datasets
+family's call, second use — because both suites covering it were red where they
+sat: `useLoadSpanIntoPromptPlayground.unit.test.ts` was 10/35 red at HEAD in
+`platform/app`, and its `.integration.test.ts` sibling **was in no test lane at
+all** and had never run. Both now run in the package and are green.
+
+WHOEVER MOVES THE NEXT FAMILY SHOULD RUN THE TESTS THEY ARE ABOUT TO MOVE, IN
+PLACE, FIRST. Two of this family's would have been reported as "broken by the
+move" otherwise, and the second one would not have been reported at all.
+
+#### Overlays, and the one drawer
+
+`traceV2Details` is the family's only drawer and it is a pure address: it is
+registered in `platform/app` and opened by most of the product, so it may be
+neither deleted nor copied. The chat's View Trace button names it and
+`UiPromptHost.openPlatformDrawer` writes `?drawer.open=traceV2Details` plus
+`drawer.traceId`, clearing every stale `drawer.*` key — the model-config
+family's shape, where the ADAPTER owns the `drawer.` vocabulary. Same recorded
+gap as agents, me, automations, the gateway and model config: nothing mounts
+that registry above a screen served from `apps/ui` until the chrome layout route
+exists.
+
+Everything else the studio opens is its own state and always was — the deploy
+dialog, the replicate dialog, the push-to-replicas dialog, the version history
+popover, the API-snippet dialog and the change-handle dialog were all driven by
+`useDisclosure`, never by the registry. **No drawer-registry entry was touched
+by this move**, the second family after datasets with none.
+
+#### Hazards, as they actually resolved
+
+- **`ui-web-public-boundary-leakage` is what dictates where a store lives.** The
+  tab store, the tab-id context, the chat-sync context and the version-badge
+  rule all sat under `screens/prompt-studio/`, and `behavior` hooks read every
+  one of them — which a global layer may not do. All four moved to `model/`,
+  which is where the datasets family put its table context for the same reason:
+  a store and a context are portable values, and `model` is the only layer both
+  `behavior` and a screen can reach. `getMaxTokenLimit` moved out of the
+  LLM-parameters SURFACE into `model/token-limits` for the same reason and the
+  surface re-exports it, so no caller changed.
+- **A SCREEN ENTRY THAT RE-EXPORTS ITS OWN INTERNALS COSTS ITS CONSUMER A
+  TYPECHECK.** `screens/prompt-studio/index.ts` was the studio's internal
+  barrel — thirty names its own modules compose each other through — and making
+  it the public entry meant `apps/ui` compiled the whole studio, including
+  `@langwatch/workflow-web`'s source, under ITS OWN stricter tsconfig. Four
+  functions in a package this family does not own turned red on
+  `noImplicitReturns`. The barrel is now `studio-internals.ts` and the entry is
+  four names: the loader, the procedure map, the host port and its types. The
+  four workflow-web functions got an explicit `return undefined` anyway, because
+  the lazy `import()` in the loader is still type-checked by the consumer and
+  splitting the barrel does not change that — it only keeps the runtime chunk
+  honest.
+- **`useInvokePrompt`, `invokeLLM` and `fetchSSE` WERE DEAD** and were deleted
+  rather than moved. Nothing had called them since the chat moved to CopilotKit;
+  only the `hooks/index.ts` barrel kept them reachable. Deleting them is what
+  kept this family's screen closure free of a `fetch` finding — the one the
+  datasets family carries for its presigned upload.
+- **A docblock that spells a browser global reads as a use of it.** The
+  screen-closure check greps the source with comments blanked, and it did not
+  blank a `/** … localStorage … */` block inside a `.tsx` function body. The
+  comment says "Web Storage" now, and says why.
+- **`toHaveBeenCalledWith` TREATS A PROPERTY SET TO `undefined` AS ABSENT.** The
+  first version of the drawer-address test asserted the cleared key with that
+  matcher, and disabling the clearing entirely still passed. The assertion reads
+  the recorded argument's own key set instead. A sabotage that does not land is
+  indistinguishable from a test that guards nothing.
+
+#### Known costs, all reported rather than suppressed
+
+- **THE DEMONSTRATIONS EDITOR IS GONE; THE PREVIEW STAYS.** The Edit button on a
+  prompt's few-shot examples opened `DatasetEditorTable` — 937 lines of
+  spreadsheet with four non-Datasets callers, whose in-memory branch the
+  datasets family deliberately dropped when it narrowed its own copy into
+  `@langwatch/dataset-web`. Rebuilding that branch on the primitives that
+  package publishes is the datasets feature's work, not a page move's.
+  Demonstrations still render (through `@langwatch/dataset-web`'s
+  `DatasetPreviewTable`), and the prompt editor drawer — still `platform/app`'s,
+  opened from the workflow studio and the experiments workbench — still edits
+  them. THE ONE FEATURE LOSS OF THIS MOVE that a customer can reach.
+- **A structured output is pretty-printed rather than folded.**
+  `RenderInputOutput` is `@microlink/react-json-view` behind a dynamic import
+  plus a media-part collector, a Python-repr parser and the toast singleton —
+  four modules with seven other consumers. Same frame, same monospace, no fold
+  arrows and no copy button.
+- **The hover-peek on View Trace is gone** (`features/traces-v2`' internals,
+  which `@langwatch/trace-web` does not publish), and **the Langy context chip is
+  gone from the published-prompt rows** — the same loss the me, automations,
+  agents, datasets and model-config families took. **`SetupWithAgentButton` is
+  gone from the empty state**, the datasets family's loss, second time.
+- **`compactMenu` did not travel.** The studio asked the application's product
+  menu to collapse so its sidebar had room; there is no capability for a screen
+  to ask that of a chrome it no longer knows about.
+- 8 new architecture-lint findings, 798 → 806: one `cross-feature` and one
+  `ui-screen-closure` for `@langwatch/dataset-web` (the preview table, cheaper
+  than a fifth copy of a table the datasets feature owns), four
+  `ui-screen-closure` for `@langwatch/workflow-web` — two of them the surface
+  findings this package already carried, now counted a second time because the
+  screen entry reaches those surfaces — and the `@langwatch/platform-api-client`
+  import in the procedure map that every family carries.
+- 39 `legacy-feature-fragment-baseline` rows went with their files. The prompt
+  feature keeps 41: the fourteen shared modules and their closure.
+- ZERO new `platform/app` typecheck errors. The whole-tree count is 14 in 11
+  files, which is exactly the baseline; nothing outside the family imported the
+  page, the playground, or any deleted module.
+- `describeError` is the fourth `describe-error.ts` stub — gateway-web, ops-web
+  and user-web took the same one. Its single caller is the chat bubble's
+  `unknown` branch, which is the branch the classifier already gave up on, so
+  the registry's answer for it was the generic line too. The words are
+  `UNKNOWN_ERROR_PRESENTATION`'s verbatim, which is what keeps the scenario that
+  pins them bound.
+
+#### The tenth family's own additions, for whoever moves the eleventh
+
+- **AN EIGHTH HOST PORT OF THE SAME SHAPE.** Deferred an eighth time. What this
+  one asks that none before it did is `tabCapabilities()`: the open prompt tabs
+  are persisted per project in Web Storage, one key per tab, and the store had
+  already been written to take its storage and its logger as arguments. The host
+  answers them, so the package never names a browser global — and `apps/ui`
+  answers them from `behavior/ui-browser-storage.ts` rather than from the
+  feature, because `ui-browser-capability` seals a frontend feature off from
+  `window` just as firmly.
+- **COUNT THE DELETABLE SET, NOT THE CLOSURE.** See the top of this section. It
+  is the difference between "44 files move" and "56 files delete, 14 are
+  copied and 63 are read".
+- **Run the moving tests where they are, before moving them.** Two of this
+  family's were red at HEAD and one of those had never been in a lane at all.
+  Without the before-run, a red inherited suite reads as a move that broke
+  something — and a suite that never ran reads as coverage that existed.
+- **A public screen entry must not re-export the screen's internals.** The
+  consumer compiles what the entry names, under its own tsconfig. Four names:
+  loader, api, port, port types.
+- **A copy that loses its writer loses its `Controller` too.** The narrowed
+  demonstrations field kept a `react-hook-form` `Controller` whose render never
+  touched the field it subscribed to — a subscription the `watch` above it had
+  already made. Narrowing a copy means narrowing what it is wired to, not only
+  what it renders.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -1312,7 +1541,7 @@ closures are computed net of that.
 | 2 | settings S5 data governance | 4 | 5+5 | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one. |
 | 3 | datasets | 2 | 6+6 | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move. |
 | 4 | settings S4 model config | 2 | 7+6 | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect. |
-| 5 | prompts | 1 | 44+14 | "model out first" is now just NINE family-local copies (5 optimization_studio consumers die with workflows); ~70 prompt fragment lines retire; prompt-web governed, 57% adapter ratio |
+| 5 | prompts | 1 | 44+14 | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39. |
 | 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
 | 7 | settings S2 RBAC | 2 | 8+4 | ~/server/api/rbac fix (shared with governance's baseline suppression); governing authz-web clears 14 findings governance+gateway carry |
 | 8 | annotations | 5 | 12+7 | traceV2Details chrome gap; relayout annotation-web; tab-as-prop |

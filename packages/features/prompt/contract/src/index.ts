@@ -24,6 +24,10 @@ export {
   runtimeParametersSchema,
   inputWithValueSchema,
   runtimeInputsSchema,
+  LlmConfigInputTypes,
+  LlmConfigOutputTypes,
+  type LlmConfigInputType,
+  type LlmConfigOutputType,
 } from "./prompt.field-schemas";
 export * from "./prompt.hoist";
 export * from "./prompt.liquid";

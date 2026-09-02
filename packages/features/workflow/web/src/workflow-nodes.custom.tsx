@@ -32,6 +32,9 @@ const LatestComponentVersionCheck = ({ node }: { node: NodeProps<Node<Custom>> }
       }, 0);
       return () => clearTimeout(updateInternalsTimeout);
     }
+    // No timer was scheduled, so there is nothing to clear. Stated rather than
+    // fallen through, for `noImplicitReturns`.
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentVersion]);
 

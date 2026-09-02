@@ -2,7 +2,16 @@ import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
 import { SchemaVersion } from "./prompt.enums";
 
-const LlmConfigInputTypes = [
+/**
+ * The parameter types a prompt input may declare.
+ *
+ * Exported because both halves of the wire need the list itself and not only
+ * the schema built from it: the prompt studio's type picker renders one option
+ * per member, and it used to read `platform/app/src/types.ts`'s identical copy
+ * — an application module a browser package may not reach. The two lists were
+ * kept in step by hand; now there is one.
+ */
+export const LlmConfigInputTypes = [
   "str",
   "float",
   "bool",
@@ -15,7 +24,15 @@ const LlmConfigInputTypes = [
   "dict",
   "chat_messages",
 ] as const;
-const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
+/** The parameter types a prompt output may declare. */
+export const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
+
+/** One declared input parameter type. */
+export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
+
+/** One declared output parameter type. */
+export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
+
 export const nodeDatasetSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),

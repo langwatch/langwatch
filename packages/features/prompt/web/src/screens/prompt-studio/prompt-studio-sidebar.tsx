@@ -19,14 +19,7 @@ interface SidebarRootProps extends BoxProps {
  */
 function SidebarRoot({ children, ...props }: SidebarRootProps) {
   return (
-    <Box
-      as="nav"
-      width="full"
-      height="100%"
-      overflowY="auto"
-      paddingBottom="2"
-      {...props}
-    >
+    <Box as="nav" width="full" height="100%" overflowY="auto" paddingBottom="2" {...props}>
       <VStack gap={0} align="stretch">
         {children}
       </VStack>
@@ -146,10 +139,7 @@ function SidebarList({
       <SidebarSectionHeader onClick={() => setIsOpen(!isOpen)} cursor="pointer">
         <HStack gap={1.5}>
           {collapsible && (
-            <Box
-              transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
-              transition="transform 0.2s"
-            >
+            <Box transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"} transition="transform 0.2s">
               <LuChevronDown size={12} />
             </Box>
           )}

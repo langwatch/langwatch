@@ -5,6 +5,19 @@ export const PROMPT_FEATURE_ID = "prompt" as const;
 export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
 export type PromptScope = z.infer<typeof promptScopeSchema>;
 
+/**
+ * The two scope values, as a value.
+ *
+ * Browser surfaces compare against `PromptScope.PROJECT` and write
+ * `PromptScope.ORGANIZATION`; they used to read the generated Prisma client's
+ * enum object for it, which a browser package may not import. Stated here off
+ * the schema's own members, so a third scope cannot be added on one side alone.
+ */
+export const PromptScope = {
+  PROJECT: "PROJECT",
+  ORGANIZATION: "ORGANIZATION",
+} as const satisfies Record<Uppercase<PromptScope>, PromptScope>;
+
 export const promptMessageSchema = z
   .object({
     role: z.enum(["user", "assistant", "system"]),

@@ -76,6 +76,7 @@
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
     "@langwatch/user-web": "workspace:*",
     "@tanstack/react-query": "5.101.4",

@@ -115,6 +115,16 @@
         ],
         "surfaces": []
       }
+    },
+    {
+      "id": "prompt-studio",
+      "root": "prompt",
+      "uses": {
+        "screens": [
+          "@langwatch/prompt-web/screens/prompt-studio"
+        ],
+        "surfaces": []
+      }
     }
   ]
 }

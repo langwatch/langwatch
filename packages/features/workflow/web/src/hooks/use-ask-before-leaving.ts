@@ -29,6 +29,9 @@ export const useAskBeforeLeaving = () => {
         event.returnValue = message;
         return message;
       }
+      // No warning to show: the handler returns nothing and the browser
+      // navigates. Stated rather than fallen through, for `noImplicitReturns`.
+      return undefined;
     };
 
     window.addEventListener("beforeunload", onBeforeUnload);

@@ -13,11 +13,7 @@ interface DeletableMessageProps {
  * Single Responsibility: Wraps message components with delete functionality.
  * Shows delete button on hover for clean UI.
  */
-export function DeletableMessage({
-  messageId,
-  onDelete,
-  children,
-}: DeletableMessageProps) {
+export function DeletableMessage({ messageId, onDelete, children }: DeletableMessageProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (

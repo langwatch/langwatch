@@ -15,11 +15,7 @@ export interface ChatSendButtonProps extends Omit<ButtonProps, "onClick"> {
 /**
  * Send button for chat input with disabled state handling.
  */
-export function ChatSendButton({
-  disabled = false,
-  onSend,
-  ...buttonProps
-}: ChatSendButtonProps) {
+export function ChatSendButton({ disabled = false, onSend, ...buttonProps }: ChatSendButtonProps) {
   return (
     <Button
       type="button"
