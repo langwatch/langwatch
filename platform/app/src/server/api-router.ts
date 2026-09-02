@@ -15,13 +15,11 @@ import {
   settlementGraceMs,
 } from "@langwatch/gateway-server";
 import { eventMatches, WebhookEnvelopeService } from "@langwatch/enterprise-api";
-import { createExportTracesRestApp } from "@langwatch/platform-api";
 import {
   createAppRestFeatures,
   ForbiddenError,
   requestTraceIds,
 } from "@langwatch/platform-api/app-rest";
-import { app as adminApp } from "~/server/routes/ops/admin";
 import { buildAnalyticsRestApp } from "./analytics/analytics-rest";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { createScenarioRunExportApp } from "./export/scenario-runs/scenario-run-export-rest";
@@ -52,8 +50,6 @@ import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
-import { app as otelApp } from "./routes/otel";
-import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
@@ -97,11 +93,8 @@ import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { getServerAuthSession, type Session } from "~/server/auth";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
-import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
-import { exportRequestSchema, type ExportRequest } from "~/server/export/types";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { rateLimit } from "~/server/rateLimit";
-import { bodyLimit } from "./routes/_lib/body-limit";
 import { extractInlineMediaFromEvent } from "./stored-objects/content-extractor";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { WorkflowEvaluationService } from "~/server/workflows/workflowEvaluation.service";
@@ -198,39 +191,6 @@ export function createApiRouter(app: App) {
   // regression test pins both directions.
   api.route("/", experimentsV3App);
   api.route("/", experimentsV3LegacyAliasApp); // /api/evaluations/v3/... → /api/experiments/...
-  // The trace export resolves a browser session in-handler rather than taking a
-  // project credential, so its ports are generic over the request schema, the
-  // session and the viewer's protections — which `createAppRestFeatures` is
-  // not. It is mounted directly for that reason, and is therefore invisible to
-  // the route-authorization audit that reads that one list.
-  api.route(
-    "/",
-    // Explicit type arguments, not inferred. Every port on this object is a
-    // context-sensitive arrow, so `TSession` is fixed before any of them can
-    // supply a candidate and falls back to its constraint — which would take
-    // the session type off `probeProjectPermission` and `getViewerProtections`
-    // silently. Naming it is what keeps the browser session the one this
-    // process resolves.
-    createExportTracesRestApp<ExportRequest, z.input<typeof exportRequestSchema>, Session>({
-      security: appRestSecurity,
-      ports: {
-        requestSchema: exportRequestSchema,
-        resolveSession: (request) => getServerAuthSession({ app, req: request as NextRequest }),
-        probeProjectPermission: (session, projectId, permission) =>
-          probeProjectPermission({ session }, projectId, permission),
-        getViewerProtections: (session, { projectId }) =>
-          // The context this read takes is `{ prisma, session, publiclyShared? }`
-          // — it forwards to `probeProjectPermission`, which resolves the
-          // application itself. Same two fields the permission probe beside
-          // this one passes, and the same two the route passed before it moved.
-          getUserProtectionsForProject({ prisma, session }, { projectId }),
-        exports: () => app.traceExport,
-        broadcast: () => app.broadcast,
-        unauthenticatedError: () => new ExportUnauthenticatedError(),
-        exportFailedError: (cause) => new ExportFailedError(cause),
-      },
-    }).hono,
-  );
   api.route("/", createScenarioRunExportApp(app));
   // Most REST families now live in `@langwatch/platform-api` and are mounted by
   // factory rather than by import. `createAppRestFeatures` is their single
@@ -280,7 +240,6 @@ export function createApiRouter(app: App) {
     ports: {
       agentPlatformUrl,
       authorizeDatasetDirectUpload: authorizeDirectUpload,
-      bodyLimit,
       canonicalError: (error, c) => canonicalErrorFor(error, requestTraceIds(c)),
       copilotServiceAdapterFor: ({ projectId }) =>
         new PromptStudioAdapter({
@@ -349,7 +308,6 @@ export function createApiRouter(app: App) {
   api.route("/", tracesApp);
 
   api.route("/", gatewayInternalApp);
-  api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
@@ -361,7 +319,6 @@ export function createApiRouter(app: App) {
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 
-  api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would
@@ -370,10 +327,6 @@ export function createApiRouter(app: App) {
   api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
-  // ORDERING: must come after otelApp and collectorApp, whose namespaces its
-  // aliases overlap — the real routes get their match first. It declines
-  // anything it does not recognise, so apps mounted after it are unaffected.
-  api.route("/", otelPathAliasApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);

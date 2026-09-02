@@ -54,6 +54,23 @@ describe("the agent sandbox key sweep", () => {
         expect(tick, "the sweep read the clock more than once").toBe(1);
       });
 
+      /** @scenario "A key whose lifetime has passed is retired" */
+      it("retires a key only once its lifetime has elapsed", async () => {
+        const { repository, revokeExpiredByName } = repositoryDouble(3);
+        const now = new Date("2026-01-01T00:00:00.000Z");
+
+        const count = await AgentSandboxKeyReapService.create({
+          repository,
+          now: () => now,
+        }).reap();
+
+        expect(count).toBe(3);
+        // `lte: now` rather than `lt`, and `revokedAt: null`, are what make the
+        // sweep idempotent: a key already retired is not retired again, and a
+        // key expiring exactly now is not left behind for another hour.
+        expect(revokeExpiredByName).toHaveBeenCalledWith({ name: "Agent sandbox run", now });
+      });
+
       /** @scenario "The sandbox sweep reports how many keys it retired" */
       it("answers how many keys it retired", async () => {
         const { repository } = repositoryDouble(3);

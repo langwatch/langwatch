@@ -20,6 +20,7 @@ export * from "./scenario-run";
 export * from "./scenario-run-parameter.error";
 export * from "./run-parameters";
 export * from "./scenario-run-category";
+export * from "./scenario-run-export";
 export * from "./scenario-run-data";
 export * from "./scenario-run.utils";
 export * from "./scenario-set-id";

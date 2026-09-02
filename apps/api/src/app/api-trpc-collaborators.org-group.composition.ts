@@ -205,17 +205,35 @@ export abstract class ApiViewerProtectionsPort {
 }
 
 /**
- * The Enterprise application the four Enterprise namespaces read.
+ * The Enterprise application the nineteen Enterprise namespaces read.
  *
- * One port rather than four, because a deployment either composed the
+ * One port rather than nineteen, because a deployment either composed the
  * Enterprise application or it did not: a licence without a SCIM application
- * is not a smaller product, it is a half-wired one.
+ * is not a smaller product, it is a half-wired one, and a governance console
+ * without the capability behind it is a page of empty lists that reads as
+ * "nothing configured".
+ *
+ * Two groups fill from it. The org group reads the licensing, SCIM and
+ * usage-limit slices and the single sign-on ledger; the gateway group reads
+ * `governance`. The port is one because the deployment decision is one.
  */
 export abstract class ApiEnterpriseApplicationPort {
-  /** The `ctx.app` slices the four surfaces read. */
+  /** The `ctx.app` slices the four tenant surfaces read. */
   abstract readonly application: Pick<
     ApiTrpcFeatureApplication,
     "licensing" | "scimApp" | "usageLimits"
+  >;
+  /**
+   * The `ctx.app` slices the fifteen governance and gateway-governance
+   * surfaces read.
+   *
+   * A separate member rather than four more entries on `application` above,
+   * because the two halves are filled by two different composition folds and a
+   * single object would make each of them able to overwrite the other's.
+   */
+  abstract readonly governance: Pick<
+    ApiTrpcFeatureApplication,
+    "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
   >;
   /** The back office's single sign-on connection ledger. */
   abstract backoffice(): ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>;

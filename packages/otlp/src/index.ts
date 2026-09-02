@@ -22,3 +22,23 @@ export {
 } from "./any-value";
 export { normalizeOtlpAttributeMap, otlpScalarValue } from "./attribute-map";
 export { bytesToHex, decodeBase64OpenTelemetryId } from "./id";
+export {
+  OTLP_MAX_BODY_BYTES,
+  parseOtlpLogs,
+  parseOtlpMetrics,
+  parseOtlpTraces,
+  readOtlpBody,
+  type OtlpParseResult,
+} from "./body";
+export {
+  OtlpBodyTooLargeError,
+  OtlpBodyUnreadableError,
+  OtlpUnsupportedEncodingError,
+} from "./errors";
+export {
+  CANONICAL_OTLP_BASE_PATH,
+  canonicalOtlpPath,
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+  stampCorrectedPath,
+} from "./path-canonicalisation";

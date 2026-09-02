@@ -53,9 +53,14 @@ export type ApiEventingInfrastructureOptions = {
  *    lose it; omitting the store entirely is worse still, because the runtime
  *    answers a store-less registration with a pipeline that drops commands
  *    silently.
- *  - No `ProcessStore`. A process manager's inbox, outbox and wakes are the
- *    consumer's work, and a pipeline that declared one would refuse to
- *    register here rather than half-run.
+ *  - `processManagerMode: "producer-only"` and no `ProcessStore`. A process
+ *    manager's inbox, outbox and wakes are the consumer's work. Declaring the
+ *    mode is what lets a pipeline that MOUNTS one still register here for its
+ *    commands: the runtime declines the manager by name, once at boot, instead
+ *    of refusing the whole pipeline. Without it, one process-manager
+ *    declaration inside a definition made every command on it unsendable from
+ *    the tier a customer's action arrives at — which is how the API came to
+ *    answer `service_unavailable` for every scenario run and Langy turn.
  *
  * It exists only where the queue does. Redis is what a command is enqueued
  * into, so a process without one cannot produce, and pretending otherwise
@@ -86,6 +91,7 @@ export class ApiEventingInfrastructure {
     const eventSourcing = new EventSourcing({
       enabled: true,
       eventStore: EventStoreProducerOnly.create({ processName: options.processName }),
+      processManagerMode: "producer-only",
       queueFactory: createEventingGroupQueueFactory({
         dependencies: options.queue.dependencies,
         consumersEnabled: false,

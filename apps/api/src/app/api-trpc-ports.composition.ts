@@ -377,6 +377,18 @@ export function createApiTrpcPorts<
      */
     agentGroup: collaborators.agentGroup,
 
+    /**
+     * The twenty-one gateway and governance surfaces, forwarded whole, for the
+     * same reason: the group is COMPOSED against this process's own Prisma and
+     * ClickHouse already, by `composeApiGatewayGroupCollaborators`, which is
+     * also where the one capability it cannot build — the Enterprise governance
+     * application — names its own absence.
+     */
+    gatewayGroup: collaborators.gatewayGroup,
+
+    /** The two answers `github.*` reaches, forwarded whole for the same reason. */
+    github: collaborators.github,
+
     user: {
       ...collaborators.user,
 

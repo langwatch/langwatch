@@ -12,6 +12,12 @@ export {
 export type { AgentSandboxKeyReapDeps } from "./intents/agent-sandbox-key-reap.intent";
 export { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service";
 export {
+  AGENT_SANDBOX_KEY_TTL_MS,
+  AGENT_SANDBOX_PERMISSIONS,
+  mintAgentSandboxApiKey,
+  tryMintAgentSandboxApiKey,
+} from "./services/agent-sandbox-key-mint.service";
+export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,
 } from "./processes/agent-sandbox-key-reap.process";

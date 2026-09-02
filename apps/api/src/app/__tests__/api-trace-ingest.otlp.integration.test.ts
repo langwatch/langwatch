@@ -364,7 +364,7 @@ function jsonExport(span: { attributes?: unknown[] } = {}) {
 }
 
 /** The same export, encoded the way most production collectors send it. */
-function protobufExport(): Uint8Array {
+function protobufExport(): ArrayBuffer {
   const now = Date.now();
   const message = traceRequestType.create({
     resourceSpans: [
@@ -390,7 +390,13 @@ function protobufExport(): Uint8Array {
       },
     ],
   });
-  return traceRequestType.encode(message).finish();
+  const encoded: Uint8Array = traceRequestType.encode(message).finish();
+  // Copied into a buffer of its own rather than handed `encoded.buffer`. Under
+  // Node protobufjs writes into a pooled `Buffer`, so the underlying arena is
+  // longer than the message — and `Buffer.prototype.slice` is a VIEW, not a
+  // copy, so the obvious spelling posts trailing bytes from someone else's
+  // write and the receiver answers 400.
+  return Uint8Array.from(encoded).buffer as ArrayBuffer;
 }
 
 /** A failure here must be legible rather than swallowed into a generic 500. */

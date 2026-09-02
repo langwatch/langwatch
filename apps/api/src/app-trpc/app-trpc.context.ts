@@ -29,7 +29,15 @@ import type { AnnotationApp } from "@langwatch/annotation-server";
 import type { ApiKeyApp } from "@langwatch/api-key-server";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
-import type { EnterpriseTrpcContext } from "@langwatch/enterprise-api";
+import type {
+  EnterpriseTrpcContext,
+  GovernanceApp,
+  GovernanceService,
+  OrganizationSessionPolicyService,
+  WebhookApp,
+} from "@langwatch/enterprise-api";
+import type { GatewayApp } from "@langwatch/gateway-server";
+import type { GithubService } from "@langwatch/github-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AuthzApp } from "@langwatch/authz-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -102,6 +110,52 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * every rollout gate the browser asks about.
    */
   featureFlags: FeatureFlagService;
+  /**
+   * The AI Gateway's one application, as all six core gateway surfaces reach
+   * it.
+   *
+   * One instance for the six namespaces AND for the two public REST families
+   * beside them: the browser's door and the SDK's door decide what a virtual
+   * key may reach, what a budget allows and what a key has spent from the same
+   * object, so they cannot enforce different rules. That was the whole reason
+   * the retired application grew this application in the first place.
+   */
+  gateway: GatewayApp;
+  /**
+   * The GitHub App an organization connected, as `github.*` reads it.
+   *
+   * Blank where the deployment registered no App — that is the service's own
+   * answer, not an absence this record models: a process with no App still
+   * mounts the namespace and reports "not connected", which is what the
+   * coding-agent settings page renders.
+   */
+  github: GithubService;
+  /**
+   * The Enterprise governance capability the console's ten surfaces read, and
+   * the `/` landing decision reads the setup rollup from.
+   *
+   * Named here rather than taken from `EnterpriseTrpcContext["app"]` below
+   * because the governance transports declare their own contexts: the
+   * projection would satisfy the four licensing and SCIM slices and none of
+   * these.
+   */
+  governance: GovernanceService;
+  /**
+   * The governance APPLICATION beside the capability: the personal virtual
+   * keys a member mints and the routing policies their traffic follows.
+   *
+   * Distinct from `governance` because they answer different questions — one is
+   * the organization's governance state, the other is the write path over it —
+   * and the two packaged transports name them apart.
+   */
+  governanceApp: GovernanceApp;
+  /** The rules an organization bounds its members' sessions by. */
+  sessionPolicy: OrganizationSessionPolicyService;
+  /**
+   * Where a spend event is delivered, as the endpoint surface registers and
+   * lists them.
+   */
+  webhooks: WebhookApp;
   /**
    * The Langy conversation panel's one application — the slim spine, one
    * conversation's messages, the turn-start operation both doors share, and the

@@ -593,48 +593,6 @@ async function loadOrganization({
 }
 
 /**
- * Diagnostic fields safe to emit on auth failure. Captures enough request
- * fingerprint to attribute 401s to a specific customer/SDK in CloudWatch
- * without leaking credentials or request bodies. `traceparent` lets us join
- * the failed POST to the customer's downstream OTel trace, which usually
- * carries identifying metadata even when the auth header path doesn't.
- *
- * `hasEmptyAuthToken` distinguishes "X-Auth-Token sent as an empty string"
- * (typically a customer-side env-var misconfig) from "no auth header at all"
- * (typically a misconfigured SDK or unauthenticated probe). Both produce the
- * same 401 today — the log line tells them apart.
- */
-export type AuthDiagnostics = {
-  path: string;
-  method: string;
-  userAgent: string | null;
-  traceparent: string | null;
-  forwardedFor: string | null;
-  hasEmptyAuthToken: boolean;
-};
-
-export function collectAuthDiagnostics(c: {
-  req: {
-    path: string;
-    method: string;
-    header: (name: string) => string | undefined;
-  };
-}): AuthDiagnostics {
-  const get = (name: string) => c.req.header(name) ?? null;
-  const xAuthToken = c.req.header("x-auth-token");
-  return {
-    path: c.req.path,
-    method: c.req.method,
-    userAgent: get("user-agent"),
-    traceparent: get("traceparent"),
-    forwardedFor: get("x-forwarded-for") ?? get("x-real-ip"),
-    // Sent-but-empty is distinct from absent (SDK with a misconfigured
-    // empty api_key still serializes the header).
-    hasEmptyAuthToken: xAuthToken !== undefined && xAuthToken === "",
-  };
-}
-
-/**
  * A Langy session key is refused for two different reasons that look
  * identical from the ceiling check: the human it mirrors does not hold the
  * permission, or Langy is never delegated it at all. Only the first one is

@@ -73,6 +73,7 @@ export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
 } from "./adapters/simulation-processing-pipeline.adapter";
+export { createSimulationProcessingProducerPipeline } from "./adapters/simulation-processing-producer.adapter";
 export {
   ScenarioApp,
   type QueueSimulationRunInput,

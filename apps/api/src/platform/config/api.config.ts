@@ -166,6 +166,25 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "API_KEY_PEPPER",
   }),
   /**
+   * The pepper a VIRTUAL key's stored secret is hashed under.
+   *
+   * Its own leaf beside the API-key pepper above, and not the same value: a
+   * virtual key is presented to the Go data plane rather than to this process,
+   * and the two credential families are rotated independently. A process that
+   * peppered one with the other's key would authenticate none of the keys
+   * already issued.
+   *
+   * An unvalidated optional string for the reason every credential here is: an
+   * operator who exports the variable blank has not configured a pepper, and
+   * `Config.secret` would refuse the whole boot over it. What blank means is
+   * the cipher's own rule and lives with it — `VirtualKeyCryptoAdapter` raises
+   * `pepper_missing` at the first hash rather than at boot, so a deployment
+   * that runs no gateway needs no pepper at all.
+   */
+  virtualKeyPepper: Config.value(optionalEnvironmentString, {
+    env: "LW_VIRTUAL_KEY_PEPPER",
+  }),
+  /**
    * The bearer credential a caller must present to scrape this process's
    * metrics, under the name every other LangWatch tier reads it by.
    *

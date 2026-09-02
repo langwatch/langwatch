@@ -25,8 +25,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1080.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-webhook-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

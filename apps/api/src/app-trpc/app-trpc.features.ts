@@ -153,6 +153,11 @@ import {
   createRoleTrpcRouter,
   type RoleTrpcPorts,
 } from "../features/role/role-trpc.mount";
+import {
+  createGithubTrpcRouter,
+  type GithubTrpcContext,
+  type GithubTrpcMountPorts,
+} from "../features/github/github-trpc.mount";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import {
   createWorkflowOptimizationTrpcRouter,
@@ -163,6 +168,11 @@ import {
   type AnyAppAgentGroupTrpcPorts,
   type AppAgentGroupTrpcContext,
 } from "./app-trpc.agent-group";
+import {
+  createAppGatewayGroupTrpcFeatures,
+  type AnyAppGatewayGroupTrpcPorts,
+  type AppGatewayGroupTrpcContext,
+} from "./app-trpc.gateway-group";
 import {
   createAppOrgGroupTrpcFeatures,
   type AnyAppOrgGroupTrpcPorts,
@@ -211,7 +221,26 @@ export interface AppTrpcFeaturePorts<
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
   TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
+  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
 > {
+  /**
+   * The twenty-one surfaces the AI Gateway and the governance console that
+   * steers it are administered through, as one entry.
+   *
+   * Same reason the trace, organization, agent and product-infrastructure
+   * groups are one entry each: they are one graph — a virtual key is minted by
+   * the governance console, priced by the budget ledger, delivered on by a
+   * webhook endpoint and billed through a subscription — and one entry keeps
+   * their ports in {@link AppGatewayGroupTrpcPorts} rather than on this
+   * interface, which five other halves of the record also edit.
+   */
+  gatewayGroup: TGatewayGroup;
+  /**
+   * The two answers `github.*` reaches that the GitHub feature does not own:
+   * which organization a project belongs to, and where a command on the
+   * connection is recorded.
+   */
+  github: GithubTrpcMountPorts;
   /**
    * The three surfaces that answer for a project's own storage, retention and
    * monitoring, as one entry.
@@ -500,6 +529,8 @@ export function createAppTrpcFeatures<
     WorkflowOptimizationTrpcContext &
     WorkflowTrpcContext &
     AppAgentGroupTrpcContext &
+    AppGatewayGroupTrpcContext &
+    GithubTrpcContext &
     AppOrgGroupTrpcContext &
     AppProductInfraTrpcContext &
     AppTraceGroupTrpcContext,
@@ -526,6 +557,7 @@ export function createAppTrpcFeatures<
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
   TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
+  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
 >(options: {
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
   ports: AppTrpcFeaturePorts<
@@ -549,7 +581,8 @@ export function createAppTrpcFeatures<
     TTraceGroup,
     TOrgGroup,
     TAgentGroup,
-    TProductInfra
+    TProductInfra,
+    TGatewayGroup
   >;
 }) {
   const { mount, ports } = options;
@@ -576,6 +609,13 @@ export function createAppTrpcFeatures<
     // it is swept on, and the monitors running beside it — one entry, and one
     // place their parameters live.
     ...createAppProductInfraTrpcFeatures({ mount, ports: ports.productInfra }),
+    // The twenty-one AI Gateway and governance-console surfaces, spread in
+    // whole for the same reason again: one graph — a virtual key is minted by
+    // the console, priced by the budget ledger, delivered on by a webhook
+    // endpoint and billed through a subscription — one entry, and one place
+    // their ports live. Fifteen of them are Enterprise, and they arrive
+    // through the single composition seam a core process may see them through.
+    ...createAppGatewayGroupTrpcFeatures({ mount, ports: ports.gatewayGroup }),
     // One wire namespace assembled from three packaged transports, exactly as
     // the client has always called it: the charted reads at `analytics.*`, the
     // workbench at `analytics.lwql`, and the saved charts at
@@ -640,6 +680,10 @@ export function createAppTrpcFeatures<
     featureFlag: createFeatureFlagTrpcRouter(mount),
     graphs: createGraphTrpcRouter({ ...mount, ports: ports.graphs }),
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
+    // The GitHub App an organization connected, and the pull requests its
+    // coding agents opened. Its own entry rather than part of a group: one
+    // namespace, two ports, and no graph shared with anything beside it.
+    github: createGithubTrpcRouter({ ...mount, ports: ports.github }),
     home: createHomeTrpcRouter({ ...mount, ports: ports.home }),
     identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
     integrationsChecks: createIntegrationsChecksTrpcRouter({

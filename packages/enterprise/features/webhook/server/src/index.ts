@@ -130,3 +130,47 @@ export {
  * status code and enum spelling is the feature's published contract.
  */
 export { createWebhookRestApp } from "./transport/api-rest/webhook.api";
+
+// ---------------------------------------------------------------------------
+// An endpoint's LAST HOP
+//
+// Everything above the destination interface is one machinery no matter where
+// an endpoint delivers — the same coalescing buffer, the same retry ladder, the
+// same delivery log, the same signature over the same bytes. Only the hop
+// differs, and it differs behind `WebhookDestination`.
+// ---------------------------------------------------------------------------
+export type {
+  WebhookDestination,
+  WebhookDispatchRequest,
+  WebhookDispatchVerdict,
+} from "./ports/webhook-destination.port";
+export {
+  webhookDestinationFor,
+  type WebhookDestinationDeps,
+} from "./adapters/webhook-destination.adapter";
+export { httpWebhookDestination } from "./adapters/http.webhook-destination.adapter";
+export {
+  classifySqsFailure,
+  dropSqsClient,
+  isStaleCredentialFailure,
+  resetSqsClientCache,
+  SQS_MAX_MESSAGE_BYTES,
+  sqsClientFor,
+  sqsMessageAttributes,
+  sqsMessageBytes,
+  sqsWebhookDestination,
+  type AwsClientConfigPort,
+  type SqsDestinationConfig,
+} from "./adapters/sqs.webhook-destination.adapter";
+export {
+  inspectSqsQueueUrl,
+  parseSqsQueueUrl,
+  sqsHostFor,
+  type SqsQueueUrlInspection,
+  type SqsQueueUrlProblem,
+} from "./services/sqs-queue-url.rules";
+export {
+  pruneExpiredIdempotencyReceipts,
+  pruneWebhookDeliveries,
+  WEBHOOK_DELIVERY_RETENTION_MS,
+} from "./repositories/prisma/prisma.webhook-retention.repository";

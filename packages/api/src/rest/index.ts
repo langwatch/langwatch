@@ -9,6 +9,13 @@
 // here: a consumer imports each from the entry point that owns it.
 // ---------------------------------------------------------------------------
 
+// The fingerprint a credential refusal is logged with, on every family that
+// resolves its own credential.
+export { type AuthDiagnostics, collectAuthDiagnostics } from "./auth-diagnostics.js";
+// The wire-size cap every ingestion family carries. Here rather than in one
+// family because nine of them apply it, and a second implementation would be a
+// second answer to "how big is too big" on the same process.
+export { bodyLimit, type BodyLimitOptions } from "./body-limit.js";
 export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
 export type { RestService } from "./builder.js";
 export type {

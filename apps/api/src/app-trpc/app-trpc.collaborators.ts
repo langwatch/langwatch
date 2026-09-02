@@ -51,6 +51,7 @@ import type {
 } from "@langwatch/project-server";
 import type { PromptTrpcPorts } from "@langwatch/prompt-server";
 import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
+import type { GithubTrpcMountPorts } from "../features/github/github-trpc.mount";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcPorts,
@@ -60,6 +61,7 @@ import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
 import type { AnyAppAgentGroupTrpcPorts } from "./app-trpc.agent-group";
+import type { AnyAppGatewayGroupTrpcPorts } from "./app-trpc.gateway-group";
 import type { AnyAppOrgGroupTrpcPorts } from "./app-trpc.org-group";
 import type { AnyAppProductInfraTrpcPorts } from "./app-trpc.product-infra";
 import type { AnyAppTraceGroupTrpcPorts } from "./app-trpc.trace-group";
@@ -133,6 +135,7 @@ export type ApiTrpcCollaborators<
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
   TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
+  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
 > = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.
@@ -271,6 +274,32 @@ export type ApiTrpcCollaborators<
   agentGroup: TAgentGroup;
 
   /**
+   * The twenty-one AI Gateway and governance-console surfaces' ports, as one
+   * entry.
+   *
+   * Like the three groups above, this is not a leftover: the API composes the
+   * gateway application itself — the virtual-key operations service, the
+   * ClickHouse budget ledger, the per-key spend rollup and the spend-event feed
+   * all run on its own Prisma and ClickHouse connections. What it cannot
+   * compose is named INSIDE the group — the Enterprise governance application,
+   * whose event-sourcing command registrations have not moved — so a deployment
+   * reads one absence per capability rather than one absence for twenty-one
+   * namespaces.
+   */
+  gatewayGroup: TGatewayGroup;
+
+  /**
+   * The two answers `github.*` reaches that the GitHub feature does not own:
+   * which organization a project belongs to, and where a command on the
+   * connection is recorded.
+   *
+   * Its own entry rather than a member of the group above, because it is one
+   * namespace with two ports and no shared graph: the GitHub App an
+   * organization connected has nothing to do with what its virtual keys spend.
+   */
+  github: GithubTrpcMountPorts;
+
+  /**
    * The three product-infrastructure surfaces' ports, as one entry.
    *
    * Like the three groups above, this is not a leftover: the API composes the
@@ -338,5 +367,6 @@ export type AnyApiTrpcCollaborators = ApiTrpcCollaborators<
   AnyAppTraceGroupTrpcPorts,
   AnyAppOrgGroupTrpcPorts,
   AnyAppAgentGroupTrpcPorts,
-  AnyAppProductInfraTrpcPorts
+  AnyAppProductInfraTrpcPorts,
+  AnyAppGatewayGroupTrpcPorts
 >;
