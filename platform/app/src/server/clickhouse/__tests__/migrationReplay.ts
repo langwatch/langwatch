@@ -44,7 +44,7 @@ export const CURRENT_ROLLUP_REBUILD_MIGRATIONS = [
   "00069_gateway_budget_scope_totals_budget_grain.sql",
   "00070_gateway_budget_ledger_nano_usd.sql",
   "00082_gateway_budget_scope_totals_exclude_pulled.sql",
-  "00087_aggregating_rollup_dimension_columns.sql",
+  "00088_aggregating_rollup_dimension_columns.sql",
 ] as const;
 
 /** Replays `CURRENT_ROLLUP_REBUILD_MIGRATIONS` in order. */

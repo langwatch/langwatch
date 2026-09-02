@@ -33,7 +33,7 @@ const MIGRATIONS_DIR = resolve(
   "src/server/clickhouse/migrations",
 );
 
-const CONVERGE_MIGRATION = "00087_aggregating_rollup_dimension_columns.sql";
+const CONVERGE_MIGRATION = "00088_aggregating_rollup_dimension_columns.sql";
 
 /** Column names that never carry a merge rule of their own. */
 const NON_COLUMN_PREFIXES = ["INDEX", "CONSTRAINT", "PROJECTION", "PRIMARY"];
