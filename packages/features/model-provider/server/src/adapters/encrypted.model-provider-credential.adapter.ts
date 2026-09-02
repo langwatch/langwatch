@@ -1,7 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { decrypt } from "~/utils/encryption";
+import {
+  ModelProviderCredentialCodec,
+  type ModelProviderCredentialCipherPort,
+} from "../ports/model-provider.port";
 
-const logger = createLogger("langwatch:modelProviders:customKeys");
+const logger = createLogger("langwatch:model-provider:credentials");
 
 /**
  * How a ModelProvider's `customKeys` column read back.
@@ -49,24 +52,35 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
  * an unreadable one look identical to a caller that only reads `keys`: on the
  * voice path the webhook answers 404 and the reconciler skips the session, so
  * the call settles as cost-unknown with no other signal that anything went
- * wrong. `decrypt` logs its own failures; a parse failure had none.
+ * wrong.
  */
-export function readCustomKeys(raw: unknown): CustomKeysRead {
+export function readCustomKeys(
+  raw: unknown,
+  cipher: ModelProviderCredentialCipherPort,
+): CustomKeysRead {
   if (raw === null || raw === undefined) return ABSENT;
   if (typeof raw === "object") {
     return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
   }
   if (typeof raw !== "string") return UNREADABLE;
-  return parseDecrypted(raw);
+  return parseDecrypted(raw, cipher);
 }
 
 /** Decrypts one stored value and reads it as JSON. */
-function parseDecrypted(raw: string): CustomKeysRead {
+function parseDecrypted(raw: string, cipher: ModelProviderCredentialCipherPort): CustomKeysRead {
   let plaintext: string;
   try {
-    plaintext = decrypt(raw);
-  } catch {
-    // decrypt logs its own failures.
+    plaintext = cipher.decrypt(raw);
+  } catch (error) {
+    // The error NAME only: a cipher that refuses a value may quote it, and the
+    // value here is a customer's credential.
+    logger.warn(
+      {
+        errorName: error instanceof Error ? error.name : "unknown",
+        encryptedLength: raw.length,
+      },
+      "a model provider's custom keys would not decrypt; reading it as unreadable",
+    );
     return UNREADABLE;
   }
   try {
@@ -85,5 +99,36 @@ function parseDecrypted(raw: string): CustomKeysRead {
       "a model provider's custom keys decrypted to something that is not JSON; reading it as unreadable",
     );
     return UNREADABLE;
+  }
+}
+
+/**
+ * The stored form of a provider's credentials: encrypted JSON, one column.
+ *
+ * The cipher is injected because the KEY is the deployment's, and the format
+ * is the deployment's too — rows this codec writes are read back by every
+ * other process in the installation. What belongs to the feature, and lives
+ * here, is the lenient read: a legacy plain-object row, an absent column and
+ * an undecryptable one are three different facts, and the decode answers null
+ * for the last two rather than taking a request down with it.
+ */
+export class EncryptedModelProviderCredentialAdapter extends ModelProviderCredentialCodec {
+  static create(input: {
+    cipher: ModelProviderCredentialCipherPort;
+  }): EncryptedModelProviderCredentialAdapter {
+    return new EncryptedModelProviderCredentialAdapter(input.cipher);
+  }
+
+  private constructor(private readonly cipher: ModelProviderCredentialCipherPort) {
+    super();
+  }
+
+  encode(value: Record<string, unknown> | null): unknown {
+    return value === null ? null : this.cipher.encrypt(JSON.stringify(value));
+  }
+
+  tryDecode(value: unknown): Record<string, unknown> | null {
+    const parsed = readCustomKeys(value, this.cipher);
+    return parsed.state === "read" ? parsed.keys : null;
   }
 }

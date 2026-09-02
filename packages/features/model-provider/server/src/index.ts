@@ -12,13 +12,57 @@ export {
   ModelCostProjectPort,
   ModelCostProjectScopePort,
   ModelProviderCatalog,
+  ModelProviderCodexHandlePort,
+  ModelProviderCredentialCipherPort,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  ModelProviderCredentialProbePort,
   ModelProviderConnectionRateLimiter,
+  ModelProviderEgressPort,
+  ModelProviderManagedGatewayPort,
+  ModelProviderRateLimitPort,
   CodexTokenRefresher,
   ModelTranslationPort,
   ModelProviderIdService,
 } from "./ports/model-provider.port";
+export type {
+  ModelProviderEgressRequest,
+  ModelProviderEgressResponse,
+} from "./ports/model-provider.port";
+export {
+  EncryptedModelProviderCredentialAdapter,
+  readCustomKeys,
+  type CustomKeysRead,
+} from "./adapters/encrypted.model-provider-credential.adapter";
+export {
+  RegistryModelProviderCatalogAdapter,
+  UnmanagedModelProviderGatewayAdapter,
+  type RegistryModelProviderCatalogOptions,
+} from "./adapters/registry.model-provider-catalog.adapter";
+export {
+  HttpModelProviderCredentialProbeAdapter,
+  UnavailableModelProviderCredentialProbeAdapter,
+  validateKeyWithCustomUrl,
+  validateProviderApiKey,
+} from "./adapters/http.model-provider-credential-probe.adapter";
+export {
+  CodexAccountService,
+  CodexAuthError,
+  CodexOAuthModelProviderTokenRefresherAdapter,
+} from "./adapters/codex-oauth.model-provider-token-refresher.adapter";
+export { WindowedModelProviderConnectionRateLimiterAdapter } from "./adapters/windowed.model-provider-connection-rate-limiter.adapter";
+export {
+  SsrfModelProviderEgressAdapter,
+  type ModelProviderEgressPolicy,
+} from "./adapters/ssrf.model-provider-egress.adapter";
+export { PrefixedModelProviderIdAdapter } from "./adapters/prefixed.model-provider-id.adapter";
+export { VercelAiModelTranslationAdapter } from "./adapters/vercel-ai.model-translation.adapter";
+export {
+  getVercelAIModel,
+  ModelProviderExecutionHandleService,
+  type ModelProviderExecutionHandleInput,
+  type ModelProviderExecutionHandleOptions,
+} from "./services/model-provider-execution-handle.service";
 export { ModelProviderKeysService } from "./services/model-provider-keys.service";
 export { resolveMaxTokensCeiling } from "./adapters/resolve-max-tokens-ceiling.adapter";
 export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter";

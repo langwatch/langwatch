@@ -195,7 +195,14 @@ export async function fetchValidatedDestination(
   try {
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
-      headers,
+      // Entries rather than the `Headers` instance itself. Two copies of the
+      // undici types are reachable in this repository — the one this package
+      // resolves, and the one `@types/node` carries — and a consumer that has
+      // both in scope cannot assign one library's `Headers` to the other's
+      // parameter even though they are the same object at runtime. The pair
+      // list is the shape both accept, and it is what undici builds from a
+      // `Headers` anyway.
+      headers: [...headers],
       body: init?.body as string | undefined,
       // Without this the caller's AbortSignal.timeout(...) is silently dropped
       // and undici's 300s default is the only bound — across every hop.

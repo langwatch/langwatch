@@ -119,6 +119,12 @@ const databaseMocks = vi.hoisted(() => {
     {
       get: (target: Record<string, unknown>, key: string) =>
         key in target ? target[key] : emptyDelegate,
+      // A composed service may ASK whether a delegate exists before it uses
+      // one — the model-provider repository refuses a client that has no
+      // `modelProvider` rather than failing on the first read — so presence
+      // has to agree with the getter above. Without this trap the double
+      // answers "here is a delegate" and "there is no such model" at once.
+      has: () => true,
     },
   );
   const configured: { value: boolean } = { value: false };

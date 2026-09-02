@@ -31,15 +31,17 @@
  *
  * ## What arrives as an option, and why
  *
- * The MODEL-PROVIDER vertical has not moved: the six ports
- * `PostgresModelProviderAdapter` needs — its catalogue, its credential codec,
- * its Codex refresher, its connection limiter, its translation port and its id
- * service — are all still `platform/app` classes. The workflow service cannot
- * be built without a model-provider service (a Studio node's model is resolved
- * per run), so it arrives here and the execution half composes only when a
- * host has one. That is a named absence rather than a degradation: a workflow
- * namespace mounted over a model gateway that does not exist would answer
- * every run with an unattributable failure.
+ * The MODEL GATEWAY still arrives as a required input rather than being built
+ * here, and it is now built by the process rather than by a host: the six
+ * ports `PostgresModelProviderAdapter` needs are composed in
+ * `api-model-provider.composition.ts` over this process's own graph. It stays
+ * an input because ONE gateway serves the whole process — the REST families,
+ * the packaged namespaces and this half all read the same provider rows — and
+ * a second composed here would be a second answer to which credential a
+ * provider holds. A Studio node's model is resolved per run, so an absent
+ * gateway still makes this whole half absent, which is a named absence rather
+ * than a degradation: a workflow namespace mounted over a gateway that does
+ * not exist would answer every run with an unattributable failure.
  *
  * The rest degrade FAIL-CLOSED, each with its own reason:
  *

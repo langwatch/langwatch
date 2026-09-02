@@ -261,6 +261,38 @@ export const apiConfigDefinition = RuntimeConfig.define({
       }),
       publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
     },
+    /**
+     * The three facts the MODEL GATEWAY needs that are the deployment's rather
+     * than the feature's.
+     *
+     * `isSaas` decides whether a SYSTEM provider — one credentialed by
+     * LangWatch's own environment rather than by the customer — may be enabled
+     * at all. A self-hosted install that happens to export `OPENAI_API_KEY`
+     * for something else would otherwise find a provider it never configured
+     * switched on for every project, which is why this is its own flag and not
+     * inferred from the presence of a key.
+     *
+     * The other two fence the outbound credential probe. `blockLocalHttpCalls`
+     * refuses private, loopback and link-local destinations, and
+     * `allowedProxyHosts` is the literal allowlist that relaxes only that
+     * block — the cloud-metadata endpoints are refused either way, whatever a
+     * deployment sets. TLS verification deliberately follows `isSaas` rather
+     * than the address policy: on-prem operators routinely call services with
+     * self-signed certificates, which has nothing to do with whether private
+     * addresses are reachable.
+     *
+     * All three are read here because this module is the process's only
+     * environment reader.
+     */
+    modelProvider: {
+      isSaas: Config.value(optionalEnvironmentString, { env: "IS_SAAS" }),
+      blockLocalHttpCalls: Config.value(optionalEnvironmentString, {
+        env: "BLOCK_LOCAL_HTTP_CALLS",
+      }),
+      allowedProxyHosts: Config.value(optionalEnvironmentString, {
+        env: "ALLOWED_PROXY_HOSTS",
+      }),
+    },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
       clusterEndpoints: Config.value(optionalEnvironmentString, {
@@ -337,6 +369,35 @@ export type ApiClickHouseConfigResolution = Readonly<{
  * NOT configured it, and a `fetch` at `"/go/studio/execute_sync"` reports a
  * URL parse failure rather than the configuration gap that caused it.
  */
+/**
+ * What the model gateway was told about this deployment.
+ *
+ * `isSaas` is read the platform app's way — `"1"` or `"true"`, anything else
+ * off — so one variable means one thing across every tier. The egress pair is
+ * the address policy an outbound credential probe is judged by; an unset
+ * allowlist is an empty one rather than a wildcard, because a wildcard read
+ * from an absent variable is how a fence stops fencing without anyone
+ * deciding it should.
+ */
+export type ApiModelProviderConfigResolution = Readonly<{
+  isSaas: boolean;
+  blockLocalHttpCalls: boolean;
+  allowedProxyHosts: readonly string[];
+  /**
+   * The process environment a SYSTEM provider's credential and a managed
+   * organization's Bedrock configuration are read from.
+   *
+   * A map rather than named leaves, and it is the one place in this config
+   * where that is right: WHICH variable carries a provider's key is the
+   * provider registry's business — sixteen providers, each with its own
+   * `apiKey` and optional `endpointKey`, and custom providers naming keys no
+   * schema here could enumerate — while WHETHER this deployment set them is
+   * the environment's. Reading it here rather than at the gateway is what
+   * keeps this module the process's only environment reader.
+   */
+  environment: Readonly<Record<string, string | undefined>>;
+}>;
+
 export type ApiExecutionConfigResolution = Readonly<{
   /** Where the NLP engine answers; absent means no workflow or code evaluator runs. */
   nlpServiceUrl: string | undefined;
@@ -348,6 +409,7 @@ export type ApiInfrastructureConfig = Readonly<{
   database: ApiDatabaseConfigResolution;
   clickhouse: ApiClickHouseConfigResolution;
   execution: ApiExecutionConfigResolution;
+  modelProvider: ApiModelProviderConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
 }>;
@@ -419,10 +481,49 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         nlpServiceUrl: value.infrastructure.execution.nlpServiceUrl?.trim() || undefined,
         publicBaseUrl: value.infrastructure.execution.publicBaseUrl?.trim() || undefined,
       },
+      modelProvider: resolveModelProviderConfig(
+        value.infrastructure.modelProvider,
+        environmentStrings(source),
+      ),
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
   };
+}
+
+/**
+ * The deployment's answers for the model gateway.
+ *
+ * Both flags are read the platform app's way: `"1"` or `"true"` is on, and
+ * every other value — including a variable set to something well-meant like
+ * `"yes"` — is off, because two tiers disagreeing about whether a fence is up
+ * is worse than either answer. The allowlist is split on commas and trimmed,
+ * and blank entries are dropped: an empty host matches nothing useful and
+ * would otherwise sit in the list looking like a rule.
+ */
+function resolveModelProviderConfig(
+  value: Readonly<{
+    isSaas: string | undefined;
+    blockLocalHttpCalls: string | undefined;
+    allowedProxyHosts: string | undefined;
+  }>,
+  environment: Readonly<Record<string, string | undefined>>,
+): ApiModelProviderConfigResolution {
+  return {
+    isSaas: isEnabledFlag(value.isSaas),
+    blockLocalHttpCalls: isEnabledFlag(value.blockLocalHttpCalls),
+    allowedProxyHosts:
+      value.allowedProxyHosts
+        ?.split(",")
+        .map((host) => host.trim())
+        .filter((host) => host.length > 0) ?? [],
+    environment,
+  };
+}
+
+/** The platform app's exact reading of a boolean environment variable. */
+function isEnabledFlag(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
 }
 
 /**

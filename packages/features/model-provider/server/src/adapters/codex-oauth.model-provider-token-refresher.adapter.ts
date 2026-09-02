@@ -6,6 +6,7 @@ import {
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { CodexTokenRefresher } from "../ports/model-provider.port";
 
 /**
  * Sign in with your OpenAI account for the Codex provider, so requests bill
@@ -327,5 +328,43 @@ export function decodeCodexClaims(idToken: string): CodexClaims {
     };
   } catch {
     return { accountId: "", email: "", plan: "" };
+  }
+}
+
+/**
+ * The Codex refresher, over the device-flow account service above.
+ *
+ * The two are separate because they answer different callers: the account
+ * service runs the sign-in ceremony a person walks through, while this is what
+ * the gateway asks when a stored session's access token has aged out. A
+ * rejected refresh is a session that expired rather than a failure — the
+ * customer signs in again — and everything else is still a fault, so it
+ * propagates.
+ */
+export class CodexOAuthModelProviderTokenRefresherAdapter extends CodexTokenRefresher {
+  static create(
+    input: { issuer?: string } = {},
+  ): CodexOAuthModelProviderTokenRefresherAdapter {
+    return new CodexOAuthModelProviderTokenRefresherAdapter(
+      new CodexAccountService(fetch, input.issuer),
+    );
+  }
+
+  private constructor(private readonly account: CodexAccountService) {
+    super();
+  }
+
+  async refresh(input: {
+    tokens: CodexTokenKeys;
+  }): Promise<{ status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }> {
+    try {
+      const tokens = await this.account.refresh(input.tokens);
+      return { status: "refreshed", tokens };
+    } catch (error) {
+      if (error instanceof CodexAuthError && error.kind === "refresh_rejected") {
+        return { status: "session_expired" };
+      }
+      throw error;
+    }
   }
 }

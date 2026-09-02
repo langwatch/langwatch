@@ -10,17 +10,32 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-vi.mock("../../../utils/encryption", () => ({
-  encrypt: vi.fn((text: string) => `mock-iv:mock-encrypted-${text}:mock-tag`),
-  decrypt: vi.fn((encrypted: string) => {
-    const match = encrypted.match(/^mock-iv:mock-encrypted-(.+):mock-tag$/);
+import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
+import {
+  EncryptedModelProviderCredentialAdapter,
+  readCustomKeys as readWithCipher,
+} from "../encrypted.model-provider-credential.adapter";
+
+/**
+ * A cipher with the real one's shape and none of its cryptography: the two
+ * things under test here are the LENIENT READ and what the warning line is
+ * allowed to contain, and neither has anything to do with AES.
+ */
+class RecordedCipher extends ModelProviderCredentialCipherPort {
+  encrypt(value: string): string {
+    return `mock-iv:mock-encrypted-${value}:mock-tag`;
+  }
+
+  decrypt(value: string): string {
+    const match = value.match(/^mock-iv:mock-encrypted-(.+):mock-tag$/);
     if (!match) throw new Error("Invalid encrypted string format");
     return match[1]!;
-  }),
-}));
+  }
+}
 
-import { encrypt } from "../../../utils/encryption";
-import { readCustomKeys } from "../customKeys";
+const cipher = new RecordedCipher();
+const encrypt = (value: string): string => cipher.encrypt(value);
+const readCustomKeys = (raw: unknown) => readWithCipher(raw, cipher);
 
 /**
  * The three answers a stored credential bag can give.
@@ -127,6 +142,32 @@ describe("readCustomKeys", () => {
         state: "unreadable",
         keys: {},
       });
+    });
+  });
+});
+
+describe("EncryptedModelProviderCredentialAdapter", () => {
+  const codec = EncryptedModelProviderCredentialAdapter.create({ cipher });
+
+  describe("given a bag to store", () => {
+    it("writes it through the cipher and reads the same bag back", () => {
+      const encoded = codec.encode({ OPENAI_API_KEY: "sk-secret" });
+
+      // Through the cipher, not beside it: the column holds whatever the
+      // deployment's cipher made of the JSON, which is what makes a row this
+      // process writes readable by the one that wrote the others.
+      expect(encoded).toBe(cipher.encrypt(JSON.stringify({ OPENAI_API_KEY: "sk-secret" })));
+      expect(codec.tryDecode(encoded)).toEqual({ OPENAI_API_KEY: "sk-secret" });
+    });
+
+    it("writes null as null rather than as encrypted emptiness", () => {
+      expect(codec.encode(null)).toBeNull();
+    });
+  });
+
+  describe("given a column that cannot be read", () => {
+    it("decodes to null rather than to an empty bag", () => {
+      expect(codec.tryDecode("not-a-value-this-cipher-can-decrypt")).toBeNull();
     });
   });
 });

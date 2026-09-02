@@ -28,6 +28,7 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
+import type { LanguageModel } from "ai";
 export type ModelProviderRecord = ModelProvider;
 export type ModelDefaultConfigSaveInput = {
   id: string;
@@ -331,4 +332,114 @@ export abstract class ModelCostProjectPort {
  */
 export abstract class ModelCostProjectScopePort {
   abstract tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null>;
+}
+
+/**
+ * The at-rest cipher a stored credential is written and read through.
+ *
+ * A port rather than an implementation because the KEY is the deployment's:
+ * every process reads its own `CREDENTIALS_SECRET` and hands the cipher in,
+ * and a package that named the variable would decide for all of them. The
+ * format itself is a WIRE FORMAT — rows written by one process are read by
+ * another — so the cipher passed here must be the deployment's one cipher and
+ * not a second implementation of it.
+ */
+export abstract class ModelProviderCredentialCipherPort {
+  abstract encrypt(value: string): string;
+  abstract decrypt(value: string): string;
+}
+
+/** One outbound probe's answer, as the credential prober reads it. */
+export type ModelProviderEgressResponse = {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+};
+
+/** What one credential probe asks of the network. */
+export type ModelProviderEgressRequest = {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  signal: AbortSignal;
+};
+
+/**
+ * The guarded way out of the process, for the credential probe.
+ *
+ * Every probe carries a customer's credential to a URL a customer chose, so it
+ * may not go through bare `fetch`: the composition root supplies an
+ * SSRF-validated, IP-pinned, redirect-refusing egress and this package never
+ * learns which one. `isRedirectRefusal` is on the port for the same reason the
+ * prober matches by type rather than by message — a refused hop is a different
+ * answer to the customer than a host that never replied, and only the
+ * implementation knows which error class it raises.
+ */
+export abstract class ModelProviderEgressPort {
+  abstract fetch(
+    url: string,
+    request: ModelProviderEgressRequest,
+  ): Promise<ModelProviderEgressResponse>;
+  abstract isRedirectRefusal(error: unknown): boolean;
+}
+
+/**
+ * The stored-credential probe itself.
+ *
+ * Separated from {@link ModelProviderCatalog} because it is the one catalogue
+ * answer that leaves the process: a deployment with no egress of its own can
+ * compose every other catalogue answer and refuse this one by name, rather
+ * than reporting an unchecked credential as a working one.
+ */
+export abstract class ModelProviderCredentialProbePort {
+  abstract probe(input: {
+    provider: string;
+    customKeys: Record<string, string>;
+  }): Promise<ModelProviderCredentialVerdict>;
+}
+
+/** One fixed window, counted wherever the process counts its windows. */
+export abstract class ModelProviderRateLimitPort {
+  abstract consume(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<{ allowed: boolean; resetAt: number }>;
+}
+
+/**
+ * Whether LangWatch itself supplies a provider's credentials, and with what.
+ *
+ * The managed-provider vertical is Enterprise and this package is not, so the
+ * two methods it actually needs are named here and the composition root
+ * adapts its Enterprise service onto them. Absent, every provider is the
+ * customer's own — which is the true answer for every deployment that has no
+ * managed providers, and the WRONG one for a deployment that does, so a
+ * composition root that has the service must pass it.
+ */
+export abstract class ModelProviderManagedGatewayPort {
+  abstract isManaged(input: { organizationId: string; provider: string }): boolean;
+  abstract prepareParameters(input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  }): Promise<Record<string, string>>;
+}
+
+/**
+ * The handle a Codex model executes through.
+ *
+ * Codex has exactly one road — the AI gateway's Responses endpoint, on the
+ * per-project virtual key the Langy agent uses — so resolving one needs the
+ * gateway vertical, which is not this feature's. A process that composes no
+ * gateway credential passes nothing and the cascade refuses codex models by
+ * name; every other provider is unaffected.
+ */
+export abstract class ModelProviderCodexHandlePort {
+  abstract resolve(input: {
+    projectId: string;
+    model: string;
+    featureKey: string;
+  }): Promise<LanguageModel>;
 }

@@ -1,26 +1,54 @@
 import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
+  MASKED_KEY_PLACEHOLDER,
   tryGetModelProviderDefinition,
   type ModelProviderCredentialVerdict,
   type ModelProviderService,
   type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
 import {
-  providerApiRoots,
-  providerDefaultBaseUrls,
-} from "../../features/onboarding/regions/model-providers/registry";
-import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
-import { RedirectRefusedError, ssrfSafeFetch } from "../../utils/ssrfProtection";
+  ModelProviderCredentialProbePort,
+  type ModelProviderEgressPort,
+  type ModelProviderEgressResponse,
+} from "../ports/model-provider.port";
+
+/**
+ * The documented API root and default endpoint of every provider the probe
+ * knows how to reach.
+ *
+ * Stated here rather than derived from the onboarding grid's registry, which
+ * is where they used to live: that registry is a BROWSER module — icons,
+ * themed assets, field labels — and no server module may value-import one.
+ * These two maps are the only thing this module ever read from it, and they
+ * are not presentation: they are where a credential is carried to.
+ *
+ * Keyed by the BACKEND provider key the model-provider registry uses.
+ */
+const providerDefaultBaseUrls: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  gemini: "https://generativelanguage.googleapis.com/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  groq: "https://api.groq.com/openai/v1",
+  xai: "https://api.x.ai/v1",
+  cerebras: "https://api.cerebras.ai/v1",
+};
+
+/** Version-less API roots keyed by the backend provider key — see `apiRoot`. */
+const providerApiRoots: Record<string, string> = {
+  gemini: "https://generativelanguage.googleapis.com",
+};
 
 /**
  * The response shape the probe actually receives.
  *
- * `ssrfSafeFetch` goes out through undici so it can pin the resolved IP, and
- * undici ships its own `Response` type. Deriving the alias from the function
- * rather than naming either one keeps this correct if that ever changes.
+ * The three members it reads, and no more: the egress the composition root
+ * supplies goes out through undici so it can pin the resolved IP, and naming
+ * undici's own `Response` here would put a transport library in a package that
+ * never opens a socket.
  */
-type ProbeResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
+type ProbeResponse = ModelProviderEgressResponse;
 
 /**
  * The verdict this module produces, and the reasons a check never ran.
@@ -819,8 +847,8 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
  * and would report every refused redirect as a connection failure while
  * looking entirely correct.
  */
-function isRefusedRedirect(err: unknown): boolean {
-  return err instanceof RedirectRefusedError;
+function isRefusedRedirect(err: unknown, egress: ModelProviderEgressPort): boolean {
+  return egress.isRedirectRefusal(err);
 }
 
 function redirectedFailure(context: ProbeContext): RankedFailure {
@@ -846,10 +874,12 @@ async function probeOnce({
   candidate,
   context,
   deadline,
+  egress,
 }: {
   candidate: ProbeRequest;
   context: ProbeContext;
   deadline: AbortSignal;
+  egress: ModelProviderEgressPort;
 }): Promise<
   { accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }
 > {
@@ -873,17 +903,16 @@ async function probeOnce({
     // redirect strips `Authorization` but carries `x-api-key`, `x-goog-api-key`
     // and `xi-api-key` straight through to the new host. A redirect is not
     // something a models listing needs.
-    response = await ssrfSafeFetch(candidate.url, {
+    response = await egress.fetch(candidate.url, {
       method: candidate.method ?? "GET",
       headers: candidate.headers,
       ...(candidate.body === undefined ? {} : { body: candidate.body }),
       signal: deadline,
-      followRedirects: false,
     });
   } catch (err) {
     return {
       accepted: false,
-      failure: isRefusedRedirect(err)
+      failure: isRefusedRedirect(err, egress)
         ? redirectedFailure(context)
         : unreachableFailure(context),
     };
@@ -910,9 +939,11 @@ async function probeOnce({
 async function runProbeChain({
   candidates,
   context,
+  egress,
 }: {
   candidates: ProbeRequest[];
   context: ProbeContext;
+  egress: ModelProviderEgressPort;
 }): Promise<ModelProviderCredentialVerdict> {
   const failures: RankedFailure[] = [];
 
@@ -927,7 +958,7 @@ async function runProbeChain({
       break;
     }
 
-    const outcome = await probeOnce({ candidate, context, deadline });
+    const outcome = await probeOnce({ candidate, context, deadline, egress });
 
     if (outcome.accepted) {
       return verified();
@@ -974,11 +1005,20 @@ export async function validateKeyWithCustomUrl({
   provider,
   customBaseUrl,
   modelProviders: service,
+  environment,
+  egress,
 }: {
   projectId: string;
   provider: string;
   customBaseUrl: string | undefined;
   modelProviders: ModelProviderService;
+  /**
+   * The process environment the fallback key is read from, passed in rather
+   * than read here: a package has no environment of its own, and the caller
+   * that has one is the composition root.
+   */
+  environment: Readonly<Record<string, string | undefined>>;
+  egress: ModelProviderEgressPort;
 }): Promise<ModelProviderCredentialVerdict> {
   const providerDef = tryGetModelProviderDefinition(provider);
   if (!providerDef) {
@@ -1007,7 +1047,7 @@ export async function validateKeyWithCustomUrl({
 
   // Fallback to env var if no stored key
   if (!apiKey) {
-    apiKey = process.env[apiKeyField]?.trim() ?? "";
+    apiKey = environment[apiKeyField]?.trim() ?? "";
   }
 
   if (!apiKey) {
@@ -1032,7 +1072,7 @@ export async function validateKeyWithCustomUrl({
   }
   // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
 
-  return validateProviderApiKey(provider, customKeys);
+  return validateProviderApiKey(provider, customKeys, egress);
 }
 
 /**
@@ -1150,6 +1190,7 @@ function whyNotCheckable({
 export async function validateProviderApiKey(
   provider: string,
   customKeys: Record<string, string>,
+  egress: ModelProviderEgressPort,
 ): Promise<ModelProviderCredentialVerdict> {
   // Get provider definition from registry
   const providerDef = tryGetModelProviderDefinition(provider);
@@ -1201,6 +1242,7 @@ export async function validateProviderApiKey(
       hasConfigurableEndpoint: !!endpointField,
       ...googleDoorFor({ provider, agentPlatform }),
     },
+    egress,
   });
 }
 
@@ -1227,4 +1269,54 @@ function googleDoorFor({
     googleDoor:
       agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
   };
+}
+
+/**
+ * The catalogue's credential probe, over the process's guarded egress.
+ *
+ * A class over the two functions above rather than the functions themselves,
+ * because the egress is the composition root's: this is where the deployment's
+ * SSRF policy meets the feature's knowledge of how each provider authenticates.
+ */
+export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbePort {
+  static create(input: {
+    egress: ModelProviderEgressPort;
+  }): HttpModelProviderCredentialProbeAdapter {
+    return new HttpModelProviderCredentialProbeAdapter(input.egress);
+  }
+
+  private constructor(private readonly egress: ModelProviderEgressPort) {
+    super();
+  }
+
+  probe(input: {
+    provider: string;
+    customKeys: Record<string, string>;
+  }): Promise<ModelProviderCredentialVerdict> {
+    return validateProviderApiKey(input.provider, input.customKeys, this.egress);
+  }
+}
+
+/**
+ * The probe a deployment with no guarded egress composes.
+ *
+ * Every credential comes back `unchecked` rather than `verified`: a key that
+ * was never probed reported as working is the failure the third verdict exists
+ * to prevent, and it is the one answer this stand-in must not give.
+ */
+export class UnavailableModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbePort {
+  static create(): UnavailableModelProviderCredentialProbeAdapter {
+    return new UnavailableModelProviderCredentialProbeAdapter();
+  }
+
+  probe(_input: {
+    provider: string;
+    customKeys: Record<string, string>;
+  }): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({
+      outcome: "unchecked",
+      valid: true,
+      reason: "provider_not_probeable",
+    });
+  }
 }

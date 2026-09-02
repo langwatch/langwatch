@@ -46,6 +46,10 @@ import { ApiAuditPort } from "../../api-request.policy";
 import { ApiApplication } from "../../api.application";
 import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
+import type { OrganizationService } from "@langwatch/organization-contract";
+import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
+import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import { composeApiModelProviders } from "../api-model-provider.composition";
 import {
   composeApiExecutionCollaborators,
   withApiExecutionCollaborators,
@@ -103,30 +107,94 @@ const experimentRow = {
 };
 
 /**
- * The two tables this composition reads in these three calls, and nothing
+ * The project's configured default for the model a new Studio graph is built
+ * with — one row, read back through the packaged Prisma repository.
+ */
+const modelDefaultRow = {
+  id: "model_default_1",
+  organizationId: "org-1",
+  config: { "workflows.create_default": "openai/gpt-5-mini" },
+  scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+  authorId: null,
+  createdAt: new Date("2026-09-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+};
+
+/** The version row a create writes, as the repository reads it back. */
+const versionRow = {
+  id: "version-1",
+  projectId: "project-1",
+  workflowId: "workflow-1",
+  version: "1",
+  commitMessage: "First commit",
+  autoSaved: false,
+  dsl: {},
+  parentId: null,
+  authorId: "user-1",
+  createdAt: new Date("2026-09-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+};
+
+/**
+ * The tables this composition reads in these calls, and nothing
  * else.
  *
  * Every other model answers a rejecting proxy, so a read the test did not
  * intend fails by name instead of quietly resolving to `undefined`.
  */
-function testPrisma() {
+function testPrisma(options: { modelDefaults?: readonly unknown[] } = {}) {
   const workflowFindFirst = vi.fn(async () => workflowRow);
   const experimentFindMany = vi.fn(async () => [experimentRow]);
+  const modelDefaultFindMany = vi.fn(async () => [...(options.modelDefaults ?? [modelDefaultRow])]);
+  const workflowCreate = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+    ...workflowRow,
+    ...data,
+  }));
+  const workflowUpdate = vi.fn(async () => workflowRow);
+  const savedVersions: Array<Record<string, unknown>> = [];
+  const workflowVersionCreate = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+    savedVersions.push(data);
+    return { ...versionRow, ...data };
+  });
 
   const client = new Proxy(
     {
-      workflow: { findFirst: workflowFindFirst, findMany: async () => [] },
+      workflow: {
+        findFirst: workflowFindFirst,
+        findMany: async () => [],
+        create: workflowCreate,
+        update: workflowUpdate,
+      },
+      workflowVersion: {
+        create: workflowVersionCreate,
+        findFirst: async () => null,
+        findMany: async () => [],
+      },
       experiment: { findMany: experimentFindMany },
+      modelDefaultConfig: { findMany: modelDefaultFindMany },
     },
     {
       get(target, property) {
         if (property in target) return target[property as keyof typeof target];
         return stub(`prisma.${String(property)}`);
       },
+      // A repository may ASK for its delegates before it uses them — the model
+      // provider one refuses a client with no `modelProvider` rather than
+      // failing on the first read — so presence has to agree with the getter:
+      // every model exists, and reaching one this file did not describe still
+      // fails by name.
+      has: () => true,
     },
   ) as unknown as PrismaClient;
 
-  return { client, workflowFindFirst, experimentFindMany };
+  return {
+    client,
+    workflowFindFirst,
+    experimentFindMany,
+    modelDefaultFindMany,
+    workflowCreate,
+    savedVersions,
+  };
 }
 
 /** Permits everything: the refusal path is the declared check's own suite. */
@@ -279,6 +347,30 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
   } as unknown as AnyApiTrpcCollaborators;
 }
 
+/**
+ * A Studio graph whose one LLM node names no model — the shape that makes the
+ * create path ask the gateway rather than take the client's word for it.
+ */
+const modellessDsl = {
+  spec_version: "1.5",
+  name: "Support triage",
+  icon: "🧭",
+  description: "",
+  version: "1",
+  template_adapter: "default" as const,
+  enable_tracing: true,
+  state: {},
+  nodes: [
+    {
+      id: "llm_call",
+      type: "signature",
+      position: { x: 0, y: 0 },
+      data: { parameters: [{ identifier: "llm", type: "llm", value: null }] },
+    },
+  ],
+  edges: [],
+};
+
 const evaluationOutcome = {
   status: "processed" as const,
   score: 0.82,
@@ -287,8 +379,81 @@ const evaluationOutcome = {
   details: null,
 };
 
-function composeApplication(options: { eventing?: boolean } = {}) {
-  const prisma = testPrisma();
+/**
+ * The project and organization reads the model gateway derives a scope chain
+ * from: a default set on the project, its team or its organization.
+ */
+function testProjects(): ProjectService {
+  const project = {
+    id: "project-1",
+    name: "Support",
+    slug: "support",
+    teamId: "team-1",
+    team: { id: "team-1", name: "Core", organizationId: "org-1" },
+  } as unknown as ProjectWithTeam;
+
+  return {
+    getWithTeam: async () => project,
+    tryGetWithTeam: async () => project,
+  } as unknown as ProjectService;
+}
+
+function testOrganizations(): OrganizationService {
+  return {
+    getBillingProfile: async () => ({ id: "org-1", name: "LangWatch" }),
+  } as unknown as OrganizationService;
+}
+
+/**
+ * The stored-secret cipher, with the deployment's key replaced by a marker.
+ *
+ * A real AES key would prove nothing extra here: what the gateway needs from
+ * this port is that a credential column round-trips, and the algorithm has its
+ * own suite in `@langwatch/secret-server`.
+ */
+function testCipher(): SecretEncryptionPort {
+  return {
+    encrypt: (value: string) => `enc:${value}`,
+    decrypt: (value: string) => {
+      if (!value.startsWith("enc:")) throw new Error("Invalid encrypted string format");
+      return value.slice("enc:".length);
+    },
+  } as SecretEncryptionPort;
+}
+
+/**
+ * The REAL model gateway, composed the way the production root composes it.
+ *
+ * Not a double: `composeApiModelProviders` builds the packaged service over
+ * the packaged Prisma repositories, the moved catalogue, the moved credential
+ * codec and the moved connection limiter. The fakes are at the PORTS this
+ * process owns — the database, the project and organization reads, the cipher
+ * and the counter — which is exactly the seam the composition draws.
+ */
+function testModelGateway(prisma: PrismaClient) {
+  return composeApiModelProviders({
+    prisma,
+    projects: testProjects(),
+    organizations: testOrganizations(),
+    authorization: testAuthz(),
+    encryption: testCipher(),
+    rateLimit: async () => ({ allowed: true, remaining: 19, resetAt: Date.now() + 60_000 }),
+    environment: {},
+    isSaas: false,
+    egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
+    nlpServiceUrl: "http://127.0.0.1:5561",
+    processName: "langwatch-api-test",
+  });
+}
+
+function composeApplication(
+  options: {
+    eventing?: boolean;
+    realModelGateway?: boolean;
+    modelDefaults?: readonly unknown[];
+  } = {},
+) {
+  const prisma = testPrisma({ modelDefaults: options.modelDefaults });
   const clickhouse = testClickHouse();
   const eventing = testEventing();
   const runEvaluationForTrace = vi.fn(async () => evaluationOutcome);
@@ -297,7 +462,9 @@ function composeApplication(options: { eventing?: boolean } = {}) {
   const execution = composeApiExecutionCollaborators({
     prisma: prisma.client,
     processName: "langwatch-api-test",
-    modelProviders: testModelProviders(),
+    modelProviders: options.realModelGateway
+      ? testModelGateway(prisma.client)
+      : testModelProviders(),
     agents: testAgents(),
     resolveClickHouseClient: clickhouse.resolveClient,
     nlpServiceUrl: "http://127.0.0.1:5561",
@@ -473,6 +640,74 @@ describe("given the execution collaborators composed over this process's own gra
         score: 0.82,
         passed: true,
       });
+    });
+  });
+
+  describe("when a workflow is created through the real /api/trpc handler", () => {
+    /**
+     * The whole point of this file, one call deeper.
+     *
+     * `workflow.create` prepares the graph before it writes it, and preparing
+     * a graph whose LLM node names no model is what asks the MODEL GATEWAY
+     * which model this project uses. Nothing on that path is stubbed here: the
+     * gateway is `composeApiModelProviders`, the resolution is the packaged
+     * cascade, and the default it reads is a row the packaged Prisma
+     * repository fetched. Before this composition existed the gateway arrived
+     * as a host option nobody supplied, so this procedure could not run at all.
+     */
+    it("resolves the project's default model through the real gateway", async () => {
+      const { application, prisma } = composeApplication({ realModelGateway: true });
+
+      const { status } = await mutateTrpc(application, "workflow.create", {
+        projectId: "project-1",
+        dsl: modellessDsl,
+        commitMessage: "First commit",
+      });
+
+      expect(status).toBe(200);
+      // The row was read at the ORGANIZATION scope the project's team resolves
+      // to, which is the chain the cascade walks — a resolution that skipped it
+      // would answer from the registry flagship and look identical here.
+      expect(prisma.modelDefaultFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: "org-1" } }),
+      );
+      // And the model it resolved is on the node that had none, which is what
+      // the run would have executed with.
+      const written = prisma.savedVersions[0]?.dsl as
+        | { nodes: Array<{ data: { parameters: Array<{ value: unknown }> } }> }
+        | undefined;
+      expect(written?.nodes[0]?.data.parameters[0]?.value).toMatchObject({
+        model: "openai/gpt-5-mini",
+      });
+    });
+
+    /**
+     * The discriminator for the assertion above.
+     *
+     * With no configured default the cascade raises "nothing is configured at
+     * any scope" and the studio adapter falls back to the registry flagship,
+     * so the two cases answer with different models — which is what makes the
+     * first one evidence that the row was read rather than a coincidence.
+     */
+    it("falls back to the registry flagship when the project configured none", async () => {
+      const { application, prisma } = composeApplication({
+        realModelGateway: true,
+        modelDefaults: [],
+      });
+
+      const { status } = await mutateTrpc(application, "workflow.create", {
+        projectId: "project-1",
+        dsl: modellessDsl,
+        commitMessage: "First commit",
+      });
+
+      expect(status).toBe(200);
+      const written = prisma.savedVersions[0]?.dsl as
+        | { nodes: Array<{ data: { parameters: Array<{ value: { model: string } }> } }> }
+        | undefined;
+      const resolved = written?.nodes[0]?.data.parameters[0]?.value.model;
+      expect(resolved).toBeDefined();
+      expect(resolved).not.toBe("openai/gpt-5-mini");
     });
   });
 

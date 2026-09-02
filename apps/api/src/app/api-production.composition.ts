@@ -70,6 +70,10 @@ import {
   type ApiExecutionCollaborators,
 } from "./api-trpc-collaborators.execution.composition";
 import {
+  composeApiModelProviders,
+  LoggedApiModelProviderAbsence,
+} from "./api-model-provider.composition";
+import {
   composeApiProductCollaborators,
   sealApiTrpcCollaborators,
   withApiProductCollaborators,
@@ -223,18 +227,20 @@ export type ApiProductionCompositionOptions = {
    */
   trpcCollaborators?: AnyApiTrpcCollaborators;
   /**
-   * A host's already-composed model gateway.
+   * A host's already-composed model gateway, when it has one.
    *
-   * The one collaborator the EXECUTION half cannot do without and this process
-   * cannot yet build for itself: `PostgresModelProviderAdapter` takes six
-   * ports — its catalogue, its credential codec, its Codex refresher, its
-   * connection limiter, its translation port and its id service — whose only
-   * implementations are still `platform/app` classes. A Studio node's model is
-   * resolved per run, so the workflow service cannot be composed without one.
+   * Optional since this process now composes its own — see
+   * {@link ApiProductionComposition.resolveModelProviders} and
+   * `api-model-provider.composition.ts` for the six ports and where each is
+   * answered from. An injected service still wins, for the same reason the
+   * secret and API-key services let one win: a host that already owns the
+   * product graph has ONE gateway per process, and a Studio node resolved
+   * through a second one could disagree with it about which credential a
+   * provider row holds.
    *
-   * Absent means this process composes no workflow, experiment or evaluation
-   * surfaces at all, rather than mounting four namespaces over a gateway that
-   * does not exist and answering every run with an unattributable failure.
+   * What it no longer means is an absent execution half: the four namespaces
+   * mount whenever this process has a database, an agent service and a stored
+   * secret cipher, whether or not a host hands anything in.
    */
   modelProviders?: ModelProviderService;
   /**
@@ -1011,6 +1017,76 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The model gateway this process serves, and where it came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. An injected service wins, for the reason every other injected service
+   *     wins here — one gateway per process, and a test binding a double is
+   *     asking for the double.
+   *  2. Otherwise this process composes its own over the guarded client, the
+   *     project / organization / AuthZ graph it already holds and the SAME
+   *     stored-secret cipher its secret service is built on. A provider
+   *     credential written by any process in the deployment decrypts here, and
+   *     one written here decrypts there, because it is one cipher and one
+   *     format.
+   *
+   * Three things can leave it absent, and they are told apart at boot: no
+   * database, no tenancy graph, and no `CREDENTIALS_SECRET`. The third is the
+   * interesting one — every stored credential is encrypted, so a gateway
+   * without the cipher would report every configured provider as unusable
+   * rather than failing honestly, which is why it gates instead of degrading.
+   */
+  private resolveModelProviders(
+    options: ApiRuntimeCompositionOptions,
+    encryption: SecretEncryptionPort | undefined,
+  ): ModelProviderService | undefined {
+    if (this.options.modelProviders) return this.options.modelProviders;
+
+    const absence = LoggedApiModelProviderAbsence.create(
+      createLogger(options.config.serviceName),
+    );
+    const database = this.composedDatabase?.connection;
+    if (!database) {
+      absence.absent("no-database");
+      return undefined;
+    }
+    const tenancy = this.composedTenancy;
+    const authz = this.composedAuthz;
+    if (!tenancy || !authz) {
+      absence.absent("no-tenancy");
+      return undefined;
+    }
+    if (!encryption) {
+      absence.absent("no-encryption");
+      return undefined;
+    }
+
+    return composeApiModelProviders({
+      prisma: database.client,
+      projects: tenancy.projects,
+      organizations: tenancy.organizations,
+      authorization: authz.permissions,
+      encryption,
+      // The SAME counter every other metered path spends against, so a
+      // connection-test budget cannot be spent twice by asking on two paths.
+      rateLimit: (request) => this.rateLimiter.consume(request),
+      environment: options.config.infrastructure.modelProvider.environment,
+      isSaas: options.config.infrastructure.modelProvider.isSaas,
+      egress: {
+        blockLocal: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
+        // Tied to the hosted flag rather than to the address policy: an
+        // on-prem install calling a service with a self-signed certificate is
+        // a different question from whether private addresses are reachable.
+        verifyTls: options.config.infrastructure.modelProvider.isSaas,
+      },
+      nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
+      processName: options.config.serviceName,
+    });
+  }
+
+  /**
    * Composes the execution half of the collaborator set over this process's
    * own graph.
    *
@@ -1019,8 +1095,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    *  - the DATABASE, because every service below is a row reader;
    *  - the AGENT service, because a wizard experiment resolves the agents its
    *    targets name and the reference set takes one;
-   *  - the MODEL GATEWAY, which this process cannot build for itself — see
-   *    {@link ApiProductionCompositionOptions.modelProviders}.
+   *  - the MODEL GATEWAY, which this process now composes for itself and can
+   *    only miss for one reason — no stored-secret cipher, so not a single
+   *    provider credential could be read. See {@link resolveModelProviders}.
    *
    * Everything else is optional and degrades where it is used rather than
    * here: no ClickHouse means a run history refuses at the call, no NLP
@@ -1035,7 +1112,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     encryption: SecretEncryptionPort | undefined,
   ): ApiExecutionCollaborators | undefined {
     const database = this.composedDatabase?.connection;
-    const modelProviders = this.options.modelProviders;
+    const modelProviders = this.resolveModelProviders(options, encryption);
     if (!database || !agents || !modelProviders) {
       LoggedApiExecutionAbsence.create(createLogger(options.config.serviceName)).absent({
         database: Boolean(database),

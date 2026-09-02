@@ -1,21 +1,21 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { LanguageModel } from "ai";
 import {
+  isCodexModel,
   ModelNotConfiguredError,
   ModelProviderDisabledError,
   type ModelProviderAlternateResolution,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import { env } from "../../env.mjs";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
-} from "@langwatch/model-provider-server";
-import { prisma } from "../db";
-import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
-import { getCodexVercelAIModel } from "./codexGatewayModel";
-import { isCodexModel } from "@langwatch/model-provider-contract";
+} from "../adapters/legacy-model-provider.adapter";
+import type {
+  ModelCostProjectPort,
+  ModelProviderCodexHandlePort,
+} from "../ports/model-provider.port";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
@@ -28,37 +28,44 @@ import { isCodexModel } from "@langwatch/model-provider-contract";
  * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
  * it to a sticky toast prompting the user to configure a default.
  */
-type VercelModelInput = {
+export type ModelProviderExecutionHandleInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
-  modelProviders: ModelProviderService;
-  managedProviders: ManagedProviderService;
-  /**
-   * Where the execution proxy (nlpgo's `/go/proxy/v1`) lives, from the
-   * process's own `ModelClientConfig`.
-   *
-   * Present so feature code does not read `LANGWATCH_NLP_SERVICE` itself —
-   * which is the entire reason that config object exists. The composition root
-   * has been passing it since `ModelClientConfig` was introduced; it just had
-   * nowhere to land, so this function went on reading the environment and the
-   * injected value was inert. The env var stays as the fallback for the call
-   * sites that have no config to hand.
-   */
-  executionProxyUrl?: string;
-  /**
-   * The AI gateway's base URL, same source and same reason. Codex models are
-   * the only ones that use it: their handle comes from the gateway's Responses
-   * endpoint rather than the execution proxy.
-   */
-  codexGatewayUrl?: string;
 };
 
-export const getVercelAIModel = async (input: VercelModelInput) => {
-  const { projectId, model, featureKey = "prompt.create_default", managedProviders } = input;
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
+export type ModelProviderExecutionHandleOptions = {
+  /** The composed gateway every provider row and prepared credential is read from. */
+  modelProviders: ModelProviderService;
+  /**
+   * The project read that decides whether the id names anything at all.
+   *
+   * `ProjectService` satisfies it. Without it an unknown project resolves to
+   * an empty provider set and the customer is told they have configured no
+   * providers, which is a different — and wrong — thing to be told.
+   */
+  projects: ModelCostProjectPort;
+  /**
+   * Where the execution proxy answers, fully formed: nlpgo's `/go/proxy/v1`.
+   *
+   * The whole URL rather than the engine's address plus a path this package
+   * would have to know, because the path is the WORKFLOW feature's and a
+   * feature server package may not reach into another's. The composition root
+   * holds both and joins them.
+   */
+  executionProxyBaseUrl: string;
+  /**
+   * Codex's own road, where the process composed one. Absent means codex
+   * models refuse by name — see {@link ModelProviderCodexHandlePort}.
+   */
+  codexHandles?: ModelProviderCodexHandlePort;
+};
+
+export const getVercelAIModel = async (
+  input: ModelProviderExecutionHandleInput & ModelProviderExecutionHandleOptions,
+): Promise<LanguageModel> => {
+  const { projectId, model, featureKey = "prompt.create_default" } = input;
+  const project = await input.projects.tryGetWithTeam(projectId);
 
   if (!project) {
     throw new Error("Project not found");
@@ -94,15 +101,19 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
   // the existence/enabled guards so an explicit "openai_codex/..." model
   // cannot bypass a disconnected or disabled provider row.
   if (isCodexModel(model_)) {
-    return getCodexVercelAIModel({
+    if (!input.codexHandles) {
+      throw new Error(
+        `Codex models cannot be executed by this process: it composes no AI gateway credential, and "${model_}" has no other road. Configure the gateway, or choose a model from another provider.`,
+      );
+    }
+    return input.codexHandles.resolve({
       projectId,
       model: model_,
       featureKey,
-      gatewayUrl: input.codexGatewayUrl,
     });
   }
 
-  const litellmParams = await prepareLitellmParams(input.modelProviders, managedProviders, {
+  const litellmParams = await prepareLitellmParams(input.modelProviders, null, {
     model: model_,
     modelProvider,
     projectId,
@@ -115,9 +126,7 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
   // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
   // side reads x-litellm-* via the gatewayproxy package and dispatches
   // in-process.
-  const baseURL = nlpgoProxyBaseURL({
-    baseURL: input.executionProxyUrl ?? env.LANGWATCH_NLP_SERVICE!,
-  });
+  const baseURL = input.executionProxyBaseUrl;
   const vercelProvider = createOpenAICompatible({
     name: `${providerKey}`,
     apiKey: litellmParams.api_key,
@@ -227,4 +236,26 @@ async function resolveModel({
   throw new Error(
     "No model providers configured for this project. Go to Settings → Model Providers to add one.",
   );
+}
+
+/**
+ * The model-resolution cascade with its collaborators bound once.
+ *
+ * The function above is the cascade; this is how a process holds it. Every
+ * caller in a process resolves through the SAME instance, which is the point:
+ * two instances could disagree about where the execution proxy lives, and the
+ * one that drifts answers with a handle pointing at nothing.
+ */
+export class ModelProviderExecutionHandleService {
+  static create(
+    options: ModelProviderExecutionHandleOptions,
+  ): ModelProviderExecutionHandleService {
+    return new ModelProviderExecutionHandleService(options);
+  }
+
+  private constructor(private readonly options: ModelProviderExecutionHandleOptions) {}
+
+  resolve(input: ModelProviderExecutionHandleInput): Promise<LanguageModel> {
+    return getVercelAIModel({ ...this.options, ...input });
+  }
 }

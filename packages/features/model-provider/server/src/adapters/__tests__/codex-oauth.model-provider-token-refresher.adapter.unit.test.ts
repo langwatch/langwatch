@@ -4,11 +4,12 @@
  * the network boundary; everything inside the service is real.
  */
 import { describe, expect, it } from "vitest";
+import type { CodexTokenKeys } from "@langwatch/model-provider-contract";
 import {
   CodexAccountService,
   CodexAuthError,
   decodeCodexClaims,
-} from "../codexAccount.service";
+} from "../codex-oauth.model-provider-token-refresher.adapter";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
 function fakeIdToken(payload: Record<string, unknown>): string {
@@ -30,7 +31,7 @@ type Script = Record<string, (body: string) => { status: number; json: unknown }
 /** fetch stand-in routed by URL path, recording every request body. */
 function scriptedFetch(script: Script) {
   const calls: { url: string; body: string }[] = [];
-  const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const impl = (async (input: unknown, init?: { body?: unknown }) => {
     const url = String(input);
     const body = typeof init?.body === "string" ? init.body : "";
     calls.push({ url, body });

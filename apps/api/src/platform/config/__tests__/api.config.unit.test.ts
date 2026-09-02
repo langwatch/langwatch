@@ -57,6 +57,21 @@ describe("API process configuration", () => {
           },
         },
         execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
+        // The gateway's own three facts, and the environment it reads a system
+        // provider's credential from — which is this call's source, filtered to
+        // its string entries, because that is the only environment this module
+        // is given.
+        modelProvider: {
+          isSaas: false,
+          blockLocalHttpCalls: false,
+          allowedProxyHosts: [],
+          environment: {
+            ENVIRONMENT: "production",
+            API_HOST: "127.0.0.1",
+            API_PORT: "6560",
+            API_HTTP_DRAIN_GRACE_MS: "9000",
+          },
+        },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
           globalConcurrency: undefined,
@@ -294,6 +309,20 @@ describe("API process configuration", () => {
         },
       },
       execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
+      modelProvider: {
+        isSaas: false,
+        blockLocalHttpCalls: false,
+        allowedProxyHosts: [],
+        environment: {
+          REDIS_URL: "redis://redis.example.test:6379",
+          REDIS_DB_INDEX: "4",
+          GLOBAL_QUEUE_CONCURRENCY: "12",
+          GROUP_QUEUE_ZSTD_WRITES_ENABLED: "true",
+          GROUP_QUEUE_MSGPACK_WRITES_ENABLED: "true",
+          LANGWATCH_DISPATCH_TENANT_CAP: "0",
+          LANGWATCH_DISPATCH_GLOBAL_BUDGET: "48",
+        },
+      },
       redis: {
         configured: true,
         mode: "standalone",
