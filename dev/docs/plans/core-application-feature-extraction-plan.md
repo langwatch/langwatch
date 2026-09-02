@@ -7829,3 +7829,174 @@ carry `"Failed to trigger topic clustering"` — a plain `Error` thrown by
 baseline. `@langwatch/gateway-server`: `tsc` clean; **37 files / 289 tests**,
 at baseline. `git diff --numstat -- platform/app`: **0 insertions on every
 row**.
+
+## The identity producer pipelines and Langy's title generator, 2026-09-03
+
+**Three identity pipelines were unregistered on `apps/api`, and one of the three
+was breaking sign-in ceremonies outright.** The producer-only mode landed by
+`bb7b334882` closed the framework half of this for the agent-side pipelines and
+recorded `join_requests` and `sso_connections` as "same mechanism, now
+unblocked". Taking them turned up a third that needed no mechanism at all:
+`identity` declares NO process manager, was simply never registered here, and
+`IdentityLedgerWriter.stage` THROWS on a null sender rather than degrading —
+`"identity ledger cannot stage: the identity pipeline exposes no \"…\" sender"`.
+Every ceremony that states an identifier fact on this tier — attaching a sign-in
+method, verifying an address, marking a primary, detaching one, erasing a user,
+proposing a link, and the seven two-step verification commands — failed on that
+line. It is also the one ledger that needs no event log of its own: it does not
+append and then stage, the QUEUED RUN appends, so registering the pipeline
+closes it completely.
+
+### What was composed
+
+`packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts`
+adds `createIdentityProducerPipeline`, `createJoinRequestProducerPipeline` and
+`createSsoConnectionProducerPipeline`, built exactly like
+`createSimulationProcessingProducerPipeline`: the SAME packaged definition, with
+stand-ins for every consumer-side dependency that exist so the definition can be
+CONSTRUCTED and refuse by name if one is ever CALLED. The projection heads and
+the two process-manager ports are hand-written refusals; the nine guard
+repositories behind `IdentityGuards`, `MfaGuards`, `JoinRequestGuards` and
+`SsoConnectionGuards` are one proxy helper, because a producer reaches none of
+them (guards run inside the command handler, which is the consumer's work) and a
+hand-written double would be a second description of nine interfaces.
+
+`apps/api/src/app/api-identity-pipelines.composition.ts` registers all three on
+this process's own Eventing and resolves their senders EAGERLY into a registry —
+thirteen identity commands, five join-request commands, fourteen connection
+commands. A command a ledger names that the definition no longer declares fails
+this process's BOOT rather than one person's ceremony.
+`ApiEventingIdentityAdapter.tryPipelineCommand` now reads that registry instead
+of answering `null` for an unregistered pipeline, and the adapter takes the
+`EventSourcing` runtime rather than the infrastructure that wraps it, because
+the store is all it uses.
+
+`scim-sync` is deliberately NOT registered: nothing on this process composes
+`ScimSyncLedgerWriter`, so a registration would publish senders for commands no
+surface here can make.
+
+### The Langy title generator moved
+
+`platform/app/src/runtime/app/features/langy-title-generation.adapter.ts` (139
+lines) is DELETED. Its work is now
+`@langwatch/langy-server`'s `services/langy-title-generator.service.ts` —
+the transcript, the prompt, the character budget, the sanitiser and the
+`generateText` call — over `ports/langy-title-model.port.ts` and the
+already-packaged `LangyEventingPorts.trustedMessages`. The package gains `ai`.
+
+The resolve-then-fall-back cascade did NOT travel with it, and that is the one
+shape change: only `ModelNotConfiguredError` means "the cascade resolved
+nothing", that type belongs to `@langwatch/model-provider-contract`, and a
+feature package that never depends on it cannot tell that refusal from a
+disabled provider or an unknown project. So the port takes `featureKey` and
+`fallbackModel` and the ADAPTER makes the two attempts —
+`apps/worker/src/app/worker-langy-title-model.composition.ts`, which is also
+where the engine address and the workflow feature's proxy path are joined.
+
+### Absences closed
+
+| Absence | Before | After |
+| --- | --- | --- |
+| `identity` staged senders (`apps/api`) | every identifier and two-step ceremony threw at `stage` | thirteen real dispatchers, registered at boot |
+| `join_requests` staged senders (`apps/api`) | `tryPipelineCommand` answered `null`; the ledger threw | five real dispatchers |
+| `sso_connections` staged senders (`apps/api`) | the same | fourteen real dispatchers, for an injected Enterprise application composed over this process's eventing |
+| `withoutTitleGeneration()` (`apps/worker`) | unconditional | CONDITIONAL — reported only where no model gateway, project directory or execution proxy is composed |
+| `withoutModelTranslation()` (`apps/worker`) | unconditional | CONDITIONAL — the packaged `VercelAiModelTranslationAdapter` takes the seat wherever `LANGWATCH_NLP_SERVICE` is named |
+
+`apps/worker/src/platform/config/worker.config.ts` gains
+`infrastructure.modelProvider.nlpServiceUrl` from `LANGWATCH_NLP_SERVICE` — the
+same variable `apps/api` resolves its authoring model handles through, so a
+model call this process makes and one that process makes cannot reach two
+proxies. The address rather than the proxy PATH: the path is the workflow
+feature's and the composition root joins them, which is the join
+`withoutModelTranslation()` previously named as its own blocker.
+
+`worker-production.composition.ts` LIFTS the model-gateway composition above
+Langy's conversation pipeline, because that pipeline now reads it. Nothing
+between the two positions depended on it.
+
+### Absences remaining, and the exact blocker
+
+- **The join-request ledger's own DURABLE APPEND still refuses**, and it is the
+  one absence this lane opened rather than closed —
+  `ApiIdentityPipelinesAbsenceReport.withoutDurableAppend()`, logged at `warn`.
+  `JoinRequestLedgerWriter.commit` appends the facts itself BEFORE staging the
+  command, and this process's store is `EventStoreProducerOnly`, which refuses
+  `storeEvents` by name. Closing it means composing
+  `EventingClickHouseEventStore` over the ClickHouse resolver `apps/api`
+  already holds plus an `EventingRetentionConfiguration` this process's config
+  does not read — and, before that, a decision that the API tier writes to the
+  event log directly, which is the opposite of the producer-only property
+  `ApiEventingInfrastructure` states three times over. The identity ledger is
+  unaffected: it stages and the queued run appends.
+- **`withoutTitleGeneration()` and `withoutModelTranslation()` are conditional
+  but still REPORTED in production**, because `tryCreateWorkerModelProviders`
+  is still handed `tenancy: undefined`. That is the `ProjectService` wave the
+  worker blocker graph already names, with the same wall: an
+  `OrganizationService` needs an `AuthzService`, and `PostgresAuthzAdapter`
+  needs a prom-client `Registry` this process deliberately does not hold. This
+  lane adds nothing to that blocker and removes nothing from it.
+- **`UnavailableApiLangyUiActionCatalog`** is not one composition away and never
+  will be from a server process: the only catalogue that exists is the
+  experiments workbench's, which is a browser module, and
+  `src/server/__tests__/frontend-boundary.unit.test.ts` walks the real graph.
+- **`withoutEvaluatorExecution()` (`apps/worker`)** wants a seven-member
+  execution bundle — engine, monitors, trace evidence, Azure safety
+  credentials, settings recovery, inputs offload and costs — not one
+  composition, and `api-evaluator-execution.composition.ts` belongs to a
+  concurrent lane.
+- **`withoutAppCredentials()` and `withoutDirectoryTokenRevocation()`** are
+  deployment credentials and a SCIM directory capability. Neither is a
+  composition.
+
+### Judgment calls
+
+`IdentityLedgerWriter`'s null-sender path was left THROWING rather than softened
+now that a sender exists: with the registration in place the throw is
+unreachable on this tier, and it is the only thing that would catch a future
+process composing eventing without registering the pipeline.
+`stagedSenderVia` in `join-request-ledger.adapter.ts` still returns a wrapper
+whose `send` resolves `undefined` when the port answers `null` — a silent drop
+in the shape of a success — but it is a package file whose other consumer is the
+worker, and this lane's registration means the API never takes that branch; it
+is recorded here rather than changed under a concurrent lane.
+
+The producer's guard repositories are a `Proxy` rather than nine classes.
+Every access answers a function that rejects naming the process, the pipeline
+and the read; symbol properties answer `undefined` so the object is not
+accidentally thenable.
+
+`ApiEventingIdentityAdapter.create` changed shape (it now takes
+`{ eventSourcing, pipelines }`), which is a breaking change to one call site in
+`api-production.composition.ts` and none elsewhere.
+
+### Gates
+
+`apps/worker`: `vitest run` **59 files / 440 tests, all passing** (baseline
+59 / 438 — this lane adds two composition scenarios), `tsc --noEmit` and
+`tsc --noEmit -p tsconfig.test.json` both **0 errors**,
+`apps/worker/src/features/job-registry.json` **byte-unchanged**.
+`apps/api`: `vitest run` **94 files / 810 tests, 809 passing**; the one failure
+is `api-trpc-collaborators.org-group.integration.test.ts` expecting the wire to
+carry `"Failed to trigger topic clustering"`, which a concurrent lane's new
+`app-trpc.error-formatter.ts` degrades to "An unknown error occurred" — the
+same failure that lane already recorded, and nothing in this lane touches it.
+`tsc --noEmit` has **1 error**, `../ui/src/behavior/public-config.ts` reaching
+for `document`; `tsc --noEmit -p tsconfig.test.json` has **8**, all in other
+lanes' REST and tRPC test files. None is a file this lane wrote.
+`@langwatch/identity-eventing`: **13 files / 60 tests** (baseline 12 / 56),
+`tsc` and `tsc -p tsconfig.test.json` both clean.
+`@langwatch/langy-server`: **54 files / 506 tests, all passing**, `tsc` clean.
+`git diff --numstat -- platform/app`: **0 insertions on every row** (68 rows,
+all deletions).
+
+**API absence count** (`grep -rn "abstract without" apps/api/src`): **9
+declared**, two of them this lane's (`withoutQueue`, `withoutDurableAppend`).
+The count going up while three pipelines come online is the honest shape: a
+write path that could not be composed at all had no absence to declare, and one
+that is composed declares the substrate it still does not hold.
+
+**Worker absence count** (`grep -rn "abstract without" apps/worker/src`): **26
+declared, unchanged.** Two of them — `withoutTitleGeneration()` and
+`withoutModelTranslation()` — moved from unconditional to conditional, and both
+declarations stay because the deployment each names is still reachable.

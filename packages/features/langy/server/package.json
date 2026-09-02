@@ -109,6 +109,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@trpc/server": "^11.18.0",
+    "ai": "^6.0.217",
     "hono": "^4.12.27",
     "langwatch": "workspace:*",
     "nanoid": "^5.1.5",

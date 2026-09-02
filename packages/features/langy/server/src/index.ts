@@ -160,6 +160,12 @@ export { LangyAnalyticsEventSinkPort } from "./ports/langy-analytics-event-sink.
 export type { LangyAnalyticsEventRecord } from "./ports/langy-analytics-event-sink.port";
 export type { LangyEffectPorts } from "./ports/langy-effect.port";
 export type { LangyTitleGenerator } from "./ports/langy-effect.port";
+export { LangyTitleModelPort } from "./ports/langy-title-model.port";
+export {
+  LANGY_TITLE_FEATURE_KEY,
+  LangyTitleGeneratorService,
+  type LangyTitleGeneratorDeps,
+} from "./services/langy-title-generator.service";
 export {
   LangyEffectPortsAdapter,
   type CreateLangyEffectPortsOptions,
@@ -257,3 +263,15 @@ export {
   type LangyIdentityToken,
   type LangyKeyIdentity,
 } from "./services/langy-key-identity.service";
+
+// The per-user daily cap on pull requests Langy may open on someone's behalf.
+export {
+  getLangyGithubPrUsage,
+  type GithubPrLimitResult,
+  LANGY_GITHUB_PRS_PER_DAY,
+  LangyGithubPrCounterPort,
+  recordExtraLangyGithubPrs,
+  recordLangyGithubPr,
+  releaseLangyGithubPrPermit,
+  reserveLangyGithubPrPermit,
+} from "./services/langy-github-pr-quota.service";

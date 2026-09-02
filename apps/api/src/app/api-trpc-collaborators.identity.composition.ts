@@ -108,6 +108,7 @@ import {
   type JoinRequestTrpcPorts,
   type OnboardingTrpcPorts,
   type OrganizationPlanUser,
+  type OrganizationProvisioningPort,
   type OrganizationRestService,
   type OrganizationSeatDecision,
 } from "@langwatch/organization-server";
@@ -261,6 +262,15 @@ export type ApiIdentityCollaborators = Readonly<{
    * operations the contract does not declare, routed onto one object.
    */
   organizationRest: OrganizationRestService;
+  /**
+   * The same object again, in the shape `/api/organizations` takes.
+   *
+   * Published rather than rebuilt: instance provisioning creates the tenant
+   * the management family then administers, and two objects over those rows
+   * would let a freshly provisioned organization be missing from the listing
+   * that is supposed to enumerate exactly them.
+   */
+  organizationProvisioning: OrganizationService & OrganizationProvisioningPort;
   /**
    * The tenant fan-out this half composed, published so a REST family can
    * broadcast on it too.
@@ -564,6 +574,16 @@ export function composeApiIdentityCollaborators(
     // question each.
     "listMembers",
     "getMember",
+    // The four INSTANCE-PROVISIONING operations `/api/organizations` performs.
+    // Same reason again: the canonical contract does not declare them because
+    // they run before any credential for the organization exists, so the door
+    // that creates a tenant and the screens that administer it afterwards must
+    // resolve through one object or a provisioned organization would be
+    // invisible to the second.
+    "createForProvisioning",
+    "listProvisioningSummaries",
+    "getProvisioningSummary",
+    "deleteProvisionedOrganization",
   ]);
 
   const organizationsForApp = new Proxy(organizations, {
@@ -806,6 +826,8 @@ export function composeApiIdentityCollaborators(
     // same rows would let `/api/organization/members` and the members screen
     // disagree about who is in an organization.
     organizationRest: organizationsForApp as unknown as OrganizationRestService,
+    organizationProvisioning: organizationsForApp as unknown as OrganizationService &
+      OrganizationProvisioningPort,
     broadcast,
 
     application: {

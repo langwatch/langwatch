@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { LangyTitleModelPort } from "@langwatch/langy-server";
 import { describe, expect, it } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
@@ -72,7 +73,21 @@ function clickHouseDouble() {
   });
 }
 
-function compose(source: Record<string, unknown> = {}) {
+/**
+ * A model gateway that answers, without one existing.
+ *
+ * Only the composition decision is under test here: whether the process wires
+ * `@langwatch/langy-server`'s own generator or reports the absence. What the
+ * generator DOES with a handle is that service's own suite, which is where the
+ * prompt, the character budget and the failure contract live.
+ */
+class FakeTitleModel extends LangyTitleModelPort {
+  resolveTitleModel(): Promise<never> {
+    return Promise.reject(new Error("the composition test never resolves a model"));
+  }
+}
+
+function compose(source: Record<string, unknown> = {}, titleModels?: LangyTitleModelPort) {
   return createWorkerLangyConversation({
     config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
     database: createWorkerProcessDatabase() as never,
@@ -91,6 +106,7 @@ function compose(source: Record<string, unknown> = {}) {
         });
       },
     } as never,
+    ...(titleModels ? { titleModels } : {}),
     absence: new RecordingAbsence(),
   });
 }
@@ -261,6 +277,31 @@ describe("given the langy conversation pipeline this process composes for itself
 
       expect(RECORDED.absences).toEqual(
         expect.arrayContaining(["titleGeneration", "sessionKeyMint"]),
+      );
+    });
+  });
+
+  describe("when this process composed a model gateway", () => {
+    /** @scenario "Title generation and session-key minting are declared absent" */
+    it("stops declaring the title absence and wires the packaged generator instead", () => {
+      reset();
+      compose({}, new FakeTitleModel());
+
+      expect(RECORDED.absences).not.toContain("titleGeneration");
+      // The mint is a different precondition — an authorization graph, not a
+      // model — so a gateway must not quieten it.
+      expect(RECORDED.absences).toContain("sessionKeyMint");
+    });
+
+    /** @scenario "The worker mounts every langy conversation routing key" */
+    it("registers the same routing keys it does without one", () => {
+      reset();
+      const withGateway = compose({}, new FakeTitleModel()).buildProcessing() as never;
+      reset();
+      const without = compose().buildProcessing() as never;
+
+      expect([...registeredKeys(withGateway)].sort()).toEqual(
+        [...registeredKeys(without)].sort(),
       );
     });
   });

@@ -124,6 +124,11 @@ export {
   type EventingJoinRequestLifecycleOptions,
 } from "./adapters/eventing.join-request-lifecycle.adapter";
 export {
+  createIdentityProducerPipeline,
+  createJoinRequestProducerPipeline,
+  createSsoConnectionProducerPipeline,
+} from "./adapters/producer.identity-pipelines.adapter";
+export {
   PostgresJoinRequestPipelineAdapter,
   type JoinRequestPipelineDatabase,
   type PostgresJoinRequestPipelineOptions,

@@ -210,6 +210,7 @@ import {
   WorkerLangyAbsenceReportPort,
   type WorkerLangyConversationDatabase,
 } from "./worker-langy-conversation.composition";
+import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition";
 import {
   createWorkerScenarioProcessing,
   WorkerScenarioAbsenceReportPort,
@@ -744,6 +745,52 @@ export class WorkerProductionComposition {
     if (options.config.infrastructure.storage.backend === "azure") {
       traceAbsence?.withoutDatasetStorage();
     }
+    // The model gateway, composed once for every path in this process that
+    // resolves a customer's model: topic clustering's four questions and an
+    // online evaluation's `X_LITELLM_*` environment. Two gateways would be two
+    // decryptions of one stored credential and two answers to which model a
+    // project clusters with, so it is built here and handed down.
+    //
+    // The cipher is the SAME `resolveWorkerStoredSecretCipher` the three other
+    // stored-secret verticals read under — a provider credential is written by
+    // the control plane under `CREDENTIALS_SECRET` — and its absence is a gate
+    // rather than a degradation, because a gateway that could not decrypt would
+    // report every configured provider as unusable instead of failing honestly.
+    const modelProviders = tryCreateWorkerModelProviders({
+      config: options.config,
+      database: options.database,
+      redis: processRedis,
+      encryption: options.config.automation.credentialsEncryptionKey
+        ? resolveWorkerStoredSecretCipher(options.config)
+        : undefined,
+      // THE ONE PRECONDITION THIS PROCESS STILL MISSES. A provider row's scope
+      // is the triple project/team/organization and its reads are authorized,
+      // so the gateway takes the whole tenancy graph — and this process composes
+      // the READ half of Project only (`createWorkerTraceCapabilityServices`),
+      // no `OrganizationService` beyond Billing's tenant lookup, and AuthZ's
+      // consumer pipeline rather than an `AuthzService`. Composing those three
+      // is its own slice: `PostgresOrganizationAdapter` needs an `AuthzService`
+      // and `PostgresAuthzAdapter` needs a metric registry this process does
+      // not hold. Named here so the gap is a decision an operator reads at
+      // boot, not an empty provider list a customer discovers.
+      tenancy: undefined,
+      ...(WorkerProductionComposition.modelProviderAbsence(options)
+        ? { absence: WorkerProductionComposition.modelProviderAbsence(options)! }
+        : {}),
+    });
+    // Which model a conversation's title is written by, over that same
+    // gateway. `undefined` where the gateway, the project directory or the
+    // execution proxy is missing, and Langy's own absence report says so at
+    // boot rather than one warning per conversation.
+    const langyTitleModels = tryCreateWorkerLangyTitleModel({
+      modelProviders: modelProviders?.modelProviders,
+      // The READ half of Project this process already composed, which is the
+      // whole of what a model cascade asks of a project directory. The gateway
+      // above still wants the full tenancy graph and does not get it — that is
+      // its own absence, and this one must not restate it.
+      projects: traceServices.projects,
+      nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
+    });
     // Langy's conversation pipeline, composed here rather than received.
     //
     // UNCONDITIONAL, on the same footing as trace processing: the pipeline owns
@@ -764,6 +811,7 @@ export class WorkerProductionComposition {
         >[0]["resolveClickHouseClient"],
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         ...(tenantBroadcast ? { broadcast: tenantBroadcast } : {}),
+        ...(langyTitleModels ? { titleModels: langyTitleModels } : {}),
         ...(langyAbsence ? { absence: langyAbsence } : {}),
         ...(options.observability ? { logger: options.observability.logger } : {}),
       }),
@@ -1023,39 +1071,6 @@ export class WorkerProductionComposition {
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
     trackedEvents.connect(trace.commands.recordSpan);
-    // The model gateway, composed once for every path in this process that
-    // resolves a customer's model: topic clustering's four questions and an
-    // online evaluation's `X_LITELLM_*` environment. Two gateways would be two
-    // decryptions of one stored credential and two answers to which model a
-    // project clusters with, so it is built here and handed down.
-    //
-    // The cipher is the SAME `resolveWorkerStoredSecretCipher` the three other
-    // stored-secret verticals read under — a provider credential is written by
-    // the control plane under `CREDENTIALS_SECRET` — and its absence is a gate
-    // rather than a degradation, because a gateway that could not decrypt would
-    // report every configured provider as unusable instead of failing honestly.
-    const modelProviders = tryCreateWorkerModelProviders({
-      config: options.config,
-      database: options.database,
-      redis: processRedis,
-      encryption: options.config.automation.credentialsEncryptionKey
-        ? resolveWorkerStoredSecretCipher(options.config)
-        : undefined,
-      // THE ONE PRECONDITION THIS PROCESS STILL MISSES. A provider row's scope
-      // is the triple project/team/organization and its reads are authorized,
-      // so the gateway takes the whole tenancy graph — and this process composes
-      // the READ half of Project only (`createWorkerTraceCapabilityServices`),
-      // no `OrganizationService` beyond Billing's tenant lookup, and AuthZ's
-      // consumer pipeline rather than an `AuthzService`. Composing those three
-      // is its own slice: `PostgresOrganizationAdapter` needs an `AuthzService`
-      // and `PostgresAuthzAdapter` needs a metric registry this process does
-      // not hold. Named here so the gap is a decision an operator reads at
-      // boot, not an empty provider list a customer discovers.
-      tenancy: undefined,
-      ...(WorkerProductionComposition.modelProviderAbsence(options)
-        ? { absence: WorkerProductionComposition.modelProviderAbsence(options)! }
-        : {}),
-    });
     // Topic's runtime, composed here rather than received. Its execution
     // ports are this process's own — the tenant-keyed ClickHouse client the
     // event store already resolves through, the model gateway above, a direct

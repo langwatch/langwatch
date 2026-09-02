@@ -6,12 +6,14 @@ import {
   NullLangyWorkerMetricsAdapter,
   PostgresLangyAdapter,
   LangyTokenBuffer,
+  LangyTitleGeneratorService,
   LangyTurnHandoffStore,
   UnavailableLangyWorkerAdapter,
   type LangyAnalyticsClickHouseClientResolver,
   type LangyBroadcastPort,
   type LangyDatabase,
   type LangyTitleGenerator,
+  type LangyTitleModelPort,
 } from "@langwatch/langy-server";
 import type { TenantBroadcastPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -50,6 +52,16 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
   defaultRetentionDays: number;
   /** The one tenant publisher this process holds; absent without Redis. */
   broadcast?: TenantBroadcastPort;
+  /**
+   * Where a title call's model handle comes from, when this process composed
+   * a model gateway.
+   *
+   * The SAME gateway topic clustering resolves its four questions through:
+   * two gateways would be two decryptions of one stored credential and two
+   * answers to which model a project's title is written by. Absent means the
+   * conversation keeps whatever title it has, reported by name.
+   */
+  titleModels?: LangyTitleModelPort;
   absence?: WorkerLangyAbsenceReportPort;
   logger?: Logger;
 }>;
@@ -73,19 +85,20 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
  *       |- LangyTokenBuffer / LangyTurnHandoffStore   the queue's own Redis
  *       |- createLangyWorkerPort             the agent manager, or absent
  *       |- tenant broadcast                  the shared publisher, renamed
- *       |- titleGenerator                    ABSENT (see below)
+ *       |- LangyTitleGeneratorService        the model gateway, or absent
  *       `- sessionKeys                       ABSENT (see below)
  *
  * TWO NAMED ABSENCES, both reported rather than silently answered.
  *
- * `titleGenerator` resolves a model through the whole `ModelProviderService`
- * cascade — the project's execution providers, the feature's model resolution,
- * an alternate when the resolved provider is disabled, and the LiteLLM
- * execution parameters. Four methods, but the service behind them is not
- * composable in this process yet, and a generator that INVENTED a model would
- * bill a customer's key against a provider they did not choose. Absent, the
- * intent answers `null`, which is the same no-op the App takes for an empty
- * transcript: the conversation keeps whatever title it has.
+ * `titleGenerator` is composed where this process composed a model gateway and
+ * named an execution proxy, and the generator itself is
+ * `@langwatch/langy-server`'s own service over that gateway and this package's
+ * trusted message reader. What stays absent is the DEPLOYMENT, not the code: a
+ * provider row's scope is the triple project/team/organization and its reads
+ * are authorized, so the gateway takes a whole tenancy graph this process does
+ * not yet compose — the same precondition `worker-model-provider.composition`
+ * names. Absent, the intent answers `null`, which is the same no-op the App
+ * takes for an empty transcript: the conversation keeps whatever title it has.
  *
  * `sessionKeys` mints a scoped API key for the ONE recovery branch where the
  * agent manager answered `428 credentialsRequired` and the stashed handoff
@@ -104,7 +117,7 @@ export function createWorkerLangyConversation(
   const workerMetrics = NullLangyWorkerMetricsAdapter.create();
 
   if (!options.config.langy) options.absence?.withoutAgentManager();
-  options.absence?.withoutTitleGeneration();
+  if (!options.titleModels) options.absence?.withoutTitleGeneration();
   options.absence?.withoutSessionKeyMint();
 
   return EventingLangyConversationAdapter.create({
@@ -126,7 +139,16 @@ export function createWorkerLangyConversation(
           metrics: workerMetrics,
         })
       : UnavailableLangyWorkerAdapter.create(workerMetrics),
-    titleGenerator: absentTitleGenerator(logger),
+    titleGenerator: options.titleModels
+      ? LangyTitleGeneratorService.create({
+          // The conversation's own message projection, read through the
+          // trusted reader this package already composes: the transcript is
+          // scoped by the event that asked for a title, so no user id is
+          // carried and none can be forgotten.
+          messages: persistence.trustedMessages,
+          models: options.titleModels,
+        }).generator()
+      : absentTitleGenerator(logger),
     sessionKeys: new WorkerAbsentLangySessionKeys(),
   });
 }

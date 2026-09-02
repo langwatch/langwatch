@@ -580,6 +580,16 @@ export const workerConfigDefinition = RuntimeConfig.define({
       allowedProxyHosts: Config.value(optionalEnvironmentString, {
         env: "ALLOWED_PROXY_HOSTS",
       }),
+      // Where the OpenAI-compatible execution proxy answers. The SAME variable
+      // `apps/api` resolves its authoring model handles through, because a
+      // model call this process makes and a model call that one makes must
+      // reach one engine — two addresses would bill two different proxies for
+      // one project's key. Optional: a deployment that named no engine
+      // composes no execution handle and every model CALL this process would
+      // make is absent by name, while every provider READ still answers.
+      nlpServiceUrl: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_NLP_SERVICE",
+      }),
     },
   },
 });
@@ -655,6 +665,15 @@ export type WorkerInfrastructureConfig = Readonly<{
 export type WorkerModelProviderConfig = Readonly<{
   blockLocalHttpCalls: boolean;
   allowedProxyHosts: readonly string[];
+  /**
+   * The NLP engine's address, or nothing where the deployment named none.
+   *
+   * The address rather than the proxy PATH: the path belongs to the workflow
+   * feature and the composition root joins the two, which is what keeps this
+   * module the process's only environment reader without it also owning a
+   * route another package defines.
+   */
+  nlpServiceUrl: string | undefined;
   /**
    * The process environment the provider registry resolves a system
    * credential from.
@@ -1241,9 +1260,11 @@ function resolveWorkerModelProviderConfig(
   value: Readonly<{
     blockLocalHttpCalls: boolean;
     allowedProxyHosts: string | undefined;
+    nlpServiceUrl: string | undefined;
   }>,
   environment: Readonly<Record<string, string | undefined>>,
 ): WorkerModelProviderConfig {
+  const nlpServiceUrl = value.nlpServiceUrl?.trim();
   return {
     blockLocalHttpCalls: value.blockLocalHttpCalls,
     allowedProxyHosts:
@@ -1251,6 +1272,10 @@ function resolveWorkerModelProviderConfig(
         ?.split(",")
         .map((host) => host.trim())
         .filter((host) => host.length > 0) ?? [],
+    // A blank variable is an unset one. An empty base URL would compose a
+    // proxy address of `/go/proxy/v1`, which resolves against nothing and
+    // fails on the first model call rather than at boot.
+    nlpServiceUrl: nlpServiceUrl ? nlpServiceUrl : undefined,
     environment,
   };
 }

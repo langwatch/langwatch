@@ -35,6 +35,18 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import {
+  EventSourcing,
+  type EventSourcedQueueDefinition,
+  type EventSourcedQueueProcessor,
+  createTenantId,
+} from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { JOIN_REQUESTED_EVENT_TYPE } from "@langwatch/identity-contract";
+import {
+  JOIN_REQUEST_AGGREGATE_TYPE,
+  JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
+} from "@langwatch/identity-eventing";
 import { IdentityEventingPort } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -44,6 +56,8 @@ import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiApplication } from "../../api.application";
+import { ApiEventingIdentityAdapter } from "../api-identity-eventing.adapter";
+import { composeApiIdentityPipelines } from "../api-identity-pipelines.composition";
 import { ApiAuditPort } from "../../api-request.policy";
 import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
@@ -171,7 +185,11 @@ class SilentEventing extends IdentityEventingPort {
   }
 }
 
-function composeIdentityHalf(prisma: PrismaClient, grants: AuthzGrantsService) {
+function composeIdentityHalf(
+  prisma: PrismaClient,
+  grants: AuthzGrantsService,
+  eventing: IdentityEventingPort = new SilentEventing(),
+) {
   return composeApiIdentityCollaborators({
     prisma,
     organizations: {
@@ -188,7 +206,7 @@ function composeIdentityHalf(prisma: PrismaClient, grants: AuthzGrantsService) {
     auth: {} as unknown as AuthService,
     redis: null,
     rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
-    eventing: new SilentEventing(),
+    eventing,
     deployment: {
       baseUrl: "https://app.acme.test",
       adminEmails: "staff@langwatch.ai",
@@ -348,18 +366,21 @@ class RecordingAudit extends ApiAuditPort {
   }
 }
 
-function composeApplication() {
+function composeApplication(
+  overrides: { prismaClient?: PrismaClient; eventing?: IdentityEventingPort } = {},
+) {
   const prisma = testPrisma();
   const { grants, attachBindings } = testGrants();
   const audit = new RecordingAudit();
+  const client = overrides.prismaClient ?? prisma.client;
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
+    database: { client } as unknown as PrismaConnection,
     authz: testAuthz(),
     audit,
     collaborators: withApiIdentityCollaborators(
       baseCollaborators(),
-      composeIdentityHalf(prisma.client, grants),
+      composeIdentityHalf(client, grants, overrides.eventing),
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -477,6 +498,234 @@ describe("given an API process composed with the identity half of the record", (
       const serialized = JSON.stringify(body);
       expect(serialized).toContain("service_unavailable");
       expect(serialized).toContain("Enterprise plan store");
+    });
+  });
+});
+
+/**
+ * The organization that is open to `acme.test`, and the person asking to join
+ * it.
+ *
+ * Every read below is one the join path actually makes, and the values are
+ * chosen so the matcher ADMITS: a domain that is not a consumer mail provider,
+ * no identity provider already covering it, `domainJoin` at `request` rather
+ * than `off`, and one verified member on the domain to corroborate that the
+ * company owns it.
+ */
+const JOIN_ORGANIZATION_ID = "organization-acme";
+const JOIN_DOMAIN = "acme.test";
+
+/**
+ * The Prisma reads the join path makes, answered.
+ *
+ * `joinRequest.findUnique` is deliberately two answers to two readers. The
+ * FIRST call is the guard's idempotency check — the same command id names the
+ * same aggregate, and a second pass must cost no event — so it answers "no such
+ * request". Every later call is the ledger's read-your-writes observation of
+ * the fold, and it answers with a cursor past the events just appended, which
+ * is what a converged projection looks like. A single answer could only model
+ * one of the two, and answering "no row" to both would make the test spend the
+ * ledger's whole two-second convergence window waiting for a queue this process
+ * deliberately does not drain.
+ */
+function joinRequestPrisma() {
+  let projectionReads = 0;
+  const converged = () => {
+    const now = new Date();
+    const later = new Date(Date.now() + 60_000);
+    return {
+      id: "join-request-1",
+      userId: SESSION_USER.id,
+      organizationId: JOIN_ORGANIZATION_ID,
+      domain: JOIN_DOMAIN,
+      state: "PENDING",
+      matchedVia: "verified-identifier-domain",
+      createdAt: now,
+      updatedAt: now,
+      occurredAt: now,
+      acceptedAt: later,
+      lastEventId: "zzzzzzzzzzzzzzzzzzzzzzzzzz",
+      projectionVersion: "1",
+      expiresAt: later,
+      resolvedAt: null,
+      resolvedByType: null,
+      resolvedById: null,
+      withdrawalCause: null,
+    };
+  };
+
+  return {
+    // The legacy verified-address column: this person is not on identifiers
+    // yet, which is the fallback `verifiedEmailFor` takes.
+    user: {
+      findUnique: vi.fn(async () => ({
+        email: `sam@${JOIN_DOMAIN}`,
+        emailVerified: new Date(),
+      })),
+    },
+    identifier: {
+      findMany: vi.fn(async () => [{ userId: "member-1" }]),
+      count: vi.fn(async () => 0),
+      findFirst: vi.fn(async () => null),
+    },
+    organizationUser: {
+      findMany: vi.fn(async () => [
+        { organizationId: JOIN_ORGANIZATION_ID, userId: "member-1" },
+      ]),
+      groupBy: vi.fn(async () => [
+        { organizationId: JOIN_ORGANIZATION_ID, _count: { userId: 4 } },
+      ]),
+      findFirst: vi.fn(async () => null),
+    },
+    organization: {
+      findMany: vi.fn(async () => [
+        {
+          id: JOIN_ORGANIZATION_ID,
+          name: "Acme",
+          domainJoin: "request",
+          joinDomains: [],
+          ssoDomain: null,
+        },
+      ]),
+    },
+    ssoConnection: { findMany: vi.fn(async () => []) },
+    joinRequest: {
+      findUnique: vi.fn(async () => {
+        projectionReads += 1;
+        return projectionReads === 1 ? null : converged();
+      }),
+      findFirst: vi.fn(async () => null),
+    },
+  } as unknown as PrismaClient;
+}
+
+/**
+ * This process's own producer-only Eventing, over a fake event store and a
+ * queue that records rather than runs.
+ *
+ * The runtime is REAL: `composeApiIdentityPipelines` registers the packaged
+ * `join-requests` definition on it, process manager and all, and the senders
+ * the ledger stages through are the ones that registration produced. What is
+ * faked is the two substrates a web process does not hold — the durable log and
+ * Redis — so the test can observe what the ledger handed each of them.
+ *
+ * The queue factory is what makes this a producer rather than an inline
+ * executor. Without one, `send` runs the command handler in-process, and a
+ * producer's guards refuse by name because reading a `JoinRequest` head is the
+ * consumer's work.
+ */
+function producerEventing() {
+  const eventStore = EventStoreMemory.createForTesting();
+  const staged: Array<{ queue: string; payload: Record<string, unknown> }> = [];
+  const eventSourcing = new EventSourcing({
+    enabled: true,
+    eventStore,
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+    consumersEnabled: false,
+    queueFactory: (
+      definition: EventSourcedQueueDefinition<Record<string, unknown>>,
+    ): EventSourcedQueueProcessor<Record<string, unknown>> => ({
+      send: async (payload) => {
+        staged.push({ queue: definition.name, payload });
+      },
+      sendBatch: async () => undefined,
+      close: async () => undefined,
+      waitUntilReady: async () => undefined,
+    }),
+  });
+
+  const pipelines = composeApiIdentityPipelines({
+    eventing: eventSourcing,
+    processName: "langwatch-api",
+  });
+
+  return {
+    eventStore,
+    staged,
+    eventSourcing,
+    eventing: ApiEventingIdentityAdapter.create({ eventSourcing, pipelines }),
+  };
+}
+
+describe("given an API process that registered the identity pipelines producer-only", () => {
+  describe("when somebody asks to join an organization open to their domain", () => {
+    /** @scenario "A join request command lands on this process's own event stack" */
+    it("appends the request's facts and stages the command through the real /api/trpc handler", async () => {
+      const queue = producerEventing();
+      const { application } = composeApplication({
+        prismaClient: joinRequestPrisma(),
+        eventing: queue.eventing,
+      });
+
+      const { status, body } = await callTrpc(
+        application,
+        "joinRequests.request",
+        { organizationId: JOIN_ORGANIZATION_ID },
+        "mutation",
+      );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        result: { data: { json: { state: "PENDING" } } },
+      });
+
+      // Leg one: the durable append. The ledger waits for it before returning,
+      // so a request that answered PENDING without one would be a request
+      // nothing could ever fold.
+      const requestId = (
+        body as { result: { data: { json: { joinRequestId: string } } } }
+      ).result.data.json.joinRequestId;
+      const appended = await queue.eventStore.getEvents(
+        requestId,
+        { tenantId: createTenantId(JOIN_ORGANIZATION_ID) },
+        JOIN_REQUEST_AGGREGATE_TYPE,
+      );
+      expect(appended.map((event) => event.type)).toEqual([JOIN_REQUESTED_EVENT_TYPE]);
+
+      // Leg two: the staged command, on the sender the producer registration
+      // produced. This is the leg that answered `null` before the registration
+      // existed, which the ledger turns into "the pipeline exposes no
+      // \"requestJoin\" sender" — a write that arrived and could not leave.
+      expect(queue.staged).toHaveLength(1);
+      expect(queue.staged[0]?.payload).toMatchObject({
+        joinRequestId: requestId,
+        organizationId: JOIN_ORGANIZATION_ID,
+        userId: SESSION_USER.id,
+        domain: JOIN_DOMAIN,
+      });
+
+      await queue.eventSourcing.close();
+    });
+
+    /**
+     * The discriminator for "registered producer-only" against "registered as a
+     * consumer would": the lifecycle manager is declined BY NAME, so no inbox,
+     * outbox or wake exists in this process for a queue it never drains.
+     */
+    /** @scenario "A join request command lands on this process's own event stack" */
+    it("declines the join lifecycle process manager by name rather than running it", async () => {
+      const queue = producerEventing();
+
+      expect(queue.eventSourcing.unrunProcessManagers).toContain(
+        JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
+      );
+
+      await queue.eventSourcing.close();
+    });
+  });
+
+  describe("when this process composed no queue at all", () => {
+    /** @scenario "A process with no queue registers no identity pipeline" */
+    it("registers nothing, so the ledger refuses rather than dropping the request", () => {
+      const pipelines = composeApiIdentityPipelines({
+        eventing: undefined,
+        processName: "langwatch-api",
+      });
+
+      expect(
+        pipelines.tryCommand({ pipeline: "join-requests", command: "requestJoin" }),
+      ).toBeNull();
     });
   });
 });

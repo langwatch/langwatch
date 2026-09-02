@@ -54,6 +54,28 @@ Feature: The standalone API process dispatches commands and consumes none
       # customer's action arrives at, which is how a scenario run and a Langy
       # turn came to answer `service_unavailable` on a healthy deployment.
 
+  Rule: The identity ledgers write through this process's own registrations
+
+    # The two identity ledgers read an absent sender differently and neither
+    # reading is "nothing happened": the identity ledger THROWS, because the
+    # queued run is what appends its facts, and the join-request ledger throws
+    # too. So a pipeline this tier never registered is a write that arrives at
+    # the door and cannot leave.
+
+    @integration
+    Scenario: A join request command lands on this process's own event stack
+      Given the API process registered the identity pipelines producer-only
+      When somebody asks to join an organization open to their verified domain
+      Then the request's facts are appended before the call returns
+      And the join command is staged on the sender the registration produced
+      And the join lifecycle process manager is declined by name
+
+    @integration
+    Scenario: A process with no queue registers no identity pipeline
+      Given the deployment configured no Redis
+      When the API process composes its identity pipelines
+      Then it registers none, and every ledger refuses by name rather than dropping the write
+
   Rule: Dispatch is released before the connection under it
 
     @unit

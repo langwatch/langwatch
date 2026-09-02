@@ -115,6 +115,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-server": "workspace:*",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@slack/webhook": "^7.1.0",

@@ -29,7 +29,8 @@
  *   codexTokenRefresher  the packaged OAuth device-flow refresher.
  *   ids              the feature's three row prefixes over `nanoid`, the same
  *                    minter the API tier writes rows with.
- *   translation      ABSENT — see `AbsentWorkerModelTranslation`.
+ *   translation      the packaged Vercel AI adapter over the execution proxy,
+ *                    or ABSENT where the deployment named no NLP engine.
  *
  * The tenancy graph is NOT composed here. `projects`, `organizations` and
  * `authorization` arrive as arguments for the same reason they do on the API
@@ -38,6 +39,7 @@
  * one everything else in the process uses.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
+import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 import {
   AwsStsManagedProviderCredentialAdapter,
   EnvironmentManagedProviderConfigurationAdapter,
@@ -57,6 +59,7 @@ import {
   PrefixedModelProviderIdAdapter,
   RegistryModelProviderCatalogAdapter,
   SsrfModelProviderEgressAdapter,
+  VercelAiModelTranslationAdapter,
   WindowedModelProviderConnectionRateLimiterAdapter,
   type ModelProviderCredentialCipherPort,
   type PostgresModelProviderAdapterOptions,
@@ -210,7 +213,15 @@ export function createWorkerModelProviders(
     logger,
   });
 
-  options.absence?.withoutModelTranslation();
+  // The engine's address plus the proxy path, joined here because the path is
+  // the WORKFLOW feature's and the address is the deployment's — one join, made
+  // once per process, so a translation and a Langy title call cannot reach two
+  // different proxies.
+  const nlpServiceUrl = options.config.infrastructure.modelProvider.nlpServiceUrl;
+  const executionProxyBaseUrl = nlpServiceUrl
+    ? nlpProxyBaseUrl({ baseUrl: nlpServiceUrl })
+    : undefined;
+  if (!executionProxyBaseUrl) options.absence?.withoutModelTranslation();
   if (!options.redis) options.absence?.withoutConnectionWindows();
 
   const modelProviders = PostgresModelProviderAdapter.create({
@@ -243,7 +254,12 @@ export function createWorkerModelProviders(
       systemProviderEnvironment: options.config.infrastructure.modelProvider.environment,
       isSaas: options.config.deployment.saas,
     }),
-    translation: new AbsentWorkerModelTranslation(),
+    translation: executionProxyBaseUrl
+      ? VercelAiModelTranslationAdapter.create({
+          projects: options.projects,
+          executionProxyBaseUrl,
+        })
+      : new AbsentWorkerModelTranslation(),
     ids: PrefixedModelProviderIdAdapter.create({ suffix: () => nanoid() }),
   }).build();
 
@@ -388,19 +404,14 @@ export class WorkerConnectionWindowUnavailableError extends Error {
 }
 
 /**
- * The one named absence in the gateway: translating a customer's text.
+ * Translating a customer's text, where the deployment named no NLP engine.
  *
- * WHY IT IS NOT COMPOSED HERE. A translation is a MODEL CALL, executed against
- * the OpenAI-compatible proxy that hangs off the NLP engine's address — which
- * is the Workflow feature's path joined to a deployment's engine address, a
- * join this process does not make and has no other reason to. Answering it
- * would mean carrying a second description of that URL.
- *
- * REFUSING COSTS NOTHING HERE, and that is why the absence is acceptable where
- * the clustering one was not: `translate` is reached from one tRPC procedure on
- * the API tier, this process serves no transport at all, and no command,
- * projection or subscriber in it ever calls it. It refuses by name so a future
- * caller finds the decision rather than a silent empty string.
+ * A translation is a MODEL CALL executed against the OpenAI-compatible proxy
+ * that hangs off the engine's address, and `LANGWATCH_NLP_SERVICE` is what
+ * names it. With one set, the packaged `VercelAiModelTranslationAdapter` — the
+ * SAME adapter the API tier composes — takes this seat, so the two tiers cannot
+ * translate through different proxies. Without one there is no address to dial,
+ * and this refuses by name rather than answering a silent empty string.
  */
 class AbsentWorkerModelTranslation extends ModelTranslationPort {
   translate(input: { projectId: string; text: string; model: string }): Promise<never> {
@@ -414,7 +425,7 @@ export class WorkerModelTranslationUnavailableError extends Error {
 
   constructor(projectId: string) {
     super(
-      `This process cannot translate for project ${projectId}: a translation executes against the NLP engine's OpenAI-compatible proxy, and this process composes no execution address.`,
+      `This process cannot translate for project ${projectId}: a translation executes against the NLP engine's OpenAI-compatible proxy, and this deployment named no LANGWATCH_NLP_SERVICE.`,
     );
   }
 }
