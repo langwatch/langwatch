@@ -980,17 +980,25 @@ export class DatasetService {
       // `byteSize` rides along so the scan can bound what it actually fetches,
       // not only what the dataset row claims it will. `readValidChunkOffsets`
       // validates the index and the row bounds but not this, so an
-      // otherwise-valid entry can carry no size; it becomes `null` — one chunk
-      // that cannot be measured — rather than a number, because arithmetic on
-      // `undefined` yields `NaN` and one such entry would silently disable the
-      // bound for the whole dataset.
+      // otherwise-valid entry can carry no size, or a nonsensical one; it
+      // becomes `null` — one chunk that cannot be measured — rather than a
+      // number, because arithmetic on `undefined` yields `NaN` and one such
+      // entry would silently disable the bound for the whole dataset.
+      //
+      // Negative sizes are normalised for a sharper reason than tidiness: a
+      // running total is not merely uninformed by one, it is actively set back
+      // by it, so a single entry reading -100 MB buys passage for every chunk
+      // after it while the total still looks well inside the limit.
       //
       // No deduplication needed: a repeated index is rejected at validation, so
       // every entry here names a chunk no other entry names.
       return offsets
         .map((offset) => ({
           index: offset.index,
-          byteSize: Number.isFinite(offset.byteSize) ? offset.byteSize : null,
+          byteSize:
+            Number.isFinite(offset.byteSize) && offset.byteSize >= 0
+              ? offset.byteSize
+              : null,
         }))
         .sort((a, b) => a.index - b.index);
     }
