@@ -460,6 +460,116 @@ describe("governance cost rollup", () => {
     });
   });
 
+  describe("given two spenders' cells restated on different dates", () => {
+    /** @scenario "A day restated twice reports only the latest move" */
+    it("reports what the day held just before the LATEST revision", async () => {
+      // The counterexample for the day-level "was $X". Two cells of one day,
+      // restated a fortnight apart. Summing every revised cell's prior figure
+      // regardless of date reports $300 — a $70 move — under the later date,
+      // whose actual move was $50. §15: the marker holds only the latest
+      // revision.
+      const early = Date.parse("2026-08-05T04:00:00.000Z");
+      const late = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const cell of [
+        // ada: 100 -> 120, restated on the 5th.
+        {
+          RawActorId: "ada",
+          AmountNanoUsd: 120_000_000_000,
+          PreviousAmountNanoUsd: 100_000_000_000,
+          RevisedAt: Math.floor(early / 1000),
+          LastObservedAt: Math.floor(early / 1000),
+        },
+        // bob: 200 -> 250, restated on the 20th — the day's latest.
+        {
+          RawActorId: "bob",
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(late / 1000),
+          LastObservedAt: Math.floor(late / 1000),
+        },
+      ]) {
+        await repo.upsert({ ...base, ...cell, EventTimestamp: 1_000 });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lane?.amountNanoUsd).toBe(370_000_000_000);
+      expect(lane?.revisedAt).toBe(Math.floor(late / 1000));
+      // 120 + 200: ada was already at its restated figure by the 20th, so it
+      // contributes what it holds now, not what it held on the 5th.
+      expect(lane?.previousAmountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+
+    it("sums every prior when the whole day was restated at one moment", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const actor of ["ada", "bob"]) {
+        await repo.upsert({
+          ...base,
+          RawActorId: actor,
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(at / 1000),
+          LastObservedAt: Math.floor(at / 1000),
+          EventTimestamp: 1_000,
+        });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // Both cells ARE the latest revision, so both swap in their priors. The
+      // pinning rule must not cost the common case its answer.
+      expect(lane?.amountNanoUsd).toBe(500_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(400_000_000_000);
+    });
+
+    it("carries an unrevised cell's current figure into the earlier total", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      await repo.upsert({
+        ...base,
+        RawActorId: "ada",
+        AmountNanoUsd: 250_000_000_000,
+        PreviousAmountNanoUsd: 200_000_000_000,
+        RevisedAt: Math.floor(at / 1000),
+        LastObservedAt: Math.floor(at / 1000),
+        EventTimestamp: 1_000,
+      });
+      await repo.upsert({
+        ...base,
+        RawActorId: "bob",
+        AmountNanoUsd: 70_000_000_000,
+        EventTimestamp: 1_000,
+      });
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // bob was never revised, so it compares NULL against the day's latest
+      // revision. It has to land in the current-amount arm — dropping out of
+      // the sum would understate the earlier total by its whole figure.
+      expect(lane?.amountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(270_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+  });
+
   describe("given a cell summarized before the markers were added", () => {
     /** @scenario "A day summarized before the markers existed reads as settled" */
     it("reads as never revised and never observed", async () => {

@@ -336,12 +336,23 @@ export class GovernanceCostRollupClickHouseRepository {
    * for a whole day. `RevisedAt` is the LATEST revision anywhere in the day,
    * because the marker says the day changed and one changed cell changed it.
    * `LastObservedAt` is the NEWEST touch anywhere in the day, because a pull
-   * that reached any cell of the day looked at that day. And the prior total
-   * reconstructs what the day added up to before those revisions: each revised
-   * cell contributes what it used to hold, each untouched cell contributes
-   * what it still holds. Cells that cannot state a prior figure are counted
-   * rather than skipped, so the caller can withhold a partial "was" the same
-   * way it withholds a partial total.
+   * that reached any cell of the day looked at that day.
+   *
+   * The prior total is pinned to that same latest revision — it is what the
+   * day added up to in the moment BEFORE it, not before every revision the day
+   * has ever seen. Only the cells revised at that moment contribute what they
+   * used to hold; every other cell contributes what it holds now, because by
+   * then it already did. Summing every revised cell's prior regardless of date
+   * reports a move that spans revisions weeks apart under the latest one's
+   * date, and §15 is explicit that the marker holds only the latest revision.
+   * That needs a third layer: the day's latest revision is a window over the
+   * deduped cells, and it has to be known before the sum that uses it.
+   *
+   * `CellsWithoutPreviousAmount` counts the cells whose CONTRIBUTION to that
+   * prior total cannot be stated in dollars — a max-revised cell whose earlier
+   * figure was unpriced, or any cell whose current figure is. Above zero the
+   * caller withholds the whole "was", the same way it withholds a partial
+   * total.
    */
   async sumDaysByLane(input: {
     tenantId: string;
@@ -366,9 +377,15 @@ export class GovernanceCostRollupClickHouseRepository {
        * of it has ever been restated.
        */
       revisedAt: number | null;
-      /** What the day totalled before those revisions, nano-USD. */
+      /**
+       * What the day totalled in the moment before `revisedAt`, nano-USD —
+       * not before every revision it has ever had. See the method doc.
+       */
       previousAmountNanoUsd: number | null;
-      /** Cells that can state no prior figure. Above zero, withhold the "was". */
+      /**
+       * Cells whose contribution to that prior total cannot be stated in
+       * dollars. Above zero, withhold the "was".
+       */
       cellsWithoutPreviousAmount: number;
       /** Unix SECONDS a pull last touched any cell of the day. */
       lastObservedAt: number;
@@ -389,29 +406,55 @@ export class GovernanceCostRollupClickHouseRepository {
             )
           ) AS CurrenciesWithoutUsdAmount,
           max(LatestRevisedAt)             AS RevisedAt,
-          -- A cell nobody revised still contributed its figure to the older
-          -- total, so it carries that figure over. Only the revised ones swap
-          -- in what they used to hold.
-          sumOrNull(LatestPriorAmountNanoUsd)  AS PreviousAmountNanoUsd,
-          countIf(LatestPriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
+          sumOrNull(PriorAmountNanoUsd)    AS PreviousAmountNanoUsd,
+          countIf(PriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
           max(LatestLastObservedAt)        AS LastObservedAt
         FROM (
+          -- Middle layer: what each cell contributed to the day's total AS OF
+          -- the moment before the day's latest revision.
+          --
+          -- Only the cells revised AT that moment swap in what they used to
+          -- hold. A cell revised EARLIER was already carrying its current
+          -- figure by then, so swapping in its prior would rewind a change
+          -- that had finished happening and inflate the reported move. Two
+          -- cells restated a fortnight apart is the case that exposes it: the
+          -- day would be labelled with the later date and a delta spanning
+          -- both. §15 says the marker holds only the LATEST revision.
+          --
+          -- The ifNull is load-bearing: a never-revised cell compares NULL
+          -- against the day's max, and a NULL condition is not a branch
+          -- anyone should have to reason about. Those cells belong in the
+          -- current-amount arm, not out of the sum.
           SELECT
-            ${KEY_COLUMNS.join(",\n            ")},
-            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
-            argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
-            toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt,
+            Day,
+            CostSource,
+            CurrencyCode,
+            LatestAmountNanoUsd,
+            LatestRevisedAt,
+            LatestLastObservedAt,
             if(
-              argMax(tuple(RevisedAt), EventTimestamp).1 IS NULL,
-              argMax(tuple(AmountNanoUsd), EventTimestamp).1,
-              argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1
-            ) AS LatestPriorAmountNanoUsd
-          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
-          WHERE TenantId = {tenantid:String}
-            AND Day >= {fromday:Date}
-            AND Day <= {today:Date}
-            AND Version = {version:String}
-          GROUP BY ${KEY_COLUMNS.join(", ")}
+              ifNull(
+                LatestRevisedAt
+                  = max(LatestRevisedAt) OVER (PARTITION BY Day, CostSource),
+                0
+              ),
+              LatestPreviousAmountNanoUsd,
+              LatestAmountNanoUsd
+            ) AS PriorAmountNanoUsd
+          FROM (
+            SELECT
+              ${KEY_COLUMNS.join(",\n              ")},
+              argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
+              argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS LatestPreviousAmountNanoUsd,
+              argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
+              toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt
+            FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+            WHERE TenantId = {tenantid:String}
+              AND Day >= {fromday:Date}
+              AND Day <= {today:Date}
+              AND Version = {version:String}
+            GROUP BY ${KEY_COLUMNS.join(", ")}
+          )
         )
         GROUP BY Day, CostSource
         ORDER BY Day, CostSource

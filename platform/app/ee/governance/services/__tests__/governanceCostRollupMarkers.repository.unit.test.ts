@@ -141,7 +141,7 @@ describe("GovernanceCostRollupClickHouseRepository", () => {
       expect(query).toContain("max(LatestLastObservedAt)");
     });
 
-    it("reconstructs the day's earlier total from the cells that changed", async () => {
+    it("pins the earlier total to the day's latest revision, not to every revision", async () => {
       const { client, repo } = repositoryOver([]);
       await repo.sumDaysByLane({
         tenantId: CELL.tenantId,
@@ -149,13 +149,23 @@ describe("GovernanceCostRollupClickHouseRepository", () => {
         toDay: "2026-08-07",
       });
 
-      // A cell nobody revised contributed its current figure to the older
-      // total too; only the revised ones swap in what they used to hold.
-      // Summing only the revised cells would report a "was" far smaller than
-      // the day ever cost.
-      expect(queryOf(client)).toContain("AS LatestPriorAmountNanoUsd");
-      expect(queryOf(client)).toContain(
-        "countIf(LatestPriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount",
+      // The correctness proof for this is a RESULT, and it lives in
+      // `governanceCostRollup.integration.test.ts` ("two cells restated on
+      // different dates"), because the rule is entirely in SQL that a stubbed
+      // client never executes. What is checkable here is the shape the rule
+      // needs: the day's latest revision has to be known BEFORE the sum that
+      // uses it, which is a window over the deduped cells and a third layer.
+      // A two-layer query cannot express it, so its absence is a real signal.
+      const query = queryOf(client);
+      expect(query).toContain(
+        "max(LatestRevisedAt) OVER (PARTITION BY Day, CostSource)",
+      );
+      // Never-revised cells compare NULL against that max and must land in the
+      // current-amount arm rather than dropping out of the sum.
+      expect(query).toContain("ifNull(");
+      expect(query).toContain("AS PriorAmountNanoUsd");
+      expect(query).toContain(
+        "countIf(PriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount",
       );
     });
 

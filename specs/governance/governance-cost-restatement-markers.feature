@@ -94,6 +94,17 @@ Feature: A cost day says how much to trust its own figure
     # anchor has to be order-independent or a redelivery moves it backwards.
 
   @integration
+  Scenario: A day restated twice reports only the latest move
+    Given a day where one spender's cost was restated two weeks before another's
+    When the cost screen reads that day
+    Then the day names the later restatement as when it changed
+    And the earlier amount it names is what the day held just before that
+    # Not what it held before the FIRST of the two. The spender restated two
+    # weeks earlier was already carrying the new figure by then, so counting
+    # its old one reports a move spanning both restatements under the later
+    # one's date. A cell nobody restated still contributes what it holds.
+
+  @integration
   Scenario: The markers survive a read taken before storage compacts
     Given a day was restated
     When the summary is read before storage is compacted
