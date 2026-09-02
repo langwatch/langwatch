@@ -2,6 +2,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import {
   type AzureBillReader,
+  assertAzureBillHasItsOwnCredential,
   assertAzureBillNotAlreadyClaimed,
   readClaimedSubscription,
 } from "../azureBillOwnership";
@@ -165,6 +166,141 @@ describe("given an admin saving a source that names no Azure subscription", () =
           claimedBy: [existingReader({ subscriptionId: "" })],
         }),
       ).not.toThrow();
+    });
+  });
+});
+
+describe("given a save that names a subscription and carries credentials", () => {
+  const configWithCredentials = (
+    credentials: Record<string, unknown>,
+  ): Record<string, unknown> => ({
+    ...configNaming(SUBSCRIPTION),
+    credentials,
+  });
+  const conversationCredentials = {
+    tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
+    clientId: "bot-client-id",
+    clientSecret: "bot-client-secret",
+  };
+
+  describe("when the credentials hold no billing pair", () => {
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("refuses the save and says the bill needs its own sign-in", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials(conversationCredentials),
+        }),
+      ).toThrow(/its own app registration/);
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it.each([
+      ["only the billing client id", { billingClientId: "billing-client-id" }],
+      [
+        "only the billing client secret",
+        { billingClientSecret: "billing-client-secret" },
+      ],
+      [
+        "a blank billing secret",
+        { billingClientId: "billing-client-id", billingClientSecret: "  " },
+      ],
+    ])("refuses half a pair too — %s", (_case, half) => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials({
+            ...conversationCredentials,
+            ...half,
+          }),
+        }),
+      ).toThrow(/its own app registration/);
+    });
+  });
+
+  describe("when the credentials hold the billing pair", () => {
+    it("saves the source", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials({
+            ...conversationCredentials,
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          }),
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when no subscription is named", () => {
+    it("asks for nothing — there is no bill to sign in to", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: {
+            adapter: "copilot_studio_dataverse",
+            credentials: conversationCredentials,
+          },
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when the credentials are not readable at this layer", () => {
+    // An edit does not resend secrets: the service carries the stored,
+    // already-validated envelope across, and by the time this guard sees the
+    // config the credentials are either absent or an encrypted string.
+    // Whether that is fine depends entirely on whether the CLAIM is new.
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it.each([
+      ["credentials absent", undefined],
+      ["credentials already encrypted", "enc:v1:abcdef"],
+    ])("refuses a create that claims the bill — %s", (_case, credentials) => {
+      // Nothing downstream requires credentials: `createSource` checks the
+      // schedule, the plan cap, the source type and the destinations, then
+      // writes. So a create naming a subscription with no readable pair is
+      // STORED unless it is refused right here — the one remaining way to
+      // reach "subscription named, bill unreadable forever".
+      const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
+      if (credentials !== undefined) parserConfig.credentials = credentials;
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({ parserConfig }),
+      ).toThrow(/needs its own app registration/i);
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("leaves an edit alone when the stored config already claimed the bill", () => {
+      // The envelope was proven to hold the billing pair when the claim was
+      // first saved. Refusing here would lock an admin out of renaming their
+      // own source.
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: {
+            ...configNaming(SUBSCRIPTION),
+            credentials: "enc:v1:abcdef",
+          },
+          storedParserConfig: configNaming(SUBSCRIPTION),
+        }),
+      ).not.toThrow();
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it.each([
+      ["carried across encrypted", "enc:v1:abcdef"],
+      ["absent from the edit", undefined],
+    ])("refuses an edit that ADDS the claim while the credentials are %s", (_case, credentials) => {
+      // The escape this closes: an API edit adding the subscription while
+      // the stored envelope rides across unread would store exactly the
+      // state the create-path refusal exists to prevent — subscription
+      // named, billing pair never checked, bill silent forever.
+      const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
+      if (credentials !== undefined) parserConfig.credentials = credentials;
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig,
+          storedParserConfig: {
+            adapter: "copilot_studio_dataverse",
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          },
+        }),
+      ).toThrow(/re-enter the credentials/i);
     });
   });
 });

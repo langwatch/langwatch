@@ -99,11 +99,22 @@ before the relying code ships:
   `51_sp_cost_access.sh`). `totalCostUSD` (Microsoft's own
   invoice-grade conversion) is **unprobed** — no script ever requested
   it; a §20 probe before the Azure puller ships.
-- **Copilot** has no prepaid-credit consumption API (proven dead end,
-  `KNOWN_DEAD.md`); the per-seat price API's *absence* is reasoned from
-  the licensing model, not a probe — no probe can prove a
-  negative. It has SKU/roster counts (4 licensed / 2 enabled measured)
-  and activity.
+- **Copilot** prepaid credits are **invisible to Azure Cost Management**
+  — measured, not assumed: on our own prepaid tenant the cost feed
+  returned six month-to-date lines (largest EUR 25.79 Azure Databricks)
+  and **no Copilot line at all**, because prepaid credit packs create no
+  Azure resource to bill against (`configuration.md`, "What we proved").
+  That is the full extent of what is proven. This ADR previously called
+  prepaid consumption a "proven dead end" citing a `KNOWN_DEAD.md` that
+  exists in neither the repo nor the vault; the claim is **withdrawn**
+  as stronger than its evidence. The research note is explicit that the
+  Microsoft 365 admin centre *does* render month-to-date credits **per
+  agent** — the detail we want — and that our search for the interface
+  behind that screen was "a failed search, not proof that none exists".
+  §21 therefore never infers prepaid from data, and §20 carries the
+  probe. The per-seat price API's *absence* is separately reasoned from
+  the licensing model, not a probe — no probe can prove a negative. It
+  has SKU/roster counts (4 licensed / 2 enabled measured) and activity.
 - **Databricks** query history shows humans as **emails** and service
   principals as **bare UUIDs** — proven *under app-only
   service-principal auth* (`51_by_user.csv`; the probe's own client id
@@ -627,9 +638,13 @@ SCIM degrade to "unassigned", never break.
   is carried per §9.
 - **Copilot**: three sources on one screen — seat cost (our price list ×
   roster), real daily spend (Azure Cost Management, for pay-as-you-go
-  customers who grant the role), activity (conversation counts). Prepaid
-  customers see an honest "prepaid credits are not readable by any API"
-  note — proven, not assumed.
+  customers who grant the role on a **separate billing identity**, §21),
+  activity (conversation counts). Prepaid customers see an honest
+  "prepaid credits are not readable through the cost feed" note —
+  shown only where the customer has **declared** they are prepaid
+  (§21.4). We never infer it: an empty cost feed is indistinguishable
+  from a quiet month, and a guessed sentence about someone's contract
+  is a confident falsehood.
 - **Databricks/Genie**: warehouse cost prorated per statement
   (`shareOf()`); Genie serving tokens are named unattributable rather
   than guessed.
@@ -731,6 +746,165 @@ then.
 - The broken `openai_compliance` / `claude_compliance` sources are
   replaced/retired per ADR-122's diagnosis, outside this document.
 
+### §21. Azure billing is a second identity on the same connection, and a bill we could not read is never rendered as zero
+
+Wave 1 shipped the Azure cost read using the **same registered app** as
+the Copilot bot (`copilotStudioDataverse.puller.ts:398-405` builds both
+the Dataverse token and the Resource Manager token from one flat
+credential set). That works and is wrong: it makes the money permission
+and the employee-content permission the same grant. §20 already wrote
+down that "some security teams will refuse" a broad grant, for
+Databricks; this is the same objection, for Azure, and it is the one an
+enterprise security review actually raises.
+
+**21.1 Two identities, one connection.** The Copilot Studio source
+carries two registered apps: the **bot identity** (Dataverse
+transcripts, Graph seat counts) and a **billing identity** (Azure
+Resource Manager, holding **Cost Management Reader** at the
+subscription). They are separate credential keys in the same connection,
+not separate connection types.
+
+*Why.* Separation of duty is a property of which login holds which
+permission, not of how many things a customer has to connect. Azure
+reports spend **per subscription**, and every environment in a Copilot
+deployment bills to one subscription — so a second connection type would
+stand in exactly one relationship to the first, forever, while doubling
+what a customer has to get right. The security goal is met entirely by
+the credential split: the approver who signs off on the finance grant
+hands out a permission that reads money and cannot read a conversation.
+
+*Rejects:* a dedicated billing connection type (§21 rejected
+alternatives); and **any fallback to the bot identity** when billing
+credentials are absent. A fallback silently re-creates the exact grant
+this section exists to break, and it does so in the one case nobody is
+watching — the customer who declined to give billing access.
+
+**21.2 No schema change, and no new secret-handling path.** Credentials
+are already `Record<string, string>`
+(`pullers/pullerAdapter.ts:164-168`), decrypted by the worker before an
+adapter sees them, and carried across edits without ever being returned
+to the browser (`activity-monitor/ingestionSource.service.ts:771-791`).
+The billing identity is two more keys in that map. *Why:* the encryption,
+carry-across and never-echo guarantees are the expensive parts and they
+already exist and are pinned by test
+(`dashboard/pages/__tests__/ingestionSourceSecretFields.unit.test.ts`);
+adding a second secret storage shape would mean auditing two of them.
+
+**Inside the envelope is load-bearing, not stylistic** (red-team, v3.4):
+both never-echo guards match the key `"credentials"` by exact string
+equality (`routers/ingestionSources.ts:104`,
+`activity-monitor/ingestionSource.service.ts:791`). A billing secret at
+any *new* top-level key — `billingCredentials`, say — would be returned
+to the browser and dropped on edit. The new keys go inside the existing
+`credentials` map or nowhere.
+
+**21.3 The spend lane never displays a figure it did not read.** Where
+there is no figure, the lane carries a **reason from a closed list**
+(Constants) and the screen turns that reason into a sentence. A blank is
+never rendered as `0`, and a currency amount is only ever drawn from a
+read that returned one.
+
+The reason channel is **new construction, not a port** (corrected by the
+red-team, v3.4): `GovernanceCostLaneDto` today has no status field at
+all, `unavailableReason` is a two-value whole-screen switch, and the
+puller collapses every cost failure — 403, 429, timeout, malformed
+reply — into one bare `return null`
+(`copilotStudioDataverse.puller.ts:1128`) whose reason survives only in
+a log line. The closed list is therefore bounded by what the system can
+actually know: whether billing credentials are configured, whether the
+customer declared prepaid, and whether the last read succeeded. It
+**cannot** distinguish "permission refused" from "throttled" today,
+because Azure's 403 and 429 die at the same line; the list carries one
+`billing_read_failed` reason for both until a reason survives the
+puller, which is its own change with its own tests.
+
+*Why.* This is the whole point of the work. A finance lead who reports
+"$0 Copilot spend" to a board because the panel was blank has been
+misled by us, and the number is wrong in the direction that looks
+reassuring. Wrong beats incomplete only when the reader can tell which
+they are looking at.
+
+*Rejects:* passing the provider's own error text to the browser —
+untranslatable, changes without notice, and can carry identifiers we do
+not want rendered in a customer's page. Also rejects claiming a
+granularity of reason the pipeline does not preserve — a panel that says
+"permission refused" on a throttle is the same confident falsehood as
+the silent zero, wearing more words.
+
+**21.4 Prepaid is declared by the customer, never inferred.** The
+connection form carries a customer-set flag: *this Copilot runs on
+prepaid message packs*. The prepaid sentence is shown only when it is
+set.
+
+*Why.* Prepaid credit packs create no Azure resource, so the cost feed
+returns nothing — which is byte-for-byte what a quiet pay-as-you-go
+month returns. Nothing in the response distinguishes them (measured,
+Context §"Measured provider behaviour"). Inferring would print a
+confident claim about a customer's contract that we cannot support, and
+would print it most often for the customer who simply had a quiet month.
+
+*Rejects:* inferring prepaid from persistently-zero spend alongside
+present seats.
+
+**21.5 A billing failure never changes connection health.** The source
+stays **active** while conversations flow. The billing problem is
+reported on the spend lane only.
+
+*Why.* The connection's job is arriving data, and it is doing it. Red
+sends whoever investigates hunting a bot fault that does not exist,
+while the actionable message — *we cannot see your bill* — is on the
+panel of the person who went looking for spend. The research note
+reached this independently for the rate-limit case: a refusal "should
+never be the reason a collection run is reported as broken"
+(`configuration.md`). Azure's cost allowance is a few requests per
+minute, **shared with the customer's own staff browsing cost in the
+portal**, so refusals are ordinary operation, not incident.
+
+*Rejects:* red on any billing failure; and an amber third health state,
+which would be a new state across every connection type, not just this
+one.
+
+**21.6 Withdrawn (v3.4).** This section proposed a save-time
+verification read — four attempts over three minutes — so a
+just-granted permission would read "checking" instead of "refused"
+while Microsoft's grant propagates. The red-team killed it on three
+grounds and no rewrite survives them. (a) **No seam exists**: no save
+path performs a cost read, and every cost read sits behind the six-hour
+gate (`azureCostManagement.ts:99,118`), so the "window" would contain
+exactly one attempt. (b) **The state is unknowable**: nothing stores
+when a grant happened, and a hold is recorded identically for refusal,
+throttle, timeout and malformed reply — a lane keyed on it would say
+"checking billing access" to a customer who never granted anything.
+(c) **The premise misread the measurement**: what was measured
+(`configuration.md`, not in this repo) was a *subscriptions list*
+returning empty after a grant — a different endpoint from the cost
+query, and an empty list is not a refusal; an empty 200 on the cost
+query takes the *priced* branch, not a failure branch. What survives:
+the propagation delay is real and belongs in the **setup instructions**
+("if the check fails right after granting, wait two minutes and retry")
+— copy, not machinery.
+
+**21.7 The lane shape is copied from seats, not factored out — and the
+copy is of the shape, not the semantics.** The seat union
+(`GovernanceSeatLaneDto`) is the precedent for *a discriminated union
+the panel switches copy on*. It is **not** precedent for reporting a
+provider refusal (corrected by the red-team, v3.4): its `read_failed`
+arm fires only when **our own** ClickHouse query throws
+(`governanceCost.service.ts:275-295`); a provider-side Graph 403 writes
+no rows and renders as `awaiting_data` — the exact collapse §21.3
+forbids for spend. Spend copies the union shape and must do better than
+its semantics; the seat lane's own gap is recorded as an open question
+rather than silently inherited as a standard.
+
+*Why not factor out.* This is the **second** occurrence, not the third.
+An abstraction built at n=2 is shaped like its first caller and the
+next one bends to fit — §19's own reasoning, applied one level down.
+Factoring out would also mean editing working seat code nobody asked us
+to change, in a branch already four deep in a stack.
+
+*Rejects:* a shared lane type spanning seats and spend now. Revisit at
+the third lane.
+
 ## Constants
 
 | Name | Value | Purpose |
@@ -743,6 +917,10 @@ then.
 | Permission verbs | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation) | ADR-092 registry entries gating the screens |
 | Feature flags | `release_ui_ai_governance_enabled`, `release_ui_governance_billed_cost_enabled` — both already registered (backend + frontend registries), already gating nav and placeholder routes | staged rollout of the screens |
 | Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
+| Billing credential keys (§21.1) | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId` | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret` |
+| Prepaid declaration (§21.4) | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false` | the only thing that licenses the prepaid sentence; never inferred |
+| Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
+| Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
 
 ## Invariants
 
@@ -759,6 +937,10 @@ then.
 | Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
 | Identity grants nothing | no authz code path reads `DiscoveredPerson`/`DiscoveredAgent`/`IdentityMatch` | hard constraint 3; test: authz engine module has no import of identity tables |
 | Matches are dated and evidenced | every `IdentityMatch` row has evidence kind + validFrom; corrections close and reopen, never rewrite | §11/§12; unique-open-link constraint + test |
+| No figure we did not read | the spend lane renders a currency amount only when a cost read returned one; every other state renders a sentence from the closed reason list, never `0` and never blank | §21.3; table-driven test over all three reasons asserting each renders its sentence and **none** renders a currency amount (`azureBillingNote.unit.test.ts`, digit-free assertion) |
+| The billing identity reads only money | the Resource Manager token is minted from `billingClientId`/`billingClientSecret`; the Dataverse and Graph tokens are minted from the bot's — no code path mints one from the other's credentials, and no fallback exists | §21.1; test: with billing credentials absent, the cost read is skipped and **zero** Resource Manager calls are made — asserted on the captured call list, not on the absence of a log line |
+| Billing secrets never echo | `billingClientSecret` is never returned to the browser on read or edit, and survives an edit that does not resend it | §21.2; `ingestionSourceSecretFields.unit.test.ts` extended to the new keys — merge blocker |
+| Prepaid is declared, never derived | the prepaid sentence is reachable only when `azureBillingIsPrepaid` is set; no code path sets it from response data | §21.4; test: zero-row cost read with seats present renders `no_spend_recorded`, not `prepaid_declared` |
 
 ## Assumptions
 
@@ -771,6 +953,10 @@ then.
 | SCIM/Entra directory data flows for department links | orgs without it degrade to "unassigned" department; per-person drill still works via provider-native ids |
 | Azure serves `totalCostUSD` on the customer's agreement type (unprobed — §20) | the biller-conversion column stays 0 for Azure; per-currency totals still correct; single-total view waits for a rate table |
 | Databricks grants the puller SCIM read + system-table access under app-only auth (SCIM listing unprobed; privilege bar is high — §20) | Databricks people arrive nameless (UUIDs/emails from query history only); identity wave degrades to email evidence; cost lane unaffected |
+| The billed subscription sits in the **same tenant** as the Copilot environment, so the billing identity can reuse `tenantId` (§21.1) | cross-tenant billing arrangements (CSP, Lighthouse) cannot connect the bill at all until an optional `billingTenantId` ships; conversations and seats are unaffected — open question below |
+| An Azure cost response with zero rows means "nothing billed", not "we were refused" — refusals arrive as 401/403/429, not as an empty result (§21.3) | a permission failure renders as `no_spend_recorded` and the customer waits forever for a read that will never succeed; the closed reason list stops being honest. **Verified in the puller** (v3.4): a non-OK status takes the held branch (`copilotStudioDataverse.puller.ts:1115-1128`), never the priced one; only a parsed 200 can price a window |
+| No API exposes prepaid credit consumption (§21.4) | **already known to be shaky** — the M365 admin centre renders month-to-date credits per agent, so an endpoint likely exists and our search for it failed. If one is found, §21.4's declaration flag becomes a fallback for un-probed tenants rather than the only source, and the prepaid sentence is replaced by a real figure. Nothing in this design has to be undone |
+| Customers who are prepaid will tick the prepaid box (§21.4) | a prepaid customer who leaves it unticked sees `no_spend_recorded` — "no spend recorded this period" — which is *true but unhelpful*; they conclude the integration is broken rather than that Azure cannot see their credits. Mitigation is copy, not architecture |
 
 ## Gates
 
@@ -784,6 +970,9 @@ then.
 | GDPR erasure blanking person references | no | large | human review, always; erasure blanks person fields, money amounts stay |
 | Screens behind flags | yes | small | none — ship it |
 | Seat price list edits (admin) | yes (recompute at read heals) | small | none — audit-logged, no approval step |
+| Billing credential keys on the connection form (§21.2) | **no** — a secret echoed to a browser stays echoed | medium | human review of the form diff (both credential builders: `dashboard/pages/inventory.tsx:2647` create and `:2702-2708` edit — a change applied to one and not the other is the failure mode), **plus** `ingestionSourceSecretFields.unit.test.ts` extended to `billingClientSecret` as a merge blocker |
+| Dropping the bot-identity fallback for the cost read (§21.1) | yes (re-add credentials) | small — **no connected source can be in this state**: `azureSubscriptionId` has never shipped to `main`, so it arrives in the same release as the save-time refusal and no stored source claims a bill without the pair | automated: ships behind `release_ui_governance_billed_cost_enabled`; the refusal is `assertAzureBillHasItsOwnCredential` on create AND on an edit that adds the claim (v3.5). A source claiming nothing reads no bill, exactly as today |
+| Spend-lane reason states (§21.3) | yes | medium (customer-visible money) | automated: the three-reason table-driven test + the no-currency-amount assertion; behind the existing flag |
 
 ## Schema
 
@@ -946,6 +1135,26 @@ them like every other pull.
 - **Company-wide cost platform** — abstraction at n=1 (§19).
 - **Freeze restated days after N days** — disagrees with the provider's
   own console (§15).
+- **A separate billing connection type** — the bill is per subscription
+  and every environment bills to one, so it would stand in exactly one
+  relationship to the Copilot connection forever, while doubling the
+  setup a customer must get right; separation of duty comes from the
+  credential split, not the connection count (§21.1).
+- **Falling back to the bot identity when billing credentials are
+  absent** — silently re-creates the combined grant this section exists
+  to break, in the one case nobody is watching (§21.1).
+- **Inferring "prepaid" from persistently-zero spend** — an empty cost
+  feed is identical to a quiet month; the guess prints a confident
+  falsehood about a customer's contract (§21.4).
+- **Provider error text on the customer's screen** — untranslatable,
+  changes without notice, can carry identifiers (§21.3).
+- **Turning the connection red on a billing failure**, or adding an
+  amber third state — red sends the investigator after a bot fault that
+  does not exist; amber is a new state across every connection type
+  (§21.5).
+- **A shared spend/seat lane type now** — abstraction at n=2; the second
+  caller would bend to the first's shape (§21.7, §19's reasoning one
+  level down).
 
 ## Consequences
 
@@ -965,6 +1174,16 @@ rollup. Seat money computed at read means
 exports must run the same multiplication (one shared code path, or
 numbers drift). Read-time identity resolution makes per-person queries
 join-heavy; acceptable at current volume, revisit if drill-downs slow.
+**No Copilot connection that exists today loses a spend figure** — this
+was written when §21 was expected to land after the subscription field,
+and it did not: `azureSubscriptionId` has never reached `main`, so it
+ships in the same release as the refusal that requires the billing pair
+beside it. Every connection that exists today claims no subscription,
+reads no bill, and is unchanged. Customers now have two Azure grants to
+obtain rather than one, and the second one has a different approver —
+the reason it is worth doing is also the reason it is slower to adopt.
+That cost lands on the customers who adopt the spend lane next, not as a
+regression for the ones already connected.
 
 **Neutral.** ADR-088's machinery is untouched except Decision 4's
 attribution. Pulled data's home gets a dedicated, permission-gated
@@ -979,12 +1198,119 @@ money tables, only the identity tables and read paths.
 | Collision-review screen for suspended auto-links (§12) — shape and priority | Sergio (flagged for pending/) |
 | Email re-issue policy detail: minimum evidence to *reopen* a closed identity under a reused address | identity implementer |
 | Genie serving-token attribution — revisit only if Databricks exposes request-level linkage | watch provider changelog |
-| Copilot prepaid-credit visibility — revisit if a consumption API ever ships | watch provider changelog |
+| Copilot prepaid-credit visibility — **one-script probe**, not a changelog watch: the M365 admin centre renders month-to-date credits per agent, so an endpoint plausibly exists and our earlier search for it failed. Probe it; record the answer in the Assumptions table either way (§20's rule) | Sergio |
+| Cross-tenant billing: does any real customer bill the subscription from a different tenant than the Copilot environment? If yes, `billingTenantId` becomes a third billing key (§21.1 assumption) | deferred until one appears |
+| Should the connection form stop asking for the subscription id at all? The billing identity **finds the subscription by itself** (measured, `configuration.md`: "the form does not need to ask for it, and should not"). Removing the field would also dissolve #7738's uniqueness race, which is a race on that very field | Sergio — sequence against #7738 |
+| Does a failed billing read count toward the source's `errorCount`? §21.5 fixes the *health colour*; the error counter is a separate mechanism — the cost read already refuses to feed it by contract (`azureCostManagement.ts:200`) | resolved v3.4 — it does not, verified |
+| The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:275-295`); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue |
+| A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say *refused* vs *throttled*. Worth threading a reason through the cursor? | implementation PR or follow-up |
+| ~~The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content~~ | resolved in the implementation PR — the premise ("Azure is the only pulled producer") was already false: the OpenAI, Anthropic and Databricks admin pullers feed the same lane today, so a mixed org's note fell permanently silent, including the failed-read warning. The note's spend check now asks the rollup for the CLAIMING SOURCE's own rows (`hasRowsForSource`, keyed on `IngestionSourceId`), never the lane's |
+| Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
 | Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
+
+- **v3.6 (2026-09-02, captain: Sergio Esteban).** The subscription claim
+  becomes fixed once the bill has been read. Review of the sealed-envelope
+  swap (v3.4's "honest path") found it only honest before the first cost
+  read: the cursor and the rollup rows are filed under the source, so a
+  swapped claim showed the old subscription's spend under the new one's
+  name and masked the failed-read note. An edit may still swap the claim
+  before any cost read, and may drop the claim at any time; once cost
+  memory exists, a different bill means a new source — the same
+  archive-and-recreate rule the report already has, for the same
+  recorded-spend-continuity reason. Verifying which subscription the
+  memory belongs to stays withdrawn (§21.6); the guard refuses instead of
+  guessing.
+
+- **v3.5 (2026-09-02, captain: Sergio Esteban).** Review pass on the §21
+  implementation. Two corrections, one of them load-bearing:
+  - **The create path was still open.** v3.4 withdrew
+    `no_billing_credentials` from the spend lane's closed reason list
+    because the save-time refusal made the state unstorable. It did not:
+    the guard waved creates through, reasoning that a create carrying no
+    credentials "fails for the louder reason" downstream. Nothing
+    downstream requires credentials, so a direct caller could store a
+    claimed subscription with no billing pair. The refusal now covers
+    create as well as claim-adding edits, which is what makes v3.4's
+    withdrawal true rather than merely intended.
+  - **The rollout consequence was wrong in the other direction.** Two
+    passages said every already-connected source goes dark on deploy.
+    They assumed the subscription field was already live; it has never
+    reached `main`, so it ships alongside the refusal and no existing
+    connection claims a bill at all. The blast radius of dropping the
+    bot-identity fallback is small, not large, and the Gates row and the
+    consequences paragraph now say so.
+
+- **v3.4 (2026-09-02, captain: Sergio Esteban).** Red-team pass on §21
+  and its derived scenarios: four independent refuters (reachability,
+  surface, duplication, observability), all four landing. What changed:
+  - **§21.6 withdrawn.** The save-time verification read had no seam
+    (no save path reads cost; the six-hour gate holds), keyed on a state
+    nothing stores (when a grant happened), and misread its own
+    measurement (a subscriptions *list* returning empty, not a cost
+    query being refused). The propagation delay survives as setup copy.
+  - **§21.7 corrected.** The seat union is precedent for the *shape*
+    only. Its `read_failed` fires solely on our own store query
+    throwing; a provider 403 renders as `awaiting_data` — the very
+    collapse §21.3 forbids. The seat lane's own gap is now an open
+    question instead of an inherited standard.
+  - **§21.3 grounded.** The reason list shrinks from six to four —
+    `awaiting_grant` withdrawn with §21.6, `billing_access_denied`
+    folded into `billing_read_failed` because 403 and 429 die at the
+    same line in the puller and no reason survives to any reader. The
+    reason channel is named as new construction: no DTO field, no
+    cursor field, no renderer branch exists for it today.
+  - **§21.2 sharpened.** Both never-echo guards match `"credentials"`
+    by exact string equality; the billing keys go inside that envelope
+    or they leak. Recorded as load-bearing.
+  - Dissent recorded: the observability refuter showed the harness
+    captures full request bodies and bearer tokens, so the credential-
+    separation invariant is directly testable — two of the challenge
+    briefing's own premises (URL-only capture, no fake timers) were
+    wrong.
+
+- **v3.3 (2026-09-01, captain: Sergio Esteban).** Adds §21 — the Azure
+  billing identity and the honesty rule for the spend lane — and
+  withdraws an overstated evidence claim. Supersedes issue #7733; the
+  work is issued as #7745.
+  - **Framing.** Decision scoped to Copilot Studio only, *not* stated as
+    a rule for every connection: Databricks' permission model has not
+    been examined, and asserting a rule for it would be asserting
+    something unverified. Blast radius set at "a customer reads a wrong
+    number" — reversible by deploy, nothing destroyed — which is why the
+    gates below are automated rather than human, except on the secret
+    path.
+  - **Round 1 (four forks, two re-asked).** Two constraints assumed
+    settled in discussion were deliberately *not* re-locked by the
+    captain and so were re-opened rather than carried: the connection
+    shape and the health colour. Both then locked as §21.1 and §21.5,
+    with reasons that are now written down instead of remembered.
+  - **Evidence correction, raised against this ADR's own text.** The
+    captain challenged the prepaid claim directly ("do you have
+    evidence?"). The cited `KNOWN_DEAD.md` exists in neither the repo
+    nor the vault, and the underlying research note says in terms that
+    the admin centre *does* render per-agent credits and that our search
+    for the interface behind it was "a failed search, not proof that
+    none exists". The Context bullet is rewritten to claim only what was
+    measured — prepaid packs create no Azure resource, so the cost feed
+    shows no Copilot line — and §20's probe list gains the endpoint
+    hunt. **What survived the correction:** the design does not depend
+    on the dead end being real; §21.4 asks the customer instead, which
+    is correct either way.
+  - **Round 2 (one new fork, found in prior art, not in discussion).**
+    The research note records that Azure answers *empty* for a minute or
+    two after the role is granted — identical to a refusal. §21.6 adds a
+    save-time verification with a 3-minute window, because the six-hour
+    read cadence would otherwise freeze a false "no billing access" for
+    six hours. This widens #7745 beyond what was filed.
+  - **Scaffolding fork: one-off, not shared** (§21.7). Seats already
+    solves the same lane problem; this is the second occurrence, so the
+    shape is copied rather than factored out.
+  - **Recorded cost, not hidden:** every existing Copilot connection
+    loses its spend figure on deploy (Consequences, Gates).
 
 - **v3.2 (2026-08-29, captain: Sergio Esteban).** Eight pre-implementation
   rulings folded, one restructure:

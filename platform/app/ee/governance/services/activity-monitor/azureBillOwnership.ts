@@ -59,6 +59,126 @@ export function readClaimedSubscription(
 }
 
 /**
+ * The customer's own prepaid declaration, read off the stored config.
+ *
+ * A reader beside `readClaimedSubscription` for the same reason it exists:
+ * the config is untyped JSON, and every caller hand-reading the key is a
+ * caller that can quietly disagree with the others about what counts as
+ * declared. Only a stored `true` does — the declaration is a checkbox an
+ * admin ticked, never an inference (ADR-128 §21.4).
+ */
+export function readPrepaidDeclared(
+  parserConfig: Record<string, unknown> | null | undefined,
+): boolean {
+  return parserConfig?.azureBillingIsPrepaid === true;
+}
+
+/**
+ * Refuse a save that names a subscription without the bill's own credential.
+ *
+ * The bill is read with its own registered app — one that holds Cost
+ * Management Reader and cannot read a conversation — and never with the
+ * conversation credential (ADR-128 §21.1). Enforcing that at save time is
+ * what keeps the state "subscription named, bill unreadable forever" from
+ * existing at all: refused here, it never needs explaining on a spend panel
+ * months later to someone who was not in the room when the source was made.
+ *
+ * Only a save that carries readable credentials can be judged on its pair.
+ * An edit does not resend secrets — the service carries the stored,
+ * already-validated envelope across, so by the time this guard runs the
+ * credentials are absent or an encrypted string. Which of two saves that is
+ * decides everything:
+ *
+ * - The stored config ALREADY claimed a subscription: the envelope was
+ *   proven to hold the billing pair when the claim was first saved, and
+ *   refusing now would lock an admin out of renaming their own source.
+ * - The stored config claimed none: the envelope was never checked for a
+ *   billing pair, and waving the claim through would store exactly the
+ *   state this guard exists to refuse — one API edit away, invisible to
+ *   the form, explained to nobody. Refused; claiming a bill means
+ *   re-entering the credentials with the pair inside.
+ *
+ * A CREATE naming a subscription is refused unless this very save carries the
+ * pair. Nothing downstream of this guard requires credentials — `createSource`
+ * validates the schedule, the plan cap, the source type and the destinations,
+ * then writes — so a create that omits the subscribe-time secrets is stored,
+ * not "caught by a louder failure". That path is the only way the state this
+ * guard exists to refuse could still be reached, which is precisely why it
+ * cannot be the one path left open.
+ *
+ * An edit SWAPPING one subscription for another behind a sealed envelope is
+ * allowed HERE, and the distinction is worth stating because it looks like a
+ * hole. What is checked here is that a claim never lands without a pair
+ * PRESENT, never that the pair can read the subscription named — §21.6
+ * proposed verifying the grant at save time and v3.4 withdrew it. The
+ * swapped-in claim still rides the envelope validated for the previous one,
+ * so the pair is there; if it turns out not to cover the new subscription the
+ * read fails and the window is held, which the panel says out loud as
+ * `billing_read_failed`. Refusing the swap outright would force an admin to
+ * retype both secrets whenever one registered app holds Cost Management
+ * Reader across several subscriptions — the ordinary Azure setup — and prove
+ * nothing about the new one.
+ *
+ * That honest-path promise only holds while no bill has been read: once one
+ * has, the cursor and the recorded rows keep answering for the old bill
+ * under the new claim, and the failed-read note is masked instead of said.
+ * `assertClaimedSubscriptionUnchangedOncePulled` (in the service, beside the
+ * report guard it mirrors) is what closes that half — this guard stays about
+ * the pair being present, never about which bill the source has history with.
+ */
+export function assertAzureBillHasItsOwnCredential(params: {
+  parserConfig: Record<string, unknown> | null | undefined;
+  /** The config as stored before this edit. Omitted on create. */
+  storedParserConfig?: Record<string, unknown> | null;
+}): void {
+  const { parserConfig, storedParserConfig } = params;
+  if (readClaimedSubscription(parserConfig) === null) return;
+
+  const complaint =
+    "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
+
+  const credentials = parserConfig?.credentials;
+  if (
+    typeof credentials !== "object" ||
+    credentials === null ||
+    Array.isArray(credentials)
+  ) {
+    // Nothing readable to judge. The one save that may pass is an edit
+    // carrying the sealed envelope across for a claim that was already
+    // judged when it was made; a create, or an edit that ADDS the claim,
+    // has never had its pair checked by anyone.
+    if (
+      storedParserConfig !== undefined &&
+      readClaimedSubscription(storedParserConfig) !== null
+    ) {
+      return;
+    }
+    const editComplaint =
+      "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
+    const message =
+      storedParserConfig === undefined ? complaint : editComplaint;
+    throw new ValidationError(message, {
+      meta: { formErrors: [message] },
+    });
+  }
+
+  const readBillingKey = (key: string): string => {
+    const value = (credentials as Record<string, unknown>)[key];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  if (
+    readBillingKey("billingClientId") &&
+    readBillingKey("billingClientSecret")
+  ) {
+    return;
+  }
+
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
+/**
  * Refuse a config claiming a subscription another live source already reads.
  *
  * A no-op for a config claiming no subscription — silence here means "nothing
