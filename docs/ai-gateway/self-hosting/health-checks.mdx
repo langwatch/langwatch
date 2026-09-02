@@ -111,7 +111,7 @@ Set `enabled: false` to keep the endpoint in-cluster.
 
 On `SIGTERM` the gateway flips `/readyz` to 503, waits `shutdown.preDrainWaitSeconds` (default 5), closes the listener and gives in-flight requests `shutdown.timeoutSeconds` (default 60). `terminationGracePeriodSeconds` must cover both plus 10 seconds of slack. The sequence, the metrics to watch and the values for long streams are on [Helm chart](/ai-gateway/self-hosting/helm#graceful-drain).
 
-If requests still reach a pod after it flipped to draining during a rollout, raise `shutdown.preDrainWaitSeconds` and `terminationGracePeriodSeconds` together. A `preStop` sleep delays the `SIGTERM` instead, so the pod is not yet reporting 503 during the sleep and the load balancer has no signal to act on.
+If requests still reach a pod after it flipped to draining during a rollout, raise `shutdown.preDrainWaitSeconds` and `terminationGracePeriodSeconds` together. A `preStop` sleep delays the `SIGTERM` instead, so the pod still reports ready during the sleep and the load balancer has no signal to act on.
 
 ## Synthetic request
 

@@ -477,7 +477,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Credential-leak incident response](https://langwatch.ai/docs/ai-gateway/cookbooks/credential-leak-incident.md): What to do when a LangWatch AI Gateway virtual key leaks, from containment to rotation and the audit trail afterwards.
 - [Prometheus alert rules](https://langwatch.ai/docs/ai-gateway/cookbooks/prometheus-alerts.md): A PromQL ruleset for the LangWatch AI Gateway, covering reliability, provider health, budget enforcement and the auth cache.
 - [Grafana dashboard](https://langwatch.ai/docs/ai-gateway/cookbooks/grafana-dashboard.md): An importable Grafana dashboard for the LangWatch AI Gateway, covering request health, provider health, the auth cache, budgets, guardrails, streaming and the drain.
-- [Production runbook](https://langwatch.ai/docs/ai-gateway/cookbooks/production-runbook.md): Diagnose p99 spikes, goroutine leaks, memory growth, and other "why is the gateway slow?" incidents using the loopback-bound pprof admin listener.
 
 # AI Governance
 

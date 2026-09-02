@@ -103,7 +103,7 @@ Then confirm the request produced a spend record:
 
 ```bash
 kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/metrics | grep gateway_spend_spool
+  -- curl -sS http://langwatch-gateway/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
 ```
 
 Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.

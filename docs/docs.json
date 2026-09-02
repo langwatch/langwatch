@@ -699,8 +699,7 @@
               "ai-gateway/cookbooks/migrate-from-portkey",
               "ai-gateway/cookbooks/credential-leak-incident",
               "ai-gateway/cookbooks/prometheus-alerts",
-              "ai-gateway/cookbooks/grafana-dashboard",
-              "ai-gateway/cookbooks/production-runbook"
+              "ai-gateway/cookbooks/grafana-dashboard"
             ]
           }
         ]
@@ -2027,6 +2026,10 @@
     {
       "source": "/ai-gateway/cookbooks/multi-tenant-reseller",
       "destination": "/ai-gateway/cookbooks/metering-and-rebilling"
+    },
+    {
+      "source": "/ai-gateway/cookbooks/production-runbook",
+      "destination": "/ai-gateway/troubleshooting"
     }
   ]
 }

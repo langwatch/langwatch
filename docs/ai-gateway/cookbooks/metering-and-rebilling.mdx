@@ -81,7 +81,7 @@ curl -sS $LW/api/gateway/v1/budgets \
   -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
-# Per-end-user allowance: one template covers every current and future end user
+# Per-end-user allowance: one template covers every end user, current and new
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
   -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."}, "external_id": "acme-4171",
