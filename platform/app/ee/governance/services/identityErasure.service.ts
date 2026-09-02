@@ -16,17 +16,27 @@
  *   1. record the identifier's digest on the suppression list, so the next
  *      thirty-day-lookback pull does not simply re-import what we erased;
  *   2. blank the platform-user reference on every link the person holds;
- *   3. replace the identifier and display text on the person row itself,
+ *   3. delete the money rows carrying the identifier and ask for those days to
+ *      be rebuilt, so they come back under the pseudonym with totals intact;
+ *   4. replace the identifier and display text on the person row itself,
  *      keeping the row so its spend stays attributable to somebody;
- *   4. delete the money rows carrying the identifier and replay those days, so
- *      they come back under the pseudonym with their totals intact;
  *   5. — which only works because the fold consults the same suppression list
  *      on its way past (`actorIdForRollupWrite`), so this service refreshes the
- *      in-process snapshot between step 1 and step 4.
+ *      in-process snapshot before any of the money work runs.
  *
- * Order matters in one direction: the suppression row must exist before the
- * replay, or the replay re-derives the original identifier from the raw event
- * log and writes it straight back.
+ * Two orderings are load-bearing rather than incidental. The suppression row
+ * must exist before the rebuild, or the rebuild re-derives the original
+ * identifier from the raw event log and writes it straight back. And the money
+ * rows must be deleted before the person row is pseudonymized, because the
+ * delete addresses those rows BY the original identifier and the pseudonymize
+ * destroys the last copy of it.
+ *
+ * Which leaves a window where the rows are gone and the rebuild has not
+ * happened, and crossing it needs more than ordering. `moneyRowsPendingAt` is
+ * written before the delete and cleared after the rebuild is accepted, with
+ * `moneyRebuildSince` recording the day to start from while there is still
+ * something to ask. A call that finds the marker standing resumes there rather
+ * than reading `erasedAt` and reporting a clean erasure that did no work.
  *
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
@@ -90,6 +100,21 @@ export interface ErasureOutcome {
    * dropped is how finance stops trusting the screen.
    */
   daysNotRebuilt: { tenantId: string; day: string }[];
+  /**
+   * The day a rebuild of the daily totals was asked to start from, or null
+   * where none was needed — no day carried the identifier, or every one of them
+   * is older than the event log keeps.
+   */
+  rebuiltFrom: string | null;
+  /**
+   * True when this call picked up an earlier erasure that removed the money
+   * rows and died before rebuilding them.
+   *
+   * Worth reporting rather than hiding: a resumed erasure means those totals
+   * were wrong for however long the gap lasted, which is a thing an operator
+   * asking "did that erasure work?" needs to be told.
+   */
+  resumed: boolean;
 }
 
 export interface IdentityErasureDeps {
@@ -110,16 +135,55 @@ export interface IdentityErasureDeps {
   now?: () => Date;
 }
 
+/**
+ * Everything an erasure hashes about one person: the stand-in that replaces
+ * their identifier, and every digest that goes on the suppression list.
+ *
+ * The display text is hashed too, and separately, because a provider that put
+ * "Maria Silva" in one field and an opaque id in the other has published two
+ * identifiers — suppressing only the one we happen to key on lets the other
+ * back in on the next pull. When they are the same string it is one digest, not
+ * the same digest twice.
+ *
+ * One digest, two jobs: it is the membership test every write path runs, and it
+ * is the value written in place of the original. Which is why no table anywhere
+ * maps a stand-in back to what it replaced.
+ */
+function digestsFor(person: { rawActorId: string; displayText: string }): {
+  pseudonym: string;
+  identifierHashes: string[];
+} {
+  const secret = readErasureSecret();
+  const pseudonym = erasureDigest({ secret, identifier: person.rawActorId });
+  if (person.displayText === person.rawActorId) {
+    return { pseudonym, identifierHashes: [pseudonym] };
+  }
+  return {
+    pseudonym,
+    identifierHashes: [
+      pseudonym,
+      erasureDigest({ secret, identifier: person.displayText }),
+    ],
+  };
+}
+
 export class IdentityErasureService {
   constructor(private readonly deps: IdentityErasureDeps) {}
 
   /**
    * Erases one discovered person from the governance data.
    *
-   * Idempotent: erasing an already-erased person recomputes the same digest
-   * from the pseudonym it already holds... which it cannot, because the
-   * original is gone. So a second call is a no-op that reports the pseudonym
-   * already in place rather than hashing a hash.
+   * Idempotent in three states rather than two. An erasure that ran to
+   * completion is a no-op on a second call: the original identifier is gone, so
+   * re-deriving the digest is impossible and the pseudonym already in place is
+   * reported instead of a hash of a hash.
+   *
+   * But an erasure that got as far as deleting the money rows and then died is
+   * NOT finished, and it used to look finished — `erasedAt` was already stamped,
+   * so the second call short-circuited and returned a clean outcome with no
+   * affected days, while those days sat permanently short by the erased amount
+   * and nothing anywhere said so. So the second call resumes at the money rows
+   * instead, and reports what it actually did.
    */
   async erase({
     organizationId,
@@ -141,45 +205,34 @@ export class IdentityErasureService {
 
     // Hashing an already-pseudonymized value would put a digest-of-a-digest on
     // the suppression list, which matches nothing a provider will ever send and
-    // would leave the list quietly growing with entries that cannot fire.
+    // would leave the list quietly growing with entries that cannot fire. So
+    // the identity half never runs twice — but the money half might still be
+    // owed, and this is the only place that ever finds out.
     if (person.erasedAt) {
-      return {
+      return await this.finishEarlierErasure({
+        organizationId,
         discoveredPersonId,
         pseudonym: person.rawActorId,
-        suppressionRowsRecorded: 0,
-        identityMatchesBlanked: 0,
-        affectedDays: [],
-        daysNotRebuilt: [],
-      };
+        moneyRowsPendingAt: person.moneyRowsPendingAt,
+        rebuildSince: person.moneyRebuildSince,
+      });
     }
 
-    const secret = readErasureSecret();
     const original = person.rawActorId;
-    // One digest, two jobs: the membership test the write paths run, and the
-    // value written in place of the original. Hence no mapping table anywhere.
-    const pseudonym = erasureDigest({ secret, identifier: original });
-    // The display text is erased too, and separately: a provider that put
-    // "Maria Silva" in one field and an opaque id in the other has published
-    // two identifiers, and suppressing only the one we happen to key on lets
-    // the other back in on the next pull.
-    const displayDigest =
-      person.displayText === original
-        ? pseudonym
-        : erasureDigest({ secret, identifier: person.displayText });
+    const { pseudonym, identifierHashes } = digestsFor(person);
 
-    // Step 1 — the do-not-reimport list, before anything else. A crash after
-    // this point leaves the identifier suppressed but not yet removed, which is
-    // recoverable by re-running. A crash before it, with the rows already
-    // deleted, would let the next pull put them straight back.
+    // Step 1 — the do-not-reimport list, before anything else. A crash before
+    // it, with the rows already deleted, would let the next pull put them
+    // straight back. A crash after it leaves the identifier suppressed but not
+    // yet removed, which a re-run picks up: the identity half is idempotent by
+    // `skipDuplicates` and a blank-if-set update, and the money half is
+    // resumable because of the markers written around the delete below.
     const suppressionRowsRecorded = await this.deps.suppression.recordAll(
       this.deps.prisma,
       {
         organizationId,
         provider: person.provider,
-        identifierHashes:
-          displayDigest === pseudonym
-            ? [pseudonym]
-            : [pseudonym, displayDigest],
+        identifierHashes,
         erasedAt: now,
       },
     );
@@ -202,7 +255,22 @@ export class IdentityErasureService {
         discoveredPersonId,
       });
 
-    // Step 3 — the person row survives under the pseudonym.
+    const { affectedDays, daysNotRebuilt, rebuiltFrom } =
+      await this.eraseFromMoneyRows({
+        organizationId,
+        discoveredPersonId,
+        rawActorId: original,
+        // A previous attempt that got as far as recording a plan keeps it: by
+        // now the rows it was about to delete may already be gone, so asking
+        // ClickHouse again would answer "no days affected" and quietly drop the
+        // rebuild those deleted rows are still owed.
+        recordedRebuildSince: person.moneyRebuildSince,
+        at: now,
+      });
+
+    // Step 3 — the person row survives under the pseudonym. AFTER the delete,
+    // because the delete addresses rows by the original identifier and this is
+    // the write that destroys the last copy of it.
     await this.deps.discoveredPeople.pseudonymize(this.deps.prisma, {
       id: discoveredPersonId,
       organizationId,
@@ -210,10 +278,12 @@ export class IdentityErasureService {
       erasedAt: now,
     });
 
-    const { affectedDays, daysNotRebuilt } = await this.eraseFromMoneyRows({
+    await this.finishMoneyRows({
       organizationId,
       discoveredPersonId,
-      rawActorId: original,
+      tenantIds: await this.tenantIdsFor(organizationId),
+      rebuildSince: rebuiltFrom,
+      daysNotRebuilt,
     });
 
     return {
@@ -223,45 +293,134 @@ export class IdentityErasureService {
       identityMatchesBlanked,
       affectedDays,
       daysNotRebuilt,
+      rebuiltFrom,
+      resumed: false,
     };
   }
 
   /**
-   * Step 4: the daily totals, across every tenant this organization has ever
-   * written under.
+   * What a second call does to somebody already erased: either nothing, or the
+   * part the first call did not survive to do.
+   *
+   * The distinction is the whole of this review finding. Before it, both
+   * answers were the empty one.
+   */
+  private async finishEarlierErasure({
+    organizationId,
+    discoveredPersonId,
+    pseudonym,
+    moneyRowsPendingAt,
+    rebuildSince,
+  }: {
+    organizationId: string;
+    discoveredPersonId: string;
+    pseudonym: string;
+    moneyRowsPendingAt: Date | null;
+    rebuildSince: string | null;
+  }): Promise<ErasureOutcome> {
+    if (moneyRowsPendingAt) {
+      return await this.resumeMoneyRows({
+        organizationId,
+        discoveredPersonId,
+        pseudonym,
+        rebuildSince,
+      });
+    }
+    return {
+      discoveredPersonId,
+      pseudonym,
+      suppressionRowsRecorded: 0,
+      identityMatchesBlanked: 0,
+      affectedDays: [],
+      daysNotRebuilt: [],
+      rebuiltFrom: null,
+      resumed: false,
+    };
+  }
+
+  /**
+   * Picks up an erasure whose identity half finished and whose money half did
+   * not.
+   *
+   * The rows are already deleted — that happens before the identifier is
+   * destroyed — so what is outstanding is the rebuild, and the day to start it
+   * from was written down before the delete for exactly this moment.
+   *
+   * Reports `resumed`, and never a clean empty outcome: a second call that
+   * silently returned "nothing to do" while a day sat short by the erased
+   * amount is the failure this whole marker exists to end.
+   */
+  private async resumeMoneyRows({
+    organizationId,
+    discoveredPersonId,
+    pseudonym,
+    rebuildSince,
+  }: {
+    organizationId: string;
+    discoveredPersonId: string;
+    pseudonym: string;
+    rebuildSince: string | null;
+  }): Promise<ErasureOutcome> {
+    logger.warn(
+      { organizationId, discoveredPersonId, rebuildSince },
+      "Resuming an erasure whose daily cost rows were removed but never rebuilt",
+    );
+
+    await this.finishMoneyRows({
+      organizationId,
+      discoveredPersonId,
+      tenantIds: await this.tenantIdsFor(organizationId),
+      rebuildSince,
+      daysNotRebuilt: [],
+    });
+
+    return {
+      discoveredPersonId,
+      pseudonym,
+      suppressionRowsRecorded: 0,
+      identityMatchesBlanked: 0,
+      // Which days those were is not recoverable: the rows naming them are
+      // gone and the identifier that addressed them is destroyed. The day the
+      // rebuild starts from is what was kept, and it is what the rebuild needs.
+      affectedDays: [],
+      daysNotRebuilt: [],
+      rebuiltFrom: rebuildSince,
+      resumed: true,
+    };
+  }
+
+  /**
+   * Step 4's destructive half: work out what a rebuild will need, write that
+   * down, and only then remove the rows.
    *
    * The tenant list comes from the persisted history and never from the live
    * resolver, which filters archived projects — one archive and this method
    * would erase nothing and report success.
    *
-   * Delete first, then replay. The identifier is part of what addresses a row,
-   * so there is no edit that removes it; the rows go, and the replay puts them
-   * back with the fold substituting the pseudonym on its way past.
+   * Delete rather than edit. The identifier is part of what addresses a row, so
+   * there is no edit that removes it; the rows go, and a rebuild puts them back
+   * with the fold substituting the pseudonym on its way past.
    */
   private async eraseFromMoneyRows({
     organizationId,
     discoveredPersonId,
     rawActorId,
+    recordedRebuildSince,
+    at,
   }: {
     organizationId: string;
     discoveredPersonId: string;
     rawActorId: string;
+    recordedRebuildSince: string | null;
+    at: Date;
   }): Promise<{
     affectedDays: { tenantId: string; day: string }[];
     daysNotRebuilt: { tenantId: string; day: string }[];
+    rebuiltFrom: string | null;
   }> {
-    const tenantIds = (
-      await this.deps.tenantHistory.findAllByOrganization(this.deps.prisma, {
-        organizationId,
-      })
-    ).map((row) => row.tenantId);
+    const tenantIds = await this.tenantIdsFor(organizationId);
 
     const affectedDays = await this.deps.rollupErasure.findDaysCarryingActor({
-      tenantIds,
-      rawActorId,
-    });
-
-    await this.deps.rollupErasure.deleteRowsCarryingActor({
       tenantIds,
       rawActorId,
     });
@@ -274,10 +433,52 @@ export class IdentityErasureService {
             lost.tenantId === candidate.tenantId && lost.day === candidate.day,
         ),
     );
+    const rebuiltFrom =
+      recordedRebuildSince ??
+      replayable.map((entry) => entry.day).sort()[0] ??
+      null;
 
-    if (replayable.length > 0) {
-      const since = replayable.map((entry) => entry.day).sort()[0] as string;
-      await this.deps.replay.replaySince({ tenantIds, since });
+    // Before the delete, always. Once the rows are gone nothing can be asked
+    // which days they were on, so a crash between here and the rebuild would
+    // otherwise leave those days permanently short with nothing recording that
+    // a rebuild was owed.
+    await this.deps.discoveredPeople.markMoneyRowsPending(this.deps.prisma, {
+      id: discoveredPersonId,
+      organizationId,
+      at,
+      rebuildSince: rebuiltFrom,
+    });
+
+    await this.deps.rollupErasure.deleteRowsCarryingActor({
+      tenantIds,
+      rawActorId,
+    });
+
+    return { affectedDays, daysNotRebuilt, rebuiltFrom };
+  }
+
+  /**
+   * Step 4's constructive half: ask for the rebuild, then declare the money
+   * rows settled.
+   *
+   * The marker is cleared LAST, after the rebuild has been accepted. A throw
+   * anywhere above leaves it standing, and the next call resumes here.
+   */
+  private async finishMoneyRows({
+    organizationId,
+    discoveredPersonId,
+    tenantIds,
+    rebuildSince,
+    daysNotRebuilt,
+  }: {
+    organizationId: string;
+    discoveredPersonId: string;
+    tenantIds: string[];
+    rebuildSince: string | null;
+    daysNotRebuilt: { tenantId: string; day: string }[];
+  }): Promise<void> {
+    if (rebuildSince) {
+      await this.deps.replay.replaySince({ tenantIds, since: rebuildSince });
     }
 
     if (daysNotRebuilt.length > 0) {
@@ -287,7 +488,19 @@ export class IdentityErasureService {
       );
     }
 
-    return { affectedDays, daysNotRebuilt };
+    await this.deps.discoveredPeople.settleMoneyRows(this.deps.prisma, {
+      id: discoveredPersonId,
+      organizationId,
+    });
+  }
+
+  /** Every area this organization has ever written governance rows under. */
+  private async tenantIdsFor(organizationId: string): Promise<string[]> {
+    const rows = await this.deps.tenantHistory.findAllByOrganization(
+      this.deps.prisma,
+      { organizationId },
+    );
+    return rows.map((row) => row.tenantId);
   }
 
   /**
