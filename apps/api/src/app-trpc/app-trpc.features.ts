@@ -48,6 +48,7 @@ import type {
   OnboardingTrpcContext,
   OnboardingTrpcPorts,
 } from "@langwatch/organization-server";
+import type { PresenceTrpcContext } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   IntegrationsChecksTrpcContext,
@@ -103,6 +104,7 @@ import {
   type ExportTrpcContext,
 } from "../features/export/export-trpc.mount";
 import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
+import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
 import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
@@ -325,6 +327,7 @@ export function createAppTrpcFeatures<
     JoinRequestTrpcContext &
     LangWatchQLTrpcContext &
     OnboardingTrpcContext &
+    PresenceTrpcContext &
     PublicEnvTrpcContext &
     SavedWorkbenchChartTrpcContext &
     UserTrpcContext &
@@ -425,6 +428,12 @@ export function createAppTrpcFeatures<
     // The sign-up ceremony, beside the `organization.createAndAssign` it is
     // built on: same package, same questionnaire schema, same opt-out reason.
     onboarding: createOnboardingTrpcRouter({ ...mount, ports: ports.onboarding }),
+    // Who else is looking at this project, and where their cursor is. It takes
+    // no ports — every answer is read off the request context's own
+    // application slice — and it is in this list because two of its four
+    // procedures are subscriptions: a namespace mounted beside the record
+    // would be callable over `/api/trpc` and un-watchable over `/api/sse`.
+    presence: createPresenceTrpcRouter(mount),
     // A procedure rather than a router: the client calls `publicEnv({})` at
     // the root, and giving it a namespace would rename it.
     publicEnv: createPublicEnvTrpcProcedure({ ...mount, ports: ports.auth }),

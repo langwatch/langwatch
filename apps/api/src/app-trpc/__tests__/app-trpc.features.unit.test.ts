@@ -47,6 +47,7 @@ import type {
   JoinRequestTrpcContext,
   OnboardingTrpcContext,
 } from "@langwatch/organization-server";
+import type { PresenceTrpcContext } from "@langwatch/presence-server";
 import type { IntegrationsChecksTrpcContext } from "@langwatch/project-server";
 import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
 import type {
@@ -81,6 +82,7 @@ type TestContext = AnalyticsTrpcContext &
   JoinRequestTrpcContext &
   LangWatchQLTrpcContext &
   OnboardingTrpcContext &
+  PresenceTrpcContext &
   PublicEnvTrpcContext &
   SavedWorkbenchChartTrpcContext &
   UserTrpcContext &
@@ -306,6 +308,7 @@ describe("the app tRPC feature list", () => {
         "joinRequests",
         "onboarding",
         "optimization",
+        "presence",
         "publicEnv",
         "user",
         "workflow",
@@ -373,6 +376,17 @@ describe("the app tRPC feature list", () => {
       // verticals through a port, so the one thing this pins is that the
       // procedure the onboarding surfaces call is the packaged one.
       expect(procedureNamesOf(features.integrationsChecks)).toEqual(["getCheckStatus"]);
+      // Who else is in the project. `onPresenceUpdate` and `onPresenceCursor`
+      // are the two of this namespace's procedures that STREAM, which is the
+      // reason presence is in the record at all: mounted beside it they would
+      // answer over `/api/trpc` and be invisible to the subscription lane.
+      expect(procedureNamesOf(features.presence)).toEqual([
+        "cursor",
+        "leave",
+        "onPresenceCursor",
+        "onPresenceUpdate",
+        "update",
+      ]);
       // The account surface only. `personalUsage`, `budgetOverview` and
       // `cliBootstrap` answer on the same `user.*` name in the app, but they
       // read governance data and are mounted from the Enterprise composition,

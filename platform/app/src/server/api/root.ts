@@ -251,7 +251,6 @@ import { langyEgressRouter } from "~/runtime/app/internal-api/langy.router";
 import { llmModelCostsRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { modelProviderRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { monitorsRouter } from "~/runtime/app/internal-api/monitor.router";
-import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
@@ -2153,7 +2152,6 @@ const coreRouters = {
   monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
-  presence: presenceRouter,
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,

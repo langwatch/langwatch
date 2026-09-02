@@ -259,6 +259,42 @@ When `apps/api` becomes the origin, that slice needs:
 
 Nothing above is in scope here and none of it was touched.
 
+## Which of the nine the record serves
+
+The subscription lane resolves a path on a caller built from the process's own
+root, so a procedure is watchable exactly when its namespace is in
+`apps/api/src/app-trpc/app-trpc.features.ts`. Four of the nine are:
+
+| in the record | why it was cheap |
+| ------------- | ---------------- |
+| `export.onExportProgress`, `export.onScenarioRunExportProgress` | the mount owns its procedures and takes no ports |
+| `presence.onPresenceUpdate`, `presence.onPresenceCursor` | `PresenceTrpcApi` takes no ports; every answer is read off `ctx.app` |
+
+The other five are `traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate`,
+`scenarios.onSimulationUpdate`, `langy.onConversationUpdate` and
+`langy.onTurnStream`, and they are all blocked by the same thing: their
+transports take PORTS, the record's ports object is supplied by
+`platform/app/src/server/api/root.ts`, and `platform/app` is deletes-only —
+a new port group there is an insertion. What each wants:
+
+- `scenarios` — `trackServerEvent`, `fireScenarioCreatedNurturing`,
+  `captureException`.
+- `traces` — the two filter schemas built on the app's analytics vocabulary,
+  the evaluator/precondition engine, `formatSpansDigest`, and
+  `getUserProtectionsForProject` (data-privacy policy service + plan
+  visibility window + `resolveOrganizationId`).
+- `tracesV2` — `createTracesV2TrpcPorts()`: the AI composer, the ClickHouse
+  query translator, the reserved-metadata write and the ancestor-prompt walk.
+- `langy` / `langyEgress` — a Redis rate limiter, the product-analytics sink,
+  the audit sink, the two platform-private gates (`refuseDemoProject`,
+  `enforceLangyAccess`) and `LangyUiActionService`. The service has a second
+  platform consumer (`server/routes/langy-ui-actions.ts`), so it cannot be
+  moved into `@langwatch/langy-server` either without that file's import line
+  gaining a name.
+
+So the record entry is the LAST line of each of those verticals' port
+migration, not a mount move that can be done ahead of it.
+
 ## Not done, and why
 
 - `platform/app` is unchanged — zero lines. The twin stays where it is; when
