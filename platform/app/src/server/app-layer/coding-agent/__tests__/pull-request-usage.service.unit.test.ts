@@ -96,7 +96,11 @@ function personalSessionRow(
   };
 }
 
-/** One (session, model) total, as the per-call fact table returns it. */
+/**
+ * One (session, model, context) total, as the per-call fact table returns it.
+ * Unstamped by default — the shape every row predating the stamp has, which
+ * the legacy whole-session rule prices.
+ */
 function modelTotalsRow(
   over: Partial<SessionModelTotalsRow> = {},
 ): SessionModelTotalsRow {
@@ -104,6 +108,10 @@ function modelTotalsRow(
     tenantId: "project-1",
     sessionId: "session-a",
     model: "claude-fable-5",
+    repositoryHost: "",
+    repositoryOwner: "",
+    repositoryName: "",
+    branch: "",
     inputTokens: 100,
     outputTokens: 50,
     cacheReadTokens: 20,
@@ -111,6 +119,19 @@ function modelTotalsRow(
     costUsd: 1.5,
     ...over,
   };
+}
+
+/** The same row stamped on the mapping's own repository. */
+function stampedTotalsRow(
+  over: Partial<SessionModelTotalsRow> = {},
+): SessionModelTotalsRow {
+  return modelTotalsRow({
+    repositoryHost: "github.com",
+    repositoryOwner: "acme",
+    repositoryName: "widgets",
+    branch: "feat/linkage",
+    ...over,
+  });
 }
 
 /** Nothing is bundled unless a case says so. */
@@ -148,32 +169,51 @@ function serviceWith({
   pullRequests,
   sessions,
   modelTotals = [],
+  stampedSessions = [],
+  sessionsById = [],
   isSourceNonBillable = allBilled,
 }: {
   pullRequests: GithubPullRequestRow[];
   sessions: CodingAgentBranchSessionRow[];
   modelTotals?: SessionModelTotalsRow[];
+  /** What the stamped-branch discovery read answers. */
+  stampedSessions?: Array<{ tenantId: string; sessionId: string }>;
+  /** What the by-id session read answers for the stamp-only discoveries. */
+  sessionsById?: CodingAgentBranchSessionRow[];
   isSourceNonBillable?: (params: {
     organizationId: string;
     sourceType: string;
   }) => Promise<boolean>;
 }) {
   const listByRepositoryBranch = vi.fn().mockResolvedValue(sessions);
+  const listBySessionIds = vi.fn().mockResolvedValue(sessionsById);
   const sumTokensByModelPerSession = vi.fn().mockResolvedValue(modelTotals);
+  const listSessionsByStampedBranch = vi
+    .fn()
+    .mockResolvedValue(stampedSessions);
   const service = new PullRequestUsageService({
     pullRequests: {
-      findByNumber: vi.fn().mockResolvedValue(pullRequests[0] ?? null),
+      findByNumber: vi.fn(
+        async ({ prNumber }: { prNumber: number }) =>
+          pullRequests.find((row) => row.prNumber === prNumber) ?? null,
+      ),
       findAllByBranches: vi.fn().mockResolvedValue(pullRequests),
     } as never,
-    sessions: { listByRepositoryBranch } as never,
+    sessions: { listByRepositoryBranch, listBySessionIds } as never,
     personalSessions: { listRecent: vi.fn().mockResolvedValue([]) },
-    sessionEvents: { sumTokensByModelPerSession },
+    sessionEvents: { sumTokensByModelPerSession, listSessionsByStampedBranch },
     installations: { coversRepository: vi.fn().mockResolvedValue(true) },
     resolveOrganizationId: async () => "org-1",
     isSourceNonBillable,
     now: () => NOW,
   });
-  return { service, listByRepositoryBranch, sumTokensByModelPerSession };
+  return {
+    service,
+    listByRepositoryBranch,
+    listBySessionIds,
+    sumTokensByModelPerSession,
+    listSessionsByStampedBranch,
+  };
 }
 
 /** A personal workspace: named by the person who owns it, never linked. */
@@ -242,12 +282,16 @@ function personalServiceWith({
     .mockResolvedValue(organizationSessions);
   const service = new PullRequestUsageService({
     pullRequests: { findByNumber: vi.fn(), findAllByBranches } as never,
-    sessions: { listByRepositoryBranch } as never,
+    sessions: {
+      listByRepositoryBranch,
+      listBySessionIds: vi.fn().mockResolvedValue([]),
+    } as never,
     personalSessions: {
       listRecent: vi.fn().mockResolvedValue(personalSessions),
     },
     sessionEvents: {
       sumTokensByModelPerSession: vi.fn().mockResolvedValue(modelTotals),
+      listSessionsByStampedBranch: vi.fn().mockResolvedValue([]),
     },
     installations: { coversRepository: vi.fn().mockResolvedValue(true) },
     resolveOrganizationId: async () => "org-1",
@@ -560,10 +604,14 @@ describe("PullRequestUsageService", () => {
             findByNumber: vi.fn(),
             findAllByBranches: vi.fn().mockResolvedValue([]),
           } as never,
-          sessions: { listByRepositoryBranch: vi.fn() } as never,
+          sessions: {
+            listByRepositoryBranch: vi.fn(),
+            listBySessionIds: vi.fn().mockResolvedValue([]),
+          } as never,
           personalSessions: { listRecent },
           sessionEvents: {
             sumTokensByModelPerSession: vi.fn().mockResolvedValue([]),
+            listSessionsByStampedBranch: vi.fn().mockResolvedValue([]),
           },
           installations: { coversRepository: vi.fn().mockResolvedValue(true) },
           resolveOrganizationId: async () => "org-1",
@@ -591,10 +639,14 @@ describe("PullRequestUsageService", () => {
             findByNumber: vi.fn().mockResolvedValue(pullRequestRow()),
             findAllByBranches: vi.fn().mockResolvedValue([pullRequestRow()]),
           } as never,
-          sessions: { listByRepositoryBranch } as never,
+          sessions: {
+            listByRepositoryBranch,
+            listBySessionIds: vi.fn().mockResolvedValue([]),
+          } as never,
           personalSessions: { listRecent: vi.fn().mockResolvedValue([]) },
           sessionEvents: {
             sumTokensByModelPerSession: vi.fn().mockResolvedValue([]),
+            listSessionsByStampedBranch: vi.fn().mockResolvedValue([]),
           },
           installations: { coversRepository: vi.fn().mockResolvedValue(true) },
           resolveOrganizationId: async () => "org-1",
@@ -701,9 +753,17 @@ describe("PullRequestUsageService", () => {
 
   describe("given a personal session that drove two branches", () => {
     /** @scenario "The personal page discovers pull requests from every branch a session drove" */
-    it("looks up the pull requests of both, not only the one it ended on", async () => {
+    it("lists a row for each branch's pull request, not only the last one", async () => {
       const { service, findAllByBranches } = personalServiceWith({
-        pullRequests: [pullRequestRow()],
+        pullRequests: [
+          pullRequestRow(),
+          pullRequestRow({
+            prNumber: 8,
+            headBranch: "feat/next",
+            htmlUrl: "https://github.com/acme/widgets/pull/8",
+            prCreatedAt: new Date(NOW - 8 * HOUR),
+          }),
+        ],
         personalSessions: [
           personalSessionRow({
             sessionId: "mine",
@@ -727,9 +787,16 @@ describe("PullRequestUsageService", () => {
           headBranches: ["feat/linkage", "feat/next"],
         }),
       );
-      // Discovered through the branch it left, and priced there too.
-      expect(usage.rows[0]?.prNumber).toBe(7);
-      expect(usage.rows[0]?.sessionsCount).toBe(1);
+      expect(usage.rows.map((row) => row.prNumber).sort()).toEqual([7, 8]);
+      // With no stamped facts, the whole session prices under the pull
+      // request it opened first; the other row is discovered but reports the
+      // work that was stamped on it, which is none.
+      expect(
+        usage.rows.find((row) => row.prNumber === 7)?.totalTokens,
+      ).toBe(180);
+      expect(
+        usage.rows.find((row) => row.prNumber === 8)?.totalTokens,
+      ).toBe(0);
     });
   });
 
@@ -1174,6 +1241,238 @@ describe("PullRequestUsageService", () => {
         "title",
         "totalTokens",
       ]);
+    });
+  });
+
+  describe("given a session whose fact rows stamp work on two pull requests", () => {
+    // One session, two branches, each with its own live pull request. The
+    // stamps put a fifth of the event tokens on the first branch and the rest
+    // on the second, so the cumulative totals split 20/80.
+    const splitFixture = () => ({
+      pullRequests: [
+        pullRequestRow(),
+        pullRequestRow({
+          prNumber: 8,
+          headBranch: "feat/next",
+          htmlUrl: "https://github.com/acme/widgets/pull/8",
+          prCreatedAt: new Date(NOW - 8 * HOUR),
+        }),
+      ],
+      sessions: [
+        sessionRow({ gitBranches: ["feat/linkage", "feat/next"] }),
+      ],
+      modelTotals: [
+        stampedTotalsRow({
+          inputTokens: 20,
+          outputTokens: 10,
+          cacheReadTokens: 4,
+          cacheCreationTokens: 2,
+          costUsd: 0.2,
+        }),
+        stampedTotalsRow({
+          branch: "feat/next",
+          inputTokens: 80,
+          outputTokens: 40,
+          cacheReadTokens: 16,
+          cacheCreationTokens: 8,
+          costUsd: 0.8,
+        }),
+      ],
+    });
+
+    /** @scenario "A session that drove two pull requests splits its cost between them" */
+    it("prices each pull request by the share of tokens stamped on it", async () => {
+      const first = await serviceWith(splitFixture()).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(
+        splitFixture(),
+      ).service.getPullRequestUsage({ ...QUERY, prNumber: 8 });
+
+      expect(first.totals.inputTokens).toBe(20);
+      expect(first.totals.outputTokens).toBe(10);
+      expect(first.totals.cacheReadTokens).toBe(4);
+      expect(first.totals.cacheCreationTokens).toBe(2);
+      expect(first.totals.costUsd).toBeCloseTo(0.3, 10);
+
+      expect(second.totals.inputTokens).toBe(80);
+      expect(second.totals.outputTokens).toBe(40);
+      expect(second.totals.cacheReadTokens).toBe(16);
+      expect(second.totals.cacheCreationTokens).toBe(8);
+      expect(second.totals.costUsd).toBeCloseTo(1.2, 10);
+
+      // The two shares partition the session's own cumulative totals.
+      expect(first.totals.totalTokens + second.totals.totalTokens).toBe(180);
+    });
+
+    /** @scenario "The model breakdown reports only the pull request's own calls" */
+    it("keeps each pull request's model breakdown to its own stamped calls", async () => {
+      const fixture = splitFixture();
+      fixture.modelTotals[1] = {
+        ...fixture.modelTotals[1]!,
+        model: "claude-opus-5",
+      };
+
+      const first = await serviceWith(fixture).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      expect(first.modelBreakdown.map((m) => m.model)).toEqual([
+        "claude-fable-5",
+      ]);
+      expect(second.modelBreakdown.map((m) => m.model)).toEqual([
+        "claude-opus-5",
+      ]);
+    });
+  });
+
+  describe("given a session whose fact rows carry no stamped context", () => {
+    const legacyFixture = () => ({
+      pullRequests: [
+        pullRequestRow(),
+        pullRequestRow({
+          prNumber: 8,
+          headBranch: "feat/next",
+          htmlUrl: "https://github.com/acme/widgets/pull/8",
+          prCreatedAt: new Date(NOW - 8 * HOUR),
+        }),
+      ],
+      sessions: [
+        sessionRow({ gitBranches: ["feat/linkage", "feat/next"] }),
+      ],
+    });
+
+    /** @scenario "Tokens stamped with no context follow the legacy whole-session rule" */
+    it("lands the whole total on the first-opened pull request alone", async () => {
+      const fixture = { ...legacyFixture(), modelTotals: [modelTotalsRow()] };
+
+      const first = await serviceWith(fixture).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      expect(first.totals.totalTokens).toBe(180);
+      expect(second.totals.totalTokens).toBe(0);
+      expect(second.rows).toHaveLength(0);
+    });
+
+    /** @scenario "A session with no fact rows at all keeps the legacy rule whole" */
+    it("prices a session that logged no per-call facts under the legacy rule", async () => {
+      const fixture = { ...legacyFixture(), modelTotals: [] };
+
+      const first = await serviceWith(fixture).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      expect(first.totals.totalTokens).toBe(180);
+      expect(second.totals.totalTokens).toBe(0);
+    });
+  });
+
+  describe("given a session whose stamps span two repositories", () => {
+    /** @scenario "Tokens stamped on another repository stay out of this one" */
+    it("counts only this repository's stamped share toward its pull request", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+        modelTotals: [
+          stampedTotalsRow({
+            inputTokens: 50,
+            outputTokens: 25,
+            cacheReadTokens: 10,
+            cacheCreationTokens: 5,
+          }),
+          stampedTotalsRow({
+            repositoryOwner: "other",
+            repositoryName: "gadgets",
+            branch: "feat/elsewhere",
+            inputTokens: 50,
+            outputTokens: 25,
+            cacheReadTokens: 10,
+            cacheCreationTokens: 5,
+          }),
+        ],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.inputTokens).toBe(50);
+      expect(usage.totals.outputTokens).toBe(25);
+      expect(usage.totals.totalTokens).toBe(90);
+      expect(usage.totals.costUsd).toBeCloseTo(0.75, 10);
+    });
+  });
+
+  describe("given a session whose row moved on to another repository", () => {
+    /** @scenario "A session found only by its stamps still counts toward the pull request" */
+    it("finds the session through its stamps and counts its stamped share", async () => {
+      const movedOn = sessionRow({
+        sessionId: "moved-on",
+        gitBranch: "feat/elsewhere",
+        gitBranches: ["feat/linkage", "feat/elsewhere"],
+      });
+      const { service, listBySessionIds } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [],
+        stampedSessions: [{ tenantId: "project-1", sessionId: "moved-on" }],
+        sessionsById: [movedOn],
+        modelTotals: [stampedTotalsRow({ sessionId: "moved-on" })],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(listBySessionIds).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionIds: ["moved-on"] }),
+      );
+      expect(usage.totals.totalTokens).toBe(180);
+    });
+
+    /** @scenario "The unstamped bucket is priced only where the session's row lives" */
+    it("leaves a stamp-discovered session's unstamped tokens out of this repository", async () => {
+      const movedOn = sessionRow({
+        sessionId: "moved-on",
+        gitBranch: "feat/elsewhere",
+        gitBranches: ["feat/linkage", "feat/elsewhere"],
+      });
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [],
+        stampedSessions: [{ tenantId: "project-1", sessionId: "moved-on" }],
+        sessionsById: [movedOn],
+        modelTotals: [
+          // Half the event tokens stamped here, half unstamped: only the
+          // stamped half may be priced under this repository's pull request.
+          stampedTotalsRow({
+            sessionId: "moved-on",
+            inputTokens: 50,
+            outputTokens: 25,
+            cacheReadTokens: 10,
+            cacheCreationTokens: 5,
+          }),
+          modelTotalsRow({
+            sessionId: "moved-on",
+            inputTokens: 50,
+            outputTokens: 25,
+            cacheReadTokens: 10,
+            cacheCreationTokens: 5,
+          }),
+        ],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.totalTokens).toBe(90);
     });
   });
 });
