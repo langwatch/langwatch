@@ -70,7 +70,7 @@ Feature: Azure billing identity — the bill is read with its own credential
     # is a second thing postable to a typed-in host. The bearer tokens it
     # buys travel further — the secret itself does not.
 
-  @unimplemented
+  @unit
   Scenario: A tenant that declared prepaid packs is told the bill cannot show them
     Given the customer declared the tenant pays with prepaid message packs
     And the bill was read and contained nothing for conversations
@@ -80,7 +80,7 @@ Feature: Azure billing identity — the bill is read with its own credential
     # returns nothing — byte-for-byte what a quiet pay-as-you-go month
     # returns. Only the customer's own declaration licenses this sentence.
 
-  @unimplemented
+  @unit
   Scenario: A tenant that declared nothing is never told it is prepaid
     Given the customer declared nothing about prepaid packs
     And the bill was read and contained nothing for conversations
@@ -90,7 +90,7 @@ Feature: Azure billing identity — the bill is read with its own credential
     # The vacuity guard on the declaration axis: without it, printing the
     # prepaid sentence unconditionally would pass the scenario above.
 
-  @unimplemented
+  @unit
   Scenario: A declared-prepaid tenant whose bill has amounts sees the amounts
     Given the customer declared the tenant pays with prepaid message packs
     But the bill was read and contained amounts for conversations
