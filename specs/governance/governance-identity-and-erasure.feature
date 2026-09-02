@@ -209,6 +209,16 @@ Feature: Erasing a person from the governance data, and making it stick
     # current one.
 
   @unit
+  Scenario: An erasure interrupted after the totals were removed finishes on the next attempt
+    Given an erasure that removed the daily totals and then failed
+    When the erasure is asked for again
+    Then it rebuilds the days the first attempt could not
+    And it says it was picking up unfinished work
+    # Until this, the second attempt saw the person already erased, did nothing,
+    # and reported success — while those days stayed short by the erased amount
+    # with nothing anywhere recording that a rebuild was owed.
+
+  @unit
   Scenario: Days too old to rebuild are reported rather than passed over
     Given an erased person with spend older than the history we keep
     When they are erased
