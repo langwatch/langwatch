@@ -537,15 +537,6 @@ function nullableFloat(raw: number | string | null | undefined): number | null {
 }
 
 /**
- * The span's cost from its own tokens and rates.
- *
- * Most ingest paths emit token counts but no `gen_ai.usage.cost`: trace-level
- * cost is computed at fold time from tokens times pricing. This mirrors that
- * for one span, feeding the same priority cascade (custom enrichment rates,
- * then the static model registry, then the SDK span cost) with the attributes
- * the summary query already selects.
- */
-/**
  * An empty ClickHouse column means the span never reported the quantity, and
  * the cost cascade must not read it as a zero it can price.
  */
@@ -553,6 +544,15 @@ function set(value: string | null | undefined): string | undefined {
   return value || undefined;
 }
 
+/**
+ * The span's cost from its own tokens and rates.
+ *
+ * Most ingest paths emit token counts but no `gen_ai.usage.cost`: trace-level
+ * cost is computed at fold time from tokens times pricing. This mirrors that
+ * for one span, feeding computeSpanCost's priority cascade (custom enrichment
+ * rates, then the SDK's own span cost, then the static model registry) with
+ * the attributes the summary query already selects.
+ */
 function computeSummaryRowCost({
   row,
   inputTokens,
