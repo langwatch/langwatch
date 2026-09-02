@@ -58,6 +58,34 @@ export class IdentityAlreadyLinkedError extends HandledError {
 }
 
 /**
+ * The person has been erased, so nothing may link an account to them again.
+ *
+ * The erasure deletes their pending suggestions, so ordinarily there is nothing
+ * left to confirm. This covers the window that deletion cannot: a queue read
+ * before the erasure ran and clicked after it, and the moments inside the
+ * erasure itself where the person row is not yet marked. `fault` is customer
+ * because clicking a stale queue entry is an ordinary thing for a person to do
+ * — but unlike the other two, this refusal is the last thing standing between a
+ * click and an erased person carrying an account again.
+ */
+export class IdentityErasedError extends HandledError {
+  declare readonly code: "identity_erased";
+
+  constructor(discoveredPersonId: string) {
+    super(
+      "identity_erased",
+      "This person has been erased and cannot be linked to an account",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: { discoveredPersonId },
+      },
+    );
+    this.name = "IdentityErasedError";
+  }
+}
+
+/**
  * Postgres' exclusion-violation code.
  *
  * The repo maps Prisma's `P2002` and, before this, no exclusion violation

@@ -170,3 +170,21 @@ Feature: Deciding which provider-named person is which LangWatch account
     Given a suggestion that has already been confirmed
     When somebody confirms it again
     Then the confirmation is refused
+
+  # An erased person is never linked to an account again, and a review queue is
+  # read by people, so the two halves below are one rule. Erasure takes the
+  # invitation away; the refusal covers the queue already on somebody's screen.
+
+  @integration
+  Scenario: Erasing a person clears the match suggestions naming them
+    Given a person with a pending match suggestion
+    When the person is erased
+    Then no suggestion names that person any more
+
+  @unit @integration
+  Scenario: Confirming a suggestion for an erased person is refused
+    Given a stored suggestion for a person who has since been erased
+    When somebody confirms it
+    Then the confirmation is refused
+    And the refusal says the person has been erased
+    And no link to that account is opened

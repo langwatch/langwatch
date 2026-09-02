@@ -35,6 +35,7 @@ import {
 } from "../repositories/governanceIdentity.repository";
 import {
   IdentityAlreadyLinkedError,
+  IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
   isExclusionViolation,
 } from "./identityMatch.errors";
@@ -295,6 +296,13 @@ export class IdentityMatchService {
    *
    * Confirming clears EVERY candidate for that person, not only the confirmed
    * row — they now hold a link, so the rest are decisions nobody will make.
+   *
+   * Three refusals, and the erased one is not decoration. The automatic pass
+   * cannot reach an erased person — the read filters them out — but this path
+   * is a human clicking a row they were shown, and a row shown before an
+   * erasure can be clicked after it. The erasure deletes pending suggestions
+   * for exactly that reason; this check is what covers the interval where a
+   * queue is already on somebody's screen.
    */
   async confirmSuggestion({
     organizationId,
@@ -309,6 +317,21 @@ export class IdentityMatchService {
     });
     if (!suggestion) {
       throw new IdentityMatchSuggestionNotFoundError(suggestionId);
+    }
+
+    // Read the person rather than trusting the suggestion, because the whole
+    // point is that the suggestion is older than the answer.
+    const person = await this.discoveredPeople.findById(this.prisma, {
+      id: suggestion.discoveredPersonId,
+      organizationId,
+    });
+    if (!person) {
+      // The row is gone. Nothing to link, and nothing more specific to say
+      // than that the thing being confirmed no longer exists.
+      throw new IdentityMatchSuggestionNotFoundError(suggestionId);
+    }
+    if (person.erasedAt) {
+      throw new IdentityErasedError(suggestion.discoveredPersonId);
     }
 
     const openLinks = await this.matches.findOpenByOrganization(this.prisma, {

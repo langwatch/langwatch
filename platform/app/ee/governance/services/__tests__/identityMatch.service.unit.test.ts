@@ -21,6 +21,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 
 import {
   IdentityAlreadyLinkedError,
+  IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
 } from "../identityMatch.errors";
 import { IdentityMatchService } from "../identityMatch.service";
@@ -53,8 +54,15 @@ const build = ({
   directoryIds = [],
   suggestions = [],
   openThrows,
+  erasedPeople = [],
 }: {
   people?: Person[];
+  /**
+   * People `findById` can see but `findMatchable` cannot, because they are
+   * erased. Confirming reads by id on purpose — a suggestion outlives the
+   * answer it was computed from.
+   */
+  erasedPeople?: Person[];
   openLinks?: { discoveredPersonId: string; userId: string | null }[];
   emails?: { userId: string; email: string }[];
   directoryIds?: { userId: string; externalId: string }[];
@@ -76,6 +84,13 @@ const build = ({
 
   const discoveredPeople = {
     findMatchable: vi.fn().mockResolvedValue(people),
+    findById: vi.fn(async (_client: unknown, params: { id: string }) => {
+      const live = people.find((row) => row.id === params.id);
+      if (live) return { ...live, erasedAt: null };
+      const erased = erasedPeople.find((row) => row.id === params.id);
+      if (erased) return { ...erased, erasedAt: at };
+      return null;
+    }),
     suspend: vi.fn(
       async (
         _client: unknown,
@@ -294,6 +309,7 @@ describe("Feature: turning a suggestion into a link", () => {
   describe("given a stored suggestion for a person with no link", () => {
     it("opens the link on the person's say-so, not on the score", async () => {
       const { service, opened, deletedForPerson } = build({
+        people: [person()],
         suggestions: [suggestion],
       });
 
@@ -332,6 +348,7 @@ describe("Feature: turning a suggestion into a link", () => {
       // check and the constraint hold one rule between them, so they say one
       // sentence.
       const { service } = build({
+        people: [person()],
         suggestions: [suggestion],
         openThrows: Object.assign(new Error("conflicting key value"), {
           code: "23P01",
@@ -341,6 +358,50 @@ describe("Feature: turning a suggestion into a link", () => {
       await expect(
         service.confirmSuggestion({ organizationId, suggestionId: "ims_1" }),
       ).rejects.toBeInstanceOf(IdentityAlreadyLinkedError);
+    });
+  });
+
+  describe("given a suggestion for a person who has since been erased", () => {
+    /** @scenario "Confirming a suggestion for an erased person is refused" */
+    it("refuses and opens nothing, whatever the queue still shows", async () => {
+      // The erasure deletes pending suggestions, so this is the interval that
+      // deletion cannot cover: a queue rendered before the erasure, clicked
+      // after it. Without this check the click links an account to a person who
+      // asked to be forgotten.
+      const { service, opened } = build({
+        erasedPeople: [person()],
+        suggestions: [suggestion],
+      });
+
+      await expect(
+        service.confirmSuggestion({ organizationId, suggestionId: "ims_1" }),
+      ).rejects.toBeInstanceOf(IdentityErasedError);
+      expect(opened).toEqual([]);
+    });
+
+    it("refuses before it reads the open links, so nothing can talk it round", async () => {
+      // Ordering matters: an erased person whose links were blanked has no open
+      // link, so the already-linked check would wave them straight through.
+      const { service, matches } = build({
+        erasedPeople: [person()],
+        suggestions: [suggestion],
+      });
+
+      await expect(
+        service.confirmSuggestion({ organizationId, suggestionId: "ims_1" }),
+      ).rejects.toBeInstanceOf(IdentityErasedError);
+      expect(matches.findOpenByOrganization).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a suggestion whose person row is gone entirely", () => {
+    it("refuses rather than opening a link to nothing", async () => {
+      const { service, opened } = build({ suggestions: [suggestion] });
+
+      await expect(
+        service.confirmSuggestion({ organizationId, suggestionId: "ims_1" }),
+      ).rejects.toBeInstanceOf(IdentityMatchSuggestionNotFoundError);
+      expect(opened).toEqual([]);
     });
   });
 });

@@ -48,6 +48,7 @@ import type {
   ErasedIdentifierSuppressionRepository,
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
 } from "../repositories/governanceIdentity.repository";
 import type { GovernanceRollupErasureClickHouseRepository } from "./governanceRollupErasure.clickhouse.repository";
 import { erasureDigest, readErasureSecret } from "./logic/erasureDigest";
@@ -87,6 +88,15 @@ export interface ErasureOutcome {
   suppressionRowsRecorded: number;
   /** Platform-user references blanked across the person's links. */
   identityMatchesBlanked: number;
+  /**
+   * Pending match suggestions deleted (ADR-128 §12).
+   *
+   * Nonzero on a fresh erasure means the person was sitting in somebody's
+   * review queue. Nonzero on an erasure that had already finished means
+   * something re-suggested an erased person, which is a bug worth the count
+   * being visible for.
+   */
+  matchSuggestionsRemoved: number;
   /** Every `(tenant, day)` whose money rows carried the identifier. */
   affectedDays: { tenantId: string; day: string }[];
   /**
@@ -123,6 +133,16 @@ export interface IdentityErasureDeps {
   suppression: ErasedIdentifierSuppressionRepository;
   discoveredPeople: DiscoveredPersonRepository;
   identityMatches: IdentityMatchRepository;
+  /**
+   * The pending match suggestions for this person (ADR-128 §12).
+   *
+   * An erasure that blanked the links but left the suggestions behind left a
+   * way back in: confirming a suggestion computed before the erasure opens a
+   * fresh link on an erased person, which is the one thing "never matched
+   * again" forbids. The nightly recompute would eventually drop the row, so the
+   * window was up to a day wide rather than theoretical.
+   */
+  matchSuggestions: IdentityMatchSuggestionRepository;
   rollupErasure: GovernanceRollupErasureClickHouseRepository;
   replay: RollupReplayPort;
   /**
@@ -248,12 +268,18 @@ export class IdentityErasureService {
     // and this method returns a clean outcome.
     await refreshInstalledSuppressionSnapshot();
 
-    // Step 2 — the links keep their dates; only the platform user goes.
+    // Step 2 — the links keep their dates; only the platform user goes. The
+    // pending questions about this person go entirely: a suggestion is an
+    // invitation to open a link, and there must be none left to accept.
     const identityMatchesBlanked =
       await this.deps.identityMatches.blankUserReferences(this.deps.prisma, {
         organizationId,
         discoveredPersonId,
       });
+    const matchSuggestionsRemoved = await this.clearMatchSuggestions({
+      organizationId,
+      discoveredPersonId,
+    });
 
     const { affectedDays, daysNotRebuilt, rebuiltFrom } =
       await this.eraseFromMoneyRows({
@@ -278,7 +304,7 @@ export class IdentityErasureService {
       erasedAt: now,
     });
 
-    await this.finishMoneyRows({
+    const sweptLate = await this.finishMoneyRows({
       organizationId,
       discoveredPersonId,
       tenantIds: await this.tenantIdsFor(organizationId),
@@ -291,6 +317,7 @@ export class IdentityErasureService {
       pseudonym,
       suppressionRowsRecorded,
       identityMatchesBlanked,
+      matchSuggestionsRemoved: matchSuggestionsRemoved + sweptLate,
       affectedDays,
       daysNotRebuilt,
       rebuiltFrom,
@@ -326,11 +353,20 @@ export class IdentityErasureService {
         rebuildSince,
       });
     }
+    // Already finished. The sweep still runs, and it is not ceremony: the
+    // person reads as erased from here on, so anything that put a suggestion
+    // back is a bug this call is the last chance to notice — a nonzero count on
+    // a finished erasure says exactly that.
+    const matchSuggestionsRemoved = await this.clearMatchSuggestions({
+      organizationId,
+      discoveredPersonId,
+    });
     return {
       discoveredPersonId,
       pseudonym,
       suppressionRowsRecorded: 0,
       identityMatchesBlanked: 0,
+      matchSuggestionsRemoved,
       affectedDays: [],
       daysNotRebuilt: [],
       rebuiltFrom: null,
@@ -366,7 +402,7 @@ export class IdentityErasureService {
       "Resuming an erasure whose daily cost rows were removed but never rebuilt",
     );
 
-    await this.finishMoneyRows({
+    const matchSuggestionsRemoved = await this.finishMoneyRows({
       organizationId,
       discoveredPersonId,
       tenantIds: await this.tenantIdsFor(organizationId),
@@ -379,6 +415,7 @@ export class IdentityErasureService {
       pseudonym,
       suppressionRowsRecorded: 0,
       identityMatchesBlanked: 0,
+      matchSuggestionsRemoved,
       // Which days those were is not recoverable: the rows naming them are
       // gone and the identifier that addressed them is destroyed. The day the
       // rebuild starts from is what was kept, and it is what the rebuild needs.
@@ -476,7 +513,7 @@ export class IdentityErasureService {
     tenantIds: string[];
     rebuildSince: string | null;
     daysNotRebuilt: { tenantId: string; day: string }[];
-  }): Promise<void> {
+  }): Promise<number> {
     if (rebuildSince) {
       await this.deps.replay.replaySince({ tenantIds, since: rebuildSince });
     }
@@ -492,6 +529,44 @@ export class IdentityErasureService {
       id: discoveredPersonId,
       organizationId,
     });
+
+    // The second sweep, and the reason there are two. The first ran before the
+    // person was marked erased, and until that mark lands the suggestion job
+    // still reads them as a live candidate — so a pass overlapping this erasure
+    // could have written a row back in between. Here the mark is set and the
+    // job can no longer see them, which makes this the sweep that is final.
+    // Both paths into this method are paths out of an erasure, so a run that
+    // died after the mark and resumed still ends here.
+    return await this.clearMatchSuggestions({
+      organizationId,
+      discoveredPersonId,
+    });
+  }
+
+  /**
+   * Drops every pending suggestion naming this person.
+   *
+   * Idempotent by construction, which is what lets it be called more than once
+   * per erasure without any care about ordering.
+   */
+  private async clearMatchSuggestions({
+    organizationId,
+    discoveredPersonId,
+  }: {
+    organizationId: string;
+    discoveredPersonId: string;
+  }): Promise<number> {
+    const removed = await this.deps.matchSuggestions.deleteAllForPerson(
+      this.deps.prisma,
+      { organizationId, discoveredPersonId },
+    );
+    if (removed > 0) {
+      logger.info(
+        { organizationId, discoveredPersonId, removed },
+        "Erasure removed pending identity match suggestions for the erased person",
+      );
+    }
+    return removed;
   }
 
   /** Every area this organization has ever written governance rows under. */

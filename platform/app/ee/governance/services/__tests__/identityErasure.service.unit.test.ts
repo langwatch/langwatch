@@ -46,6 +46,8 @@ function buildService(
     failDeleteTimes?: number;
     /** How many times the rebuild request throws before it starts working. */
     failReplayTimes?: number;
+    /** Pending match suggestions the person is sitting in (ADR-128 §12). */
+    pendingSuggestions?: number;
   } = {},
 ) {
   const failures = {
@@ -145,6 +147,12 @@ function buildService(
         return 2;
       }),
     } as unknown as IdentityErasureDeps["identityMatches"],
+    matchSuggestions: {
+      deleteAllForPerson: vi.fn(async () => {
+        calls.push("suggestions.delete");
+        return overrides.pendingSuggestions ?? 0;
+      }),
+    } as unknown as IdentityErasureDeps["matchSuggestions"],
     rollupErasure: {
       findDaysCarryingActor: vi
         .fn()
@@ -240,6 +248,54 @@ describe("given a provider-named person an organization has asked us to erase", 
       );
       expect(calls.indexOf("snapshot.refresh")).toBeLessThan(
         calls.indexOf("replay"),
+      );
+    });
+  });
+
+  describe("when the person is sitting in somebody's match review queue", () => {
+    /** @scenario "Erasing a person clears the match suggestions naming them" */
+    it("deletes the pending suggestions and reports how many there were", async () => {
+      const { service, calls } = buildService({ pendingSuggestions: 3 });
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      // Two sweeps by design, so the total is both. Leaving them behind was a
+      // way back in: confirming one opens a fresh link on an erased person.
+      expect(outcome.matchSuggestionsRemoved).toBe(6);
+      expect(
+        calls.filter((call) => call === "suggestions.delete"),
+      ).toHaveLength(2);
+    });
+
+    it("clears them alongside the links, before the identifier is destroyed", async () => {
+      const { service, calls } = buildService({ pendingSuggestions: 1 });
+
+      await service.erase({ organizationId: ORG, discoveredPersonId: PERSON });
+
+      // The first sweep sits with `matches.blank`: an erasure that got as far
+      // as detaching the account and then died must not leave an invitation to
+      // reattach it lying in a queue.
+      expect(calls.indexOf("suggestions.delete")).toBeGreaterThan(
+        calls.indexOf("matches.blank"),
+      );
+      expect(calls.indexOf("suggestions.delete")).toBeLessThan(
+        calls.indexOf("people.pseudonymize"),
+      );
+    });
+
+    it("sweeps again after the person is marked, which is when the job can no longer re-add", async () => {
+      const { service, calls } = buildService({ pendingSuggestions: 1 });
+
+      await service.erase({ organizationId: ORG, discoveredPersonId: PERSON });
+
+      // Between the first sweep and the mark, the suggestion job still reads
+      // this person as a live candidate. The mark is what closes that door, so
+      // the sweep that lands after it is the one that is final.
+      expect(calls.lastIndexOf("suggestions.delete")).toBeGreaterThan(
+        calls.indexOf("people.pseudonymize"),
       );
     });
   });

@@ -15,14 +15,38 @@
  * Decision: ADR-128 §12
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
-import { IdentityAlreadyLinkedError } from "../identityMatch.errors";
+import {
+  DiscoveredPersonRepository,
+  ErasedIdentifierSuppressionRepository,
+  GovernanceTenantHistoryRepository,
+  IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
+} from "../../repositories/governanceIdentity.repository";
+import { IdentityErasureService } from "../identityErasure.service";
+import {
+  IdentityAlreadyLinkedError,
+  IdentityErasedError,
+} from "../identityMatch.errors";
 import { IdentityMatchService } from "../identityMatch.service";
 import { IdentityMatchSuggestionService } from "../identityMatchSuggestion.service";
+import { ERASURE_SECRET_ENV } from "../logic/erasureDigest";
+import {
+  clearSuppressionSnapshot,
+  installSuppressionSnapshot,
+} from "../logic/suppressionSnapshot";
 
 const ns = nanoid(8);
 
@@ -44,6 +68,29 @@ const seenAt = new Date("2026-08-01T00:00:00.000Z");
 const matcher = () => new IdentityMatchService({ prisma, now: () => at });
 const suggester = () =>
   new IdentityMatchSuggestionService({ prisma, now: () => at });
+
+/**
+ * The real erasure against real Postgres, with only the two boundaries that are
+ * not Postgres faked: the daily-cost rows in ClickHouse and the rebuild that
+ * follows them. What is under test here is whether an erasure leaves anything
+ * behind in the review queue, and that question is entirely a Postgres one.
+ */
+const eraser = () =>
+  new IdentityErasureService({
+    prisma,
+    tenantHistory: new GovernanceTenantHistoryRepository(),
+    suppression: new ErasedIdentifierSuppressionRepository(),
+    discoveredPeople: new DiscoveredPersonRepository(),
+    identityMatches: new IdentityMatchRepository(),
+    matchSuggestions: new IdentityMatchSuggestionRepository(),
+    rollupErasure: {
+      findDaysCarryingActor: async () => [],
+      deleteRowsCarryingActor: async () => {},
+    } as never,
+    replay: { replaySince: async () => {} },
+    replayHorizon: () => null,
+    now: () => at,
+  });
 
 /** A discovered person, with only the fields a test ever varies spelled out. */
 const seedPerson = async (person: {
@@ -79,6 +126,16 @@ const linksFor = (discoveredPersonId: string) =>
 
 describe("Feature: the match engine, against the database that holds its rules", () => {
   beforeAll(async () => {
+    // The erasure refuses to run without a secret to digest with, and reaches
+    // the process's one suppression snapshot rather than taking it injected.
+    vi.stubEnv(ERASURE_SECRET_ENV, "e".repeat(32));
+    installSuppressionSnapshot({
+      load: async () => ({
+        digestsByOrganization: new Map(),
+        organizationByTenant: new Map(),
+      }),
+    });
+
     await prisma.organization.create({
       data: {
         id: organizationId,
@@ -122,6 +179,8 @@ describe("Feature: the match engine, against the database that holds its rules",
   );
 
   afterAll(async () => {
+    clearSuppressionSnapshot();
+    vi.unstubAllEnvs();
     await cleanupTestRows(prisma, [
       ["identityMatchSuggestion", { organizationId }],
       ["identityMatch", { organizationId }],
@@ -382,6 +441,67 @@ describe("Feature: the match engine, against the database that holds its rules",
       ).rejects.toBeInstanceOf(IdentityAlreadyLinkedError);
       // And the link that was already there is untouched.
       await expect(linksFor(person.id)).resolves.toHaveLength(1);
+    });
+  });
+
+  describe("given a person with a pending suggestion who is then erased", () => {
+    /** @scenario "Erasing a person clears the match suggestions naming them" */
+    it("leaves no suggestion naming them behind", async () => {
+      const person = await seedPerson({
+        id: "dp_erase_queue",
+        rawActorId: "erasing@acme.test",
+        displayText: "m.silva",
+      });
+      await suggester().recompute({ organizationId });
+      await expect(
+        prisma.identityMatchSuggestion.count({
+          where: { organizationId, discoveredPersonId: person.id },
+        }),
+      ).resolves.toBe(1);
+
+      await eraser().erase({
+        organizationId,
+        discoveredPersonId: person.id,
+      });
+
+      // The nightly recompute would have got there eventually. "Eventually" is
+      // up to a day, and for the whole of it the suggestion is confirmable.
+      await expect(
+        prisma.identityMatchSuggestion.count({
+          where: { organizationId, discoveredPersonId: person.id },
+        }),
+      ).resolves.toBe(0);
+    });
+  });
+
+  describe("given a suggestion that outlived the erasure of its person", () => {
+    /** @scenario "Confirming a suggestion for an erased person is refused" */
+    it("refuses with the erased error and opens no link", async () => {
+      const person = await seedPerson({
+        id: "dp_erase_race",
+        rawActorId: "raced@acme.test",
+        displayText: "m.silva",
+      });
+      await suggester().recompute({ organizationId });
+      const suggestion = await prisma.identityMatchSuggestion.findFirstOrThrow({
+        where: { organizationId, discoveredPersonId: person.id },
+      });
+
+      // The row is marked without the deletion running: this is the state a
+      // reviewer holding an already-rendered queue is in, and the state the
+      // erasure itself passes through between its mark and its sweep.
+      await prisma.discoveredPerson.update({
+        where: { id: person.id },
+        data: { erasedAt: new Date("2026-09-02T00:00:00.000Z") },
+      });
+
+      await expect(
+        matcher().confirmSuggestion({
+          organizationId,
+          suggestionId: suggestion.id,
+        }),
+      ).rejects.toBeInstanceOf(IdentityErasedError);
+      await expect(linksFor(person.id)).resolves.toHaveLength(0);
     });
   });
 

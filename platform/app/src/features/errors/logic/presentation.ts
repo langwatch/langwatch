@@ -2002,6 +2002,11 @@ const presentations = {
     describe: () =>
       "Someone linked them while this list was open. Reload to see who they are linked to.",
   },
+  identity_erased: {
+    title: "This person has been erased",
+    describe: () =>
+      "Their details were removed at their request, so they can no longer be linked to an account. Reload to see the current list.",
+  },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
     describe: () =>

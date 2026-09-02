@@ -7,6 +7,7 @@ import {
   ErasedIdentifierSuppressionRepository,
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
 } from "@ee/governance/repositories/governanceIdentity.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
@@ -1092,6 +1093,7 @@ export function initializeDefaultApp(options?: {
         suppression: new ErasedIdentifierSuppressionRepository(),
         discoveredPeople: new DiscoveredPersonRepository(),
         identityMatches: new IdentityMatchRepository(),
+        matchSuggestions: new IdentityMatchSuggestionRepository(),
         rollupErasure: governanceRollupErasureRepository,
         // Resolved at call time: the ops group is composed further down, and
         // an erasure happens long after boot. Refusing rather than skipping the
