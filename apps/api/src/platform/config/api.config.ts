@@ -1,4 +1,5 @@
 import {
+  assertObservabilityDoesNotSelfIngest,
   Config,
   environmentBooleanSchema,
   parseDataplaneS3RoutingTable,
@@ -838,6 +839,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       API_KEY_PEPPER: firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE),
     },
   }).value;
+  refuseApiSelfIngest(value);
   return {
     ...value,
     featureFlags: resolveFeatureFlagConfig(source),
@@ -933,6 +935,37 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
   };
+}
+
+/**
+ * Refuses a boot whose telemetry exporter points back at this deployment.
+ *
+ * The platform process this one replaced refused `LANGWATCH_API_KEY` outright,
+ * because with a key set the SDK ships the process's own operational telemetry
+ * into whatever ingest it is pointed at, and that ingest was always this one:
+ * a feedback loop in which every ingested span does work that emits more
+ * spans. This process accepts the key on purpose — exporting to a DIFFERENT
+ * LangWatch install is a supported shape — so the refusal narrowed to the one
+ * case the blanket rule was protecting.
+ *
+ * The three addresses are this deployment's own, in the order an operator
+ * recognises them: the public origin, the origin sessions are signed for, and
+ * the listener this process binds. `port` is passed apart from `host` because
+ * `API_HOST` is a bind address and carries none.
+ */
+function refuseApiSelfIngest(value: ApiConfigProjection): void {
+  assertObservabilityDoesNotSelfIngest({
+    runtime: "api",
+    apiKeyEnv: "LANGWATCH_API_KEY",
+    apiKey: value.observability.apiKey,
+    endpointEnv: "LANGWATCH_ENDPOINT",
+    endpoint: value.observability.endpoint,
+    deployment: [
+      { env: "BASE_HOST", value: value.infrastructure.execution.publicBaseUrl },
+      { env: "NEXTAUTH_URL", value: value.browserSession.url },
+      { env: "API_HOST/API_PORT", value: value.host, port: value.port },
+    ],
+  });
 }
 
 /**

@@ -24,41 +24,138 @@ import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import { extractApiKeyRequestCredentials } from "./app/api-key-request-credentials";
 import type { ApiAuditPort } from "./api-request.policy";
 
-/** The published credential refusal for the API process's project routes. */
-export class ApiRestAuthenticationError extends HandledError {
-  declare readonly code: "missing_credentials" | "invalid_credentials";
+/**
+ * The credential refusals this process publishes, one class per code.
+ *
+ * They were two classes over seven codes, each picking its code from a
+ * constructor parameter. That shape is invisible to the registry guard in
+ * `apps/ui/src/model/errors/__tests__/codes.unit.test.ts`, which finds a code
+ * by the string literal at its declaration: a union in a signature has no
+ * literal to find, and a `declare readonly code:` union yields only its FIRST
+ * member. `credential_class_mismatch` and `invalid_credentials` were therefore
+ * raised here and reported as copy nothing raises, which is the same report a
+ * genuinely dead entry produces.
+ *
+ * The guard's own docblock names the remedy and prefers this one: a subclass
+ * per code, so the scanner sees every code and a code added here can never
+ * reach a customer without copy. The alternative — listing them in that file's
+ * `PARAMETERIZED_CODES` — buys the same green run at the price of
+ * hand-maintenance, and these families do not share one body: two statuses,
+ * two faults, two legacy labels and a `meta` on exactly one of them.
+ */
+
+/** No credential at all on a project route. */
+export class ApiRestMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
   readonly legacyError = "Unauthorized";
 
-  constructor(code: "missing_credentials" | "invalid_credentials") {
-    super(
-      code,
-      code === "missing_credentials" ? "Authentication required" : "Invalid credentials",
-      { httpStatus: 401, fault: "customer" },
-    );
-    this.name = "ApiRestAuthenticationError";
+  constructor() {
+    super("missing_credentials", "Authentication required", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "ApiRestMissingCredentialsError";
   }
 }
 
-type OrganizationAuthenticationCode =
-  | "missing_credentials"
-  | "invalid_credentials"
-  | "credential_class_mismatch"
-  | "organization_not_found"
-  | "internal_error";
+/** A project credential that resolves to nothing. */
+export class ApiRestInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+  readonly legacyError = "Unauthorized";
 
-/** The organization-credential refusal the management families publish. */
-export class ApiOrganizationAuthenticationError extends HandledError {
-  readonly legacyError: "Unauthorized" | "Internal Server Error";
+  constructor() {
+    super("invalid_credentials", "Invalid credentials", { httpStatus: 401, fault: "customer" });
+    this.name = "ApiRestInvalidCredentialsError";
+  }
+}
 
-  constructor(code: OrganizationAuthenticationCode) {
-    const details = organizationAuthenticationDetails(code);
-    super(code, details.message, {
-      httpStatus: details.status,
-      fault: details.status >= 500 ? "platform" : "customer",
-      ...(details.meta ? { meta: details.meta } : {}),
+/** No credential at all on a management route. */
+export class ApiOrganizationMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+  readonly legacyError = "Unauthorized";
+
+  constructor() {
+    super("missing_credentials", "Authentication required. Use Authorization: Bearer <api-key>.", {
+      httpStatus: 401,
+      fault: "customer",
     });
-    this.legacyError = details.legacyError;
-    this.name = "ApiOrganizationAuthenticationError";
+    this.name = "ApiOrganizationMissingCredentialsError";
+  }
+}
+
+/**
+ * A project key presented where an organization key is required.
+ *
+ * Its own code rather than a plain refusal because the remediation is
+ * specific and actionable: the caller holds a valid key of the wrong class,
+ * and `meta` names both classes so a client can say which to swap in.
+ */
+export class ApiOrganizationCredentialClassMismatchError extends HandledError {
+  declare readonly code: "credential_class_mismatch";
+  readonly legacyError = "Unauthorized";
+
+  constructor() {
+    super(
+      "credential_class_mismatch",
+      "This endpoint needs an organization API key. The key sent is a project API key.",
+      {
+        httpStatus: 401,
+        fault: "customer",
+        meta: { required: "organization_api_key", presented: "project_api_key" },
+      },
+    );
+    this.name = "ApiOrganizationCredentialClassMismatchError";
+  }
+}
+
+/** An organization credential that resolves to nothing. */
+export class ApiOrganizationInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+  readonly legacyError = "Unauthorized";
+
+  constructor() {
+    super("invalid_credentials", "Invalid credentials.", { httpStatus: 401, fault: "customer" });
+    this.name = "ApiOrganizationInvalidCredentialsError";
+  }
+}
+
+/**
+ * A credential whose organization has since been deleted.
+ *
+ * 401 rather than 404: the caller's credential is what stopped being usable,
+ * and a management route that answered 404 would confirm the deletion to
+ * whoever still holds the key.
+ */
+export class ApiOrganizationNotFoundForCredentialError extends HandledError {
+  declare readonly code: "organization_not_found";
+  readonly legacyError = "Unauthorized";
+
+  constructor() {
+    super("organization_not_found", "Organization not found", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "ApiOrganizationNotFoundForCredentialError";
+  }
+}
+
+/**
+ * The credential lookup itself failed.
+ *
+ * The one 5xx of the family, and `fault` says so explicitly: an unannotated
+ * 500 defaults to `"customer"` and would record a real incident as routine
+ * refusal noise.
+ */
+export class ApiOrganizationAuthenticationUnavailableError extends HandledError {
+  declare readonly code: "internal_error";
+  readonly legacyError = "Internal Server Error";
+
+  constructor() {
+    super("internal_error", "Authentication service error", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "ApiOrganizationAuthenticationUnavailableError";
   }
 }
 
@@ -229,20 +326,12 @@ export class ApiRestSecurity {
     return async (context, next) => {
       const credentials = extractApiKeyRequestCredentials(context.req.raw);
       if (!credentials) {
-        return this.refuse(
-          context,
-          new ApiRestAuthenticationError("missing_credentials"),
-          envelope,
-        );
+        return this.refuse(context, new ApiRestMissingCredentialsError(), envelope);
       }
 
       const resolved = await this.apiKeys.tryResolveToken(credentials);
       if (!resolved) {
-        return this.refuse(
-          context,
-          new ApiRestAuthenticationError("invalid_credentials"),
-          envelope,
-        );
+        return this.refuse(context, new ApiRestInvalidCredentialsError(), envelope);
       }
 
       installProjectVariables(context, resolved);
@@ -310,11 +399,7 @@ export class ApiRestSecurity {
     return async (context, next) => {
       const credentials = extractApiKeyRequestCredentials(context.req.raw);
       if (!credentials) {
-        return this.refuse(
-          context,
-          new ApiOrganizationAuthenticationError("missing_credentials"),
-          envelope,
-        );
+        return this.refuse(context, new ApiOrganizationMissingCredentialsError(), envelope);
       }
 
       let resolution;
@@ -325,21 +410,15 @@ export class ApiRestSecurity {
           { error, method: context.req.method, path: context.req.path },
           "Organization credential resolution failed",
         );
-        return this.refuse(
-          context,
-          new ApiOrganizationAuthenticationError("internal_error"),
-          envelope,
-        );
+        return this.refuse(context, new ApiOrganizationAuthenticationUnavailableError(), envelope);
       }
 
       if (!resolution.ok) {
         return this.refuse(
           context,
-          new ApiOrganizationAuthenticationError(
-            resolution.reason === "wrong_credential_class"
-              ? "credential_class_mismatch"
-              : "invalid_credentials",
-          ),
+          resolution.reason === "wrong_credential_class"
+            ? new ApiOrganizationCredentialClassMismatchError()
+            : new ApiOrganizationInvalidCredentialsError(),
           envelope,
         );
       }
@@ -365,9 +444,9 @@ export class ApiRestSecurity {
         }
         return this.refuse(
           context,
-          new ApiOrganizationAuthenticationError(
-            organizationMissing ? "organization_not_found" : "internal_error",
-          ),
+          organizationMissing
+            ? new ApiOrganizationNotFoundForCredentialError()
+            : new ApiOrganizationAuthenticationUnavailableError(),
           envelope,
         );
       }
@@ -594,37 +673,4 @@ function apiKeyCeilingRefusal(
 
 function isMutation(method: string): boolean {
   return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
-}
-
-function organizationAuthenticationDetails(code: OrganizationAuthenticationCode): {
-  status: 401 | 500;
-  message: string;
-  legacyError: "Unauthorized" | "Internal Server Error";
-  meta?: Record<string, string>;
-} {
-  switch (code) {
-    case "missing_credentials":
-      return {
-        status: 401,
-        legacyError: "Unauthorized",
-        message: "Authentication required. Use Authorization: Bearer <api-key>.",
-      };
-    case "credential_class_mismatch":
-      return {
-        status: 401,
-        legacyError: "Unauthorized",
-        message: "This endpoint needs an organization API key. The key sent is a project API key.",
-        meta: { required: "organization_api_key", presented: "project_api_key" },
-      };
-    case "invalid_credentials":
-      return { status: 401, legacyError: "Unauthorized", message: "Invalid credentials." };
-    case "organization_not_found":
-      return { status: 401, legacyError: "Unauthorized", message: "Organization not found" };
-    case "internal_error":
-      return {
-        status: 500,
-        legacyError: "Internal Server Error",
-        message: "Authentication service error",
-      };
-  }
 }

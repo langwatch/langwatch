@@ -1,4 +1,5 @@
 import {
+  assertObservabilityDoesNotSelfIngest,
   Config,
   environmentBooleanSchema,
   environmentOneOrTrueSchema,
@@ -947,6 +948,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     definition: workerConfigDefinition,
     source: normalizeWorkerConfigSource(source),
   }).value;
+  refuseWorkerSelfIngest(value, source);
   const mail = resolveWorkerMailConfig(value.mail, value.nextauthSecret);
   const langy = resolveWorkerLangyConfig(value.langy);
 
@@ -1020,6 +1022,41 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     },
     featureFlags: resolveFeatureFlagConfig(source),
   };
+}
+
+/**
+ * Refuses a boot whose telemetry exporter points back at this deployment.
+ *
+ * The platform process this one replaced refused `LANGWATCH_API_KEY` outright,
+ * because with a key set the SDK ships the process's own operational telemetry
+ * into whatever ingest it is pointed at, and that ingest was always this one:
+ * a feedback loop in which every ingested span does work that emits more
+ * spans. This process accepts the key on purpose — exporting to a DIFFERENT
+ * LangWatch install is a supported shape — so the refusal narrowed to the one
+ * case the blanket rule was protecting.
+ *
+ * A worker serves no listener, so the deployment's addresses are the two
+ * origins it links back to. `NEXTAUTH_URL` is taken from the source rather
+ * than from a projection leaf because this process consumes no such value —
+ * it needs only to recognise its own front door — and a leaf nothing reads
+ * would be a configuration field with no consumer.
+ */
+function refuseWorkerSelfIngest(
+  value: WorkerConfigProjection,
+  source: Readonly<Record<string, unknown>>,
+): void {
+  const nextauthUrl = source.NEXTAUTH_URL;
+  assertObservabilityDoesNotSelfIngest({
+    runtime: "worker",
+    apiKeyEnv: "LANGWATCH_API_KEY",
+    apiKey: value.observability.apiKey,
+    endpointEnv: "LANGWATCH_ENDPOINT",
+    endpoint: value.observability.endpoint,
+    deployment: [
+      { env: "BASE_HOST", value: value.mail.baseHost },
+      { env: "NEXTAUTH_URL", value: typeof nextauthUrl === "string" ? nextauthUrl : undefined },
+    ],
+  });
 }
 
 /**

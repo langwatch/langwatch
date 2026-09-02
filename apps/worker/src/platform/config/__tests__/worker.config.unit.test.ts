@@ -448,6 +448,78 @@ describe("resolveWorkerConfig", () => {
       spendSettlementGraceMs: "45000",
     });
   });
+
+  /**
+   * The self-ingest refusal, at the boundary that owns it.
+   *
+   * `assertObservabilityDoesNotSelfIngest` is tested exhaustively in
+   * `@langwatch/config`; what belongs here is the WIRING — that this process
+   * hands the guard the two origins it links back to, and that a boot which
+   * would loop refuses before any consumer is composed.
+   */
+  describe("when the observability exporter is configured", () => {
+    /** @scenario "A process pointed at its own ingest refuses to boot" */
+    it("refuses a key exporting to this deployment's public origin", () => {
+      expect(() =>
+        resolveWorkerConfig({
+          LANGWATCH_API_KEY: "sk-lw-a-real-looking-key",
+          LANGWATCH_ENDPOINT: "https://app.example.test",
+          BASE_HOST: "https://app.example.test",
+        }),
+      ).toThrow(/LANGWATCH_API_KEY is set and LANGWATCH_ENDPOINT resolves to app\.example\.test/);
+    });
+
+    /** @scenario "A process pointed at its own ingest refuses to boot" */
+    it("refuses a key exporting to a sibling service of this worktree's stack", () => {
+      expect(() =>
+        resolveWorkerConfig({
+          LANGWATCH_API_KEY: "sk-lw-a-real-looking-key",
+          LANGWATCH_ENDPOINT: "https://gateway.portless.langwatch.localhost",
+          BASE_HOST: "https://app.portless.langwatch.localhost",
+        }),
+      ).toThrow(/BASE_HOST/);
+    });
+
+    /** @scenario "The refusal names the variables and never the key" */
+    it("names the variables and never the key", () => {
+      let raised: unknown;
+      try {
+        resolveWorkerConfig({
+          LANGWATCH_API_KEY: "sk-lw-secret-value",
+          LANGWATCH_ENDPOINT: "https://app.example.test",
+          NEXTAUTH_URL: "https://app.example.test",
+        });
+      } catch (error) {
+        raised = error;
+      }
+
+      expect(raised).toBeInstanceOf(Error);
+      expect((raised as Error).message).toContain("NEXTAUTH_URL");
+      expect((raised as Error).message).not.toContain("sk-lw-secret-value");
+    });
+
+    /** @scenario "A process exporting to a different LangWatch install boots" */
+    it("accepts a key exporting to a different LangWatch install", () => {
+      const config = resolveWorkerConfig({
+        LANGWATCH_API_KEY: "sk-lw-a-real-looking-key",
+        LANGWATCH_ENDPOINT: "https://app.langwatch.ai",
+        BASE_HOST: "https://app.example.test",
+        NEXTAUTH_URL: "https://app.example.test",
+      });
+
+      expect(config.observability.endpoint).toBe("https://app.langwatch.ai");
+    });
+
+    /** @scenario "A process with no observability key boots whatever the endpoint says" */
+    it("accepts no key at all, whatever the endpoint names", () => {
+      const config = resolveWorkerConfig({
+        LANGWATCH_ENDPOINT: "https://app.example.test",
+        BASE_HOST: "https://app.example.test",
+      });
+
+      expect(config.observability.apiKey).toBeUndefined();
+    });
+  });
 });
 
 describe("given the four privacy variables the ingestion path reads", () => {

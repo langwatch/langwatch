@@ -591,6 +591,13 @@ export {
   type SkippedDataplaneS3Route,
 } from "./dataplane-s3";
 export {
+  assertObservabilityDoesNotSelfIngest,
+  DEFAULT_LANGWATCH_ENDPOINT,
+  type DeploymentAddress,
+  type SelfIngestGuardInput,
+  SelfIngestingObservabilityError,
+} from "./self-ingest-guard";
+export {
   getZodIssueMessage,
   mapZodIssuesToLogContext,
   parseZodFieldErrors,

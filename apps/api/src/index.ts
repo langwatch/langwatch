@@ -1,9 +1,14 @@
 export { ApiApplication } from "./api.application";
 export { ApiSecretRestFeature } from "./api-secret-rest.feature";
 export {
-  ApiOrganizationAuthenticationError,
+  ApiOrganizationAuthenticationUnavailableError,
+  ApiOrganizationCredentialClassMismatchError,
+  ApiOrganizationInvalidCredentialsError,
+  ApiOrganizationMissingCredentialsError,
+  ApiOrganizationNotFoundForCredentialError,
   ApiOrganizationPermissionError,
-  ApiRestAuthenticationError,
+  ApiRestInvalidCredentialsError,
+  ApiRestMissingCredentialsError,
   ApiRestProjectPolicy,
   ApiRestSecurity,
   ApiRouteProjectNotFoundError,
@@ -219,10 +224,6 @@ export {
   type CodingAgentCallerScope,
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
-export {
-  type CopilotServiceAdapterFactory,
-  createCopilotKitRestApp,
-} from "./features/copilotkit/copilotkit-rest";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
