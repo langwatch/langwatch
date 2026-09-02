@@ -53,7 +53,6 @@ export function workingContextOfFacts(
   return context;
 }
 
-/** Whether a context is complete enough to stamp fact rows with. */
 export function isStampableContext(context: SessionWorkingContext): boolean {
   return (
     context.repositoryHost !== "" &&
@@ -95,8 +94,13 @@ export interface SessionContextMemo {
  */
 const MEMO_TTL_SECONDS = 180 * 24 * 60 * 60;
 
-const memoKey = (tenantId: string, sessionId: string): string =>
-  `coding-agent:session-context:${tenantId}:${sessionId}`;
+const memoKey = ({
+  tenantId,
+  sessionId,
+}: {
+  tenantId: string;
+  sessionId: string;
+}): string => `coding-agent:session-context:${tenantId}:${sessionId}`;
 
 export class RedisSessionContextMemo implements SessionContextMemo {
   constructor(private readonly redis: Redis | Cluster) {}
@@ -108,7 +112,7 @@ export class RedisSessionContextMemo implements SessionContextMemo {
     tenantId: string;
     sessionId: string;
   }): Promise<SessionWorkingContext | null> {
-    const raw = await this.redis.get(memoKey(tenantId, sessionId));
+    const raw = await this.redis.get(memoKey({ tenantId, sessionId }));
     if (raw === null) return null;
     try {
       const parsed = JSON.parse(raw) as Partial<SessionWorkingContext>;
@@ -133,7 +137,7 @@ export class RedisSessionContextMemo implements SessionContextMemo {
     context: SessionWorkingContext;
   }): Promise<void> {
     await this.redis.set(
-      memoKey(tenantId, sessionId),
+      memoKey({ tenantId, sessionId }),
       JSON.stringify(context),
       "EX",
       MEMO_TTL_SECONDS,
@@ -141,9 +145,29 @@ export class RedisSessionContextMemo implements SessionContextMemo {
   }
 }
 
-/** Test double, and the fallback for a preset with no Redis. */
+/**
+ * How many sessions the no-Redis fallback keeps. A worker holds one entry per
+ * session it is currently draining, and a few hundred bytes each, so this is
+ * far above any real concurrency while still being a ceiling: without one the
+ * map grows for the life of the process.
+ */
+const IN_MEMORY_MEMO_MAX_ENTRIES = 10_000;
+
+/**
+ * Test double, and the fallback for a preset with no Redis.
+ *
+ * Bounded two ways, because a process holding this map has no Redis to expire
+ * it: entries carry the same TTL the Redis memo writes, and the map evicts its
+ * oldest entry once it is full. An evicted session stamps nothing more, which
+ * degrades to the legacy whole-session rule exactly like an expired Redis key.
+ */
 export class InMemorySessionContextMemo implements SessionContextMemo {
-  private readonly entries = new Map<string, SessionWorkingContext>();
+  private readonly entries = new Map<
+    string,
+    { context: SessionWorkingContext; expiresAtMs: number }
+  >();
+
+  constructor(private readonly now: () => number = Date.now) {}
 
   async get({
     tenantId,
@@ -152,7 +176,14 @@ export class InMemorySessionContextMemo implements SessionContextMemo {
     tenantId: string;
     sessionId: string;
   }): Promise<SessionWorkingContext | null> {
-    return this.entries.get(memoKey(tenantId, sessionId)) ?? null;
+    const key = memoKey({ tenantId, sessionId });
+    const entry = this.entries.get(key);
+    if (entry === undefined) return null;
+    if (entry.expiresAtMs <= this.now()) {
+      this.entries.delete(key);
+      return null;
+    }
+    return entry.context;
   }
 
   async set({
@@ -164,7 +195,19 @@ export class InMemorySessionContextMemo implements SessionContextMemo {
     sessionId: string;
     context: SessionWorkingContext;
   }): Promise<void> {
-    this.entries.set(memoKey(tenantId, sessionId), context);
+    const key = memoKey({ tenantId, sessionId });
+    // Re-inserting moves the key to the end of the Map's insertion order, so
+    // the eviction below always drops the least recently written session.
+    this.entries.delete(key);
+    this.entries.set(key, {
+      context,
+      expiresAtMs: this.now() + MEMO_TTL_SECONDS * 1000,
+    });
+    while (this.entries.size > IN_MEMORY_MEMO_MAX_ENTRIES) {
+      const oldest = this.entries.keys().next();
+      if (oldest.done === true) break;
+      this.entries.delete(oldest.value);
+    }
   }
 }
 

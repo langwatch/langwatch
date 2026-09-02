@@ -796,6 +796,46 @@ describe("PullRequestUsageService", () => {
       );
       expect(usage.rows.find((row) => row.prNumber === 8)?.totalTokens).toBe(0);
     });
+
+    /** @scenario "A discovered pull request with no stamped work still dates itself" */
+    it("dates a row with no stamped work by the pull request, not the epoch", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [
+          pullRequestRow(),
+          pullRequestRow({
+            prNumber: 8,
+            headBranch: "feat/next",
+            htmlUrl: "https://github.com/acme/widgets/pull/8",
+            prCreatedAt: new Date(NOW - 8 * HOUR),
+            prUpdatedAt: new Date(NOW - 2 * HOUR),
+          }),
+        ],
+        personalSessions: [
+          personalSessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+        // Every stamped token lands on the first branch, so the second pull
+        // request is discovered with no share of its own.
+        modelTotals: [stampedTotalsRow({ sessionId: "mine" })],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      const empty = usage.rows.find((row) => row.prNumber === 8);
+      expect(empty?.totalTokens).toBe(0);
+      expect(empty?.costUsd).toBeNull();
+      expect(empty?.lastActivityAtMs).toBe(NOW - 2 * HOUR);
+    });
   });
 
   describe("given a pull request whose sessions ran in two projects", () => {
@@ -1322,6 +1362,99 @@ describe("PullRequestUsageService", () => {
       expect(second.modelBreakdown.map((m) => m.model)).toEqual([
         "claude-opus-5",
       ]);
+    });
+  });
+
+  describe("given a session whose fact rows report cost but no token counts", () => {
+    // Some agents price a call without telling us its token counts. The
+    // stamps still have to decide where the money lands, so the ratio falls
+    // back to cost rather than the whole session dropping to the legacy rule.
+    const costOnlyFixture = () => ({
+      pullRequests: [
+        pullRequestRow(),
+        pullRequestRow({
+          prNumber: 8,
+          headBranch: "feat/next",
+          htmlUrl: "https://github.com/acme/widgets/pull/8",
+          prCreatedAt: new Date(NOW - 8 * HOUR),
+        }),
+      ],
+      sessions: [sessionRow({ gitBranches: ["feat/linkage", "feat/next"] })],
+      modelTotals: [
+        stampedTotalsRow({
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.2,
+        }),
+        stampedTotalsRow({
+          branch: "feat/next",
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.8,
+        }),
+      ],
+    });
+
+    /** @scenario "A session that priced its calls without reporting tokens splits by cost" */
+    it("splits the session by the cost stamped on each branch", async () => {
+      const first = await serviceWith(
+        costOnlyFixture(),
+      ).service.getPullRequestUsage(QUERY);
+      const second = await serviceWith(
+        costOnlyFixture(),
+      ).service.getPullRequestUsage({ ...QUERY, prNumber: 8 });
+
+      expect(first.totals.costUsd).toBeCloseTo(0.3, 10);
+      expect(first.totals.inputTokens).toBe(20);
+      expect(second.totals.costUsd).toBeCloseTo(1.2, 10);
+      expect(second.totals.inputTokens).toBe(80);
+
+      // The two shares still partition the session's own cumulative totals.
+      expect(first.totals.totalTokens + second.totals.totalTokens).toBe(180);
+    });
+  });
+
+  describe("given a branch that hosted a merged pull request and later a new one", () => {
+    // One branch, two eras: the first pull request merged an hour before the
+    // session started, the second opened before it. The stamps name the
+    // branch, so the era decides which of the two they belong to.
+    const recycledFixture = () => ({
+      pullRequests: [
+        pullRequestRow({
+          state: "closed",
+          prClosedAt: new Date(NOW - 9 * HOUR),
+          prMergedAt: new Date(NOW - 9 * HOUR),
+        }),
+        pullRequestRow({
+          prNumber: 9,
+          htmlUrl: "https://github.com/acme/widgets/pull/9",
+          prCreatedAt: new Date(NOW - 8 * HOUR),
+        }),
+      ],
+      sessions: [sessionRow()],
+      modelTotals: [stampedTotalsRow()],
+    });
+
+    /** @scenario "Two pull requests on one branch split by era, not by double counting" */
+    it("counts the stamped tokens toward the branch's tenure winner only", async () => {
+      const merged = await serviceWith(
+        recycledFixture(),
+      ).service.getPullRequestUsage(QUERY);
+      const successor = await serviceWith(
+        recycledFixture(),
+      ).service.getPullRequestUsage({ ...QUERY, prNumber: 9 });
+
+      expect(merged.totals.sessionsCount).toBe(0);
+      expect(merged.totals.totalTokens).toBe(0);
+      expect(merged.totals.costUsd).toBeNull();
+
+      expect(successor.totals.sessionsCount).toBe(1);
+      expect(successor.totals.totalTokens).toBe(180);
+      expect(successor.totals.costUsd).toBeCloseTo(1.5, 10);
     });
   });
 

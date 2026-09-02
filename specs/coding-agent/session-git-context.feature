@@ -5,6 +5,9 @@
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber.ts (declared-agent labeling, title stamp)
 #   platform/app/src/server/app-layer/traces/canonicalisation/extractors/claudeCode.ts                                (title extraction from the response body)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.derivation.ts (fold semantics)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/session-context-memo.ts           (the declared context the stamp reads)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/commands/contributeLogFactsCommand.ts      (where the stamp is applied)
+#   platform/app/src/server/clickhouse/migrations/00087_coding_agent_session_events_working_context.sql                  (the stamped fact columns)
 #   platform/app/src/server/clickhouse/migrations/00075_coding_agent_sessions_git_context.sql                          (session columns)
 #   platform/app/src/server/clickhouse/migrations/00077_coding_agent_sessions_git_branches.sql                         (every branch the session drove)
 #
@@ -136,6 +139,40 @@ Rule: Fact rows are stamped with the context declared before them
     Given a session whose declaration names a repository but no branch
     When a model call is contributed after it
     Then the stored fact row carries no stamped context
+
+  # The stamp is a refinement of the record, never part of it, so a memo
+  # outage costs later rows their stamp and nothing else. Those rows fall
+  # back to the legacy whole-session rule.
+
+  @unit
+  Scenario: A record whose memo cannot be read is contributed unstamped
+    Given a memo that fails every read
+    When a model call is contributed
+    Then the record is still contributed, carrying no stamped context
+
+  @unit
+  Scenario: A declaration whose memo cannot be written is still contributed
+    Given a memo that fails every write
+    When a session declares its working context
+    Then the declaration is still contributed
+
+Rule: The memo that carries the stamp forgets on its own
+
+  # The memo holds one entry per live session. Redis expires them; the
+  # no-Redis fallback has to do it itself, or a long-running process grows
+  # one entry per session it ever saw.
+
+  @unit
+  Scenario: A memo entry is forgotten once its lifetime passes
+    Given a context written to the no-Redis memo
+    When its lifetime has passed
+    Then the memo answers nothing for that session
+
+  @unit
+  Scenario: The no-Redis memo stops growing at its bound
+    Given more sessions written to the no-Redis memo than it holds
+    When the oldest session's context is read
+    Then it has been evicted, and the newest sessions are still remembered
 
 Rule: A session remembers every branch it drove
 

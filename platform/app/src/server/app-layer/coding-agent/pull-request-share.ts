@@ -102,7 +102,7 @@ export function attributeSessionsToPullRequest({
       repositoryFullName,
     });
     if (share <= 0) continue;
-    scaled.push(scaleSession(session, share));
+    scaled.push(scaleSession({ session, share }));
     attributedTotals.push(...prRows);
   }
 
@@ -127,13 +127,13 @@ function shareOfPullRequest({
   repositoryHost: string;
   repositoryFullName: string;
 }): { share: number; prRows: SessionModelTotalsRow[] } {
-  const totalWeight = rows.reduce((sum, row) => sum + weightOf(row), 0);
+  const { weightOf, totalWeight } = weighing(rows);
 
   // The stamps may name branches the session row's bounded branch set no
   // longer holds, so the tenure rule is asked about the union of both.
   const stampedBranches = rows
     .filter((row) =>
-      isStampedOnRepository(row, repositoryHost, repositoryFullName),
+      isStampedOnRepository({ row, repositoryHost, repositoryFullName }),
     )
     .map((row) => row.branch);
   const headBranches = [
@@ -156,8 +156,9 @@ function shareOfPullRequest({
     pullRequests,
   }).get(session.sessionId);
 
-  // No event rows: nothing to divide by, so the legacy whole-session rule
-  // stands — and only where the session's own row lives, like always.
+  // No event rows, or rows that report neither tokens nor cost: nothing to
+  // divide by, so the legacy whole-session rule stands — and only where the
+  // session's own row lives, like always.
   if (totalWeight === 0) {
     return {
       share: rowMatched && legacyWinner === prNumber ? 1 : 0,
@@ -170,20 +171,23 @@ function shareOfPullRequest({
       return rowMatched && legacyWinner === prNumber;
     }
     return (
-      isStampedOnRepository(row, repositoryHost, repositoryFullName) &&
+      isStampedOnRepository({ row, repositoryHost, repositoryFullName }) &&
       perBranch.get(row.branch) === prNumber
     );
   });
-  const prWeight = prRows.reduce((sum, row) => sum + weightOf(row), 0);
+  const prWeight = sum(prRows, weightOf);
 
   return { share: prWeight / totalWeight, prRows };
 }
 
 /** The session's counters and cost scaled to its share of the pull request. */
-function scaleSession(
-  session: CodingAgentBranchSessionRow,
-  share: number,
-): CodingAgentBranchSessionRow {
+function scaleSession({
+  session,
+  share,
+}: {
+  session: CodingAgentBranchSessionRow;
+  share: number;
+}): CodingAgentBranchSessionRow {
   if (share >= 1) return session;
   return {
     ...session,
@@ -212,11 +216,15 @@ function isUnstamped(row: SessionModelTotalsRow): boolean {
  * the remote's casing verbatim, the mapping stores lower case. Branch names
  * stay case sensitive and are compared by the caller.
  */
-function isStampedOnRepository(
-  row: SessionModelTotalsRow,
-  repositoryHost: string,
-  repositoryFullName: string,
-): boolean {
+function isStampedOnRepository({
+  row,
+  repositoryHost,
+  repositoryFullName,
+}: {
+  row: SessionModelTotalsRow;
+  repositoryHost: string;
+  repositoryFullName: string;
+}): boolean {
   if (isUnstamped(row)) return false;
   return (
     row.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
@@ -225,13 +233,44 @@ function isStampedOnRepository(
   );
 }
 
-function weightOf(row: SessionModelTotalsRow): number {
+/**
+ * The unit one session's rows are weighed in, and their total in that unit.
+ *
+ * Tokens whenever the session reports any: every agent reports them, and they
+ * are what the counters being split are made of. A session that priced its
+ * calls without reporting token counts is weighed by cost instead, so its
+ * stamps still decide where the money lands rather than the whole session
+ * falling back to the legacy rule. The unit is picked per session, so one
+ * ratio never mixes dollars with tokens.
+ */
+function weighing(rows: readonly SessionModelTotalsRow[]): {
+  weightOf: (row: SessionModelTotalsRow) => number;
+  totalWeight: number;
+} {
+  const tokenWeight = sum(rows, tokensOf);
+  if (tokenWeight > 0) return { weightOf: tokensOf, totalWeight: tokenWeight };
+  return { weightOf: costOf, totalWeight: sum(rows, costOf) };
+}
+
+function tokensOf(row: SessionModelTotalsRow): number {
   return (
     row.inputTokens +
     row.outputTokens +
     row.cacheReadTokens +
     row.cacheCreationTokens
   );
+}
+
+/** Never negative: a stray negative cost would eat another row's share. */
+function costOf(row: SessionModelTotalsRow): number {
+  return row.costUsd > 0 ? row.costUsd : 0;
+}
+
+function sum(
+  rows: readonly SessionModelTotalsRow[],
+  of: (row: SessionModelTotalsRow) => number,
+): number {
+  return rows.reduce((total, row) => total + of(row), 0);
 }
 
 export function sessionKey(session: {

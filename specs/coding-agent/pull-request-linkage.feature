@@ -7,6 +7,7 @@
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
+#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
 #   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
@@ -383,6 +384,21 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     And a session whose fact rows stamp that branch
     When both pull requests' usage is read
     Then the stamped tokens count toward the branch's tenure winner only
+
+  @unit
+  Scenario: A discovered pull request with no stamped work still dates itself
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows stamp all of its tokens on one branch
+    When the personal pull requests are read
+    Then the other pull request is still a row, reporting no tokens and no cost
+    And that row is dated by the pull request itself rather than by the epoch
+
+  @unit
+  Scenario: A session that priced its calls without reporting tokens splits by cost
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows report cost but no token counts
+    When each pull request's usage is read
+    Then each reports the share of the cost stamped on its branch
 
   @unit
   Scenario: The model breakdown reports only the pull request's own calls

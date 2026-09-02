@@ -350,6 +350,7 @@ describe("ContributeLogFactsCommand", () => {
   });
 
   describe("when the memo cannot be read", () => {
+    /** @scenario "A record whose memo cannot be read is contributed unstamped" */
     it("contributes the record unstamped rather than failing it", async () => {
       const failing: SessionContextMemo = {
         get: async () => {
@@ -366,6 +367,26 @@ describe("ContributeLogFactsCommand", () => {
 
       expect(event!.type).toBe(LOG_FACTS_CONTRIBUTED_EVENT_TYPE);
       expect(event!.data.branch).toBeUndefined();
+    });
+  });
+
+  describe("when the memo cannot be written", () => {
+    /** @scenario "A declaration whose memo cannot be written is still contributed" */
+    it("contributes the declaration itself rather than failing it", async () => {
+      const failing: SessionContextMemo = {
+        get: async () => null,
+        set: async () => {
+          throw new Error("redis away");
+        },
+      };
+      const handler = logFactsHandler(failing);
+
+      const [event] = await handler.handle(
+        makeCommand(CONTRIBUTE_LOG_FACTS_COMMAND_TYPE, declarationData()),
+      );
+
+      expect(event!.type).toBe(LOG_FACTS_CONTRIBUTED_EVENT_TYPE);
+      expect(event!.data.recordId).toBe("rec-context");
     });
   });
 });

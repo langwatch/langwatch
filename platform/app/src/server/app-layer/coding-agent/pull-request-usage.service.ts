@@ -637,7 +637,14 @@ export class PullRequestUsageService {
       return {
         ...toIdentity(pullRequest),
         title: pullRequest.title,
-        lastActivityAtMs: latestActivityAtMs(attached),
+        // Discovery runs on this project's own sessions, the share runs on
+        // the stamps, so a discovered pull request can end up with no session
+        // attached: every stamp of the session that found it landed on a
+        // neighbour. The row stays, reporting no tokens and no cost, and
+        // dates itself by the pull request rather than by the epoch.
+        lastActivityAtMs:
+          latestActivityAtMs(attached) ||
+          (pullRequest.prUpdatedAt ?? pullRequest.prCreatedAt).getTime(),
         sessionsCount: totals.sessionsCount,
         inputTokens: totals.inputTokens,
         outputTokens: totals.outputTokens,
@@ -772,24 +779,28 @@ export class PullRequestUsageService {
     sessions: CodingAgentBranchSessionRow[];
     rowMatchedSessionKeys: ReadonlySet<string>;
   }> {
-    const rowMatched = await this.deps.sessions.listByRepositoryBranch({
-      tenantIds,
-      repositoryHost,
-      repositoryOwner,
-      repositoryName,
-      branches,
-      startedAtFromMs: fromMs,
-    });
+    // Independent reads, so they go together: the stamped one needs the
+    // row-matched keys only to subtract them, which happens after both land.
+    const [rowMatched, stamped] = await Promise.all([
+      this.deps.sessions.listByRepositoryBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        startedAtFromMs: fromMs,
+      }),
+      this.deps.sessionEvents.listSessionsByStampedBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        fromMs,
+      }),
+    ]);
     const rowMatchedSessionKeys = new Set(rowMatched.map(sessionKey));
 
-    const stamped = await this.deps.sessionEvents.listSessionsByStampedBranch({
-      tenantIds,
-      repositoryHost,
-      repositoryOwner,
-      repositoryName,
-      branches,
-      fromMs,
-    });
     const missing = stamped.filter(
       (pair) => !rowMatchedSessionKeys.has(sessionKey(pair)),
     );

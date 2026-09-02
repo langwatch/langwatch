@@ -16,6 +16,7 @@ import {
   isStampableContext,
   SESSION_CONTEXT_EVENT,
   type SessionContextMemo,
+  type SessionWorkingContext,
   workingContextOfFacts,
 } from "../services/session-context-memo";
 
@@ -81,8 +82,9 @@ export class ContributeLogFactsCommand
    * else (hooks, plugin loads, body events) passes through untouched.
    *
    * A memo write is idempotent, so a retried command re-writes the same value.
-   * A memo read failure degrades to an unstamped row rather than failing the
-   * contribution — attribution is a refinement of the record, not part of it.
+   * Neither a failed read nor a failed write fails the contribution: both
+   * degrade to an unstamped row, because attribution is a refinement of the
+   * record, not part of it.
    */
   private async stamped(
     data: ContributeLogFactsCommandData,
@@ -90,29 +92,14 @@ export class ContributeLogFactsCommand
     const rawName = String(data.facts["event.name"] ?? "");
 
     if (normalizeEventName(rawName) === SESSION_CONTEXT_EVENT) {
-      const context = workingContextOfFacts(data.facts);
-      if (context) {
-        await this.deps.contextMemo.set({
-          tenantId: data.tenantId,
-          sessionId: data.sessionId,
-          context,
-        });
-      }
+      await this.remember(data);
       return data;
     }
 
     if (!mapsToCodingAgentSessionEvent({ data })) return data;
 
-    let context;
-    try {
-      context = await this.deps.contextMemo.get({
-        tenantId: data.tenantId,
-        sessionId: data.sessionId,
-      });
-    } catch {
-      return data;
-    }
-    if (context === null || !isStampableContext(context)) return data;
+    const context = await this.stampableContext(data);
+    if (context === null) return data;
 
     return {
       ...data,
@@ -121,6 +108,45 @@ export class ContributeLogFactsCommand
       repositoryName: context.repositoryName,
       branch: context.branch,
     };
+  }
+
+  /**
+   * Put a declaration's context in the memo, for the rows that follow it. A
+   * declaration naming no repository says nothing to remember, and a memo
+   * outage leaves those later rows unstamped rather than failing this one.
+   */
+  private async remember(data: ContributeLogFactsCommandData): Promise<void> {
+    const context = workingContextOfFacts(data.facts);
+    if (context === null) return;
+    try {
+      await this.deps.contextMemo.set({
+        tenantId: data.tenantId,
+        sessionId: data.sessionId,
+        context,
+      });
+    } catch {
+      return;
+    }
+  }
+
+  /**
+   * The context this record should be stamped with, or null when there is
+   * none to stamp: nothing declared yet, a partial declaration, or a memo
+   * that cannot be read.
+   */
+  private async stampableContext(
+    data: ContributeLogFactsCommandData,
+  ): Promise<SessionWorkingContext | null> {
+    try {
+      const context = await this.deps.contextMemo.get({
+        tenantId: data.tenantId,
+        sessionId: data.sessionId,
+      });
+      if (context === null || !isStampableContext(context)) return null;
+      return context;
+    } catch {
+      return null;
+    }
   }
 
   static getAggregateId(payload: ContributeLogFactsCommandData): string {

@@ -339,45 +339,51 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
       ]);
     });
 
-    it("round-trips the stamp and returns one total per context", async () => {
-      const totals = await repository.sumTokensByModelPerSession({
-        tenantIds: [tenantId],
-        sessionIds: [stampedSession],
-        fromMs: baseMs - 60_000,
-      });
+    describe("when the per-model totals are read", () => {
+      it("round-trips the stamp and returns one total per context", async () => {
+        const totals = await repository.sumTokensByModelPerSession({
+          tenantIds: [tenantId],
+          sessionIds: [stampedSession],
+          fromMs: baseMs - 60_000,
+        });
 
-      const byBranch = new Map(totals.map((row) => [row.branch, row]));
-      expect(byBranch.get("feat/split")?.inputTokens).toBe(10);
-      expect(byBranch.get("feat/split")?.repositoryOwner).toBe("Acme");
-      expect(byBranch.get("feat/other")?.inputTokens).toBe(30);
-      expect(byBranch.get("")?.inputTokens).toBe(50);
-      expect(byBranch.get("")?.repositoryOwner).toBe("");
+        const byBranch = new Map(totals.map((row) => [row.branch, row]));
+        expect(byBranch.get("feat/split")?.inputTokens).toBe(10);
+        expect(byBranch.get("feat/split")?.repositoryOwner).toBe("Acme");
+        expect(byBranch.get("feat/other")?.inputTokens).toBe(30);
+        expect(byBranch.get("")?.inputTokens).toBe(50);
+        expect(byBranch.get("")?.repositoryOwner).toBe("");
+      });
     });
 
-    it("finds the session by its stamped branch, case-folding the repository", async () => {
-      const pairs = await repository.listSessionsByStampedBranch({
-        tenantIds: [tenantId],
-        repositoryHost: "github.com",
-        repositoryOwner: "acme",
-        repositoryName: "widgets",
-        branches: ["feat/split"],
-        fromMs: baseMs - 60_000,
-      });
+    describe("when a stamped branch is looked up", () => {
+      it("finds the session, case-folding the repository", async () => {
+        const pairs = await repository.listSessionsByStampedBranch({
+          tenantIds: [tenantId],
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          branches: ["feat/split"],
+          fromMs: baseMs - 60_000,
+        });
 
-      expect(pairs).toEqual([{ tenantId, sessionId: stampedSession }]);
+        expect(pairs).toEqual([{ tenantId, sessionId: stampedSession }]);
+      });
     });
 
-    it("answers nothing for a branch nothing was stamped on", async () => {
-      const pairs = await repository.listSessionsByStampedBranch({
-        tenantIds: [tenantId],
-        repositoryHost: "github.com",
-        repositoryOwner: "acme",
-        repositoryName: "widgets",
-        branches: ["feat/never-stamped"],
-        fromMs: baseMs - 60_000,
-      });
+    describe("when a branch nothing was stamped on is looked up", () => {
+      it("answers nothing", async () => {
+        const pairs = await repository.listSessionsByStampedBranch({
+          tenantIds: [tenantId],
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          branches: ["feat/never-stamped"],
+          fromMs: baseMs - 60_000,
+        });
 
-      expect(pairs).toEqual([]);
+        expect(pairs).toEqual([]);
+      });
     });
   });
 });
