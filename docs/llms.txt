@@ -398,7 +398,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Billing & Spend Events](https://langwatch.ai/docs/ai-gateway/billing-events.md): One spend event per gateway request, delivered by signed webhooks and reconcilable over REST. The money contract, settled requests, supersession, and the two-grain reconciliation workflow.
 - [Webhooks](https://langwatch.ai/docs/features/webhooks.md): Signed, retried, replayable event delivery to your endpoints, with per-endpoint subscriptions, a delivery log, health, and automatic disabling of dead receivers.
-- [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): The end-to-end pattern for platforms that rebill their own customers, provision a tenant key and caps, ingest signed spend events, reconcile, handle breaches, and close periods.
+- [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): Give each customer their own virtual key and caps, ingest signed spend events into your billing ledger, reconcile, handle breaches, and close periods.
 - [Demo: a rebilling agent platform](https://langwatch.ai/docs/ai-gateway/demo-agent-platform.md): The open-source agent-billing-demo repo, a tiny agent SaaS that meters and rebills its customers entirely through LangWatch, in TypeScript and Python.
 
 ## Governance
@@ -428,7 +428,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Caching & Performance
 
 - [Cache Control](https://langwatch.ai/docs/ai-gateway/cache-control.md): Cache rules decide, per request, whether the LangWatch AI Gateway forwards, strips, or injects provider prompt-cache markers.
-- [Streaming](https://langwatch.ai/docs/ai-gateway/streaming.md): SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
+- [Streaming](https://langwatch.ai/docs/ai-gateway/streaming.md): Read a completion as Server-Sent Events through the gateway, and know what the caller gets when a stream stops early.
 
 ### Safety & Governance
 

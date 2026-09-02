@@ -2026,7 +2026,7 @@
     },
     {
       "source": "/ai-gateway/cookbooks/multi-tenant-reseller",
-      "destination": "/ai-gateway/billing-events"
+      "destination": "/ai-gateway/cookbooks/metering-and-rebilling"
     }
   ]
 }

@@ -1951,231 +1951,118 @@ description: OpenAI-compatible error shapes and a complete type enum.
 sidebarTitle: Errors
 ---
 
-Every LangWatch error, from the gateway data plane and from the management API alike, is returned in one OpenAI-compatible envelope:
+Every error the LangWatch AI Gateway writes itself uses one JSON envelope:
 
 ```json
 {
   "error": {
-    "type":    "<type>",
-    "code":    "<code>",
-    "message": "<human-readable>",
-    "meta":    { "<key>": "<value>" }
+    "type": "budget_exceeded",
+    "code": "budget_exceeded",
+    "message": "Budget exceeded for scope=project window=month",
+    "meta": {
+      "budget_id": "bgt_01HZX9K3MNN",
+      "budget_scope": "project",
+      "budget_window": "month"
+    },
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "b7ad6b7169203331",
+    "tips": ["Raise the project's monthly limit, or wait for the window to roll over."],
+    "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+    "fault": "customer"
   }
 }
 ```
 
-This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SDK (which parses a superset), expect. Existing client code raises its usual typed exceptions unchanged.
+The OpenAI, Anthropic and Google SDKs parse this shape and raise their usual typed exceptions.
 
-## Two planes, one envelope, one difference
-
-`type`, `code`, `message` and `meta` mean the same thing on both LangWatch surfaces, and a client that reads only those four works against either. The surfaces are:
-
-- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/v1/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
-- The **data plane**: the OpenAI-compatible chat surface the gateway serves. Your application's model calls go here.
-
-They differ in exactly two ways, both consequences of the data plane being OpenAI-wire-shaped on purpose:
-
-| | Control plane | Data plane |
-|---|---|---|
-| Validation detail | `error.meta.reasons` | `error.reasons` |
-| `402 budget_exceeded` | never | this is the only place it is raised |
-
-Read the reason chain from the plane you called. Nothing else about the envelope moves, and the data plane's extra `tips`, `docs_url` and `fault` fields are additive on both.
-
-<Note>`402 budget_exceeded` is a data-plane refusal because a budget stops **traffic**, not administration. Creating or editing a budget over the control plane is never refused for being over cap.</Note>
-
-### Fields
+## Fields
 
 | Field | Always present | What it is |
 |---|---|---|
-| `type` | yes | The coarse discriminant provider SDKs branch on. On the gateway data plane it carries the same value as `code` (the table below is the enum). On the management API it is the status class: `bad_request`, `unauthenticated`, `permission_denied`, `not_found`, `conflict`, `precondition_failed`, `unprocessable_entity`, `rate_limited`, `internal_error`. |
-| `code` | yes | The specific, stable machine name for what happened. **This is the field to branch on**, on either plane. |
-| `message` | yes | One sentence for a human. Wording is not stable; never parse it. |
-| `meta` | no | Structured detail the sentence deliberately leaves out, so a client never has to scrape prose. Keys are `lower_snake_case` (for example `budget_id`, `budget_scope`, `scope_type`). Omitted entirely when there is nothing to add. On the data-plane `402`, `meta.budget_scope` is the offending budget's `scope_type`: it keeps the `budget_` prefix because it sits in a self-consistent family alongside `budget_id`, `budget_window` and `budget_provider`. |
-| `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them when filing support tickets. |
+| `type` | yes | The coarse discriminant provider SDKs branch on. It carries the same value as `code`. |
+| `code` | yes | The stable machine name for what happened. Branch on this field. |
+| `message` | yes | One sentence for a person. Wording changes, so never parse it. When the failing code attached no message, it repeats the code. |
+| `meta` | no | Structured detail the sentence leaves out, in `lower_snake_case` keys. A `402` carries `budget_id`, `budget_scope`, `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. |
+| `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them in a support ticket. |
+| `tips` | no | Up to four remediation sentences, in the order to try them. |
+| `docs_url` | no | An absolute link to the page that explains the refusal. |
+| `fault` | no | Who has to act: `customer`, `provider`, or `platform`. |
+| `reasons` | no | The chain of wrapped errors, each in this same shape. |
 
-Validation failures put the offending fields under `meta`: `meta.target` names the part of the request that failed (`json`, `query`, `param`) and `meta.fields` lists the offending paths. The per-violation chain carries one `{ code, message, meta }` entry each, with `meta.field`, `meta.type` and, where the schema knows them, `meta.expected` and `meta.received`. That chain lives at **`error.meta.reasons` on the control plane** and at **`error.reasons` on the data plane**, as above.
+Ignore fields you do not recognize. New ones are added over time and none of them changes an existing one.
 
-The gateway data plane adds three fields on the errors it can offer a next step for, most notably the `402 budget_exceeded`:
+## Error codes
 
-| Field | What it is |
-|---|---|
-| `tips` | An ordered list of remediation sentences. |
-| `docs_url` | A deep link to the page explaining the refusal. |
-| `fault` | Who has to act: `customer`, `platform`, or `provider`. |
+| `code` | HTTP | Cause | What the caller does |
+|---|---|---|---|
+| `invalid_api_key` | 401 | The presented credential matches no virtual key. | Check the key in `Authorization`, `X-Api-Key`, `X-Goog-Api-Key` or `Xi-Api-Key`. |
+| `virtual_key_revoked` | 403 | The key was revoked. Revocation is one way. | Mint a new key. |
+| `virtual_key_disabled` | 403 | The key was disabled. The secret is intact. | Ask an administrator to enable it. |
+| `virtual_key_expired` | 403 | The key's expiration date has passed. | Extend the expiration date, or create a new key. |
+| `budget_exceeded` | 402 | A budget that applies to this request is over its limit. | Raise the limit named in `meta`, or wait for the window to roll over. |
+| `rate_limited` | 429 | The key is over its requests-per-minute or requests-per-day ceiling. | Back off and retry. |
+| `realtime_session_limit` | 429 | The key already holds its maximum of open realtime voice sessions. | Retry when a call ends. |
+| `guardrail_blocked` | 403 | A pre-call or post-call guardrail returned `block`. | Change the content, or change the guardrail on the key. |
+| `guardrail_upstream_unavailable` | 503 | A guardrail evaluator could not be reached, and the key fails closed. | Retry, or set the key's guardrails to fail open. |
+| `policy_violation` | 403 | The request content matched a deny rule in the key's policy rules. | Change the request, or change the policy rule. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, its policy rules, its provider access, or its routing policy. | Send a model the key allows, or widen the key. |
+| `model_provider_not_bound` | 400 | The request names a provider the key holds no credential for. | Bind that provider to the key, or send the model to a provider the key holds. |
+| `model_not_recognized` | 400 | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider. | Send the model as `provider/model`. |
+| `missing_model` | 400 | The request names no model. `meta.request_type` says where the endpoint expects one. | Add the model to the request. |
+| `unsupported_parameter` | 400 | The target lane cannot honor a parameter, or `drop_tuning_params` is `false` and the lane has no mapping for it. | Remove the parameter, or allow the drop. |
+| `end_user_required` | 400 | A per-end-user budget is active on the key and the request carried no end-user id. | Send the `user` body field or the `X-LangWatch-End-User-Id` header, then retry. |
+| `no_provider_configured` | 400 | The key's bundle carries no provider credential at all. | Configure a model provider for the organization. |
+| `provider_credential_invalid` | 400 | The stored credential cannot produce an authenticated call, so the request never left LangWatch. | Re-save the credential in Settings, Model Providers. Retrying does not clear it. |
+| `provider_config_invalid` | 400 | The provider slot cannot serve this request: no key declares the model, a deployment mapping is missing, or the provider does not implement the operation. | Add the model or the deployment mapping to the provider. |
+| `provider_credential_rejected` | 401 | The provider received the credential and refused it. | Check the key or service account is not revoked, expired, or short of permission for the model. |
+| `bad_request` | 400 | The request body or a required part failed validation. | Read `message` for the field, and send the request again. |
+| `payload_too_large` | 413 | The body is over the server's maximum request size. It is rejected at the edge, before auth and before any provider call. | Send a smaller body. |
+| `not_found` | 404 | The resource the request named does not exist. | Check the path. |
+| `provider_error` | 502 | An upstream provider failed and no credential in the chain answered. | Retry with backoff, then check the provider's status page. |
+| `provider_timeout` | 504 | The provider accepted the request and did not answer in time. | Retry with backoff. |
+| `provider_connection_failed` | 502 | Nothing answered at the provider's address, so the request never reached it. | Retry. Check a custom base URL is correct and reachable. |
+| `chain_exhausted` | 502 | Every credential in the fallback chain failed. | Retry, then check the providers on the key. |
+| `circuit_open` | 503 | Repeated upstream failures opened the credential's circuit breaker, so the gateway declined to dial the provider. | Retry after the cooldown. Answered 4xx responses never open the breaker. |
+| `codex_session_expired` | 401 | The codex provider's OpenAI sign-in is dead. | Sign in with OpenAI again on the model provider. |
+| `request_abandoned` | 499 | The caller disconnected, or its deadline expired before the provider answered. | Send the request again if you still need the answer. |
+| `auth_upstream_unavailable` | 503 | The gateway could not reach the LangWatch control plane to resolve the key. | Retry. |
+| `realtime_registry_unavailable` | 503 | The control plane could not record a realtime voice session, so the gateway minted nothing. | Retry. |
+| `internal_error` | 500 | An unclassified gateway failure. | Retry, and quote `trace_id` in a support ticket. |
 
-A client that reads only `type`, `code`, `message` and `meta` works unchanged against both planes; the three fields above are additive.
+## Provider errors
 
-<Note>Clients must ignore unknown fields. Fields are added to this envelope over time and none of the additions above changes an existing one.</Note>
+A provider's own terminal response is forwarded instead of being replaced. The status is the provider's, and the body is the provider's own bytes when the adapter captured them. `Retry-After` and `x-should-retry` are forwarded with it, so a client can honor the provider's backoff hint.
+
+When only the status and the message are available, the gateway writes the same envelope with the provider's error discriminant in `type` and `code`, for example `insufficient_quota` or `overloaded_error`, and `provider_error` when the adapter parsed neither.
 
 ## Response headers
 
-Errors (like successes) always carry:
-
-- `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
-- `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
-- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses. Use it to tell the two apart rather than guessing from the body shape.
-
-## Type enum
-
-| `type` | HTTP | When |
+| Header | When present | Value |
 |---|---|---|
-| `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
-| `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
-| `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
-| `virtual_key_expired` | `403` | The VK carries an expiration date and that date has passed. The key material is intact and its status is still `active`, so extending `expires_at` puts it back in service without minting a new secret. |
-| `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
-| `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
-| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
-| `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
-| `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
-| `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
-| `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `policy_rules.tools.deny` (or absent from `allow` if set). |
-| `url_not_allowed` | `403` | Any `http://`, `https://` URL extracted from the request body (user messages, tool-call args, system prompts, anywhere) matched `policy_rules.urls.deny` or fell outside a non-null `allow` list. |
-| `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
-| `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
-| `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
-| `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
-| `upstream_timeout` | `504` | An upstream provider timed out and fallback (if any) was exhausted. |
-| `bad_request` | `400` | Validation error on the incoming payload. |
-| `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
-| `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
-| `payload_too_large` | `413` | Request body exceeded `SERVER_MAX_REQUEST_BODY_BYTES` (default 32 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
-| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
+| `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
+| `X-LangWatch-Handled-Error` | The gateway wrote the error | The body's `error.code`. It is removed from a forwarded provider response, so it tells the two apart. |
+| `X-LangWatch-Provider` | A provider error was forwarded and the provider is known | The provider that answered. |
+| `Retry-After`, `x-should-retry` | The provider sent them | The provider's own values, forwarded. |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id, and the `gateway_request_id` on spend events. |
+| `X-LangWatch-Budget-Warning` | A budget is at or over its warning threshold | `<scope>:<percent>`, or `<scope>/<model provider id>:<percent>` for a provider-filtered budget. Comma separated. |
 
-## Control-plane codes
+`X-LangWatch-Budget-Warning` rides on successful responses. A budget in warning never becomes an error envelope.
 
-The management and webhook APIs answer with the same envelope, and their `type` is the status class. Branch on `code`:
-
-| `code` | HTTP | When |
-|---|---|---|
-| `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
-| `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
-| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in, in an organization with no governance project either. |
-| `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
-| `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
-| `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
-| `gateway_spend_group_by_unstable` | `400` | A spend rollup was grouped by `model` or `provider`, or into time buckets, over a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that actually served it, so a page walk over such a group counts some requests twice and misses others. `meta.group_by` names the dimensions that move and `meta.settles_at` is when the requested window becomes safe. Reconcile closed periods, or send `allow_unstable` when an approximate shape is enough. |
-| `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
-| `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
-| `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
-| `external_id_conflict` | `409` | The `external_id` you supplied already belongs to another resource of this type in the organization. |
-| `idempotency_error` | `409` | An `Idempotency-Key` was reused with a different body, or while its first request is still running. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely). |
-| `webhook_endpoint_not_found` | `404` | No webhook endpoint with that id is visible to this credential. |
-| `spend_source_unavailable` | `412` | The deployment has no ClickHouse spend source, so a spend figure would be indistinguishable from zero spend. |
-
-## Budget-warning headers (not errors)
-
-These are *soft* signals on **successful** responses:
-
-- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is at or over the 80 percent soft threshold. Multiple can be present.
-
-A `warn` breach never turns into an error envelope; it's only a header.
-
-## `end_user_required` (fail-closed attribution)
-
-When a virtual key carries an active [attributed-user budget template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) and a request arrives with **no end-user id** anywhere the gateway resolves one, the request is rejected with `error.code = "end_user_required"` rather than passing uncapped. Branch on the `code`: the fix is always on the request side, send the OpenAI `user` field or the `X-LangWatch-End-User-Id` header (`X-Litellm-End-User-Id` is accepted as an alias), and the error's `message` and `tips` name exactly that. It is terminal for the request as sent; do not retry without adding the id.
-
-## Examples
-
-### Invalid key
-
-```http
-HTTP/1.1 401 Unauthorized
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
-
-{
-  "error": {
-    "type":    "invalid_api_key",
-    "code":    "invalid_api_key",
-    "message": "No active virtual key matches the presented credential."
-  }
-}
-```
-
-### Budget exceeded
-
-```http
-HTTP/1.1 402 Payment Required
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_1f0a7c3d5e8b2946af10c7d3e5b829
-
-{
-  "error": {
-    "type":    "budget_exceeded",
-    "code":    "budget_exceeded",
-    "message": "Budget exceeded for scope=project window=month",
-    "meta":    {
-      "budget_id":     "bgt_01HZX9K3MNN",
-      "budget_scope":  "project",
-      "budget_window": "month"
-    },
-    "tips":     ["Raise the project's monthly limit, or wait for the window to roll over."],
-    "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
-    "fault":    "customer"
-  }
-}
-```
-
-### Blocked tool
-
-```http
-HTTP/1.1 403 Forbidden
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
-
-{
-  "error": {
-    "type":    "tool_not_allowed",
-    "code":    "tool_not_allowed",
-    "message": "Tool 'shell.exec' is blocked by VK policy policy_rules.tools.",
-    "meta":    { "tool": "shell.exec" }
-  }
-}
-```
-
-### Upstream timeout after fallback exhaustion
-
-```http
-HTTP/1.1 504 Gateway Timeout
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_4e71a9c2b60d85f3179ec4b208da6f
-X-LangWatch-Provider: anthropic
-X-LangWatch-Fallback-Count: 2
-
-{
-  "error": {
-    "type":    "upstream_timeout",
-    "code":    "upstream_timeout",
-    "message": "All 3 providers in the fallback chain timed out after 30000ms."
-  }
-}
-```
+<Note>A non-streaming call that runs long writes a keep-alive byte, which commits status `200` before the outcome is known. The response then carries `X-LangWatch-Heartbeat-Active: true`, and the body still holds an `error` key when the call failed. Read the body rather than the status on those responses.</Note>
 
 ## Streaming errors
 
-For SSE streaming, a terminal `event: error` frame carries the same envelope and the stream ends:
+Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:
 
 ```
 event: error
-data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection reset after 2 chunks"}}
+data: {"type":"error","error":{"type":"provider_error","message":"upstream connection reset"}}
 
 ```
 
-Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Gateway-Request-Id` still identifies the session in traces.
+`error.type` is the gateway `code` from the table above, or the provider's own error discriminant on a forwarded failure. When the provider sent a native error body, that body is written into the frame verbatim instead.
 
-### Mid-stream `code` values
-
-Once bytes are flowing, the HTTP status is already 200, so the distinguishing signal for clients is the `code` field inside the terminal frame:
-
-| `code` | Source | Meaning |
-|---|---|---|
-| `upstream_mid_stream_failure` | provider path | Upstream errored, reset, or closed unexpectedly after at least one chunk was emitted. Pre-connection failures fall through the transparent-fallback path and never reach the client, so seeing this code means fallback was either not configured, already exhausted, or the failure happened too late. |
-| `stream_chunk_blocked` | guardrail path | A `stream_chunk` guardrail returned `block` on a visible-text frame before emit. Subsequent upstream chunks are discarded (see [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk)). The channel is closed immediately after the frame. |
-| `guardrail_upstream_unavailable` | guardrail path | Terminal path is flag-only for streaming (see [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed)); you'll see this code only if a future iter wires post-stream enforcement. |
-
-<Note>The `type` on a streaming terminal frame always reflects the category (`provider_error`, `guardrail_blocked`), clients keying off `type` will already have a usable classification. The `code` is the granular discriminator if you need it (for example, a retry policy that distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't retry").</Note>
+Treat a stream that delivered chunks and then an error frame as incomplete.
 
 ---
 
@@ -2274,484 +2161,61 @@ description: Manage virtual keys, budgets, and routing policies programmatically
 sidebarTitle: Management REST
 ---
 
-The management REST API is the same surface the `langwatch` CLI and LangWatch dashboard use, exposed for scripts, CI pipelines, SDKs, and terraform providers. It runs on the LangWatch control plane (`https://app.langwatch.ai`), separately from the data-plane gateway (`https://gateway.langwatch.ai`).
+## What it is
 
-Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_...` or `X-Auth-Token: lwp_...`). No new token format.
+The management REST API creates and edits the gateway's own resources: virtual keys, budgets, cache rules, and the spend they produce. It is the surface the `langwatch` CLI and the LangWatch dashboard use.
 
-<Info>The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from Node or Python, consider using the CLI rather than calling the REST directly, it handles pagination, JSON formatting, and error messages for you.</Info>
-
-## Base
+It runs on the LangWatch control plane, not on the gateway data plane:
 
 ```
-Base URL: https://app.langwatch.ai/api/gateway/v1
-Auth:     Authorization: Bearer <project_api_token>
-Content:  application/json
+https://app.langwatch.ai/api/gateway/v1
 ```
 
-Self-hosted: replace the base with your control plane's DNS.
+Self-hosted: use your own control plane host with the same path prefix.
 
-## Paging
+## Authentication
 
-Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim, and keep going until it comes back `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
-
-## Retrying a create safely
-
-The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/v1/endpoints`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
-
-```bash
-curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  -H "Idempotency-Key: signup-acme-4171" \
-  -H "Content-Type: application/json" \
-  -d '{ "scope": {...}, "name": "customer-acme", "window": "month", "limit_usd": "250" }'
-```
-
-- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. Nothing is created twice.
-- Send the same key with a **different** body and the request is refused: `409` with `error.code = "idempotency_error"`. The key already stands for a different request.
-- Retry while the first attempt is still running and you also get `409 idempotency_error`, so two racing retries cannot both create.
-- Only successful outcomes are stored. If the create failed, a retry runs it again for real.
-- The key is yours to choose, 8 to 255 characters. Scope it to the thing you are creating, not the attempt.
-
-Replay is what makes a lost create recoverable on the two routes that return a secret exactly once: replaying the original request returns the original `secret`.
-
-<Warning>
-**The body has to be identical on the retry**, because the key is matched against a fingerprint of it. A field computed fresh each attempt makes every retry a `409`: `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive such values from something the first call already produced, for example the `created_at` of the virtual key you just minted, rather than from the clock at retry time.
-</Warning>
-
-Keys are scoped to your project on the gateway routes and to your organization on the webhook routes, so two projects can use the same key text without colliding. Stored responses are encrypted at rest and expire after 24 hours.
-
-## From the SDKs
-
-Both LangWatch SDKs wrap this API, so you get the paging walk, the error types, and the idempotency plumbing without writing them. `virtualKeys` / `virtual_keys` and `gatewayBudgets` / `gateway_budgets` cover this page; `spendEvents` / `spend_events` and `webhooks` cover the [billing](/ai-gateway/billing-events) and [webhook](/features/webhooks) surfaces.
-
-<CodeGroup>
-
-```typescript TypeScript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
-
-// Three ways to read a list: one page, the whole walk, or a stream.
-const page = await langwatch.gatewayBudgets.listPage({ limit: 100 });
-const { data } = await langwatch.gatewayBudgets.list({ externalId: "acme-tenant-4171" });
-for await (const budget of langwatch.gatewayBudgets.iterate()) {
-  console.log(budget.name, budget.resets_at);
-}
-
-const budget = await langwatch.gatewayBudgets.create(
-  {
-    scope: { kind: "project", project_id: "proj_01HZ..." },
-    name: "customer-acme",
-    window: "month",
-    limit_usd: "250",
-    cycle_anchor_at: "2026-01-17T09:00:00Z",
-    external_id: "acme-tenant-4171",
-  },
-  {
-    idempotencyKey: "signup-acme-4171",
-    onIdempotentReplay: () => console.log("replayed, nothing was created"),
-  },
-);
-
-await langwatch.gatewayBudgets.archive(budget.id);
-```
-
-```python Python
-import os
-
-import langwatch
-
-langwatch.setup(api_key=os.environ["LANGWATCH_API_KEY"])
-
-# Three ways to read a list: one page, the whole walk, or a stream.
-page = langwatch.gateway_budgets.list_page(limit=100)
-listing = langwatch.gateway_budgets.list(external_id="acme-tenant-4171")
-for budget in langwatch.gateway_budgets.iterate():
-    print(budget["name"], budget["resets_at"])
-
-budget = langwatch.gateway_budgets.create(
-    scope={"kind": "project", "project_id": "proj_01HZ..."},
-    name="customer-acme",
-    window="month",
-    limit_usd="250",
-    cycle_anchor_at="2026-01-17T09:00:00Z",
-    external_id="acme-tenant-4171",
-    idempotency_key="signup-acme-4171",
-    on_idempotent_replay=lambda: print("replayed, nothing was created"),
-)
-
-langwatch.gateway_budgets.archive(budget["id"])
-```
-
-</CodeGroup>
-
-Three things are worth knowing before you write against them:
-
-- **Paging has three shapes on purpose.** `listPage` / `list_page` returns one page and its cursor when you want to drive the walk yourself. `list` returns the whole set. `iterate` streams rows and fetches pages behind you, which is what you want over a large window.
-- **`idempotencyKey` / `idempotency_key` is a per-call option**, not a body field, and the replay callback fires when the server answered from a stored receipt. That is how a provisioning job tells "I created it" from "it already existed".
-- **Retirement is named after what it does.** Budgets and webhook endpoints `archive`, which keeps their history readable. Virtual keys `disable` (reversible) or `revoke` (terminal).
-
-## Your own ids and metadata
-
-Virtual keys and budgets both take two optional fields on create, so you do not have to keep a mapping table between your system and LangWatch:
-
-- `external_id`: your identifier for whatever this resource belongs to, for example your customer id. Unique per organization and resource type. Reusing one answers `409` with `error.code = "external_id_conflict"`, which is what makes provisioning safe to retry.
-- `metadata`: a flat object of string keys and values, echoed back on every read.
-
-Filter by your own id instead of storing ours:
-
-```bash
-curl -sS "https://app.langwatch.ai/api/gateway/v1/budgets?external_id=acme-tenant-4171" \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY"
-```
-
-## Virtual keys
-
-### List
+Send a LangWatch API key on every request:
 
 ```
-GET /virtual-keys
-GET /virtual-keys?limit=100&cursor=<next_cursor>
+Authorization: Bearer $LANGWATCH_API_KEY
 ```
 
-Returns the keys visible to your credential: keys scoped to your project, its team, or the whole organization, newest first.
-
-Visibility is applied to each page after it is read, so a page of virtual keys can hold fewer rows than `limit` while the walk still has more to give.
-
-Response:
-
-```json
-{
-  "data": [
-    {
-      "id": "vk_01HZX...",
-      "organization_id": "org_01HZ...",
-      "name": "prod-key",
-      "description": null,
-      "status": "active",
-      "purpose": "user",
-      "display_prefix": "vk-lw-01HZX9",
-      "principal_user_id": null,
-      "trace_project_id": "proj_01HZ...",
-      "trace_project_archived": false,
-      "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
-      "routing_policy_id": null,
-      "routing_mode": "none",
-      "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
-      "revision": "3",
-      "created_at": "2026-04-10T12:00:00Z",
-      "updated_at": "2026-04-18T18:21:00Z",
-      "last_used_at": "2026-04-18T21:03:12Z",
-      "revoked_at": null,
-      "expires_at": null
-    }
-  ]
-}
-```
-
-`purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
-
-`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys with no recent use.
-
-`expires_at` is the date the key stops serving, or `null` for a key that never expires. `status` stays `active` past that date, so compare `expires_at` with the current time to tell an expired key apart.
-
-### Create
-
-```
-POST /virtual-keys
-```
-
-Body (only `name` is required):
-
-```json
-{
-  "name": "ci-key",
-  "description": "CI smoke tests",
-  "principal_user_id": null,
-  "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
-  "routing_mode": "none",
-  "routing_policy_id": null,
-  "expires_at": "2026-09-01T00:00:00.000Z",
-  "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
-  "config": { "providersAllowed": ["mp_openai..."] }
-}
-```
-
-- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
-- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
-- `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
-- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
-- `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
-- `expires_at` is when the key stops serving. Omit it and the key never expires. A date already in the past is refused with `virtual_key_expiry_in_past`. After the date, requests are refused with `virtual_key_expired` while `status` stays `active`, so read `expires_at` rather than the status to tell an expired key apart.
-
-Response `201`:
-
-```json
-{
-  "virtual_key": { /* full VK shape per List */ },
-  "secret": "vk-lw-01HZX9K3MABCDEFGH...JIKLMN0Z"
-}
-```
-
-<Warning>The `secret` field is returned **only this once**. Persist it immediately.</Warning>
-
-### Get
-
-```
-GET /virtual-keys/:id
-```
-
-Response: `{ "virtual_key": {...} }`. No secret.
-
-### Spend
-
-```
-GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
-```
-
-Requires `gatewayUsage:view`. `from` and `to` are epoch milliseconds, both optional, defaulting to the current UTC calendar month. Answers `{ "virtual_key_id", "spent_usd", "requests", "window" }`, with `window` echoed in the same unit so a response feeds straight back as the next request. It reads the cost path the dashboard reads, so this number and the UI agree by construction.
-
-On deployments without a ClickHouse spend source the endpoint answers `412` with `error.code = "spend_source_unavailable"` rather than a `$0.00` that cannot be told apart from a zero-spend key.
-
-### Update
-
-```
-PATCH /virtual-keys/:id
-```
-
-Body (all fields optional):
-
-```jsonc
-{
-  "name": "new-name",
-  "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
-  "trace_project_id": "proj_01HZ...", // or null to re-resolve it
-  "routing_mode": "fallback_all",
-  "expires_at": "2026-10-01T00:00:00.000Z", // or null so it never expires
-  "budget": { "limit_usd": "50", "window": "month" },
-  "config": { /* partial, merges with existing */ }
-}
-```
-
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
-
-### Rotate, disable, enable, revoke
-
-```
-POST /virtual-keys/:id/rotate
-POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
-POST /virtual-keys/:id/enable
-POST /virtual-keys/:id/revoke
-```
-
-**Rotate** answers `{ "virtual_key": {...}, "secret": "vk-lw-NEW..." }`. The previous secret keeps authenticating for a 24 hour grace window, so in-flight clients roll over without a coordinated deploy.
-
-**Disable** is the reversible stop (`virtualKeys:update`): the key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact, and enable restores the key exactly as it was.
-
-**Revoke** is one-way. It also archives the key's own budgets and discards any rotation grace.
-
-All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
-
-## Budgets
-
-### List
-
-```
-GET /budgets
-GET /budgets?scope_type=virtual_key,principal
-GET /budgets?limit=100&cursor=<next_cursor>
-```
-
-Returns the non-archived budgets in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), newest first, with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter, applied in the query, so `limit` counts the rows you get back.
-
-Response:
-
-```json
-{
-  "spend_available": true,
-  "data": [
-    {
-      "id": "bgt_01HZ...",
-      "organization_id": "org_01HZ...",
-      "scope_type": "virtual_key",
-      "scope_id": "vk_01HZX...",
-      "name": "customer-acme cap",
-      "description": null,
-      "window": "month",
-      "on_breach": "block",
-      "limit_usd": "25",
-      "limit_nano_usd": 25000000000,
-      "spent_usd": "12.4531",
-      "spent_nano_usd": 12453100000,
-      "timezone": null,
-      "provider_key": null,
-      "external_id": "acme-tenant-4171",
-      "metadata": { "plan": "growth" },
-      "current_period_started_at": "2026-07-01T00:00:00.000Z",
-      "resets_at": "2026-08-01T00:00:00.000Z",
-      "cycle_anchor_at": null,
-      "last_reset_at": null,
-      "archived_at": null,
-      "created_at": "2026-06-12T10:00:00.000Z"
-    }
-  ]
-}
-```
-
-- **Money is an integer.** `limit_nano_usd` and `spent_nano_usd` are int64 billionths of a USD, and they are the source of truth; `limit_usd` and `spent_usd` are decimal strings rendered from them for display. Compare and sum the integers, and round exactly once at the end. Reading the strings back into a float is how a reconciliation drifts by a cent.
-- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` or `spent_nano_usd` as real spend in that case.
-- `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
-- `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
-- `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
-- `current_period_started_at` and `resets_at` are computed as you read them, so they always describe the period the budget is actually in. `cycle_anchor_at` is the instant the cycle rolls from, or `null` for calendar alignment.
-
-### Create
-
-```
-POST /budgets
-```
-
-Body:
-
-```jsonc
-{
-  "scope": {
-    "kind": "project",         // or organization, team, virtual_key, principal, group, attributed_user
-    "project_id": "proj_..."   // the id field depends on scope.kind:
-                               // organization_id | team_id | project_id |
-                               // virtual_key_id | principal_user_id | group_id;
-                               // attributed_user takes exactly one of
-                               // anchor_virtual_key_id | anchor_project_id
-  },
-  "name": "project-monthly-cap",
-  "description": "Standard monthly envelope",
-  "window": "month",           // minute | hour | day | week | month | total | manual
-  "limit_usd": 5000,           // or "5000.00"
-  "on_breach": "block",        // or warn
-  "timezone": "Europe/Amsterdam",
-  "provider_key": null,        // optional ModelProvider id to pin the budget to one provider
-  "cycle_anchor_at": null,     // optional ISO 8601 instant; rolls the cycle from here
-  "external_id": null,         // optional, your own id
-  "metadata": {}               // optional, flat string map
-}
-```
-
-`group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period).
-
-`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#anchoring-a-cycle-to-your-own-date) for the clamping rules.
-
-### Get
-
-```
-GET /budgets/:id
-```
-
-Response: `{ "budget": {...} }`, the same row shape the list returns, including live `spent_usd` and the current period pair.
-
-### Update
-
-```
-PATCH /budgets/:id
-```
-
-Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope, window, and `cycle_anchor_at` are fixed at creation; to move a period boundary, [reset](#reset-period) it.
-
-### Reset period
-
-```
-POST /budgets/:id/reset
-POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
-```
-
-Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
-
-### End-user spend
-
-Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
-
-### Archive
-
-```
-DELETE /budgets/:id
-```
-
-Soft archive: preserves ledger history, stops enforcement on new requests. Returns the archived row with `archived_at` set.
-
-## Provider bindings
-
-Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
-
-## Cache rules
-
-Organization-scoped overrides that modulate cache behaviour for gateway requests. Evaluated first-match-wins by priority descending; a matched rule beats the per-key default but loses to a per-request `X-LangWatch-Cache` header.
-
-```
-GET    /cache-rules            gatewayCacheRules:view
-GET    /cache-rules/:id        gatewayCacheRules:view
-POST   /cache-rules            gatewayCacheRules:create
-PATCH  /cache-rules/:id        gatewayCacheRules:update
-DELETE /cache-rules/:id        gatewayCacheRules:delete   (archive)
-```
-
-The rule shape, the full matcher and action tables, and the evaluation order live on [Cache control](/ai-gateway/cache-control#cache-rules). What is specific to this API:
-
-- A create needs at least one matcher. A rule that matches every request has to be declared explicitly, which v1 does not support.
-- `matchers` and `action` **replace** the stored value when provided, rather than merging field by field. Omit them and the stored value is untouched.
-- `mode_enum` is echoed as a top-level field alongside `action.mode`, so dashboards can filter on it without parsing the action.
-- `GET /cache-rules/:id` answers `404` for archived rules; use the audit log to inspect removed ones.
-- `DELETE` is a soft archive and returns the archived row with `200`, not `204`, so a script can confirm the `archivedAt` timestamp.
-
-## Webhooks and billing surfaces
-
-Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
-
-- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
-- `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
-
-## Errors
-
-All responses follow the OpenAI-compatible envelope, with `type` as the status class and `code` as the stable machine name to branch on:
-
-```json
-{
-  "error": {
-    "type": "bad_request",
-    "code": "trace_project_required",
-    "message": "an organization- or team-owned key needs a project for its traces and costs to land in..."
-  }
-}
-```
-
-Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#control-plane-codes).
-
-## Audit
-
-Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `cache_rule`) to scope. Writes via scoped API keys are attributed to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<projectId>`. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
-
-## Rate limits
-
-Management endpoints are rate-limited to 100 req/min/token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
-
-## Shared service layer
-
-This API and the dashboard call the same service layer on the server, so a rule enforced in one is enforced in the other. The only differences are the field naming (`snake_case` here, `camelCase` in the app) and how the caller is identified (API credential versus browser session). The refusals are pinned by an integration suite, so the two surfaces cannot drift apart.
-
-## OpenAPI
-
-Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
-
-```
-GET https://app.langwatch.ai/api/gateway/v1/openapi.json
-```
-
-It carries the whole public REST surface, not only the gateway routes, so one fetch feeds a client generator, a Postman import, or an agent that needs the schemas. Self-hosted: same path on your control plane's DNS.
-
-## See also
-
-- [langwatch CLI](/integration/cli#ai-gateway-commands): the same operations from a shell.
-- [RBAC](/ai-gateway/rbac): which scopes your token needs.
-- [Security](/ai-gateway/security): how your API tokens and resulting writes are protected.
+`X-Auth-Token: $LANGWATCH_API_KEY` is accepted in its place.
+
+Virtual keys, budgets and cache rules authenticate with a project API key. Spend authenticates with an organization API key.
+
+## Permissions
+
+Each resource needs its own permission on the key:
+
+| Resource | Read | Write |
+|---|---|---|
+| Virtual keys | `virtualKeys:view` | `virtualKeys:create`, `virtualKeys:update`, `virtualKeys:rotate`, `virtualKeys:delete` |
+| Budgets | `gatewayBudgets:view` | `gatewayBudgets:create`, `gatewayBudgets:update`, `gatewayBudgets:delete` |
+| Cache rules | `gatewayCacheRules:view` | `gatewayCacheRules:create`, `gatewayCacheRules:update`, `gatewayCacheRules:delete` |
+| Spend | `gatewaySpend:view` | `gatewaySpend:manage` |
+
+A legacy project key passes every check. A scoped API key is checked against its role bindings.
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Virtual Keys" icon="key" href="/api-reference/gateway-virtual-keys/overview">
+    Create, read, update, rotate, disable, enable and revoke keys.
+  </Card>
+  <Card title="Budgets" icon="wallet" href="/api-reference/gateway-budgets/overview">
+    Create, read, update, reset and archive spending limits.
+  </Card>
+  <Card title="Cache Rules" icon="database" href="/api-reference/gateway-cache-rules/overview">
+    Create, read, update and archive cache-control rules.
+  </Card>
+  <Card title="Spend" icon="chart-line" href="/api-reference/gateway-spend/overview">
+    Read spend events and summaries, and replay events to an endpoint.
+  </Card>
+</CardGroup>
+
+**Also check:** [Errors](/ai-gateway/api/errors), [Virtual keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets).
 
 ---
 
@@ -2876,62 +2340,85 @@ description: List the models a virtual key can access through the LangWatch AI G
 sidebarTitle: Models
 ---
 
-Returns the effective model list for the virtual key presented on the request. Entries are deduplicated and stable-sorted across **three groups**: OpenAI-compatible tools (Cursor, Codex, `openai models list`, etc.) treat the whole list uniformly.
-
 ## Request
 
+```bash
+curl https://gateway.langwatch.ai/v1/models \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
 ```
-GET /v1/models
-Authorization: Bearer vk-lw-<ULID>
-```
+
+A valid virtual key is the only requirement. The list is what that key can dispatch, so two keys in the same project can return different lists.
 
 ## Response
 
-OpenAI-shape `list` object:
+OpenAI's own `list` shape:
 
 ```json
 {
   "object": "list",
   "data": [
-    { "id": "claude",             "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "gpt-4o",             "object": "model", "created": 1712000000, "owned_by": "azure_openai" },
-    { "id": "gpt-5-mini",         "object": "model", "created": 1712000000, "owned_by": "openai"       },
-    { "id": "claude-haiku-*",     "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "anthropic/*",        "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "openai/*",           "object": "model", "created": 1712000000, "owned_by": "openai"       }
+    { "id": "claude-sonnet-4-5", "object": "model", "created": 0, "owned_by": "anthropic" },
+    { "id": "complex",           "object": "model", "created": 0, "owned_by": "anthropic" },
+    { "id": "europe/gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai" },
+    { "id": "gpt-5-mini",        "object": "model", "created": 0, "owned_by": "openai" }
   ]
 }
 ```
 
-### The three groups
+Entries are sorted by `id` and deduplicated. `data` is always an array, empty rather than null when the key can reach nothing.
 
-1. **Aliases** from the VK's `model_aliases` map, e.g. `claude` resolves to `anthropic/claude-haiku-4-5-20251001`, `gpt-4o` routes to the VK's Azure deployment. `owned_by` reflects the **resolved** provider so UIs can render "gpt-4o (Azure)" correctly.
-2. **`models_allowed` entries** shown verbatim, including globs like `claude-haiku-*`. Clients that support pattern matching (most) pass these through; simpler pickers render them for the human to edit.
-3. **Provider-type shortcuts**: one entry per provider bound on the VK (`openai/*`, `anthropic/*`, `bedrock/*`, `azure/*`, `vertex/*`, `gemini/*`). Tools like Cursor that let the user type the exact model id can pick a concrete model under the shortcut (e.g. `openai/gpt-5-mini`) without waiting for the alias table to be updated. See [Model Aliases → Aliases always win over explicit form](/ai-gateway/model-aliases#aliases-always-win-over-explicit-form--if-both-are-defined) for how the `provider/model` form interacts with aliases.
+| Field | Value |
+|---|---|
+| `id` | The exact string to send as `model`. |
+| `object` | Always `model`. |
+| `created` | Always `0`. A gateway model list has no creation date to report. |
+| `owned_by` | The provider family that serves the model: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, and the rest. `langwatch` when the entry carries no provider. |
 
-### Providers with a routing handle
+## What the list holds
 
-A discovered model from a provider that has a [routing handle](/ai-gateway/model-naming#routing-handles) is listed under the handle-qualified id, for example `europe/claude-sonnet-5`. That is the name that reaches that exact provider, so two providers of the same type keep separate entries instead of collapsing into one. `owned_by` stays the provider type in both entries, because it is what a picker groups by.
+Three sources, filtered to what the key can actually call:
 
-<Note>The list is deliberately permissive, it covers everything the VK could plausibly route, not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream models until you send a real request. The gateway's per-request model resolution remains the source of truth for "will this actually route?"</Note>
+1. **Model aliases** on the key, under the alias name. An alias whose target the key cannot dispatch to is left out.
+2. **Allowlist entries**, when the key sets `models_allowed`. The allowlist is authoritative, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out and the concrete ids come from discovery instead.
+3. **Discovered models** from every credential the key can reach, read from each provider's own catalog.
 
-## Permissions
+Every candidate is then dropped when the key's allowlist or its policy rules refuse it, and when the key holds no credential for the provider that would serve it. A listed model is one a request for it can reach.
 
-Only requires a valid VK; no extra permission. The returned list is scoped to what the VK can actually dispatch, engineers don't need `virtualKeys:view` to call this.
+### Model tiers
 
-## Use cases
+When the key runs on a routing policy, the reserved tier names `complex`, `reasoning` and `fast` are in the list. A tier is an alias the policy sets, and it falls through to the policy's default model when the policy names no target for it. A tier with no target and no default model is not listed.
 
-- **Model pickers** in UIs that speak the OpenAI API, they call `/v1/models` and render the list.
-- **Pre-flight check** in CI: assert the CI's VK has access to the models your tests depend on.
-- **Debugging aliases**: see what each VK exposes by hitting this with its token.
-- **CLI probes**: coding tools like Codex and Cursor call `/v1/models` on startup to auto-configure completion and model picking. The provider shortcuts (`openai/*`, `anthropic/*`) mean the user can type `openai/gpt-5-mini` directly in the picker without first adding an alias server-side. See [Coding CLI integrations](/ai-gateway/cli/codex).
+### Providers with an instance handle
+
+A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-5-mini`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
+
+## Incomplete discovery
+
+A provider the key can dispatch to can contribute nothing to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
+
+```
+X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
+```
+
+| Reason | Meaning |
+|---|---|
+| `not-enumerable` | The provider has no catalog endpoint for this credential shape, and no deployment mapping to read model names from. |
+| `probe-failed` | The provider has a catalog endpoint and this round's probe did not deliver: the endpoint was down or slow, the key was rejected, or the endpoint policy refused the URL. |
+
+The header is absent when the list is complete, and when the key sets a literal allowlist, since no catalog is read then.
 
 ## Errors
 
-- `401 invalid_api_key`, unknown or malformed VK.
-- `403 virtual_key_revoked`, VK revoked.
+| Code | Status | Cause |
+|---|---|---|
+| `invalid_api_key` | 401 | The presented credential matches no virtual key. |
+| `virtual_key_revoked` | 403 | The key was revoked. |
+| `virtual_key_disabled` | 403 | The key was disabled. |
+| `virtual_key_expired` | 403 | The key's expiration date has passed. |
 
-See [API: Errors](/ai-gateway/api/errors) for the full table.
+The full table is on [Errors](/ai-gateway/api/errors).
+
+**Also check:** [Model naming](/ai-gateway/model-naming), [Model aliases](/ai-gateway/model-aliases), [Routing policies](/ai-gateway/governance/routing-policies).
 
 ---
 
@@ -4941,28 +4428,51 @@ If you haven't enabled `networkPolicy`, the provider egress row doesn't need a c
 
 ---
 title: "Metering and rebilling your customers through the gateway"
-description: The end-to-end pattern for platforms that rebill their own customers, provision a tenant key and caps, ingest signed spend events, reconcile, handle breaches, and close periods.
+description: Give each customer their own virtual key and caps, ingest signed spend events into your billing ledger, reconcile, handle breaches, and close periods.
 sidebarTitle: Metering & Rebilling
-keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, budgets, end users
+keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, budgets, end users, reseller
 ---
 
-A platform whose customers consume LLMs through it can meter and rebill that usage. This cookbook wires that end to end on LangWatch: one virtual key per tenant, caps for the tenant and for each of their end users, signed spend events into your billing ledger, reconciliation, breach handling, and period close. Your product keeps zero metering code of its own.
+This cookbook is for a platform whose customers consume LLMs through it. Your backend provisions one virtual key per customer through the management API, the LangWatch AI Gateway enforces the caps and meters every request, and signed spend events feed your billing ledger. Your product keeps no metering code of its own, and your customers never see a provider credential.
 
 <Card title="The runnable reference: agent-billing-demo" icon="github" href="https://github.com/langwatch/agent-billing-demo">
-  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions a real tenant key and real caps, chat rides the gateway, and the meters on screen are driven by the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point your coding agent at that repo as the canonical integration example; every file is written to be copied from.
+  An open-source agent-platform SaaS that implements every step below in both TypeScript and Python: sign-up provisions a real tenant key and real caps, chat goes through the gateway, and the meters on screen come from the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop and provisioning are written to be copied from.
 </Card>
 
 ## What you need
 
-- An Enterprise plan or license (webhooks and the billing APIs gate on it).
-- **Two credentials**, because the surfaces are deliberately separated. A gateway key for provisioning (`virtualKeys:*`, `gatewayBudgets:*`), and an **organization** API key for the billing and webhook surfaces (`webhookEndpoints:manage`, `gatewaySpend:view`), whose permissions only an organization-scoped role can grant. The curls below show which one each call takes. See [RBAC](/ai-gateway/rbac).
-- A provider credential configured once at organization scope (**Settings > Model Providers**). Tenants never see it.
+- An Enterprise plan or license. Webhook endpoints and the spend APIs are Enterprise features.
+- Two credentials, because the two surfaces need different permissions. A LangWatch API key with `virtualKeys:manage` and `gatewayBudgets:manage` for provisioning, and an organization API key with `webhookEndpoints:manage` and `gatewaySpend:view` for the billing and webhook surfaces. The commands below show which one each call takes. See [RBAC](/ai-gateway/rbac).
+- A provider credential configured once at organization scope under **Settings > Model Providers**. Tenants never see it.
 
-The vocabulary used throughout: a **tenant** is your customer (one **virtual key** each); an **end user** is a person inside a tenant (no provisioning, attributed per request); a **spend event** is the metering record; an **envelope** is how events arrive at your webhook receiver.
+Vocabulary used on this page: a **tenant** is your customer and has one **virtual key**; an **end user** is a person inside a tenant, attributed per request with no provisioning; a **spend event** is the metering record for one request; an **envelope** is how events arrive at your webhook receiver.
+
+## The shape
+
+```
+End user's app
+      |
+      v
+Your backend  --provisions keys and budgets-->  LangWatch management API (/api/gateway/v1/*)
+      |
+      |  hands the key to the tenant's runtime
+      v
+Tenant runtime  --/v1/chat/completions-->  LangWatch AI Gateway  -->  the provider, on your credential
+```
+
+Pick the unit of tenancy once:
+
+| Unit | One virtual key per | Budget scope | When to use |
+|---|---|---|---|
+| Customer | tenant | `virtual_key` | Most SaaS products: one account is one key. |
+| Seat | LangWatch user | `principal` | Internal platforms where every seat is a LangWatch member. |
+| Team | team in your organization | `team` | Customers modelled as LangWatch teams with their own projects. |
+
+The rest of this page uses one key per customer. `principal` budgets target LangWatch member accounts, which your external customers are not, so for a reseller the per-customer unit is the virtual key itself.
 
 ## 1. Provision a tenant
 
-Signing up a customer is four calls from your backend: mint the key, attach a hard cap and a soft cap, add the per-end-user allowance. Store the key id, the secret (shown once), and the budget ids on your customer row.
+Signing up a customer is four calls from your backend: mint the key, attach a hard cap and a soft cap, add the per-end-user allowance. Store the key id, the secret (shown once) and the budget ids on your customer row.
 
 ```mermaid
 sequenceDiagram
@@ -4978,41 +4488,45 @@ sequenceDiagram
 ```
 
 ```bash
-# The tenant key
+# The tenant key, with the models it may use and a request rate cap
 curl -sS $LW/api/gateway/v1/virtual-keys \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"name": "customer-acme"}'
-# -> {"virtual_key": {"id": "vk_..."}, "secret": "vk-lw-live_..."}  persist both
+  -H "Idempotency-Key: signup-acme-4171" \
+  -d '{"name": "customer-acme", "external_id": "acme-4171",
+       "config": {"modelsAllowed": ["openai/gpt-5-mini", "anthropic/claude-haiku-4-5"],
+                  "rateLimits": {"rpm": 60}}}'
+# -> {"virtual_key": {"id": "vk_..."}, "secret": "vk-lw-..."}  persist both
 
 # Hard cap: blocks at the limit
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme hard cap", "window": "manual", "limit_usd": "500", "on_breach": "block"}'
 
 # Soft cap: warns without blocking (a second, lower budget)
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
-# Per-end-user allowance: ONE template covers every current and future end user
+# Per-end-user allowance: one template covers every current and future end user
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."},
+  -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme per-user cap", "window": "month", "limit_usd": "25", "on_breach": "block"}'
 ```
 
-Choices worth making deliberately:
+Decisions to make on purpose:
 
-- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and every budget, and send an `Idempotency-Key` on each create. A signup that times out halfway then replays with the same key and the same body: the calls that already succeeded return their original response instead of minting a second key, and `external_id` lets you find what you created without having stored our ids first. That is what turns provisioning from "store four ids in a transaction and hope" into a retryable job, and it means you can look a tenant up with `?external_id=acme-tenant-4171` instead of keeping a mapping table in sync. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely).
-- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets, or set `cycle_anchor_at` to the moment the customer signed up so their period rolls on their own anniversary rather than the 1st. The three combine freely.
-- **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
-- **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
+- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and on every budget, and send an `Idempotency-Key` header on each create. A signup that times out halfway and replays with the same key and body gets the original response back instead of a second key, and `GET /api/gateway/v1/virtual-keys?external_id=acme-4171` finds the tenant without a mapping table.
+- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use a calendar window (`month`, aligned to UTC) if you bill on calendar months, or set `cycle_anchor_at` to the signup moment so the period rolls on the customer's anniversary.
+- **The hard and soft caps are two budgets.** `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; reaching a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
+- **The attributed-user template** is one rule: each distinct end user on this key gets $25 per month. A bucket appears on the user's first spend; you create and delete no per-user budgets.
+- **`modelsAllowed` and `rateLimits`** on the key are the only two fields of `config` a tenant key usually needs. `rateLimits.rpm` and `rateLimits.rpd` are enforced at the gateway; a tenant over the limit gets `429 rate_limited`. See [Rate limits](/ai-gateway/rate-limits).
 
 ## 2. Register your webhook endpoint (once)
 
-Your billing ledger is fed by [webhook endpoints](/features/webhooks). Register your receiver once, org-wide, subscribed to the spend stream (and the budget signals if you want them):
+Your billing ledger is fed by [webhook endpoints](/features/webhooks). Register your receiver once for the organization, subscribed to the spend stream and the budget signals:
 
 ```bash
 curl -sS $LW/api/webhooks/v1/endpoints \
@@ -5022,7 +4536,7 @@ curl -sS $LW/api/webhooks/v1/endpoints \
                           "gateway.budget.threshold_crossed", "gateway.budget.breached"]}'
 ```
 
-The `201` response includes the signing `secret`, shown once. Give it to your receiver, then use the endpoint's **test fire** to prove the path before real traffic.
+The `201` response includes the signing `secret`, shown once. Give it to your receiver, then call `POST /api/webhooks/v1/endpoints/{id}/test` to prove the path before real traffic. The test delivery carries `X-LangWatch-Test-Fire: true`.
 
 ## 3. The request path
 
@@ -5037,29 +4551,31 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
     messages=[...],
     user=end_user.id,                            # attribution: who inside the tenant
     extra_headers={
-        "x-langwatch-metadata": json.dumps({     # echoed verbatim on every spend event
+        "X-LangWatch-Metadata": json.dumps({     # echoed on every spend event
             "tenant": tenant.id, "plan": tenant.plan,
         }),
     },
 )
 ```
 
-That is the whole integration on the request side. The `user` field (or the `x-langwatch-end-user-id` header, which wins over the body) is what the per-user template enforces on and what `end_user_id` carries on every spend event. The metadata echo is how your billing joins events back to your own records without lookups.
+That is the whole integration on the request side. The `user` field, or the `X-LangWatch-End-User-Id` header which wins over the body, is what the per-user template enforces on and what `end_user_id` carries on every spend event. The metadata echo is how your billing joins events back to your own records without lookups.
 
 <Warning>
-With an attributed-user template active, a request that carries **no** end-user id is rejected with `error.code = "end_user_required"` rather than passing uncapped. A cap evadable by omitting a field is not a cap. Send the id from day one.
+With an attributed-user template active, a request that carries no end-user id is rejected with `400` and `error.code = "end_user_required"`. Send the id from day one.
 </Warning>
+
+The gateway, on every request: authenticates the key, checks the tenant's and the end user's budgets, applies `modelsAllowed`, sends the request to the provider on your credential, records the spend against both budgets, and writes a trace into the key's trace project.
 
 ## 4. Receive, verify, ingest
 
 ```mermaid
 sequenceDiagram
     participant App as Your app
-    participant GW as AI Gateway
+    participant GW as LangWatch AI Gateway
     participant LW as LangWatch
     participant RX as Your webhook receiver
     participant L as Your billing ledger
@@ -5069,7 +4585,7 @@ sequenceDiagram
     RX->>RX: verify HMAC over the raw body (5 min tolerance)
     RX->>L: upsert by event id (dedup), replace settled on supersession
     App->>GW: traffic continues until a cap is reached
-    GW-->>App: 402 budget_exceeded {budget_scope: attributed_user or virtual_key}
+    GW-->>App: 402 budget_exceeded {meta.budget_scope: attributed_user or virtual_key}
     LW->>RX: gateway.budget.threshold_crossed, then gateway.budget.breached
     App->>LW: POST /api/gateway/v1/budgets/:id/reset   period close
     Note over LW: reset moves the period boundary only;<br/>recorded spend and emitted events never change
@@ -5078,11 +4594,13 @@ sequenceDiagram
 
 Your receiver does three things, in order:
 
-1. **Verify the signature** over the exact raw request bytes with your endpoint secret, rejecting stale timestamps. Copy the verifier from the [webhooks reference](/features/webhooks#verifying-signatures) or from the demo repo (`ts/src/verify-signature.ts`, `python/verify_signature.py`).
-2. **Dedup by envelope `id`** and ingest. At-least-once delivery plus stable ids means an upsert keyed on `id` is enough; retries and replays become no-ops.
-3. **Handle the settled pair**: a `gateway.request.settled` event books the request with unknown cost and `needs_reconciliation`; if a `gateway.request.completed` later arrives for the same `gateway_request_id`, **replace** the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-spend-event).
+1. **Verify the signature.** The `X-LangWatch-Signature` header is `t=<unix seconds>,v1=<hex>`; the HMAC-SHA256 is computed over `<t>.<raw body>` with your endpoint secret. Reject a timestamp older than 300 seconds. For 24 hours after you roll the secret, the header carries two `v1=` values and either one is valid. Copy the verifier from the [webhooks reference](/features/webhooks#verifying-signatures) or from the demo repository.
+2. **Dedup by envelope `id`** and ingest. Delivery is at least once and ids are stable, so an upsert keyed on `id` is enough; retries and replays become no-ops. Each delivery also carries `X-LangWatch-Delivery-Id` and `X-LangWatch-Delivery-Attempt`.
+3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-spend-event).
 
-Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time.
+Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time. The `usage` object on a delivered event has five fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` and `reasoning_tokens`. Reasoning tokens are reported for display and are never priced separately.
+
+A delivery that fails is retried after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours, then every 12 hours, 11 attempts in total. A `Retry-After` header on your response is honoured as a floor.
 
 ## 5. Reconcile
 
@@ -5095,7 +4613,11 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, no request is missing and the same request is priced differently on each side, so compare `cost.nano_usd` per id rather than its presence. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching totals mean no aggregate divergence. They do not prove both systems hold the same set of `gateway_request_id`, because a different set can sum to the same amount, so a biller that needs request-level certainty walks the events regardless.
+
+On divergence, walk `spend-events` for that key and window by cursor and compare the count per `gateway_request_id`. One request dropped and another booked twice leaves the id sets looking close and the money wrong; the ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, compare `cost.nano_usd` per id. Both reads take the same filters, so you can narrow the walk to what the checksum covered.
+
+For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint and let your dedup absorb the duplicates.
 
 ### Narrowing and grouping
 
@@ -5105,56 +4627,65 @@ Repeat a filter to widen it and name two filters to narrow. Both reads accept `p
 # Two models, one customer tier, one team, in one call
 curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
 &from=$FROM_MS&to=$TO_MS\
-&model=gpt-5-mini&model=claude-opus-5\
+&model=openai/gpt-5-mini&model=anthropic/claude-opus-4-1\
 &metadata=customer_tier:gold\
 &team_id=$TEAM_ID" \
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
 ```
 
-`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not contain a colon, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
 
-`group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
+`group_by` takes one or two of `virtual_key`, `end_user`, `project`, `model`, `provider`, `principal` and `request_type`, and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
 
 <Warning>
-Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
+Grouping by `model` or `provider`, or into time buckets, is refused with `400 gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that served it. A page walk over a group that can move counts some requests twice and misses others.
 
-Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait for that time instead of guessing.
 </Warning>
 
 ## 6. Breach handling and period close
 
-When a cap is hit, the request is rejected with `402` and machine-readable meta:
+When a cap is reached, the gateway rejects the request with `402` and names the budget in `meta`:
 
 ```json
 {
   "error": {
     "type": "budget_exceeded",
     "code": "budget_exceeded",
-    "message": "The end-user spending limit (per month) has been reached. Contact your LangWatch admin to raise it.",
-    "meta": {"budget_id": "bgt_...", "budget_scope": "attributed_user", "budget_window": "month"}
+    "message": "The end user spending limit (per month) for this request has been reached. Contact your LangWatch admin to raise it.",
+    "meta": {"budget_id": "bgt_...", "budget_scope": "attributed_user", "budget_window": "month"},
+    "tips": ["Contact your LangWatch admin to raise the end user spending limit",
+             "Switch to a cheaper model or reduce request volume to stay within the limit"],
+    "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+    "trace_id": "..."
   }
 }
 ```
 
-`budget_scope` is the branch your product copy needs: `attributed_user` means "your allowance ran out" (show the end user an upgrade path), `virtual_key` means "your organization's cap ran out" (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `warn` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
+`meta.budget_scope` is the branch your product copy needs: `attributed_user` means the end user's allowance ran out (show them an upgrade path), `virtual_key` means the tenant's cap ran out (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `warn` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
+
+Test the `402` path in your app before go-live. An unhandled `402` is the most common way a tenant's flow breaks on the day a cap is reached.
 
 At period close, reset the tenant's `manual` budgets:
 
 ```bash
-# Whole tenant: new period starts now
+# Whole tenant: a new period starts now
 curl -sS -X POST "$LW/api/gateway/v1/budgets/$HARD_CAP_ID/reset" \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" -d '{}'
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -d '{"reason": "invoice 2026-08 issued"}'
 
 # One end user's bucket only (their own cycle), template period untouched
 curl -sS -X POST "$LW/api/gateway/v1/budgets/$TEMPLATE_ID/reset?end_user_id=u_123" \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" -d '{}'
 ```
 
-Reset moves the period boundary and recomputes the next reset. It **never mutates recorded spend**: the ledger and every emitted event are immutable, so reconciliation is unaffected by resets. On calendar windows a mid-period reset truncates the running period and the next boundary stays calendar.
+Reset moves the period boundary and recomputes the next reset. It never changes recorded spend: the ledger and every emitted event are immutable, so reconciliation is unaffected by resets. The `reason` is written to the audit log with the reset.
 
-## 7. The kill switch
+To change a tenant's cap when their plan changes, `PATCH /api/gateway/v1/budgets/{id}` with the new `limit_usd`. To raise the per-user allowance, patch the template; every bucket follows.
 
-For non-payment or abuse, stop a tenant reversibly:
+## 7. Suspend, rotate, revoke
+
+**Non-payment or abuse.** Stop a tenant reversibly:
 
 ```bash
 curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
@@ -5162,22 +4693,32 @@ curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
   -d '{"reason": "payment overdue"}'
 ```
 
-Requests on the key are rejected with the distinct `virtual_key_disabled` error (`403`) until you call `/enable`. Budgets, scopes, key material, and any running rotation grace stay intact, and the change propagates to the gateway in seconds through the change feed. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events. Reserve `/revoke` for the terminal goodbye; see [Virtual keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
+Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up on its next change-feed poll, a long poll of about 10 seconds. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
+
+**The customer resets their API key in your UI.** `POST /api/gateway/v1/virtual-keys/{id}/rotate` returns a new secret; send it to the customer once. The old secret keeps authenticating for 24 hours, so a client you have not reached yet does not fail mid-rollout. The event is `gateway.virtual_key.rotated`.
+
+**The customer is gone for good.** `POST /api/gateway/v1/virtual-keys/{id}/revoke`. The next request returns `403 virtual_key_revoked`. Revoke is one-way; for a cancellation grace period, disable now and revoke after the grace.
+
+**Audit.** Every write through your backend credential is recorded with the action, the target and the before and after values, attributed to the key's owning member. Filter the audit log on the `virtual_key` target for a per-customer provisioning history. See [Audit](/ai-gateway/audit).
 
 ## Rendering budget bars in your UI
 
 The pair every tenant dashboard wants, current spend against the cap:
 
-- Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key` returns each budget with live `spent_usd` and `limit_usd`.
-- Per end user: `GET /api/gateway/v1/end-users/:id/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
+- Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key&external_id=acme-4171` returns each budget with live `spent_usd` and `limit_usd`. `spend_available: false` means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
+- Per tenant, one number: `GET /api/gateway/v1/virtual-keys/{id}/spend` returns `{virtual_key_id, spent_usd, requests, window: {from, to}}` for the current UTC month by default, or the `from` and `to` you pass. The same value is shown on the key in the Virtual Keys page, so what you invoice matches what you see.
+- Per end user: `GET /api/gateway/v1/end-users/{id}/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
 
-## Where to go deeper
+Rating stays in your billing system: you define the markup over the gateway-reported cost, or bill passthrough plus a fee, and events carry `rate_version` so cost is re-derivable.
 
-- [Billing & spend events](/ai-gateway/billing-events): every payload field, money rules, reconciliation, replay.
-- [Webhooks](/features/webhooks): signatures, retries, auto-disable, health, delivery controls.
-- [Budgets](/ai-gateway/budgets): scopes, windows including `manual`, thresholds, the breach error catalog.
-- [Multi-tenant SaaS reseller pattern](/ai-gateway/cookbooks/multi-tenant-reseller): the provisioning-side cookbook this billing loop plugs into.
-- [The demo agent platform](/ai-gateway/demo-agent-platform): what the reference repo shows and how to run it.
+## Gotchas
+
+- Never let a tenant see your backend API key. It holds `virtualKeys:manage`; they could provision keys charged to you.
+- Name keys after your tenant id (`customer-<id>`) and set `external_id`. Those are your join keys for spend read-back and audit history; `principal_user_id` is only for LangWatch members.
+- Rotate the key when an end user leaves the tenant's organization. Until then the ex-user keeps spend access until the budget resets.
+- Budgets scoped to `virtual_key` are the right level for per-customer enforcement; `principal` and `team` scopes are for members and teams of your own LangWatch organization.
+
+**Also check:** [Billing & spend events](/ai-gateway/billing-events) for every payload field, money rules, reconciliation and replay; [Webhooks](/features/webhooks) for signatures, retries, auto-disable and delivery controls; [Budgets](/ai-gateway/budgets) for scopes, windows and thresholds; [Virtual keys](/ai-gateway/virtual-keys) for the key lifecycle; [The demo agent platform](/ai-gateway/demo-agent-platform) for the reference repository.
 
 ---
 
@@ -10670,100 +10211,51 @@ When these features land in the gateway code, the chart's `templates/configmap.y
 
 ---
 title: Streaming
-description: SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
+description: Read a completion as Server-Sent Events through the gateway, and know what the caller gets when a stream stops early.
 sidebarTitle: Streaming
 ---
 
-Clients read LLM streams as Server-Sent Events: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
+## Which endpoints stream
 
-## The streaming contract
+| Endpoint | How you ask for a stream |
+|---|---|
+| `POST /v1/chat/completions` | `"stream": true` in the body |
+| `POST /v1/messages` | `"stream": true` in the body |
+| `POST /v1/responses` | `"stream": true` in the body |
+| `POST /v1beta/models/{model}:streamGenerateContent` | The method name. The Gemini SDKs call it for you |
+| `POST /v1beta/models/{model}:streamGenerateAnswer` | The method name |
 
-### Before the first chunk: mutations allowed
+`/v1/embeddings`, `/v1/audio/*` and `/v1/models` return one response and never stream.
 
-- Gateway may inject response headers (`X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
-- Pre-call guardrails may rewrite the request payload before dispatch.
-- Fallback chain may transparently switch providers if the primary fails before any chunk arrives.
+## Start a stream
 
-At this point no client-visible byte has been emitted yet, so changes are safe.
+The base URL for an OpenAI-style SDK is `https://gateway.langwatch.ai/v1`. The Anthropic and Gemini SDKs append their own version segment, so give them `https://gateway.langwatch.ai`.
 
-### After the first chunk: strict passthrough
 
-- SSE events are forwarded to the client **byte-for-byte**, in order, without merging, splitting, or reordering.
-- No header injection (except the ones already emitted on the first frame).
-- No mid-stream provider switch, even if the primary dies after chunk N, the gateway does NOT fall back to a secondary provider silently. Instead it terminates the stream.
-
-Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta`, `input_json_delta` ordering; any reformat breaks their tool-call parser.
-
-### Terminal error shapes
-
-Once the first chunk has been sent to the client, the gateway never silent-switches providers. If something goes wrong mid-stream, the stream ends with a terminal `event: error` frame. **Two shapes exist in v1**, distinguishable by `error.code`:
-
-**Upstream connection failure:**
-
-```
-event: error
-data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
-
-```
-
-**Stream-chunk guardrail block** (from [stream_chunk guardrails](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas)):
-
-```
-event: error
-data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<policy reason>","param":null}}
-
-```
-
-Both frames are byte-locked by the Go test suite, any future shape drift breaks the build. Clients that parse SSE `error` frames should key off `error.code` to distinguish provider failures (retryable after backoff) from policy blocks (retry won't help unless the input changes).
-
-Post-emission sequence for both shapes:
-
-1. Gateway emits the terminal `event: error` frame (shown above).
-2. Gateway closes the client connection.
-3. For `provider_error`: the failed provider's circuit-breaker counter increments. For `guardrail_blocked`: a verdict metric (`gateway_guardrail_verdicts_total{verdict=block}`) increments instead, the provider is healthy, policy fired.
-
-The gateway **never** silent-switches to the fallback mid-stream. Splicing chunks from two providers would produce an inconsistent response: mismatched tool-call ids, accumulated-content replay, token-accounting drift. The choice is deliberate and enforced in code.
-
-The client is free to retry the request; a fresh request will go through the fallback chain from scratch (which IS allowed to transparently switch providers, see below).
-
-### Pre-connection fallback (transparent)
-
-When the primary returns a retryable error **before** any chunk has been sent to the client (connection failures, pre-first-chunk 5xx, 429, timeout, network), the gateway walks the VK's `fallback.chain` the same way it does for non-streaming calls. The caller sees exactly one stream, from whichever credential accepted the request.
-
-`X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
-
-## `stream_chunk` guardrails
-
-Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text, role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage, skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
-
-- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so it does **not** emit `gateway_guardrail_verdicts_total{verdict="fail_open"}`; the trace attribute is the signal for degraded policy services on stream chunks. Only the `request` and `response` directions count fail-open verdicts.
-- **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
-- **Decision `modify`** is **not implemented in v1**: chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
-
-## Starting a streaming request
-
-### OpenAI-compatible
+  ### OpenAI
 
 ```python
 from openai import OpenAI
+
 client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 for chunk in client.chat.completions.create(
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
     messages=[{"role": "user", "content": "count to 5"}],
     stream=True,
 ):
     print(chunk.choices[0].delta.content or "", end="")
 ```
 
-### Anthropic-compatible
+  ### Anthropic
 
 ```python
 import anthropic
+
 client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="vk-lw-...")
 
 with client.messages.stream(
-    model="claude-haiku-4-5-20251001",
+    model="anthropic/claude-haiku-4-5-20251001",
     max_tokens=64,
     messages=[{"role": "user", "content": "count to 5"}],
 ) as stream:
@@ -10771,99 +10263,107 @@ with client.messages.stream(
         print(text, end="")
 ```
 
-## Tool-call deltas: what to look for
 
-Anthropic emits this sequence for a tool call:
 
-```
-event: content_block_start
-data: {"index": 1, "content_block": {"type": "tool_use", "id": "tu_01H...", "name": "read_file", "input": {}}}
+## What the frames look like
 
-event: content_block_delta
-data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":"}}
+The frame shape follows the endpoint you called, not the provider that served the request.
 
-event: content_block_delta
-data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": " \"./README.md\"}"}}
-
-event: content_block_stop
-data: {"index": 1}
-```
-
-Claude Code reassembles `partial_json` chunks into a full JSON object. Any reordering or re-splitting breaks this. The gateway preserves the exact chunk boundaries.
-
-OpenAI emits tool-call deltas as:
+`POST /v1/chat/completions` sends OpenAI chunk objects, one per `data:` line, and closes with `data: [DONE]`.
 
 ```
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"read_file","arguments":""}}]}}]}
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":"}}]}}]}
-data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"./README.md\"}"}}]}}]}
+data: {"id":"chatcmpl-...","choices":[{"delta":{"content":"1"}}]}
+
+data: [DONE]
 ```
 
-Same passthrough discipline.
+`POST /v1/messages` sends the Anthropic Messages event union: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`. When an Anthropic credential serves the request, the provider's own SSE bytes reach the client unchanged and the gateway appends no `[DONE]` trailer. When another provider serves it, the gateway builds the same event union from the provider's response.
 
-## Observability
+`POST /v1/responses` sends the OpenAI Responses events (`response.created`, `response.output_text.delta`, `response.completed`) and closes with `data: [DONE]`.
 
-- `X-LangWatch-Gateway-Request-Id` on the first frame.
-- Trace span per chunk would be too expensive, the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
-- Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
+The `/v1beta` Gemini routes forward the provider's bytes unchanged, with no `[DONE]` trailer.
 
-<Info>Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`, `.total_ms`, `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request model + log-line correlation is the operator signal.</Info>
+Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v1/messages` a tool call is a `content_block_start` with `"type": "tool_use"`, then `input_json_delta` frames whose `partial_json` strings concatenate into the argument object, then `content_block_stop`. On `/v1/chat/completions` the same call arrives as `delta.tool_calls[]` entries whose `function.arguments` strings concatenate.
 
-## Usage extraction (critical for streaming budgets)
+## When a stream fails after it opened
 
-Streaming responses are just as expensive as non-streaming, but the usage block (token counts, cost inputs) arrives asynchronously, typically in the terminal chunk, but providers differ:
+The HTTP status is committed to `200` the moment the first frame is written, so a failure after that point cannot change it. The gateway ends the stream with an `event: error` frame instead.
 
-| Provider | How usage is reported on a stream |
+```
+event: error
+data: {"type":"error","error":{"type":"provider_error","message":"upstream connection closed"}}
+```
+
+`error.type` carries the provider's own discriminant when the provider named one, for example `insufficient_quota` or `overloaded_error`. For a failure the gateway itself raised, it carries the gateway error code, for example `budget_exceeded`. When the provider sent its own error event body, that body is forwarded unchanged instead of the frame above.
+
+Read `error.type` to decide what to do. A provider failure is worth a retry after a backoff. A gateway code such as `policy_violation` or `budget_exceeded` needs the request or the key to change first.
+
+The error index for every code is on [Troubleshooting](/ai-gateway/troubleshooting).
+
+## When a guardrail stops a stream
+
+A stream chunk guardrail runs on every chunk before the gateway forwards it. On a fail verdict the gateway closes the upstream stream at that chunk and forwards nothing more. The caller keeps the chunks already sent and gets no `event: error` frame, because the guardrail stops the stream rather than raising an error on it.
+
+Stream chunk guardrails always fail open. The gateway waits 50 milliseconds for the verdict; a timeout or an evaluator error lets the chunk through and records `langwatch.guardrail.stream_chunk_fail_open` with the cause on the span.
+
+A fail verdict blocks. A modify verdict does not rewrite the chunk.
+
+**Also check:** [Guardrails](/ai-gateway/guardrails) for the directions, the failure modes and the setup steps.
+
+## Fallback on a stream
+
+The gateway walks the key's fallback chain while it opens the stream. Once the provider accepts the request and the first frame is written, no other credential can take over: splicing two providers into one stream would give the caller mismatched tool-call ids and double-counted tokens.
+
+A retryable failure before the first frame is therefore invisible to the caller. One stream arrives, from whichever credential accepted the request. `X-LangWatch-Fallback-Count` reports how many credentials were tried and skipped; the header is absent when the first one worked.
+
+A failure after the first frame ends the stream with the error frame above. Send the request again to walk the chain from the start.
+
+**Also check:** [Fallback Chains](/ai-gateway/providers/fallback-chains).
+
+## Token usage on a stream
+
+Providers report usage at the end of a stream, in their own shape.
+
+| Endpoint and provider | Where the usage arrives |
 |---|---|
-| Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
-| OpenAI, Azure OpenAI | The final data-only chunk carries `usage` when the request body has `stream_options: {include_usage: true}`. **The gateway auto-injects this flag** on OpenAI/Azure streaming requests when the caller hasn't set it, see below |
-| Bedrock | Usage on the final `message_delta` event, same as Anthropic |
-| Vertex, Gemini | Usage on the terminal `candidates[].finishReason` event |
+| `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}` |
+| `/v1/messages` on Anthropic or Bedrock | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
+| `/v1beta` on Gemini or Vertex | `usageMetadata` on the chunks that carry it |
 
-The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
+The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.
 
-- **Empty deltas don't zero-stomp real numbers.** OpenAI's pre-terminal "empty usage" deltas are ignored; the real numbers arrive on the last chunk.
-- **OpenAI/Azure auto-injects `stream_options: {include_usage: true}`.** Most OpenAI SDKs don't set this flag by default, without it, OpenAI never emits usage on the SSE stream, and the gateway would have to debit `$0`. The gateway's `DispatchStream` path detects OpenAI/Azure + `stream:true` + missing flag and injects the option via `sjson.SetBytes` before the body reaches Bifrost. Other body fields round-trip byte-for-byte (so OpenAI's prompt-prefix auto-cache still hits on identical prefixes). Callers who explicitly set `stream_options: {include_usage: false}` are honoured (never overwritten).
-- **`success_no_usage` warning is now rare.** With the auto-injection above, OpenAI streams should always report usage. If you still see `span.status = success_no_usage` or the `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` header, it means either (a) the caller opted out of usage explicitly via `include_usage: false`, or (b) the provider returned a stream without a final usage frame (very rare, file a bug with the trace id).
+On `/v1/chat/completions` to OpenAI, Azure OpenAI or a custom OpenAI-compatible endpoint, the gateway sets `stream_options.include_usage` to `true` when the body does not carry it. Without the flag those providers report no usage at all and the request would debit nothing. A body that sets the flag itself, to `true` or to `false`, is left as sent.
 
-### Setting `stream_options.include_usage` in your client
-
-Auto-injection means you don't have to. To keep the call explicit and portable across gateways, the form is identical to direct-OpenAI usage:
+You can still set it yourself to keep the call explicit:
 
 ```python
 for chunk in client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[...],
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "count to 5"}],
     stream=True,
     stream_options={"include_usage": True},
 ):
     pass
 ```
 
-```ts
-const stream = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [...],
-  stream: true,
-  stream_options: { include_usage: true },
-});
+When a stream closes with zero total tokens, the gateway sends one more frame before the end:
+
+```
+event: warning
+data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
 
-### Alerting on missing usage (residual cases)
+That stream debits nothing, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
 
-In Prometheus, Grafana:
+## Requests without `stream`
 
-```promql
-sum(rate(gateway_streaming_usage_missing_total[5m])) > 0
-```
+A request without `stream: true` returns one JSON body. The gateway runs the response guardrails on the full body, and the fallback chain stays open for the whole call because the caller sees only the response that succeeded.
 
-After the gateway-side auto-injection landed, this should sit at zero in steady state for OpenAI, Azure streaming traffic. If it spikes, capture the request body via `LW_LOG_MESSAGE_BODY=1` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) and check whether the caller is opting out of usage explicitly.
+<Warning>
+A proxy in front of a self-hosted gateway must not buffer responses. With buffering on, every frame is held until the provider finishes and the caller gets the whole stream at once. On an nginx ingress set `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, and raise the read timeout above the longest stream you allow. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
+</Warning>
 
-## Non-streaming clients
-
-Requests without `stream: true` are dispatched synchronously, accumulated upstream, and returned as a single JSON response. Pre-call guardrails run on the request; post-call guardrails run on the full response and can block/modify the final body.
-
-The "no mid-stream switch" rule doesn't apply, non-streaming calls can fall back freely because the client only ever sees the final successful response.
+**Also check:** [Parameter mapping](/ai-gateway/parameter-mapping) for what happens to a parameter the target provider has no field for, [Observability](/ai-gateway/observability) for the span attributes and the metrics.
 
 ---
 
@@ -18739,7 +18239,7 @@ Run your agent through the LangWatch wrapper. This will open LangWatch for you t
 
   ### Cursor
 
-    Cursor connects through the LangWatch AI Gateway. See [Cursor](/coding-agents/overview).
+    Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a LangWatch AI Gateway virtual key. See the [gateway quickstart](/ai-gateway/quickstart).
 
 
 
