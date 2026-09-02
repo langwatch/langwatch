@@ -10,7 +10,7 @@ Do this once as an organization owner or admin. After it, every member signs in 
 
 You need:
 
-- The owner or admin role on the LangWatch organization.
+- The owner or admin role on the LangWatch organization. The Admin role holds every gateway permission. A Member can create and rotate virtual keys and read every gateway page, and cannot change providers, routing policies, budgets or cache rules.
 - One API key or credential set per provider you want to make available. The credential fields per provider are on [Providers](/ai-gateway/providers/overview).
 
 ## Add a model provider
@@ -18,8 +18,6 @@ You need:
 <Steps>
   <Step title="Open Settings > Model Providers">
     Go to **Settings > Model Providers** (`/settings/model-providers`), also listed as **Model Providers** in the **AI Gateway** sidebar. Click **Add Model Provider** and pick the provider from the menu.
-
-    {/* screenshot: admin-setup-model-providers.png, the Model Providers table with the Add Model Provider button and one connected provider row */}
   </Step>
 
   <Step title="Paste the credentials and pick the scope">
@@ -41,10 +39,6 @@ You need:
     |---|---|
     | Fallback priority | The order used when a virtual key has no routing policy. The lower number is tried first. Rows with the same number are tried in creation order. |
     | Provider config (JSON) | Provider-specific routing hints, such as a Bedrock region or an Azure deployment override. It must be a JSON object. |
-
-    The same section shows the health status, the last health check and the circuit-breaker state for this row, read only.
-
-    {/* screenshot: admin-setup-provider-advanced.png, the provider drawer with the Routing handle field filled and the Advanced (Gateway) section expanded on Fallback priority and Provider config */}
   </Step>
 </Steps>
 
@@ -63,8 +57,6 @@ Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create 
 Open **AI Gateway > Budgets** (`/gateway/budgets`) and create a budget. A budget caps spend on a scope: the organization, a team, a project, one virtual key, one member, or a group. Every request is checked against every budget that applies to it.
 
 Set at least one budget before you tell members to sign in. A key with no budget still serves traffic, and the gateway has no limit to refuse it at.
-
-{/* screenshot: admin-setup-budget.png, the New budget drawer with the scope, the window and the limit filled */}
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the scopes, the windows and the breach behavior.
 

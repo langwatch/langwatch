@@ -51,11 +51,23 @@ All matchers you set must match for the rule to fire. A matcher you leave empty 
 | Model | The requested model name matches the glob pattern, for example `claude-*` or `openai/gpt-5*`. |
 | Virtual key id | The request's virtual key has this id. |
 | Virtual key prefix | The key's display prefix starts with this text. |
-Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+| Virtual key tags | The key carries every tag listed, for example `team=support`. |
+
+<Frame caption="The Match when block of the New cache rule drawer. Every field you fill must match. With only the model pattern filled, the rule matches every key.">
+  <img src="/images/ai-gateway/cache-rule-drawer.png" alt="The Match when block of the New cache rule drawer with the virtual key id, display prefix, tags, principal, model and request metadata fields" />
+</Frame>
 
 The model matcher is compared with the model string as the caller sent it, before any alias or provider prefix is resolved. A rule on `claude-*` matches `claude-haiku-4-5` and does not match `anthropic/claude-haiku-4-5`. Write the pattern for the names your callers send, or add a second pattern with the prefix.
 
-Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+Leave the principal field empty. The gateway does not pass a principal to the rule evaluation, so a rule that sets one never fires. The request metadata key and value are not evaluated: a rule that sets them matches as if they were empty.
+
+### Action
+
+The **Then do** block sets one of the three [actions](#actions).
+
+<Frame caption="The Then do block with the action set to force.">
+  <img src="/images/ai-gateway/cache-rule-drawer-action.png" alt="The Then do block of the New cache rule drawer with Cache control mode set to force" />
+</Frame>
 
 ### Priority
 

@@ -32,7 +32,7 @@ The gateway waits up to 5 seconds for a request or response evaluation and 50 mi
 
 An evaluation that cannot complete (a timeout, an evaluator error, an evaluator that is no longer marked as a guardrail) is not a pass.
 
-- **Fail closed** blocks the request with `503 guardrail_upstream_unavailable`. This is the default.
+- **Fail closed** refuses the request. This is the default. An evaluator that throws or returns an error answers `403 guardrail_blocked` with the message `guardrail evaluator failed to run`, or the evaluator's own error text. When the gateway cannot reach LangWatch to run the check, or the check does not answer within the timeout, the answer is `503 guardrail_upstream_unavailable` with the message `guardrail could not be evaluated`.
 - **Fail open** lets the request through and stamps `langwatch.guardrail.fail_open=true` and `langwatch.guardrail.direction` on the span, with a `guardrail_fail_open` span event that carries the cause.
 
 Stream chunk guardrails always fail open, so a slow evaluator never stalls a stream. The span records `langwatch.guardrail.stream_chunk_fail_open` with the cause.
@@ -50,7 +50,7 @@ Content-Type: application/json
     "type": "guardrail_blocked",
     "code": "guardrail_blocked",
     "message": "<the evaluator's reason>",
-    "trace_id": "..."
+    "fault": "customer"
   }
 }
 ```

@@ -3388,11 +3388,23 @@ All matchers you set must match for the rule to fire. A matcher you leave empty 
 | Model | The requested model name matches the glob pattern, for example `claude-*` or `openai/gpt-5*`. |
 | Virtual key id | The request's virtual key has this id. |
 | Virtual key prefix | The key's display prefix starts with this text. |
-Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+| Virtual key tags | The key carries every tag listed, for example `team=support`. |
+
+<Frame caption="The Match when block of the New cache rule drawer. Every field you fill must match. With only the model pattern filled, the rule matches every key.">
+  <img src="/images/ai-gateway/cache-rule-drawer.png" alt="The Match when block of the New cache rule drawer with the virtual key id, display prefix, tags, principal, model and request metadata fields" />
+</Frame>
 
 The model matcher is compared with the model string as the caller sent it, before any alias or provider prefix is resolved. A rule on `claude-*` matches `claude-haiku-4-5` and does not match `anthropic/claude-haiku-4-5`. Write the pattern for the names your callers send, or add a second pattern with the prefix.
 
-Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+Leave the principal field empty. The gateway does not pass a principal to the rule evaluation, so a rule that sets one never fires. The request metadata key and value are not evaluated: a rule that sets them matches as if they were empty.
+
+### Action
+
+The **Then do** block sets one of the three [actions](#actions).
+
+<Frame caption="The Then do block with the action set to force.">
+  <img src="/images/ai-gateway/cache-rule-drawer-action.png" alt="The Then do block of the New cache rule drawer with Cache control mode set to force" />
+</Frame>
 
 ### Priority
 
@@ -5396,7 +5408,7 @@ Do this once as an organization owner or admin. After it, every member signs in 
 
 You need:
 
-- The owner or admin role on the LangWatch organization.
+- The owner or admin role on the LangWatch organization. The Admin role holds every gateway permission. A Member can create and rotate virtual keys and read every gateway page, and cannot change providers, routing policies, budgets or cache rules.
 - One API key or credential set per provider you want to make available. The credential fields per provider are on [Providers](/ai-gateway/providers/overview).
 
 ## Add a model provider
@@ -5404,8 +5416,6 @@ You need:
 <Steps>
   <Step title="Open Settings > Model Providers">
     Go to **Settings > Model Providers** (`/settings/model-providers`), also listed as **Model Providers** in the **AI Gateway** sidebar. Click **Add Model Provider** and pick the provider from the menu.
-
-    {/* screenshot: admin-setup-model-providers.png, the Model Providers table with the Add Model Provider button and one connected provider row */}
   </Step>
 
   <Step title="Paste the credentials and pick the scope">
@@ -5427,10 +5437,6 @@ You need:
     |---|---|
     | Fallback priority | The order used when a virtual key has no routing policy. The lower number is tried first. Rows with the same number are tried in creation order. |
     | Provider config (JSON) | Provider-specific routing hints, such as a Bedrock region or an Azure deployment override. It must be a JSON object. |
-
-    The same section shows the health status, the last health check and the circuit-breaker state for this row, read only.
-
-    {/* screenshot: admin-setup-provider-advanced.png, the provider drawer with the Routing handle field filled and the Advanced (Gateway) section expanded on Fallback priority and Provider config */}
   </Step>
 </Steps>
 
@@ -5449,8 +5455,6 @@ Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create 
 Open **AI Gateway > Budgets** (`/gateway/budgets`) and create a budget. A budget caps spend on a scope: the organization, a team, a project, one virtual key, one member, or a group. Every request is checked against every budget that applies to it.
 
 Set at least one budget before you tell members to sign in. A key with no budget still serves traffic, and the gateway has no limit to refuse it at.
-
-{/* screenshot: admin-setup-budget.png, the New budget drawer with the scope, the window and the limit filled */}
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the scopes, the windows and the breach behavior.
 
@@ -5977,7 +5981,7 @@ The gateway waits up to 5 seconds for a request or response evaluation and 50 mi
 
 An evaluation that cannot complete (a timeout, an evaluator error, an evaluator that is no longer marked as a guardrail) is not a pass.
 
-- **Fail closed** blocks the request with `503 guardrail_upstream_unavailable`. This is the default.
+- **Fail closed** refuses the request. This is the default. An evaluator that throws or returns an error answers `403 guardrail_blocked` with the message `guardrail evaluator failed to run`, or the evaluator's own error text. When the gateway cannot reach LangWatch to run the check, or the check does not answer within the timeout, the answer is `503 guardrail_upstream_unavailable` with the message `guardrail could not be evaluated`.
 - **Fail open** lets the request through and stamps `langwatch.guardrail.fail_open=true` and `langwatch.guardrail.direction` on the span, with a `guardrail_fail_open` span event that carries the cause.
 
 Stream chunk guardrails always fail open, so a slow evaluator never stalls a stream. The span records `langwatch.guardrail.stream_chunk_fail_open` with the cause.
@@ -5995,7 +5999,7 @@ Content-Type: application/json
     "type": "guardrail_blocked",
     "code": "guardrail_blocked",
     "message": "<the evaluator's reason>",
-    "trace_id": "..."
+    "fault": "customer"
   }
 }
 ```
@@ -7231,18 +7235,20 @@ The response carries `X-LangWatch-Fallback-Count` with the number of failovers t
 ```
 HTTP/1.1 200 OK
 X-LangWatch-Fallback-Count: 1
-X-LangWatch-Gateway-Request-Id: 9f2c...
+X-LangWatch-Gateway-Request-Id: req_3e8385c4e62cbe4e31ca9c410c5891
 ```
+
+The body is the provider's normal response and does not name the skipped provider.
 
 The span records the provider that served the request. Prometheus counts every attempt in `gateway_provider_attempts_total{credential_id, outcome}` and every failover in `gateway_fallback_events_total{from_credential, to_credential}`.
 
 ## Circuit breaker
 
-Each provider credential has a circuit breaker. After 10 failures inside a 30 second window the breaker opens and the gateway skips that credential for 60 seconds, then lets one probe request through. A 5xx, a timeout or a connection failure counts as a failure; a 429 or a terminal 4xx does not.
+Each provider credential has a circuit breaker. After 10 failures inside a 30 second window the breaker opens and the gateway skips that credential for 60 seconds, then lets one probe request through. A 5xx, a timeout or a connection failure counts as a failure; a 429 or a terminal 4xx does not. The window decides: the same ten failures spread over more than 30 seconds leave the breaker closed.
 
 A skipped credential does not consume an attempt. When the breaker is open on every credential in the chain the caller gets `503 circuit_open` with the message `provider temporarily unavailable: repeated upstream failures opened the circuit breaker, retry shortly`.
 
-The window, the threshold and the open duration are gateway settings: `LW_GATEWAY_CIRCUIT_WINDOW_S`, `LW_GATEWAY_CIRCUIT_THRESHOLD`, `LW_GATEWAY_CIRCUIT_COOLDOWN_S`. `gateway_circuit_state{credential_id}` reports 0 closed, 1 open, 2 half-open.
+The window, the threshold and the open duration are gateway settings: `LW_GATEWAY_CIRCUIT_WINDOW_S`, `LW_GATEWAY_CIRCUIT_THRESHOLD`, `LW_GATEWAY_CIRCUIT_COOLDOWN_S`. `gateway_circuit_state{credential_id}` reports 0 closed, 1 open, 2 half-open, and is the only view of the breaker state. A skipped attempt is counted as `outcome="circuit_open"` in `gateway_provider_attempts_total`.
 
 ## Errors before the first attempt
 
@@ -38041,6 +38047,16 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
 
 The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/gateway-virtual-keys/create-virtual-key) and a retry that lost its response returns the original secret instead of stranding it.
 
+To create the same endpoint from the UI, click **New endpoint** on the Webhooks page and pick the destination, the URL and the events.
+
+<Frame caption="The New webhook endpoint drawer: the destination, the URL, the nine gateway event types, and the delivery controls at their defaults.">
+  <img src="/images/ai-gateway/webhook-drawer.png" alt="The New webhook endpoint drawer with Destination, Endpoint URL, the Events checkboxes and the Delivery fields" />
+</Frame>
+
+<Frame caption="The signing secret dialog after Create endpoint. It is shown once. Roll secret in the row menu issues a new one.">
+  <img src="/images/ai-gateway/webhook-signing-secret.png" alt="The Signing secret dialog with the whsec_ value and a Copy button" />
+</Frame>
+
 ### What a receiver URL must look like
 
 A webhook URL is a destination our workers dial on your behalf, so it is held to one policy across the product:
@@ -38164,6 +38180,8 @@ X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
+
+The digest is the HMAC-SHA256 of the string `<t>.<raw body>` with the endpoint secret, as lower-case hex. During a secret roll the header carries one `v1` per valid secret, newest first, and the delivery is authentic when any of them matches.
 
 Both SDKs ship a verifier, so you do not have to get the digest, the timestamp tolerance, the constant-time compare, and the rotation window right yourself. Pass the **raw bytes** you received: parsing and re-serializing the JSON first breaks the digest.
 
@@ -38302,7 +38320,7 @@ An endpoint can put each batch on your own Amazon SQS queue instead of POSTing i
 **`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
 </Warning>
 
-**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt are **message attributes** under the same names they use as HTTP headers:
 
 | Message attribute | Same as the HTTP header |
 |---|---|
@@ -38359,7 +38377,7 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
 - **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
 
-**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 
 **Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
 
@@ -38401,6 +38419,10 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 ## The delivery log
 
 `GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+
+<Frame caption="The Deliveries drawer, from the endpoint's row menu: the health numbers on top, then one row per attempt with your receiver's status.">
+  <img src="/images/ai-gateway/webhook-deliveries.png" alt="The Deliveries drawer with lag, dead-lettered count, sends per minute, success rate and p95 latency above a table of attempts" />
+</Frame>
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 

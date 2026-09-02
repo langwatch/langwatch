@@ -58,6 +58,16 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
 
 The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/gateway-virtual-keys/create-virtual-key) and a retry that lost its response returns the original secret instead of stranding it.
 
+To create the same endpoint from the UI, click **New endpoint** on the Webhooks page and pick the destination, the URL and the events.
+
+<Frame caption="The New webhook endpoint drawer: the destination, the URL, the nine gateway event types, and the delivery controls at their defaults.">
+  <img src="/images/ai-gateway/webhook-drawer.png" alt="The New webhook endpoint drawer with Destination, Endpoint URL, the Events checkboxes and the Delivery fields" />
+</Frame>
+
+<Frame caption="The signing secret dialog after Create endpoint. It is shown once. Roll secret in the row menu issues a new one.">
+  <img src="/images/ai-gateway/webhook-signing-secret.png" alt="The Signing secret dialog with the whsec_ value and a Copy button" />
+</Frame>
+
 ### What a receiver URL must look like
 
 A webhook URL is a destination our workers dial on your behalf, so it is held to one policy across the product:
@@ -181,6 +191,8 @@ X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
+
+The digest is the HMAC-SHA256 of the string `<t>.<raw body>` with the endpoint secret, as lower-case hex. During a secret roll the header carries one `v1` per valid secret, newest first, and the delivery is authentic when any of them matches.
 
 Both SDKs ship a verifier, so you do not have to get the digest, the timestamp tolerance, the constant-time compare, and the rotation window right yourself. Pass the **raw bytes** you received: parsing and re-serializing the JSON first breaks the digest.
 
@@ -319,7 +331,7 @@ An endpoint can put each batch on your own Amazon SQS queue instead of POSTing i
 **`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
 </Warning>
 
-**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt are **message attributes** under the same names they use as HTTP headers:
 
 | Message attribute | Same as the HTTP header |
 |---|---|
@@ -376,7 +388,7 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
 - **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
 
-**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 
 **Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
 
@@ -418,6 +430,10 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 ## The delivery log
 
 `GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+
+<Frame caption="The Deliveries drawer, from the endpoint's row menu: the health numbers on top, then one row per attempt with your receiver's status.">
+  <img src="/images/ai-gateway/webhook-deliveries.png" alt="The Deliveries drawer with lag, dead-lettered count, sends per minute, success rate and p95 latency above a table of attempts" />
+</Frame>
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
