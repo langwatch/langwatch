@@ -17,6 +17,7 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
+import { actorIdForRollupWrite } from "../services/logic/erasedActorId";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
@@ -222,7 +223,16 @@ function dimensionsOf(event: {
     currencyCode: GOVERNANCE_COST_CURRENCY_USD,
     // The spender is the key's principal; the caller's own end user is the
     // fallback for a key with no resolved principal.
-    rawActorId: d.principal_user_id || d.end_user_id,
+    //
+    // Substituted for a pseudonym when this identifier has been erased
+    // (ADR-128 §9 step 5). It has to happen HERE rather than at the store,
+    // because this tuple is also the row's key: erasure removes the old rows
+    // and replays the days, and a replay that re-derived the original would
+    // write it back beside the pseudonymized row and double the amount.
+    rawActorId: actorIdForRollupWrite({
+      tenantId: event.tenantId,
+      rawActorId: d.principal_user_id || d.end_user_id,
+    }),
   };
 }
 

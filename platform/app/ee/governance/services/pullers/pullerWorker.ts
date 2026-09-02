@@ -37,6 +37,10 @@ import {
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
 import {
+  loadErasureSuppression,
+  partitionSuppressedEvents,
+} from "../erasureSuppression.service";
+import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
@@ -441,7 +445,25 @@ async function writePulledEvents({
   // from the same pull disagreeing about when they were observed could order a
   // corrected figure behind the one it corrects.
   const observedAt = new Date();
-  for (const event of events) {
+  // The do-not-reimport list, resolved once per run for the same reason the
+  // cost flag above is. Without this check the pullers undo every erasure on
+  // their next pass: they look thirty days back, so an actor erased today is
+  // re-read and re-written tomorrow (ADR-128 §9 step 1). `event.actor` is what
+  // becomes `ActorEmail` and rides inside the raw OCSF payload, and it is the
+  // actor id the cost record carries — one check covers both writes because a
+  // suppressed event is not written at all rather than written and erased
+  // again later.
+  const suppression = await loadErasureSuppression({
+    prisma,
+    organizationId: source.organizationId,
+    provider: source.sourceType,
+  });
+  const { kept, suppressedCount } = partitionSuppressedEvents({
+    events,
+    actorOf: (event) => event.actor,
+    suppression,
+  });
+  for (const event of kept) {
     await ocsfRepo.insertEvent(
       mapToOcsfRow({
         event,
@@ -457,6 +479,15 @@ async function writePulledEvents({
       observedAt,
       pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
     });
+  }
+  if (suppressedCount > 0) {
+    // Worth a line: these are real provider rows this run deliberately did not
+    // store, so a total that looks short has an explanation here rather than
+    // looking like a pull that lost data.
+    logger.info(
+      { ingestionSourceId: source.id, suppressedCount },
+      "skipped pulled events naming an erased identifier",
+    );
   }
   await routeConversationsToTraceDestination({ events, source });
 }

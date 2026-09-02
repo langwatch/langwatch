@@ -304,6 +304,35 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "updateMany" && isSystemManagedKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // Governance identity (ADR-128 §11). Every read and write names its
+  // organization: these are admin-curated rows about people a provider put on a
+  // cost row, and there is no query shape that wants more than one tenant's.
+  DiscoveredPerson: {},
+  DiscoveredAgent: {},
+  IdentityMatch: {},
+  // Which governance tenants an organization has ever written rows under.
+  //
+  // Two shapes need more than organizationId. `tenantId` is a project id —
+  // globally unique, so it resolves to exactly one organization, which is the
+  // whole reason this table exists: it translates a tenant back to its owner
+  // AFTER the project has been archived, when the live resolver has gone blind
+  // to it. And the fold's suppression snapshot loads the tenant→organization map
+  // for the whole process in one pass, which is across-organizations by design
+  // and has no predicate to offer. Granted on `findMany` only, and the rows are
+  // two opaque ids and two timestamps — platform bookkeeping, no customer data.
+  GovernanceTenantHistory: {
+    platformScopeActions: ["findMany"],
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "tenantId") === "string",
+  },
+  // Digests of erased identifiers (ADR-128 §9). Same snapshot read, same
+  // reasoning, and this table is the one place in the codebase that holds no
+  // customer data BY CONSTRUCTION: it stores hashes precisely so it is not a
+  // copy of the identifiers it exists to keep out. Every other access names its
+  // organization.
+  ErasedIdentifierSuppression: {
+    platformScopeActions: ["findMany"],
+  },
   // The grants ledger's projection tables (ADR-092 §13). Written only by
   // the authz_grants fold (plus revocation enforcement); read by the engine
   // per organization. Row id / organizationId cover every access pattern.
