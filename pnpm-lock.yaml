@@ -469,6 +469,9 @@ importers:
       '@langwatch/gateway-web':
         specifier: workspace:*
         version: link:../../packages/features/gateway/web
+      '@langwatch/model-provider-web':
+        specifier: workspace:*
+        version: link:../../packages/features/model-provider/web
       '@langwatch/ops-web':
         specifier: workspace:*
         version: link:../../packages/features/ops/web
@@ -575,6 +578,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../packages/aws-client
+      '@langwatch/coding-agent-server':
+        specifier: workspace:*
+        version: link:../../packages/features/coding-agent/server
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -596,9 +602,15 @@ importers:
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../../packages/features/log/contract
+      '@langwatch/log-server':
+        specifier: workspace:*
+        version: link:../../packages/features/log/server
       '@langwatch/metric-contract':
         specifier: workspace:*
         version: link:../../packages/features/metric/contract
+      '@langwatch/metric-server':
+        specifier: workspace:*
+        version: link:../../packages/features/metric/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -4456,6 +4468,61 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/model-provider/web:
+    dependencies:
+      '@langwatch/authz-web':
+        specifier: workspace:*
+        version: link:../../authz/web
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../design-system
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
+    devDependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

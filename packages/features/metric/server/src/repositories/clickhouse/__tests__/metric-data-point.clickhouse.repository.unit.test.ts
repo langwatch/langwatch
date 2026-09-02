@@ -2,12 +2,12 @@ import { formatQueryParams } from "@clickhouse/client/dist/common";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository";
-import type { MetricClickHouseClient } from "../clickhouse.metric-data-point.repository";
+import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository";
 import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
 import { point } from "@langwatch/metric-server/testing";
 
-type InsertCall = { table: string; values: unknown[] };
+type InsertCall = { table: string; values: readonly unknown[] };
 
 function response(rows: unknown[]): { json<T = unknown>(): Promise<T[]> } {
   return {
@@ -129,6 +129,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(insertCalls(insert)[0]?.values[0]).toMatchObject({ LastSeenAt: new Date(3_000) });
   });
 
+  /** @scenario "The organization-wide usage read still routes by organization" */
   it("routes usage reads through the organization resolver and deduplicates by PointId", async () => {
     const queryCalls: string[] = [];
     const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {

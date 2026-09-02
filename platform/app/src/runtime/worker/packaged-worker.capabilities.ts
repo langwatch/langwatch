@@ -186,8 +186,6 @@ export function packagedWorkerCapabilities(options: {
         connectSettlement: workerCapabilityAlreadyConnected,
       },
     },
-    metric: { installer: { buildProcessing: () => definition("metric_processing") } },
-    log: { installer: { buildProcessing: () => definition("log_processing") } },
     trace: { installer: TraceProcessingServerInstaller.create(capabilities.trace) },
     suite: { installer: { buildProcessing: () => definition("suite_run_processing") } },
     scenario: {

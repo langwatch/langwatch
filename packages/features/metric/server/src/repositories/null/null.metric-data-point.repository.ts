@@ -1,8 +1,10 @@
 import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
+import type {
+  MetricDataPointBulkWrite,
+  MetricDataPointWrite,
+} from "../metric-data-point-append.repository";
 import {
   MetricDataPointRepository,
-  type MetricDataPointBulkWrite,
-  type MetricDataPointWrite,
   type SeriesTotalByPointAttribute,
 } from "../metric-data-point.repository";
 

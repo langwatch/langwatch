@@ -31,7 +31,7 @@ import {
 import { MetricDataPointStorageMapProjection } from "../projections/metric-data-point-storage.projection";
 import { MetricSeriesCatalogMapProjection } from "../projections/metric-series-catalog.projection";
 import { MetricTimeRollupMapProjection } from "../projections/metric-time-rollup.projection";
-import type { MetricDataPointRepository } from "../repositories/metric-data-point.repository";
+import type { MetricDataPointAppendRepository } from "../repositories/metric-data-point-append.repository";
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
@@ -49,7 +49,7 @@ export interface MetricProcessingPipelineDeps {
 }
 
 export interface MetricProcessingAdapterOptions {
-  repository: MetricDataPointRepository;
+  repository: MetricDataPointAppendRepository;
   defaultRetentionDays: number;
   metricCommandShardCount: number;
   subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];

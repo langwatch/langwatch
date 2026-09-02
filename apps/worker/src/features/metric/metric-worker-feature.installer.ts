@@ -1,16 +1,14 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
+import type { MetricProcessingPipeline } from "@langwatch/metric-server";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** Dispatch subscribers mounted on Metric's processing pipeline. */
-export type MetricWorkerSubscribers = EventSubscriberDefinition<MetricProcessingEvent>[];
 
 /** Metric's worker-facing capability after its server graph is composed. */
 export interface MetricWorkerCapability {
   buildProcessing(options?: {
     subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
-  }): Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+  }): MetricProcessingPipeline;
 }
 
 /**

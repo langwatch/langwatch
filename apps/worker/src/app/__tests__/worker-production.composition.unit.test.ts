@@ -1,5 +1,6 @@
 import {
   InMemoryProcessStore,
+  type AppendStore,
   type EventSourcedQueueProcessor,
   type EventSourcing,
 } from "@langwatch/eventing";
@@ -11,6 +12,8 @@ import {
   EventingServerRuntime,
   PrismaProcessStore,
 } from "@langwatch/eventing/server";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
+import { point } from "@langwatch/metric-server/testing";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { ProjectService } from "@langwatch/project-contract";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
@@ -190,6 +193,55 @@ function blobMaintenanceDefinition() {
       deleteDispatchedBefore: async () => 0,
     },
   });
+}
+
+function canonicalLogRecord(): CanonicalLogRecord {
+  return {
+    tenantId: "project_alpha",
+    organizationId: "organization_test",
+    recordId: "a".repeat(64),
+    resourceSchemaUrl: "",
+    resourceAttributesJson: "[]",
+    resourceAttributesFlatJson: "{}",
+    resourceAttributeKeys: [],
+    resourceDroppedAttributesCount: 0,
+    scopeSchemaUrl: "",
+    scopeName: "com.anthropic.claude_code.events",
+    scopeVersion: "1",
+    scopeAttributesJson: "[]",
+    scopeAttributeKeys: [],
+    scopeDroppedAttributesCount: 0,
+    wireTraceId: "",
+    wireSpanId: "",
+    correlationTraceId: "b".repeat(32),
+    correlationSpanId: "c".repeat(16),
+    correlationSource: "claude_synthesized",
+    timeUnixNano: "1700000000000000000",
+    observedTimeUnixNano: "0",
+    timeUnixMs: 1_700_000_000_000,
+    severityNumber: 9,
+    severityText: "INFO",
+    bodyType: "string",
+    bodyJson: '{"type":"string","value":"hello"}',
+    bodyText: "hello",
+    attributesJson: "[]",
+    attributesFlatJson: '{"event.name":"api_request"}',
+    attributeKeys: ["event.name"],
+    droppedAttributesCount: 0,
+    flags: 0,
+    eventName: "api_request",
+    providerKind: "claude_code",
+    providerEventKind: "model",
+    providerEventSequence: "1",
+    providerSessionId: "session",
+    providerConversationId: "",
+    providerPromptId: "prompt",
+    piiRedactionLevel: "ESSENTIAL",
+    canonicalPayload: "{}",
+    canonicalSizeBytes: 2,
+    occurredAt: 1_700_000_000_000,
+    acceptedAt: 1_800_000_000_000,
+  };
 }
 
 describe("WorkerProductionComposition", () => {
@@ -631,7 +683,7 @@ describe("WorkerProductionComposition", () => {
       );
     });
 
-    it("says nothing when the process is a GitHub App", async () => {
+    it("says nothing about credentials when the process is a GitHub App", async () => {
       const warn = vi.fn();
 
       await recheckThrough(
@@ -642,7 +694,15 @@ describe("WorkerProductionComposition", () => {
         }),
       );
 
-      expect(warn).not.toHaveBeenCalled();
+      // Scoped to GitHub's reason rather than to the logger: this graph
+      // supplies no Coding Agent pipeline, and that absence is declared here
+      // too. A bare "never warned" would pass only until the next honest
+      // declaration and then fail for a reason that has nothing to do with
+      // GitHub credentials.
+      expect(warn).not.toHaveBeenCalledWith(
+        { reason: "no-github-app-credentials" },
+        expect.anything(),
+      );
     });
   });
 
@@ -735,6 +795,227 @@ describe("WorkerProductionComposition", () => {
       await sweepThrough(compositionWith({}, { apiKey: { updateMany } }));
 
       expect(updateMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * Metric and Log, composed here rather than handed over built.
+   *
+   * Both pipelines were the App's to build: their repository carried an
+   * organization-keyed ClickHouse read (metric) and a trace read cap (log)
+   * that durable processing never touches, and this process can supply
+   * neither. What these cases hold is that the pipelines are composed by THIS
+   * graph, from the tenant-keyed client and retention its Eventing substrate
+   * already resolved, and that the ADR-056 edge into Coding Agent is either
+   * mounted or declared missing by name. A pipeline wired to the wrong client
+   * registers exactly the same routing keys and stores nothing.
+   */
+  describe("when metric and log processing are composed", () => {
+    function compositionWith(
+      input: {
+        resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        source?: Record<string, unknown>;
+        observability?: object;
+        codingAgent?: boolean;
+      } = {},
+    ) {
+      const commands = {
+        contributeSpanFacts: vi.fn(async () => undefined),
+        contributeMetricFacts: vi.fn(async () => undefined),
+        contributeLogFacts: vi.fn(async () => undefined),
+      };
+      const composition = WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: (input.resolveClickHouseClient ??
+            (async () => ({
+              insert: async () => undefined,
+              query: async () => ({ json: async () => [] }),
+            }))) as never,
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: {} as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(input.codingAgent
+          ? {
+              codingAgent: {
+                installer: {
+                  buildProcessing: () =>
+                    ({
+                      metadata: { name: "coding_agent_processing", aggregateType: "codingAgent" },
+                      commands: [],
+                      processManagers: new Map(),
+                    }) as never,
+                },
+              },
+            }
+          : {}),
+        ...(input.observability ? { observability: input.observability as never } : {}),
+      });
+      return { composition, commands };
+    }
+
+    function definitionsFrom(composition: WorkerProductionComposition, feature: string) {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === feature,
+      );
+      expect(installer, `the composition mounted no ${feature} feature`).toBeDefined();
+      const registered: { name: string; subscribers: string[] }[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push({
+          name: definition.metadata.name,
+          subscribers: [...definition.eventSubscribers.keys()],
+        });
+        return { commands: {} } as never;
+      });
+      return { installer: installer!, registered };
+    }
+
+    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
+    it("mounts both pipelines from this graph's own ClickHouse client", async () => {
+      const { composition } = compositionWith();
+
+      for (const feature of ["metric", "log"] as const) {
+        const { installer, registered } = definitionsFrom(composition, feature);
+        await installer.install();
+        expect(registered.map((entry) => entry.name)).toEqual([
+          feature === "metric" ? "metric_processing" : "log_processing",
+        ]);
+      }
+    });
+
+    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
+    it.each([
+      ["metric", () => point({ tenantId: "project_alpha", timeUnixMs: 1_800_000_000_000 })],
+      ["log", () => canonicalLogRecord()],
+    ] as const)(
+      "appends %s rows through the ClickHouse client this graph resolved",
+      async (feature, row) => {
+        const insert = vi.fn(async (_request: { values: readonly unknown[] }) => undefined);
+        const resolveClickHouseClient = vi.fn(async () => ({
+          insert,
+          query: async () => ({ json: async () => [] }),
+        }));
+        const { composition } = compositionWith({ resolveClickHouseClient });
+        const stores: AppendStore<never>[] = [];
+        const eventSourcing = composition.eventing.eventSourcing;
+        vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+          for (const entry of definition.mapProjections.values()) {
+            stores.push((entry.definition as unknown as { store: AppendStore<never> }).store);
+          }
+          return { commands: {} } as never;
+        });
+        await composition.featureInstallers
+          .find((candidate) => candidate.name === feature)!
+          .install();
+
+        await stores[0]!.append(row() as never, { retentionPolicy: undefined } as never);
+
+        // The client this composition resolved, for the tenant the row names.
+        // A pipeline handed any other client registers the identical routing
+        // keys and writes its rows somewhere nothing reads.
+        expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
+        // 49 is the substrate's own `retention.defaultRetentionDays` above,
+        // not a number configured a second time here. Two graphs stamping
+        // different retentions on the same table expire each other's rows.
+        expect(insert.mock.calls[0]![0].values[0]).toMatchObject({ _retention_days: 49 });
+      },
+    );
+
+    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
+    it("mounts the coding-agent dispatch subscribers when that pipeline is present", async () => {
+      const { composition } = compositionWith({ codingAgent: true });
+
+      const metric = definitionsFrom(composition, "metric");
+      await metric.installer.install();
+      const log = definitionsFrom(composition, "log");
+      await log.installer.install();
+
+      expect(metric.registered[0]!.subscribers).toEqual(["codingAgentMetricFactsDispatch"]);
+      expect(log.registered[0]!.subscribers).toEqual(["codingAgentLogFactsDispatch"]);
+    });
+
+    /** @scenario "A worker without the Coding Agent pipeline names the missing edge" */
+    it("names the absent Coding Agent pipeline, and mounts both anyway", async () => {
+      const warn = vi.fn();
+
+      const { composition } = compositionWith({
+        observability: { logger: { info: vi.fn(), warn } },
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        { reason: "no-coding-agent-pipeline" },
+        expect.stringContaining("without the Coding Agent pipeline"),
+      );
+      expect(composition.featureInstallers.map((installer) => installer.name)).toEqual(
+        expect.arrayContaining(["metric", "log"]),
+      );
+    });
+
+    /** @scenario "A worker without the Coding Agent pipeline names the missing edge" */
+    it("says nothing about the edge when the Coding Agent pipeline is present", () => {
+      const warn = vi.fn();
+
+      compositionWith({
+        codingAgent: true,
+        observability: { logger: { info: vi.fn(), warn } },
+      });
+
+      expect(warn).not.toHaveBeenCalledWith(
+        { reason: "no-coding-agent-pipeline" },
+        expect.anything(),
+      );
+    });
+
+    /** @scenario "Producer and consumer clamp one lane count" */
+    it("shards the command lanes on the same variables the App reads", async () => {
+      const { composition } = compositionWith({
+        source: { METRIC_PROCESSING_SHARDS: "4", LOG_PROCESSING_SHARDS: "2" },
+      });
+      const lanes = new Map<string, Set<string>>();
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        for (const command of definition.commands) {
+          const seen = new Set<string>();
+          // Enough distinct identities that every lane a shard count of 4 or
+          // 2 can produce is reached; the ids are fixed, so the hash and the
+          // lanes it yields are the same on every run.
+          for (let index = 0; index < 64; index += 1) {
+            const id = index.toString(16).padStart(64, "0");
+            seen.add(
+              command.options!.getGroupKey!({ pointId: id, recordId: id } as never) as string,
+            );
+          }
+          lanes.set(definition.metadata.name, seen);
+        }
+        return { commands: {} } as never;
+      });
+      for (const feature of ["metric", "log"] as const) {
+        await composition.featureInstallers
+          .find((candidate) => candidate.name === feature)!
+          .install();
+      }
+
+      // The exact lane sets the two variables ask for. A composition that
+      // ignored them would answer with the eight-lane metric default and the
+      // sixteen-lane log default instead, and both are supersets of these.
+      expect([...lanes.get("metric_processing")!].sort()).toEqual([
+        "metric:0",
+        "metric:1",
+        "metric:2",
+        "metric:3",
+      ]);
+      expect([...lanes.get("log_processing")!].sort()).toEqual(["log:0", "log:1"]);
     });
   });
 });

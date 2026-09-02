@@ -1,16 +1,14 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
+import type { LogProcessingPipeline } from "@langwatch/log-server";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** Dispatch subscribers mounted on Log's processing pipeline. */
-export type LogWorkerSubscribers = EventSubscriberDefinition<LogProcessingEvent>[];
 
 /** Log's worker-facing capability after its server graph is composed. */
 export interface LogWorkerCapability {
   buildProcessing(options?: {
     subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];
-  }): Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+  }): LogProcessingPipeline;
 }
 
 /**

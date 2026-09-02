@@ -26,7 +26,7 @@ import {
   recordCanonicalLogCommandDataSchema,
 } from "@langwatch/log-contract";
 import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection";
-import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository";
+import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository";
 import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store";
 import { CanonicalLogAdapter } from "./canonical-log.adapter";
 
@@ -38,7 +38,7 @@ export interface LogProcessingPipelineDeps {
 }
 
 export interface LogProcessingAdapterOptions {
-  repository: CanonicalLogRecordRepository;
+  repository: CanonicalLogRecordAppendRepository;
   defaultRetentionDays: number;
   logCommandShardCount: number;
   subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];

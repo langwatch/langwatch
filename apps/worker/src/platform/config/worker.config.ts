@@ -74,6 +74,18 @@ export const workerConfigDefinition = RuntimeConfig.define({
     privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
     host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
   },
+  /**
+   * How many ordered lanes the metric and log command paths spread across.
+   *
+   * Read from the same two variables the App reads, and resolved by the same
+   * two functions, because the App produces into these pipelines while this
+   * process consumes them: two graphs that clamped a lane count differently
+   * would put one point's command and its retry on different lanes.
+   */
+  processing: {
+    metricShards: Config.value(optionalEnvironmentString, { env: "METRIC_PROCESSING_SHARDS" }),
+    logShards: Config.value(optionalEnvironmentString, { env: "LOG_PROCESSING_SHARDS" }),
+  },
   infrastructure: {
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
@@ -157,6 +169,12 @@ export type WorkerShutdownConfig = Readonly<{
   processDeadlineMs: number;
 }>;
 
+/** The command-lane counts the metric and log processing pipelines shard on. */
+export type WorkerProcessingConfig = Readonly<{
+  metricShards?: string;
+  logShards?: string;
+}>;
+
 /** The GitHub App credentials the branch sweep mints installation tokens with. */
 export type WorkerGithubConfig = Readonly<{
   appId?: string;
@@ -174,6 +192,7 @@ export type WorkerConfig = Readonly<{
   observability: WorkerConfigProjection["observability"];
   shutdown: WorkerShutdownConfig;
   github: WorkerGithubConfig;
+  processing: WorkerProcessingConfig;
   infrastructure: WorkerInfrastructureConfig;
 }>;
 
@@ -198,6 +217,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
     github: value.github,
+    processing: value.processing,
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),

@@ -1,15 +1,15 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository";
+import type { CanonicalLogRecordAppendRepository } from "../../repositories/canonical-log-record-append.repository";
 
 export class CanonicalLogRecordStore implements AppendStore<CanonicalLogRecord> {
   private constructor(
-    private readonly repository: CanonicalLogRecordRepository,
+    private readonly repository: CanonicalLogRecordAppendRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(
-    repository: CanonicalLogRecordRepository,
+    repository: CanonicalLogRecordAppendRepository,
     defaultRetentionDays: number,
   ): CanonicalLogRecordStore {
     return new CanonicalLogRecordStore(repository, defaultRetentionDays);

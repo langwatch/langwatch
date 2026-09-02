@@ -1,19 +1,5 @@
-import type {
-  CanonicalMetricDataPoint,
-  MetricUsageEstimate,
-  MetricUsageEstimateQuery,
-} from "@langwatch/metric-contract";
-
-export interface MetricDataPointWrite {
-  point: CanonicalMetricDataPoint;
-  retentionDays?: number;
-}
-
-/** A replay chunk: many points for one tenant, written in one round trip. */
-export interface MetricDataPointBulkWrite {
-  points: CanonicalMetricDataPoint[];
-  retentionDays?: number;
-}
+import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
+import { MetricDataPointAppendRepository } from "./metric-data-point-append.repository";
 
 /** One series' total over a window, with the label set that identifies it. */
 export interface SeriesTotalByPointAttribute {
@@ -23,19 +9,11 @@ export interface SeriesTotalByPointAttribute {
   pointAttributes: Record<string, string>;
 }
 
-export abstract class MetricDataPointRepository {
-  abstract ensureDataPoint(args: MetricDataPointWrite): Promise<void>;
-
-  abstract ensureDataPoints(args: MetricDataPointBulkWrite): Promise<void>;
-
-  abstract upsertSeries(args: MetricDataPointWrite): Promise<void>;
-
-  abstract upsertSeriesMany(args: MetricDataPointBulkWrite): Promise<void>;
-
-  abstract recomputeAffectedRollups(args: MetricDataPointWrite): Promise<void>;
-
-  abstract recomputeAffectedRollupsMany(args: MetricDataPointBulkWrite): Promise<void>;
-
+/**
+ * The whole metric surface: the append port durable processing uses, plus the
+ * two reads that only a query graph makes.
+ */
+export abstract class MetricDataPointRepository extends MetricDataPointAppendRepository {
   abstract queryUsageEstimates(query: MetricUsageEstimateQuery): Promise<MetricUsageEstimate[]>;
 
   /**

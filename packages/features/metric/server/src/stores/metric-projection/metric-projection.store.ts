@@ -1,10 +1,10 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
-import type { MetricDataPointRepository } from "../../repositories/metric-data-point.repository";
+import type { MetricDataPointAppendRepository } from "../../repositories/metric-data-point-append.repository";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 
 abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> {
   constructor(
-    protected readonly repo: MetricDataPointRepository,
+    protected readonly repo: MetricDataPointAppendRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
@@ -23,7 +23,7 @@ abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> 
 
 export class MetricDataPointAppendStore extends MetricStoreBase {
   static create(
-    repository: MetricDataPointRepository,
+    repository: MetricDataPointAppendRepository,
     defaultRetentionDays: number,
   ): MetricDataPointAppendStore {
     return new MetricDataPointAppendStore(repository, defaultRetentionDays);
@@ -47,7 +47,7 @@ export class MetricDataPointAppendStore extends MetricStoreBase {
 
 export class MetricSeriesCatalogAppendStore extends MetricStoreBase {
   static create(
-    repository: MetricDataPointRepository,
+    repository: MetricDataPointAppendRepository,
     defaultRetentionDays: number,
   ): MetricSeriesCatalogAppendStore {
     return new MetricSeriesCatalogAppendStore(repository, defaultRetentionDays);
@@ -71,7 +71,7 @@ export class MetricSeriesCatalogAppendStore extends MetricStoreBase {
 
 export class MetricTimeRollupAppendStore extends MetricStoreBase {
   static create(
-    repository: MetricDataPointRepository,
+    repository: MetricDataPointAppendRepository,
     defaultRetentionDays: number,
   ): MetricTimeRollupAppendStore {
     return new MetricTimeRollupAppendStore(repository, defaultRetentionDays);

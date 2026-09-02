@@ -23,10 +23,22 @@ import {
   PostgresLangySessionKeyReapAdapter,
 } from "@langwatch/langy-server";
 import {
+  createCodingAgentLogFactsDispatchSubscriber,
+  createCodingAgentMetricFactsDispatchSubscriber,
+} from "@langwatch/coding-agent-server";
+import { CanonicalLogAdapter, ClickHouseLogProcessingAdapter } from "@langwatch/log-server";
+import {
+  ClickHouseMetricProcessingAdapter,
+  resolveMetricCommandShardCount,
+} from "@langwatch/metric-server";
+import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
-import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
+import {
+  TraceCanonicalisationService,
+  TraceProcessingInstallerPort,
+} from "@langwatch/trace-server";
 import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer";
 import {
   AuthzWorkerFeatureInstaller,
@@ -74,16 +86,8 @@ import {
   GovernanceIngestionWorkerFeatureInstaller,
   type GovernanceIngestionWorkerCapability,
 } from "../features/governance/governance-ingestion-worker-feature.installer";
-import {
-  LogWorkerFeatureInstaller,
-  type LogWorkerCapability,
-  type LogWorkerSubscribers,
-} from "../features/log/log-worker-feature.installer";
-import {
-  MetricWorkerFeatureInstaller,
-  type MetricWorkerCapability,
-  type MetricWorkerSubscribers,
-} from "../features/metric/metric-worker-feature.installer";
+import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer";
+import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer";
 import {
   ScenarioWorkerFeatureInstaller,
   type ScenarioWorkerCapability,
@@ -200,6 +204,22 @@ export abstract class WorkerGithubAbsenceReportPort {
   abstract withoutAppCredentials(): void;
 }
 
+/**
+ * Reports the composition decision an absent Coding Agent pipeline would
+ * otherwise hide.
+ *
+ * Metric and Log mount either way: canonical points and records are stored by
+ * their own projections and need nothing from another feature. What changes is
+ * the ADR-056 edge — the two dispatch subscribers that lift a coding agent's
+ * session-keyed facts out of those events and contribute them — because a
+ * subscriber cannot dispatch into a pipeline this graph never registered. A
+ * deployment should read that in its own logs at boot rather than infer it
+ * from coding-agent sessions that stay empty.
+ */
+export abstract class WorkerCodingAgentFactsAbsenceReportPort {
+  abstract withoutCodingAgentPipeline(): void;
+}
+
 /** Evaluation's durable processing pipeline, mounted before its dispatchers. */
 export type WorkerEvaluationCompositionOptions = {
   installer: EvaluationWorkerCapability;
@@ -248,18 +268,6 @@ export type WorkerGovernanceIngestionCompositionOptions = {
 /** The monthly billing roll-up, whose command re-dispatches itself forward. */
 export type WorkerBillingReportingCompositionOptions = {
   installer: BillingReportingWorkerCapability;
-};
-
-/** Metric's package-owned processing pipeline and its dispatch subscribers. */
-export type WorkerMetricCompositionOptions = {
-  installer: MetricWorkerCapability;
-  subscribers?: MetricWorkerSubscribers;
-};
-
-/** Log's package-owned processing pipeline and its dispatch subscribers. */
-export type WorkerLogCompositionOptions = {
-  installer: LogWorkerCapability;
-  subscribers?: LogWorkerSubscribers;
 };
 
 /** The AuthZ grants ledger, mounted last so every producer exists first. */
@@ -317,8 +325,6 @@ type WorkerProductionCompositionBaseOptions = {
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
   gatewaySpend?: WorkerGatewaySpendCompositionOptions;
-  metric?: WorkerMetricCompositionOptions;
-  log?: WorkerLogCompositionOptions;
   suite?: WorkerSuiteCompositionOptions;
   scenario?: WorkerScenarioCompositionOptions;
   experiment?: WorkerExperimentCompositionOptions;
@@ -463,20 +469,61 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const metric = options.metric
-      ? MetricWorkerFeatureInstaller.create({
-          installer: options.metric.installer,
-          eventing,
-          ...(options.metric.subscribers ? { subscribers: options.metric.subscribers } : {}),
-        })
-      : undefined;
-    const log = options.log
-      ? LogWorkerFeatureInstaller.create({
-          installer: options.log.installer,
-          eventing,
-          ...(options.log.subscribers ? { subscribers: options.log.subscribers } : {}),
-        })
-      : undefined;
+    // Unconditional, on the same footing as the sweeps above: both pipelines
+    // are composed from their own feature package over the tenant-keyed
+    // ClickHouse client this graph already resolves its event store through,
+    // so there is no graph in which they are present but unbuildable.
+    //
+    // `retention.defaultRetentionDays` is the number the event store already
+    // stamps rows with, read once here rather than configured a second time,
+    // and the two shard counts come from the same environment variables the
+    // App reads (worker.config `processing`) so producer and consumer clamp a
+    // lane count identically.
+    if (!codingAgent) {
+      WorkerProductionComposition.codingAgentFactsAbsence(options)?.withoutCodingAgentPipeline();
+    }
+    const metric = MetricWorkerFeatureInstaller.create({
+      eventing,
+      installer: ClickHouseMetricProcessingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          options.config.processing.metricShards,
+        ),
+      }),
+      ...(codingAgent
+        ? {
+            subscribers: [
+              createCodingAgentMetricFactsDispatchSubscriber({
+                contributeMetricFacts: codingAgent.commands.contributeMetricFacts,
+              }),
+            ],
+          }
+        : {}),
+    });
+    const log = LogWorkerFeatureInstaller.create({
+      eventing,
+      installer: ClickHouseLogProcessingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
+          options.config.processing.logShards,
+        ),
+      }),
+      ...(codingAgent
+        ? {
+            subscribers: [
+              createCodingAgentLogFactsDispatchSubscriber({
+                contributeLogFacts: codingAgent.commands.contributeLogFacts,
+                // Stateless derivation of the generated session title out of
+                // one response body; it reads nothing and holds nothing, so
+                // this graph builds its own rather than taking the App's.
+                traceCanonicalisation: TraceCanonicalisationService.create(),
+              }),
+            ],
+          }
+        : {}),
+    });
     const trace = TraceWorkerFeatureInstaller.create({
       installer: options.trace.installer,
       eventing,
@@ -599,6 +646,15 @@ export class WorkerProductionComposition {
   ): WorkerGithubAbsenceReportPort | undefined {
     return options.observability
       ? LoggedWorkerGithubAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The same logger, for the ADR-056 edge Metric and Log mount without. */
+  private static codingAgentFactsAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerCodingAgentFactsAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerCodingAgentFactsAbsence.create(options.observability.logger)
       : undefined;
   }
 
@@ -917,6 +973,24 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
     this.logger.warn(
       { reason: "no-github-app-credentials" },
       "worker composed GitHub branch maintenance without App credentials: pull-request linkage is not re-checked, and only its retention half runs",
+    );
+  }
+}
+
+/** Names the missing Coding Agent pipeline once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerCodingAgentFactsAbsence extends WorkerCodingAgentFactsAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerCodingAgentFactsAbsence {
+    return new LoggedWorkerCodingAgentFactsAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutCodingAgentPipeline(): void {
+    this.logger.warn(
+      { reason: "no-coding-agent-pipeline" },
+      "worker composed metric and log processing without the Coding Agent pipeline: canonical points and records are still stored, and no coding-agent session facts are contributed from them",
     );
   }
 }
