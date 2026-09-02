@@ -16,10 +16,10 @@
  * every keystroke would be exactly as janky as it sounds.
  */
 
-import { Box, Button, Card, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Text } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, Compass, GripVertical, Pin } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { GraphCardMenu } from "~/components/analytics/reports/GraphCardMenu";
@@ -167,11 +167,6 @@ export function PlaygroundWidgetCard({
     setIsDrawerOpen(true);
   };
 
-  const openQueriesTab = () => {
-    setDrawerTab("queries");
-    setIsDrawerOpen(true);
-  };
-
   // Reverts the draft AND closes — covers Cancel, the drawer's own close
   // trigger, and clicking outside it, so none of the three can leave a
   // discarded edit sitting in the draft for the next open to reveal.
@@ -200,17 +195,7 @@ export function PlaygroundWidgetCard({
           overflow="hidden"
           gap={2}
         >
-          <HStack minWidth={0}>
-            <IconButton
-              aria-label="Drag widget"
-              variant="ghost"
-              size="xs"
-              cursor="grab"
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical />
-            </IconButton>
+          <HStack minWidth={0} cursor="grab" {...attributes} {...listeners}>
             <Text
               fontSize="sm"
               fontWeight="bold"
@@ -240,44 +225,6 @@ export function PlaygroundWidgetCard({
                 ))}
               </Menu.Content>
             </Menu.Root>
-
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <IconButton
-                  aria-label="Add to dashboard"
-                  variant="ghost"
-                  size="xs"
-                >
-                  <Pin />
-                </IconButton>
-              </Menu.Trigger>
-              <Menu.Content>
-                {dashboards.length === 0 ? (
-                  <Menu.Item value="none" disabled>
-                    No dashboards
-                  </Menu.Item>
-                ) : (
-                  dashboards.map((d) => (
-                    <Menu.Item
-                      key={d.id}
-                      value={d.id}
-                      onClick={() => onPin(d.id, d.name)}
-                    >
-                      {d.name}
-                    </Menu.Item>
-                  ))
-                )}
-              </Menu.Content>
-            </Menu.Root>
-
-            <IconButton
-              aria-label="Explore queries"
-              variant="ghost"
-              size="xs"
-              onClick={openQueriesTab}
-            >
-              <Compass />
-            </IconButton>
 
             <GraphCardMenu
               graphId={widget.id}
