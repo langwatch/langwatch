@@ -6271,6 +6271,9 @@ passing a `Uint8Array` to `fetch`; both closed while this ran).
 three that remain are `app-trpc.features.unit.test.ts`'s context drift, already
 recorded. `vitest run` — **770 tests, 1 failing, not in this lane's files**:
 the org-group half's clustering scheduler.
+`api-standalone.executable.integration.test.ts` also failed once under the
+parallel run and passes 9/9 on its own — it binds a real listener, so it
+collides with whatever else in the shard is binding one.
 `git diff --numstat -- platform/app`: **0 insertions on every row**, 175 rows.
 
 

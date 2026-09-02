@@ -8,10 +8,15 @@ Feature: Idempotency-Key on the control-plane creates
   # request", and the receipt is what lets the second one answer with the
   # first one's response.
   #
-  # Bound scenarios run in
-  # platform/app/src/app/api/gateway-platform/__tests__/ and
-  # platform/app/src/app/api/webhooks/__tests__/ against the real Hono apps and
-  # real Postgres.
+  # The receipt protocol itself — the claim, its heartbeat, its takeover window
+  # and the encrypted stored response — is
+  # packages/api/src/rest/idempotency-ledger.ts, bound in
+  # packages/api/src/rest/__tests__/idempotency-ledger.unit.test.ts. The API
+  # process composes exactly one of it (apps/api/src/app/
+  # api-idempotency.composition.ts) and hands the runner to every family that
+  # accepts the header, which is what stops two takeover clocks racing over one
+  # table. The REST scenarios are bound in
+  # apps/api/src/app/__tests__/api-gateway-idempotency.integration.test.ts.
 
   As a backend that provisions gateway resources programmatically
   I want a create I can retry without checking first whether it landed

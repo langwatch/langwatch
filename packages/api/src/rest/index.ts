@@ -205,6 +205,25 @@ export {
   readIdempotencyKey,
 } from "./idempotency.js";
 
+// `Idempotency-Key`: the receipt ledger the wire half dispatches through.
+export {
+  HEARTBEAT_INTERVAL_MS,
+  IdempotencyConflictError,
+  type IdempotencyConflictReason,
+  IdempotencyLedger,
+  type IdempotencyReceiptCreateInput,
+  type IdempotencyReceiptPersistence,
+  type IdempotencyReceiptRecord,
+  type IdempotencyReceiptUpdateInput,
+  type IdempotencyResponseCipher,
+  isClaimAbandoned,
+  RECEIPT_TTL_MS,
+  serializeResponseBody,
+  TAKEOVER_AFTER_MS,
+  withIdempotency,
+  type WithIdempotencyParams,
+} from "./idempotency-ledger.js";
+
 // Shared hardening for the routes that stream stored-object bytes.
 export {
   jsonResponse,

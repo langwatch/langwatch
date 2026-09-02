@@ -15,6 +15,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./webhooks": {
+      "types": "./src/webhooks.ts",
+      "default": "./src/webhooks.ts"
+    },
     "./governance/admin-workspace-view-audit.adapter": {
       "types": "./src/governance/admin-workspace-view-audit.adapter.ts",
       "default": "./src/governance/admin-workspace-view-audit.adapter.ts"

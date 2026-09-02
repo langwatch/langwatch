@@ -25,12 +25,13 @@
  * a key that genuinely spent nothing. `spendSourceAvailable` is what carries
  * that distinction into the application.
  *
- * The idempotency ledger is a NAMED ABSENCE — {@link ApiGatewayIdempotencyPort}
- * — because the receipt store it runs on is `server/api/idempotency.ts`, still
- * in the retired application and read by four other families that are another
- * lane's to move. Absent, the three REST creates that accept an
- * `Idempotency-Key` refuse by name. A runner that executed unguarded would mint
- * a second virtual key on a retry the caller sent precisely so it would not.
+ * The idempotency ledger is a PORT — {@link ApiGatewayIdempotencyPort} — and
+ * the process's own implementation of it is `api-idempotency.composition.ts`,
+ * over `@langwatch/api/rest`'s receipt protocol. It stays a port because a
+ * deployment can hold no database or no cipher, and then the three REST creates
+ * that accept an `Idempotency-Key` refuse by name: a runner that executed
+ * unguarded would mint a second virtual key on a retry the caller sent
+ * precisely so it would not.
  */
 import type { ApiKeyPermissionScope, AuthzService } from "@langwatch/authz-contract";
 import {
@@ -41,6 +42,7 @@ import {
   GatewaySpendEventsService,
   GatewayUsageService,
   GatewayVirtualKeySpendAdapter,
+  type GatewayService,
   PrismaGatewayAdapter,
   VirtualKeyCryptoAdapter,
   VirtualKeyService,
@@ -97,11 +99,12 @@ class ApiCapabilityUnavailableError extends HandledError {
 /**
  * The receipt ledger a keyed REST create dispatches through.
  *
- * A port rather than a composition because the ledger it runs on — the
- * `IdempotencyReceipt` claim, its heartbeat and its takeover window — is
- * `platform/app/src/server/api/idempotency.ts`, a module four other REST
- * families still read and another lane's to move. Copying its 752 lines here
- * would give the deployment two receipt stores with two takeover clocks.
+ * A port rather than a direct dependency because the ledger — the
+ * `IdempotencyReceipt` claim, its heartbeat and its takeover window — needs a
+ * database AND a cipher, and a deployment can hold neither. It is ONE ledger
+ * per process wherever it exists: two would be two takeover clocks racing each
+ * other's claims, which is the double create the header exists to prevent.
+ * See `api-idempotency.composition.ts`.
  */
 export abstract class ApiGatewayIdempotencyPort {
   abstract readonly run: IdempotentRunner;
@@ -217,6 +220,16 @@ export type ApiGatewayComposition = Readonly<{
   virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
   /** The spend-event feed the REST spend family reads, on the same terms. */
   spendEvents: GatewaySpendEventsService | undefined;
+  /**
+   * The budget, cache-rule and guardrail decision store.
+   *
+   * Exposed as well as folded into the application because the Go data plane's
+   * warm-cache config is materialised against it: one key's bundle carries the
+   * budgets, the cache rules and the guardrails that apply to it, and reading
+   * them through a second service would let the bundle disagree with what the
+   * console shows.
+   */
+  budgetDecisions: GatewayService;
 }>;
 
 /**
@@ -463,7 +476,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       }),
   });
 
-  return { app, virtualKeys, budgetSpend, virtualKeySpend, spendEvents };
+  return { app, virtualKeys, budgetSpend, virtualKeySpend, spendEvents, budgetDecisions };
 }
 
 /**

@@ -59,6 +59,7 @@ export * from "./ports/gateway-open-admissions.port";
 export * from "./adapters/clickhouse.gateway-open-admissions.adapter";
 export * from "./intents/gateway-spend.intent";
 export * from "./adapters/eventing.gateway-spend.adapter";
+export { createGatewaySpendProducerPipeline } from "./adapters/gateway-spend-producer.adapter";
 export {
   PostgresGatewayBudgetResolutionAdapter,
   type GatewayBudgetResolutionDatabase,
@@ -124,6 +125,16 @@ export {
  * apart.
  */
 export { createGatewayPlatformRestApp } from "./transport/api-rest/gateway-platform.api";
+export {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+  createGatewayInternalRestApp,
+  GATEWAY_SIGNATURE_WINDOW_SECONDS,
+  type GatewayInternalRestPorts,
+  type GatewaySpendCommandSender,
+} from "./transport/api-rest/gateway-internal.api";
+export { GatewayInternalStorePort } from "./ports/gateway-internal-store.port";
+export { PrismaGatewayInternalStoreAdapter } from "./adapters/prisma.gateway-internal-store.adapter";
 export {
   createGatewaySpendRestApp,
   type GatewaySpendEnvelope,
@@ -225,3 +236,16 @@ export {
 export { GatewaySpanIngestionPort } from "./ports/gateway-span-ingestion.port";
 export { GatewaySpendConfirmationPort } from "./ports/gateway-spend-confirmation.port";
 export { GatewaySpendRatingPort } from "./ports/gateway-spend-rating.port";
+export {
+  currentRegistryRateVersion,
+  ModelCatalogGatewaySpendRatingAdapter,
+  NANO_USD_PER_USD,
+  NO_RATE_RULE_CODE,
+  rateSpendNanoUsd,
+  UNPRICED_QUANTITIES_CODE,
+} from "./adapters/model-catalog.gateway-spend-rating.adapter";
+export {
+  createElevenLabsWebhookRestApp,
+  verifyElevenLabsSignature,
+  type ElevenLabsWebhookRestPorts,
+} from "./transport/api-rest/elevenlabs-webhook.api";

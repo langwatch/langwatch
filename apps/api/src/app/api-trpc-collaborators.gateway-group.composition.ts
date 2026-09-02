@@ -64,6 +64,7 @@ import type { GithubTrpcMountPorts } from "../features/github/github-trpc.mount"
 import type { ApiAuditPort } from "../api-request.policy";
 import {
   composeApiGateway,
+  type ApiGatewayComposition,
   type ApiGatewayClickHousePort,
   type ApiGatewayIdempotencyPort,
 } from "./api-gateway.composition";
@@ -150,6 +151,18 @@ export type ApiGatewayGroupCollaborators = Readonly<{
    * the browser's tRPC door reads or the two enforce different rules.
    */
   gatewayApp: ApiTrpcFeatureApplication["gateway"];
+  /**
+   * Everything the gateway composition opened, for the two doors that need
+   * more than the application.
+   *
+   * The billing reconciliation REST family reads the SPEND STORE directly — a
+   * cursor walk and a rollup, neither of which is an operation on a virtual
+   * key — and the Go data plane's internal control plane materialises a key's
+   * warm-cache bundle against the decision store. Both must be the SAME stores
+   * the gateway application prices a budget against, so they are exposed here
+   * rather than opened a second time by whoever needs them.
+   */
+  composition: ApiGatewayComposition;
 }>;
 
 /** Composes the gateway-group half from this process's own graph. */
@@ -184,6 +197,7 @@ export function composeApiGatewayGroupCollaborators(
     },
     github: githubPorts(options, logger),
     gatewayApp: gateway.app,
+    composition: gateway,
   };
 }
 

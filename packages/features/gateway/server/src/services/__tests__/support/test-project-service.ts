@@ -36,7 +36,7 @@ export class TestProjectService extends ProjectService {
   getWithTeam() {
     return this.unsupported();
   }
-  tryGetWithTeam() {
+  tryGetWithTeam(_id: string): ReturnType<ProjectService["tryGetWithTeam"]> {
     return this.unsupported();
   }
   create() {
