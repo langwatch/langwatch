@@ -76,13 +76,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Experiments
 
-- [Experiments Overview](https://langwatch.ai/docs/evaluations/experiments/overview.md): Run batch tests on your LLM applications to measure quality, compare configurations, and catch regressions before production.
+- [Experiments Overview](https://langwatch.ai/docs/evaluations/experiments/overview.md): Run a dataset through your prompts and agents in the workbench, score every row with evaluators, and compare runs before you ship a change.
 - [Experiments via SDK](https://langwatch.ai/docs/evaluations/experiments/sdk.md): Run experiments programmatically from notebooks or scripts to batch test your LLM applications.
 
 #### Via UI
 
-- [How to evaluate that your LLM answers correctly](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Measure correctness in LLM answers using LangWatch’s Experiments to compare outputs and support AI agent evaluations.
-- [How to evaluate an LLM when you don't have defined answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Measure LLM performance using LLM-as-a-Judge when no ground-truth answers exist to support scalable AI agent evaluations.
+- [How to evaluate that your LLM answers correctly](https://langwatch.ai/docs/evaluations/experiments/ui/answer-correctness.md): Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
+- [How to evaluate an LLM when you don't have defined answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 - [How to compare two or more prompts, models, or agents head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
@@ -90,9 +90,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Online Evaluation
 
-- [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Continuously score and monitor your LLM's production traffic for quality and safety with online evaluation.
-- [Setting up Monitors](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Set up online evaluation monitors in LangWatch to score outputs instantly and support continuous AI agent testing.
-- [Evaluation by Thread](https://langwatch.ai/docs/evaluations/online-evaluation/by-thread.md): Evaluate LLM applications by thread in LangWatch to analyze conversation-level performance in agent testing setups.
+- [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Score your production traffic as it arrives with monitors that run an evaluator on every matching trace or thread, and read the results on the trace, in the list and in analytics.
+- [Setting up Monitors](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 
 ### Guardrails
 
@@ -111,12 +110,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create and manage datasets in LangWatch to build evaluation sets for LLMs and structured AI agent testing.
 - [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
-- [Generating a dataset with AI](https://langwatch.ai/docs/datasets/ai-dataset-generation.md): Generate datasets with AI to bootstrap LLM evaluations, regression tests, and simulation-based agent testing.
 - [Automatically build datasets from real-time traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
 - [Add trace threads to datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add full conversation threads to datasets in LangWatch to generate richer evaluation inputs for AI agent testing.
 - [View images in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): View image datasets in LangWatch to support multimodal evaluations and agent testing scenarios.
 
-- [Annotations](https://langwatch.ai/docs/features/annotations.md): Use annotations in LangWatch for expert labeling, trace review, and structured evaluation workflows for AI agent testing.
+### Annotations
+
+- [Overview](https://langwatch.ai/docs/annotations/overview.md)
+- [Queues](https://langwatch.ai/docs/annotations/queues.md)
+- [Scores](https://langwatch.ai/docs/annotations/scores.md)
 
 ## Prompt Management
 

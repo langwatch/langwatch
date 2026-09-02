@@ -1,19 +1,84 @@
 ---
 title: How to evaluate an LLM when you don't have defined answers
 sidebarTitle: How to evaluate when you don't have defined answers
-description: Measure LLM performance using LLM-as-a-Judge when no ground-truth answers exist to support scalable AI agent evaluations.
+description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
 
-For some AI applications, it's not really possible to define a golden answer, this happens for example in creative tasks, where it's hard to define a single correct answer.
+Creative, advisory and open-ended tasks have no single correct answer, so an exact comparison does not work. An LLM-as-a-Judge evaluator reads the input and the output, applies the criteria you write, and returns a verdict with its reasoning.
 
-The video below shows how to use the LangWatch Experiments via UI to evaluate a Business Coaching Agent, where we don't have defined answers, but we can use an LLM-as-a-judge to evaluate the quality of the answers:
+This guide builds an experiment for a business coaching assistant, where the dataset has questions from users and no expected answers.
 
-<iframe
-  width="720"
-  height="420"
-  src="https://www.youtube.com/embed/PQPGOJqYR2Q"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
+## Prerequisites
+
+- A dataset with an `input` column. See [Datasets](/datasets/overview).
+- A model provider configured in Settings, so the prompt column and the judge can call a model.
+
+## Pick the judge type
+
+LangWatch ships three LLM-as-a-Judge evaluators. All three read the same inputs (`input`, `output` and, when you map it, `contexts`) and apply the criteria you write in the evaluator's prompt.
+
+| Evaluator | Returns | Use it when |
+|-----------|---------|-------------|
+| **LLM-as-a-Judge Boolean Evaluator** | Pass or fail | The output either meets the criteria or it does not. |
+| **LLM-as-a-Judge Score Evaluator** | A number on the scale your prompt defines. The default prompt asks for 0.0 to 1.0. | You want a graded verdict, for example how satisfied the user is likely to be. |
+| **LLM-as-a-Judge Category Evaluator** | One of the categories you define, each with a name and a description | You want to sort outputs into buckets, for example `on_topic`, `off_topic`, `refusal`. |
+
+## Steps
+
+<Steps>
+<Step title="Create the experiment and add the dataset">
+Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New Experiment**, then **Create Experiment**. Under **Datasets**, click **Add** and pick **Select existing dataset**.
+</Step>
+
+<Step title="Add a prompt column">
+Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, keep `{{input}}` as the user message, and save.
+</Step>
+
+<Step title="Create the judge">
+On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
+
+Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+
+```
+You are evaluating a business coaching assistant.
+The output passes only if all of these are true:
+1. It answers the question the user asked, not a different one.
+2. It gives at least one concrete next step the user can take this week.
+3. It does not invent numbers, laws or company facts.
+4. It stays under 200 words.
+Fail the output if any criterion is not met, and name the criterion that failed.
+```
+
+<Frame>
+<img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
+</Frame>
+
+In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Save the evaluator.
+</Step>
+
+<Step title="Run">
+Click **Run** in the header. Each row fills with the assistant's answer and the judge's verdict.
+</Step>
+
+<Step title="Read the reasons">
+Click an evaluator chip to open its **Result** block. **Details** holds the judge's reasoning, including the criterion that failed. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
+
+<Frame>
+<img src="/images/evaluations/workbench-evaluator-result.png" alt="An evaluator chip popover with the score, label, status and the judge's reasoning in Details" />
+</Frame>
+</Step>
+</Steps>
+
+## Calibrate the judge
+
+A judge is a model with a prompt, so check it before you trust its pass rate.
+
+- Read ten verdicts by hand. If you disagree with the judge on more than one or two, tighten the criteria: replace adjectives such as "helpful" with observable checks such as "gives a next step".
+- Keep the judge model separate from the model under test when you can, so the same blind spots do not score themselves.
+- Reuse the evaluator. It is saved under [Evaluators](https://app.langwatch.ai/@project/evaluators) and you can attach the same one to an online evaluation to score production traffic with the same criteria. See [Online Evaluation](/evaluations/online-evaluation/overview).
+
+## Iterate and compare runs
+
+Change the prompt, click **Run** again, then open **Results** and click **Compare** in the **Experiment Runs** sidebar to see both runs side by side. The pass rate tells you whether the change helped; the reasons on the rows that flipped tell you why.
+
+**Also check:** [Answer correctness](/evaluations/experiments/ui/answer-correctness) when your dataset has expected outputs, and [Comparison](/evaluations/experiments/ui/pairwise-compare) to let a judge pick the best of two or more prompts per row instead of scoring each one alone.

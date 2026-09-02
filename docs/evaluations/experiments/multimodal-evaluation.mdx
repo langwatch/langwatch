@@ -4,7 +4,7 @@ sidebarTitle: Multimodal Evaluation
 description: Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 ---
 
-LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators, no custom code required.
+The built-in LLM-as-a-Judge evaluators accept images as inputs and outputs. Any vision-capable model (GPT-5.2, Claude Sonnet, Gemini and others) reads the images and scores them against the criteria in your prompt.
 
 This covers common multimodal use cases:
 - **Image generation quality**: score outputs of image generation models
@@ -44,24 +44,21 @@ Image detection is strict by design, a field is treated as an image only when th
 
 ### Step 1: Create a Dataset with Image Columns
 
-1. Go to **Evaluations** → **New Evaluation** → **Create Experiment**
-2. Click **+** next to the Datasets header to create a new dataset
-3. Add columns and set their type to **image** using the column type dropdown
+1. Go to **Experiments**, click **New Experiment**, then **Create Experiment**
+2. Under **Datasets**, click **Add**, then **Create new**
+3. Add columns and set their type to **image (URL)** in the column type select
+4. Paste image URLs or base64 data URIs into the cells. The grid renders them as thumbnails you can click to expand.
 
-<div style={{ display: "flex", justifyContent: "center" }}>
-  <Frame caption="Set column type to image" style={{ maxWidth: "300px" }}>
-    <img src="/images/dataset-image-select.png" alt="Column type selector showing image option" />
-  </Frame>
-</div>
-
-4. Paste image URLs or base64 data URIs into the cells, the workbench renders them inline with click-to-expand
+<Frame caption="A dataset with an image column rendered as thumbnails">
+  <img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column showing thumbnails" />
+</Frame>
 
 ### Step 2: Add an LLM-as-a-Judge Evaluator
 
-1. Click **+ Add evaluator** on a row in the evaluators section
-2. Select an **LLM-as-a-Judge** evaluator (Boolean, Score, or Category)
+1. On the prompt or agent column, click **Add evaluator**, then **New Evaluator**
+2. Pick the **LLM as Judge** category and one of the Boolean, Score or Category evaluators
 3. Choose a **vision-capable model** (e.g. `gpt-5.2`, `claude-sonnet-4-5-20250929`)
-4. Write a prompt that references the image fields, map dataset columns to the evaluator's `input`, `output`, `contexts`, or `expected_output` variables
+4. Write a prompt that references the image fields, and map dataset columns to the evaluator's `input`, `output` and `contexts` variables
 
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
 
@@ -78,7 +75,7 @@ The LLM-as-a-Judge prompt instructs the model to evaluate all three images and s
 
 ### Step 3: Run and Iterate
 
-Click the **play button** to run the evaluator. The model receives all images as vision content and returns structured results (score, pass/fail, or category) with detailed reasoning.
+Click **Run** in the header, or the run button on the column. The model receives all images as vision content and returns a score, a pass or fail, or a category, with its reasoning in the evaluator's **Details**.
 
 Use this workflow to **iterate on your evaluator prompt** until you have reliable evaluation criteria, then save it for reuse across experiments and CI/CD pipelines.
 
@@ -110,7 +107,7 @@ After iterating on your evaluator in the UI, save it and call it from code:
 ```python Python
 import langwatch
 
-df = langwatch.datasets.get_dataset("my-image-dataset").to_pandas()
+df = langwatch.dataset.get_dataset("my-image-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("image-quality-evaluation")
 
@@ -268,7 +265,7 @@ Image evaluation requires a **vision-capable model**. Any model supported by [li
 | Google | `gemini-2.0-flash`, `gemini-2.5-pro` |
 
 <Note>
-If a non-vision model is selected, the evaluator falls back to sending plain text descriptions. For accurate image evaluation, always select a vision-capable model.
+The evaluator sends every detected image as image content to the model you select, whether or not that model reads images. Pick a vision-capable model, or the provider rejects the request.
 </Note>
 
 ## Next Steps

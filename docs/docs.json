@@ -185,8 +185,7 @@
                 "group": "Online Evaluation",
                 "pages": [
                   "evaluations/online-evaluation/overview",
-                  "evaluations/online-evaluation/setup-monitors",
-                  "evaluations/online-evaluation/by-thread"
+                  "evaluations/online-evaluation/setup-monitors"
                 ]
               },
               {
@@ -211,13 +210,19 @@
                 "pages": [
                   "datasets/overview",
                   "datasets/programmatic-access",
-                  "datasets/ai-dataset-generation",
                   "datasets/automatically-from-traces",
                   "datasets/dataset-threads",
                   "datasets/dataset-images"
                 ]
               },
-              "features/annotations"
+              {
+                "group": "Annotations",
+                "pages": [
+                  "annotations/overview",
+                  "annotations/queues",
+                  "annotations/scores"
+                ]
+              }
             ]
           },
           {
@@ -2029,6 +2034,22 @@
     {
       "source": "/agent-simulations/red-teaming",
       "destination": "/agent-testing/red-teaming"
+    },
+    {
+      "source": "/evaluations/online-evaluation/by-thread",
+      "destination": "/evaluations/online-evaluation/setup-monitors#evaluate-whole-threads"
+    },
+    {
+      "source": "/datasets/ai-dataset-generation",
+      "destination": "/datasets/overview"
+    },
+    {
+      "source": "/features/annotations",
+      "destination": "/annotations/overview"
+    },
+    {
+      "source": "/scenarios",
+      "destination": "/agent-testing/overview"
     }
   ]
 }
