@@ -1,13 +1,13 @@
 /**
- * What a freshly-created playground widget starts with: a React/TSX file
+ * What a freshly-created dashboard widget starts with: a React/TSX file
  * (the Code pane) and the named LangWatchQL statements it may run. Neither
  * SQL travels from the frame — these are the pieces the persisted
  * `CustomGraph.graph` stores together, in the shape
- * `PlaygroundWidgetDefinition` (`~/server/analytics/playgroundWidgetDefinition`)
+ * `DashboardWidgetDefinition` (`~/server/analytics/dashboardWidgetDefinition`)
  * describes.
  */
 
-import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
 /** Bucketed trace counts — the canonical follows-everything statement. */
 const BUCKETED_TRACES_SQL = `SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
@@ -24,7 +24,7 @@ ORDER BY bucket`;
  * window/granularity placeholders, which the executor supplies regardless of
  * what a query declares.
  */
-export const STARTER_WIDGET_QUERIES: PlaygroundQuery[] = [
+export const STARTER_WIDGET_QUERIES: DashboardWidgetQuery[] = [
   { name: "main", sql: BUCKETED_TRACES_SQL },
 ];
 

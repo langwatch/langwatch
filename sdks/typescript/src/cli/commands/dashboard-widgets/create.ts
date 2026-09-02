@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -14,7 +14,7 @@ import {
  * Returns the created widget rather than printing it: the output port
  * renders it in whatever format the caller asked for (utils/output.ts).
  */
-export const createPlaygroundWidgetCommand = async (
+export const createDashboardWidgetCommand = async (
   options: DefinitionFlags & { name?: string; project?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options.project });
@@ -43,7 +43,7 @@ export const createPlaygroundWidgetCommand = async (
     process.exit(1);
   }
 
-  const service = new PlaygroundWidgetsApiService();
+  const service = new DashboardWidgetsApiService();
   const spinner = createSpinner(`Creating widget "${options.name}"...`).start();
 
   try {
@@ -64,7 +64,7 @@ export const createPlaygroundWidgetCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "create playground widget" });
+    failSpinner({ spinner, error, action: "create dashboard widget" });
     process.exit(1);
   }
 };

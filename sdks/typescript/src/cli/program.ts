@@ -3297,51 +3297,51 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Add playground-widget command group — custom-chart-playground widgets
-  const playgroundWidgetCmd = program
-    .command("playground-widget")
-    .description("Manage custom-chart-playground widgets");
+  // Add dashboard-widget command group — custom-chart-playground widgets
+  const dashboardWidgetCmd = program
+    .command("dashboard-widget")
+    .description("Manage dashboard widgets");
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("schema")
       .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { project?: string }) => {
-      const { playgroundWidgetSchemaCommand: impl } = await import("./commands/playground-widgets/schema.js");
+      const { dashboardWidgetSchemaCommand: impl } = await import("./commands/dashboard-widgets/schema.js");
       return impl(options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("list")
-      .description("List the project's playground widgets")
+      .description("List the project's dashboard widgets")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { project?: string }) => {
-      const { listPlaygroundWidgetsCommand: impl } = await import("./commands/playground-widgets/list.js");
+      const { listDashboardWidgetsCommand: impl } = await import("./commands/dashboard-widgets/list.js");
       return impl(options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("get <id>")
-      .description("Get a playground widget by ID — its React source and named queries")
+      .description("Get a dashboard widget by ID — its React source and named queries")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { project?: string }) => {
-      const { getPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/get.js");
+      const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
       return impl(id, options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("create")
-      .description("Save a custom-chart-playground widget from a React source file and its named LangWatchQL queries")
+      .description("Save a dashboard widget from a React source file and its named LangWatchQL queries")
       .requiredOption("--name <name>", "Widget name")
       .option("--code <code>", "The widget's React source")
       .option("--code-file <path>", "Read the widget's React source from a file")
@@ -3355,15 +3355,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       queriesFile?: string;
       project?: string;
     }) => {
-      const { createPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/create.js");
+      const { createDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/create.js");
       return impl(options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("update <id>")
-      .description("Update a playground widget's name or definition")
+      .description("Update a dashboard widget's name or definition")
       .option("--name <name>", "New widget name")
       .option("--code <code>", "New React source")
       .option("--code-file <path>", "Read the new React source from a file")
@@ -3380,27 +3380,27 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         project?: string;
       },
     ) => {
-      const { updatePlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/update.js");
+      const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
       return impl(id, options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("delete <id>")
-      .description("Delete a playground widget")
+      .description("Delete a dashboard widget")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { project?: string }) => {
-      const { deletePlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/delete.js");
+      const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
       return impl(id, options);
     },
   );
 
   emitsResult(
-    playgroundWidgetCmd
+    dashboardWidgetCmd
       .command("pin <widget>")
-      .description("Add a playground widget to a dashboard (widget and dashboard by id or name)")
+      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
       .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3408,7 +3408,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       widget: string,
       options: { dashboard?: string; project?: string },
     ) => {
-      const { pinPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/pin.js");
+      const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
       return impl(widget, options);
     },
   );

@@ -1,7 +1,7 @@
-# North-star custom-chart-playground widgets
+# North-star dashboard widgets
 
-Ten custom-chart-playground widgets, one per `@langwatch/charts` primitive,
-showing the intended "north-star" shape of a playground widget: a query
+Ten dashboard widgets, one per `@langwatch/charts` primitive,
+showing the intended "north-star" shape of a dashboard widget: a query
 scoped only to `{period_start:DateTime}` / `{period_end:DateTime}`, a
 component from the shared chart library, and the three guard-clause states
 (error, loading, empty) every widget should degrade through gracefully.
@@ -72,8 +72,8 @@ GROUP BY outcome
 - `north-star-*.json` — the 10 widget definitions (`{ name, code, queries }`),
   one file per `@langwatch/charts` primitive.
 - `seed.mjs` — creates all 10 widgets in a project via the REST API
-  (`POST /api/v1/projects/{projectId}/analytics/playground-widgets`, see
-  `platform/app/src/app/api/analytics-sql/[[...route]]/app.playground-widgets.v1.ts`).
+  (`POST /api/v1/projects/{projectId}/analytics/dashboard-widgets`, see
+  `platform/app/src/app/api/analytics-sql/[[...route]]/app.dashboard-widgets.v1.ts`).
   Configured via `LW_ENDPOINT`, `LW_API_KEY`, `PROJECT_ID` env vars. Lists
   existing widgets first and skips any whose name already matches, so
   re-running is idempotent-ish (it will not update a widget edited since the
@@ -84,5 +84,5 @@ GROUP BY outcome
 - `platform/app/src/features/custom-chart-playground/bridge/chartsLib/index.ts` — the 10 component prop shapes.
 - `platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts` — `traces` (~89-322), `trace_metrics` (~819-1053), `evaluation_metrics` (~1349-1531).
 - `platform/app/src/features/custom-chart-playground/presets.ts` — reserved `{period_start}` / `{period_end}` parameter contract.
-- `skills/recipes/playground-widgets/SKILL.mdx` — worked widget example and hook contract.
+- `skills/recipes/dashboard-widgets/SKILL.mdx` — worked widget example and hook contract.
 - `platform/app/scripts/legacy-parity-widgets/` — sibling golden set (per-legacy-chart, rather than per-primitive) this set mirrors in structure.

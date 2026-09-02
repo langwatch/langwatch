@@ -1,44 +1,44 @@
 /**
- * Custom-chart-playground widgets — the REST routes.
+ * Dashboard widgets — the REST routes (custom-chart-playground authored).
  *
  * Five endpoints under the LangWatchQL analytics SQL family, the twin of the
- * saved-workbench-chart routes for the playground's own `CustomGraph` kind:
+ * saved-workbench-chart routes for the widget's own `CustomGraph` kind:
  *
- *  - `GET    /api/v1/projects/{projectId}/analytics/playground-widgets`
- *  - `POST   /api/v1/projects/{projectId}/analytics/playground-widgets`
- *  - `GET    /api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}`
- *  - `PATCH  /api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}`
- *  - `DELETE /api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}`
+ *  - `GET    /api/v1/projects/{projectId}/analytics/dashboard-widgets`
+ *  - `POST   /api/v1/projects/{projectId}/analytics/dashboard-widgets`
+ *  - `GET    /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
+ *  - `PATCH  /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
+ *  - `DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
  *
  * They exist so Langy — and any CLI caller — can create, update and delete the
  * widgets the custom-chart-playground page renders, an action surface the page
- * itself has through the `playgroundWidgets` tRPC router but no API key could
- * reach. Placement is deliberately absent: a playground widget lives on the
+ * itself has through the `dashboardWidgets` tRPC router but no API key could
+ * reach. Placement is deliberately absent: a dashboard widget lives on the
  * playground page, not a dashboard, so there is nothing to place it onto.
  *
  * ## What is validated here
  *
  * The request's envelope — a name, and a `{ code, queries }` definition whose
- * `queries` match the versioned {@link playgroundQuerySchema} — and nothing
+ * `queries` match the versioned {@link dashboardWidgetQuerySchema} — and nothing
  * about what a query's SQL means. A widget's queries are governed at run time
  * by `LW.query` inside the sandbox, not at save, exactly as the tRPC router
- * writes them. The single write path is {@link PlaygroundWidgetService}.
+ * writes them. The single write path is {@link DashboardWidgetService}.
  *
- * @see ~/server/analytics/playground-widgets — the service and its shape
- * @see ~/server/api/routers/playgroundWidgets.ts — the UI's tRPC twin
+ * @see ~/server/analytics/dashboard-widgets — the service and its shape
+ * @see ~/server/api/routers/dashboardWidgets.ts — the UI's tRPC twin
  */
 
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { Project } from "~/generated/prisma/client";
 
-import { customChartPlaygroundEnabled } from "~/server/analytics/playground-widgets/access";
-import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/playground-widgets/errors";
+import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
+import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/dashboard-widgets/errors";
 import {
-  type PlaygroundWidget,
-  PlaygroundWidgetService,
-} from "~/server/analytics/playground-widgets/playgroundWidget.service";
-import { playgroundQuerySchema } from "~/server/analytics/playgroundWidgetDefinition";
+  type DashboardWidget,
+  DashboardWidgetService,
+} from "~/server/analytics/dashboard-widgets/dashboardWidget.service";
+import { dashboardWidgetQuerySchema } from "~/server/analytics/dashboardWidgetDefinition";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
@@ -55,7 +55,7 @@ const nameSchema = z.string().min(1).max(200);
 /** The `{ code, queries }` a create supplies. `queries` gets the versioned schema. */
 const definitionShape = {
   code: z.string().min(1),
-  queries: z.array(playgroundQuerySchema),
+  queries: z.array(dashboardWidgetQuerySchema),
 };
 
 const createWidgetSchema = z.object({
@@ -67,7 +67,7 @@ const updateWidgetSchema = z
   .object({
     name: nameSchema.optional(),
     code: z.string().min(1).optional(),
-    queries: z.array(playgroundQuerySchema).optional(),
+    queries: z.array(dashboardWidgetQuerySchema).optional(),
   })
   // A PATCH naming nothing is a mistake worth reporting, and `code` without
   // `queries` (or the reverse) would write half a definition — the two rewrite
@@ -138,7 +138,7 @@ const WIDGET_TAGS = ["Analytics / LangWatchQL"];
  */
 const widgetNotFoundResponse: Record<404, RouteResponse> = {
   404: {
-    description: "No playground widget with this id in this project",
+    description: "No dashboard widget with this id in this project",
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
@@ -153,7 +153,7 @@ function widgetResource({
   widget,
   project,
 }: {
-  widget: PlaygroundWidget;
+  widget: DashboardWidget;
   project: Project;
 }): z.infer<typeof widgetSchema> {
   return {
@@ -174,12 +174,12 @@ function widgetResource({
   };
 }
 
-function widgetService(): PlaygroundWidgetService {
-  return PlaygroundWidgetService.create(prisma);
+function widgetService(): DashboardWidgetService {
+  return DashboardWidgetService.create(prisma);
 }
 
 /**
- * The project this playground-widgets request runs for: `lwqlProject`'s
+ * The project this dashboard-widgets request runs for: `lwqlProject`'s
  * usual pair of checks (credential/path match, then the whole-surface LWQL
  * flag), plus this route family's OWN flag — the page and the CLI must agree
  * on whether the playground exists at all, and the whole point of a REST
@@ -188,7 +188,7 @@ function widgetService(): PlaygroundWidgetService {
  * @throws {CustomChartPlaygroundNotEnabledError} when
  *   `release_custom_chart_playground` is off for this project.
  */
-async function playgroundWidgetsProject({
+async function dashboardWidgetsProject({
   project,
   requestedProjectId,
 }: {
@@ -214,7 +214,7 @@ async function playgroundWidgetsProject({
 function widgetIdOf(widgetId: string | undefined): string {
   if (!widgetId) {
     throw new Error(
-      "playground widget route matched without a widgetId path parameter",
+      "dashboard widget route matched without a widgetId path parameter",
     );
   }
   return widgetId;
@@ -222,16 +222,16 @@ function widgetIdOf(widgetId: string | undefined): string {
 
 function registerList(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:view")).get(
-    "/:projectId/analytics/playground-widgets",
+    "/:projectId/analytics/dashboard-widgets",
     describeRoute({
-      summary: "List custom-chart-playground widgets",
+      summary: "List dashboard widgets",
       description:
-        "Lists every custom-chart-playground widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.",
+        "Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
         200: {
-          description: "The project's playground widgets",
+          description: "The project's dashboard widgets",
           content: {
             "application/json": { schema: resolver(widgetListSchema) },
           },
@@ -239,7 +239,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -253,11 +253,11 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
 
 function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:create")).post(
-    "/:projectId/analytics/playground-widgets",
+    "/:projectId/analytics/dashboard-widgets",
     describeRoute({
-      summary: "Create a custom-chart-playground widget",
+      summary: "Create a dashboard widget",
       description:
-        "Saves a React source file and the named LangWatchQL queries it runs as one playground widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+        "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -269,7 +269,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createWidgetSchema),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -285,23 +285,23 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
 
 function registerRead(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:view")).get(
-    "/:projectId/analytics/playground-widgets/:widgetId",
+    "/:projectId/analytics/dashboard-widgets/:widgetId",
     describeRoute({
-      summary: "Get a custom-chart-playground widget",
+      summary: "Get a dashboard widget",
       description:
-        "Returns one playground widget with its React source and named queries. A widget saved in another project is reported as not found.",
+        "Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
         ...widgetNotFoundResponse,
         200: {
-          description: "The playground widget",
+          description: "The dashboard widget",
           content: { "application/json": { schema: resolver(widgetSchema) } },
         },
       },
     }),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -316,11 +316,11 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
 
 function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:update")).patch(
-    "/:projectId/analytics/playground-widgets/:widgetId",
+    "/:projectId/analytics/dashboard-widgets/:widgetId",
     describeRoute({
-      summary: "Update a custom-chart-playground widget",
+      summary: "Update a dashboard widget",
       description:
-        "Replaces a playground widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
+        "Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -333,7 +333,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateWidgetSchema),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -356,11 +356,11 @@ function registerAssignDashboard(
   secured: ReturnType<typeof createProjectApp>,
 ): void {
   secured.access(requires("analytics:update")).post(
-    "/:projectId/analytics/playground-widgets/:widgetId/dashboard",
+    "/:projectId/analytics/dashboard-widgets/:widgetId/dashboard",
     describeRoute({
-      summary: "Add a playground widget to a dashboard",
+      summary: "Add a dashboard widget to a dashboard",
       description:
-        "Assigns a playground widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.",
+        "Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -373,7 +373,7 @@ function registerAssignDashboard(
     }),
     zValidator("json", assignDashboardSchema),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -390,11 +390,11 @@ function registerAssignDashboard(
 
 function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:delete")).delete(
-    "/:projectId/analytics/playground-widgets/:widgetId",
+    "/:projectId/analytics/dashboard-widgets/:widgetId",
     describeRoute({
-      summary: "Delete a custom-chart-playground widget",
+      summary: "Delete a dashboard widget",
       description:
-        "Deletes one playground widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.",
+        "Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.",
       tags: WIDGET_TAGS,
       responses: {
         ...canonicalBaseResponses,
@@ -403,7 +403,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await playgroundWidgetsProject({
+      const project = await dashboardWidgetsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -417,14 +417,14 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
 }
 
 /**
- * Registers the custom-chart-playground widget routes on the LangWatchQL
+ * Registers the dashboard widget routes on the LangWatchQL
  * analytics SQL app.
  *
  * One function per verb because the house line ceiling is per function and a
  * described route is a dozen lines of prose before it is a handler; the split
  * is mechanical and the registration order is the document's.
  */
-export function registerPlaygroundWidgetRoutes(
+export function registerDashboardWidgetRoutes(
   secured: ReturnType<typeof createProjectApp>,
 ): void {
   registerList(secured);

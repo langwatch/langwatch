@@ -5,7 +5,7 @@
  *
  * Each kind is edited on the surface that wrote it — the builder can't read a
  * saved statement, and neither the builder nor the workbench can read a
- * playground widget's `{ code, queries }`. Getting this wrong sends a member
+ * dashboard widget's `{ code, queries }`. Getting this wrong sends a member
  * to an empty editor with a URL claiming otherwise, which is why the label
  * and the destination are asserted together: a right label pointed at the
  * wrong route would still read as a pass if either were checked alone.
@@ -37,8 +37,8 @@ afterEach(() => {
 });
 
 describe("a card's Edit menu item", () => {
-  describe("given a playground widget", () => {
-    /** @scenario "A playground card's Edit action opens the playground page" */
+  describe("given a dashboard widget", () => {
+    /** @scenario "A dashboard widget card's Edit action opens the playground page" */
     it("is labelled \"Open in playground\" and navigates to the playground page", async () => {
       const user = userEvent.setup();
       render(
@@ -47,7 +47,7 @@ describe("a card's Edit menu item", () => {
           projectSlug="proj"
           colSpan={1}
           rowSpan={1}
-          isPlaygroundWidget
+          isDashboardWidget
           onSizeChange={vi.fn()}
           onDelete={vi.fn()}
           isDeleting={false}

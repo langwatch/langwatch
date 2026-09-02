@@ -1,14 +1,14 @@
 /**
  * One query's last run, rendered as a result table or an error — the same
  * `QueryLastRun` shape whether it came from the live chart's `LW.query` or
- * the Queries tab's own standalone Run button (`usePlaygroundWidgetExecutor`).
+ * the Queries tab's own standalone Run button (`useDashboardWidgetExecutor`).
  */
 
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
 
 import { formatNumber } from "~/utils/formatNumber";
 
-import type { QueryLastRun } from "./usePlaygroundWidgetExecutor";
+import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
 /** How many result rows the preview table shows — this is a query tester, not a data grid. */
 const MAX_PREVIEW_ROWS = 20;
@@ -48,13 +48,13 @@ function TruncationBanner() {
   );
 }
 
-interface PlaygroundQueryResultViewProps {
+interface DashboardWidgetQueryResultViewProps {
   run: QueryLastRun | undefined;
 }
 
-export function PlaygroundQueryResultView({
+export function DashboardWidgetQueryResultView({
   run,
-}: PlaygroundQueryResultViewProps) {
+}: DashboardWidgetQueryResultViewProps) {
   if (!run) {
     return (
       <Text fontSize="12px" color="fg.muted">

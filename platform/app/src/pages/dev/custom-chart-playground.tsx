@@ -37,7 +37,7 @@ const LANGY_PAGE_CONTEXT = [
     label:
       "Custom chart playground: each widget is one React/TSX file (default " +
       "export, may import react/react-dom/recharts) plus named LangWatchQL " +
-      "queries. Format: server/analytics/playgroundWidgetDefinition.ts",
+      "queries. Format: server/analytics/dashboardWidgetDefinition.ts",
   },
   {
     id: "dashboard:custom-chart-playground-fetch-api",

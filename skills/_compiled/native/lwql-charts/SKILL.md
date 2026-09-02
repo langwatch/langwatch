@@ -89,7 +89,7 @@ langwatch chart delete <chart-id>
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `saved_workbench_charts_disabled_for_playground` — the custom-chart-playground is enabled for this project, which turns `chart` commands off; do not retry any `chart` command. Use the `playground-widgets` skill / `langwatch playground-widget` commands instead.
+- `saved_workbench_charts_disabled_for_playground` — the custom-chart-playground is enabled for this project, which turns `chart` commands off; do not retry any `chart` command. Use the `dashboard-widgets` skill / `langwatch dashboard-widget` commands instead.
 - A save that succeeds but a run that fails naming a column — the SQL names one that does not exist; re-read the schema (Step 1) and fix the column, then update the chart.
 - `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
 - `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.

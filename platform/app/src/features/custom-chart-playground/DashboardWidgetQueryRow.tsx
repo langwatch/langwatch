@@ -18,13 +18,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, Play, Trash2 } from "lucide-react";
-import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { formatNumber } from "~/utils/formatNumber";
 
-import { PlaygroundCodeEditor } from "./PlaygroundCodeEditor";
-import { PlaygroundQueryParamsEditor } from "./PlaygroundQueryParamsEditor";
-import { PlaygroundQueryResultView } from "./PlaygroundQueryResultView";
-import type { QueryLastRun } from "./usePlaygroundWidgetExecutor";
+import { DashboardWidgetCodeEditor } from "./DashboardWidgetCodeEditor";
+import { DashboardWidgetQueryParamsEditor } from "./DashboardWidgetQueryParamsEditor";
+import { DashboardWidgetQueryResultView } from "./DashboardWidgetQueryResultView";
+import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
 /** The one-line "683 rows · 53ms" (or error) a collapsed row shows without expanding. */
 function runSummary(run: QueryLastRun | undefined): string | null {
@@ -36,11 +36,11 @@ function runSummary(run: QueryLastRun | undefined): string | null {
   return typeof elapsedMs === "number" ? `${rows} · ${elapsedMs}ms` : rows;
 }
 
-interface PlaygroundQueryRowProps {
-  query: PlaygroundQuery;
+interface DashboardWidgetQueryRowProps {
+  query: DashboardWidgetQuery;
   /** Empty when this name collides with a sibling's — the panel computes it. */
   nameError: string | null;
-  onChange: (next: PlaygroundQuery) => void;
+  onChange: (next: DashboardWidgetQuery) => void;
   onRemove: () => void;
   canRemove: boolean;
   onRun: () => void;
@@ -48,7 +48,7 @@ interface PlaygroundQueryRowProps {
   lastRun: QueryLastRun | undefined;
 }
 
-export function PlaygroundQueryRow({
+export function DashboardWidgetQueryRow({
   query,
   nameError,
   onChange,
@@ -57,7 +57,7 @@ export function PlaygroundQueryRow({
   onRun,
   isRunning,
   lastRun,
-}: PlaygroundQueryRowProps) {
+}: DashboardWidgetQueryRowProps) {
   const summary = runSummary(lastRun);
 
   return (
@@ -131,14 +131,14 @@ export function PlaygroundQueryRow({
                 borderRadius="md"
                 overflow="hidden"
               >
-                <PlaygroundCodeEditor
+                <DashboardWidgetCodeEditor
                   language="sql"
                   value={query.sql}
                   onChange={(sql) => onChange({ ...query, sql })}
                 />
               </Box>
 
-              <PlaygroundQueryParamsEditor
+              <DashboardWidgetQueryParamsEditor
                 params={query.parameters ?? []}
                 onChange={(parameters) => onChange({ ...query, parameters })}
               />
@@ -146,7 +146,7 @@ export function PlaygroundQueryRow({
               <Text fontSize="11px" color="fg.muted">
                 Last result
               </Text>
-              <PlaygroundQueryResultView run={lastRun} />
+              <DashboardWidgetQueryResultView run={lastRun} />
             </VStack>
           </Accordion.ItemContent>
         </Card.Body>

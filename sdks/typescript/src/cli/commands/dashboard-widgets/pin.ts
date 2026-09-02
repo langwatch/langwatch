@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import {
   DashboardsApiService,
   type DashboardSummary,
@@ -16,7 +16,7 @@ import type { CommandResult } from "../../utils/output";
  * back to a name match across the project's widgets.
  */
 async function resolveWidgetRef(
-  widgets: PlaygroundWidgetsApiService,
+  widgets: DashboardWidgetsApiService,
   ref: string,
 ) {
   try {
@@ -59,7 +59,7 @@ async function resolveDashboardRef(
  * Returns the pinned widget rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const pinPlaygroundWidgetCommand = async (
+export const pinDashboardWidgetCommand = async (
   widgetRef: string,
   options: { dashboard?: string; project?: string },
 ): Promise<CommandResult | void> => {
@@ -70,7 +70,7 @@ export const pinPlaygroundWidgetCommand = async (
 
   await resolveCredentials({ project: options.project });
 
-  const widgets = new PlaygroundWidgetsApiService();
+  const widgets = new DashboardWidgetsApiService();
   const dashboards = new DashboardsApiService();
   const spinner = createSpinner(`Adding "${widgetRef}" to dashboard...`).start();
 
@@ -96,7 +96,7 @@ export const pinPlaygroundWidgetCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "pin playground widget" });
+    failSpinner({ spinner, error, action: "pin dashboard widget" });
     process.exit(1);
   }
 };

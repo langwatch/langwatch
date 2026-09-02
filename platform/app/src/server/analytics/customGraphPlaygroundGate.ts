@@ -19,7 +19,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import {
   CUSTOM_CHART_PLAYGROUND_FLAG,
   customChartPlaygroundEnabled,
-} from "~/server/analytics/playground-widgets/access";
+} from "~/server/analytics/dashboard-widgets/access";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
@@ -29,8 +29,8 @@ import { remediation } from "~/server/app-layer/error-remediation";
  * `customer` fault, 403 — a product decision an administrator can change,
  * not an incident. The message NAMES the flag and the alternative
  * deliberately: this is the third chart-creation surface (after `chart` and
- * `playground-widget`), and the one caller-visible signal that stops an
- * agent from retrying `graph` and pushes it toward `playground-widget`
+ * `dashboard-widget`), and the one caller-visible signal that stops an
+ * agent from retrying `graph` and pushes it toward `dashboard-widget`
  * instead.
  */
 export class CustomGraphWritesDisabledForPlaygroundError extends HandledError {
@@ -39,7 +39,7 @@ export class CustomGraphWritesDisabledForPlaygroundError extends HandledError {
   constructor() {
     super(
       "custom_graph_writes_disabled_for_playground",
-      `Creating or editing dashboard graphs is turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the playground-widgets skill / \`langwatch playground-widget\` commands instead.`,
+      `Creating or editing dashboard graphs is turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the dashboard-widgets skill / \`langwatch dashboard-widget\` commands instead.`,
       {
         httpStatus: 403,
         ...remediation("custom_graph_writes_disabled_for_playground"),

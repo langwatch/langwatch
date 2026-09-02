@@ -1,5 +1,5 @@
 /**
- * The playground's Monaco pane: one dynamic import and one set of editor
+ * The dashboard widget author's Monaco pane: one dynamic import and one set of editor
  * options, shared by the in-card Code view and the edit drawer so the two
  * surfaces can never drift on wrapping, folding, font size or theme.
  *
@@ -57,18 +57,18 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   });
 };
 
-interface PlaygroundCodeEditorProps {
+interface DashboardWidgetCodeEditorProps {
   /** Monaco's "typescript" language id highlights JSX/TSX too. */
   language: "typescript" | "sql";
   value: string;
   onChange: (value: string) => void;
 }
 
-export function PlaygroundCodeEditor({
+export function DashboardWidgetCodeEditor({
   language,
   value,
   onChange,
-}: PlaygroundCodeEditorProps) {
+}: DashboardWidgetCodeEditorProps) {
   const { colorMode } = useColorMode();
 
   return (

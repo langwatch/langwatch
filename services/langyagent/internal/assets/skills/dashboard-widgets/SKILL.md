@@ -1,7 +1,7 @@
 ---
-name: playground-widgets
+name: dashboard-widgets
 user-prompt: "Build me a custom chart widget"
-description: Author a custom-chart-playground widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.
+description: Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.
 license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
 feature-flag: release_custom_chart_playground
@@ -9,9 +9,9 @@ metadata:
   category: recipe
 ---
 
-# Author a Custom Chart Playground Widget
+# Author a Dashboard Widget
 
-Turn a question ("show cost per model as a bar chart") into a saved playground widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
+Turn a question ("show cost per model as a bar chart") into a saved dashboard widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
 
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
@@ -19,14 +19,14 @@ Reach for this instead of `lwql-charts` when the visualization is not a plain Ve
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
-Every `playground-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
 
 ## Step 1: Discover the schema before writing any SQL
 
 Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
 
 ```bash
-langwatch playground-widget schema -f json
+langwatch dashboard-widget schema -f json
 ```
 
 Read the datasets, their grain, their time column, and which columns are `available` to you.
@@ -38,7 +38,7 @@ Read the datasets, their grain, their time column, and which columns are `availa
 `--queries-file` is a JSON array of named queries: `{ name, sql, parameters? }`. A widget's code calls a query by `name` — the two files are one unit.
 
 - `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
-- The reserved bound names `{period_start:DateTime}`, `{period_end:DateTime}`, `{period_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `playground_query_reserved_param` / a schema validation error. On the playground page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
+- The reserved bound names `{period_start:DateTime}`, `{period_end:DateTime}`, `{period_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `dashboard_widget_query_reserved_param` / a schema validation error. On the dashboard-widgets authoring page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
 - Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
 
 ```json
@@ -100,7 +100,7 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 ## Step 4: Save the widget, then prove it renders
 
 ```bash
-langwatch playground-widget create \
+langwatch dashboard-widget create \
   --name "Cost by model" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -112,14 +112,14 @@ Creating (and updating) validates the queries file's shape and the widget's JS/T
 ## Managing saved widgets
 
 ```bash
-langwatch playground-widget list -f json
-langwatch playground-widget get <id> -f json      # code, queries, platformUrl
-langwatch playground-widget update <id> --code-file widget.tsx --queries-file queries.json
-langwatch playground-widget delete <id>
-langwatch playground-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+langwatch dashboard-widget list -f json
+langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
+langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard-widget delete <id>
+langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the playground. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
@@ -177,7 +177,7 @@ export default function Widget() {
 Create it:
 
 ```bash
-langwatch playground-widget create \
+langwatch dashboard-widget create \
   --name "Daily traces" \
   --code-file widget.tsx \
   --queries-file queries.json \
@@ -187,9 +187,9 @@ langwatch playground-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `playground-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
-- `playground_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
-- `playground_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `period_start`, `period_end`, or `period_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
+- `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
+- `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `period_start`, `period_end`, or `period_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
 - "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, or `recharts`; use only those, or the corresponding global.
 - A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.

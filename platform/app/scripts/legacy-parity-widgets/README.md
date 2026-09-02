@@ -1,8 +1,8 @@
 # Legacy analytics parity widgets
 
-Eight custom-chart-playground widgets that reproduce the legacy `/analytics`
+Eight dashboard widgets that reproduce the legacy `/analytics`
 dashboard charts (metrics, users, evaluations pages) as LangWatchQL-backed
-widgets, so the playground can replace those pages chart-for-chart.
+widgets, so dashboards can replace those pages chart-for-chart.
 
 Every query below declares no explicit parameters — each uses only the
 reserved `{period_start:DateTime}` / `{period_end:DateTime}` bounds, which the
@@ -32,10 +32,10 @@ executor fills from the page's own time window automatically (see
 ## Files
 
 - `legacy-*.json` — the 8 widget definitions (`{ name, code, queries }`),
-  one file per widget, ready to hand to `seed.mjs` or `langwatch playground-widget create`.
+  one file per widget, ready to hand to `seed.mjs` or `langwatch dashboard-widget create`.
 - `seed.mjs` — creates all 8 widgets in a project via the REST API
-  (`POST /api/v1/projects/{projectId}/analytics/playground-widgets`, see
-  `platform/app/src/app/api/analytics-sql/[[...route]]/app.playground-widgets.v1.ts`).
+  (`POST /api/v1/projects/{projectId}/analytics/dashboard-widgets`, see
+  `platform/app/src/app/api/analytics-sql/[[...route]]/app.dashboard-widgets.v1.ts`).
   Configured via `LW_ENDPOINT`, `LW_API_KEY`, `PROJECT_ID` env vars. Lists
   existing widgets first and skips any whose name already matches, so
   re-running is idempotent-ish (it will not update a widget edited since the
@@ -47,4 +47,4 @@ executor fills from the page's own time window automatically (see
 - `platform/app/src/server/analytics/lwql/catalog/postgresViews.ts` — `annotations` (lines 74-135).
 - `platform/app/src/server/analytics/registry.ts` — legacy metric/aggregation definitions.
 - `platform/app/src/components/analytics/UserMetrics.tsx`, `platform/app/src/components/LLMMetrics.tsx` — legacy chart configs.
-- `platform/app/src/features/custom-chart-playground/presets.ts`, `skills/recipes/playground-widgets/SKILL.mdx` — worked widget example and hook contract.
+- `platform/app/src/features/custom-chart-playground/presets.ts`, `skills/recipes/dashboard-widgets/SKILL.mdx` — worked widget example and hook contract.

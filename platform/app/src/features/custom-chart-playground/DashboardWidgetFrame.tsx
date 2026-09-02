@@ -1,9 +1,9 @@
 /**
- * One persisted custom-chart-playground widget, rendered read-only on a
- * dashboard grid — the `playground_srcdoc` sibling of
+ * One persisted dashboard widget, rendered read-only on a
+ * dashboard grid — the `dashboard_srcdoc` sibling of
  * `LangWatchQLDashboardWidget`.
  *
- * No live re-fetch by id: unlike a placed workbench chart, a playground
+ * No live re-fetch by id: unlike a placed workbench chart, a dashboard widget
  * widget has no separate source of truth to drift from. The `CustomGraph`
  * row IS the widget — the playground editor mutates this exact row's `graph`
  * column, so whatever the dashboard's own list query already returned is
@@ -12,8 +12,8 @@
  *
  * The period comes from the dashboard's own period control
  * (`usePeriodSelector`), exactly the way `LangWatchQLDashboardWidget` reads
- * it — one control moves every card, playground widgets included. There is
- * no per-card granularity override yet (playground widgets carry none the
+ * it — one control moves every card, dashboard widgets included. There is
+ * no per-card granularity override yet (dashboard widgets carry none the
  * way a placed workbench chart's `granularitySeconds` does), so every card
  * runs at the executor's own default step.
  */
@@ -23,21 +23,21 @@ import { useMemo } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useColorMode } from "~/components/ui/color-mode";
-import { playgroundWidgetDefinitionSchema } from "~/server/analytics/playgroundWidgetDefinition";
+import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
-import { usePlaygroundChartNavigate } from "./usePlaygroundChartNavigate";
-import { usePlaygroundWidgetExecutor } from "./usePlaygroundWidgetExecutor";
+import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
+import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
 
 // The dashboard surfaces its own failures around the frame; the frame itself
-// has no separate log panel here, matching PlaygroundWidgetCard's reading.
+// has no separate log panel here, matching DashboardWidgetCard's reading.
 const noopLog = () => {
   // Intentionally empty.
 };
 
-export interface PlaygroundDashboardWidgetProps {
+export interface DashboardWidgetFrameProps {
   readonly id: string;
-  /** The row's `CustomGraph.graph` column — a `PlaygroundWidgetDefinition`. */
+  /** The row's `CustomGraph.graph` column — a `DashboardWidgetDefinition`. */
   readonly graph: unknown;
   readonly projectId: string;
   /** Host context for `LW.navigate` — never read off the frame's own params. */
@@ -45,16 +45,16 @@ export interface PlaygroundDashboardWidgetProps {
   readonly maxHeight: number;
 }
 
-export function PlaygroundDashboardWidget({
+export function DashboardWidgetFrame({
   id,
   graph,
   projectId,
   projectSlug,
   maxHeight,
-}: PlaygroundDashboardWidgetProps) {
+}: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
   const { period } = usePeriodSelector();
-  const onNavigate = usePlaygroundChartNavigate(projectSlug);
+  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
   // back: two `Date`s for the same instant are never `Object.is`-equal, so a
@@ -72,10 +72,10 @@ export function PlaygroundDashboardWidget({
   // safeParse and degrades to an empty file with no queries rather than
   // crashing the grid, the same fallback `CustomChartPlayground.tsx`'s
   // `toWidget` uses on the editor page.
-  const parsed = playgroundWidgetDefinitionSchema.safeParse(graph);
+  const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const { executeQuery, params } = usePlaygroundWidgetExecutor(
+  const { executeQuery, params } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
     { timeWindow },

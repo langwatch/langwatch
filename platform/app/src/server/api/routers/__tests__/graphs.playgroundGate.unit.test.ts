@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   BUILDER_CHART_KIND,
-  PLAYGROUND_SRCDOC_CHART_KIND,
+  DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
 
@@ -55,7 +55,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 // Both gates stubbed per test: this suite is about what `placeableKindFilter`
 // DOES with the two answers, not about how either flag resolves (which
-// `lwql/access.ts` / `playground-widgets/access.ts` and their own tests own).
+// `lwql/access.ts` / `dashboard-widgets/access.ts` and their own tests own).
 const lwqlEnabledMock = vi.fn();
 vi.mock("~/server/analytics/lwql/access", () => ({
   lwqlEnabled: (args: unknown) => lwqlEnabledMock(args),
@@ -63,7 +63,7 @@ vi.mock("~/server/analytics/lwql/access", () => ({
 }));
 
 const customChartPlaygroundEnabledMock = vi.fn();
-vi.mock("~/server/analytics/playground-widgets/access", () => ({
+vi.mock("~/server/analytics/dashboard-widgets/access", () => ({
   customChartPlaygroundEnabled: (args: unknown) =>
     customChartPlaygroundEnabledMock(args),
   CUSTOM_CHART_PLAYGROUND_FLAG: "release_custom_chart_playground",
@@ -92,7 +92,7 @@ beforeEach(() => {
 });
 
 describe("the dashboard's card read", () => {
-  /** @scenario "The dashboard's card procedures admit playground rows only when the flag is on" */
+  /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
   it("admits playground rows when the flag is on", async () => {
     lwqlEnabledMock.mockResolvedValue(false);
     customChartPlaygroundEnabledMock.mockResolvedValue(true);
@@ -103,11 +103,11 @@ describe("the dashboard's card read", () => {
     });
 
     expect(kindClauseOf(findMany)).toEqual({
-      in: [BUILDER_CHART_KIND, PLAYGROUND_SRCDOC_CHART_KIND],
+      in: [BUILDER_CHART_KIND, DASHBOARD_SRCDOC_CHART_KIND],
     });
   });
 
-  /** @scenario "The dashboard's card procedures admit playground rows only when the flag is on" */
+  /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
   it("scopes the read to builder rows with both flags off, exactly the old grid", async () => {
     lwqlEnabledMock.mockResolvedValue(false);
     customChartPlaygroundEnabledMock.mockResolvedValue(false);
@@ -120,7 +120,7 @@ describe("the dashboard's card read", () => {
     expect(kindClauseOf(findMany)).toBe(BUILDER_CHART_KIND);
   });
 
-  /** @scenario "Workbench and playground rows are both admitted when both flags are on" */
+  /** @scenario "Workbench and dashboard-widget rows are both admitted when both flags are on" */
   it("admits builder, workbench and playground together when both flags are on", async () => {
     lwqlEnabledMock.mockResolvedValue(true);
     customChartPlaygroundEnabledMock.mockResolvedValue(true);
@@ -131,11 +131,11 @@ describe("the dashboard's card read", () => {
     });
 
     expect(kindClauseOf(findMany)).toEqual({
-      in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND, PLAYGROUND_SRCDOC_CHART_KIND],
+      in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND, DASHBOARD_SRCDOC_CHART_KIND],
     });
   });
 
-  /** @scenario "The playground flag does not change workbench visibility, or the reverse" */
+  /** @scenario "The dashboard-widget flag does not change workbench visibility, or the reverse" */
   it("admits playground but not workbench when only the playground flag is on", async () => {
     lwqlEnabledMock.mockResolvedValue(false);
     customChartPlaygroundEnabledMock.mockResolvedValue(true);
@@ -151,6 +151,6 @@ describe("the dashboard's card read", () => {
     // workbench flag does that, unchanged from before this feature existed.
     const clause = kindClauseOf(findMany) as { in: string[] };
     expect(clause.in).not.toContain(WORKBENCH_SQL_CHART_KIND);
-    expect(clause.in).toContain(PLAYGROUND_SRCDOC_CHART_KIND);
+    expect(clause.in).toContain(DASHBOARD_SRCDOC_CHART_KIND);
   });
 });

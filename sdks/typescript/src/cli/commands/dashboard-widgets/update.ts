@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { PlaygroundWidgetsApiService } from "@/client-sdk/services/playground-widgets/playground-widgets-api.service";
+import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -16,7 +16,7 @@ import {
  * call touching nothing is refused locally, matching the API's own refusal
  * of an empty update.
  */
-export const updatePlaygroundWidgetCommand = async (
+export const updateDashboardWidgetCommand = async (
   id: string,
   options: DefinitionFlags & { name?: string; project?: string },
 ): Promise<CommandResult | void> => {
@@ -42,7 +42,7 @@ export const updatePlaygroundWidgetCommand = async (
     process.exit(1);
   }
 
-  const service = new PlaygroundWidgetsApiService();
+  const service = new DashboardWidgetsApiService();
   const spinner = createSpinner(`Updating widget "${id}"...`).start();
 
   try {
@@ -63,7 +63,7 @@ export const updatePlaygroundWidgetCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "update playground widget" });
+    failSpinner({ spinner, error, action: "update dashboard widget" });
     process.exit(1);
   }
 };

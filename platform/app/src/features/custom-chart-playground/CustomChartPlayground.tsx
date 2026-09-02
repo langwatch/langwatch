@@ -16,12 +16,12 @@ import { Plus } from "lucide-react";
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
 import { sizeOptions } from "~/components/analytics/reports/GraphCardMenu";
 import { toaster } from "~/components/ui/toaster";
-import { playgroundWidgetDefinitionSchema } from "~/server/analytics/playgroundWidgetDefinition";
+import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
 import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
-import type { PlaygroundWidget } from "./PlaygroundWidgetCard";
-import { PlaygroundWidgetGrid } from "./PlaygroundWidgetGrid";
+import type { DashboardWidget } from "./DashboardWidgetCard";
+import { DashboardWidgetGrid } from "./DashboardWidgetGrid";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "./presets";
 
 /**
@@ -41,8 +41,8 @@ function toWidget(row: {
   colSpan: number;
   rowSpan: number;
   dashboardId?: string | null;
-}): PlaygroundWidget {
-  const parsed = playgroundWidgetDefinitionSchema.safeParse(row.graph);
+}): DashboardWidget {
+  const parsed = dashboardWidgetDefinitionSchema.safeParse(row.graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
   return {
     id: row.id,
@@ -78,17 +78,17 @@ export function CustomChartPlayground({
   );
   const dashboardId = dashboard.data?.id;
 
-  const widgetsQuery = api.playgroundWidgets.list.useQuery(
+  const widgetsQuery = api.dashboardWidgets.list.useQuery(
     { projectId },
     { enabled: projectId.length > 0 },
   );
 
-  const createWidget = api.playgroundWidgets.create.useMutation();
-  const updateWidget = api.playgroundWidgets.update.useMutation();
-  const deleteWidget = api.playgroundWidgets.delete.useMutation();
-  const updateLayout = api.playgroundWidgets.updateLayout.useMutation();
+  const createWidget = api.dashboardWidgets.create.useMutation();
+  const updateWidget = api.dashboardWidgets.update.useMutation();
+  const deleteWidget = api.dashboardWidgets.delete.useMutation();
+  const updateLayout = api.dashboardWidgets.updateLayout.useMutation();
   const batchUpdateLayouts =
-    api.playgroundWidgets.batchUpdateLayouts.useMutation();
+    api.dashboardWidgets.batchUpdateLayouts.useMutation();
 
   const widgets = (widgetsQuery.data ?? []).map(toWidget);
 
@@ -167,7 +167,7 @@ export function CustomChartPlayground({
   // mutation and the same refetch. `onSuccess` lets the caller flip itself
   // back to Chart only once the write landed.
   const handleSave = (
-    input: { id: string; code: string; queries: PlaygroundWidget["queries"] },
+    input: { id: string; code: string; queries: DashboardWidget["queries"] },
     options?: { onSuccess?: () => void },
   ) => {
     updateWidget.mutate(
@@ -227,7 +227,7 @@ export function CustomChartPlayground({
           <Text>No widgets yet. Click “New widget” to add one.</Text>
         </Box>
       ) : (
-        <PlaygroundWidgetGrid
+        <DashboardWidgetGrid
           widgets={widgets}
           projectId={projectId}
           projectSlug={projectSlug}

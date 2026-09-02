@@ -1,7 +1,7 @@
 /**
- * The playground's widget grid. Mirrors `components/analytics/reports`'
+ * The dashboard widget grid. Mirrors `components/analytics/reports`'
  * `ReportGrid`: a dnd-kit sortable grid over the same 2-column layout, reusing
- * `calculateGridPositions` to repack on drop. Cards are playground widgets
+ * `calculateGridPositions` to repack on drop. Cards are dashboard widgets
  * (sandboxed frames) rather than builder/workbench graphs.
  */
 
@@ -17,22 +17,22 @@ import {
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 
 import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
-import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import {
-  type PlaygroundWidget,
-  PlaygroundWidgetCard,
-} from "./PlaygroundWidgetCard";
+  type DashboardWidget,
+  DashboardWidgetCard,
+} from "./DashboardWidgetCard";
 
-interface PlaygroundWidgetGridProps {
-  widgets: PlaygroundWidget[];
+interface DashboardWidgetGridProps {
+  widgets: DashboardWidget[];
   projectId: string;
   projectSlug: string;
   onWidgetDelete: (id: string) => void;
   onWidgetSizeChange: (id: string, size: SizeOption) => void;
   onWidgetSave: (
-    input: { id: string; code: string; queries: PlaygroundQuery[] },
+    input: { id: string; code: string; queries: DashboardWidgetQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
   onWidgetsReorder: (layouts: GridLayout[]) => void;
@@ -40,7 +40,7 @@ interface PlaygroundWidgetGridProps {
   savingWidgetId: string | null;
 }
 
-export function PlaygroundWidgetGrid({
+export function DashboardWidgetGrid({
   widgets,
   projectId,
   projectSlug,
@@ -50,7 +50,7 @@ export function PlaygroundWidgetGrid({
   onWidgetsReorder,
   deletingWidgetId,
   savingWidgetId,
-}: PlaygroundWidgetGridProps) {
+}: DashboardWidgetGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
@@ -86,7 +86,7 @@ export function PlaygroundWidgetGrid({
           width="100%"
         >
           {widgets.map((widget) => (
-            <PlaygroundWidgetCard
+            <DashboardWidgetCard
               key={widget.id}
               widget={widget}
               projectId={projectId}
