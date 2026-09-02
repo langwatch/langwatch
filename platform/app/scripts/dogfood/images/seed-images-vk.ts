@@ -139,7 +139,7 @@ async function ensureProvider({
       // The row cannot serve a request: either nothing can decrypt it, or it
       // has no credential and this run has none to give it. Enabling it would
       // put a provider in the routing chain that fails at credential
-      // materialisation on every request, which reads as the gateway being
+      // materialization on every request, which reads as the gateway being
       // broken rather than as this row needing attention.
       process.stderr.write(skipHint("seed-images", decision.reason));
       return { id: existing.id, isUsable: false };
@@ -278,7 +278,7 @@ async function main() {
       : [];
     // Adding this run's provider is not enough: a provider the policy already
     // names may have become unreadable since, and leaving it in the chain
-    // sends traffic to a credential that cannot materialise.
+    // sends traffic to a credential that cannot materialize.
     const merged = Array.from(new Set([...priorIds, ...providerIds])).filter(
       (id) => !unusableIds.includes(id),
     );

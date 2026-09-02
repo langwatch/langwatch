@@ -575,7 +575,7 @@ var imageEditFormFields = []string{
 // OpenAI Node SDK posts an array of files as "image[]"; a caller sending a
 // single file, and curl, use "image". Only one of the two may carry files:
 // the parsed form states no order across fields, so a request using both has
-// no order the gateway can honour, and it is refused rather than guessed.
+// no order the gateway can honor, and it is refused rather than guessed.
 var imageEditFileFields = []string{"image[]", "image"}
 
 // imageEditsHandler terminates POST /v1/images/edits (OpenAI-wire multipart
