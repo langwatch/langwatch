@@ -58,8 +58,10 @@ describe("FilterDisplay", () => {
       );
 
       const style = getComputedStyle(screen.getByText(LONG_VALUE));
-      expect(style.webkitLineClamp).not.toBe("1");
-      expect(style.overflow).not.toBe("hidden");
+      // Asserted as absent rather than "not 1": a negative assertion would
+      // also pass if the styles had never applied at all.
+      expect(style.webkitLineClamp).toBe("");
+      expect(style.overflow).toBe("");
     });
 
     it("breaks mid-token so an unbreakable id cannot run past its container", () => {

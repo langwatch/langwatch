@@ -977,17 +977,20 @@ function AutomationsPage() {
                                       {trigger.filterQuery ? (
                                         // ADR-043: a trace-subject automation shows
                                         // its search query.
-                                        <Code
-                                          size="sm"
-                                          variant="surface"
-                                          display="block"
-                                          minWidth={0}
+                                        <HoverableBigText
                                           lineClamp={2}
-                                          wordBreak="break-word"
-                                          title={trigger.filterQuery}
+                                          expandedVersion={trigger.filterQuery}
                                         >
-                                          {trigger.filterQuery}
-                                        </Code>
+                                          <Code
+                                            size="sm"
+                                            variant="surface"
+                                            display="block"
+                                            minWidth={0}
+                                            wordBreak="break-word"
+                                          >
+                                            {trigger.filterQuery}
+                                          </Code>
+                                        </HoverableBigText>
                                       ) : trigger.filters &&
                                         typeof trigger.filters === "string" &&
                                         trigger.filters !== "{}" ? (
@@ -1003,18 +1006,24 @@ function AutomationsPage() {
                                       <Text textStyle="sm" fontWeight="medium">
                                         {triggerActionName(trigger.action)}
                                       </Text>
-                                      <Box
+                                      {/* Clamped, so it needs a reveal: the
+                                          destination (a long email, a webhook
+                                          URL) is the whole point of the cell.
+                                          Not expandable — the dialog wants a
+                                          string and these are nodes. */}
+                                      <HoverableBigText
                                         textStyle="xs"
                                         color="fg.muted"
                                         width="full"
                                         lineClamp={2}
                                         overflowWrap="anywhere"
+                                        expandable={false}
                                       >
                                         {actionItems(
                                           trigger.action,
                                           actionParams,
                                         )}
-                                      </Box>
+                                      </HoverableBigText>
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
