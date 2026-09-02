@@ -35,9 +35,8 @@ function snapshotHolding(
 
 /** Installs a snapshot and waits for its first load, so lookups are decided. */
 async function install(data: SuppressionSnapshotData): Promise<void> {
-  const snapshot = new SuppressionSnapshot(async () => data);
+  const snapshot = installSuppressionSnapshot({ load: async () => data });
   await snapshot.refreshNow();
-  installSuppressionSnapshot(snapshot);
 }
 
 describe("given the actor id a money row is about to be written under", () => {

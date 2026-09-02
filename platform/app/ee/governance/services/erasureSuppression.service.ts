@@ -26,16 +26,25 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { ErasedIdentifierSuppressionRepository } from "../repositories/governanceIdentity.repository";
+import {
+  ErasedIdentifierSuppressionRepository,
+  GovernanceTenantHistoryRepository,
+} from "../repositories/governanceIdentity.repository";
 import {
   ErasureSecretMissingError,
   erasureDigest,
   readErasureSecret,
 } from "./logic/erasureDigest";
+import {
+  installSuppressionSnapshot,
+  type SuppressionSnapshotData,
+  type SuppressionSnapshotLoader,
+} from "./logic/suppressionSnapshot";
 
 const logger = createLogger("langwatch:governance:erasure-suppression");
 
 const repository = new ErasedIdentifierSuppressionRepository();
+const tenantHistoryRepository = new GovernanceTenantHistoryRepository();
 
 /**
  * The suppression answer for one (organization, provider), resolved once and
@@ -112,6 +121,64 @@ export async function loadErasureSuppression({
     isSuppressed: (identifier: string) =>
       identifier !== "" && hashes.has(erasureDigest({ secret, identifier })),
   };
+}
+
+/**
+ * The read behind the fold's snapshot: every suppression row and every recorded
+ * tenant, in one pass, for every organization on the deployment.
+ *
+ * Deployment-wide rather than per-organization because the fold does not get to
+ * choose what arrives — it is handed a `tenantId` by the executor and must
+ * answer synchronously, so the whole picture has to already be in hand. Both
+ * tables are small by construction: one row per erased identifier, one row per
+ * governance project ever used.
+ *
+ * The provider is dropped on purpose. The fold's check is organization-wide,
+ * for the reason in this module's header, so carrying the provider through
+ * would only invite somebody to start filtering on it.
+ */
+export function createSuppressionSnapshotLoader(
+  prisma: PrismaClient,
+): SuppressionSnapshotLoader {
+  return async (): Promise<SuppressionSnapshotData> => {
+    const [suppressions, tenants] = await Promise.all([
+      repository.findAll(prisma),
+      tenantHistoryRepository.findAll(prisma),
+    ]);
+
+    const digestsByOrganization = new Map<string, Set<string>>();
+    for (const row of suppressions) {
+      const digests =
+        digestsByOrganization.get(row.organizationId) ?? new Set<string>();
+      digests.add(row.identifierHash);
+      digestsByOrganization.set(row.organizationId, digests);
+    }
+
+    return {
+      digestsByOrganization,
+      organizationByTenant: new Map(
+        tenants.map((row) => [row.tenantId, row.organizationId]),
+      ),
+    };
+  };
+}
+
+/**
+ * Gives this process the view of the suppression list that the money fold reads.
+ *
+ * The composition root calls this, and so does the test that proves the
+ * substitution happens — one entry point, so the thing under test is the thing
+ * that ships. Without it `actorIdForRollupWrite` finds no snapshot and returns
+ * every identifier verbatim, which is correct behaviour for a process that
+ * cannot reach Postgres and a silent data leak for one that can.
+ *
+ * Cheap to call unconditionally: nothing is read until the first money event
+ * asks a question, so a process that never folds never touches the tables.
+ */
+export function installGovernanceSuppressionSnapshot(
+  prisma: PrismaClient,
+): void {
+  installSuppressionSnapshot({ load: createSuppressionSnapshotLoader(prisma) });
 }
 
 /** What one batch kept, and how much of it the erasure list held back. */

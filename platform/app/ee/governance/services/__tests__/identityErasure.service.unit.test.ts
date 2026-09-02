@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -9,7 +9,10 @@ import {
   IdentityErasureService,
 } from "../identityErasure.service";
 import { ERASURE_SECRET_ENV, erasureDigest } from "../logic/erasureDigest";
-import { SuppressionSnapshot } from "../logic/suppressionSnapshot";
+import {
+  clearSuppressionSnapshot,
+  installSuppressionSnapshot,
+} from "../logic/suppressionSnapshot";
 
 const SECRET = "a".repeat(32);
 const ORG = "org_a";
@@ -60,12 +63,16 @@ function buildService(
     replayedTenants?: string[];
   } = { suppressionHashes: [] };
 
-  const snapshot = new SuppressionSnapshot(async () => {
-    calls.push("snapshot.refresh");
-    return {
-      digestsByOrganization: new Map(),
-      organizationByTenant: new Map(),
-    };
+  // Installed rather than injected: the service reaches the process's one
+  // snapshot on purpose, so this is the only handle a test gets on it either.
+  installSuppressionSnapshot({
+    load: async () => {
+      calls.push("snapshot.refresh");
+      return {
+        digestsByOrganization: new Map(),
+        organizationByTenant: new Map(),
+      };
+    },
   });
 
   const deps: IdentityErasureDeps = {
@@ -121,7 +128,6 @@ function buildService(
         recorded.replayedTenants = params.tenantIds;
       }),
     },
-    snapshot,
     replayHorizon: () => overrides.replayHorizon ?? null,
     now: () => new Date("2026-09-02T00:00:00.000Z"),
   };
@@ -133,6 +139,8 @@ describe("given a provider-named person an organization has asked us to erase", 
   beforeEach(() => {
     vi.stubEnv(ERASURE_SECRET_ENV, SECRET);
   });
+
+  afterEach(() => clearSuppressionSnapshot());
 
   describe("when the erasure runs", () => {
     /** @scenario "Erasing a person replaces their identifier everywhere it is stored" */
