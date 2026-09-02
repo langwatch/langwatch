@@ -2,11 +2,12 @@
  * Which page key each personal-workspace screen answers, and what it is
  * wrapped in.
  *
- * The route table names seven page keys — five under `/me` and two under a
- * project — and the package exposes seven loaders under names of its own. This
- * is the map between them, and the only place either vocabulary meets the
- * other. `/me/devices` is not here: it is a redirect row in the table, which is
- * what a path that only ever went somewhere else should be.
+ * The route table names eight page keys — five under `/me`, two under a project
+ * and Settings > Authentication — and the package exposes loaders under names
+ * of its own. This is the map between them, and the only place either
+ * vocabulary meets the other. `/me/devices` is not here: it is a redirect row
+ * in the table, which is what a path that only ever went somewhere else should
+ * be.
  *
  * Each page is wrapped three times, and the order matters. The host provider is
  * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
@@ -16,8 +17,8 @@
  * is set by a page that actually opened, never by one that turned out to be a
  * 404.
  *
- * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE. All seven were behind
- * `withFeatureFlagGuard("release_ui_ai_governance_enabled")` and none of them
+ * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE. All seven personal keys were
+ * behind `withFeatureFlagGuard("release_ui_ai_governance_enabled")` and none of them
  * carried a permission guard, so that is what is stated here. The five `/me`
  * pages passed `bypassOnboardingRedirect: true`, which was never a refusal — it
  * turned OFF the platform guard's habit of bouncing a reader with no project to
@@ -43,6 +44,7 @@ import {
   UiPageNotFound,
 } from "../../../../ui/elements/ui-page-fallbacks";
 import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
+import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
 import { withPersonalWorkspaceHost } from "./personal-workspace-host-provider";
 
 /**
@@ -112,7 +114,33 @@ function personalWorkspacePage(
   };
 }
 
+/**
+ * Settings > Authentication, which is this package's eighth key and the one
+ * that is not a `/me/*` page. It rides the family's own screen entry rather
+ * than one of its own: `ui-screen-owner` requires a screen entry's id to match
+ * the frontend feature that composes it, so one feature may mount exactly one.
+ *
+ * WRAPPED DIFFERENTLY FROM THE OTHER SEVEN, in all three of the ways that can
+ * differ, and each is the platform page's policy one for one:
+ *
+ * - NO FLAG. The seven `/me` and project keys are behind
+ *   `release_ui_ai_governance_enabled`; this page shipped long before that flag
+ *   and every signed-in reader has always been able to open it.
+ * - NO PERMISSION. Everything on it is keyed on the reader's own account, so
+ *   there is no scope to hold a grant over.
+ * - SETTINGS CHROME rather than a personal-home marker. It is a settings page,
+ *   it is reached from the settings navigation, and a reader who opens it has
+ *   not chosen the personal workspace as their home.
+ */
+const authenticationPage: UiPageLoader = async () => {
+  const module = await personalWorkspaceScreens.authentication();
+  const titled = withDocumentTitle("Authentication · LangWatch", module.default as ComponentType);
+  const guarded = withUiPageGuard({ fallbacks: FALLBACKS })(titled);
+  return { default: withPersonalWorkspaceHost(withUiSettingsLayout(guarded)) };
+};
+
 export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
+  "pages/settings/authentication": authenticationPage,
   "pages/me/index": personalWorkspacePage("overview", { title: "My Usage · LangWatch" }),
   "pages/me/configure": personalWorkspacePage("configure", {
     title: "My Settings · LangWatch",

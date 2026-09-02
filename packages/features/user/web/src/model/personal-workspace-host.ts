@@ -24,6 +24,12 @@
  * ROLE (a view-only member is told why their own workspace refuses writes), and
  * whether the scope has resolved yet (the two project-scoped screens say
  * nothing about a project until they have one, rather than "no sessions").
+ *
+ * What the SIGN-IN METHODS screen added to it is a transport rather than a
+ * reading: five better-auth ceremonies, because a passkey is registered in the
+ * browser and never over tRPC, and `better-auth` is one of the imports ADR-004
+ * seals off. Declared on this port rather than on a second one — a package has
+ * ONE host port — and answered from `apps/ui/src/behavior/ui-passkeys.ts`.
  */
 
 import { createContext, useContext } from "react";
@@ -39,6 +45,15 @@ export type PersonalOrganization = {
   id: string;
   name: string;
   slug: string;
+  /**
+   * The single sign-on provider the organization is pinned to, if any.
+   *
+   * Read by ONE surface, Settings > Authentication, for one decision: an
+   * organization on enterprise single sign-on may not link additional sign-in
+   * methods, because a second way in would route around the provider the
+   * organization chose.
+   */
+  ssoProvider?: string | null;
   teams: readonly PersonalTeam[];
 };
 
@@ -97,6 +112,16 @@ export type PersonalSuccessNotice = {
 export type PersonalFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /**
+   * A sentence for a refusal that has no code to look up.
+   *
+   * The credentials family added this to `UiFailureNotice` and it is the same
+   * field: the registry still WINS over it, so it can never talk over
+   * registered copy, and it only fills the gap where there is no code at all. A
+   * passkey ceremony that did not finish is exactly that — there is no server
+   * error, only a device that could not complete the attempt.
+   */
+  description?: string;
   id?: string;
 };
 
@@ -109,7 +134,47 @@ export type PersonalFailureNotice = {
 export type PersonalDeployment = {
   isSaas: boolean;
   appBaseUrl: string;
+  /**
+   * Whether this deployment mounted the passkey plugin at boot.
+   *
+   * A deployment that did not has no endpoint behind any of the passkey
+   * controls, so the section renders nothing rather than making an offer it
+   * cannot honour. Read from the browser bootstrap contract, which is the
+   * static half of the public environment and is available before any request.
+   */
+  passkeysEnabled: boolean;
 };
+
+/**
+ * One passkey, of the parts this family reads.
+ *
+ * `transports` is what the authenticator said about how it is reached, and it
+ * is a HINT rather than a fact — which is why it only decides which heading a
+ * card sits under and never anything that would matter if it were wrong.
+ */
+export type HeldPasskey = {
+  id: string;
+  name?: string | null;
+  createdAt: string | Date;
+  transports?: string | null;
+};
+
+/**
+ * How a passkey ceremony ended.
+ *
+ * THE THREE-WAY ANSWER IS THE WHOLE VALUE OF THIS TYPE. A cancelled prompt is
+ * not a failure: somebody opened the operating system's dialog, looked at it
+ * and closed it, and saying "something went wrong" about a decision is telling
+ * them off for deciding. better-auth reports that as a zero status, which the
+ * application reads and this flag carries.
+ */
+export type PasskeyOutcome =
+  | { ok: true }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false };
+
+/** How an attempt to link an additional sign-in method ended. */
+export type LinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
 
 /**
  * The one thing a screen is handed.
@@ -173,6 +238,39 @@ export abstract class PersonalWorkspaceHostPort {
    * application decides how its own session is refreshed.
    */
   abstract refreshSession(): Promise<void>;
+
+  // -- the reader's own sign-in methods ---------------------------------------
+  //
+  // FIVE CEREMONIES AND A REDIRECT, none of them tRPC. Passkeys are registered,
+  // renamed and removed through better-auth's browser client, and linking an
+  // additional method leaves the page for the provider — so `better-auth` is
+  // the import ADR-004 seals off and the wire lives in
+  // `apps/ui/src/behavior/ui-passkeys.ts`, the browser-transport home the
+  // credentials family carved out for the CLI device flow.
+  //
+  // THE SPLIT IS THE POINT, and it is the same one: what the screen SAYS about
+  // an outcome is decided here and pinned in this package; what the outcome IS
+  // — in particular that a cancelled device prompt arrives as a zero status and
+  // is not a failure — is decided in `apps/ui` and pinned there.
+
+  /** Every passkey this account holds, newest reading each time it is asked. */
+  abstract listPasskeys(): Promise<readonly HeldPasskey[]>;
+
+  /** Runs the registration ceremony on this device. */
+  abstract registerPasskey(): Promise<PasskeyOutcome>;
+
+  abstract renamePasskey(input: { id: string; name: string }): Promise<PasskeyOutcome>;
+
+  abstract removePasskey(input: { id: string }): Promise<PasskeyOutcome>;
+
+  /**
+   * Sends the reader to the provider to link an additional sign-in method.
+   *
+   * Answers a REASON rather than throwing, because the failure that matters
+   * here is the provider refusing rather than the request failing: better-auth
+   * hands back an error string and the section shows it.
+   */
+  abstract linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome>;
 
   abstract succeeded(notice: PersonalSuccessNotice): void;
 

@@ -31,6 +31,7 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/gateway-web": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@paper-design/shaders-react": "^0.0.76",

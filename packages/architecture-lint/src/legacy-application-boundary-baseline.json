@@ -768,9 +768,6 @@
       "platform/app/src/pages/settings.tsx": [
         "../server/app-layer/organizations/repositories/organization.repository"
       ],
-      "platform/app/src/pages/settings/audit-log.tsx": [
-        "~/server/app-layer/organizations/repositories/organization.repository"
-      ],
       "platform/app/src/pages/settings/members.tsx": [
         "../../server/app-layer/organizations/repositories/organization.repository"
       ],

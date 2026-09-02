@@ -29,6 +29,13 @@ import {
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import {
+  linkUiSignInMethod,
+  listUiPasskeys,
+  registerUiPasskey,
+  removeUiPasskey,
+  renameUiPasskey,
+} from "../../../../behavior/ui-passkeys";
 import { useRefreshUiSession } from "../../../../behavior/ui-session-refresh";
 import { UiPersonalWorkspaceHost } from "../../behavior/personal-workspace-host.adapter";
 
@@ -39,12 +46,20 @@ import { UiPersonalWorkspaceHost } from "../../behavior/personal-workspace-host.
  * with no stated address rather than a broken one: the install copy then prints
  * the hosted application, which is the same fallback the CLI itself applies.
  */
-function readDeployment(): { isSaas: boolean; appBaseUrl: string } {
+function readDeployment(): { isSaas: boolean; appBaseUrl: string; passkeysEnabled: boolean } {
   try {
     const config = readPublicAppConfig();
-    return { isSaas: config.deployment === "saas", appBaseUrl: config.appBaseUrl };
+    return {
+      isSaas: config.deployment === "saas",
+      appBaseUrl: config.appBaseUrl,
+      passkeysEnabled: config.passkeys,
+    };
   } catch {
-    return { isSaas: false, appBaseUrl: "https://app.langwatch.ai" };
+    // A shell with no configuration is a self-hosted one with no stated
+    // address rather than a broken one. Passkeys read OFF there for the same
+    // reason the section gates on the flag at all: offering a ceremony a
+    // deployment never mounted an endpoint for is an offer we cannot honour.
+    return { isSaas: false, appBaseUrl: "https://app.langwatch.ai", passkeysEnabled: false };
   }
 }
 
@@ -69,6 +84,10 @@ function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
         id: organization.id,
         name: organization.name,
         slug: organization.slug,
+        // The one field Settings > Authentication reads off the graph that no
+        // other personal-workspace screen does: an organization pinned to a
+        // single sign-on provider may not link additional methods.
+        ssoProvider: organization.ssoProvider ?? null,
         teams: organization.teams.map((team) => ({
           id: team.id,
           name: team.name,
@@ -119,6 +138,15 @@ function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
           setQuery: (next, options) => route.setQuery(next, options),
           navigate: (to) => navigation.navigate(to),
           refreshSession,
+          listPasskeys: () => listUiPasskeys(),
+          registerPasskey: () => registerUiPasskey(),
+          renamePasskey: (input) => renameUiPasskey(input),
+          removePasskey: (input) => removeUiPasskey(input),
+          // Back to the page the reader is standing on, so a linked method
+          // lands them where they asked for it rather than at the product's
+          // front door.
+          linkSignInMethod: (provider) =>
+            linkUiSignInMethod(provider, { callbackUrl: "/settings/authentication" }),
           succeeded: (notice) => feedback.succeeded(notice),
           failed: (failure) => feedback.failed(failure),
         },

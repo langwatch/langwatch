@@ -36,6 +36,9 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 import {
   PersonalWorkspaceHostPort,
   PersonalWorkspaceHostProvider,
+  type HeldPasskey,
+  type LinkSignInMethodOutcome,
+  type PasskeyOutcome,
   type PersonalActor,
   type PersonalDeployment,
   type PersonalFailureNotice,
@@ -53,6 +56,14 @@ export type PersonalQuery = Readonly<Record<string, string | undefined>>;
 /** Everything a screen wrote through the host, in the order it wrote it. */
 export type PersonalHostRecording = {
   navigations: string[];
+  /** The passkey ceremonies a screen ran, and what it named them with. */
+  passkeyCeremonies: Array<
+    | { kind: "register" }
+    | { kind: "rename"; id: string; name: string }
+    | { kind: "remove"; id: string }
+  >;
+  /** The providers a screen asked to link an additional sign-in method with. */
+  linkedProviders: string[];
   /** How many times a screen asked for the signed-in reader to be re-read. */
   sessionRefreshes: number;
   queries: Array<{ next: PersonalQuery; replace: boolean }>;
@@ -88,6 +99,7 @@ export const FAKE_ACTOR: PersonalActor = {
 const DEFAULT_DEPLOYMENT: PersonalDeployment = {
   isSaas: true,
   appBaseUrl: "https://app.langwatch.ai",
+  passkeysEnabled: true,
 };
 
 export type FakePersonalHostOptions = {
@@ -113,6 +125,12 @@ export type FakePersonalHostOptions = {
   params?: Readonly<Record<string, string | undefined>>;
   /** The query string the screen opens on. */
   query?: PersonalQuery;
+  /** The passkeys the account holds, as the ceremonies leave them. */
+  passkeys?: readonly HeldPasskey[];
+  /** How the next passkey ceremony ends. Success unless a test says otherwise. */
+  passkeyOutcome?: PasskeyOutcome;
+  /** How the next attempt to link a sign-in method ends. */
+  linkOutcome?: LinkSignInMethodOutcome;
 };
 
 export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
@@ -121,6 +139,8 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
       options,
       recording: {
         navigations: [],
+        passkeyCeremonies: [],
+        linkedProviders: [],
         sessionRefreshes: 0,
         queries: [],
         successes: [],
@@ -235,6 +255,30 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
 
   async refreshSession(): Promise<void> {
     this.recording.sessionRefreshes += 1;
+  }
+
+  async listPasskeys(): Promise<readonly HeldPasskey[]> {
+    return this.options.passkeys ?? [];
+  }
+
+  async registerPasskey(): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "register" });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async renamePasskey({ id, name }: { id: string; name: string }): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "rename", id, name });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async removePasskey({ id }: { id: string }): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "remove", id });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
+    this.recording.linkedProviders.push(provider);
+    return this.options.linkOutcome ?? { ok: true };
   }
 
   succeeded(notice: PersonalSuccessNotice): void {

@@ -52,6 +52,7 @@ import type {
   OrganizationTeam,
   OrganizationTeamAccess,
   OrganizationTeamWithMembers,
+  EnrichedAuditLog,
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,
   PersonalFeatures,
@@ -108,28 +109,6 @@ type OrganizationMemberWithUser = OrganizationUser & { user: UserWithTeams };
 
 export type OrganizationWithMembersAndTheirTeams = Organization & {
   members: OrganizationMemberWithUser[];
-};
-
-/** One audit-log row, with its actor and its project already resolved. */
-type EnrichedAuditLog = {
-  id: string;
-  createdAt: Date;
-  userId: string | null;
-  organizationId: string | null;
-  projectId: string | null;
-  action: string;
-  payload: unknown;
-  ipAddress: string | null;
-  userAgent: string | null;
-  error: string | null;
-  args: unknown;
-  user: { id: string; name: string | null; email: string | null } | null;
-  project: { id: string; name: string } | null;
-  source: "platform" | "gateway";
-  targetKind: string | null;
-  targetId: string | null;
-  before: unknown;
-  after: unknown;
 };
 
 // ---------------------------------------------------------------------------

@@ -98,6 +98,8 @@ function settingsRouteSections(): Map<string, string> {
     "data-retention",
     "data-privacy",
     "model-provider",
+    "organization",
+    "personal-workspace",
     "secret",
   ]) {
     sections.set(
@@ -134,6 +136,8 @@ describe("the pages under /settings", () => {
       expect(modules).toContain("pages/settings/role-bindings");
       expect(modules).toContain("pages/settings/api-keys");
       expect(modules).toContain("pages/settings/secrets");
+      expect(modules).toContain("pages/settings/audit-log");
+      expect(modules).toContain("pages/settings/authentication");
     });
   });
 

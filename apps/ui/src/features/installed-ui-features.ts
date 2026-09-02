@@ -28,6 +28,7 @@ import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
 import { opsApiBinding, opsPageLoaders } from "./ops";
+import { organizationApiBinding, organizationPageLoaders } from "./organization";
 import { promptApiBinding, promptPageLoaders } from "./prompt";
 import { secretApiBinding, secretPageLoaders } from "./secret";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
@@ -46,6 +47,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...governancePageLoaders,
     ...modelProviderPageLoaders,
     ...opsPageLoaders,
+    ...organizationPageLoaders,
     ...promptPageLoaders,
     ...secretPageLoaders,
     ...personalWorkspacePageLoaders,
@@ -63,6 +65,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     governanceApiBinding,
     modelProviderApiBinding,
     opsApiBinding,
+    organizationApiBinding,
     promptApiBinding,
     secretApiBinding,
     ...personalWorkspaceApiBindings,

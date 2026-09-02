@@ -114,7 +114,19 @@ const GATEWAY_PAGE_KEYS = [
   "pages/gateway/webhooks",
 ];
 
+const ORGANIZATION_PAGE_KEYS = [
+  // One key, its own package, and its own new one. `organization.getAuditLogs`
+  // is `@langwatch/organization-server`'s transport and `EnrichedAuditLog` is
+  // `@langwatch/organization-contract`'s, so the credentials family's rule —
+  // a key belongs to the family that owns its transport — puts it here.
+  "pages/settings/audit-log",
+];
+
 const PERSONAL_WORKSPACE_PAGE_KEYS = [
+  // The one key in this family that is not a `/me/*` page. Every tRPC call on
+  // Settings > Authentication is `user.*`, and the account's own credentials
+  // are what this package is for.
+  "pages/settings/authentication",
   "pages/me/index",
   "pages/me/configure",
   "pages/me/sessions",
@@ -213,6 +225,7 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
+          ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
@@ -221,7 +234,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Sixteen for fifteen features: the personal workspace mounts two,
+      // Seventeen for sixteen features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
@@ -237,6 +250,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/enterprise-governance-web",
         "@langwatch/model-provider-web",
         "@langwatch/ops-web",
+        "@langwatch/organization-web",
         "@langwatch/prompt-web",
         "@langwatch/secret-web",
         "@langwatch/user-web",
@@ -297,12 +311,13 @@ describe("given what apps/ui serves itself", () => {
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
+          ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(16);
+      expect(merged.apis).toHaveLength(17);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

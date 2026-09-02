@@ -52,6 +52,24 @@ vi.mock("@langwatch/user-web/screens/personal-workspace", async () => {
   };
 });
 
+// The eighth key rides the family's own screen entry, so the Proxy above already
+// serves it. It is the one loader in this family that carries no flag and does
+// carry the settings chrome, which is what makes it worth mounting here beside
+// the seven.
+
+// The harvested settings chrome reads the plan and the membership role over the
+// application's transport, neither of which is what this file is about.
+vi.mock("../src/behavior/ui-organization-facts", () => ({
+  useUiOrganizationFacts: () => ({
+    isEnterprise: false,
+    isPlanLoading: false,
+    isLiteMember: false,
+    isSaaS: false,
+  }),
+  useUiPlatformAdmin: () => false,
+}));
+
+import { MemoryRouter } from "react-router";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
@@ -132,13 +150,17 @@ async function openPage(key: string, flags: Record<string, boolean | undefined>)
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders. The query client is there for the
   // host provider, which builds the session refresher the avatar control asks
-  // for; the shell always has one and this is the smallest way to say so.
+  // for; the shell always has one and this is the smallest way to say so. The
+  // router is there for the settings key: the harvested chrome reads the
+  // address to decide which settings group is open.
   render(
     <ChakraProvider value={defaultSystem}>
       <QueryClientProvider client={new QueryClient()}>
-        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(flags))}>
-          <Mounted />
-        </UiCapabilityContextProvider>
+        <MemoryRouter initialEntries={[key.replace(/^pages/, "")]}>
+          <UiCapabilityContextProvider value={capabilities(new AnsweringSession(flags))}>
+            <Mounted />
+          </UiCapabilityContextProvider>
+        </MemoryRouter>
       </QueryClientProvider>
     </ChakraProvider>,
   );

@@ -103,3 +103,48 @@ export const claimOrganizationBillingCustomerInputSchema = z
 export type ClaimOrganizationBillingCustomerInput = z.infer<
   typeof claimOrganizationBillingCustomerInputSchema
 >;
+
+/**
+ * One audit-log row, with its actor and its project already resolved.
+ *
+ * DECLARED HERE RATHER THAN INFERRED FROM THE ROUTER because the screen that
+ * renders it lives in `@langwatch/organization-web`, and a web package may
+ * neither import `@langwatch/organization-server` nor name an `AppRouter` that
+ * does not exist until a process instantiates one. `OrganizationApp.getAuditLogs`
+ * is annotated with this type, so widening what the audit trail answers is a
+ * compile error at the producer rather than a silent disclosure at the table.
+ *
+ * ONE TABLE, TWO SHAPES. Gateway writes carry `targetKind` plus a `before`/
+ * `after` diff; platform writes carry `args` and `metadata`. `source` is
+ * COMPUTED from the presence of `targetKind` rather than stored, which is why
+ * it is not nullable while the four fields it is derived from are.
+ *
+ * `userId` is nullable so a background job, a migration or any other system
+ * actor can write a row without inventing a person to blame it on.
+ */
+export type EnrichedAuditLog = {
+  id: string;
+  createdAt: Date;
+  /** Nullable to support system-actor writes (background jobs, migrations). */
+  userId: string | null;
+  organizationId: string | null;
+  projectId: string | null;
+  action: string;
+  payload: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  error: string | null;
+  args: unknown;
+  user: { id: string; name: string | null; email: string | null } | null;
+  project: { id: string; name: string } | null;
+  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
+  source: "platform" | "gateway";
+  /** Gateway resource kind — only set when source="gateway". */
+  targetKind: string | null;
+  /** Gateway resource id — only set when source="gateway". */
+  targetId: string | null;
+  /** Gateway-side diff (before state). Only set when source="gateway". */
+  before: unknown;
+  /** Gateway-side diff (after state). Only set when source="gateway". */
+  after: unknown;
+};

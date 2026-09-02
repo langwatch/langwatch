@@ -18,7 +18,6 @@
     {"feature":"api-key","file":"platform/app/src/pages/settings/api-keys/apiKeyAnchor.ts","kind":"page-shell"},
     {"feature":"api-key","file":"platform/app/src/runtime/app/features/api-key.ts","kind":"composition"},
     {"feature":"api-key","file":"platform/app/src/server/api-key/auth-middleware.ts","kind":"legacy-implementation"},
-    {"feature":"audit-log","file":"platform/app/src/pages/settings/audit-log.tsx","kind":"page-shell"},
     {"feature":"audit-log","file":"platform/app/src/runtime/app/features/audit-log.ts","kind":"composition"},
     {"feature":"authz","file":"platform/app/src/runtime/app/features/authz.ts","kind":"composition"},
     {"feature":"authz","file":"platform/app/src/server/app-layer/authz/demo-project.ts","kind":"legacy-implementation"},

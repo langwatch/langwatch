@@ -1,3 +1,23 @@
+/**
+ * What an Enterprise license unlocks on a self-hosted deployment, licensed or
+ * not.
+ *
+ * Moved from `platform/app/src/components/settings/EnterpriseCapabilitiesSection.tsx`
+ * with its copy and its reasoning intact. Hiding a paid feature entirely makes
+ * it look missing rather than purchasable, and leaves an operator with no
+ * in-product route to the setup guide at all.
+ *
+ * Cloud renders nothing: there these are provisioned by LangWatch as part of
+ * the plan, so the section would be noise on a page about sign-in methods. The
+ * leading separator belongs to the section for that reason, so Cloud does not
+ * get a divider with nothing under it.
+ *
+ * IT ADDRESSES TWO ENTERPRISE PROCEDURES AND IMPORTS NO ENTERPRISE PACKAGE.
+ * `license.getSsoGateStatus` and `limits.getUsage` are strings in a procedure
+ * map; a core web package may not DEPEND on an enterprise one, and it never
+ * does — the gateway family's map addresses `routingPolicy` the same way.
+ */
+
 import {
   Badge,
   Box,
@@ -11,10 +31,8 @@ import {
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
-
-import { useActivePlan } from "~/hooks/useActivePlan";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { api } from "~/utils/api";
+import { api } from "../../behavior/personal-workspace-api";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
 
 const DOCS_BASE = "https://docs.langwatch.ai";
 
@@ -28,8 +46,8 @@ type Capability = {
 
 /**
  * The capabilities a license unlocks that an operator would otherwise never
- * see. Kept to the ones with a real setup guide behind them, so every row
- * leads somewhere useful rather than to a sales page.
+ * see. Kept to the ones with a real setup guide behind them, so every row leads
+ * somewhere useful rather than to a sales page.
  */
 const CAPABILITIES = [
   {
@@ -52,8 +70,7 @@ const CAPABILITIES = [
     key: "audit-logs",
     name: "Audit logs",
     icon: FileClock,
-    description:
-      "A record of who changed what, exportable to your SIEM for compliance reviews.",
+    description: "A record of who changed what, exportable to your SIEM for compliance reviews.",
     docsPath: "/ai-governance/audit-log",
   },
 ] as const satisfies readonly Capability[];
@@ -114,32 +131,18 @@ function CapabilityRow({
 }
 
 /**
- * Lists the capabilities an Enterprise license unlocks on a self-hosted
- * deployment, licensed or not. Hiding a paid feature entirely makes it look
- * missing rather than purchasable, and leaves an operator with no way to find
- * the setup guide.
- *
- * Cloud renders nothing: there these are provisioned by LangWatch as part of
- * the plan, so the section would be noise on a page about sign-in methods. The
- * leading separator belongs to the section for that reason, so Cloud does not
- * get a divider with nothing under it.
- */
-/**
  * The states an operator cannot diagnose from the page alone: an identity
  * provider is configured, everybody is signing in by email anyway, and the
  * reason is either a license the deployment does not hold or a provider that
- * never started. The gate logs both at startup, but nobody reads server logs
- * to explain a login screen, and email mode looks identical to a deployment
- * that never wanted single sign-on.
+ * never started. The gate logs both at startup, but nobody reads server logs to
+ * explain a login screen, and email mode looks identical to a deployment that
+ * never wanted single sign-on.
  *
  * Each cause is fixed somewhere else, so each gets its own remedy rather than
  * one message covering both.
  */
 function SsoConfiguredButNotInUseNotice() {
-  const ssoGate = api.license.getSsoGateStatus.useQuery(
-    {},
-    { refetchOnWindowFocus: false },
-  );
+  const ssoGate = api.license.getSsoGateStatus.useQuery({}, { refetchOnWindowFocus: false });
 
   const gate = ssoGate.data;
   if (!gate?.configuredProvider) return null;
@@ -174,14 +177,14 @@ function SsoConfiguredButNotInUseNotice() {
             This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
             {unlicensed ? (
               <>
-                so everyone is signing in by email until a license is activated. Activate
-                one and restart the server to switch single sign-on on.
+                so everyone is signing in by email until a license is activated. Activate one and
+                restart the server to switch single sign-on on.
               </>
             ) : (
               <>
-                but it could not be started, so everyone is signing in by email. Check
-                that the provider name is one LangWatch supports and that its client
-                credentials are set, then restart the server.
+                but it could not be started, so everyone is signing in by email. Check that the
+                provider name is one LangWatch supports and that its client credentials are set,
+                then restart the server.
               </>
             )}
           </Text>
@@ -192,11 +195,18 @@ function SsoConfiguredButNotInUseNotice() {
 }
 
 export function EnterpriseCapabilitiesSection() {
-  const publicEnv = usePublicEnv();
-  const { isEnterprise } = useActivePlan();
+  const host = usePersonalWorkspaceHost();
+  const organizationId = host.scope().organizationId ?? "";
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId },
+    {
+      enabled: !!organizationId && host.hasPermission("organization:view"),
+      retry: false,
+    },
+  );
+  const isEnterprise = usage.data?.activePlan.type === "ENTERPRISE";
 
-  const isSelfHosted = publicEnv.data?.IS_SAAS === false;
-  if (!isSelfHosted) return null;
+  if (host.deployment().isSaas) return null;
 
   return (
     <>
@@ -217,11 +227,7 @@ export function EnterpriseCapabilitiesSection() {
 
         <VStack align="start" gap={3} width="full">
           {CAPABILITIES.map((capability) => (
-            <CapabilityRow
-              key={capability.key}
-              capability={capability}
-              isLicensed={isEnterprise}
-            />
+            <CapabilityRow key={capability.key} capability={capability} isLicensed={isEnterprise} />
           ))}
         </VStack>
 

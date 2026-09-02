@@ -14,6 +14,9 @@
  */
 
 import type {
+  HeldPasskey,
+  LinkSignInMethodOutcome,
+  PasskeyOutcome,
   PersonalActor,
   PersonalDeployment,
   PersonalFailureNotice,
@@ -45,6 +48,19 @@ export type PersonalWorkspaceHostActions = {
   ) => void;
   navigate: (to: string) => void;
   refreshSession: () => Promise<void>;
+  /**
+   * The five better-auth ceremonies Settings > Authentication runs.
+   *
+   * Actions rather than readings, and named on the port rather than reached
+   * for: a passkey is registered in the browser, never over tRPC, and
+   * `better-auth` is one of the imports ADR-004 seals off from a screen. The
+   * wire is `apps/ui/src/behavior/ui-passkeys.ts`.
+   */
+  listPasskeys: () => Promise<readonly HeldPasskey[]>;
+  registerPasskey: () => Promise<PasskeyOutcome>;
+  renamePasskey: (input: { id: string; name: string }) => Promise<PasskeyOutcome>;
+  removePasskey: (input: { id: string }) => Promise<PasskeyOutcome>;
+  linkSignInMethod: (provider: string) => Promise<LinkSignInMethodOutcome>;
   succeeded: (notice: PersonalSuccessNotice) => void;
   failed: (failure: PersonalFailureNotice) => void;
 };
@@ -134,6 +150,26 @@ export class UiPersonalWorkspaceHost extends PersonalWorkspaceHostPort {
 
   refreshSession(): Promise<void> {
     return this.actions.refreshSession();
+  }
+
+  listPasskeys(): Promise<readonly HeldPasskey[]> {
+    return this.actions.listPasskeys();
+  }
+
+  registerPasskey(): Promise<PasskeyOutcome> {
+    return this.actions.registerPasskey();
+  }
+
+  renamePasskey(input: { id: string; name: string }): Promise<PasskeyOutcome> {
+    return this.actions.renamePasskey(input);
+  }
+
+  removePasskey(input: { id: string }): Promise<PasskeyOutcome> {
+    return this.actions.removePasskey(input);
+  }
+
+  linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
+    return this.actions.linkSignInMethod(provider);
   }
 
   succeeded(notice: PersonalSuccessNotice): void {

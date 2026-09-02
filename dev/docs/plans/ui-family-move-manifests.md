@@ -2232,6 +2232,247 @@ directions, and sabotaging one key with `organization:manage` turns it red.
 - **A LINT RULE THAT READS IDENTIFIERS WILL READ YOUR PORT'S FIELD NAMES.** Name a
   port after what it is FOR, not after the browser API behind it.
 
+### settings S7 identity — MOVED (2 of 3 keys). TWO packages, 11 platform files, 0 insertions, 2,639 deletions
+
+Moved fourteenth, and the first family whose keys DID NOT ALL MOVE. Two of the
+three went: `/settings/audit-log` to a new `@langwatch/organization-web`, and
+`/settings/authentication` into the existing `@langwatch/user-web`.
+`/settings/scim` is SPLIT-BLOCKED and is the only key of this family left in
+`platform/app`.
+
+#### THE OWNERSHIP RULE DECIDED ALL THREE, AND IT SPLIT THEM THREE WAYS
+
+The credentials family's rule read strictly — a key belongs to the family that
+owns its TRANSPORT, with the type rule as the exception — puts the three keys in
+three different places, which is why "settings S7 identity" was never one family:
+
+- **`audit-log` → `organization`.** `organization.getAuditLogs` and
+  `organization.getOrganizationWithMembersAndTheirTeams` are mounted from
+  `@langwatch/organization-server`, a CORE package. `EnrichedAuditLog` is the
+  organization contract's. The only thing on the page that is not this feature's
+  is the plan gate, which is one boolean off `limits.getUsage`. New package.
+- **`authentication` → `user`.** Every tRPC call on the page is `user.*` —
+  linked accounts, whether a password exists, and the two password writes.
+  `@langwatch/user-web`'s own description already claimed the subject ("their
+  credentials"). Folded in rather than given a package of its own, which would
+  have duplicated a host port that already declares who is signed in.
+- **`scim` → enterprise scim, which has no web package.** `scimToken.*` is
+  `@langwatch/enterprise-scim-server`'s and `ScimTokenSummary` — `{ id,
+  connectionId, description, createdAt, lastUsedAt }`, exactly the row the table
+  renders — is `@langwatch/enterprise-scim-contract`'s. Both rules agree, so the
+  key belongs in an enterprise web package that does not exist, and mounting one
+  means a SECOND enterprise dependency on `apps/ui`.
+
+**THE "STRUCTURAL BLOCK" IS A POLICY COST, NOT AN IMPOSSIBILITY, and the S3 row
+overstates it.** `apps/ui` ALREADY depends on `@langwatch/enterprise-governance-web`
+and carries the `enterprise-direction` finding for it; governance shipped with
+that finding recorded rather than blocked. So `packages/enterprise/composition/ui`
+is what would RETIRE the finding, not what makes the move possible. `scim` is
+recorded as blocked because this move did not have the standing to add a second
+such edge, not because the edge cannot exist. Whoever takes S3 billing should
+start from that correction.
+
+#### A NEW PACKAGE FOR ONE 662-LINE PAGE, AND WHY THAT IS RIGHT
+
+`@langwatch/organization-web` exists for one screen, and it is the secret-web
+call taken a second time: `organization` is the widest contract in the platform
+and the audit trail will not be its only surface — S1 (org / members / teams) is
+five more keys of the same transport, and its ranking row's blocker
+(`OrganizationUserRole` has no contract home) is a CONTRACT decision, not a
+package one. The package, its host port, its procedure map and its testing
+harness are all in place for it now.
+
+#### THE CONTRACT MOVE IS A REAL REPOINT, AND IT FOUND A DUPLICATE
+
+`EnrichedAuditLog` existed TWICE: exported from
+`platform/app/src/server/app-layer/organizations/repositories/organization.repository.ts`
+and restated privately inside `@langwatch/organization-server`'s
+`organization.app.ts`, field for field. The producer is packaged, so the ruling
+allows the real fix: the type is declared in `@langwatch/organization-contract`,
+`OrganizationApp.getAuditLogs` is annotated with it, and the package's private
+copy is deleted. The PLATFORM declaration stays — three other platform modules
+read it and deletes-only forbids repointing them — so the duplicate is halved
+rather than closed, and it closes when the organization app-layer moves.
+
+#### THE THIRD WIRE, AND THE SECOND KIND OF SPLIT
+
+The credentials family carved out `apps/ui/src/behavior` for a wire whose other
+side is a published binary. This family put two more things there, and only one
+of them is a wire:
+
+- **`ui-passkeys.ts` is a wire.** Four better-auth ceremonies plus
+  `/link-social`, and a screen may name neither `better-auth` nor `fetch`. What
+  the screen SAYS about an outcome is pinned in `@langwatch/user-web`; what an
+  outcome MEANS is pinned in `apps/ui/tests/ui-passkeys.unit.test.ts`. THE
+  READING THAT MATTERS is that better-auth reports a device prompt the person
+  DISMISSED as an error with STATUS ZERO. Reading that as a failure is telling
+  somebody off for a decision, and it is invisible from a render — sabotaging
+  `error.status === 0` to `false` turns exactly one wire test red and no screen
+  test at all.
+- **`ui-file-download.ts` is not a wire, it is a SAVE.** The audit trail's CSV
+  export is the one place in this family where a screen hands the reader a FILE,
+  and a screen may not mint an object URL, synthesise an anchor or click one. So
+  the same split applies to a different kind of browser ability: WHAT the file
+  contains is decided in `@langwatch/organization-web` and pinned there, HOW it
+  reaches the disk is `apps/ui`'s. All three ways to get the sequence wrong are
+  SILENT — a detached anchor's click does nothing, a URL revoked before the click
+  cancels the save it was racing, and one never revoked leaks a blob for the life
+  of a page whose whole purpose is repeated exports — which is exactly why it was
+  worth taking out of a 662-line page body.
+
+#### THE EXPORT IS THE PROPERTY THIS FAMILY ACTUALLY TURNS ON
+
+`/settings/audit-log?targetKind=virtual_key&targetId=vk_…` is a link the gateway
+detail pages write, and the Export CSV button walks the whole filtered history.
+An export that widened past the filters on screen would hand a compliance
+reviewer rows they did not ask for and did not know they had — a DISCLOSURE
+DRESSED UP AS A CONVENIENCE. The screen sends ONE filter object to both the table
+and the export, and `audit-log.screen.test.tsx` asserts it; blanking `targetKind`
+in that object turns it red.
+
+#### FOUR THINGS THE PLATFORM PAGE DID THAT ARE NOW BETTER, EACH NAMED
+
+- **A failed export told the CONSOLE.** `console.error` and a button that had
+  visibly done nothing. It is a `failed` notice now. A report that did not arrive
+  is exactly what a compliance reviewer has to be told about.
+- **The range control could not name four of its own eleven presets.** The
+  platform label matched calendar days BEFORE sub-day windows, and every window
+  shorter than a day spans one calendar day — so picking "Last 1 hour" relabelled
+  the trigger "Today". The order is reversed here.
+- **An Auth0 account id with no strategy in it rendered an EMPTY label.** The
+  platform code passed `"unknown"` as the default and then never reached it: an
+  empty string is not nullish, so `titleCase("")` won. A row in a list of
+  sign-in methods with no label at all.
+- **`ChangePasswordDialog`'s inputs were never asserted to be masked.** Three of
+  them, every one a credential. Sabotaging one to `type="text"` now turns the
+  suite red.
+
+#### THE AUTHORED MESSAGE, AND WHY IT COULD NOT JUST BE DROPPED
+
+`user.changePassword` throws ONE customer-authored sentence: a 401 saying WHICH
+password was wrong. `BrowserUiFeedback` resolves copy from an error CODE, and an
+authored non-5xx `TRPCError` carries none — so the move would have degraded it to
+"something went wrong on our side", telling the reader to wait for something that
+will never change. The narrowed reader
+(`@langwatch/user-web`'s `model/handled-error.ts`) travels with the family and the
+sentence rides `UiFailureNotice.description`, which the capability uses ONLY where
+there is no code, so it can never talk over registered copy. BOTH of the platform
+guard's layers travelled: the server's own `data.authored` flag, and the
+independent machine-prose refusal, because the cost of being wrong is a Prisma
+string in front of a customer.
+
+#### A FOURTH SIGHTING OF THE FEATURE-PARITY TRAP, AND A NEW SHAPE OF IT
+
+**A `@scenario` ON A LINE OF ITS OWN INSIDE A DOCBLOCK BINDS NOTHING.**
+`isFollowedByTestCall` scans forward from the end of the annotation and expects
+`it(` after whitespace and complete comments; a `*/` on the next line is neither,
+so the annotation is silently discarded. Only `/** @scenario … */` on ONE line
+above the test binds. **47 scenario titles across the repo are annotated ONLY in
+the multi-line form**, including one in `apps/ui/tests/ui-page-guard.unit.test.tsx`
+— an `@regression @rbac` scenario about a principal who manages the organization
+but cannot read governance, which has been reading as unbound since it was
+written. That one is restored here (additively, a second single-line annotation);
+the other 46 are recorded and untouched.
+
+The four specs this family touches, before and after:
+
+- `specs/audit-log/audit-log.feature`: **0 of 17 enforced → 20/20 bound.** Every
+  page-level scenario was `@unimplemented` and the file said why in a comment —
+  "no JSDOM render integration test exists for it yet". Two of the seventeen were
+  simply un-`@unimplemented`ed; EIGHTEEN more were written for behaviour that held
+  before the move and had never been stated: the
+  export's filter fidelity, its batch walk, the truncation marker, the file's
+  arrival, the plan gate, the empty state, the system-actor row, and the whole
+  address-carried filter and paging surface.
+- `specs/settings/change-password-auth0.feature`: 14/16 → **19/19 bound.** Four
+  scenarios written for the linked-methods list, which had none, plus the masking
+  pin and the page's absence of a guard. Two scenarios' PROSE was corrected: they
+  described a "Failed to change password" toast carrying the server's message,
+  which #5984 stopped being true.
+- `specs/identity/passkeys.feature`: **four settings scenarios un-`@unimplemented`ed
+  and three written.** The section shipped with no render test at all.
+- `specs/licensing/self-hosted-enterprise-discovery.feature`: 4/4, preserved.
+
+#### The page guards, and the pair of them
+
+`/settings/audit-log` carries `organization:manage` and `/settings/authentication`
+carries NOTHING, and asserting the two together in one file is the point: the
+audit trail names who did what from every address in the organization, and the
+sign-in methods page is the reader's own account. A page-level refusal on the
+second would leave a member with no way to change their own password.
+`organization-page-policy.integration.test.tsx` asserts both directions of the
+first and the absence of the second; swapping `manage` for `view` turns it red.
+
+#### Known costs, all reported rather than suppressed
+
+- **4 new architecture-lint findings (821 → 825), and THREE of them are one
+  import.** `ContactSalesBlock` from `@langwatch/enterprise-billing-web` costs a
+  `cross-feature`, an `enterprise-direction` and a `ui-screen-closure` on
+  `@langwatch/organization-web`. `@langwatch/authz-web` and
+  `@langwatch/gateway-web` each carry the SAME THREE for the SAME component, so
+  this is the third instance of a documented edge rather than a new class. The
+  fourth is `@langwatch/platform-api-client` in the procedure map, the line every
+  family carries. `+2` on the oxlint side (2,590 → 2,592), both the same import.
+- **`ui-screen-owner` REFUSES A SECOND SCREEN ENTRY PER FRONTEND FEATURE.** The
+  obvious shape — `@langwatch/user-web/screens/authentication` beside
+  `screens/personal-workspace` — is exactly what that rule exists to stop: an
+  entry's id must match the frontend feature composing it, so ONE feature mounts
+  ONE entry. The screen rides `personalWorkspaceScreens` instead, which is the
+  api-key family's shape (one entry, two screens at unrelated addresses) reached
+  by a different route. Worth knowing before the eighth family designs an export.
+- **`@langwatch/enterprise-licensing-server` and `@langwatch/enterprise-scim-server`
+  PROCEDURES ARE ADDRESSED AND NEITHER PACKAGE IS IMPORTED.** A procedure map
+  names STRINGS. `license.getSsoGateStatus` and `limits.getUsage` cost
+  `@langwatch/user-web` nothing, the same way `routingPolicy` costs
+  `@langwatch/gateway-web` nothing. The enterprise-direction rule is about
+  manifests; only a TYPE or a COMPONENT crosses it.
+- **`authClient.useListPasskeys()` WAS REACTIVE AND A PORT METHOD CANNOT BE.**
+  The plugin re-ran its own hook after each of its writes; the section re-reads
+  the list explicitly after every ceremony that changes it. Same thing on screen,
+  stated rather than implied.
+- **The project switcher is the same recorded chrome gap**, and this family loses
+  least by it: the audit trail's own Project filter already narrows the table to
+  any project in the organization.
+- **`PeriodSelector` and `NavigationFooter` are narrowed family-local copies.**
+  343 and 443 lines with twenty-odd and two callers respectively; what travelled
+  is presets-only (no absolute inputs, no "All time") and offset-only (no cursor
+  mode, no scroll id, no tRPC total-hits hook — the platform footer's own docblock
+  says the audit log never used them). `disambiguateLabels` was EXCLUSIVE and
+  moved with its suite; its docblock named three prospective callers and none
+  ever arrived.
+- **`Link` is the fifth copy of a dozen lines of policy** — user-web, gateway-web
+  and governance-web carry the same one. A web package may not import another web
+  package, so the alternative is a surface publishing twelve lines.
+- **ZERO new `platform/app` typecheck errors**: 18 in 13 files, the attributed
+  baseline, none of them this family's. Nothing outside the two families imported
+  any deleted file.
+- **Six sabotages, each caught red then restored**: the audit-log page guard
+  (`manage` → `view`), the export's target filter (blanked, so the report widens),
+  the object URL revoked before the click, the new-password input's
+  `type="password"`, `readPasskeyOutcome`'s zero-status branch, and the authored
+  message on a rejected password change.
+
+#### The fourteenth family's own additions, for whoever moves the fifteenth
+
+- **A FAMILY IS NOT A FAMILY BECAUSE THE SETTINGS MENU GROUPS IT.** Three keys
+  sat under one heading and belonged to three different features. Survey the
+  TRANSPORT of every key in a ranking row before believing the row's count; this
+  one moved two, blocked one, and created a package the row did not name.
+- **CHECK WHETHER A "STRUCTURAL BLOCK" IS STRUCTURAL.** The S3 row says `apps/ui`
+  may not import enterprise web. It already does, and has since governance. The
+  finding is a recorded cost, and the composition package RETIRES it rather than
+  enabling anything.
+- **A HOST PORT CAN CARRY A SAVE AS WELL AS A WIRE.** `download` is the first
+  port method that hands the reader a file. The split is the credentials
+  family's, applied to a browser ability rather than to an HTTP call, and it is
+  what made three silent ordering bugs assertable.
+- **AN ENTERPRISE PROCEDURE PATH IS FREE; AN ENTERPRISE TYPE IS NOT.** Before
+  concluding a key is enterprise-blocked, separate the two. Two of this family's
+  keys address enterprise procedures and neither pays for it.
+- **CHECK THE FORM OF EVERY `@scenario` YOU WRITE.** The multi-line docblock form
+  reads correctly, formats correctly, and binds nothing. Run
+  `pnpm check:feature-parity` after writing the tests, not after writing the spec.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -2249,7 +2490,7 @@ closures are computed net of that.
 | 3   | datasets                                                                                                                  | 2    | 6+6    | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 4   | settings S4 model config                                                                                                  | 2    | 7+6    | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect.                                                                                                                                                                                                                                                                        |
 | 5   | prompts                                                                                                                   | 1    | 44+14  | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39.                                                                                                                                                                                                                                                                                                                                  |
-| 6   | settings S7 identity                                                                                                      | 3    | 8+3    | needs a web package decision; EnrichedAuditLog contract type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 6   | settings S7 identity                                                                                                      | 3    | 8+3    | **MOVED (2 of 3 keys), SPLIT-BLOCKED** — see the section above. The row's "a web package decision" was three decisions, not one: `audit-log` went to a NEW `@langwatch/organization-web` (core transport, core contract), `authentication` folded into `@langwatch/user-web` (every call on it is `user.*`), and `scim` is blocked because both the transport and the row type are `@langwatch/enterprise-scim-contract`'s. The `EnrichedAuditLog` move was a real repoint and found the type declared TWICE. What the row missed is that the export is the property the audit page turns on, that the CSV save needed a host port of a kind no family had asked for, and that the multi-line `@scenario` form binds nothing. |
 | 7   | settings S2 RBAC                                                                                                          | 2    | 8+4    | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract.                                                                                                                                                                                          |
 | 8   | annotations                                                                                                               | 5    | 12+7   | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound.                                                                                                                                                                                               |
 | 9   | settings S6 credentials + /cli/auth                                                                                       | 3    | 14+12  | **MOVED** — see the section above. Three keys and TWO packages: `secrets` went to a new `@langwatch/secret-web` rather than riding in `api-key-web`, because every type on that page is the secret contract's. The row was right that the CLI screen could not ship separately. What it missed is that `/cli/auth` talks to three REST routes the published CLI polls the other side of, so the exchange moved into `apps/ui/src/behavior` and is pinned there byte for byte; that the secrets spec was 0/0 bound and its four refusal codes had no customer copy at all; and that the rbac fix, harmless on the roles page, adds three explicit `langy` strings to an admin's CLI key. |

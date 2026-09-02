@@ -1,3 +1,25 @@
+/**
+ * Creating, seeing and removing passkeys, in the one place somebody goes
+ * looking for them (Passkey Central: "Create, view and manage passkeys in
+ * account settings").
+ *
+ * Moved from `platform/app/src/components/me/PasskeysSection.tsx`. Every word
+ * of copy, both headings and the empty-state hero travel unchanged; what
+ * changed is where the ceremonies live. `authClient.passkey.*` is `better-auth`
+ * in a screen's closure, which ADR-004 seals off, so the four calls are host
+ * methods and the wire is `apps/ui/src/behavior/ui-passkeys.ts`.
+ *
+ * ONE BEHAVIOURAL DIFFERENCE, NAMED. `authClient.useListPasskeys()` was a
+ * reactive hook the plugin re-ran after each of its own writes; a port method
+ * cannot be, so the list is re-read here after every ceremony that changes it.
+ * The reader sees the same thing; the refresh is explicit rather than implied.
+ *
+ * It sits ABOVE the password section on purpose. The order of a settings page
+ * is an argument about what an account should be secured with, and putting the
+ * thing we would rather people used underneath the thing we would rather they
+ * stopped using makes the opposite one.
+ */
+
 import {
   Box,
   Button,
@@ -10,64 +32,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Fingerprint, MoreVertical, Usb } from "lucide-react";
-import { useEffect, useState } from "react";
-
-import { Dialog } from "~/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "~/components/ui/toaster";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { authClient } from "~/utils/auth-client";
+import { Fingerprint, MoreVertical, Usb } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { isSecurityKey, passkeyLabel } from "../../model/sign-in-methods";
+import {
+  usePersonalWorkspaceHost,
+  type HeldPasskey,
+  type PasskeyOutcome,
+} from "../../model/personal-workspace-host";
 
-/** What the plugin stores per credential, of the parts this screen reads. */
-interface HeldPasskey {
-  id: string;
-  name?: string | null;
-  createdAt: string | Date;
-  transports?: string | null;
-}
-
-/**
- * Whether this one lives on a key somebody carries rather than on a device
- * they own.
- *
- * Read off TRANSPORTS rather than `deviceType`, which is the tempting field
- * and the wrong one: `deviceType` says whether the credential syncs, and a
- * platform authenticator that does not sync is still on the person's laptop,
- * not on a key in their pocket. `usb`, `nfc` and `ble` are how a roaming
- * authenticator is reached, and nothing else is reached that way.
- *
- * It stays a heuristic — transports are a hint the authenticator supplies —
- * so it decides only which HEADING a card sits under, never anything that
- * would matter if it were wrong.
- */
-function isSecurityKey(passkey: HeldPasskey): boolean {
-  const transports = passkey.transports ?? "";
-  return ["usb", "nfc", "ble"].some((transport) =>
-    transports.includes(transport),
-  );
-}
-
-/**
- * What to call one in a list of them.
- *
- * A passkey registered from the sign-up screen is labelled with the address it
- * was created for; one added from settings carries whatever the browser chose,
- * which is often nothing. "Passkey" is the honest fallback — better than an
- * id, and it is exactly why renaming exists.
- */
-function passkeyLabel(passkey: HeldPasskey): string {
-  return passkey.name?.trim() || "Passkey";
-}
-
-/**
- * Giving a passkey a name somebody will recognise later.
- *
- * The guidance is blunt about why this matters: a person with three passkeys
- * and no names cannot tell which is the work laptop and which is the phone
- * they no longer own, so they remove none of them. A name is what makes the
- * list actionable, and it is the one thing the ceremony cannot supply.
- */
 function RenamePasskeyDialog({
   passkey,
   onClose,
@@ -80,9 +55,9 @@ function RenamePasskeyDialog({
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Seeded from the passkey being renamed rather than held in sync with it:
-  // the dialog opens once per passkey, and re-seeding on every render would
-  // fight whatever is being typed.
+  // Seeded from the passkey being renamed rather than held in sync with it: the
+  // dialog opens once per passkey, and re-seeding on every render would fight
+  // whatever is being typed.
   useEffect(() => {
     if (passkey) setName(passkey.name ?? "");
   }, [passkey]);
@@ -188,8 +163,8 @@ function RemovePasskeyDialog({
         </Dialog.Header>
         <Dialog.Body>
           <Text fontSize="sm" color="fg.muted">
-            You will not be able to sign in with it again. The passkey stays on
-            your device until you delete it there too.
+            You will not be able to sign in with it again. The passkey stays on your device until
+            you delete it there too.
           </Text>
         </Dialog.Body>
         <Dialog.Footer>
@@ -214,8 +189,8 @@ function RemovePasskeyDialog({
 
 /**
  * One group of cards under a heading it earns. Renders nothing when empty:
- * "Passkeys on security keys (0)" is a heading about an absence, and the
- * page is not a report.
+ * "Passkeys on security keys (0)" is a heading about an absence, and the page
+ * is not a report.
  */
 function PasskeyGroup({
   heading,
@@ -224,7 +199,7 @@ function PasskeyGroup({
   onRemove,
 }: {
   heading: string;
-  passkeys: HeldPasskey[];
+  passkeys: readonly HeldPasskey[];
   onRename: (passkey: HeldPasskey) => void;
   onRemove: (passkey: HeldPasskey) => void;
 }) {
@@ -232,8 +207,8 @@ function PasskeyGroup({
 
   return (
     <VStack width="full" align="stretch" gap={2}>
-      {/* Named for where the thing IS, not for what the specification calls
-          it: nobody has ever wanted a "device-bound credential". */}
+      {/* Named for where the thing IS, not for what the specification calls it:
+          nobody has ever wanted a "device-bound credential". */}
       <Text fontSize="xs" color="fg.muted" fontWeight={600}>
         {heading}
       </Text>
@@ -242,11 +217,7 @@ function PasskeyGroup({
           <Card.Body paddingY={3}>
             <HStack>
               <Box color="fg.muted" display="flex">
-                {isSecurityKey(passkey) ? (
-                  <Usb size={16} />
-                ) : (
-                  <Fingerprint size={16} />
-                )}
+                {isSecurityKey(passkey) ? <Usb size={16} /> : <Fingerprint size={16} />}
               </Box>
               <VStack align="start" gap={0}>
                 <Text fontSize="sm" fontWeight={500}>
@@ -257,10 +228,9 @@ function PasskeyGroup({
                 </Text>
               </VStack>
               <Spacer />
-              {/* One trigger per row, per row-actions-overflow-menu.md: two
-                  icon buttons in a row is the pattern that doc exists to
-                  stop, and it puts a destructive action one stray click from
-                  a credential. */}
+              {/* One trigger per row, per row-actions-overflow-menu.md: two icon
+                  buttons in a row is the pattern that doc exists to stop, and it
+                  puts a destructive action one stray click from a credential. */}
               <Menu.Root>
                 <Menu.Trigger asChild>
                   <Button
@@ -275,11 +245,7 @@ function PasskeyGroup({
                   <Menu.Item value="rename" onClick={() => onRename(passkey)}>
                     Rename
                   </Menu.Item>
-                  <Menu.Item
-                    value="remove"
-                    color="red.500"
-                    onClick={() => onRemove(passkey)}
-                  >
+                  <Menu.Item value="remove" color="red.500" onClick={() => onRemove(passkey)}>
                     Remove
                   </Menu.Item>
                 </Menu.Content>
@@ -292,61 +258,64 @@ function PasskeyGroup({
   );
 }
 
-/**
- * Creating, seeing and removing passkeys, in the one place somebody goes
- * looking for them (Passkey Central, "Create, view and manage passkeys in
- * account settings").
- *
- * It sits ABOVE the password section on purpose. The order of a settings page
- * is an argument about what the account should be secured with, and putting
- * the thing we would rather people used underneath the thing we would rather
- * they stopped using makes the opposite one.
- *
- * With nothing enrolled it is a hero rather than an empty list: an empty list
- * says "you have none of these" to somebody who does not know what they are,
- * and the whole difficulty with passkeys is that most people have never
- * knowingly made one. So the empty state explains, in the guide's own words,
- * what a passkey is and where it lives — in terms of the fingerprint or face
- * somebody already uses — and offers to make one.
- */
 export function PasskeysSection() {
-  const publicEnv = usePublicEnv();
-  const passkeys = authClient.useListPasskeys();
+  const host = usePersonalWorkspaceHost();
+  const passkeysEnabled = host.deployment().passkeysEnabled;
+
+  const [held, setHeld] = useState<readonly HeldPasskey[]>([]);
+  const [isPending, setIsPending] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  // Which passkey a dialog is open for, or null. Held as the row rather than
-  // an id so the dialogs can name it — "Remove?" over a list of three
+  // Which passkey a dialog is open for, or null. Held as the row rather than an
+  // id so the dialogs can name it — "Remove?" over a list of three
   // identical-looking cards is not a question anybody can answer.
   const [renaming, setRenaming] = useState<HeldPasskey | null>(null);
   const [removing, setRemoving] = useState<HeldPasskey | null>(null);
 
+  const reload = useCallback(async () => {
+    setIsPending(true);
+    try {
+      setHeld(await host.listPasskeys());
+    } finally {
+      setIsPending(false);
+    }
+  }, [host]);
+
+  useEffect(() => {
+    if (!passkeysEnabled) return;
+    void reload();
+  }, [passkeysEnabled, reload]);
+
+  /**
+   * Says what happened, and says nothing at all about a decision.
+   *
+   * A cancelled prompt is somebody opening the operating system's dialog,
+   * looking at it and closing it. Reporting that as a failure is telling them
+   * off for deciding, which is why `cancelled` exists on the outcome at all.
+   */
+  const report = async (
+    outcome: PasskeyOutcome,
+    { done, failed, description }: { done: string; failed: string; description: string },
+  ) => {
+    if (outcome.ok) {
+      host.succeeded({ title: done });
+      await reload();
+      return;
+    }
+    if (outcome.cancelled) return;
+    host.failed({ error: new Error(failed), fallbackTitle: failed, description });
+  };
+
   // A deployment that never mounted the plugin has no endpoint behind any of
   // this. Rendering the hero there would be an offer we cannot honour.
-  if (publicEnv.data?.PASSKEYS_ENABLED !== true) return null;
-
-  const held = passkeys.data ?? [];
+  if (!passkeysEnabled) return null;
 
   const create = async () => {
     setIsCreating(true);
     try {
-      const result = await authClient.passkey.addPasskey({});
-      // A cancelled prompt is not a failure. Somebody opened the OS dialog,
-      // looked at it and closed it; saying "something went wrong" about a
-      // decision would be telling them off for deciding.
-      if (result?.error) {
-        if (result.error.status !== 0) {
-          toaster.error({
-            title: "That passkey wasn't created",
-            description:
-              "The attempt didn't finish. Try again, or use another way to sign in.",
-          });
-        }
-        return;
-      }
-      toaster.success({ title: "Passkey created" });
-    } catch {
-      toaster.error({
-        title: "That passkey wasn't created",
-        description: "This device could not complete the attempt.",
+      await report(await host.registerPasskey(), {
+        done: "Passkey created",
+        failed: "That passkey wasn't created",
+        description: "The attempt didn't finish. Try again, or use another way to sign in.",
       });
     } finally {
       setIsCreating(false);
@@ -354,41 +323,19 @@ export function PasskeysSection() {
   };
 
   const remove = async (id: string) => {
-    try {
-      const result = await authClient.passkey.deletePasskey({ id });
-      if (result?.error) {
-        toaster.error({
-          title: "That passkey wasn't removed",
-          description: "Try again in a moment.",
-        });
-        return;
-      }
-      toaster.success({ title: "Passkey removed" });
-    } catch {
-      toaster.error({
-        title: "That passkey wasn't removed",
-        description: "Try again in a moment.",
-      });
-    }
+    await report(await host.removePasskey({ id }), {
+      done: "Passkey removed",
+      failed: "That passkey wasn't removed",
+      description: "Try again in a moment.",
+    });
   };
 
   const rename = async ({ id, name }: { id: string; name: string }) => {
-    try {
-      const result = await authClient.passkey.updatePasskey({ id, name });
-      if (result?.error) {
-        toaster.error({
-          title: "That passkey wasn't renamed",
-          description: "Try again in a moment.",
-        });
-        return;
-      }
-      toaster.success({ title: "Passkey renamed" });
-    } catch {
-      toaster.error({
-        title: "That passkey wasn't renamed",
-        description: "Try again in a moment.",
-      });
-    }
+    await report(await host.renamePasskey({ id, name }), {
+      done: "Passkey renamed",
+      failed: "That passkey wasn't renamed",
+      description: "Try again in a moment.",
+    });
   };
 
   return (
@@ -399,25 +346,25 @@ export function PasskeysSection() {
           <Text fontWeight={600}>Passkeys</Text>
         </HStack>
         <Text color="fg.muted" fontSize="sm">
-          Passkeys can be created and saved on your devices, like your phone or
-          laptop, or on security keys. With passkeys on your devices, you don't
-          need to remember complex passwords.
+          Passkeys can be created and saved on your devices, like your phone or laptop, or on
+          security keys. With passkeys on your devices, you don&apos;t need to remember complex
+          passwords.
         </Text>
       </VStack>
 
-      {passkeys.isPending ? <Spinner size="sm" /> : null}
+      {isPending ? <Spinner size="sm" /> : null}
 
-      {!passkeys.isPending && held.length === 0 ? (
+      {!isPending && held.length === 0 ? (
         <Card.Root width="full" data-testid="passkeys-empty">
           <Card.Body>
             <VStack align="start" gap={3}>
-              {/* Said in terms of what somebody already does with their
-                  device, because "public key credential" is not a thing
-                  anybody has ever wanted. */}
+              {/* Said in terms of what somebody already does with their device,
+                  because "public key credential" is not a thing anybody has ever
+                  wanted. */}
               <Text fontSize="sm">
-                Passkeys are encrypted digital keys you create using your
-                fingerprint, face, or screen lock. They are saved in your
-                credential manager, so you can sign in on other devices.
+                Passkeys are encrypted digital keys you create using your fingerprint, face, or
+                screen lock. They are saved in your credential manager, so you can sign in on other
+                devices.
               </Text>
               <Button
                 colorPalette="orange"
@@ -460,16 +407,8 @@ export function PasskeysSection() {
         </VStack>
       ) : null}
 
-      <RenamePasskeyDialog
-        passkey={renaming}
-        onClose={() => setRenaming(null)}
-        onRename={rename}
-      />
-      <RemovePasskeyDialog
-        passkey={removing}
-        onClose={() => setRemoving(null)}
-        onRemove={remove}
-      />
+      <RenamePasskeyDialog passkey={renaming} onClose={() => setRenaming(null)} onRename={rename} />
+      <RemovePasskeyDialog passkey={removing} onClose={() => setRemoving(null)} onRemove={remove} />
     </VStack>
   );
 }

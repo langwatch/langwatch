@@ -75,15 +75,12 @@ Feature: Unified Audit Log
   # Read path — /settings/audit-log shows merged stream
   # ──────────────────────────────────────────────────────────────────────────
   #
-  # The page-level rendering scenarios below describe the
-  # `/settings/audit-log` page (Source badge colours, Target column
-  # render, deep-link chips, em-dash for platform rows). The page is
-  # implemented in `src/pages/settings/audit-log.tsx` but no JSDOM
-  # render integration test exists for it yet — the underlying
-  # `getAuditLogs` query path is bound in the integration test
-  # above.
+  # The page is `@langwatch/organization-web`'s `audit-log.screen.tsx`, and
+  # since the settings S7 move it has a render suite: the scenarios below
+  # without `@unimplemented` are bound there. The ones that keep the tag need a
+  # seeded multi-row history the screen suite does not build.
 
-  @integration @unimplemented
+  @integration
   Scenario: Settings audit page lists gateway and platform events together
     Given organization "acme" has these audit rows in order:
       | created_at  | action                       | targetKind   | source   |
@@ -103,7 +100,7 @@ Feature: Unified Audit Log
     Then only rows with targetKind = "virtual_key" are returned
     And no platform rows appear (platform rows have null targetKind)
 
-  @integration @unimplemented
+  @integration
   Scenario: Deep-link from VK detail page lands pre-filtered
     Given Virtual Key "prod-key" has 4 audit entries (created/updated/rotated/revoked)
     When alice opens the VK detail page and clicks "Audit history"
@@ -127,6 +124,127 @@ Feature: Unified Audit Log
     When alice opens the VK detail page
     Then Edit / Rotate / Revoke buttons are hidden
     But the "Audit history" button is still visible and links to `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>`
+
+  @integration
+  Scenario: A deep-linked reader is offered the way back to the resource
+    Given alice opened `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>`
+    Then a link back to that virtual key appears above the heading
+    But a target kind with no detail route of its own offers no link at all,
+      because a link that 404s reads as the resource having been deleted
+
+  @integration
+  Scenario: A row written by a system actor says so rather than naming nobody
+    Given a row whose userId is null, written by a background job
+    Then the User column reads "User not found" rather than rendering empty
+
+  @integration
+  Scenario: An empty audit history says so
+    Given the organization has no audit rows in the selected window
+    Then the page says no audit logs were found, rather than showing a headerless table
+
+  @integration
+  Scenario: A deployment below the plan is told what the audit trail would show
+    Given the organization is not on an Enterprise plan
+    When alice opens `/settings/audit-log`
+    Then she is told what organisation-wide audit logs cover and how to obtain them
+    And no table is rendered at all
+
+  @integration
+  Scenario: Only an organization administrator may open the audit trail
+    Given bob holds "organization:view" and not "organization:manage"
+    When he opens `/settings/audit-log`
+    Then he is refused, and told which grant the page needs
+    And the refusal is framed in the settings chrome he navigated into
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Filtering and paging — all of it in the address, because a compliance
+  # reviewer's workflow is sending somebody else the view they are looking at
+  # ──────────────────────────────────────────────────────────────────────────
+
+  @unit
+  Scenario: The audit table opens on the last thirty days
+    Given the address carries no window
+    Then the table reads the last thirty days
+    And an unrecognised `?period=` falls back to the same window rather than
+      asking for one nobody defined
+
+  @unit
+  Scenario: A picked range is carried in the address
+    When alice picks a range from the date control
+    Then the address names it and returns the table to its first page
+    And any absolute start/end pair already in the address is dropped, because
+      the reading prefers the pair and the picker would look like it did nothing
+
+  @unit
+  Scenario: The range control names the window it is applying
+    Given the window matches one of the offered ranges
+    Then the control names that range rather than two dates
+
+  @unit
+  Scenario: The audit table pages by offsets carried in the address
+    Given the address carries no paging
+    Then the table shows the first page of twenty-five
+    And a hand-edited negative offset lands on the first page rather than failing
+
+  @unit
+  Scenario: Changing a filter returns the table to its first page
+    When alice changes any filter, or the page size
+    Then the offset returns to zero, because page four of the old filter is not
+      page four of the new one
+
+  @integration
+  Scenario: The user search resolves a typed name or address to one actor
+    Given alice types part of a member's name or email address
+    Then the read is filtered by that member's user id, not by the typed string
+    And a search matching nobody applies no user filter rather than filtering to nobody
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Export — a report taken over anything wider than the view on screen is a
+  # disclosure dressed up as a convenience
+  # ──────────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: An export is taken over exactly the filters on screen
+    Given alice is looking at a view pre-filtered by a deep-link
+    When she exports it
+    Then the export asks for the same filters the table is reading with
+
+  @unit
+  Scenario: An export walks the whole filtered history, not just the first batch
+    Given the filtered history is longer than one batch
+    When alice exports it
+    Then every batch after the first is asked for
+    And a history of exactly one batch asks for no second, empty one
+
+  @integration
+  Scenario: An exported report carries the same columns the table shows
+    Then the report carries Source, Target and the before/after diffs alongside
+      the actor, the action and the project
+    And the file is named for the day it was taken
+
+  @unit
+  Scenario: An exported report names a system-written row without inventing an actor
+    Given a row with no user
+    Then the actor columns are empty rather than filled with a placeholder
+    And a row whose project could not be resolved falls back to the project id
+
+  @unit
+  Scenario: An exported report caps its JSON columns and says when it did
+    Given a diff longer than the per-cell cap
+    Then the cell is clipped and carries an explicit truncation marker
+    And a clipped cell is therefore distinguishable from an empty one
+
+  @integration
+  Scenario: An exported report reaches the reader as a named file
+    When the report is ready
+    Then the browser saves it under the name the page chose
+    And the object URL it was built from is released afterwards, never before
+
+  @integration
+  Scenario: An export that fails tells the reader rather than the console
+    Given the export request fails
+    Then alice is told the audit log could not be exported
+    And no file is handed over
 
   # ──────────────────────────────────────────────────────────────────────────
   # Sunset of /[project]/gateway/audit

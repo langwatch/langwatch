@@ -257,6 +257,15 @@ export type PersonalOrganizationGraph = {
    * rather than one row.
    */
   members: Array<{ userId: string; role: string }>;
+  /**
+   * The single sign-on provider the organization is pinned to, if any.
+   *
+   * A staff-set string column, not a licence fact. Sign-in methods reads it for
+   * one decision: an organization on enterprise single sign-on may not link
+   * additional methods, because a second way in would route around the
+   * provider the organization chose.
+   */
+  ssoProvider?: string | null;
   teams: Array<{
     id: string;
     name: string;
@@ -315,6 +324,123 @@ export type PersonalWorkspaceApiMap = {
     };
     setLastHomePath: {
       mutation: { input: { path: string | null }; output: { ok: boolean } };
+    };
+
+    // -- the reader's own sign-in methods ------------------------------------
+    //
+    // Settings > Authentication, and every one of them is keyed on the
+    // session's own user id rather than on a scope: `policy(OWN_ACCOUNT)` on
+    // the transport, no organization named in any input. That is why the
+    // page has never carried a permission guard.
+    //
+    // NOTHING BELOW CARRIES CREDENTIAL MATERIAL BACK. `getLinkedAccounts`
+    // answers the PROVIDER and its account id, never a token; `hasPassword`
+    // answers a boolean and never the hash; and the two password writes carry
+    // a plaintext OUT and answer nothing at all. `sign-in-methods.unit.test.ts`
+    // asserts that rather than assuming it.
+
+    /**
+     * Which sign-in methods this account holds.
+     *
+     * `providerAccountId` is the identifier at the provider — under Auth0 it is
+     * the `strategy|id` string the display name is derived from — and is not a
+     * secret. There is no token on this shape and there never has been.
+     */
+    getLinkedAccounts: {
+      query: {
+        input: Record<string, never>;
+        output: Array<{ id: string; provider: string; providerAccountId: string }>;
+      };
+    };
+
+    /**
+     * Removes one sign-in method.
+     *
+     * Refuses the LAST one: the count and the delete run in one serializable
+     * transaction on the server, so two concurrent unlinks cannot both observe
+     * two accounts and leave the reader with no way in.
+     */
+    unlinkAccount: {
+      mutation: { input: { accountId: string }; output: PersonalAcknowledgement };
+    };
+
+    /**
+     * Whether this account has a password at all.
+     *
+     * The boolean, never the hash. Which of two offers the section makes turns
+     * on it, and the section assumes `true` until it arrives — flickering
+     * "Set a password" in front of somebody who has one reads as their password
+     * having been lost.
+     */
+    hasPassword: {
+      query: { input: Record<string, never>; output: { hasPassword: boolean } };
+    };
+
+    /** Replaces an existing password. The plaintext goes out; nothing comes back. */
+    changePassword: {
+      mutation: {
+        input: { currentPassword: string; newPassword: string };
+        output: PersonalAcknowledgement;
+      };
+    };
+
+    /** Sets a FIRST password, for an account that has none. One-way, the same. */
+    setPassword: {
+      mutation: { input: { password: string }; output: PersonalAcknowledgement };
+    };
+  };
+
+  /**
+   * Which sign-in mode this deployment is in.
+   *
+   * A ROOT-LEVEL procedure rather than a namespaced one, which is what the
+   * shape below says: `publicEnv` is mounted at the root of the router, and the
+   * cache key is that one segment. ADR-027 makes it the single source of truth
+   * for the mode — a deployment whose licence gate denies single sign-on is
+   * told to render the email form, and reading the environment variable
+   * directly would disagree with it.
+   */
+  publicEnv: {
+    query: {
+      input: Record<string, never>;
+      output: { NEXTAUTH_PROVIDER?: string; SHOW_OPS_IN_MAIN_SIDEBAR: boolean };
+    };
+  };
+
+  /**
+   * Why a deployment configured for single sign-on is not using it.
+   *
+   * AN ENTERPRISE PROCEDURE PATH, AND ONLY A PATH. `license.*` is mounted from
+   * `@langwatch/enterprise-licensing-server`, and a core package may not depend
+   * on an enterprise one — but a procedure map names STRINGS, so addressing it
+   * costs no dependency and raises no `enterprise-direction` finding. The
+   * gateway family's map does the same for `routingPolicy`.
+   *
+   * `configuredProvider: null` means the deployment is in email mode, which is
+   * not a fault and renders nothing.
+   */
+  license: {
+    getSsoGateStatus: {
+      query: {
+        input: Record<string, never>;
+        output: { configuredProvider: string | null; licensed: boolean; mounted: boolean };
+      };
+    };
+  };
+
+  /**
+   * Which plan the organization is on.
+   *
+   * Read for one boolean — whether a license unlocks the capabilities the
+   * self-hosted discovery section lists — so only `activePlan.type` is named.
+   * The rest of the usage payload belongs to the billing surfaces.
+   */
+  limits: {
+    getUsage: {
+      query: {
+        input: { organizationId: string };
+        output: { activePlan: { type: string } };
+      };
     };
   };
 

@@ -61,6 +61,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.1",
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
@@ -78,6 +79,7 @@
     "@langwatch/gateway-web": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
+    "@langwatch/organization-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/react-rum": "workspace:*",

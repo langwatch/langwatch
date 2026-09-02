@@ -13,6 +13,7 @@
     "@langwatch/gateway-web",
     "@langwatch/model-provider-web",
     "@langwatch/ops-web",
+    "@langwatch/organization-web",
     "@langwatch/prompt-web",
     "@langwatch/secret-web",
     "@langwatch/user-web"
@@ -136,6 +137,16 @@
       "uses": {
         "screens": [
           "@langwatch/ops-web/screens/ops"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "organization",
+      "root": "organization",
+      "uses": {
+        "screens": [
+          "@langwatch/organization-web/screens/organization"
         ],
         "surfaces": []
       }

@@ -203,6 +203,7 @@ describe("given a page behind a flag and a permission", () => {
      *
      * @scenario "A principal who manages the organization but cannot read governance is refused"
      */
+    /** @scenario "A principal who manages the organization but cannot read governance is refused" */
     it("refuses a principal who manages the organization but cannot read governance", () => {
       renderGuarded(
         new AnsweringSession({
