@@ -25,9 +25,11 @@ import { automationsApiBinding, automationsPageLoaders } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
 import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
 import { datasetApiBinding, datasetPageLoaders } from "./dataset";
+import { evaluatorApiBinding, evaluatorPageLoaders } from "./evaluator";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
+import { monitorApiBinding, monitorPageLoaders } from "./monitor";
 import { opsApiBinding, opsPageLoaders } from "./ops";
 import { organizationApiBinding, organizationPageLoaders } from "./organization";
 import { promptApiBinding, promptPageLoaders } from "./prompt";
@@ -45,9 +47,11 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...dataPrivacyPageLoaders,
     ...dataRetentionPageLoaders,
     ...datasetPageLoaders,
+    ...evaluatorPageLoaders,
     ...gatewayPageLoaders,
     ...governancePageLoaders,
     ...modelProviderPageLoaders,
+    ...monitorPageLoaders,
     ...opsPageLoaders,
     ...organizationPageLoaders,
     ...promptPageLoaders,
@@ -64,9 +68,11 @@ export const installedUiFeatures: UiFeatureInstall = {
     dataPrivacyApiBinding,
     dataRetentionApiBinding,
     datasetApiBinding,
+    evaluatorApiBinding,
     gatewayApiBinding,
     governanceApiBinding,
     modelProviderApiBinding,
+    monitorApiBinding,
     opsApiBinding,
     organizationApiBinding,
     promptApiBinding,

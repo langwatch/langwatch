@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./screens/evaluators": {
+      "types": "./src/screens/evaluators/index.ts",
+      "default": "./src/screens/evaluators/index.ts"
     }
   },
   "scripts": {
@@ -26,7 +30,9 @@
     "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "^1.22.0",
     "react-feather": "^2.0.10",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "@langwatch/platform-api-client": "workspace:*",
+    "date-fns": "^4.4.0"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",

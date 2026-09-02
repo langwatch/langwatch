@@ -128,7 +128,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /:project/online-evaluations -> pages/[project]/online-evaluations",
   "  redirect /:project/evaluations/new -> /:project/online-evaluations (from /:project/evaluations/new) [pin drawer.open=evaluatorCategorySelector]",
   "  redirect /:project/evaluations/new/choose -> /:project/online-evaluations (from /:project/evaluations/new/choose) [pin drawer.open=evaluatorCategorySelector]",
-  "  route /:project/evaluations/wizard -> pages/[project]/evaluations/wizard",
+  "  redirect /:project/evaluations/wizard -> /:project/experiments/workbench (from /:project/evaluations/wizard)",
   "  route /:project/evaluations/wizard/:slug -> pages/[project]/evaluations/wizard/[slug]",
   "  route /:project/evaluations/:id/edit -> pages/[project]/evaluations/[id]/edit",
   "  route /:project/evaluations/:id/edit/choose -> pages/[project]/evaluations/[id]/edit/choose",

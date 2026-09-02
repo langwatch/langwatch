@@ -2733,6 +2733,351 @@ step in `langwatch-app-ci.yml` beside the application's browser lane.
   thousand, that reads as noise. When a suite moves, check its test COUNT
   survived, not just that the run is green.
 
+### evaluations/evaluators — MOVED (3 of 7 keys). TWO packages, 12 platform files, 0 insertions, 1,598 deletions
+
+Moved sixteenth, and the second family whose keys did not all move. Three of
+seven went: `/:project/evaluators` to `@langwatch/evaluator-web`,
+`/:project/online-evaluations` to a NEW `@langwatch/monitor-web`, and
+`/:project/evaluations/wizard` to a route-table redirect with no loader at all.
+The other four stay in `platform/app`, each for a reason argued with a number
+below.
+
+#### THE OWNERSHIP RULE SPLIT SEVEN KEYS FOUR WAYS, AND "EVALUATIONS" WAS NEVER ONE FAMILY
+
+The credentials family's rule read strictly — a key belongs to the family that
+owns its TRANSPORT, with the type rule as the exception — puts the ranking row's
+seven keys in four different places:
+
+- **`evaluators` → evaluator.** Every tRPC call is `evaluators.*`, mounted out of
+  `@langwatch/evaluator-server`; every type is `@langwatch/evaluator-contract`'s
+  (`Evaluator`, `EvaluatorCopy`, `EvaluatorHistoryEntry`). Transport and types
+  agree, so there was nothing to argue.
+- **`online-evaluations` → monitor.** The list and every write are `monitors.*`,
+  mounted out of `@langwatch/monitor-server`, and the row is
+  `@langwatch/monitor-contract`'s. NEW PACKAGE.
+- **`evaluations/wizard` and `evaluations/wizard/:slug` → experiment.** The only
+  read is `experiments.getExperimentBySlugOrId` and the branch turns on
+  `ExperimentType` and `workbenchState`. The no-slug half needed no read at all
+  and is retired; the `:slug` half is blocked (below).
+- **`evaluations/:id/edit`, `.../edit/choose` → monitor**, and blocked on size
+  rather than on ownership (below).
+- **`experiments/index` → experiment**, and it never was this family's. The
+  module `pages/[project]/evaluations.tsx` is the EXPERIMENTS page end to end:
+  `ExperimentsPage`, its `GuardedExperimentsPage` export, and a dead default
+  export that a route-table redirect replaced in an earlier slice. Splitting
+  along ownership means it stays untouched, and it did — not one line of it is
+  in this diff.
+
+#### A NEW PACKAGE FOR ONE SCREEN, AND WHY NOT ONE PACKAGE FOR BOTH
+
+`@langwatch/monitor-web` exists for one 256-line page. That is the
+`@langwatch/organization-web` call taken a third time, and the same three things
+make it right: `monitor` is a wide contract, this will not be its only surface
+(the online evaluation drawer, the guardrails drawer and the legacy edit form
+are three more screens' worth of the same transport, each blocked today for a
+recorded reason rather than for want of a package), and the alternative — riding
+in `@langwatch/evaluator-web` — fails the type rule in both directions.
+
+ONE THING POINTED THE OTHER WAY AND IS RECORDED RATHER THAN SUPPRESSED.
+`@langwatch/evaluator-web` published `online-evaluation-performance-preview`, a
+component named for the online evaluations page and consumed by nothing else.
+That is a misplacement, not a claim of ownership, so the MODULE moved into
+monitor-web rather than the screen moving into evaluator-web — the gateway
+family's `RoutingPolicyRowActions` ruling, applied a second time. The split cost
+154 lines. The analytics family overruled the rule at 3,500; two orders of
+magnitude below that number, the rule stands.
+
+**AND THE MOVE FOUND THE TYPE DECLARED TWICE.** `OnlineEvaluationPerformance`
+was restated field for field inside `@langwatch/evaluator-web` while
+`@langwatch/evaluation-contract` already declared it and
+`EvaluationService.getMonitorPerformance` was annotated with it. The producer is
+packaged, so the S7 ruling allows the real fix: the moved module names the
+contract's type and the private restatement is gone. Not halved — closed.
+
+#### FOUR KEYS STAY, AND EACH ONE HAS A NUMBER
+
+- **`evaluations/:id/edit` and `.../edit/choose` — BLOCKED ON THE CLOSURE, NOT ON
+  OWNERSHIP.** The page body is `CheckConfigForm`, whose exclusive closure is
+  ~1,800 lines (`TryItOut` 644, `EvaluationManualIntegration` 379,
+  `EvaluatorSelection` 419, `PreconditionsField` 245,
+  `EvaluatorLLMConfigField` 120) and whose SHARED closure is the problem: a copy
+  of `DynamicZodForm` (662 lines, also read by two evaluator editors and the
+  studio's properties panel), a copy of `components/traces/TracesMapping` (1,057
+  lines, also the datasets family's), a copy of `~/server/tracer/tracesMapping`
+  (1,414 lines with 31 importers — the trace feature's vocabulary, and
+  `packages/features/trace` is another agent's live slice), plus
+  `~/server/evaluations/{types,preconditions,evaluationMappings}` and
+  `~/server/filters/{registry,types,precondition-matchers}`, and `TryItOut`
+  alone drags `FieldsFilters` (967) and `~/server/api/root`'s `AppRouter`.
+  **About 8,000 lines of copies to move a legacy form the online evaluation
+  drawer superseded.** It also names `EvaluationExecutionMode` as a VALUE out of
+  the generated Prisma client, which a governed screen may not — resolvable
+  through `monitorExecutionModeSchema`, and irrelevant next to the size.
+  RECORDED: these two keys move when `~/server/tracer/tracesMapping` and
+  `components/traces/TracesMapping` are packaged, which is the trace family's
+  work and not a page move's.
+- **`evaluations/wizard/:slug` — BLOCKED ON PROPORTION.** Its transport is
+  `experiments.*` and its branch reads `ExperimentType` and `workbenchState`, so
+  it belongs in `@langwatch/experiment-web` — which is 100 files, 27,178 lines,
+  ungoverned, and carries its own real-browser lane. Governing all of that for
+  ONE redirect screen is the disproportion the S7 scim ruling names: recorded as
+  blocked because this move did not have the standing, not because the edge
+  cannot exist.
+- **`experiments/index` — an anti-target, and the split along ownership was
+  clean.** The shared module needed no platform insertion to split, because
+  there was nothing of this family in it to take out.
+
+#### THE WIZARD'S NO-SLUG HALF IS A ROUTE-TABLE ROW, NOT A SCREEN
+
+`/:project/evaluations/wizard` with no experiment named did exactly one thing:
+`router.replace(/${project.slug}/experiments/workbench)`. That is the gateway
+family's `/gateway` ruling and the retirement `/:project/evaluations` already
+had — a redirect row says the same thing without a loader — so the key is gone
+and the module keeps only the `:slug` branch it still serves. THE `:slug` HALF
+IS NOT THIS: with a slug the destination depends on what kind of experiment it
+names, and a static forward would land a legacy experiment on a workbench that
+cannot render it, which is what the page's own docblock exists to prevent.
+
+#### THE WORST DRAWER SHARING IN THE PROGRAMME, MEASURED
+
+The ranking row called this out and it was right. `openDrawer` call sites,
+repo-wide:
+
+| drawer                      | openers | outside this family | disposition                                                                                                          |
+| --------------------------- | ------- | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `evaluatorEditor`           | 15      | 14                  | STAYS. Address only.                                                                                                 |
+| `codeEvaluatorEditor`       | 4       | 3                   | STAYS. Address only.                                                                                                 |
+| `evaluatorCategorySelector` | 5       | 4                   | STAYS. Address only.                                                                                                 |
+| `onlineEvaluation`          | 4       | 2                   | STAYS. Address only.                                                                                                 |
+| `guardrails`                | 1       | 0                   | STAYS: its opener moved, but it renders `EvaluatorSelectionBox` and opens `evaluatorList` (7 openers). Address only. |
+| `evaluatorHistory`          | 1       | 0                   | **TRAVELLED**, inline, at `?history=<id>`.                                                                           |
+| `evaluatorList`             | 7       | 7                   | Not this family's to move.                                                                                           |
+
+So SIX of the seven overlays are addresses the moved screens write and nothing
+opens under `apps/ui` — the same recorded chrome gap the coding-agent, me,
+automations, annotations and analytics families carry for the same registry,
+and **this family loses the most to it**: creating and editing an evaluator, and
+creating, editing and guarding an online evaluation, are the primary actions of
+both pages. What still works on the evaluators page is delete (with its
+cascade), replicate, push-to-replicas, sync-from-source, history and the API
+snippets; on the online evaluations page, the list, the performance, the
+analytics link, pause/resume, replicate and delete.
+
+`evaluatorHistory` is the exception the gateway ruling describes exactly: ONE
+opener in the whole repository, so it was never an application drawer, and the
+registry is composition where a screen only ever needed the address. The screen
+keeps the evaluator in `?history=<id>` and renders the panel inline;
+`platform/app`'s registered copy stays for the URL that still names it.
+
+**`setFlowCallbacks("evaluatorEditor", …)` DID NOT TRAVEL AND COULD NOT.** The
+platform page registered a callback so that saving a NEW evaluator closed the
+drawer rather than walking back up the category → type → editor stack. That is a
+registry-wide side channel that exists only because an address carries strings
+and not functions — the analytics family found the same shape behind
+`seriesFilters` — and it belongs to whoever owns the drawer. It is the single
+most-registered flow key in the repository (13 production registrations, 12 of
+them outside this family).
+
+#### THE `~/server` MODULES, AND HOW EACH RESOLVED
+
+Only ONE reached the moved closures, and it is the one three families have now
+answered the same way:
+
+- **`server/api/rbac`** via `hooks/useProjectsForCopy` —
+  `hasPermissionWithHierarchy` and `teamRoleHasPermission`, imported into a
+  browser hook. `@langwatch/authz-contract` publishes both, parity-tested
+  against the rbac pair, and the derivation now lives in
+  `apps/ui/src/model/ui-copy-targets.ts`.
+- `server/api/root`'s `AppRouter` and `server/tracer/tracesMapping` are in the
+  BLOCKED closures only, and are the reason they are blocked.
+
+#### THE FOURTH COPY WOULD HAVE BEEN THE FIFTH, SO IT IS ZERO
+
+The agents, prompts and datasets families each wrote the copy-target derivation
+out privately in their own `apps/ui/src/features/<family>/model/`. This move
+needed it for TWO more families at once, and authoring a fourth and a fifth
+identical file in one commit is not recording a duplication, it is creating one.
+It went into the GLOBAL model instead (`apps/ui/src/model/ui-copy-targets.ts`) —
+a private frontend feature may import a global layer and only the reverse is
+refused, so this costs no finding — and the three existing private copies are
+untouched, because repointing them is a change to three other families' code
+that a page move does not own. That module is where they fold in.
+
+It is also the first time the derivation has been ASSERTED. Six tests, including
+the two cases the platform hook handled only implicitly: a custom role whose
+permission column has never been written falls through to the built-in role, and
+an unrecognised legacy role string reads as the most restrictive one rather than
+as permission.
+
+#### WHAT DID NOT TRAVEL, EACH NAMED
+
+- **THE LANGY CONTEXT TARGETS.** Both screens wrapped their rows in
+  `LangyContextTarget`. `@langwatch/langy-web` is ungoverned and every consumer
+  compiles its source, which needs an `es2023` library and a stylesheet
+  declaration these packages would have had to adopt globally — the me,
+  automations and analytics families' refusal, for the fourth and fifth time.
+- **`SetupWithAgentButton`** on both empty states. 367 lines with seven
+  importers outside this family, and it reaches `features/langy/useCanAskLangy`
+  and `features/skills/setupPrompt`. The empty states keep their own create
+  action and lose the agent shortcut.
+- **THE REGISTRY'S WORDS.** `ReplicateToProjectDialog` and the generic
+  `PushToCopiesDialog` reported failures through `showErrorToast` and
+  `HandledErrorAlert`, both of which resolve copy from `platform/app`'s
+  code-keyed presentation registry. The narrowed copies report through the host
+  port's failure notice instead, so the registry still decides the words and the
+  screens never compose a sentence over a code.
+
+#### WHAT THE CLOSURE COST
+
+- **Twelve platform files deleted, 1,598 lines.** Two pages, three exclusive
+  evaluator components with two of their suites, three exclusive monitor
+  components with one suite, one exclusive hook, three loader keys and one row
+  of the loader parity suite's shared-module table.
+- **Nine family-local copies**, each with a consumer this move does not own.
+  Six are genuinely NARROWED: `CascadeArchiveDialog` → `evaluator-delete-dialog`
+  (three entity types and four related lists down to one and two, which is
+  exactly what `getRelatedEntities` answers), `ReplicateToProjectDialog` → two
+  `*-replicate-dialog`s (the generic `title`/`entityLabel`/`onCopy`/`logError`
+  seam collapsed, because the subject is known), the generic `PushToCopiesDialog`
+  → `evaluator-push-to-copies-dialog`, `formatTimeAgo` (the compact half stayed
+  behind) and `langwatchEndpointEnv` (the bare-URL half kept, the location made
+  injectable). Three travelled whole because there was nothing to leave behind:
+  `EvaluatorApiUsageDialog` (still rendered by `EvaluatorListDrawer`, and its
+  substitutions are stated in the copy's own docblock), `NoDataInfoBlock` and
+  `FullWidthListPageContent`.
+- **`Link` is the SEVENTH copy of a dozen lines of policy** — user-web,
+  gateway-web, governance-web, organization-web and analytics-web carry the same
+  one. Recorded again, and the sixth-copy note now reads as an understatement.
+- **Promotions to the Design System instead of copies**: `page-layout`,
+  `dialog`, `confirm-dialog`, `drawer`, `menu`, `select`, `checkbox`,
+  `list-table` and `shiki` all already existed there. `RenderCode` was the one
+  that could not be reused — it highlights through `@langwatch/trace-web` — so
+  `ui/elements/code-snippet.tsx` reaches the same Shiki adapter through the
+  Design System, the gateway and analytics families' shape.
+- **`@langwatch/evaluator-web` was relaid out first, and the test count proved
+  it.** Twelve flat modules and a flat `__tests__` moved into
+  `model` / `ui/{elements,blocks}` with 26 tests green before and after — the
+  measurement the analytics family said to take before writing a line of the
+  move. `evaluation-status.tsx` SPLIT on the way: `evaluationPassed` and
+  `evaluationStatusColor` are pure vocabulary a counter reads, so they are
+  `model`, and only `CheckStatusIcon` stayed an element.
+  `ui-web-layer-direction` decided that, not taste.
+
+#### THREE DEFECTS THE MOVE FOUND, ALL FIXED
+
+- **THE EVALUATOR CARD'S ROW ACTIONS HAD NO ACCESSIBLE NAME.** The menu trigger's
+  only child is an icon, so a screen reader announced "button" and nothing else —
+  in a grid of them, with no way to tell which card one belonged to. The online
+  evaluations table's trigger has always carried `aria-label="Actions for …"`;
+  the card's now does too.
+- **A REFETCH WIPED THE READER'S PUSH SELECTION.** `PushToCopiesDialog`'s effect
+  depended on the query RESULT's identity, so a window refocus or an
+  invalidation reset every checkbox while the dialog was open. The moved copy
+  keys the reset on the replica IDS as a value, so it happens when the list of
+  replicas actually changes. Found because the test-time hook returned a fresh
+  array each render and the screen rendered forever — an infinite render loop
+  that is a hang in a test and a wiped form in production.
+- **THE API SNIPPETS' ENDPOINT WAS UNASSERTABLE.** `langwatchEndpointEnv` read
+  `window.location` inline, so nothing could pin either branch; getting them the
+  wrong way round hands a self-hosted customer a snippet that posts their traffic
+  and their key to `app.langwatch.ai`. The copy takes the location as an
+  injectable parameter — `@langwatch/gateway-web`'s `docs-url` shape — and both
+  branches, the port handling and the no-document fallback are pinned.
+
+#### Known costs, all reported rather than suppressed
+
+- **3 new architecture-lint findings, 0 retired** (805 measured before, 821
+  after; the other +13 belong to a trace slice running concurrently in the same
+  tree and are named below). Mine: TWO `ui-screen-closure` for
+  `@langwatch/platform-api-client` in the two procedure maps — the line every
+  family carries, once per package — and ONE `ui-web-public-entry` for
+  `@langwatch/evaluator-web`'s root `.` export. THIRTEEN `platform/app` modules
+  import that entry (the trace span detail, four evaluator drawers, the checks
+  Try-it-out and the evaluator editors) and deletes-only forbids repointing a
+  single one, so it stays and the finding is recorded. `@langwatch/monitor-web`
+  is new and exports only its screen, so it brings none.
+- **oxlint: 3,148 → 3,255, and the delta attributable to this move is ZERO.**
+  All 107 arrivals are in three `packages/features/trace/server` files a
+  concurrent slice added. Every file this move authored or copied is clean under
+  `.oxlintrc.architecture.json`, checked one file at a time.
+- **ZERO new `platform/app` typecheck errors, and zero retired**: 14 errors in
+  11 files before and after, the attributed baseline unchanged. Nothing outside
+  the two families imported any deleted file, which a `grep` over each deleted
+  basename confirmed before the deletion and after.
+- **`specs/evaluations/evaluation-pages.feature` is new and 28/28 bound.**
+  `experiments-online-evaluations-separation.feature` is 0 of 19 enforced before
+  and after — every scenario is untagged, so it binds nothing, and six of its
+  page-level scenarios are restated and bound in the new file rather than
+  retagged in place, because the rest of that file is about navigation sections
+  and agent skills this move does not touch.
+- **Five sabotages, each caught red then restored** (table below).
+- **One inherited red, NOT this move's**:
+  `components/evaluators/__tests__/EvaluatorEditorMappingRender.integration.test.tsx`
+  fails on `No "ColorfulBlockIcon" export is defined on the
+"@langwatch/workflow-web" mock`, thrown from
+  `packages/features/prompt/web/src/surfaces/variables/variable-mapping-input.tsx:153`.
+  `ColorfulBlockIcon` arrived there in `af61da741a` (2026-08-29) and the test's
+  mock was never widened; nothing in this move's diff is on that render path.
+- **Foreign hunks in the tree, named**: `pnpm-lock.yaml` carries this move's two
+  dependency additions plus a `retry-axios` peer-key normalisation pnpm wrote on
+  its own; `packages/architecture-lint/src/service-quality-baseline.json` and
+  every `packages/features/trace/**` and `apps/worker/**` change belong to the
+  concurrent trace slice and were not touched.
+
+#### Sabotage table
+
+| #   | suite                                         | sabotage                                                                     | what turned red                                                 |
+| --- | --------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | `evaluators.screen.test.tsx`                  | `hasRelated` forced to `true`, so every delete takes the cascade             | "takes the plain delete and never the cascade"                  |
+| 2   | `langwatch-endpoint.unit.test.ts`             | `langwatchEndpoint` always answers the hosted address                        | all three self-hosted and fallback readings                     |
+| 3   | `online-evaluations.screen.test.tsx`          | the legacy-wizard experiment lookup dropped, so Edit always opens the drawer | "goes to that experiment's workbench rather than to the drawer" |
+| 4   | `evaluation-page-policy.integration.test.tsx` | `EVALUATORS_PAGE_PERMISSION` widened to `evaluations:manage`                 | both directions of the evaluators grant                         |
+| 5   | `ui-copy-targets.unit.test.ts`                | `canCreate` hard-coded to `true`                                             | the closed project, and the unrecognised legacy role            |
+
+#### Gate numbers, before and after
+
+| gate                                 | before                    | after                                               |
+| ------------------------------------ | ------------------------- | --------------------------------------------------- |
+| `pnpm --filter @langwatch/ui test`   | 77 files / 667 tests      | **79 files / 682 tests**                            |
+| `@langwatch/evaluator-web`           | 4 files / 26 tests        | **6 files / 41 tests**                              |
+| `@langwatch/monitor-web`             | — (package did not exist) | **1 file / 12 tests**                               |
+| `pnpm test:unit run src/runtime/ui`  | 1 file / 8 tests          | **1 file / 7 tests** (the retired wizard key's row) |
+| whole-tree `pnpm typecheck`          | 14 errors / 11 files      | **14 errors / 11 files**                            |
+| architecture-lint suite              | 332 tests                 | **332 tests**                                       |
+| architecture-lint CLI findings       | 805                       | **821** (+3 mine, +13 the trace slice's)            |
+| oxlint                               | 3,148                     | **3,255** (+0 mine, +107 the trace slice's)         |
+| `git diff --numstat -- platform/app` | —                         | **0 insertions, 1,598 deletions**                   |
+
+#### The sixteenth family's own additions, for whoever moves the seventeenth
+
+- **A RANKING ROW'S KEY COUNT IS A GUESS ABOUT ADDRESSES, NOT ABOUT FEATURES.**
+  Seven keys under one heading belonged to four features and produced three
+  moves, one retirement and four recorded blocks. Survey the TRANSPORT of every
+  key before believing a row — the S7 lesson, and this is its largest instance.
+- **COUNT THE DRAWER OPENERS BEFORE COSTING THE MOVE, AND COUNT THEM BY KEY.**
+  `openDrawer("<key>"` is a precise grep and it decides the whole shape: one
+  opener means the overlay travels inline (gateway's ruling), more than one means
+  it stays and the screen writes an address. This family had one of each and five
+  of the other, and knowing that before writing a line is what kept the screens
+  honest about what they can still do.
+- **A TEST-TIME HOOK THAT RETURNS A FRESH ARRAY FINDS REAL RENDER LOOPS.** The
+  push-to-replicas effect depended on a query result's identity. Under the real
+  tRPC hook that is stable and the bug is invisible; under a mock it is an
+  infinite loop, which reads as a hung vitest worker rather than as a failure.
+  When a new screen suite HANGS, suspect an effect keyed on identity before
+  suspecting the runner.
+- **AN "UN-NARROWABLE COPY" HAS A LINE COUNT, SO SAY IT.** The edit page is not
+  blocked because it felt big: it is blocked because moving it means copying
+  ~8,000 lines including 1,414 of another feature's vocabulary that 31 modules
+  read. A block argued with a number can be re-examined when the number changes;
+  a block argued with a feeling cannot.
+- **WHEN TWO FAMILIES MOVE IN ONE SLICE, THE SHARED HELPER GOES GLOBAL, NOT
+  TWICE.** Three earlier families each kept a private copy of the copy-target
+  derivation and each recorded it. Writing the fourth and fifth in the same
+  commit would have been manufacturing the duplication rather than inheriting it;
+  `apps/ui/src/model` takes it, costs no finding, and is where the other three
+  fold in.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -2743,26 +3088,26 @@ closures are computed net of that.
 
 **Dispatch order (effort = moving prod files + tests touching):**
 
-| #   | Family                                                                                                                    | Keys | Effort | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| --- | ------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | agents                                                                                                                    | 1    | ~2+0   | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 2   | settings S5 data governance                                                                                               | 4    | 5+5    | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 3   | datasets                                                                                                                  | 2    | 6+6    | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 4   | settings S4 model config                                                                                                  | 2    | 7+6    | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect.                                                                                                                                                                                                                                                                                                              |
-| 5   | prompts                                                                                                                   | 1    | 44+14  | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39.                                                                                                                                                                                                                                                                                                                                                                        |
-| 6   | settings S7 identity                                                                                                      | 3    | 8+3    | **MOVED (2 of 3 keys), SPLIT-BLOCKED** — see the section above. The row's "a web package decision" was three decisions, not one: `audit-log` went to a NEW `@langwatch/organization-web` (core transport, core contract), `authentication` folded into `@langwatch/user-web` (every call on it is `user.*`), and `scim` is blocked because both the transport and the row type are `@langwatch/enterprise-scim-contract`'s. The `EnrichedAuditLog` move was a real repoint and found the type declared TWICE. What the row missed is that the export is the property the audit page turns on, that the CSV save needed a host port of a kind no family had asked for, and that the multi-line `@scenario` form binds nothing. |
-| 7   | settings S2 RBAC                                                                                                          | 2    | 8+4    | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract.                                                                                                                                                                                                                                |
-| 8   | annotations                                                                                                               | 5    | 12+7   | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound.                                                                                                                                                                                                                                     |
-| 9   | settings S6 credentials + /cli/auth                                                                                       | 3    | 14+12  | **MOVED** — see the section above. Three keys and TWO packages: `secrets` went to a new `@langwatch/secret-web` rather than riding in `api-key-web`, because every type on that page is the secret contract's. The row was right that the CLI screen could not ship separately. What it missed is that `/cli/auth` talks to three REST routes the published CLI polls the other side of, so the exchange moved into `apps/ui/src/behavior` and is pinned there byte for byte; that the secrets spec was 0/0 bound and its four refusal codes had no customer copy at all; and that the rbac fix, harmless on the roles page, adds three explicit `langy` strings to an admin's CLI key.                                       |
-| 10  | analytics                                                                                                                 | 9    | 49+17  | **MOVED** — see the section above. Nine keys, eight screens, 72 platform files. The row was right about the four retired automations breaks and about `custom/[id]` being tab-as-prop, and it undercounted the files by half: `features/analytics-query` (21 prod + 18 tests) and the filter rail were not in its 49+17. What it missed is that three of the nine keys address ANOTHER feature's transport and stay here anyway — the first overruled ownership call, argued on the record — and that governing a destination which already had 6,150 lines of its own meant relaying the whole package out first.                                                                                                            |
-| 11  | evaluations/evaluators                                                                                                    | 7    | 16+8   | WORST drawer sharing (evaluatorEditor 20 callers); entangled with experiments at module level                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| 12  | workflows/studio/chat                                                                                                     | 3    | 53+19  | killing it also kills the prompt-model platform copies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 13  | auth front door + public (joint)                                                                                          | 13   | ~76    | ZERO blockers of any kind but NO destination package — create auth/identity web                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 14  | onboarding                                                                                                                | 4    | 54+11  | order after traces (traces-v2/onboarding is the largest consumer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 15  | settings S1 org/members/teams                                                                                             | 5    | 25+7   | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 16  | settings S3 billing                                                                                                       | 4    | 17+9   | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 17  | settings S8 integrations                                                                                                  | 2    | 2+2    | zero blockers, no destination — ride along with any settings package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces |      |        | anti-targets / downstream                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| #   | Family                                                                                                                    | Keys | Effort | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | agents                                                                                                                    | 1    | ~2+0   | **MOVED** — see the section below. The estimate was wrong in one direction only: the platform adapter was 100% adapter, but three of the four generic dialogs it rendered were the application's and had to be taken as family-local copies.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2   | settings S5 data governance                                                                                               | 4    | 5+5    | **MOVED** — see the section above. TWO keys, not four: `topic-clustering` belongs to the topic feature and `email-suppressions` to automation, both recorded rather than forced. The harvest landed, and the settings chrome is one wrapper for every family after this one.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 3   | datasets                                                                                                                  | 2    | 6+6    | **MOVED** — see the section above. Two keys, and the estimate held for the exclusive files; what it missed is that the detail page's whole spreadsheet editor has four non-Datasets callers, so it travelled as a narrowed family-local copy rather than as a move.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 4   | settings S4 model config                                                                                                  | 2    | 7+6    | **MOVED** — see the section above. Two keys, and the file estimate held almost exactly (7 prod + 6 tests surveyed, 7 prod + 5 tests moved). What it missed is that all THREE of the family's drawers stay in `platform/app`, including one with no other opener, and that the AppRouter type it names is produced by a PACKAGED transport — so the contract move was a real repoint, and it found a live defect.                                                                                                                                                                                                                                                                                                                                                                                                |
+| 5   | prompts                                                                                                                   | 1    | 44+14  | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 6   | settings S7 identity                                                                                                      | 3    | 8+3    | **MOVED (2 of 3 keys), SPLIT-BLOCKED** — see the section above. The row's "a web package decision" was three decisions, not one: `audit-log` went to a NEW `@langwatch/organization-web` (core transport, core contract), `authentication` folded into `@langwatch/user-web` (every call on it is `user.*`), and `scim` is blocked because both the transport and the row type are `@langwatch/enterprise-scim-contract`'s. The `EnrichedAuditLog` move was a real repoint and found the type declared TWICE. What the row missed is that the export is the property the audit page turns on, that the CSV save needed a host port of a kind no family had asked for, and that the multi-line `@scenario` form binds nothing.                                                                                   |
+| 7   | settings S2 RBAC                                                                                                          | 2    | 8+4    | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract.                                                                                                                                                                                                                                                                                                                  |
+| 8   | annotations                                                                                                               | 5    | 12+7   | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound.                                                                                                                                                                                                                                                                                                                       |
+| 9   | settings S6 credentials + /cli/auth                                                                                       | 3    | 14+12  | **MOVED** — see the section above. Three keys and TWO packages: `secrets` went to a new `@langwatch/secret-web` rather than riding in `api-key-web`, because every type on that page is the secret contract's. The row was right that the CLI screen could not ship separately. What it missed is that `/cli/auth` talks to three REST routes the published CLI polls the other side of, so the exchange moved into `apps/ui/src/behavior` and is pinned there byte for byte; that the secrets spec was 0/0 bound and its four refusal codes had no customer copy at all; and that the rbac fix, harmless on the roles page, adds three explicit `langy` strings to an admin's CLI key.                                                                                                                         |
+| 10  | analytics                                                                                                                 | 9    | 49+17  | **MOVED** — see the section above. Nine keys, eight screens, 72 platform files. The row was right about the four retired automations breaks and about `custom/[id]` being tab-as-prop, and it undercounted the files by half: `features/analytics-query` (21 prod + 18 tests) and the filter rail were not in its 49+17. What it missed is that three of the nine keys address ANOTHER feature's transport and stay here anyway — the first overruled ownership call, argued on the record — and that governing a destination which already had 6,150 lines of its own meant relaying the whole package out first.                                                                                                                                                                                              |
+| 11  | evaluations/evaluators                                                                                                    | 7    | 16+8   | **MOVED (3 of 7 keys), TWO packages** — see the section above. THREE keys and four features, not one family: `evaluators` to `@langwatch/evaluator-web`, `online-evaluations` to a NEW `@langwatch/monitor-web`, and `evaluations/wizard` retired to a route-table redirect. The row's drawer warning was right and undercounted the shape: `evaluatorEditor` has 15 openers not 20, but SIX of the family's seven overlays stay platform-owned, so both moved screens lose their create and edit actions to the recorded chrome gap. What it missed is that `experiments/index` needed no split at all — the shared module is the experiments page end to end — and that the two `edit` keys are blocked on ~8,000 lines of copies, 1,414 of them the trace feature's mapping vocabulary that 31 modules read. |
+| 12  | workflows/studio/chat                                                                                                     | 3    | 53+19  | killing it also kills the prompt-model platform copies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 13  | auth front door + public (joint)                                                                                          | 13   | ~76    | ZERO blockers of any kind but NO destination package — create auth/identity web                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 14  | onboarding                                                                                                                | 4    | 54+11  | order after traces (traces-v2/onboarding is the largest consumer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 15  | settings S1 org/members/teams                                                                                             | 5    | 25+7   | OrganizationUserRole has NO contract home and the org contract REFUSES to restate it — contract decision first; createProject drawer is permanently un-deletable (DashboardLayout opens it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 16  | settings S3 billing                                                                                                       | 4    | 17+9   | STRUCTURALLY BLOCKED: apps/ui (core) may not import enterprise web — needs packages/enterprise/composition/ui first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 17  | settings S8 integrations                                                                                                  | 2    | 2+2    | zero blockers, no destination — ride along with any settings package                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 18+ | setup, project home, simulations+agent-testing (joint, subscription-blocked), langy layout, experiments workbench, traces |      |        | anti-targets / downstream                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **Cross-cutting gates:**
 

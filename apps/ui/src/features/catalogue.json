@@ -11,8 +11,10 @@
     "@langwatch/data-retention-web",
     "@langwatch/dataset-web",
     "@langwatch/enterprise-governance-web",
+    "@langwatch/evaluator-web",
     "@langwatch/gateway-web",
     "@langwatch/model-provider-web",
+    "@langwatch/monitor-web",
     "@langwatch/ops-web",
     "@langwatch/organization-web",
     "@langwatch/prompt-web",
@@ -113,6 +115,16 @@
       }
     },
     {
+      "id": "evaluators",
+      "root": "evaluator",
+      "uses": {
+        "screens": [
+          "@langwatch/evaluator-web/screens/evaluators"
+        ],
+        "surfaces": []
+      }
+    },
+    {
       "id": "gateway",
       "root": "gateway",
       "uses": {
@@ -138,6 +150,16 @@
       "uses": {
         "screens": [
           "@langwatch/model-provider-web/screens/model-provider"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "online-evaluations",
+      "root": "monitor",
+      "uses": {
+        "screens": [
+          "@langwatch/monitor-web/screens/online-evaluations"
         ],
         "surfaces": []
       }

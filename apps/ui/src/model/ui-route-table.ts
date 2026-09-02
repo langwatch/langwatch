@@ -584,8 +584,18 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         },
       },
       {
+        // The evaluation wizard was retired in favour of the experiments
+        // workbench, and a brand-new evaluation always opened it. The page's
+        // no-slug branch was nothing but that replace, so a table row says the
+        // same thing without a loader — the same retirement `/:project/evaluations`
+        // above already had. The `:slug` row below is NOT this: with a slug the
+        // destination depends on what kind of experiment it names, which is a
+        // read, not a rewrite.
         path: "/:project/evaluations/wizard",
-        page: "pages/[project]/evaluations/wizard",
+        redirect: {
+          from: "/:project/evaluations/wizard",
+          to: "/:project/experiments/workbench",
+        },
       },
       {
         path: "/:project/evaluations/wizard/:slug",

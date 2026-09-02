@@ -111,6 +111,21 @@ const DATASET_PAGE_KEYS = [
   "pages/[project]/datasets/[id]",
 ];
 
+const EVALUATOR_PAGE_KEYS = [
+  // One key, one screen. The three overlays it opens — the evaluator editor,
+  // the code evaluator editor and the category picker — stay registered in
+  // `platform/app`, because between them they have thirteen openers outside
+  // this family.
+  "pages/[project]/evaluators",
+];
+
+const MONITOR_PAGE_KEYS = [
+  // One key, one screen, and the same recorded overlay gap: creating an online
+  // evaluation, editing one and setting up a guardrail are all `platform/app`
+  // drawers with openers outside this family.
+  "pages/[project]/online-evaluations",
+];
+
 const MODEL_PROVIDER_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. NEITHER CARRIES A
   // PAGE-LEVEL GRANT: both platform pages framed themselves in `SettingsLayout`
@@ -241,9 +256,11 @@ describe("given what apps/ui serves itself", () => {
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
+          ...EVALUATOR_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
+          ...MONITOR_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
@@ -254,7 +271,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Eighteen for seventeen features: the personal workspace mounts two,
+      // Twenty for nineteen features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
@@ -267,9 +284,11 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/data-privacy-web",
         "@langwatch/data-retention-web",
         "@langwatch/dataset-web",
+        "@langwatch/evaluator-web",
         "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
         "@langwatch/model-provider-web",
+        "@langwatch/monitor-web",
         "@langwatch/ops-web",
         "@langwatch/organization-web",
         "@langwatch/prompt-web",
@@ -329,9 +348,11 @@ describe("given what apps/ui serves itself", () => {
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
           ...DATASET_PAGE_KEYS,
+          ...EVALUATOR_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
+          ...MONITOR_PAGE_KEYS,
           ...OPS_PAGE_KEYS,
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
@@ -339,7 +360,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(18);
+      expect(merged.apis).toHaveLength(20);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });
