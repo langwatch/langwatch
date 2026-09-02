@@ -364,21 +364,19 @@ describe("given the create drawer for a push source, which offers neither settin
 
 describe("given the create drawer for a source that routes conversations", () => {
   describe("when it opens with Advanced still closed", () => {
-    /** @scenario "The drawer says where conversations will go without opening Advanced" */
-    it("says in plain sight that the conversations will land nowhere yet", () => {
+    /** @scenario "The drawer names the destination once one is picked" */
+    it("shows no destination line while nothing is picked", () => {
       renderComposer();
 
-      // The picker itself is still folded away — which is the whole reason
-      // the line has to exist outside the group.
+      // The field tooltips already explain the silent default; a standing
+      // warning here would repeat them.
       expect(screen.queryByTestId("ingestion-trace-destination")).toBeNull();
-      const hint = screen.getByTestId("composer-destination-hint");
-      expect(hint.textContent).toMatch(/will not land anywhere/i);
-      expect(hint.textContent).toMatch(/audit events/i);
+      expect(screen.queryByTestId("composer-destination-hint")).toBeNull();
     });
   });
 
   describe("when a destination has been picked", () => {
-    /** @scenario "The drawer says where conversations will go without opening Advanced" */
+    /** @scenario "The drawer names the destination once one is picked" */
     it("names the project the conversations will land in", async () => {
       const user = userEvent.setup();
       renderComposer();
@@ -398,7 +396,7 @@ describe("given the create drawer for a source that routes conversations", () =>
 
 describe("given the create drawer for a source that pulls counts", () => {
   describe("when it opens", () => {
-    /** @scenario "The drawer says where conversations will go without opening Advanced" */
+    /** @scenario "The drawer names the destination once one is picked" */
     it("offers no destination line, because it routes no conversations", () => {
       // A line about where conversations land, on a source that produces
       // none, describes a routing decision the adapter never makes.
