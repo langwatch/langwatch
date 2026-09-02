@@ -144,3 +144,124 @@ describe("updateSource, when the edit touches the Azure bill claim", () => {
     });
   });
 });
+
+describe("updateSource, when the edit changes which subscription's bill is read", () => {
+  const OTHER_SUBSCRIPTION = "00000000-0000-4000-8000-000000000002";
+  /** A cursor as the puller stores it after a priced cost read. */
+  const PRICED_CURSOR = JSON.stringify({
+    costPricedThroughDay: "2026-08-30",
+    costHeldSinceMs: null,
+    costReadAtMs: 1756500000000,
+  });
+  const claimingRow = (over: Record<string, unknown> = {}) =>
+    rowWith({
+      parserConfig: {
+        adapter: "copilot_studio_dataverse",
+        environmentUrl: "https://orgacme01.crm4.dynamics.com",
+        azureSubscriptionId: SUBSCRIPTION,
+        credentials: "enc:v1:abcdef",
+      },
+      ...over,
+    });
+
+  describe("given the bill has already been read", () => {
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses to swap the subscription behind the sealed envelope", async () => {
+      const { client, update } = fakePrisma(
+        claimingRow({ pollerCursor: PRICED_CURSOR }),
+      );
+
+      await expect(
+        IngestionSourceService.create(client).updateSource({
+          id: SOURCE_ID,
+          organizationId: ORG,
+          parserConfig: {
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+            azureSubscriptionId: OTHER_SUBSCRIPTION,
+          },
+        }),
+      ).rejects.toThrow(/archive this source and create a new one/i);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("still lets the claim be dropped, because stopping mixes nothing", async () => {
+      const { client, update } = fakePrisma(
+        claimingRow({ pollerCursor: PRICED_CURSOR }),
+      );
+
+      await IngestionSourceService.create(client).updateSource({
+        id: SOURCE_ID,
+        organizationId: ORG,
+        parserConfig: {
+          environmentUrl: "https://orgacme01.crm4.dynamics.com",
+        },
+      });
+
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given the bill has never been read", () => {
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("lets the subscription swap through, as before", async () => {
+      // No cost read has happened, so there is no old bill's memory to mix
+      // with the new one: no cursor to resume from, no rows filed under this
+      // source. The convenience the swap exists for — one registered app
+      // holding the reader role across several subscriptions — is untouched.
+      const { client, update } = fakePrisma(
+        claimingRow({ pollerCursor: null }),
+      );
+
+      await IngestionSourceService.create(client).updateSource({
+        id: SOURCE_ID,
+        organizationId: ORG,
+        parserConfig: {
+          environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          azureSubscriptionId: OTHER_SUBSCRIPTION,
+        },
+      });
+
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given the claim was dropped earlier but the bill's memory remains", () => {
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses to claim a subscription in two steps, even with fresh credentials", async () => {
+      // Drop the claim in one edit, add a different one in the next: without
+      // this refusal the two-step lands exactly where the direct swap was
+      // refused — old cursor, old rows, new claim. Held state counts as
+      // memory too: a held window carried across says "this bill's read
+      // failed" about a bill it never tried.
+      const { client, update } = fakePrisma(
+        rowWith({
+          pollerCursor: JSON.stringify({
+            costPricedThroughDay: null,
+            costHeldSinceMs: 1756500000000,
+            costReadAtMs: null,
+          }),
+        }),
+      );
+
+      await expect(
+        IngestionSourceService.create(client).updateSource({
+          id: SOURCE_ID,
+          organizationId: ORG,
+          parserConfig: {
+            environmentUrl: "https://orgacme01.crm4.dynamics.com",
+            azureSubscriptionId: OTHER_SUBSCRIPTION,
+            credentials: {
+              tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
+              clientId: "bot-client-id",
+              clientSecret: "bot-client-secret",
+              billingClientId: "billing-client-id",
+              billingClientSecret: "billing-client-secret",
+            },
+          },
+        }),
+      ).rejects.toThrow(/archive this source and create a new one/i);
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+});

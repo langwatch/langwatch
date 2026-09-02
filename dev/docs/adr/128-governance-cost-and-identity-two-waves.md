@@ -1173,6 +1173,19 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.6 (2026-09-02, captain: Sergio Esteban).** The subscription claim
+  becomes fixed once the bill has been read. Review of the sealed-envelope
+  swap (v3.4's "honest path") found it only honest before the first cost
+  read: the cursor and the rollup rows are filed under the source, so a
+  swapped claim showed the old subscription's spend under the new one's
+  name and masked the failed-read note. An edit may still swap the claim
+  before any cost read, and may drop the claim at any time; once cost
+  memory exists, a different bill means a new source — the same
+  archive-and-recreate rule the report already has, for the same
+  recorded-spend-continuity reason. Verifying which subscription the
+  memory belongs to stays withdrawn (§21.6); the guard refuses instead of
+  guessing.
+
 - **v3.5 (2026-09-02, captain: Sergio Esteban).** Review pass on the §21
   implementation. Two corrections, one of them load-bearing:
   - **The create path was still open.** v3.4 withdrew

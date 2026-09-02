@@ -64,6 +64,22 @@ Feature: Azure billing identity — the bill is read with its own credential
     # the state, which is why the spend panel carries no sentence for it.
 
   @unit
+  Scenario: A source that has read one bill cannot be pointed at another
+    Given a source whose bill has been read at least once
+    When an edit claims a different Azure subscription
+    Then the save is refused
+    And the refusal says to archive the source and create a new one
+    # Everything the cost read records is filed under the source, not the
+    # subscription: the cursor and the recorded rows would keep answering
+    # for the old bill under the new claim — old amounts shown under the
+    # new subscription's name, and the failed-read note masked. Same rule
+    # as the report on admin-API sources, for the same reason. Until the
+    # first cost read the swap stays allowed, and dropping the claim is
+    # always allowed: stopping mixes nothing. Once cost memory exists no
+    # new claim may land, even the dropped one back — nothing stored says
+    # which subscription the memory belongs to.
+
+  @unit
   Scenario: The billing credential is only ever presented to the sign-in service
     Given the source holds a billing credential
     When the source runs to completion

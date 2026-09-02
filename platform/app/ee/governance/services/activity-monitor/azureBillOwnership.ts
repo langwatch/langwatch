@@ -107,17 +107,24 @@ export function readPrepaidDeclared(
  * cannot be the one path left open.
  *
  * An edit SWAPPING one subscription for another behind a sealed envelope is
- * deliberately allowed, and the distinction is worth stating because it looks
- * like a hole. What is checked here is that a claim never lands without a pair
- * PRESENT, never that the pair can read the subscription named — §21.6 proposed
- * verifying the grant at save time and v3.4 withdrew it. The swapped-in claim
- * still rides the envelope validated for the previous one, so the pair is
- * there; if it turns out not to cover the new subscription the read fails and
- * the window is held, which the panel says out loud as `billing_read_failed`.
- * That is the honest path. Refusing the swap would instead force an admin to
- * retype both secrets whenever one registered app holds Cost Management Reader
- * across several subscriptions — the ordinary Azure setup — and prove nothing
- * about the new one.
+ * allowed HERE, and the distinction is worth stating because it looks like a
+ * hole. What is checked here is that a claim never lands without a pair
+ * PRESENT, never that the pair can read the subscription named — §21.6
+ * proposed verifying the grant at save time and v3.4 withdrew it. The
+ * swapped-in claim still rides the envelope validated for the previous one,
+ * so the pair is there; if it turns out not to cover the new subscription the
+ * read fails and the window is held, which the panel says out loud as
+ * `billing_read_failed`. Refusing the swap outright would force an admin to
+ * retype both secrets whenever one registered app holds Cost Management
+ * Reader across several subscriptions — the ordinary Azure setup — and prove
+ * nothing about the new one.
+ *
+ * That honest-path promise only holds while no bill has been read: once one
+ * has, the cursor and the recorded rows keep answering for the old bill
+ * under the new claim, and the failed-read note is masked instead of said.
+ * `assertClaimedSubscriptionUnchangedOncePulled` (in the service, beside the
+ * report guard it mirrors) is what closes that half — this guard stays about
+ * the pair being present, never about which bill the source has history with.
  */
 export function assertAzureBillHasItsOwnCredential(params: {
   parserConfig: Record<string, unknown> | null | undefined;
