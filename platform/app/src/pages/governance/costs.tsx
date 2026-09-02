@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { azureBillingNoteSentence } from "@ee/governance/services/azureBillingNote";
 import type {
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
@@ -252,6 +253,11 @@ function CostsBody({
           amountUsd={data.billed.amountUsd}
           cellsWithoutAmount={data.billed.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.billed.currenciesWithoutUsdAmount}
+          laneNote={
+            data.azureBilling
+              ? azureBillingNoteSentence(data.azureBilling)
+              : null
+          }
         />
         <CostLanePanel
           testId="cost-lane-gateway"

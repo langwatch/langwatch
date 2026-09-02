@@ -28,15 +28,36 @@ type SourceRow = {
   lastSuccessAt: Date | null;
 };
 
+/** One ingestion source, as the Azure billing note's read selects it. */
+type BillingSourceRow = {
+  parserConfig: Record<string, unknown> | null;
+  pollerCursor: unknown;
+};
+
 /**
- * A prisma double that answers the governance-project lookup and the source
- * read behind the stale-data notice. `sources` defaults to none, which is the
- * healthy answer: no source has stopped, so there is nothing to caveat.
+ * A prisma double answering the governance-project lookup and both source
+ * reads behind the summary: the stale-data notice and the Azure billing note.
+ *
+ * The two reads select different columns, so the double answers each from the
+ * rows that read can actually see. A test seeding a broken source cannot
+ * conjure a billing note that way, nor the other way round -- which matters
+ * because both readers happen to tolerate the other's rows silently, so
+ * cross-talk would not fail, it would just quietly assert the wrong thing.
+ * `sources` defaults to none: no source has stopped, and no bill is claimed.
  */
-function prismaWithGovProject(id: string | null, sources: SourceRow[] = []) {
+function prismaWithGovProject(
+  id: string | null,
+  sources: Array<SourceRow | BillingSourceRow> = [],
+) {
   return {
     project: { findFirst: vi.fn().mockResolvedValue(id ? { id } : null) },
-    ingestionSource: { findMany: vi.fn().mockResolvedValue(sources) },
+    ingestionSource: {
+      findMany: vi.fn(async ({ select }: { select: Record<string, boolean> }) =>
+        select.parserConfig
+          ? sources.filter((source) => "parserConfig" in source)
+          : sources.filter((source) => "name" in source),
+      ),
+    },
   } as unknown as Parameters<typeof GovernanceCostService.create>[0]["prisma"];
 }
 
@@ -709,6 +730,132 @@ describe("GovernanceCostService.summary", () => {
         });
 
         expect(result.staleSources).toBeNull();
+      });
+    });
+  });
+
+  describe("given a source reads an Azure bill", () => {
+    const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
+    const azureSource = (overrides: {
+      azureBillingIsPrepaid?: boolean;
+      pollerCursor?: unknown;
+    }) => ({
+      parserConfig: {
+        adapter: "copilot_studio_dataverse",
+        azureSubscriptionId: SUBSCRIPTION,
+        ...(overrides.azureBillingIsPrepaid === undefined
+          ? {}
+          : { azureBillingIsPrepaid: overrides.azureBillingIsPrepaid }),
+      },
+      pollerCursor:
+        overrides.pollerCursor ??
+        JSON.stringify({
+          costPricedThroughDay: "2026-08-30",
+          costHeldSinceMs: null,
+        }),
+    });
+
+    describe("when the bill was read clean and empty, with prepaid declared", () => {
+      /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
+      it("carries the prepaid note on the summary", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({ azureBillingIsPrepaid: true }),
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBe("prepaid_declared");
+        expect(result.billed.amountUsd).toBeNull();
+      });
+    });
+
+    describe("when the bill was read clean and empty, with nothing declared", () => {
+      /** @scenario "A tenant that declared nothing is never told it is prepaid" */
+      it("says no spend was recorded, never prepaid", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [azureSource({})]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBe("no_spend_recorded");
+      });
+    });
+
+    describe("when the bill holds amounts, with prepaid declared", () => {
+      /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
+      it("shows the figure and carries no note to explain away", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({ azureBillingIsPrepaid: true }),
+          ]),
+          costRollup: rollupReturning([
+            laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO }),
+          ]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBeNull();
+        expect(result.billed.amountUsd).toBe(7);
+      });
+    });
+
+    describe("when the last read is held", () => {
+      it("reports the failed read instead of an empty bill", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({
+              azureBillingIsPrepaid: true,
+              pollerCursor: JSON.stringify({
+                costPricedThroughDay: null,
+                costHeldSinceMs: 1_700_000_000_000,
+              }),
+            }),
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBe("billing_read_failed");
+      });
+    });
+
+    describe("when no source claims a subscription", () => {
+      it("carries no note — there is no bill to explain", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            {
+              parserConfig: { adapter: "copilot_studio_dataverse" },
+              pollerCursor: null,
+            },
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBeNull();
       });
     });
   });

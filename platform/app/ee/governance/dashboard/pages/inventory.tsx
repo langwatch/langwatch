@@ -2641,23 +2641,12 @@ export function buildCopilotStudioDataversePullConfig(
   const tenantId = (p.credentialsTenantId ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
-  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
-  const billingClientId = (p.credentialsBillingClientId ?? "").trim();
-  const billingClientSecret = (p.credentialsBillingClientSecret ?? "").trim();
 
   // All three or none: two thirds of an app registration is not a sign-in,
   // and accepting it would save a source that cannot run.
   if (!environmentUrl || !tenantId || !clientId || !clientSecret) return null;
 
-  // Present keys or none — never empty strings, which everything downstream
-  // would read as credentials. Whether the pair is COMPLETE is judged
-  // server-side (`assertAzureBillHasItsOwnCredential`), whose refusal names
-  // what is missing; the builder's job is only to not manufacture values.
-  const billingCredentials = {
-    ...(billingClientId ? { billingClientId } : {}),
-    ...(billingClientSecret ? { billingClientSecret } : {}),
-  };
-
+  const billing = copilotAzureBillingFrom(p);
   return {
     adapter: "copilot_studio_dataverse",
     environmentUrl,
@@ -2671,23 +2660,7 @@ export function buildCopilotStudioDataversePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
       "*/15 * * * *",
-    // Omitted rather than sent empty, the same way Genie omits an unset
-    // warehouse: the adapter reads "no subscription named" as "do not read
-    // cost", and an empty string is a subscription id it would then ask Azure
-    // about — and the schema would refuse it as not a uuid, failing the save
-    // for a field the customer deliberately left blank.
-    ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
-    // Only meaningful beside a subscription: without a bill to read the
-    // declaration has nothing to explain, and a stored `true` would spring
-    // back the day a subscription is added — declared by nobody.
-    ...(azureSubscriptionId
-      ? {
-          azureBillingIsPrepaid: switchFieldIsOn({
-            value: p.azureBillingIsPrepaid,
-            defaultOn: false,
-          }),
-        }
-      : {}),
+    ...billing.config,
     // A real boolean, because the adapter's schema is `z.boolean()` and would
     // refuse the form's string on every run. The default comes from the field
     // definition the switch renders from, so a form nobody touched saves the
@@ -2696,8 +2669,53 @@ export function buildCopilotStudioDataversePullConfig(
       value: p.readSeats,
       defaultOn: READ_SEATS_DEFAULT_ON,
     }),
-    credentials: { tenantId, clientId, clientSecret, ...billingCredentials },
+    credentials: { tenantId, clientId, clientSecret, ...billing.credentials },
   };
+}
+
+/**
+ * The Azure billing part of a Copilot Studio pullConfig: the subscription and
+ * prepaid declaration for the config itself, and the billing identity's pair
+ * for the encrypted credentials subtree.
+ *
+ * The subscription is omitted rather than sent empty, the same way Genie
+ * omits an unset warehouse: the adapter reads "no subscription named" as "do
+ * not read cost", and an empty string is a subscription id it would then ask
+ * Azure about — and the schema would refuse it as not a uuid, failing the
+ * save for a field the customer deliberately left blank. The prepaid flag
+ * rides only beside a subscription: without a bill to read the declaration
+ * has nothing to explain, and a stored `true` would spring back the day a
+ * subscription is added — declared by nobody.
+ *
+ * The billing keys are present or absent, never empty strings, which
+ * everything downstream would read as credentials. Whether the pair is
+ * COMPLETE is judged server-side (`assertAzureBillHasItsOwnCredential`),
+ * whose refusal names what is missing; the builder's job is only to not
+ * manufacture values.
+ */
+function copilotAzureBillingFrom(p: Record<string, string>): {
+  config: Record<string, unknown>;
+  credentials: Record<string, string>;
+} {
+  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
+  const billingClientId = (p.credentialsBillingClientId ?? "").trim();
+  const billingClientSecret = (p.credentialsBillingClientSecret ?? "").trim();
+
+  const config: Record<string, unknown> = {};
+  if (azureSubscriptionId) {
+    config.azureSubscriptionId = azureSubscriptionId;
+    config.azureBillingIsPrepaid = switchFieldIsOn({
+      value: p.azureBillingIsPrepaid,
+      defaultOn: false,
+    });
+  }
+
+  const credentials: Record<string, string> = {};
+  if (billingClientId) credentials.billingClientId = billingClientId;
+  if (billingClientSecret) {
+    credentials.billingClientSecret = billingClientSecret;
+  }
+  return { config, credentials };
 }
 
 /**

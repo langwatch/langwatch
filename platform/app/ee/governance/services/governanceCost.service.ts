@@ -42,6 +42,11 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
+import { readClaimedSubscription } from "./activity-monitor/azureBillOwnership";
+import {
+  azureBillingNoteFrom,
+  type GovernanceAzureBillingNote,
+} from "./azureBillingNote";
 
 const logger = createLogger("langwatch:governance:cost");
 
@@ -168,6 +173,13 @@ export interface GovernanceCostSummaryDto {
   billed: GovernanceCostLaneDto;
   /** What the gateway metered as it served the traffic. */
   gateway: GovernanceCostLaneDto;
+  /**
+   * Why the Azure bill shows nothing, when a source claims one. Null when no
+   * bill is claimed, when the figures already speak for themselves, or when
+   * the first read has not completed yet. See `azureBillingNote.ts` for the
+   * closed list and its sentences.
+   */
+  azureBilling: GovernanceAzureBillingNote | null;
   seats: GovernanceSeatLaneDto;
   /** Oldest day first. Empty while unavailable. */
   series: GovernanceCostDayDto[];
@@ -196,6 +208,7 @@ function unavailable({
     unavailableReason: reason,
     billed: laneWithoutFigure(),
     gateway: laneWithoutFigure(),
+    azureBilling: null,
     seats: { status: "awaiting_data" },
     series: [],
     windowDays,
@@ -291,6 +304,7 @@ export class GovernanceCostService {
       unavailableReason: null,
       billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
+      azureBilling: await this.readAzureBillingNote({ organizationId, rows }),
       seats,
       series: seriesFrom(rows),
       windowDays,
@@ -343,6 +357,53 @@ export class GovernanceCostService {
       oldestLastSuccessIso: oldest.lastSuccessIso,
       sourceNames: stopped.map((source) => source.name).sort(),
     };
+  }
+
+  /**
+   * The Azure billing note, from the source that claims the bill.
+   *
+   * The rollup's `costSource` is the LANE (`pulled`), not the provider, and
+   * Azure is wave 1's only pulled producer — so pulled-lane content means
+   * Azure content today. The day a second pulled provider ships, this needs
+   * provider granularity from the rollup or it will read that provider's
+   * rows as Azure's; flagged in ADR-128 §21's open questions.
+   *
+   * At most one live source can claim a given subscription (the ownership
+   * guard refuses a second), and one claiming source is the whole deployed
+   * shape — so the first claim found speaks for the bill.
+   */
+  private async readAzureBillingNote({
+    organizationId,
+    rows,
+  }: {
+    organizationId: string;
+    rows: readonly LaneRow[];
+  }): Promise<GovernanceAzureBillingNote | null> {
+    const sources = await this.deps.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { parserConfig: true, pollerCursor: true },
+    });
+    const claiming = sources.find(
+      (source) =>
+        readClaimedSubscription(
+          source.parserConfig as Record<string, unknown> | null,
+        ) !== null,
+    );
+    if (!claiming) return null;
+
+    const parserConfig = claiming.parserConfig as Record<string, unknown>;
+    const cursor = parseCostCursor(claiming.pollerCursor);
+    return azureBillingNoteFrom({
+      claimsSubscription: true,
+      prepaidDeclared: parserConfig.azureBillingIsPrepaid === true,
+      hasAzureSpendRows: rows.some(
+        (row) =>
+          row.costSource === GOVERNANCE_COST_SOURCE.PULLED &&
+          (row.amountNanoUsd !== null || row.cellsWithoutAmount > 0),
+      ),
+      costPricedThroughDay: cursor.costPricedThroughDay,
+      costHeldSinceMs: cursor.costHeldSinceMs,
+    });
   }
 
   /**
@@ -423,6 +484,42 @@ type LaneRow = {
   cellsWithoutAmount: number;
   currenciesWithoutUsdAmount: string[];
 };
+
+/**
+ * The two cost fields off a source's poller cursor, read defensively.
+ *
+ * The column stores the cursor the puller handed back — a JSON string — but
+ * it is `Json?`, older writers stored objects, and a source that never pulled
+ * has null. Anything unreadable answers "no read has completed", which keeps
+ * the note silent rather than wrong: the failure mode of guessing here is a
+ * sentence about a bill nobody read.
+ */
+function parseCostCursor(pollerCursor: unknown): {
+  costPricedThroughDay: string | null;
+  costHeldSinceMs: number | null;
+} {
+  const none = { costPricedThroughDay: null, costHeldSinceMs: null };
+  let cursor: unknown = pollerCursor;
+  if (typeof cursor === "string") {
+    try {
+      cursor = JSON.parse(cursor);
+    } catch {
+      return none;
+    }
+  }
+  if (cursor === null || typeof cursor !== "object") return none;
+  const record = cursor as Record<string, unknown>;
+  return {
+    costPricedThroughDay:
+      typeof record.costPricedThroughDay === "string"
+        ? record.costPricedThroughDay
+        : null,
+    costHeldSinceMs:
+      typeof record.costHeldSinceMs === "number"
+        ? record.costHeldSinceMs
+        : null,
+  };
+}
 
 /**
  * The figure for a set of rows, withheld unless every cell behind it is priced

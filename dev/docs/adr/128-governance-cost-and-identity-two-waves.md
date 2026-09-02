@@ -903,7 +903,7 @@ the third lane.
 | Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
 | Billing credential keys (§21.1) | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId` | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret` |
 | Prepaid declaration (§21.4) | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false` | the only thing that licenses the prepaid sentence; never inferred |
-| Spend-lane reasons (§21.3) | `no_billing_credentials`, `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today); the screen maps each to a sentence, provider text never reaches the browser |
+| Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence); the screen maps each to a sentence, provider text never reaches the browser |
 | Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
 
 ## Invariants
@@ -921,7 +921,7 @@ the third lane.
 | Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
 | Identity grants nothing | no authz code path reads `DiscoveredPerson`/`DiscoveredAgent`/`IdentityMatch` | hard constraint 3; test: authz engine module has no import of identity tables |
 | Matches are dated and evidenced | every `IdentityMatch` row has evidence kind + validFrom; corrections close and reopen, never rewrite | §11/§12; unique-open-link constraint + test |
-| No figure we did not read | the spend lane renders a currency amount only when a cost read returned one; every other state renders a sentence from the closed reason list, never `0` and never blank | §21.3; table-driven test over all four reasons asserting each renders its sentence and **none** renders a currency amount |
+| No figure we did not read | the spend lane renders a currency amount only when a cost read returned one; every other state renders a sentence from the closed reason list, never `0` and never blank | §21.3; table-driven test over all three reasons asserting each renders its sentence and **none** renders a currency amount (`azureBillingNote.unit.test.ts`, digit-free assertion) |
 | The billing identity reads only money | the Resource Manager token is minted from `billingClientId`/`billingClientSecret`; the Dataverse and Graph tokens are minted from the bot's — no code path mints one from the other's credentials, and no fallback exists | §21.1; test: with billing credentials absent, the cost read is skipped and **zero** Resource Manager calls are made — asserted on the captured call list, not on the absence of a log line |
 | Billing secrets never echo | `billingClientSecret` is never returned to the browser on read or edit, and survives an edit that does not resend it | §21.2; `ingestionSourceSecretFields.unit.test.ts` extended to the new keys — merge blocker |
 | Prepaid is declared, never derived | the prepaid sentence is reachable only when `azureBillingIsPrepaid` is set; no code path sets it from response data | §21.4; test: zero-row cost read with seats present renders `no_spend_recorded`, not `prepaid_declared` |
@@ -956,7 +956,7 @@ the third lane.
 | Seat price list edits (admin) | yes (recompute at read heals) | small | none — audit-logged, no approval step |
 | Billing credential keys on the connection form (§21.2) | **no** — a secret echoed to a browser stays echoed | medium | human review of the form diff (both credential builders: `dashboard/pages/inventory.tsx:2647` create and `:2702-2708` edit — a change applied to one and not the other is the failure mode), **plus** `ingestionSourceSecretFields.unit.test.ts` extended to `billingClientSecret` as a merge blocker |
 | Dropping the bot-identity fallback for the cost read (§21.1) | yes (re-add credentials) | large — **every already-connected source's spend lane goes dark on deploy**, because none has billing credentials yet | automated: ships behind `release_ui_governance_billed_cost_enabled`; the lane must read `no_billing_credentials` with its sentence, never `0` and never a stale figure. Existing customers are asked for the billing grant, they are not silently degraded |
-| Spend-lane reason states (§21.3) | yes | medium (customer-visible money) | automated: the four-reason table-driven test + the no-currency-amount assertion; behind the existing flag |
+| Spend-lane reason states (§21.3) | yes | medium (customer-visible money) | automated: the three-reason table-driven test + the no-currency-amount assertion; behind the existing flag |
 
 ## Schema
 
@@ -1164,6 +1164,7 @@ money tables, only the identity tables and read paths.
 | Does a failed billing read count toward the source's `errorCount`? §21.5 fixes the *health colour*; the error counter is a separate mechanism — the cost read already refuses to feed it by contract (`azureCostManagement.ts:200`) | resolved v3.4 — it does not, verified |
 | The seat lane's `read_failed` fires only when our own store query throws (`governanceCost.service.ts:275-295`); a provider-side Graph 403 writes no rows and renders as `awaiting_data`. Same collapse §21.3 forbids for spend — does the seat lane get the same honesty pass? | Sergio — follow-up issue |
 | A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say *refused* vs *throttled*. Worth threading a reason through the cursor? | implementation PR or follow-up |
+| The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content — correct while Azure is the only pulled producer, wrong the day a second one ships (`governanceCost.service.readAzureBillingNote` says so in place) | before the second pulled provider lands |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
 | Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
