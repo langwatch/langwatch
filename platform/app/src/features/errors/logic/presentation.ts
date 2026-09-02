@@ -2164,6 +2164,24 @@ const presentations = {
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  // ADR-128 §7. A key belongs to one bill at a time, so that a dollar is never
+  // counted twice. All three of these are ordinary edits, not mistakes worth a
+  // trace id.
+  ingestion_source_key_already_covered: {
+    title: "Another bill already covers this key",
+    describe: () =>
+      "A key's spend can only be paid for by one bill at a time. Stop the other bill covering it first, or move the key across in one step.",
+  },
+  ingestion_source_coverage_not_midnight: {
+    title: "Coverage starts on a date, not at a time",
+    describe: () =>
+      "A bill can only take over a key from the start of a day. Pick a date.",
+  },
+  ingestion_source_coverage_not_after_start: {
+    title: "Pick a later date",
+    describe: () =>
+      "This key's current bill already starts on that date, so there is no day for it to have covered. Choose a date after it.",
+  },
 
   // ---- datasets ----
   dataset_name_taken: {
