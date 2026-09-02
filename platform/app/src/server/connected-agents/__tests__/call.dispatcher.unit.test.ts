@@ -635,6 +635,31 @@ describe("CallDispatcher", () => {
       });
     });
   });
+
+  describe("when the instance already runs its declared number of calls", () => {
+    /** @scenario "An instance that refuses a call as busy keeps the busy code" */
+    it("refuses with agent_busy, the code a caller retries", async () => {
+      await connectInstance({
+        instanceId: "inst_1",
+        behavior: async (_, reply) => {
+          await reply.result({
+            error: {
+              code: "agent_busy",
+              message: "support-agent already runs 4 call(s)",
+            },
+          });
+        },
+      });
+
+      await expect(
+        runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: call(),
+        }),
+      ).rejects.toMatchObject({ code: "agent_busy" });
+    });
+  });
 });
 
 describe("buildCallEnvelope", () => {
