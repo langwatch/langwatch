@@ -517,7 +517,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [AI Governance Overview](https://langwatch.ai/docs/ai-governance/overview.md): A personal tool home for developers and a governance home for admins.
+- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 - [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
@@ -532,19 +532,15 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Workspaces & Access
 
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
-- [Members & invites](https://langwatch.ai/docs/ai-governance/members-and-invites.md): Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
-- [Roles & permissions](https://langwatch.ai/docs/ai-governance/roles-and-permissions.md): The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
 - [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
-- [Audit log](https://langwatch.ai/docs/ai-governance/audit-log.md): Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
 
 ## Dashboards
 
 - [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
-- [Departments](https://langwatch.ai/docs/ai-governance/departments.md): A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
+- [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
 ## Privacy
 
-- [Data privacy policy](https://langwatch.ai/docs/ai-governance/data-privacy.md): One scoped, cascading policy that controls which trace content is stored, who can read it, and how PII and secrets are redacted, written once at the organization, department, team, or project level.
 - [No-spy mode (drop conversational content)](https://langwatch.ai/docs/ai-governance/no-spy-mode.md): The privacy posture for organizations that must not store employee conversational content, one Organization rule in the data privacy policy that drops input, output, and system instructions at ingestion while keeping cost and usage metadata.
 
 ## Sources

@@ -785,23 +785,19 @@
             "group": "Workspaces & Access",
             "pages": [
               "ai-governance/workspaces",
-              "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions",
-              "ai-governance/personas",
-              "ai-governance/audit-log"
+              "ai-governance/personas"
             ]
           },
           {
             "group": "Dashboards",
             "pages": [
               "ai-governance/governance-dashboard",
-              "ai-governance/departments"
+              "ai-governance/people"
             ]
           },
           {
             "group": "Privacy",
             "pages": [
-              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },
@@ -2033,6 +2029,26 @@
     {
       "source": "/agent-simulations/red-teaming",
       "destination": "/agent-testing/red-teaming"
+    },
+    {
+      "source": "/ai-governance/roles-and-permissions",
+      "destination": "/platform/rbac"
+    },
+    {
+      "source": "/ai-governance/audit-log",
+      "destination": "/platform/audit-log"
+    },
+    {
+      "source": "/ai-governance/data-privacy",
+      "destination": "/platform/data-privacy"
+    },
+    {
+      "source": "/ai-governance/members-and-invites",
+      "destination": "/platform/members-and-teams"
+    },
+    {
+      "source": "/ai-governance/departments",
+      "destination": "/ai-governance/people"
     }
   ]
 }

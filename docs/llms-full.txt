@@ -967,6 +967,8 @@ Click a row to open the member dialog:
 
 The seat panel above the table shows **Team Members** and **Lite Members** in use against the plan limits.
 
+Each member manages their own sign-in methods at **Settings > Authentication**: passkeys and the sign-in method of their account. An administrator cannot change another member's sign-in methods there.
+
 ## Invite people
 
 Click **Add members**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
@@ -15101,87 +15103,6 @@ Use these files as the authoritative reference when implementing a CLI command o
 
 ---
 
-# FILE: ./ai-governance/audit-log.mdx
-
----
-title: Audit log
-description: Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
-sidebarTitle: Audit log
----
-
-The audit log is the immutable record of every state-changing action in your LangWatch organization, who did what to which resource, when, from where. It lives at `/settings/audit-log` and shows up in the **Settings → Teams & Access** sidebar group.
-
-<Info>**Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the OCSF v1.1 export consumes the same event stream), [CLI debug](/ai-governance/cli-debug) (`langwatch governance status` mirrors the same setup-state signals the audit log records on first activation), and [Ingestion sources](/ai-governance/ingestion-sources) (S3 audit log feeds from external SaaS platforms, Workato, Copilot Studio, Anthropic Compliance, land here as OTel-shaped events through the same pipeline, so a single audit log query covers in-platform mutations *and* third-party-tool activity in one place).</Info>
-
-<Note>**Permission required**: the audit log surface is gated to `organization:manage` (admins). Members on the org see an "Access Restricted" panel when they navigate here directly. The underlying tRPC procedure is also gated server-side, so direct API calls return UNAUTHORIZED for non-admins.</Note>
-
-## What lands in the log
-
-Two streams write into the same `AuditLog` table, the audit log lists them interleaved by timestamp.
-
-| Stream | Source | Examples |
-|---|---|---|
-| **Platform** (control plane) | tRPC mutations on the Next.js app | `organization.createInvites`, `gatewayBudgets.create`, `ingestionSources.rotate`, `team.update`, `roleBinding.assignToUser`, `virtualKeys.create` |
-| **Gateway** (data plane) | Domain events emitted by the Go AI Gateway | `gateway.budget.created`, `gateway.virtualKey.minted`, `gateway.routingPolicy.applied` |
-
-A single user action often produces both: creating a Gateway Budget through the admin UI writes a `gatewayBudgets.create` Platform row *and* a `gateway.budget.created` Gateway row, both stamped with the same `targetId` so you can correlate them in the same view.
-
-## Columns
-
-Each row shows:
-
-| Column | Source | Notes |
-|---|---|---|
-| **Timestamp** | wall-clock at the time of the mutation | rendered with relative-age helper (`3 minutes ago`) plus the full local timestamp |
-| **Source** | Either `Platform` or `Gateway` chip | discriminator across the two streams |
-| **User** | Display name + email of the caller | empty for system-emitted gateway events with no human actor |
-| **Action** | Dotted action path (`organization.createInvites`) | exactly the tRPC procedure name or the Gateway domain event name |
-| **Target** | Two-line cell, kind on top, ID below | e.g. `budget`, `_pE3XIGR7XOoUwH8G3mcB` |
-| **Project** | Project name when the action was project-scoped | empty for org-level mutations |
-| **IP address** | Caller IP when present | omitted for server-side, scheduled jobs |
-| **Error** | Exception class + message when the action failed | empty for successful mutations |
-
-The Target column is populated by a recursive walker that handles every shape a tRPC mutation might return: a direct `{id}`, a wrapped `{source: {id}}`, an array of created entities (`[{invite: {id}}, ...]` for bulk-create like `organization.createInvites`), or a wrapped array. Walking depth is capped to surface the entity ID without leaking nested unrelated IDs.
-
-## Filtering
-
-Four filters across the top of the table:
-
-- **Search by User**: name or email substring match.
-- **Filter by Action**: substring match against the action path. Type `createInvites` to pin every invite-creation row across the org's history. The URL updates to `/settings/audit-log?actionFilter=<value>&pageOffset=0` so any filtered view is bookmarkable.
-- **Project**: dropdown of every project in the org plus an "All Projects" option. When two projects share the same display name (e.g. two users' "Personal Workspace"), the dropdown automatically appends a parent-team suffix (`Personal Workspace · Alice's Workspace`, `Personal Workspace · Bob's Workspace`) so they're disambiguated visually.
-- **Select Date**: preset windows (`Last 30 days`, `Last 7 days`, custom range).
-
-The four filters compose with AND. Pagination is below the table; **Items per page** can be set to 10, 25, 50, 100, 250.
-
-## Export
-
-**Export CSV** at the top right downloads the currently filtered view as a CSV. The CSV preserves every column shown in the table (plus a few rarely-rendered ones, `requestId`, `domainErrorCode`) so it round-trips into spreadsheets, BI tools, or your SIEM if you'd rather not wire the [OCSF API](/ai-governance/compliance-architecture) just to dump a quick incident timeline.
-
-## Retention
-
-Audit log retention follows your organization's [retention policy](/platform/data-retention), scoped per organization, team, and project. Configuring it requires an Enterprise plan; other plans use the platform default window. Organizations under SOC 2, ISO 27001, or HIPAA obligations usually set a multi-year period here.
-
-Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table is kept for fast UI lookups against the most recent year. The full model is described in [Compliance architecture](/ai-governance/compliance-architecture).
-
-## Common admin questions
-
-| Question | Where to look |
-|---|---|
-| Who invited the new contractor account? | Filter `Action: organization.createInvites`, scan **Target** for the invite ID, click into **Members → Invites** for the email. |
-| When did the budget for project Foo get raised? | Filter `Action: gatewayBudgets.update` + Project = Foo. The diff between two rows is the change. |
-| Why did the gateway start blocking requests? | Filter `Source: Gateway` + `Action: gateway.budget.breached`. Each breach event carries the budget ID. |
-| Did anyone touch SSO config last weekend? | Filter `Action: organization.update` + date range. SSO provider field changes appear in the diff payload. |
-| Was the rotation of the `lw_is_*` ingest secret recorded? | Filter `Action: ingestionSources.rotate`. The Target ID is the IngestionSource ID. |
-
-## Where to next
-
-- **Forward to your SIEM**: every row is OCSF v1.1 mapped and replayable via the cron-pull API. See [Compliance architecture](/ai-governance/compliance-architecture).
-- **Detect patterns automatically**: [Anomaly Rules](/ai-governance/anomaly-rules) operate on the same event stream and fire `AnomalyAlert` rows when thresholds are crossed.
-- **Programmatic reads**: the underlying tRPC procedure is `organization.getAuditLogs` (admin-only). The CSV export uses the same procedure with no pagination.
-
----
-
 # FILE: ./ai-governance/cli-debug.mdx
 
 ---
@@ -16120,388 +16041,6 @@ Governance sits behind a single fence on each surface:
   tail`): [CLI ingest debug](/ai-governance/cli-debug).
 - For the architecture deep-dive once published:
   `architecture.md` (in flight on this branch).
-
----
-
-# FILE: ./ai-governance/data-privacy.mdx
-
----
-title: Data privacy policy
-description: One scoped, cascading policy that controls which trace content is stored, who can read it, and how PII and secrets are redacted, written once at the organization, department, team, or project level.
-sidebarTitle: Data Privacy
----
-
-Traces carry the most sensitive material in your stack: user prompts,
-model responses, system instructions, tool arguments, and whatever
-credentials or personal data leaked into any of them. The **data
-privacy policy** is the single place to decide what happens to that
-content. One set of rules covers four concerns:
-
-1. **Content disposition**: whether each content category is stored
-   at all.
-2. **Audience visibility**: who can read the content that is stored.
-3. **PII redaction**: scrubbing personal data out of stored content.
-4. **Secrets redaction**: scrubbing credentials out of stored
-   content.
-
-Rules live under **Settings > Privacy** in your organization
-settings. A rule is written once at the scope it should govern, and
-every project underneath resolves it automatically.
-
-<Info>**Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the
-organization-wide posture built from this policy for enterprises that
-must not store employee conversational content, and
-[Compliance architecture](/ai-governance/compliance-architecture) for
-how privacy fits the broader audit story.</Info>
-
-## Content categories
-
-Four categories of trace content are governed independently:
-
-| Category | What it covers |
-|---|---|
-| **Input** | User prompts and request bodies |
-| **Output** | Model responses and completions |
-| **System instructions** | System prompts and instruction blocks |
-| **Tool calls** | Tool-call arguments and tool results |
-
-Each category is set to one of three dispositions: **Capture**,
-**Restrict**, or **Drop**.
-
-## The three dispositions
-
-| Disposition | Stored? | Who can read it |
-|---|---|---|
-| **Capture** (default) | Yes | The whole team |
-| **Restrict** | Yes | Only the audience chosen on the rule |
-| **Drop** | Never | No one, the content is stripped at ingestion |
-
-### Restrict or drop?
-
-**Restrict** keeps the data. Debugging stays possible for the chosen
-audience, the audience can be widened or narrowed at any time, and
-because the check runs at read time, an audience change applies
-immediately to every trace, including traces stored before the rule
-existed.
-
-**Drop** is the hard guarantee. The content is stripped in the
-ingestion pipeline and never written, so no later permission change,
-export, or breach can surface it. The cost is that no one can debug
-with it, and it cannot be undone for data that already arrived
-dropped.
-
-Choose Restrict when the question is *who may read this*. Choose Drop
-when the requirement is *this must not exist in storage*.
-
-### Drop covers every ingestion path
-
-A drop rule applies wherever the trace comes from:
-
-- the OpenTelemetry endpoint
-- the REST collector
-- AI gateway traffic
-- ingestion keys
-- coding-agent logs (for example Claude Code request bodies)
-
-### Observability metadata always survives
-
-Whatever is dropped or restricted, the trace skeleton stays useful:
-token counts, cost, model name, latency and timings, span structure,
-and status are always stored and always visible. You can answer "what
-did this run cost?" and "where did it fail?" without anyone reading
-the conversation.
-
-### Retroactivity
-
-| Setting | Acts at | Applies to |
-|---|---|---|
-| Drop | Ingestion | New traces only |
-| PII redaction | Ingestion | New traces only |
-| Secrets redaction | Ingestion | New traces only |
-| Restrict audience | Read time | All traces, existing ones included, immediately |
-
-Adding a drop rule does not scrub traces that are already stored. To
-age out content that landed before the rule existed, pair the rule
-with your retention setup (see
-[Compliance architecture](/ai-governance/compliance-architecture)).
-
-## Scopes and the cascade
-
-A rule is written at one of four scopes:
-
-| Scope | Governs |
-|---|---|
-| **Organization** | Every project in the organization |
-| **Department** | Every project assigned to that department |
-| **Team** | Every project under that team |
-| **Project** | That project only |
-
-Organization and Department rules can be narrowed to **personal
-projects only**: every user's personal CLI workspace, where
-coding-agent traffic lands. A personal project's department follows
-its owner, so a department rule narrowed this way covers the personal
-workspaces of that department's people.
-
-When a project resolves its policy, the cascade walks **Project, then
-Department, then Team, then Organization**, and for each setting the
-most specific tier that sets it wins. A department rule beats a team
-rule. Settings a rule
-leaves unset inherit from the next tier up, so a project can drop its
-input while inheriting the organization's PII level. Two fields
-accumulate across tiers instead of overriding: **custom drop keys**
-and **custom secret patterns** are unioned, so every tier's additions
-apply.
-
-### Worked example
-
-Acme writes two rules:
-
-1. An **Organization** rule narrowed to personal projects only:
-   **Input is dropped**. Prompts from every employee's personal
-   coding-agent workspace are never stored.
-2. A **Department** rule on the HR department: **Output is
-   restricted** to the organization's `HR` group. HR's assistants
-   handle sensitive employee conversations, so only HR staff may read
-   them.
-
-How three projects resolve:
-
-| Project | Input | Output | Why |
-|---|---|---|---|
-| `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; no rule sets input. |
-| Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
-
-All three projects also resolve **Essential** PII redaction and
-secrets redaction **on**: no rule sets those fields, so the platform
-defaults apply. If `hr-helpdesk` later adds a Project rule setting
-output back to Capture, that wins, because Project is the most
-specific tier.
-
-## Audiences
-
-A restricted category is readable by the audience picked on the rule:
-
-- **Admins**, the built-in administrator audience
-- **All members**, everyone with access to the project
-- any of the organization's **groups**
-- any of the organization's **departments**
-
-An empty audience means **no one** can read the content, admins
-included.
-
-Viewers outside the audience see a `[REDACTED]` placeholder in place
-of the content, together with the reason: which privacy policy hid it
-and which audience can see it. Metadata (cost, tokens, latency,
-status) stays visible to everyone with project access.
-
-## Secrets redaction
-
-Secrets redaction is **on by default for every project**.
-Coding-agent traces are full of live credentials, so the safe default
-is to scrub them. It runs natively in the ingestion pipeline and
-replaces each detected secret with a redaction placeholder, leaving
-the surrounding text intact. How detection decides what is a
-credential is covered on
-[Secrets redaction](/coding-agents/secrets-redaction).
-
-The built-in catalog covers:
-
-- cloud and provider API keys: AWS, GitHub, OpenAI, Anthropic, Slack,
-  Google, Stripe
-- JWTs
-- private key blocks
-- database connection-string passwords
-- bearer tokens
-- values under obviously-sensitive attribute names (for example
-  `authorization`)
-
-### Custom patterns
-
-Add your own regular expressions for company-specific secrets, for
-example tokens shaped like `acme_live_...`. Patterns are validated
-when the rule is saved: a pattern that risks catastrophic
-backtracking is rejected. Custom patterns accumulate down the
-cascade, so a team's patterns apply on top of the organization's.
-
-### Turning it off
-
-A rule can disable secrets redaction for its scope.
-
-<Warning>With secrets redaction off, any credential pasted into a
-prompt or returned by a tool is stored in the clear. Turn it off only
-when you are certain no real credentials transit the projects in
-scope.</Warning>
-
-## PII redaction
-
-| Level | What it redacts | How it runs |
-|---|---|---|
-| **Disabled** | None | No scanning at all |
-| **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
-| **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
-
-Like secrets, detected PII is replaced with a redaction placeholder.
-
-<Note>Credit card numbers are validated before redaction, so a random
-16-digit order id in your traces is left intact.</Note>
-
-## Custom drop keys
-
-A rule can list extra span attribute keys to strip at ingestion, on
-top of the built-in catalog, for example `http.request.body`. Like
-custom secret patterns, drop keys accumulate across tiers: keys added
-at the organization, department, team, and project levels all apply.
-
-## Defaults
-
-With no rule anywhere in the cascade, a project resolves to:
-
-| Setting | Default |
-|---|---|
-| Input | Captured, visible to the whole team |
-| Output | Captured, visible to the whole team |
-| System instructions | Captured, visible to the whole team |
-| Tool calls | Captured, visible to the whole team |
-| PII redaction | Essential |
-| Secrets redaction | On |
-| Custom drop keys | None |
-| Custom secret patterns | None |
-
-Privacy is default-on: secrets and essential PII are scrubbed before
-you write a single rule.
-
-## Permissions
-
-Rules are managed under **Settings > Privacy**. Writing a rule
-requires the permission matching its scope:
-
-| Rule scope | Required permission |
-|---|---|
-| Organization | Organization manage |
-| Department | Organization manage |
-| Team | Team manage |
-| Project | Project update |
-
-## Where to next
-
-- [No-spy mode](/ai-governance/no-spy-mode): the organization-wide
-  drop posture for employee coding assistants, built from this
-  policy.
-- [Compliance architecture](/ai-governance/compliance-architecture):
-  retention classes, OCSF export, and the audit substrate around the
-  trace store.
-- [Roles and permissions](/ai-governance/roles-and-permissions): how
-  the manage and update permissions are granted.
-
----
-
-# FILE: ./ai-governance/departments.mdx
-
----
-title: Departments
-description: A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
-sidebarTitle: Departments
----
-
-A **department** is an accounting label for spend. You name departments (Engineering, Marketing, ...) once, assign people, teams, and projects to them, and spend rolls up by department across the whole org, including each person's personal AI use.
-
-Departments answer a question the team and per-user views cannot: *"are Marketing people spending more than Engineering people, including their personal AI use?"*. Teams are a many-to-many access construct (a person can be in several), so they are a poor single attribution key, and RBAC roles answer authorization, not accounting. A department is single-valued per person per org, so every dollar lands in exactly one bucket.
-
-<Info>**Pairs with:** [Governance dashboard](/ai-governance/governance-dashboard) for the **Spend by department** card, [Members & invites](/ai-governance/members-and-invites) and [Workspaces & access](/ai-governance/workspaces) for where you assign them, and [Roles & permissions](/ai-governance/roles-and-permissions) for why departments are *not* access control.</Info>
-
-<Note>**Departments are pure accounting.** They never grant or restrict access. Assigning someone to "Engineering" changes how their spend is attributed, nothing else.</Note>
-
-## How spend is attributed
-
-Every trace that hits the gateway resolves to exactly one department, picked by this precedence:
-
-1. **The principal user's department.** If the trace has a principal user and that user is assigned to a department, it wins.
-2. **The user's team department (inherited).** If the principal user has no own department, the department of their team is used.
-3. **The project's department.** A trace with no principal user (an autonomous agent) attributes to the department of the project it ran in.
-4. **Unassigned.** If none of the above resolve, the trace rolls up under **Unassigned**.
-
-The principal user's department always wins over the project's, and a trace is counted once. So a developer's personal AI use and the autonomous agents their team builds can land in the same department.
-
-## Where you assign departments
-
-An org can have tens of thousands of members, so assignment lives on the pages that already paginate the org chart, not as one flat list:
-
-| Surface | What you assign | Where |
-|---|---|---|
-| **People** | A member's department. Their spend, including personal AI use, rolls up to it. | [Members page](/ai-governance/members-and-invites), per row |
-| **Teams** | A team's department. The default its members and projects inherit when they have none of their own. | Teams page, per row |
-| **Projects** | A project's department. Agent spend with no human principal rolls up here. | Project settings |
-
-The **departments page** itself only creates, renames, and archives departments, and links out to those surfaces. It never renders a per-person assignment list, so it stays usable in a large org.
-
-<Frame caption="On the members page each person carries a Department column. The picker assigns that member's spend, including their personal AI use, to a department.">
-  ![Members department assignment](/images/ai-governance/departments/members-assignment.png)
-</Frame>
-
-<Frame caption="On the teams page each team row carries the same picker. A team's department is the default its members and projects inherit when they have none of their own.">
-  ![Teams department assignment](/images/ai-governance/departments/teams-assignment.png)
-</Frame>
-
-### Managing departments
-
-Open the departments page under **Governance → People** (`/governance/people`) to:
-
-- **Create** a department by name (Engineering, Marketing, ...).
-- **Edit** a department's name.
-- **Archive** a department you no longer use.
-
-It belongs to your organization; a member of another org never sees it.
-
-<Frame caption="The departments page lists each department with a kebab menu for Edit and Archive. The page only creates, renames, and archives; it never renders a per-person assignment list.">
-  ![Departments page](/images/ai-governance/departments/departments-page.png)
-</Frame>
-
-<Frame caption="Edit opens a drawer with a single Name field. Saving renames the department and the list updates in place.">
-  ![Edit department drawer](/images/ai-governance/departments/department-edit-drawer.png)
-</Frame>
-
-## SCIM auto-assignment
-
-For organizations that provision identities through SCIM, assignment is automatic. The SCIM 2.0 Enterprise User extension carries a standard `costCenter` attribute, so an IdP (Okta, Entra ID, ...) can drive department membership the same way it drives department or division. Manual per-row assignment is the fallback for orgs without SCIM.
-
-| IdP action | Result in LangWatch |
-|---|---|
-| Provisions a user whose `costCenter` is `Engineering` | The user's membership carries department "Engineering" |
-| Provisions a user whose `costCenter` is a name that does not exist yet | The department is **created on first use** and the user is assigned to it |
-| Updates a user's `costCenter` from `Engineering` to `Marketing` | The assignment is **replaced**, not added; the user carries "Marketing" |
-| Removes a user's `costCenter` attribute | The user is unassigned; their spend rolls up under **Unassigned** |
-
-## Archiving
-
-Archiving a department is non-destructive:
-
-- It no longer appears in the assignment picker on the members, teams, and project surfaces.
-- Spend previously attributed to it rolls up under **Unassigned** rather than disappearing.
-
-Assignments are never nulled on archive. The rollup maps a stored department back to a name through the active departments only, so an archived department's spend resolves as Unassigned without any backfill. Reusing an archived department's name for a new active one is allowed.
-
-## Spend by department on the dashboard
-
-The [governance dashboard](/ai-governance/governance-dashboard) renders a **Spend by department** card. Each department's total includes spend from personal projects, team projects, and agent projects attributed to it, aggregated across **every project in the org**.
-
-This is the cross-org view: the card is not limited to a single governance ingestion project, so a fully active org with no dedicated ingestion source still sees real numbers. The Marketing-versus-Engineering comparison reads from departments, not from RBAC roles or team-membership counts.
-
-Every underlying query is tenant-isolated: a department rollup for your org contains zero spend from any other org.
-
-## Permissions
-
-- Reading the department list requires `governance:view`, which is also what opens the page.
-- Creating, renaming, and archiving departments requires `governance:manage` (granted to ADMIN by default). Without it, the page shows the list and hides the write controls.
-- Assigning people, teams, and projects to a department happens on the respective surfaces under the same `governance:manage` permission.
-- Departments never appear in any access-control decision. They are an accounting dimension only.
-
-## Where to next
-
-- **See the rollup:** [Governance dashboard](/ai-governance/governance-dashboard).
-- **Assign people:** [Members & invites](/ai-governance/members-and-invites).
-- **Understand access vs accounting:** [Roles & permissions](/ai-governance/roles-and-permissions).
-- **Provision via SCIM:** [Workspaces & access](/ai-governance/workspaces).
 
 ---
 
@@ -18235,123 +17774,6 @@ If every step succeeds and step 5 returns the matching audit rows, an agent can 
 
 ---
 
-# FILE: ./ai-governance/members-and-invites.mdx
-
----
-title: Members & invites
-description: Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
-sidebarTitle: Members & invites
----
-
-The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
-
-<Info>**Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role change, and removal records a row).</Info>
-
-<Note>**Permissions**: `/settings/members` requires `organization:manage` (admins). Members navigating here directly see an "Access Restricted" panel. The underlying tRPC procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`, `organization.deleteMember`, `organization.updateMemberRole`) are also gated server-side.</Note>
-
-## What admins see at `/settings/members`
-
-Three sections, top to bottom.
-
-### Organization Members
-
-A table of every active member. Columns:
-
-| Column | What it shows |
-|---|---|
-| **Name** | Display name + avatar |
-| **Email** | The address they sign in with |
-| **Access** | Per-team role chips, `ADMIN on Marketing`, `MEMBER on Engineering`, etc. Stacks vertically when a user is on multiple teams. |
-| (overflow menu) | Per-row actions: Change role, Remove from org, View access breakdown. |
-
-The table reflects every `OrganizationUser` row plus their `TeamUser` rows. Personal-workspace teams owned by other users are hidden from non-admin viewers (a privacy boundary documented in [Workspaces](/ai-governance/workspaces#personal-workspace-privacy)).
-
-### Invites
-
-Pending invitations the admin sent that haven't been accepted yet. Columns: Email, Status, Role, Teams, (revoke action).
-
-`Status` is one of:
-
-- `INVITED`, invite link sent, not yet accepted.
-- `WAITING_APPROVAL`, invite request created by a member (not an admin) via the [self-service request flow](#self-service-invite-requests-non-admin-flow); waiting for an admin to approve.
-- `EXPIRED`, invite token timed out (24h default).
-
-Click a row to copy the invite link or revoke it.
-
-### Invite Requests (when applicable)
-
-When a non-admin member proposes a new invite via `createInviteRequest`, the row lands in this section instead of **Invites**. Admins see who requested the invite, for whom, with what proposed role + team(s), and can **Approve** (issues the actual invite) or **Reject** (deletes the request).
-
-## Adding a single member
-
-The fast path:
-
-1. Click **+ Add members** at the top right of the table.
-2. In the upsert drawer, type one or more emails (comma-separated).
-3. Pick the **Organization role**: `Admin` or `Member`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
-4. Tick **Lite Member** for anyone who should only read what the team produces rather than change it. This is the same choice as the `External` org role, and it is what decides whether they occupy a full or a lite seat. The (i) next to it lists exactly what they can see; [Seats](/ai-governance/roles-and-permissions#seats) has the full breakdown.
-5. Under **Team Assignments**, pick which teams + which team-level role per team (`Admin`, `Member`, `Viewer` per team). One row per team; click **+ Add team** to scope to multiple teams.
-6. Click **Send invites**.
-
-What happens next:
-
-- Each email gets a one-click accept link (token TTL 24h, configurable per-org).
-- A row appears under **Invites** with status `INVITED`.
-- The audit log records `organization.createInvites` with the invite's ID as the target, see [Audit log](/ai-governance/audit-log) for how to read this back.
-
-When the invitee clicks the link they land on `/auth/signin`, sign in via your company SSO (or email + password if your deployment runs the open-core flow), and end up on `/me` with their assigned org role + team memberships pre-applied. From there, point them at the [developer walkthrough](/ai-governance/getting-started-developer).
-
-## Bulk invites
-
-The same drawer accepts comma-separated emails. Each email gets its own invite row + audit log entry. Bulk creates respect the org's [seat limit](/ai-governance/control-plane#seat-limits): once the limit hits, the bulk action returns `LimitExceededError` and emits a `usageLimits.notify` event.
-
-## Self-service invite requests (non-admin flow)
-
-Some orgs let members propose invites without granting them `organization:manage`. This is the `createInviteRequest` flow, different from the admin `createInvites`:
-
-- **Permission**: `organization:view` (which all members have by default).
-- **Role**: restricted to `MEMBER` or `EXTERNAL` only, never `ADMIN`. Self-service can't escalate privilege.
-- **Status**: lands as `WAITING_APPROVAL` until an admin approves it via `approveInvite`.
-
-If your org doesn't want this surface, omit the **Request invite** UI element, there's no separate gate to disable. The procedure is always reachable but produces a request, not an invite.
-
-## Changing a member's role
-
-From the **Organization Members** table, click the overflow menu next to a row → **Change role**. Pick a new org role, optionally adjust team-level roles. Click **Save**.
-
-The change is immediate. The audit log records `organization.updateMemberRole` and `team.updateMemberRole` (one row per affected team) so you can reconstruct the timeline of who held what role on what date.
-
-Caveats:
-
-- You can't demote yourself if you're the last admin, the form returns `LAST_ADMIN_PROTECTED`.
-- You can't elevate an `EXTERNAL` user past `MEMBER` without first removing the External lite-member flag.
-- Role changes don't break existing sessions; they take effect on the next request the user makes (the permission resolver is per-request, not session-cached beyond the JWT TTL).
-
-## Removing a member
-
-Overflow menu → **Remove from org**. The user loses every team membership, every role binding, and every Personal Virtual Key they minted (revoked on the gateway via the same RBAC chain). Their existing audit log rows stay, removal doesn't rewrite history.
-
-## Per-user sign-in methods at `/settings/authentication`
-
-What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
-
-- **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
-- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
-- **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 *and* the admin hasn't enforced one provider.
-
-The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
-
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
-
-## Where to next
-
-- **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
-- **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
-- **Audit who did what when**: [Audit log](/ai-governance/audit-log).
-
----
-
 # FILE: ./ai-governance/no-spy-mode.mdx
 
 ---
@@ -18518,107 +17940,116 @@ Turning on the Enterprise feature surface takes a real signed license key. There
 # FILE: ./ai-governance/overview.mdx
 
 ---
-title: AI Governance Overview
-description: A personal tool home for developers and a governance home for admins.
+title: AI Governance
+description: An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
 sidebarTitle: Overview
+keywords: ai governance, ai inventory, ingestion sources, tool catalog, anomaly rules, departments, langwatch
 ---
 
-LangWatch gives every developer a personal home for Claude Code, Codex, Cursor, Gemini, opencode, and every other AI tool the company approves. Admins get a governance home for spend, sources, routing, anomalies, and audit trails.
+AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
 
-## How it feels day to day
+The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Anomaly Rules** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
 
-### For a developer
+## The overview page
 
-`langwatch login` opens a device-flow approval in the browser, comes back to the CLI ready to wrap any supported tool.
+The overview at `/governance` shows the last 30 days: spend over time, the spend share across teams, the top teams and users by spend, spend by department, the recent anomalies and the status of each ingestion source. Before the first source reports activity, the page shows a setup checklist instead: add tools to the catalog, define a routing policy, connect an ingestion source and define anomaly rules.
 
-<Frame caption="`langwatch login` opens a device-flow approval in the browser. SSO already linked through the org's identity provider, pre-filled user code, single Approve button.">
-  ![Device flow approval](/images/ai-governance/cli-flow/02-device-flow-approval.png)
-</Frame>
+## Pages
 
-<Frame caption="Back in the terminal: 'Logged in as you@org.com'. The session is persisted to ~/.langwatch/config.json. From this point every wrapper call is attributed to the user.">
-  ![CLI login success](/images/ai-governance/cli-flow/03-cli-login-success.png)
-</Frame>
+<CardGroup cols={2}>
+  <Card title="Inventory: sources" icon="plug" href="/ai-governance/ingestion-sources/index">
+    The systems that report AI activity to LangWatch: Claude Code, generic OpenTelemetry, Workato, Microsoft Copilot Studio, the OpenAI and Anthropic compliance and admin APIs, Databricks Genie, and custom S3 or HTTP audit logs. Each source shows whether it is active, awaiting its first event or disabled.
+  </Card>
+  <Card title="Inventory: tool catalog" icon="grid-2" href="/ai-governance/personal-portal/admin-catalog">
+    The coding assistants, model providers and external tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
+  </Card>
+  <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
+    Rules with a severity (Critical, Warning or Info) and a scope (the organization, one source type or one source) that raise an alert when activity crosses a threshold. Available on Enterprise plans.
+  </Card>
+  <Card title="People" icon="users" href="/ai-governance/people">
+    Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
+  </Card>
+  <Card title="Personal home page" icon="house-user" href="/ai-governance/personal-portal/overview">
+    `/me` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
+  </Card>
+  <Card title="Roles and permissions" icon="user-shield" href="/platform/rbac">
+    Who can open the governance pages and who can change them: `governance:view` and `governance:manage`, plus the permissions for ingestion sources, anomaly rules and the tool catalog.
+  </Card>
+  <Card title="Audit log" icon="scroll" href="/platform/audit-log">
+    Every change made in the settings, the API and the LangWatch AI Gateway, with who made it and from where.
+  </Card>
+</CardGroup>
 
-<Frame caption="`langwatch claude` (or codex, cursor, gemini, opencode) just works. The wrapper pre-injects gateway env vars, the underlying tool is unchanged, every request is gateway-routed and cost-attributed.">
-  ![CLI wrapped tool](/images/ai-governance/cli-flow/04-cli-wrapped-tool.png)
-</Frame>
+**Also check:** [Coding Agents](/coding-agents/overview) for the cost and activity of each coding agent session, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys and budgets.
 
-The Personal AI Tools Portal at `/me` is the dashboard for everything they have access to.
+---
 
-<Frame caption="The Personal AI Tools Portal at /me. Tiles for Claude Code, Codex, Cursor, Gemini, opencode wrappers, per-provider Virtual Key issuance, admin-curated internal tools. Click a tile, follow the install drawer, copy one command.">
-  ![Personal portal populated](/images/ai-governance/post-bypass/01-me-portal.png)
-</Frame>
+# FILE: ./ai-governance/people.mdx
 
-Below the tools, the live usage panel shows this month's spend against the personal budget, request count, the daily-bucket cost chart, and the model breakdown.
+---
+title: People
+description: Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
+sidebarTitle: People
+keywords: departments, people, spend attribution, cost center, scim, langwatch
+---
 
-<Frame caption="The /me usage panel below the tile fold. SPENT-of-budget gauge, request count, MOST-USED model with share, Spending-over-time daily bar chart, By-tool breakdown.">
-  ![My usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
-</Frame>
+A department is an accounting label for AI spend. You create departments on the **People** page, assign people, teams and projects to them on the members and teams pages, and the governance overview shows spend by department for the whole organization.
 
-Every span the wrapper produces lands in the developer's own Trace Explorer, with cost, tokens, duration, and model attributed to them.
+A department never grants or restricts access. Assigning a person to Engineering changes where their spend is counted and nothing else. For access, see [Access Control (RBAC)](/platform/rbac).
 
-<Frame caption="Trace Explorer at /[personal-project]/traces. Real populated traces with tokens, cost, duration columns. The same explorer admins use, scoped to the developer's own workspace.">
-  ![Trace explorer populated](/images/ai-governance/post-bypass/12-traces-populated.png)
-</Frame>
+## Manage departments
 
-> Subscription-based tools that authenticate client-side (a personal Anthropic 20x plan, an OpenAI Enterprise plan, a Cursor with a custom endpoint) skip the Virtual Key proxy path entirely. The direct-OTLP route is documented in [Ingestion templates](/ai-governance/ingestion-templates).
+Open **AI Governance > People** (`/governance/people`). The page has:
 
-### For an admin
+- **Create a department**: type a name and click **Create**.
+- The department list, with **Edit** to rename and **Archive** in the row menu.
+- **Assigning departments**: links to the members and teams pages, where you assign each person, team and project.
 
-The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+Reading the list needs `governance:view`. Creating, renaming, archiving and assigning need `governance:manage`. Without it the page shows the list only.
 
-<Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
-  ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
-</Frame>
+## Assign people, teams and projects
 
-The Tool Catalog at `/governance/inventory?tab=catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
+The People page does not list assignments per person, so it stays usable in a large organization. Assign on the pages that already list the people and teams:
 
-<Frame caption="Tool Catalog editor. Three tile classes, preset picker, custom icon upload, scope binding, publish lifecycle.">
-  ![Tool catalog editor](/images/ai-governance/post-bypass/07-tool-catalog.png)
-</Frame>
+| What | Where | Effect |
+|------|-------|--------|
+| A person | **Settings > Members**, the **Department** column | The person's spend, including their personal AI use, rolls up to this department |
+| A team | **Settings > Teams & Projects**, the picker on the team row | The default for the team's members and projects that have no department of their own |
+| A project | **Settings > Teams & Projects**, the picker on the project row | Spend of agents that run in the project with no person behind the request |
 
-Every governance mutation lands in the audit log, with filterable URL state and CSV export.
+The Department column and the pickers appear once the organization has at least one department, for a viewer with `organization:manage`.
 
-<Frame caption="The audit log table shows real entries, target, user, project, and outcome.">
-  ![Audit log](/images/ai-governance/post-bypass/08-audit-log.png)
-</Frame>
+## How spend is attributed
 
-## What it covers
+Each request counts once, in exactly one department.
 
-- **Coding assistants**: Claude Code, Codex, Cursor, Gemini CLI, opencode. The wrapper CLI signs the user in, mints a Personal Virtual Key, and routes every request through the gateway.
-- **Provider Virtual Keys**: per-user keys for Anthropic, OpenAI, Bedrock, Gemini. Drop them into your app config, same gateway, same budget, no provider secret in dotfiles.
-- **Direct OTLP ingestion**: see [Ingestion templates](/ai-governance/ingestion-templates).
-- **External AI platforms**: Workato, Microsoft Copilot Studio, OpenAI Enterprise Compliance, Anthropic Compliance API, generic S3 audit-log drops. They land in the same trace store as everything else.
-- **Anomaly detection**: admin-defined rules for spend spikes, geo mismatch, and off-hours activity, all folded from the same event stream.
-- **Compliance and SIEM export**: every event is OCSF v1.1 mapped, replayable to Splunk, Datadog Security, Sentinel, and Elastic Security via cron pull.
+For a request made by a person, LangWatch uses the first of these that is set: the person's own department, the department of their team, the department of the project the request ran in. For a request with no person behind it, for example an autonomous agent, LangWatch uses the department of the project. A project's department is its own, or the one inherited from its team.
 
-## Two personas
+A request that matches none of these is counted under **Unassigned**.
 
-LangWatch governance is shaped around two people who never need the same screen:
+The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The **Spend by department** card on the [overview](/ai-governance/overview) shows the result for the last 30 days, across every project in the organization.
 
-- **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal, Team, and Project workspaces. They never see the admin surface.
-- **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
+## Archive a department
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
+Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on; the assignments stay stored, so nothing is deleted. You can create a new department with the same name as an archived one.
 
-## Get started
+## Assign departments through SCIM
 
-- **Developer**: [First 5 minutes](/ai-governance/getting-started-developer). Install the CLI, sign in via SSO, run your first request, read your spend back.
-- **Admin**: [First 30 minutes](/ai-governance/getting-started-admin). Publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, write your first spend-spike anomaly rule.
-- **Drive governance from an agent**: every governance feature has a [REST API](/ai-governance/api), [CLI](/ai-governance/cli), and [MCP server](/ai-governance/mcp). Customers can fully set up governance via Claude Code or any MCP-capable agent.
+When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension:
 
-## Reference
+| The identity provider sends | LangWatch |
+|-----------------------------|-----------|
+| A `costCenter` that matches an active department | Assigns the user to it |
+| A `costCenter` that matches no active department | Creates the department and assigns the user |
+| A new `costCenter` value on an update | Replaces the assignment |
+| An empty `costCenter`, or removes the attribute | Clears the assignment; the user's spend counts under Unassigned |
+| No `costCenter` in the request | Leaves the assignment as it is |
 
-- [Personas](/ai-governance/personas): who sees what
-- [Workspaces, members, roles](/ai-governance/workspaces): Personal, Team, Project scopes
-- [`/governance` dashboard](/ai-governance/governance-dashboard): daily admin home
-- [Ingestion templates](/ai-governance/ingestion-templates): admin-curated catalog for direct-OTLP ingestion
-- [Ingestion sources](/ai-governance/ingestion-sources/index): Workato, Copilot Studio, Compliance APIs, S3
-- [Anomaly rules](/ai-governance/anomaly-rules)
-- [Audit log](/ai-governance/audit-log)
-- [Compliance architecture](/ai-governance/compliance-architecture): OCSF, retention, SIEM
-- [No-spy mode](/ai-governance/no-spy-mode): content-stripping for privacy-locked enterprises
-- [Open-core licensing](/ai-governance/open-core-licensing): what's Apache 2.0 vs Enterprise
+## Where else a department applies
+
+A [data privacy](/platform/data-privacy) rule can be written at department scope, and a tile in the [tool catalog](/ai-governance/personal-portal/admin-catalog) can be scoped to departments.
+
+**Also check:** [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for the pages where you assign departments.
 
 ---
 
@@ -19490,167 +18921,6 @@ The same one-click pattern applies for `openai_compliance` and
   for live inspection of pulled events
 - [Compliance architecture](/ai-governance/compliance-architecture):
   how pulled events flow through the unified observability substrate
-
----
-
-# FILE: ./ai-governance/roles-and-permissions.mdx
-
----
-title: Roles & permissions
-description: The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
-sidebarTitle: Roles & permissions
----
-
-LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
-
-- **Two layers**: *organization roles* (org-wide capabilities, e.g. `ADMIN`, `MEMBER`, `EXTERNAL`) and *team roles* (per-team capabilities, e.g. `ADMIN`, `MEMBER`, `VIEWER`).
-- **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
-- **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
-
-The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
-
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
-
-## Organization roles
-
-The three pre-built org roles. Each user in the org has exactly one.
-
-| Org role | Defaults | What it grants by default |
-|---|---|---|
-| **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
-| **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)). |
-
-The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
-
-## Seats
-
-Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
-
-- A **full seat** is someone who can change things.
-- A **lite seat** is someone who can only look at what the team produces.
-
-ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
-
-Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
-
-### What a lite member can do
-
-They can open the projects they are invited to and read what the team produces there:
-
-| They can see | They cannot |
-|---|---|
-| Traces, including the detail view | See costs |
-| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
-| Evaluations and their results | Invite anyone or change roles |
-| Scenario runs | Manage the gateway, virtual keys or budgets |
-| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
-| Their own team | |
-| The names of the project's secrets, never their values | |
-
-Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
-
-These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
-
-<Note>
-Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
-</Note>
-
-### Choosing between them
-
-The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
-
-## Team roles
-
-The four pre-built team roles. A user can have **different** team roles on different teams (`ADMIN` on Engineering, `VIEWER` on Marketing).
-
-| Team role | What it grants by default |
-|---|---|
-| **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
-| **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
-| **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
-
-A user's effective permissions on a resource are the **union** of every binding that applies, org-level baseline + team-level baseline + any custom-role overrides.
-
-## Permission catalog
-
-Every gate in the codebase is a string of the shape `<resource>:<verb>`. The full catalog (abridged):
-
-- **Organization**: `organization:view`, `organization:manage`, `organization:delete`.
-- **Governance**: `governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`.
-- **AI Tools Portal**: `aiTools:view` (everyone), `aiTools:manage` (admin).
-- **Audit log**: `auditLog:view` (team-level by default; **note** the audit log UI page is gated to `organization:manage`, the underlying procedure is on `auditLog:view`).
-- **Per-team resources**: `project:*`, `analytics:*`, `traces:*`, `virtualKeys:*`, `gatewayBudgets:*`, `gatewayProviders:*`, `routingPolicies:*`, `gatewayGuardrails:*`, `gatewayLogs:*`, `gatewayUsage:*`, `gatewayCacheRules:*`, `evaluations:*`, `datasets:*`, `workflows:*`, `prompts:*`, `scenarios:*`, `secrets:*`.
-
-## What `organization:manage` gates today
-
-The legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
-
-Picker procedures (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) intentionally stay on `organization:view` so non-admin pickers (the AddAutomationDrawer, GroupBindingInputRow, project pickers, onboarding flows) continue working, but they redact other members' email addresses to `null` for non-admin callers and strip other users' [Personal Workspaces](/ai-governance/workspaces#personal-workspace-privacy) from the result entirely.
-
-## The role catalog at `/settings/roles`
-
-The catalog page lists every role available in the org:
-
-- 4 pre-built org roles (ADMIN, MEMBER, EXTERNAL, VIEWER).
-- 4 pre-built team roles (ADMIN, MEMBER, VIEWER, CUSTOM).
-- Any custom roles your admin has authored (see below).
-
-Pre-built rows are **read-only**: you can't change what `MEMBER` does, because the gateway and the control plane both encode those defaults. Custom rows are editable.
-
-## Custom roles
-
-Custom roles are how you say "let `bob@acme.test` manage the AI Tools Portal but not the rest of the org." They're a `RoleBinding` row whose `role = "CUSTOM"` and whose `customRoleId` references a `CustomRole` row whose `permissions` JSON column lists exactly the gates that role grants.
-
-To create one:
-
-1. Open `/settings/roles` → **+ New custom role**.
-2. Name the role (e.g. `aitools-curator`).
-3. Tick the permissions to grant. Permissions are scope-aware, granting `aiTools:manage` at organization scope is different from granting it at team scope.
-4. Save.
-
-To **bind** the role to a user:
-
-1. Open `/settings/role-bindings` → **+ New binding**.
-2. Pick the user, pick the role (`aitools-curator` from the catalog), pick the scope (`Organization`, a specific team, a specific project, a governance subscope).
-3. Save.
-
-The binding is now active. The user's effective permissions are the union of:
-
-- Their org-role defaults (e.g. MEMBER → `organization:view` + `aiTools:view`).
-- Their team-role defaults for every team they're on.
-- The new custom binding (`aiTools:manage` at org scope).
-
-## Role bindings at `/settings/role-bindings`
-
-The bindings page is a **deep table**: every active `RoleBinding` row in the org. Filter by user, role, scope, or scope target. The most common admin questions:
-
-| Question | Filter |
-|---|---|
-| Who can manage the AI Tools Portal? | Role = `aiTools-curator` (or any custom role granting `aiTools:manage`). |
-| Who has admin on the Marketing team? | Role = `ADMIN`, Scope = `Team`, Scope target = Marketing. |
-| What does `bob@acme.test` actually have access to? | User = bob. Cross-reference with the [permission catalog](#permission-catalog) for what each role grants. |
-| Has anyone been bound at `Organization` scope to `MEMBER`? | Role = `MEMBER`, Scope = `Organization`. (Note: org-scoped MEMBER bindings do NOT imply team- or project-level access, the resolver is hierarchical.) |
-
-The page is the answer to "who can do what in this org." Every change records an audit log row.
-
-## How permissions resolve at request time
-
-A request hitting any `*:manage`-gated procedure flows through `checkOrganizationPermission` (or `checkTeamPermission` for team-scoped procs), which:
-
-1. Walks the user's role bindings.
-2. Builds the effective permission set as the union of: org-role defaults + every team-role default the user has + every custom-role permission via active bindings.
-3. Returns `true` if the requested permission is in the set.
-
-The resolver is **per-request**. Permission changes take effect on the next request from the user, there's no session-level cache. JWT TTL (1h) is the upper bound on how long a stale grant can leak via existing tokens.
-
-## Where to next
-
-- **Invite someone with a specific role**: [Members & invites](/ai-governance/members-and-invites).
-- **Audit who did what**: [Audit log](/ai-governance/audit-log).
-- **Gateway-side enforcement**: [AI Gateway → RBAC](/ai-gateway/rbac).
-- **Workspace scoping**: [Workspaces](/ai-governance/workspaces) (where org, team, project sit relative to each other).
 
 ---
 
