@@ -2,6 +2,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import {
   type AzureBillReader,
+  assertAzureBillHasItsOwnCredential,
   assertAzureBillNotAlreadyClaimed,
   readClaimedSubscription,
 } from "../azureBillOwnership";
@@ -164,6 +165,98 @@ describe("given an admin saving a source that names no Azure subscription", () =
           // claim: two sources that name nothing are not in conflict.
           claimedBy: [existingReader({ subscriptionId: "" })],
         }),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("given a save that names a subscription and carries credentials", () => {
+  const configWithCredentials = (
+    credentials: Record<string, unknown>,
+  ): Record<string, unknown> => ({
+    ...configNaming(SUBSCRIPTION),
+    credentials,
+  });
+  const conversationCredentials = {
+    tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
+    clientId: "bot-client-id",
+    clientSecret: "bot-client-secret",
+  };
+
+  describe("when the credentials hold no billing pair", () => {
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("refuses the save and says the bill needs its own sign-in", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials(conversationCredentials),
+        }),
+      ).toThrow(/its own app registration/);
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it.each([
+      ["only the billing client id", { billingClientId: "billing-client-id" }],
+      [
+        "only the billing client secret",
+        { billingClientSecret: "billing-client-secret" },
+      ],
+      [
+        "a blank billing secret",
+        { billingClientId: "billing-client-id", billingClientSecret: "  " },
+      ],
+    ])("refuses half a pair too — %s", (_case, half) => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials({
+            ...conversationCredentials,
+            ...half,
+          }),
+        }),
+      ).toThrow(/its own app registration/);
+    });
+  });
+
+  describe("when the credentials hold the billing pair", () => {
+    it("saves the source", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: configWithCredentials({
+            ...conversationCredentials,
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          }),
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when no subscription is named", () => {
+    it("asks for nothing — there is no bill to sign in to", () => {
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({
+          parserConfig: {
+            adapter: "copilot_studio_dataverse",
+            credentials: conversationCredentials,
+          },
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when the credentials are not readable at this layer", () => {
+    // An edit does not resend secrets: the service carries the stored,
+    // already-validated envelope across, and by the time this guard sees the
+    // config the credentials are either absent or an encrypted string. Both
+    // were checked when they were first written; refusing here would lock an
+    // admin out of renaming their own source.
+    it.each([
+      ["credentials absent", undefined],
+      ["credentials already encrypted", "enc:v1:abcdef"],
+    ])("leaves the save alone — %s", (_case, credentials) => {
+      const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
+      if (credentials !== undefined) parserConfig.credentials = credentials;
+      expect(() =>
+        assertAzureBillHasItsOwnCredential({ parserConfig }),
       ).not.toThrow();
     });
   });

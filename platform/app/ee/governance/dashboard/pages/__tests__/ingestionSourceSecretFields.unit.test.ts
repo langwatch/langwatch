@@ -37,6 +37,18 @@ describe("given the ingestion-sources field definitions", () => {
     });
   });
 
+  describe("the Azure billing identity's pair", () => {
+    /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
+    it("treats both billing fields as secrets, by name, as a merge blocker", () => {
+      // Named explicitly rather than left to the walk above (ADR-128 §21.2
+      // gates): these two are the keys of a SECOND registered app on the same
+      // connection, and either of them rendered unmasked or persisted outside
+      // the encrypted subtree is a leaked finance credential.
+      expect(isSecretFieldKey("credentialsBillingClientId")).toBe(true);
+      expect(isSecretFieldKey("credentialsBillingClientSecret")).toBe(true);
+    });
+  });
+
   describe("when a key is neither declared secret nor credentials-prefixed", () => {
     it("reports the key as not secret", () => {
       expect(isSecretFieldKey("workspaceUrl")).toBe(false);

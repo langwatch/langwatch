@@ -188,6 +188,108 @@ describe("buildCopilotStudioDataversePullConfig", () => {
     });
   });
 
+  describe("when the admin gives the bill its own credential", () => {
+    const WITH_BILLING = {
+      ...REQUIRED,
+      azureSubscriptionId: SUBSCRIPTION_ID,
+      credentialsBillingClientId: "billing-client-id",
+      credentialsBillingClientSecret: "billing-client-secret",
+    };
+
+    /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
+    it("routes the pair into the encrypted credentials subtree, beside the bot's", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer(WITH_BILLING),
+      ) as Record<string, unknown>;
+
+      expect(config.credentials).toMatchObject({
+        clientId: "app-client-id",
+        billingClientId: "billing-client-id",
+        billingClientSecret: "billing-client-secret",
+      });
+    });
+
+    /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
+    it("keeps both billing fields out of plaintext parserConfig", () => {
+      const parserConfig = buildParserConfig(composer(WITH_BILLING));
+
+      // The never-echo and encrypt-at-rest guards cover exactly one subtree:
+      // `credentials`. A copy of either key at the top level of parserConfig
+      // would be persisted as plaintext JSONB and returned to the browser.
+      expect(parserConfig).not.toHaveProperty("credentialsBillingClientId");
+      expect(parserConfig).not.toHaveProperty("credentialsBillingClientSecret");
+      expect(JSON.stringify(parserConfig)).not.toContain(
+        "billing-client-secret",
+      );
+    });
+
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
+    it("omits absent billing keys instead of sending empty strings", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...REQUIRED, azureSubscriptionId: SUBSCRIPTION_ID }),
+      ) as Record<string, unknown>;
+
+      // The server-side guard reads "key present but blank" and "key absent"
+      // as the same refusal, but an empty string stored as a credential would
+      // read as one to everything else. The builder sends real values or
+      // nothing.
+      expect(config.credentials).not.toHaveProperty("billingClientId");
+      expect(config.credentials).not.toHaveProperty("billingClientSecret");
+    });
+  });
+
+  describe("when the admin declares prepaid message packs", () => {
+    const WITH_BILLING = {
+      ...REQUIRED,
+      azureSubscriptionId: SUBSCRIPTION_ID,
+      credentialsBillingClientId: "billing-client-id",
+      credentialsBillingClientSecret: "billing-client-secret",
+    };
+
+    /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
+    it("carries the declaration as a real boolean the adapter's schema accepts", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...WITH_BILLING, azureBillingIsPrepaid: "true" }),
+      );
+
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.azureBillingIsPrepaid).toBe(true);
+    });
+
+    /** @scenario "A tenant that declared nothing is never told it is prepaid" */
+    it("defaults to not declared on an untouched form", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer(WITH_BILLING),
+      );
+
+      // The default is a claim about the customer's contract, so it must be
+      // the one that licenses NO sentence: false, never inferred.
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.azureBillingIsPrepaid).toBe(false);
+    });
+
+    /** @scenario "A tenant that declared nothing is never told it is prepaid" */
+    it("says nothing about prepaid when no subscription is named", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...REQUIRED, azureBillingIsPrepaid: "true" }),
+      ) as Record<string, unknown>;
+
+      // Without a bill to read, the declaration has nothing to explain, and a
+      // stored `true` would spring back the day a subscription is added years
+      // later, declared by nobody.
+      expect(config).not.toHaveProperty("azureBillingIsPrepaid");
+    });
+
+    /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
+    it("keeps the raw form string out of parserConfig, which wins the merge", () => {
+      const parserConfig = buildParserConfig(
+        composer({ ...WITH_BILLING, azureBillingIsPrepaid: "true" }),
+      );
+
+      expect(parserConfig).not.toHaveProperty("azureBillingIsPrepaid");
+    });
+  });
+
   describe("the composer's own field list", () => {
     const field = PARSER_FIELDS.copilot_studio_dataverse.find(
       (f) => f.key === "readSeats",

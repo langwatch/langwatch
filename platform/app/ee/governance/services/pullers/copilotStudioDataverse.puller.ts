@@ -152,6 +152,18 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    */
   azureSubscriptionId: z.string().uuid().optional(),
   /**
+   * The customer's declaration that this Copilot runs on prepaid message
+   * packs (ADR-128 §21.4).
+   *
+   * Prepaid packs create no Azure resource, so the cost feed returns nothing
+   * — indistinguishable from a quiet pay-as-you-go month. The adapter never
+   * reads this field; it exists so the spend panel can explain an empty bill
+   * with the customer's own words rather than inferring a contract from
+   * silence. Optional because a source without a subscription has no bill to
+   * explain.
+   */
+  azureBillingIsPrepaid: z.boolean().optional(),
+  /**
    * Whether to read the tenant's seat licences beside the conversations.
    *
    * On unless switched off. Seats are the half of the money the conversations

@@ -42,6 +42,7 @@ import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import {
   type AzureBillReader,
+  assertAzureBillHasItsOwnCredential,
   assertAzureBillNotAlreadyClaimed,
   readClaimedSubscription,
 } from "./azureBillOwnership";
@@ -591,6 +592,9 @@ export class IngestionSourceService {
     sourceId?: string;
   }): Promise<void> {
     if (readClaimedSubscription(params.parserConfig) === null) return;
+    // The bill's own credential first: it is a property of this save alone,
+    // so it must not wait on the cross-source read below.
+    assertAzureBillHasItsOwnCredential({ parserConfig: params.parserConfig });
     assertAzureBillNotAlreadyClaimed({
       parserConfig: params.parserConfig,
       claimedBy: await this.azureBillReaders(params.organizationId),

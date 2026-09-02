@@ -48,6 +48,19 @@ Feature: Azure billing identity — the bill is read with its own credential
     # for the customer who declined to give billing access.
 
   @unit
+  Scenario: A subscription cannot be saved without its own billing credential
+    Given a save that names an Azure subscription
+    And carries credentials for reading conversations
+    But carries no billing credential
+    When the admin saves the source
+    Then the save is refused
+    And the refusal says the bill needs its own sign-in
+    # Refused at save time so the state "subscription named, bill
+    # unreadable forever" cannot exist to need explaining on the spend
+    # panel. Half a billing pair is refused the same way — one key of two
+    # is not a sign-in.
+
+  @unit
   Scenario: The billing credential is only ever presented to the sign-in service
     Given the source holds a billing credential
     When the source runs to completion

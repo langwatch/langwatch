@@ -59,6 +59,56 @@ export function readClaimedSubscription(
 }
 
 /**
+ * Refuse a save that names a subscription without the bill's own credential.
+ *
+ * The bill is read with its own registered app — one that holds Cost
+ * Management Reader and cannot read a conversation — and never with the
+ * conversation credential (ADR-128 §21.1). Enforcing that at save time is
+ * what keeps the state "subscription named, bill unreadable forever" from
+ * existing at all: refused here, it never needs explaining on a spend panel
+ * months later to someone who was not in the room when the source was made.
+ *
+ * Only a save that carries readable credentials is judged. An edit does not
+ * resend secrets — the service carries the stored, already-validated envelope
+ * across, so by the time this guard runs the credentials are absent or an
+ * encrypted string, and refusing either would lock an admin out of renaming
+ * their own source. A create that carries no credentials at all cannot read
+ * conversations either; that save fails for the louder reason.
+ */
+export function assertAzureBillHasItsOwnCredential(params: {
+  parserConfig: Record<string, unknown> | null | undefined;
+}): void {
+  const { parserConfig } = params;
+  if (readClaimedSubscription(parserConfig) === null) return;
+
+  const credentials = parserConfig?.credentials;
+  if (
+    typeof credentials !== "object" ||
+    credentials === null ||
+    Array.isArray(credentials)
+  ) {
+    return;
+  }
+
+  const readBillingKey = (key: string): string => {
+    const value = (credentials as Record<string, unknown>)[key];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  if (
+    readBillingKey("billingClientId") &&
+    readBillingKey("billingClientSecret")
+  ) {
+    return;
+  }
+
+  const complaint =
+    "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
+/**
  * Refuse a config claiming a subscription another live source already reads.
  *
  * A no-op for a config claiming no subscription — silence here means "nothing
