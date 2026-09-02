@@ -342,6 +342,20 @@ Rule: The inbox can be narrowed to the queues being worked on
     When they pick a queue they do not belong to
     Then the read still asks only for their own items
 
+  # The read narrows to the reviewer's reach whatever the filter asks for, so a
+  # queue they cannot read is a pick that empties the list and reads as broken.
+  @unit
+  Scenario: The queue filter only offers queues the reviewer can read
+    Given the project holds a queue the reviewer is not in
+    When the filter asks which queues it may offer
+    Then it is told only the queues whose items the reviewer can read
+
+  @unit
+  Scenario: Choosing a queue for a trace still offers every queue
+    Given the reviewer is putting a trace into a queue
+    When that picker asks which queues it may offer
+    Then it is told every queue the project has
+
 Rule: The reviewer chooses which columns the list shows
 
   The list is read differently by different people, and one project's score

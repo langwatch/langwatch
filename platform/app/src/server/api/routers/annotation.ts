@@ -778,11 +778,39 @@ export const annotationRouter = createTRPCRouter({
       }
     }),
   getQueues: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        /**
+         * Ask for only the queues whose items this caller can already read.
+         * A picker built from every queue in the project offers ones the
+         * optimized read narrows straight back out, so choosing them empties
+         * the list and looks broken. Callers that genuinely target any queue
+         * — adding a trace to one, inviting people to one — leave this off.
+         */
+        reachableOnly: z.boolean().optional(),
+      }),
+    )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueue.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          projectId: input.projectId,
+          // The same reach the optimized queue-item read applies: the queues
+          // this caller belongs to, plus any holding an item assigned to them.
+          ...(input.reachableOnly
+            ? {
+                OR: [
+                  { members: { some: { userId: ctx.session.user.id } } },
+                  {
+                    AnnotationQueueItems: {
+                      some: { userId: ctx.session.user.id },
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
         select: {
           id: true,
           name: true,

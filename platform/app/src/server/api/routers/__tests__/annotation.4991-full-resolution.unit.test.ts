@@ -31,6 +31,7 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } =
 const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
 const mockQueueItemFindMany = vi.fn();
 const mockQueueItemCount = vi.fn().mockResolvedValue(1);
+const mockQueueFindMany = vi.fn().mockResolvedValue([]);
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
@@ -90,7 +91,7 @@ function makePrismaStub(): PrismaClient {
       findMany: mockAnnotationFindMany,
     },
     annotationQueue: {
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: mockQueueFindMany,
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({
@@ -219,6 +220,44 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
           ]),
         }),
       });
+    });
+  });
+
+  describe("when the caller asks which queues it can narrow to", () => {
+    /** @scenario "The queue filter only offers queues the reviewer can read" */
+    it("offers only the queues whose items this caller may already read", async () => {
+      await caller.getQueues({
+        projectId: "project_123",
+        reachableOnly: true,
+      });
+
+      // The same reach the item read applies, so every queue on offer has
+      // rows behind it: picking one can never empty the list on its own.
+      expect(mockQueueFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            projectId: "project_123",
+            OR: [
+              { members: { some: { userId: "test-user-id" } } },
+              { AnnotationQueueItems: { some: { userId: "test-user-id" } } },
+            ],
+          },
+        }),
+      );
+    });
+
+    /** @scenario "Choosing a queue for a trace still offers every queue" */
+    it("leaves every project queue on offer for callers that do not ask", async () => {
+      // The dialogs that add a trace to a queue, or invite people to one,
+      // target any queue in the project: narrowing those would hide choices
+      // the reviewer is entitled to make.
+      await caller.getQueues({ projectId: "project_123" });
+
+      expect(mockQueueFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: "project_123" },
+        }),
+      );
     });
   });
 });

@@ -387,9 +387,11 @@ export const AnnotationsTable = ({
   );
 
   // Only the inbox pools several queues into one list, so only the inbox has
-  // anything to narrow.
+  // anything to narrow. It asks for the queues it can read rather than all of
+  // them: the read narrows to the reviewer's reach either way, so offering the
+  // rest would only hand them a pick that empties the list.
   const queues = api.annotation.getQueues.useQuery(
-    { projectId: project?.id ?? "" },
+    { projectId: project?.id ?? "", reachableOnly: true },
     { enabled: !!project?.id && !!showQueueAndUser },
   );
 
