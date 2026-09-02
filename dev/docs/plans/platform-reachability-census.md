@@ -170,7 +170,7 @@ entanglement, which is the cheapest kind of move.
 | `server/gateway` | 17 | 5,226 | trpc-root, worker, rest-routes, runtime-app, config |
 | `utils` | 40 | 4,967 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
 | `components/suites` | 19 | 4,840 | loaders |
-| `features/onboarding` | 33 | 4,694 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
+| ~~`features/onboarding`~~ | 33 | 4,694 | **MOVED to `@langwatch/onboarding-web`** — the directory is gone from `platform/app`, reunited with the 54 files the traces move had taken into `@langwatch/trace-web`. |
 | `features/command-bar` | 34 | 4,473 | loaders |
 | `app/api` | 30 | 4,167 | trpc-root, worker, rest-routes, runtime-app, config |
 | `tasks` | 17 | 4,140 | rest-routes, runtime-app, config |
@@ -252,3 +252,245 @@ moves** before this census deleted anything, and neither got worse:
   `./src/env.mjs`, which currently fails **every** platform test at setup. The
   worker figures above were taken with it temporarily restored, then removed again
   to leave that agent's tree exactly as found.
+
+---
+
+# Second census — 2026-09-02
+
+Taken the same day as the first, after the UI, worker and tRPC waves landed.
+`runtime/ui/legacy-page-loaders.ts` is now an **empty registry**, the worker
+composes entirely from `apps/worker`, and `apps/api` mounts the tRPC record — so
+none of the three roots that held half the tree open in the first census exist
+any more. What remains is a server tree.
+
+The method is unchanged (esbuild resolver, every `src` file as its own entry,
+all imports external, `onResolve` records `(importer, resolved, kind)`), with
+two refinements the first pass did not need. Both are in the classifier, and
+both matter now that most of what is left is reachable rather than orphaned.
+
+## What changed in the method
+
+**Type-only holds are no longer expanded.** The first census held back any
+candidate a surviving file still names. Applied transitively that resurrects
+whole chains: one `import type { CustomGraphInput } from "~/components/analytics/CustomGraph"`
+in `report-chart.service.ts` dragged `CustomGraph.tsx` back, and with it
+`features/errors`, `utils/api.tsx`, `useOrganizationTeamProject`, `auth-client`
+and eleven more files that nothing loads. A reference is now classified before
+it is honoured: a **runtime** reference (esbuild's value graph, plus
+`vi.importActual` and a bare `vi.mock(spec)` with no factory) holds the target
+*and its dependencies*; a **type-only** reference holds the named file and
+stops there, because nothing loads it.
+
+**A test dies with its subject, not with its neighbours.** Three rules,
+in order:
+
+- A spec that names a platform module which no longer exists is residue. Nothing
+  in a deletes-only tree can restore the module.
+- A spec whose subject is in the delete set dies with it — including when it
+  reaches that subject through `await import()`. `LLMModelCostDrawer.lite-member.integration.test.tsx`
+  loads the drawer lazily; the drawer is gone, so the test has nothing to assert
+  on. Lazy breakage does not travel *onward*, so the edge is taken once and the
+  result then propagates over eager edges only.
+- A spec that is red only because a **still-to-move** file it imports has a
+  broken import is **kept**. It moves with that file. 226 surviving platform
+  files have at least one import that resolves to nothing, and 95 surviving
+  specs are red today because of it. Deleting them would throw away the tests
+  for code the migration has not finished moving.
+
+That last rule is the difference between the two censuses. The first ran while
+the UI was being carved out and most red tests genuinely had no subject left;
+this one runs against a tree where the red is mostly other agents' in-flight
+server moves.
+
+## What was deleted
+
+Pure `rm`, never `git rm`, never staged. `git diff --numstat` over the manifest
+reports **0 insertions on all 230 rows**.
+
+| Tier | What | Files | Lines |
+| --- | --- | ---: | ---: |
+| A | product modules no live root reaches (components, hooks, model-provider settings UI, the browser entry) | 121 | 20,130 |
+| B | specs whose subject is in tier A, or which name a module already gone | 92 | 19,821 |
+| C | test-support helpers no surviving spec needs | 17 | 1,954 |
+| | **total** | **230** | **41,905** |
+
+`platform/app/src` went **1,145 → 915 code files** and **245,866 → 203,721
+lines** across the census window (the ~240-line difference from the manifest is
+other agents deleting concurrently). Non-test lines are now **115,271**.
+
+A second pass over the deleted tree returns **empty** — the fixed point is
+reached in one round, because the classifier computes the orphaned-test wave in
+the same fixed point as the product deletions rather than after them.
+
+The whole browser residue went in tier A: `main.tsx`, `runtime/ui/legacy-page-loaders.ts`
+(the empty registry) and `runtime/ui/legacy-ui-shell.adapter.tsx`, plus
+`components/settings/**` (21 files, the model-provider settings surface),
+`components/projects/**`, `components/upgrade-modal/**`, `features/errors/components/**`,
+24 `hooks/**` and `utils/{api,auth-client}.tsx`. Server-side: `server/rbac/{custom-role-permissions,role-binding-resolver}.ts`,
+`server/middleware/rate-limit-langy.ts`, `server/queues/makeQueueName.ts`,
+`server/data-privacy/legacyPrivacyMapping.ts`, `server/data-retention/resolveRetentionDays.ts`,
+`server/modelProviders/{geminiDoor,modelProvider.authz}.ts`, `server/tracer/span-event-processing/strands-agents.ts`.
+
+### Held back on purpose
+
+Ten. Nine are named as a **type only** by a surviving platform file, which the
+value graph cannot see — `server/app-layer/{dependencies,subscription/subscription.service,subscription/subscription.repository}.ts`,
+`server/app-layer/evaluations/{types,evaluation-execution.types}.ts`,
+`server/{scopes/scope.types,webhooks/destinations/types,schemas/sign-up-data.schema}.ts`,
+`types/next-stubs.ts`. They go when their type consumers go, and every one of
+them was held for the same reason in the first census.
+
+The tenth is not a platform reference at all:
+`packages/features/analytics/web/src/ui/sections/__tests__/langwatch-ql-workbench.integration.test.tsx`
+calls `vi.importActual("~/utils/compat/next-router")`. A **package test loads a
+platform module for real**.
+
+## The live roots now
+
+```
+  node                                       browser
+  ────                                       ───────
+  apps/api          apps/worker              (none — apps/ui owns the route
+       │                 │                    table AND the page modules; the
+       ▼                 ▼                    platform SPA entry was deleted
+  server/api/root.ts    runtime/app/**        by this census)
+  (532 lines)          runtime/api/**
+  server/api-router.ts      │
+  src/app/api/**            │
+  src/mcp/**                ▼
+  server/better-auth/**  server/app-layer/**  ◄── src/tasks/**
+  src/instrumentation*.ts   (139 files)           src/instrumentation*.ts
+       │                        ▲
+       └────────────────────────┘
+
+  packages/features/gateway/server/**  ──►  ~/env.mjs, ~/server/db,
+  (7 files, WRONG DIRECTION)                ~/server/app-layer/app,
+                                            ~/features/errors/logic/presentation
+```
+
+| Root | Seeds | Closure |
+| --- | ---: | ---: |
+| `src/tasks/**` | 17 | 404 |
+| `src/instrumentation*.ts` | 3 | 318 |
+| `server/api-router.ts` | 1 | 336 |
+| `runtime/{app,api}/**` | 111 | 221 |
+| `server/api/root.ts` | 1 | 180 |
+| `src/app/api/**` | 30 | 93 |
+| `server/better-auth/**` | 6 | 61 |
+| `src/mcp/**` | 3 | 27 |
+| `apps/**` + `packages/**` importers | 6 | 64 |
+| configuration (`scripts/`, `e2e/`, `prisma/`, `vite*/`, `vitest*`) | 36 | 498 |
+
+`server/api/root.ts` is down to **532 lines** (2,236 at the first census, 1,203
+and then 1,010 as the API halves landed). It is no longer the thing holding
+platform open, and neither is any single transport: `server/app-layer` is, at
+139 files and 34,982 lines, with `presets.ts` alone still 3,973 of them.
+
+## What is still the last copy, and who should own it
+
+916 files. Grouped by the package or app that should end up holding them
+(full per-file manifest with its reaching root in `still-to-move.txt`):
+
+| Owner | Files | Lines |
+| --- | ---: | ---: |
+| `apps/api` — REST transport (`server/routes/**`, `src/app/api/**`, `pages/api/**`) | 87 | 22,369 |
+| `apps/api` + `apps/worker` composition root (`runtime/app/**`, `server/app-layer/*`) | 105 | 25,465 |
+| `@langwatch/trace-server` | 45 | 12,478 |
+| `@langwatch/experiment-server` (`server/experiments-v3/**`) | 19 | 9,157 |
+| `apps/api` — tRPC transport (`server/api/**`) | 40 | 8,828 |
+| `packages/ui` — client error presentation registry (`features/errors/**`) | 10 | 7,810 |
+| `@langwatch/clickhouse-client` (+ migration ownership) | 33 | 7,495 |
+| `apps/{api,worker,ui}` test harness (`test-utils/**`, root `__tests__/**`) | 41 | 7,304 |
+| `@langwatch/eventing` (`server/event-sourcing/**`) | 19 | 6,742 |
+| `@langwatch/identity-server` | 37 | 5,868 |
+| `@langwatch/system-migrations` | 17 | 5,248 |
+| `apps/worker` task lane (`src/tasks/**`) | 26 | 5,206 |
+| `@langwatch/stored-object-server` | 16 | 4,863 |
+| `@langwatch/data-privacy-server` | 20 | 4,835 |
+| `apps/api` — MCP transport (`src/mcp/**`) | 4 | 4,145 |
+| `@langwatch/analytics-server` (`server/export/**`) | 16 | 4,124 |
+| `@langwatch/organization-server` | 9 | 3,962 |
+| `@langwatch/auth-server` (incl. `server/better-auth/**`) | 17 | 6,386 |
+| `@langwatch/billing-server` (enterprise) | 19 | 2,989 |
+| `@langwatch/model-provider-server` | 16 | 2,613 |
+| `@langwatch/evaluation-server` | 11 | 2,468 |
+| `@langwatch/webhook-server` (enterprise) | 16 | 2,223 |
+| everything else (28 owners) | ~180 | ~25,000 |
+
+**The 5-file knot.** `server/app-layer/{presets,app,dependencies,config,index}.ts`
+is 5,551 lines and every server root lands in it. Nothing under it moves
+cleanly until it is split by feature; that was the first census's finding and it
+is unchanged.
+
+## Non-`src` content
+
+Classified, not deleted.
+
+**move to `apps/ui`** — `index.html` (the SPA shell; `apps/ui` has no HTML entry
+of its own yet), `public/**` (90 files: favicon, fonts, images), `vite.config.ts`,
+`vite/havenHmrGate.ts` + test, `vitest.browser.config.ts`,
+`vitest.component.config.ts`, `test-setup.browser.ts`, and the browser-facing
+half of `specs/**` (components, home, settings, sidebar, studio, langy, presence,
+monitors, scenarios, model-providers, period-selector, usage-indicator-display).
+`e2e/**` (63 files, Playwright) goes with it, except `e2e/auth-regression/**`,
+which imports `~/server/{db,prismaPgAdapter,better-auth,auth}` and moves with
+the auth vertical.
+
+**move to `apps/api` / `apps/worker`** — `scripts/{build-server.mjs,build-mcp-server.sh,bundle-optional-externals.mjs,start.sh,run-task.sh}`;
+the OpenAPI guards (`check-openapi-completeness.ts`, `check-openapi-route-coverage.ts`,
+`openapi-route-exclusions.ts`, `scripts/lib/hono-route-table.ts` and their
+`__tests__`); `check-gateway-control-plane.ts`; `generate-task-registry.mjs` and
+`scripts/migrations/**` and `scripts/ops/**` to the worker task lane; and the
+whole test harness — `vitest.config.ts`, `vitest.integration.config.ts`,
+`vitest.{pg,prisma,stripe}-integration.config.ts`, `vitest.stress.config.ts`,
+`vitest.sequencer.ts`, `vitest.durations.json`, `test-setup.ts`. The harness is
+load-bearing for the **whole repository**: root `pnpm test:unit` /
+`test:component` / `test:integration` still resolve to `@langwatch/web`, so
+these move only together with repointing the root scripts.
+
+**move elsewhere** — `prisma/{seed,seed-demo-platform,demo-platform-ids}.ts` to
+`@langwatch/prisma-client`, which already owns the schema and the migration
+history. `scripts/check-feature-parity.ts`, `check-ports.sh`, `kill-dev-tree.sh`,
+`refresh-dev-s3-env.sh` and the `check-queue` / `check-shims` tests are
+repository tooling (CI and the `Makefile` reference them by path) and belong
+under `dev/scripts` or `tools/`.
+
+**keep until cutover** — `package.json` (`@langwatch/web`), the five
+`tsconfig*.json`, `prisma.config.ts` (its own docblock says "transitional
+monolith composition only"), `vendor/langwatch-scenario-1.3.0.tgz` (a `file:`
+dependency in the lockfile — it moves with whoever inherits the scenario
+dependency), and `scripts/dogfood/**` (58 files) with the `seed-*`, `report-*`,
+`update-*`, `_dogfood_*` and `_qa-*` operator scripts. Those last only need a
+Prisma client and can be repointed at `@langwatch/prisma-client` in one pass at
+cutover.
+
+**delete now** — `vitest.mcp.config.ts`, `vitest.prisma-integration.config.ts`
+and `tsconfig.slice-check.json` have no reference anywhere in the repository.
+Left in place: this census's mandate was `src`.
+
+## Two things worth acting on
+
+**A package imports platform, which is the forbidden direction.** Seven files
+under `packages/features/gateway/server/src/**` reach back into
+`platform/app/src`: `~/env.mjs`, `~/server/db`, `~/server/app-layer/app`,
+`~/server/app-layer/permissions/imperative`,
+`~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service`
+and `~/features/errors/logic/presentation`. That last one is the reason
+`features/errors` (10 files, 7,810 lines — the client presentation registry
+`CLAUDE.md` points customers' error copy at) is still alive in platform at all.
+The gateway vertical moved; its imports did not.
+
+**Two package suites cannot collect.**
+`packages/features/trace/server/src/repositories/clickhouse/__tests__/{trace-summary,trace-analytics}.repository.integration.test.ts`
+import `startTestContainers` from
+`../../../../../../../../platform/app/src/server/event-sourcing/__tests__/integration/testContainers`,
+which no longer exists. Not caused by this census; found by it.
+
+## Reproducing
+
+Same five stages, and stage 5 is still not optional. This census watched
+`platform/app/src` go from **1,255 to 1,146 files in forty-five minutes** while
+other agents moved code out of it — the `server/app-layer/scheduler/` directory
+disappeared between building the graph and reading the result. Build the graph,
+gate the manifest (non-empty, disjoint from every root closure, nothing another
+agent has staged or modified), `rm`, then re-run to a fixed point.
