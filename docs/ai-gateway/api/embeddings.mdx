@@ -4,9 +4,7 @@ description: OpenAI-compatible embeddings endpoint through the LangWatch AI Gate
 sidebarTitle: Embeddings
 ---
 
-OpenAI-compatible embeddings. Works against OpenAI, Azure OpenAI, Bedrock (Titan), Vertex, Gemini, and Custom OpenAI-compatible providers that implement `/v1/embeddings`.
-
-## Request
+## Endpoint
 
 ```
 POST /v1/embeddings
@@ -14,53 +12,61 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
 ```
 
-```json
-{
-  "model": "text-embedding-3-small",
-  "input": ["Hello", "World"]
-}
-```
+The body is an OpenAI [Embeddings](https://platform.openai.com/docs/api-reference/embeddings/create) request. `input` is one string or an array of strings. The gateway resolves `model` through the virtual key and translates the request into the provider's own embeddings call.
 
-`input` accepts a single string or an array of strings. Token pricing is per-input-token summed across the array.
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1/embeddings \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": ["Hello", "World"]
+  }'
+```
 
 ## Response
 
-OpenAI-shape. Additional LangWatch headers:
-
-```http
-X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
-X-LangWatch-Provider: openai
-X-LangWatch-Model: text-embedding-3-small
-
+```json
 {
   "object": "list",
   "data": [
-    { "object": "embedding", "index": 0, "embedding": [0.012, -0.033, ...] },
-    { "object": "embedding", "index": 1, "embedding": [0.089, 0.041, ...] }
+    {"object": "embedding", "index": 0, "embedding": [0.012, -0.033]},
+    {"object": "embedding", "index": 1, "embedding": [0.089, 0.041]}
   ],
   "model": "text-embedding-3-small",
-  "usage": { "prompt_tokens": 2, "total_tokens": 2 }
+  "usage": {"prompt_tokens": 2, "total_tokens": 2}
 }
 ```
 
-## Provider compatibility
+## Which providers serve it
 
-| Provider | Supported | Models |
-|---|---|---|
-| OpenAI | ✅ | `text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002` |
-| Azure OpenAI | ✅ | Same as OpenAI (via deployment names) |
-| Bedrock | ✅ Titan | `amazon.titan-embed-text-v2:0` |
-| Vertex AI | ✅ Gemini embeddings | `textembedding-gecko`, `gemini-embedding-001` |
-| Gemini (AI Studio) | ✅ | `text-embedding-004`, `gemini-embedding-001` |
-| Anthropic | ❌ | No embeddings endpoint |
-| Custom OpenAI-compatible | varies | depends on upstream |
+| Model resolves to | What the gateway does |
+|---|---|
+| OpenAI, Azure OpenAI, Gemini, Vertex, Bedrock, a custom OpenAI-compatible endpoint | Translates the request into the provider's embeddings call. |
+| Voyage (`voyage/` prefix) | Forwards the OpenAI-shaped body to Voyage as written, with the bare model name. Voyage credentials serve embeddings only; any other route on them answers `400 bad_request`. |
+| Anthropic | Has no embeddings API. The provider's own rejection is forwarded. |
 
-## Fallback and caching
+## Parameters the gateway changes or refuses
 
-Subject to the same fallback rules as chat (see [Fallback Chains](/ai-gateway/providers/fallback-chains)). Embedding models are less prone to provider outages than chat models but the chain is there if needed.
+| Parameter | What the gateway does |
+|---|---|
+| `model` | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
+| `input` | Read and passed to the provider as one text or a list of texts. A body that does not parse as an embeddings request answers `400 bad_request`. |
 
-Caching: deterministic, identical `(model, input)` tuples produce identical vectors, so aggressive semantic caching is feasible. V1 does not enable gateway-level caching for embeddings; use a local cache in your application layer.
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+## Response headers
+
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+
+## Streaming
+
+This endpoint does not stream. A `stream` field in the body is not read.
 
 ## Errors
 
-See [API: Errors](/ai-gateway/api/errors).
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `bad_request`, `end_user_required`. All answer `400`. A provider's own error is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
+
+**Also check:** [Fallback chains](/ai-gateway/providers/fallback-chains), [Model aliases](/ai-gateway/model-aliases).

@@ -4,182 +4,105 @@ description: Anthropic-compatible Messages endpoint through the LangWatch AI Gat
 sidebarTitle: Messages
 ---
 
-The `/v1/messages` endpoint is Anthropic-native. Claude Code, the Anthropic Python/TypeScript SDK, and any agent built against Anthropic's Messages API works unchanged by pointing at the gateway.
-
-Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte-for-byte, which agentic CLIs depend on, and forwards `cache_control` blocks identically, which keeps the 90% Anthropic cache discount.
-
-## Request
+## Endpoint
 
 ```
 POST /v1/messages
-x-api-key: vk-lw-<ULID>     # or Authorization: Bearer vk-lw-...
+x-api-key: vk-lw-<ULID>
 anthropic-version: 2023-06-01
 Content-Type: application/json
 ```
 
-Body matches [Anthropic's Messages API](https://docs.anthropic.com/claude/reference/messages_post) verbatim. Example:
+The body is an Anthropic [Messages](https://docs.anthropic.com/en/api/messages) request. The gateway reads `model` and `stream`, resolves the model through the virtual key, and sends the request to the provider that serves it. `Authorization: Bearer <key>` works in place of `x-api-key`.
+
+Point the Anthropic SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. Claude Code takes `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`; see [Claude Code](/coding-agents/claude-code).
+
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "x-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-5",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "Hi"}]
+  }'
+```
+
+## Response
 
 ```json
 {
-  "model":      "claude-haiku-4-5-20251001",
-  "max_tokens": 1024,
-  "system":     "You are concise.",
-  "messages":   [
-    { "role": "user", "content": "Hi" }
-  ],
-  "stream":     false,
-  "temperature": 0.2,
-  "tools":      [...],
-  "tool_choice": {"type": "auto"}
-}
-```
-
-Anthropic requires `max_tokens`, omitting it returns a 400 from upstream which the gateway surfaces.
-
-### Cache-aware system prompts
-
-```json
-{
-  "model":      "claude-sonnet-4-6",
-  "max_tokens": 2048,
-  "system":     [
-    {
-      "type": "text",
-      "text": "Very long system prompt here (30k tokens+)...",
-      "cache_control": {"type": "ephemeral"}
-    }
-  ],
-  "messages":   [
-    { "role": "user", "content": "What's the first paragraph?" }
-  ]
-}
-```
-
-`cache_control` blocks are forwarded byte-identically to upstream Anthropic by default (see [Caching Passthrough](/ai-gateway/caching-passthrough)).
-
-### LangWatch-specific headers
-
-Same as [POST /v1/chat/completions](/ai-gateway/api/chat-completions#langwatch-specific-headers):
-
-- `X-LangWatch-Cache: respect|force|disable|ttl=<s>`
-- `X-LangWatch-Trace-Metadata: {...}`
-- Trace-context headers (`traceparent`, `X-LangWatch-Trace-Id`, etc.), see [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation).
-
-## Response (non-streaming)
-
-Anthropic-shaped. Response headers:
-
-```http
-HTTP/1.1 200 OK
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
-X-LangWatch-Provider: anthropic
-X-LangWatch-Model: claude-haiku-4-5-20251001
-X-LangWatch-Cache: hit
-
-{
-  "id":            "msg_01...",
-  "type":          "message",
-  "role":          "assistant",
-  "content":       [{"type": "text", "text": "Hi!"}],
-  "model":         "claude-haiku-4-5-20251001",
-  "stop_reason":   "end_turn",
+  "id": "msg_01ABC",
+  "type": "message",
+  "role": "assistant",
+  "content": [{"type": "text", "text": "Hello!"}],
+  "model": "claude-sonnet-4-5",
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
   "usage": {
-    "input_tokens":              12,
+    "input_tokens": 8,
     "cache_creation_input_tokens": 0,
-    "cache_read_input_tokens":   1024,
-    "output_tokens":             4
+    "cache_read_input_tokens": 0,
+    "output_tokens": 3
   }
 }
 ```
 
-The `cache_read_input_tokens` and `cache_creation_input_tokens` are forwarded as-is; they also flow into the debit call so budget ledgers reflect the correct cache-discounted cost.
+## Which providers serve it
 
-## Response (streaming)
+| Model resolves to | What the gateway does |
+|---|---|
+| Anthropic, or a custom Anthropic-compatible endpoint | Forwards the body as written. The answer is the provider's own bytes. |
+| Bedrock, Vertex, Gemini, OpenAI, Azure OpenAI, codex | Translates the request into the provider's own format and rebuilds the answer as an Anthropic message. |
 
-Set `"stream": true`. SSE events:
+## Parameters the gateway changes or refuses
+
+| Parameter | What the gateway does |
+|---|---|
+| `model` | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
+| `stream` | Read to choose the streaming path. |
+| `cache_control` | Governed by the key's cache rules: `disable` strips every marker, `force` adds an ephemeral marker. When no rule matches and the provider needs an explicit marker, the gateway adds one and reports `X-LangWatch-Cache-Mode: auto`. See [Cache control](/ai-gateway/cache-control). |
+| `max_tokens` | Forwarded unchanged. Anthropic requires it and answers `400` without it; that answer is forwarded. |
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+## Response headers
+
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+
+## Streaming
+
+Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing. The frames reach the client as the provider wrote them, and there is no `data: [DONE]` trailer:
 
 ```
 event: message_start
-data: {"type":"message_start","message":{"id":"msg_...","type":"message","role":"assistant","content":[],"model":"claude-haiku-4-5-20251001","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":12,"output_tokens":1}}}
+data: {"type":"message_start","message":{"id":"msg_01ABC","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-5","stop_reason":null,"usage":{"input_tokens":8,"output_tokens":1}}}
 
 event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}
-
-event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"!"}}
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}
 
 event: content_block_stop
 data: {"type":"content_block_stop","index":0}
 
 event: message_delta
-data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":4}}
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":3}}
 
 event: message_stop
 data: {"type":"message_stop"}
 ```
 
-The gateway forwards these byte-for-byte after the first chunk, including `content_block_start`, `content_block_delta`, `content_block_stop` events for tool use. See [Streaming](/ai-gateway/streaming) for the full contract.
-
-## Tool use
-
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "max_tokens": 1024,
-  "tools": [
-    {
-      "name": "get_weather",
-      "description": "...",
-      "input_schema": {...}
-    }
-  ],
-  "messages": [
-    {"role": "user", "content": "weather in Paris?"}
-  ]
-}
-```
-
-Subject to VK `policy_rules.tools`, a blocked tool name returns `403 tool_not_allowed` before the request leaves the gateway. See [Policy Rules](/ai-gateway/policy-rules).
-
-## Extended thinking (Claude Opus 4.7, Sonnet 4.6)
-
-```json
-{
-  "model":      "claude-opus-4-7",
-  "max_tokens": 8192,
-  "thinking":   { "type": "enabled", "budget_tokens": 5000 },
-  "messages":   [...]
-}
-```
-
-Thinking tokens are billed separately by Anthropic. The gateway forwards the `thinking` field unchanged; usage counts appear in `response.usage.thinking_tokens`, roll into `langwatch.usage.output_tokens` on the trace, and debit the budget. (A dedicated `langwatch.reasoning_tokens` span attribute that separates thinking from non-thinking output tokens is a v1.1 observability follow-up.)
-
-## Routing via `model` field
-
-`model` is resolved via the VK's `model_aliases` map (see [Model Aliases](/ai-gateway/model-aliases)):
-
-- `"claude-haiku-4-5-20251001"` → VK maps to `anthropic/claude-haiku-4-5-20251001` (or `bedrock/...`, `vertex/...` if the alias points there).
-- `"claude"` → whatever the VK defines as "default Claude".
-- `"anthropic/claude-opus-4-7"` → explicit form, bypasses aliases.
-
-If the resolved model isn't served by any provider in the VK, returns `403 model_not_allowed`.
+Translated lanes emit the same event set, built by the gateway. A failure after the stream opened ends it with an `event: error` frame; see [Errors](/ai-gateway/api/errors#streaming-errors).
 
 ## Errors
 
-See [API: Errors](/ai-gateway/api/errors): the full type enum applies. Errors use the OpenAI-compatible envelope (not Anthropic's native `{type: "error", error: {...}}`) for consistency across `/v1/messages` and `/v1/chat/completions`. This is a small deviation from stock Anthropic, the tradeoff is a single error-handling code path for clients that hit both endpoints.
+Errors the gateway raises use the envelope on [Errors](/ai-gateway/api/errors): `{"error": {"type", "code", "message", ...}}`. A provider's own error is forwarded with its status and body, under `X-LangWatch-Provider`.
 
-## Example: Claude Code CLI
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `unsupported_parameter`, `end_user_required`. All answer `400`.
 
-Claude Code uses `/v1/messages` natively. Setup is:
-
-```bash
-export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
-export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
-claude
-```
-
-See [Claude Code](/ai-gateway/cli/claude-code) for governance recipes (blocking shell tools, per-engineer budgets, fallback to Bedrock).
+**Also check:** [Streaming](/ai-gateway/streaming), [Parameter mapping](/ai-gateway/parameter-mapping), [Model aliases](/ai-gateway/model-aliases).

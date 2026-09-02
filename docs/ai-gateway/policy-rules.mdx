@@ -1,202 +1,98 @@
 ---
 title: Policy Rules
-description: Per-VK regex allow/deny lists for tool calls, MCP servers, and outbound URLs.
-sidebarTitle: Policy Rules
+description: Regex deny and allow lists on a routing policy that refuse a request by the tools, MCP servers, web addresses or models it names.
+sidebarTitle: Policy rules
 ---
 
-Policy rules are a pre-dispatch policy layer: simple regex allow/deny lists for four kinds of request content. Each check is a synchronous RE2 regex match with no evaluator run, enforced at the gateway in microseconds. To run an evaluator on request or response content instead, see [Guardrails](/ai-gateway/guardrails).
+## What a policy rule is
 
-Four kinds of patterns:
+A policy rule is a regular expression that the LangWatch AI Gateway checks against one part of every request. Rules live on a [routing policy](/ai-gateway/governance/routing-policies) under **Restrictions**, and apply to every virtual key that uses the policy.
 
-- **Tools**: matched against the names of tools the client declares.
-- **MCP servers**: matched against MCP server names, URLs the client declares.
-- **URLs**: heuristically matched against outbound URLs in tool-call arguments.
-- **Models**: regex-matched against the resolved model id (distinct from the glob-based `models_allowed` allowlist, see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
+Each of the four targets has two lists:
 
-Each has a `deny` list and an optional `allow` list.
+- **Refuse**: a request that matches any pattern is refused.
+- **Allow only**: when the list is not empty, every candidate in the request must match at least one pattern, or the request is refused.
 
-<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs one step later, at model resolution, and judges the resolved model. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
+| Target | What the gateway matches the patterns against |
+|---|---|
+| Tools | Every tool name in the body: `tools[].function.name` (OpenAI shape) or `tools[].name` (Anthropic shape). |
+| MCP servers | Every entry of `mcp`, `mcps` or `mcp_servers` in the body, by `name`, then `id`, then the raw string. |
+| Web addresses | Every `http://` and `https://` string anywhere in the body, longer than 8 characters, deduplicated. |
+| Models | The resolved model, judged in both spellings, `provider/model` and the bare model id. |
 
-## How it works
+Patterns are regular expressions. They are not anchored: `shell` matches `run_shell_command`. Write `^shell_.*` to match a prefix.
 
-```json
-{
-  "policy_rules": {
-    "tools": {
-      "deny":  ["^shell\\.", "^filesystem\\.(write|delete|chmod)$"],
-      "allow": null
-    },
-    "mcp": {
-      "deny":  ["^.*@mcp/unverified.*$"],
-      "allow": null
-    },
-    "urls": {
-      "deny":  [],
-      "allow": ["^https?://(allowed\\.example\\.com|api\\.internal\\.com)/.*"]
-    },
-    "models": {
-      "deny":  ["^gpt-4(-turbo)?$"],
-      "allow": null
-    }
-  }
-}
-```
+## When the check runs
 
-**Deny semantics:** any value matching a `deny` regex is blocked → 403.
+Tools, MCP servers and web addresses are checked on the body as sent, before the model resolves and before any guardrail runs. A refused request never reaches the provider.
 
-**Allow semantics:** if `allow` is **non-null**, it becomes an allowlist, only values matching `allow` pass through. Anything else is blocked. `allow: null` means "no allowlist, deny-only."
+Model rules run after the model resolves, on the model that will be served. An alias or a tier that resolves to a refused model is refused; a refused name that resolves to a permitted model is served, because nothing refused runs. A rule written `openai/gpt-4.*` and one written `gpt-4.*` refuse the same model.
 
-**Regex flavour:** patterns are compiled as [Go RE2](https://github.com/google/re2/wiki/Syntax). This is a linear-time regex engine, lookbehind, backreferences, and unbounded lookahead are not supported (by design, to eliminate ReDoS risk). Escape dots literally and anchor your patterns.
+A pattern that does not compile fails the request closed with `500 internal_error`. The gateway never skips a rule it cannot read.
 
-## What gets checked
-
-### Tools
-
-OpenAI Chat Completions: matched against `tools[].function.name`.
-Anthropic Messages: matched against `tools[].name`.
-
-Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Gateway-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.violation` span attribute is a v1.1 observability follow-up.)
-
-### MCP servers
-
-If the request declares `mcp_servers` (on the Anthropic Messages API), each `.name` and `.url` is matched.
-
-Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials for the error envelope; the policies_triggered field disambiguates).
-
-### URLs
-
-**Every `http://` and `https://` URL appearing anywhere in the request body** is extracted and evaluated against `policy_rules.urls`. Extraction is deliberately permissive: a URL present in the payload is a URL the model could be asked to fetch, regardless of which JSON key it was nested under, user messages, tool-call arguments, system prompts, all covered. Trailing markdown/JSON punctuation (`.,;:)]}` etc.) is stripped and duplicates are collapsed before matching.
-
-First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Attribution via request-id correlation (see [§Tools](#tools) above).
-
-<Note>**Enforcement vs egress control.** This layer stops a *request* from reaching a provider when it contains a disallowed URL. It does **not** prevent a provider from returning a URL that a downstream tool-runner then fetches, that requires an egress proxy on the node running the tool call, which is out of scope for the gateway. Pair blocked URLs with egress controls for defence in depth.</Note>
-
-### Models
-
-The `models` dimension is RE2-matched against the **resolved** model id, the model that serves the request and gets billed, not the string that the caller typed. Alias resolution runs first. Then the rules judge its result. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
-
-Judging the resolved id has two effects:
-
-- An alias that points to a denied model **is** blocked. An alias named `gpt-4` does not go around a rule that denies `^gpt-4(-turbo)?$`.
-- A rule that denies a name that resolves to a different model does **not** block. If `gpt-4` is an alias for `azure/my-eastus-deployment`, a deny on `^gpt-4$` never fires. The denied name never runs.
-
-Rules match the two spellings of the resolved model, the bare id and the provider-qualified id. `^gpt-4.*` and `^openai/gpt-4.*` both reach `openai/gpt-4o`. Write one form. You do not need both.
-
-The other three dimensions read the request body as sent. The gateway judges tools, MCP servers, and URLs as the client wrote them.
-
-Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see [§Tools](#tools) above).
-
-#### Models dimension vs `models_allowed`
-
-Both gate which models a VK can call, but they solve different problems:
-
-| Field | Shape | When to use |
-|---|---|---|
-| `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
-| `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
-
-They compose: a request passes only if both checks allow it. The gateway applies `models_allowed` first, at model resolution. The regex rules then judge the resolved model. The two checks read the resolved model in the two spellings, so an alias cannot go around them. Use `models_allowed` unless you need regex semantics, then reach for `policy_rules.models`.
-
-## Common policies
-
-### Block shell execution
+## What a refused caller gets
 
 ```json
-"tools": { "deny": ["^shell\\..*", "^bash$", "^exec$", "^run_command$"] }
-```
-
-### Only allow approved filesystem paths
-
-```json
-"tools": {
-  "deny": ["^filesystem\\.(write|delete|chmod|move)$"]
-}
-```
-
-### Only allow official MCPs
-
-```json
-"mcp": {
-  "allow": ["^@modelcontextprotocol/.*", "^@anthropic-ai/.*"]
-}
-```
-
-### Outbound URL allowlist
-
-```json
-"urls": {
-  "allow": [
-    "^https?://api\\.internal\\.com/.*",
-    "^https?://public-allowlist\\.example\\.com/.*"
-  ]
-}
-```
-
-## Configuring via the UI
-
-On the VK edit screen (Gateway → Virtual Keys → **Edit**), the **Policy Rules** section has four rows, one per dimension, each with a pair of monospace textareas:
-
-| Row | Deny textarea | Allow textarea |
-|---|---|---|
-| **Tools** | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
-| **MCP** | RE2 regexes for MCP server names and URLs. | Same allow semantics. |
-| **URLs** | RE2 regexes matched against every `http(s)://` URL extracted from the request body. | Same allow semantics. |
-| **Models** | RE2 regex policy on the resolved model, after any alias is applied (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
-
-The section header links to the relevant 403 error codes (`tool_not_allowed`, `url_not_allowed`, `model_not_allowed`) and calls out the fail-closed behaviour: **if any regex is invalid, the VK fails with 503 service_unavailable, never silent-bypass**. Fix the pattern, save the VK, and the next request picks it up (the bundle refresh invalidates the broken compiled cache).
-
-Leave a row empty to skip that dimension entirely.
-
-### Common presets
-
-The drawer exposes common starting points (click the helper links next to each textarea):
-
-- **No shell execution**: `^shell\..*`, `^bash$`, `^exec$`, `^run_command$` in Tools → Deny.
-- **Read-only filesystem**: `^filesystem\.(write|delete|chmod|move)$` in Tools → Deny.
-- **Official MCPs only**: `^@modelcontextprotocol/.*`, `^@anthropic-ai/.*` in MCP → Allow.
-- **Internal URLs only**: `^https?://api\.internal\.com/.*` in URLs → Allow.
-- **Block legacy GPT-4**: `^gpt-4(-turbo)?$` in Models → Deny.
-
-## Performance
-
-Pattern checks are synchronous RE2 regex evaluations; total latency is sub-microsecond even for VKs with dozens of patterns. Patterns are compiled lazily on the first request that touches a bundle and cached on the bundle; cache auto-invalidates on config refresh.
-
-## Fail-closed behaviour
-
-If the VK's `policy_rules` config is malformed (e.g. an invalid regex), the gateway **does not silently bypass policy**. Instead the request is rejected with `503 service_unavailable` and the gateway WARN-logs `policy_rules_compile_failed` + `policy_rules_broken` with the dimension + error text. This is deliberate: a policy engine that stops enforcing on bad config is worse than one that errors loudly. (A dedicated `langwatch.policy.broken` span attribute is a v1.1 observability follow-up; v1 operators correlate via the request-id header.)
-
-Fix the policy via `langwatch virtual-keys update <id>` (or the UI) and subsequent requests resume immediately, the bundle refresh invalidates the broken compiled cache.
-
-## Example: blocked tool response
-
-```http
 HTTP/1.1 403 Forbidden
-Content-Type: application/json
-X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
 
 {
   "error": {
-    "type":    "tool_not_allowed",
-    "code":    "tool_not_allowed",
-    "message": "Tool 'shell.exec' is blocked by VK policy policy_rules.tools.",
-    "param":   "tools[0].function.name"
+    "type": "policy_violation",
+    "code": "policy_violation",
+    "message": "tool \"run_shell_command\" is blocked by policy",
+    "trace_id": "..."
   }
 }
 ```
 
-The `param` field pinpoints the offending argument so client SDKs can surface a targeted error to end users. See [API: Errors](/ai-gateway/api/errors#blocked-tool) for the full envelope.
+The message names the target and the value: `is blocked by policy` for a refuse hit, `is not in allowlist` for an allow-only miss.
 
-## Combining with guardrails
+## Set up rules
 
-Policy rules are the first policy check on a request, before any guardrail call. If a pattern matches, the request fails fast without incurring a guardrail evaluator run.
+<Steps>
+  <Step title="Open the routing policy">
+    Open **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`) and edit the policy the keys use.
+  </Step>
+  <Step title="Fill the Restrictions section">
+    Expand **Restrictions**. For each target, enter one pattern per line under **Refuse**, or under **Allow only**. Leave **Allow only** blank to allow anything that is not refused.
+  </Step>
+  <Step title="Verify">
+    Send a request that names a refused tool through a key on that policy and check the response for `403` and `"code": "policy_violation"`.
+  </Step>
+</Steps>
 
-Use patterns for deterministic rules (tool names, URL allowlists) and guardrails for anything that needs semantic analysis (is this prompt an injection attempt?).
+Policy changes are written to the audit log and reach the gateway on its next change-feed poll. No key needs to be reissued.
 
-## Auditing
+## Examples
 
-Every block emits:
+Refuse shell execution and a destructive tool:
 
-- `AuditLog` row (gateway shape) with actor (user or service principal, service-account VKs use `actor=svc_<projectId>`), VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
-- `X-LangWatch-Gateway-Request-Id` response header for joining the 403 back to the trace stream.
+```
+^shell_.*
+delete_user
+```
 
-(A dedicated `langwatch.policy.violation=<kind>:<pattern>` span attribute is tracked as a v1.1 observability follow-up. In v1, use the audit log + request-id correlation to identify repeat offenders and tune patterns.)
+Allow only the tools an agent is meant to use:
+
+```
+^(read_file|list_files|search_docs)$
+```
+
+Keep web addresses inside your own domain (Allow only on Web addresses):
+
+```
+^https://api\.acme\.example/
+```
+
+Refuse a model family on every key of the policy (Refuse on Models):
+
+```
+^gpt-4o-search.*
+```
+
+## Boundaries
+
+- Rules read the request body. They do not inspect a tool call the model returns in a response or a stream; attach a response [guardrail](/ai-gateway/guardrails) for that.
+- The model target and the key's own model allowlist are separate checks. A model must pass both.
+
+**Also check:** [Routing policies](/ai-gateway/governance/routing-policies), [Guardrails](/ai-gateway/guardrails), [API Reference, Errors](/ai-gateway/api/errors).

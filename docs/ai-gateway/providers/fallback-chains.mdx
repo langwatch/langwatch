@@ -1,107 +1,83 @@
 ---
 title: Fallback Chains
-description: Survive provider outages, rate limits, and timeouts transparently.
-sidebarTitle: Fallback Chains
+description: When a provider fails, the LangWatch AI Gateway retries the request on the next provider the virtual key can reach.
+sidebarTitle: Fallback chains
 ---
 
-A fallback chain is an ordered list of provider credentials the gateway tries in sequence when the primary fails. It's per-virtual-key configuration; each VK owns its own chain.
+## What a fallback chain is
 
-## Configuring a chain
+A fallback chain is the ordered list of model providers a request may be sent to. The gateway sends the request to the first provider in the chain. If that provider fails in a way that is worth another try, the gateway sends the same request to the next one, up to the key's attempt limit.
 
-On the VK edit screen:
+The chain for a request is built from three things:
 
-1. Select a **primary** provider credential.
-2. Add one or more **fallback** credentials in the order they should be tried.
+1. **The key's routing setting**: no fallback, fall back to all eligible providers, or a routing policy.
+2. **The requested model**: only providers that can serve the model stay in the chain. A request for `claude-sonnet-4-5` is never sent to an OpenAI credential.
+3. **The key's provider access and budgets**: a provider the key is not allowed to use, or whose provider-scoped budget is exhausted, is removed.
 
-The VK's resolved configuration carries the chain and the attempt limit:
+## Routing settings on a key
 
-```json
-{
-  "fallback": {
-    "chain":        ["pc_primary_openai", "pc_anthropic", "pc_bedrock_us_east"],
-    "max_attempts": 3
-  }
-}
-```
+Open the key under **AI Gateway, Virtual Keys**. The **Routing** section has three choices:
 
-`chain` is the ordered credential list. `max_attempts` (default `3`) sets how many of them the gateway tries for one request. A key with no fallback gets exactly one attempt.
+| Choice | Chain |
+|---|---|
+| Default: no fallback | One attempt. The provider's error reaches the caller unchanged. |
+| Fall back to all eligible providers | Every provider the key's scope can reach, ordered by each provider's **Fallback priority** (Settings, Model Providers, Advanced), lowest first, then by creation date. |
+| A routing policy | The providers the policy lists, in the policy's order. See [Routing policies](/ai-gateway/governance/routing-policies). |
 
-## When fallback triggers
+The attempt limit is 3 by default and is part of the key's configuration (`fallback.maxAttempts` on the management API). With no fallback the limit is 1.
 
-The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every virtual key. There is no per-key trigger list. A narrowed list could only turn a failure the gateway can recover from into one that your callers see.
+## What triggers a fallback
 
-| Condition | Fires? | Why |
-|---|---|---|
-| Upstream `5xx` | ✅ | Provider's fault; next provider may work. |
-| `timeout` | ✅ | Provider degraded. |
-| `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
-| `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
-| Upstream `404 Not Found` | ✅ | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
-| `circuit_breaker` open | ✅ | Preemptive, gateway knows primary has been failing recently. |
-| Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
-| Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
-| Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
-| Client disconnect or an expired request deadline | ❌ | The caller went away. This tells nothing about the provider's health. |
-| LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
+The gateway decides from the provider's real answer, and this is not configurable.
 
-## Crossing providers mid-chain
+| Provider outcome | Next provider? |
+|---|---|
+| HTTP 5xx | Yes |
+| HTTP 429 | Yes |
+| HTTP 404 | Yes. In a multi-provider chain a 404 usually means this provider does not serve that model. |
+| Timeout, connection failure | Yes |
+| Any other 4xx (400, 401, 402, 403) | No. The error reaches the caller. |
+| Credential or provider configuration refused before the call | No. Retrying gives the same answer. |
+| The caller disconnected | No |
 
-A single VK may have mixed providers (OpenAI + Anthropic + Bedrock). The gateway uses [Bifrost's provider-dispatch library](https://github.com/maximhq/bifrost) to translate payloads: same `messages` schema, different wire formats.
-
-The model does not change across the chain. One request resolves to one model. The gateway sends that same model name to the next credential and expects the provider to serve it. So a chain helps when its entries overlap on the models you call: an Anthropic credential with a Bedrock credential that serves Anthropic models, or two OpenAI accounts in different regions.
-
-The gateway skips a credential that cannot serve the resolved model. It does not call it. When the model name tells the gateway which provider owns it, through an alias, the `provider/model` form, or a known bare name, the chain visits only that provider's credentials on the VK. If the name tells the gateway nothing, the gateway walks the chain as configured, and the providers' own answers decide the outcome.
-
-A VK narrowed to specific providers is enforced here too. If the model resolves to a provider that the key cannot use, the gateway refuses with `model_not_allowed`. The refusal names the model and tells the key's owner to widen the key's provider access.
+When every attempt fails, the caller gets the error of the last provider tried, with that provider's status and body.
 
 ## Streaming
 
-Fallback behaviour differs based on when failure occurs:
+For a streaming request the gateway falls back only while opening the stream. Once the first bytes reach the caller, a provider failure ends the stream with an `event: error` frame. Chunks from two providers are never spliced into one response.
 
-- **Before first chunk emits** → transparent fallback. The stream-setup call (`bifrost.ChatCompletionStreamRequest`) walks the chain the same way non-streaming dispatch does; the client sees a single stream from whichever slot accepted the request. `X-LangWatch-Fallback-Count` reports the skipped slot count.
-- **After first chunk has streamed** → **no mid-stream fallback**. The gateway emits a terminal `event: error` frame (with `code: upstream_mid_stream_failure`) and closes the connection. The client may retry; a fresh request would then re-walk the chain.
+## What the caller sees
 
-This split is deliberate, splicing chunks from two providers would produce an inconsistent response with mismatched tool-call ids and accumulated-content replay. It's a hard "no" per contract and enforced by a byte-exact assertion on the SSE error frame shape so future refactors can't accidentally break it.
+The response carries `X-LangWatch-Fallback-Count` with the number of failovers that happened, and only when it is at least 1. A request served by the first provider has no header.
 
-See [Streaming → pre-connection fallback, mid-stream failure](/ai-gateway/streaming#pre-connection-fallback-transparent) for the exact frame bytes and a worked example.
+```
+HTTP/1.1 200 OK
+X-LangWatch-Fallback-Count: 1
+X-LangWatch-Gateway-Request-Id: 9f2c...
+```
 
-## Observing the chain in traces
-
-Fallback attribution today:
-
-- Prometheus counter `gateway_provider_attempts_total{credential_id, outcome}` increments once per attempt, with `outcome` in `success | fallback_success | retryable_5xx | not_found | rate_limit | timeout | network | circuit_open | non_retryable | chain_exhausted | context_done`.
-- Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
-- Request-id correlation via `X-LangWatch-Gateway-Request-Id`, join the metric + log line back to the specific trace.
-
-<Info>Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1 observability follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives in the gateway log line for that request-id.</Info>
-
-If **all** attempts in the chain fail, the gateway returns the last provider's error envelope mapped to the OpenAI-compatible shape (`provider_error` or `upstream_timeout` as the `type`).
+The span records the provider that served the request. Prometheus counts every attempt in `gateway_provider_attempts_total{credential_id, outcome}` and every failover in `gateway_fallback_events_total{from_credential, to_credential}`.
 
 ## Circuit breaker
 
-Each provider has an independent circuit breaker with a sliding window:
+Each provider credential has a circuit breaker. After 10 failures inside a 30 second window the breaker opens and the gateway skips that credential for 60 seconds, then lets one probe request through. A 5xx, a timeout or a connection failure counts as a failure; a 429 or a terminal 4xx does not.
 
-| Default | Meaning |
-|---|---|
-| **Window:** 30 s | Failure events within the last 30 s count toward the open threshold |
-| **Threshold:** 10 failures | 10 failures in the window open the circuit |
-| **Open cooldown:** 60 s | Circuit stays open for 60 s; skipped on new requests regardless of fallback order |
-| **Half-open probe:** 1 request | After cooldown, a single probe is let through; if it succeeds, circuit closes; if it fails, another 60 s of open |
+A skipped credential does not consume an attempt. When the breaker is open on every credential in the chain the caller gets `503 circuit_open` with the message `provider temporarily unavailable: repeated upstream failures opened the circuit breaker, retry shortly`.
 
-Override at the service level:
+The window, the threshold and the open duration are gateway settings: `LW_GATEWAY_CIRCUIT_WINDOW_S`, `LW_GATEWAY_CIRCUIT_THRESHOLD`, `LW_GATEWAY_CIRCUIT_COOLDOWN_S`. `gateway_circuit_state{credential_id}` reports 0 closed, 1 open, 2 half-open.
 
-| Env var | Default |
-|---|---|
-| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` |
-| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` |
-| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` |
+## Errors before the first attempt
 
-**Per-replica, not shared**: each gateway replica maintains its own breaker state. This is deliberate, under a large-scale outage, N replicas rediscovering the recovered provider independently is resilient; depending on Redis for breaker consensus is not.
+| Code | Status | Cause |
+|---|---|---|
+| `model_not_allowed` | 400 | The model resolves to a provider the routing policy or the key's provider access dropped. The message names the policy. |
+| `no_provider_configured` | 400 | The key reaches no provider at all. |
+| `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
 
-Circuit state is emitted as a Prometheus gauge `gateway_circuit_state{credential_id}`, one series per credential slot. The state is encoded in the gauge **value**, not in a label: `0` closed, `1` open, `2` half-open. Alert on `gateway_circuit_state == 1 for 5m` to catch real provider outages (as distinct from transient blips).
+## Boundaries
 
-When a request hits a circuit that's currently `open`, the gateway skips to the next entry in the fallback chain immediately, no wasted round-trip to a provider we already know is down.
+- The gateway sends each attempt to one credential. Requests are not spread across several credentials of the same provider.
+- Which failures trigger a fallback is fixed. A per-key trigger list does not exist.
+- A fallback to a different vendor sends the prompt to that vendor. Use a routing policy or provider access to keep a key inside one vendor.
 
-## Sizing the chain
-
-Returns decrease after 3 entries. Each extra attempt spends one more provider round-trip, one after the other. With the default `max_attempts=3`, the worst case is three upstream calls in a row. The client has usually stopped waiting before the last one answers. Use chains of 2 to 3 entries for latency-sensitive traffic. Lower `max_attempts` if you need a tighter total budget. Keep longer chains for batch and offline work, where wall-clock time is cheap.
+**Also check:** [Routing policies](/ai-gateway/governance/routing-policies), [Model naming](/ai-gateway/model-naming), [Troubleshooting](/ai-gateway/troubleshooting).

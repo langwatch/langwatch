@@ -1,40 +1,26 @@
 ---
 title: Retention
-description: How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
+description: What the LangWatch AI Gateway stores for each request, and which setting governs how long each record lives.
 sidebarTitle: Retention
 keywords: retention, governance data, TTL, billing records, compliance evidence
 ---
 
-Governance data (gateway traces, activity events, audit-relevant spans and log records) lives in the same stores as every other trace your platform ingests, and its lifetime is governed by the same mechanism: **tenant retention policies**.
+## What the gateway stores
 
-## Tenant retention policies
+The gateway has no retention setting of its own. Each record it produces lives in a platform store, and that store's rule applies.
 
-Retention is configured per scope under **Settings > Data Retention**: an organization default, overridable per team and per project, most-specific wins. Periods are set in weeks, months, or years; deletion is partition-aligned (whole weeks) and enforced by the storage layer, not by an application worker that could be skipped. Policies can optionally apply retroactively to already-stored data. Configuring retention is an Enterprise capability; other plans use the platform default window.
+| Record | What it holds | Where it lives | Governed by |
+|---|---|---|---|
+| Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
+| Spend records | One spend event per request: cost, tokens, model, virtual key, end user | Spend store | A fixed 13 months. Exempt from the data retention policy. See [Billing and spend events](/ai-gateway/billing-events#retention) |
+| Budget ledger | The debits each budget enforces against | Budget ledger | No expiry |
+| Audit log | Who created, rotated, revoked or changed a virtual key, budget, provider, cache rule or guardrail | Postgres audit log | Not subject to the data retention policy. See [Audit log](/ai-gateway/audit) |
+| OCSF events | One OCSF row per trace that arrives through an ingestion source | OCSF event store | No expiry. See [OCSF export](/ai-gateway/governance/ocsf-export) |
 
-The full mechanics, including how deletion works and the self-hosted notes, live on [Platform → Data Retention](/platform/data-retention). Everything there applies to governance-origin data unchanged: a project holding gateway traffic follows its project policy, or its team's, or the organization default.
+## Traces follow the data retention policy
 
-<Note>
-Retention is scoped per organization, team, and project, never per ingestion source. Compliance notes that describe a per-source retention class map onto these scoped policies instead.
-</Note>
+Set the policy under **Settings > Data Retention**. A policy applies to an organization, a team or a project, and the most specific one wins. Periods are whole weeks. You can apply a new policy to data that is already stored.
 
-## What is deliberately exempt: billing records
+Trace retention and spend retention are independent. When a trace ages out before its spend record, the spend record still reconciles, and only the link from the record to the trace is gone.
 
-[Spend records](/ai-gateway/billing-events) are **not** governed by tenant retention. They keep a **fixed 13-month** lifetime, declared in their own table definition, exempt from retention policies and from storage tiering configuration, and the exemption is pinned by a unit test.
-
-The reason is the direction of the risk: tenant retention is customer-shrinkable to weeks and can rewrite existing data retroactively. Billing records are invoiceable evidence; a 35-day tenant policy must never hard-delete the rows a rebilling customer reconciles invoices against. So the billing ledger sits outside the tenant map with its own fixed window, and 13 months is the reconciliation and replay contract stated in the [billing docs](/ai-gateway/billing-events#retention).
-
-The same doctrine covers LangWatch's own usage-metering ledgers. The knock-on worth knowing: trace data and billing data age out independently. A spend event whose underlying trace has aged out of a short tenant window still exists and still reconciles; only the drill-through to the trace is gone.
-
-## What this means for an auditor
-
-- **Deletion is storage-enforced** (partition-aligned TTL), not best-effort application cleanup.
-- **Scope policies are explicit and auditable**: who set which window on which scope is in the audit log.
-- **Billing evidence survives tenant shortening**: financial records keep their 13-month window regardless of how tight operational trace retention is set.
-- **Longer windows are a plan capability**: extended retention beyond the plan default is Enterprise, priced by stored volume (see [Pricing](/pricing)).
-
-## Cross-references
-
-- [Platform → Data Retention](/platform/data-retention): the policy mechanics, configuration, and deletion behavior.
-- [Billing & spend events → Retention](/ai-gateway/billing-events#retention): the 13-month billing contract.
-- [Self-hosting compliance](/self-hosting/compliance): which retention capabilities sit on which license tier.
-- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export): exporting governance events to your SIEM for retention beyond LangWatch.
+**Also check:** [Data retention](/platform/data-retention) for the plan limits, the presets and how deletion works.

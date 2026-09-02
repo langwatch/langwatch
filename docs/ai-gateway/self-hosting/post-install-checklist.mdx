@@ -1,128 +1,129 @@
 ---
 title: Post-install checklist
-description: What to do after `helm install` to get personal keys, the AI Gateway, and the unified `langwatch` CLI working end-to-end.
+description: Verify a self-hosted LangWatch AI Gateway with curl, from the pod to a completed chat request.
 ---
 
-`helm install langwatch ...` prints a post-install `NOTES.txt` with
-the short form of these steps. Each step below adds the detail plus
-the `kubectl` probes self-hosters typically run to verify the
-install.
+Run these checks in order after `helm install`. Each one builds on the previous one, so the first failure tells you which layer to fix. The commands assume the release name `langwatch` and the namespace `langwatch`.
 
-If you haven't installed yet, start with [helm](./helm) and come back
-here once the chart deploys cleanly.
-
-## 1. Reach the UI as the bootstrap admin
+## 1. The pod is running
 
 ```bash
-# Default service name (release name = `langwatch`)
-kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
-open http://localhost:5560
+kubectl -n langwatch rollout status deploy/langwatch-gateway
+kubectl -n langwatch logs deploy/langwatch-gateway --tail 50
 ```
 
-Sign in with the email address that should own the bootstrap
-organization. SSO (SAML, OIDC) can be configured later, for the
-first sign-in any local-credential or Auth0 path is fine.
+Expected: `deployment "langwatch-gateway" successfully rolled out`, and a log line `aigateway_starting` with `addr: ":5563"`.
 
-If you set `ingress.enabled=true` and your DNS is pointing at the
-controller, replace the port-forward with the public URL.
+A pod in `CreateContainerConfigError` is missing the Secret or one of its keys. See [Helm chart](/ai-gateway/self-hosting/helm#common-failures).
 
-## 2. Add at least one Model Provider credential
-
-Personal keys reference a `RoutingPolicy` whose `modelProviderIds[]`
-points at one or more `ModelProvider` rows. Without at least one
-provider configured, no key, personal or service, can route traffic.
-
-In the UI: **Settings → Model Providers → Add provider**.
-
-Behind the scenes the chart materialises the encryption pepper
-needed to seal the credential at rest:
+## 2. The process answers in-cluster
 
 ```bash
-kubectl -n langwatch get secret langwatch-app-secrets \
-  -o jsonpath='{.data.LW_VK_PEPPER}' | base64 -d
-```
-
-If the pepper rotates between deployments, previously-stored
-credentials become unreadable. Treat it like a database root
-password, bind it to your existing secret-management workflow.
-
-## 3. Publish a default RoutingPolicy
-
-In the UI: **Gateway → Routing Policies → New policy**, scope =
-`organization`. Mark it default. Pick the providers from step 2 in
-your preferred fallback order. Optionally add a model allowlist,
-e.g. `claude-3-5-*` and `gpt-4o*`, to keep personal keys out of the
-expensive frontier models.
-
-When a member runs `langwatch login --device`, their personal VK
-gets bound to this policy automatically. They never see provider
-plumbing.
-
-If you skip this step, the CLI surfaces a clear error
-(`policy not configured`) instead of silently routing to nothing.
-
-## 4. Verify the AI Gateway is healthy
-
-```bash
-# In-cluster probe via the Service
 kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
   -- curl -sS http://langwatch-gateway/healthz
-# → {"status":"ok","version":"...", "uptime_s":...}
-
-# Pod-level look at warmup + provider-cache
-kubectl -n langwatch logs -l app.kubernetes.io/name=langwatch-gateway --tail 50
 ```
 
-If the gateway can't reach the control plane, it logs
-`auth_upstream_unavailable` and returns 503 for every VK call. Left
-unset, `gateway.controlPlane.baseUrl` resolves to this install's own
-app Service, `<release>-app:5560`, so a release name of your choosing
-needs no adjustment. Set it for a split-domain deployment, or when the
-control plane lives outside this install.
+Expected:
 
-## 5. Expose the gateway and set its public URL
-
-The gateway needs its **own** externally-reachable endpoint, separate
-from the app. Your LLM clients (Claude Code, Codex, Cursor) hit the
-gateway; the browser hits the app. So you provision two ingresses /
-load balancers: one for `app.your-corp.com` and one for
-`gateway.your-corp.com`.
-
-Then tell the control plane where the gateway lives, so it can hand
-that URL to CLI users at login. With the Helm chart, set the gateway's
-own host and the chart derives the rest:
-
-```yaml
-gateway:
-  ingress:
-    enabled: true
-    host: gateway.your-corp.com   # your domain, not the SaaS default
-  # publicUrl: https://gateway.your-corp.com   # or set explicitly
+```json
+{"status":"ok","version":"local","uptime_s":42.1}
 ```
 
-This populates `LW_GATEWAY_PUBLIC_URL` on the `langwatch-app`
-container. **Without it, the control plane returns
-`http://localhost:5563` to CLI users** and every `langwatch claude` /
-`langwatch codex` call from a developer laptop fails with
-`Cannot reach AI Gateway ... fetch failed`. Do NOT reuse
-`LW_GATEWAY_BASE_URL` for this: that variable is the internal
-control-plane URL the Go gateway dials back on, a different direction.
+`version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
-Verify it landed:
+## 3. The gateway reaches the control plane
 
 ```bash
-kubectl -n langwatch get deploy langwatch-app -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
-# → https://gateway.your-corp.com
+kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
+  -- curl -sS http://langwatch-gateway/health
 ```
+
+Expected:
+
+```json
+{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}
+```
+
+A `503` with `"control_plane":"unreachable for Ns"` means one of two things: the gateway cannot reach `LW_GATEWAY_BASE_URL`, or `LW_GATEWAY_INTERNAL_SECRET` differs between the app and the gateway pods. The probe runs every 15 seconds and the verdict flips after 60 seconds without a success, so wait one minute after a fix before you read it again. The log line `statusprobe_control_plane_unreachable` on the gateway pod carries the underlying error.
+
+Confirm which control plane URL the pod resolved:
+
+```bash
+kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
+  -- curl -sS http://langwatch-gateway/debug/control-plane
+```
+
+Expected: `{"control_plane_base_url":"http://langwatch-app:5560"}`.
+
+## 4. The public hostname serves TLS
+
+```bash
+curl -sS https://gateway.acme.com/health
+```
+
+Expected: the same `{"status":"ok",...}` body as step 3. A certificate error means the `gateway-tls` Secret is not issued yet; see [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
+
+## 5. Authentication rejects a missing key
+
+```bash
+curl -si https://gateway.acme.com/v1/models
+```
+
+Expected: `HTTP/2 401`, an `X-LangWatch-Gateway-Version` header, and this body:
+
+```json
+{"error":{"type":"invalid_api_key","code":"invalid_api_key","message":"missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header"}}
+```
+
+## 6. A virtual key lists models
+
+Add a model provider credential and create a virtual key in the LangWatch UI. See [Providers](/ai-gateway/providers/overview) and [Virtual keys](/ai-gateway/virtual-keys).
+
+```bash
+export LW_VK=vk-lw-YOUR_VIRTUAL_KEY
+
+curl -sS https://gateway.acme.com/v1/models \
+  -H "Authorization: Bearer $LW_VK"
+```
+
+Expected: a `200` with a `data` array of models the key can route to.
+
+## 7. A completion goes through
+
+```bash
+curl -sS https://gateway.acme.com/v1/chat/completions \
+  -H "Authorization: Bearer $LW_VK" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
+```
+
+Expected: a `chat.completion` object from the provider. The response carries `X-LangWatch-Gateway-Request-Id`, the id to search for in [Trace Explorer](/ai-gateway/observability).
+
+Then confirm the request produced a spend record:
+
+```bash
+kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
+  -- curl -sS http://langwatch-gateway/metrics | grep gateway_spend_spool
+```
+
+Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.
+
+## 8. The control plane knows the public URL
+
+The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host`.
+
+```bash
+kubectl -n langwatch get deploy langwatch-app \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
+```
+
+Expected: `https://gateway.acme.com`. An empty result means the ingress host is still the chart placeholder; set `gateway.ingress.host` or `gateway.publicUrl` and upgrade.
+
+Members can then sign in from the CLI and get a [personal key](/ai-gateway/governance/personal-keys) bound to this gateway.
 
 ## What to read next
 
-- [Helm chart](./helm): chart structure, secrets, upgrade procedure.
-- [Configuration](./config): env vars and tuning knobs.
-- [Health checks](./health-checks): readiness, liveness wiring.
-- [Scaling](./scaling): HPA, replicas, custom Prometheus metrics.
-
-For the admin-side walkthrough of features (RoutingPolicies,
-budgets, off-boarding policy), see
-[admin setup](../governance/admin-setup) under the governance
-section, same content, audience is the admin not the operator.
+- [Config](/ai-gateway/self-hosting/config): every environment variable and its default.
+- [Health checks](/ai-gateway/self-hosting/health-checks): probe semantics and the status endpoint.
+- [Scaling](/ai-gateway/self-hosting/scaling): replicas, autoscaling and per-pod caches.
+- [Admin setup](/ai-gateway/governance/admin-setup): routing policies and budgets for the whole organization.

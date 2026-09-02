@@ -1,0 +1,101 @@
+---
+title: POST /v1/responses
+description: OpenAI Responses API through the LangWatch AI Gateway, for OpenAI, Azure OpenAI and codex models.
+sidebarTitle: Responses
+---
+
+## Endpoint
+
+```
+POST /v1/responses
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+The body is an OpenAI [Responses](https://platform.openai.com/docs/api-reference/responses/create) request: `input`, `instructions`, `tools` with their native types, and the Responses stream events on the way back. The gateway reads `model` and `stream` from the whole body, so a `stream` field at the end of a large body is still found.
+
+Codex CLI and opencode send this shape; see [OpenAI Codex](/coding-agents/openai-codex).
+
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1/responses \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5-mini",
+    "input": "Hi",
+    "stream": false
+  }'
+```
+
+## Response
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "model": "gpt-5-mini",
+  "status": "completed",
+  "output": [
+    {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "Hello!"}]}
+  ],
+  "usage": {"input_tokens": 8, "output_tokens": 2, "total_tokens": 10}
+}
+```
+
+## Which providers serve it
+
+| Model resolves to | What the gateway does |
+|---|---|
+| OpenAI, Azure OpenAI | Forwards the body as written. The answer is the provider's own bytes. |
+| A codex model (`openai_codex/` prefix, your ChatGPT subscription) | Builds the request from a fixed parameter table and streams from the codex backend. A non-streaming call is assembled from that stream into one completed response. |
+
+A codex credential serves `/v1/responses` and, translated, `/v1/messages`. It does not serve `/v1/chat/completions`.
+
+## Parameters the gateway changes or refuses
+
+| Parameter | What the gateway does |
+|---|---|
+| `model` | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. On the codex lane, pinned to the bare model name. |
+| `stream` | Read to choose the streaming path. On the codex lane, pinned on towards the backend; a non-streaming call still gets one JSON body. |
+| `store` | Forwarded on OpenAI and Azure. Pinned off on the codex lane. |
+| `previous_response_id`, `background`, `top_logprobs`, `max_tool_calls` | Refused on the codex lane with `400 unsupported_parameter`: the backend cannot honor them and dropping them would change what the call returns. |
+| `max_output_tokens`, `temperature`, `top_p`, `truncation`, `metadata`, `service_tier`, `user`, `safety_identifier`, `prompt_cache_options`, `prompt_cache_retention`, and any field outside the table | Dropped on the codex lane and reported on `X-LangWatch-Params-Dropped`. |
+| `drop_tuning_params` | Consumed by the gateway. `false` turns every codex-lane drop into `400 unsupported_parameter`. |
+
+The full codex table is on [Parameter mapping](/ai-gateway/parameter-mapping#the-codex-lane). On OpenAI and Azure the body is not read beyond `model` and `stream`.
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+## Response headers
+
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers). `X-LangWatch-Params-Dropped` is the only signal for a codex-lane drop: the codex answer is the backend's own stream, so `extra_fields.params_dropped` is not added to it.
+
+## Streaming
+
+Set `"stream": true`. On OpenAI and Azure the response is `text/event-stream` with one `data:` frame per Responses event and a `data: [DONE]` trailer:
+
+```
+data: {"type":"response.created","response":{"id":"resp_abc123","status":"in_progress"}}
+
+data: {"type":"response.output_text.delta","delta":"Hello"}
+
+data: {"type":"response.completed","response":{"id":"resp_abc123","status":"completed","usage":{"input_tokens":8,"output_tokens":2,"total_tokens":10}}}
+
+data: [DONE]
+```
+
+On the codex lane the backend's own SSE frames reach the client as sent, with no `[DONE]` trailer. A failure after the stream opened ends it with an `event: error` frame; see [Errors](/ai-gateway/api/errors#streaming-errors).
+
+## Errors
+
+| Code | Status | Cause |
+|---|---|---|
+| `missing_model` | 400 | The body has no top-level `model`. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+| `model_provider_not_bound` | 400 | The model names a provider the key holds no credential for. |
+| `unsupported_parameter` | 400 | A refused codex-lane parameter, or a drop refused by `drop_tuning_params: false`. |
+| `codex_session_expired` | 401 | The codex credential's sign-in expired. Sign in with OpenAI again on the model provider. |
+
+A provider's own error is forwarded with its status and body, under `X-LangWatch-Provider`. The full table is on [Errors](/ai-gateway/api/errors).

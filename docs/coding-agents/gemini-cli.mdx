@@ -95,6 +95,20 @@ The setup sets `GEMINI_TELEMETRY_LOG_PROMPTS=true`, which is what puts the text 
 
 Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt text off. To keep content out of storage organization-wide, use the [data privacy policy](/ai-governance/data-privacy). Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
 
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: Gemini CLI keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets and model policies on top of the same telemetry.
+
+The wrapper starts Gemini CLI with `GOOGLE_GEMINI_BASE_URL` set to the gateway URL, and `GEMINI_API_KEY` and `GOOGLE_API_KEY` set to your virtual key. Gemini CLI prepends `/v1beta/models/<model>:generateContent` to the base URL itself, so set the base URL with no path. It sends the key on the `x-goog-api-key` header, which the gateway accepts along with `Authorization: Bearer`. To route a plain `gemini` run with a service virtual key, set the same variables:
+
+```bash
+export GOOGLE_GEMINI_BASE_URL="https://gateway.langwatch.ai"
+export GEMINI_API_KEY="vk-lw-..."
+gemini
+```
+
+The gateway forwards every `/v1beta/` request to Gemini unchanged, including `:streamGenerateContent`, `:countTokens` and `cachedContents`, and replaces the virtual key with your Gemini credential on the way out. The model name comes from the URL path, so use the bare Gemini model name, for example `gemini-2.5-flash`.
+
 ## Troubleshooting
 
 <AccordionGroup>

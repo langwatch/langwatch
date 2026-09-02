@@ -109,7 +109,17 @@ Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT
 
 ## Route through the LangWatch AI Gateway
 
-Everything above is telemetry: Claude Code keeps your own plan and your own provider login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and provider fallback on top of the same telemetry. [Claude Code through the gateway](/ai-gateway/cli/claude-code) covers that setup, model aliases and the governance recipes.
+Everything above is telemetry: Claude Code keeps your own plan and your own provider login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and provider fallback on top of the same telemetry.
+
+The wrapper starts Claude Code with `ANTHROPIC_BASE_URL` set to the gateway URL and `ANTHROPIC_AUTH_TOKEN` set to your virtual key, and removes `ANTHROPIC_API_KEY` from the environment, because Claude Code warns when both are set. Claude Code appends `/v1/messages` to the base URL itself, so set the base URL with no path. To route a plain `claude` run with a service virtual key, set the same two variables:
+
+```bash
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
+claude
+```
+
+A bare `claude-*` model name routes to your Anthropic credential. Write `provider/model`, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001`, to reach the model through another provider, or map a name on the virtual key. See [Model naming](/ai-gateway/model-naming) and [Model aliases](/ai-gateway/model-aliases).
 
 ## Troubleshooting
 

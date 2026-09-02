@@ -4,103 +4,101 @@ description: How to name a model in a request, and which provider the gateway se
 sidebarTitle: Model Naming
 ---
 
-The `model` field of a request accepts four kinds of name. The gateway reads them in one fixed order and the first one that matches decides which provider serves the request.
+The `model` field accepts three forms. Each one tells the gateway a different amount about where the request goes.
 
-<CardGroup cols={2}>
-  <Card title="Model name" icon="circle-check">
-    `"model": "gpt-5-mini"`. Goes to the bound provider that serves that model.
-  </Card>
-  <Card title="Provider type" icon="slash">
-    `"model": "openai/gpt-5-mini"`. Goes to a provider of that type.
-  </Card>
-  <Card title="Routing handle" icon="key">
-    `"model": "europe/claude-sonnet-5"`. Goes to that exact provider, when the key can reach it.
-  </Card>
-  <Card title="Alias" icon="arrow-right-arrow-left">
-    `"model": "coding-small"`. A per-key redirect. See [Model Aliases](/ai-gateway/model-aliases).
-  </Card>
-</CardGroup>
+| Form | Example | Where the request goes |
+|---|---|---|
+| Bare model | `"model": "gpt-5-mini"` | The provider on the key that serves that model. The gateway infers the provider. |
+| Provider and model | `"model": "openai/gpt-5-mini"` | A provider of that kind on the key. |
+| Instance handle and model | `"model": "europe/claude-sonnet-5"` | The one provider instance that carries the handle `europe`. |
+
+A fourth kind of name, an alias, is a name a routing policy maps to one of the forms above. See [Model Aliases](/ai-gateway/model-aliases).
 
 ## Resolution order
 
-For every request the gateway reads the `model` string once, in this order:
+The gateway reads the `model` string once, in this order. The first step that matches decides.
 
-1. **Alias.** If the virtual key defines an alias with that exact name, the alias decides. Nothing after this step runs.
-2. **Routing handle.** If the text before the first `/` is a routing handle on one of the organization's providers, the request goes to that provider, and the rest of the string is the model name. The key still has to reach that provider; if it does not, the request is refused with `model_provider_not_bound`.
-3. **Provider type.** If the text before the first `/` is a provider type (`openai`, `anthropic`, `custom`, and the rest of the list under [Provider types](#provider-types)), the request goes to a provider of that type. Everything after the first `/` is the model name, including any further `/`.
-4. **Declared models.** Otherwise the whole string is a model name. It is matched against the models each bound provider declares: the custom models you configured on the provider, the model ids of its deployment mapping, and, for the hosted providers, the model catalog LangWatch ships.
-5. **Model name pattern.** If no provider declares the model, a short built-in table maps a name to the vendor that originated it: `gpt-…` to OpenAI, `claude-…` to Anthropic, `gemini-…` to Google. This is the safety net for a model newer than the shipped catalog.
-6. **Providers that declared nothing.** A provider that has not listed the models it serves cannot be ruled out by a model missing from its list, so those providers stay candidates.
-7. **A key with one provider.** One provider is one door, not a choice between vendors, so the request goes to it whatever it declared. This step is what keeps a key working when its provider serves more than it lists.
+1. **Alias.** If the routing policy maps the exact string to a target, the target replaces it. The target is then read with the same rules as a request, so an alias can point at any of the three forms.
+2. **Instance handle.** If the text before the first `/` is a routing handle on one of the key's providers, the request is pinned to that provider instance. The rest of the string is the model id.
+3. **Provider family.** If the text before the first `/` is a provider family the gateway knows, the request goes to a provider of that kind. The rest of the string is the model id, including any further `/`.
+4. **Bare model.** Otherwise the whole string is the model id, slashes included, and the gateway infers the provider from it.
 
-If none of that places the model, the request is refused with `model_not_recognized`, and the message lists the prefixes the key accepts.
+The prefix is removed before the request leaves. A provider never receives `openai/gpt-5-mini` as a model name.
 
-The examples below read the order above from the top, so each one assumes no earlier step matched. A name that another provider declares, or a first segment that is also a routing handle, is decided by whichever step comes first.
+## Provider families
 
-| Request `model` | Where it goes |
+`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
+
+The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-5-mini` works.
+
+A family names a kind of provider, not one instance. If the key reaches two Anthropic providers, `anthropic/claude-sonnet-5` matches both and the first one in the key's provider order serves the request. The others stay available for failover. Use an instance handle to choose one.
+
+The provider order is the order in the key's routing policy. A key with no policy orders its providers by the global fallback priority set on each provider, then by creation date.
+
+## How the gateway infers the provider for a bare model
+
+For a bare model name the gateway tries four steps and stops at the first one that leaves at least one provider:
+
+1. **Providers that declare the model.** A custom provider lists the models it serves, and a hosted provider ships a catalog. This is what makes a declared model routable without a prefix.
+2. **The vendor in the name.** A short built-in table maps a prefix to the vendor that originated it. This is the safety net for a model newer than the shipped catalog.
+3. **Providers that declared nothing.** A provider with no model list cannot be ruled out by a model it does not list.
+4. **A key with one provider.** With one provider there is nothing to choose between, so any model name is forwarded to it.
+
+If all four steps leave no provider, the request is refused with `model_not_recognized`.
+
+The vendor table in step 2:
+
+| Model name starts with | Provider |
 |---|---|
-| `gpt-5-mini` | The bound provider that declares `gpt-5-mini`, otherwise the bound OpenAI provider |
-| `openai/gpt-5-mini` | A bound OpenAI provider, model `gpt-5-mini` |
-| `europe/claude-sonnet-5` | The reachable provider whose routing handle is `europe` |
-| `stealth/ox-alpha` | The provider that declares the model `stealth/ox-alpha`, when `stealth` is not a routing handle |
-| `custom/stealth/ox-alpha` | A bound custom provider, model `stealth/ox-alpha` |
-| `coding-small` | Wherever the key's alias points |
+| `claude-` | `anthropic` |
+| `gpt-`, `o1-`, `o3-`, `o4-`, `chatgpt-`, `text-embedding-`, `dall-e-`, `whisper-`, `tts-` | `openai` |
+| `gemini-` | `gemini` |
 
-The provider prefix is removed before the request leaves, so an upstream never receives `openai/gpt-5-mini` as a model name.
+Bedrock and Vertex are not in the table. Write `bedrock/anthropic.claude-…` or `vertex/…`, or use an alias, to reach a Claude or Gemini model through them.
 
-## Model names that contain a slash
+### Model ids that contain a slash
 
-A model id can contain a `/` of its own, which is normal for self-hosted servers and proxies: `stealth/ox-alpha`, `meta-llama/Llama-3-70B`.
+A model id can contain a `/` of its own, which is normal for self-hosted servers and proxies: `stealth/ox-alpha`, `meta-llama/Llama-3-70B`. The gateway reads the first segment as a prefix only when it is a routing handle or a provider family. Once you declare `stealth/ox-alpha` on the provider that serves it, `"model": "stealth/ox-alpha"` works as written.
 
-The gateway only reads the first segment as a prefix when it is a provider type or a routing handle. So once you declare `stealth/ox-alpha` on the provider that serves it, `"model": "stealth/ox-alpha"` works as written. `custom/stealth/ox-alpha` also works and is unambiguous.
+One case still needs a prefix. A model whose first segment spells a provider family, for example `openai/my-finetune` on a self-hosted server, is read as the `openai` family. Write `custom/openai/my-finetune` instead.
 
-One case still needs the prefix: a model whose first segment happens to spell a provider type, such as `openai/my-finetune` on a self-hosted server. The gateway reads `openai` as the provider type, so write `custom/openai/my-finetune` instead.
+## Instance handles
 
-## Provider types
+A routing handle is a name you give to one model provider. Set it on the provider in **Settings → Model Providers**. It is unique inside your organization, so `europe/claude-sonnet-5` names the same provider from every key that reaches it.
 
-`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `deepseek`, `xai`, `groq`, `cerebras`, `voyage`, `elevenlabs`, `custom`.
+Use a handle when you run more than one provider of the same kind and want to choose between them in the request. For example, a European and a United States Anthropic account.
 
-The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`.
+Rules for a handle:
 
-A provider type names a KIND of provider, not one of them. If a key has two Anthropic providers, `anthropic/claude-sonnet-5` matches both, and the first one in the key's order serves the request, as set out under [Which provider answers first](#which-provider-answers-first). Use a routing handle to choose.
+- Lowercase. It starts with a letter or a number, then letters, numbers, hyphens and underscores, up to 32 characters.
+- It cannot be a provider family name, or one of the reserved words `azure_openai`, `aws_bedrock`, `vertex`, `google_vertex`, `google_gemini`, `cloudflare`, `mp`.
+- Renaming a handle is a breaking change for every caller that uses it. Requests naming the old handle stop reaching that provider immediately.
 
-## Routing handles
+A handle pins one provider instance. When the key cannot reach that instance, the request is refused with `model_provider_not_bound` naming the handle. No other provider serves it in its place.
 
-A routing handle is a name you give to one model provider. Set it on the provider in **Settings → Model Providers**. It is unique inside your organization, so `europe/claude-sonnet-5` names the same provider whichever key sends it. A key that cannot reach that provider is refused with `model_provider_not_bound` rather than served by another one.
-
-Use one when you run more than one provider of the same type and you want to choose between them in the request, for example a European and a United States Anthropic account.
-
-Rules:
-
-- Lowercase, starting with a letter or a number, then letters, numbers, hyphens and underscores. Up to 32 characters.
-- It cannot be a provider type, because the gateway would not be able to tell the two apart.
-- Renaming a handle is a breaking change for anyone using it: requests naming the old handle stop reaching that provider immediately.
-
-The virtual key drawer shows, for each provider the key can reach, the names that reach it and which provider answers a bare provider type.
-
-`GET /v1/models` lists a provider that has a handle under the handle-qualified name, so `europe/claude-sonnet-5` appears rather than `claude-sonnet-5`. That is the name that reaches that exact provider, and it is what keeps two providers of the same type apart in the list. The `owned_by` field stays the provider type, so a model picker still groups by vendor.
-
-## Which provider answers first
-
-When a name matches more than one provider, the key's own order decides, and the rest stay available for failover:
-
-1. The order of the key's routing policy, when it has one.
-2. Otherwise the global fallback priority set on each provider.
-3. Otherwise the order the providers were created.
+`GET /v1/models` lists the models of a provider that has a handle under the handle-qualified name, so `europe/claude-sonnet-5` appears rather than `claude-sonnet-5`. See [API: `GET /v1/models`](/ai-gateway/api/models).
 
 ## Declaring the models a provider serves
 
-Hosted providers already declare their models, so `gpt-5-mini` and `claude-sonnet-5` route without any setup.
+Hosted providers already declare their models, so `gpt-5-mini` and `claude-sonnet-5` route without setup.
 
-For a **Custom (OpenAI-compatible)** provider, a self-hosted vLLM, a LiteLLM proxy or any other OpenAI-compatible endpoint, add the models under **Custom models** on the provider. That is what lets a caller name the model directly instead of writing `custom/` in front of it, and it is what puts the model in `GET /v1/models`.
+For a **Custom (OpenAI-compatible)** provider, add the models under **Custom models** on the provider. That is what lets a caller send the bare model name instead of `custom/` in front of it, and what puts the model in `GET /v1/models`.
 
-A key with only one provider does not need this: with one provider there is nothing to choose between, so any model name is forwarded to it.
+A key with one provider does not need this. Every model name is forwarded to that provider.
 
-`GET /v1/models` also lists models discovered by asking the provider's own endpoint. Discovery lists a model, but it does not declare it, so it does not tell the gateway which provider owns the bare name. The name can still reach the provider through the later steps of the resolution order, for example when that provider declares no models at all, or when the key has only one provider. On a key with several providers it is not certain: another provider that declares the name takes it first. Declare the model, or name the provider in the request.
+## When a name does not resolve
 
-## Errors
+Every refusal is a JSON error with `error.code`, and the HTTP status is fixed per code.
 
-**`model_provider_not_bound`** means the request named a provider type or a routing handle that this key cannot reach.
+| `error.code` | HTTP | Cause |
+|---|---|---|
+| `missing_model` | 400 | The request names no model. The message says where this endpoint expects it. |
+| `model_not_recognized` | 400 | A bare model name that no provider on the key serves, and the key holds more than one provider. |
+| `model_provider_not_bound` | 400 | The request named a provider family or a handle that this key cannot reach. Also returned when a request arrives on a provider-native route (`/v1/messages`, the Gemini `/v1beta` route) and the key has no provider of that vendor. |
+| `model_not_allowed` | 400 | The model resolved, but the key's `models_allowed` list, its provider access, or its routing policy excludes it. |
+| `no_provider_configured` | 400 | The organization has no model provider at all. Add one in **Settings → Model Providers**. |
+
+`model_provider_not_bound` and `model_not_recognized` list the prefixes the key accepts, so the caller can correct the request from the message. The list is capped at ten names and is also in `error.meta.options`.
 
 ```json
 {
@@ -111,8 +109,6 @@ A key with only one provider does not need this: with one provider there is noth
 }
 ```
 
-**`model_not_recognized`** means the request named a model that no bound provider serves.
-
 ```json
 {
   "error": {
@@ -122,28 +118,26 @@ A key with only one provider does not need this: with one provider there is noth
 }
 ```
 
-Both list what the key can reach, so the request can be corrected without reading this page. The list is capped at ten names.
+`models_allowed` plays no part in choosing a provider. It judges the model the request resolves to, in both spellings: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` allow the same model.
 
-## `models_allowed` is a separate thing
-
-The models allowlist on a virtual key decides what a key is ALLOWED to call. It plays no part in choosing a provider. A model can be declared on a provider and still be refused by the allowlist, and the refusal is `model_not_allowed`.
+**Also check:** [Troubleshooting](/ai-gateway/troubleshooting) for the full error index.
 
 ## Choosing a form
 
 <Steps>
   <Step title="One provider on the key">
-    Use the model name. Nothing else is needed.
+    Use the bare model name.
   </Step>
   <Step title="Several providers, different models">
-    Use the model name. Each provider declares its own models, so the name is enough.
+    Use the bare model name. Each provider declares its own models, so the name is enough.
   </Step>
-  <Step title="Several providers of the same type">
+  <Step title="Several providers of the same kind">
     Give each one a routing handle and use it: `europe/claude-sonnet-5`.
   </Step>
-  <Step title="A stable name you want to repoint later">
-    Use an alias. Edit the key once and no caller changes. See [Model Aliases](/ai-gateway/model-aliases).
+  <Step title="A stable name you can repoint later">
+    Use an alias in the routing policy. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Failover between providers">
-    Name a model that more than one bound provider serves. The gateway carries the same model name to the next provider in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+    Name a model that more than one provider on the key serves. The gateway carries the same model name to the next provider in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>

@@ -1,223 +1,84 @@
 ---
-title: Routing policies
-description: An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
+title: Routing Policies
+description: A routing policy decides once which providers a virtual key routes through, what the model tiers mean, and which tools, servers, addresses and models a request may name.
 sidebarTitle: Routing policies
 ---
 
-A routing policy is one decision, written down. It says which
-providers serve a request, and in which order. It says which model
-names a client can send.
+## What a routing policy is
 
-An admin writes the policy one time. Each virtual key points to the
-policy. To change the routing of many keys, change the policy. Do
-not change each key.
+A routing policy is a named set of routing decisions that virtual keys point at. Edit the policy and every key that uses it follows the change; no key is reissued.
 
-## Shape
+A policy holds:
 
-```ts
-RoutingPolicy {
-  id:               string
-  organizationId:   string
-  name:             string
-  description?:     string
+| Section | What it decides |
+|---|---|
+| Where it applies | The organization, teams or projects whose keys may select the policy. |
+| Providers | The model providers the policy routes through, in order. The gateway tries the first one and moves to the next on a failure that is worth another try. |
+| Model tiers | What `complex`, `reasoning` and `fast` resolve to, plus a default model. |
+| Model name mapping | Rewrites of the model name a client sends before the request reaches a provider. |
+| Restrictions | Regex refuse and allow-only lists for tools, MCP servers, web addresses and models. See [Policy rules](/ai-gateway/policy-rules). |
 
-  // The providers this policy routes through, in order. The gateway
-  // tries the first provider. If the request fails in a way that a
-  // different provider can answer, the gateway tries the next one.
-  modelProviderIds: string[]
+Manage policies under **AI Gateway, Routing Policies** in the sidebar (`/gateway/routing-policies`). Creating, editing and deleting need the `routingPolicies:manage` permission; viewing needs `routingPolicies:view`.
 
-  // Model name mapping. The key is the name the client sends. The
-  // value is the model that serves the request. The three tier names
-  // are entries in this map.
-  modelAliases:     Record<string, string>
-
-  // The model that serves a tier when the map has no entry for it.
-  // Applies only to the three tier names.
-  defaultModel?:    string
-
-  // What a request can reach. Four groups: tools, mcp, urls, models.
-  // Each group has a deny list and an allow list.
-  policyRules:      { tools: {...}, mcp: {...}, urls: {...}, models: {...} }
-
-  isDefault:        boolean
-  scopes:           { scopeType: 'ORGANIZATION' | 'TEAM' | 'PROJECT', scopeId: string }[]
-}
-```
-
-A policy can apply in more than one place. Each entry in `scopes`
-adds one organization, one team, or one project.
+{/* screenshot: routing-policy-editor.png, the routing policy drawer showing the providers list, the model tiers with the default model, and the Restrictions accordion */}
 
 ## Model tiers
 
-A client can send a tier name in the `model` field. The policy maps
-the tier name to a model. When you move to a newer model, you change
-the policy. The client code does not change.
+A tier is a reserved model name a client sends instead of naming a model. Point each tier at a model on one of the policy's providers.
 
-The gateway knows three tier names:
+| Tier | Meant for |
+|---|---|
+| `complex` | The most capable model. |
+| `reasoning` | The model best at step-by-step reasoning. |
+| `fast` | A quick and inexpensive model. |
 
-| Tier | Use |
-| --- | --- |
-| `complex` | The strongest model you have. Use it when quality is more important than cost. |
-| `reasoning` | A model that thinks before it answers. Use it for plans, analysis, and difficult debugging. |
-| `fast` | A small model for high volumes. Use it for classification, extraction, routing, and short replies. |
+A tier the policy names no target for resolves to the policy's **Default model**. A policy with no default model leaves that tier unset, and a request for it is refused as an unknown model.
 
-The client sends the tier name where a model name goes:
-
-```json
-{
-  "model": "complex"
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "fast", "messages": [{"role": "user", "content": "Summarize this ticket."}]}'
 ```
 
-Set a model for each tier in the policy. A tier without a model uses
-`defaultModel`. A tier without a model and without `defaultModel` is
-not a known name. The gateway refuses a request that sends it.
+The response reports the model that served the request in `model`. `GET /v1/models` on the key lists the tiers next to the models, so model pickers show them.
 
-`defaultModel` applies only to the three tier names. A model name
-with a typo in it still gets a refusal. The gateway does not put the
-default model in its place.
-
-Write a full model id, for example `openai/gpt-5-mini`. Do not write
-a name that changes over time, for example `openai/latest`. The
-gateway reads the value as one literal model name, so it would call
-a model named `latest`. The app refuses to save such a name.
-
-`GET /v1/models` lists each tier that has a model. The tier shows in
-a model picker with the other names. If you set `defaultModel`, the
-list has all three tiers. A tier without a model and without
-`defaultModel` is not in the list, because the gateway refuses it.
+Tiers and name mappings are the same mechanism on the wire: an alias the gateway looks up by exact name. See [Model aliases](/ai-gateway/model-aliases).
 
 ## Model name mapping
 
-`modelAliases` also maps usual model names. Use it to point an old
-name to its replacement. Use it to give a model the name your teams
-already use.
+A mapping rewrites one requested name to one served name, for example `gpt-4o` to `openai/gpt-5-mini`. The served name must be reachable through one of the policy's providers; the editor refuses a mapping that names a provider the policy does not route through.
 
-```json
-{
-  "gpt-4o": "openai/gpt-5-mini",
-  "coding": "anthropic/claude-haiku-4-5"
-}
-```
-
-A mapping cannot reach a model that the key is not permitted to use.
-The gateway examines the model that the mapping points to, not the
-name that the client sent.
-
-## Restrictions
-
-`policyRules` has four groups of patterns. Each group has a deny
-list and an allow list.
-
-- `tools`: the name of each tool in the request.
-- `mcp`: the name and the address of each MCP server in the request.
-- `urls`: each address in the request. This includes messages,
-  system prompts, and tool arguments.
-- `models`: the model that the request resolves to.
-
-The gateway refuses a request that matches a deny pattern. The
-refusal comes before the request costs money. If a group has one or
-more allow patterns, a request must match one of them. Deny wins
-over allow.
-
-The gateway applies the `models` group after the name mapping. A
-mapping cannot go around it.
+The key's own model allowlist is checked against the served model, so a mapping cannot reach a model the key is not allowed to use.
 
 ## Provider order
 
-`modelProviderIds` is an ordered list. The gateway tries the first
-provider. If the request fails in a way that a different provider
-can answer, the gateway tries the next one.
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model that resolves to a provider the policy does not include is refused with `400 model_not_allowed`, and the message names the policy:
 
-The gateway does not call a provider that cannot serve the model. A
-chain across two vendors only moves over for models that the two
-vendors serve. To give one model a backup, map its name to a model
-from each vendor, or point a tier to a model from each vendor.
-
-The gateway also removes a provider that the key cannot reach. This
-occurs, for example, when an admin removes the provider from the
-key's scope.
-
-A model name that contains a provider, for example
-`openai/gpt-5-mini`, runs only on that provider. If the key cannot
-reach the provider, the gateway refuses the request. It does not
-send the request to a different vendor. A tier or a mapping that
-points to a removed provider gets the same refusal, and
-`GET /v1/models` stops listing it.
-
-## Defaults
-
-One policy in each scope can be the default. When you make a policy
-the default, the app clears the flag on the other policies in the
-same scope. This occurs in one step. Two policies are never both the
-default for one scope.
-
-A key routes through the policy that it names. The default policy is
-the one the app offers first when someone makes a key in that scope.
-
-## Manage in the app
-
-Open **AI Gateway → Routing Policies**. The page lists your policies
-by where they apply. Select **New policy**, or open the actions menu
-on a policy and select **Edit**.
-
-In the editor you can:
-
-- Give the policy a name and a description.
-- Select where it applies.
-- Select the providers and put them in order.
-- Select a model for each tier, and a default model.
-- Map other model names.
-- Add restrictions.
-
-The editor has its own address. A link to a policy opens that
-policy.
-
-## Manage with tRPC
-
-```ts
-// List the policies in an organization.
-trpc.routingPolicy.list.useQuery({ organizationId });
-
-// List only the policies a scope can select.
-trpc.routingPolicy.list.useQuery({
-  organizationId,
-  selectableForScope: { scopeType: "TEAM", scopeId: teamId },
-});
-
-// Read one policy.
-trpc.routingPolicy.get.useQuery({ organizationId, id });
-
-// Suggest models for a tier.
-trpc.routingPolicy.tierSuggestions.useQuery({
-  organizationId,
-  tier: "complex",
-  boundProviderTypes: ["openai", "anthropic"],
-});
-
-trpc.routingPolicy.create.useMutation();
-trpc.routingPolicy.update.useMutation();
-trpc.routingPolicy.setDefault.useMutation();
-trpc.routingPolicy.delete.useMutation();
+```
+The "anthropic" provider is not available on this key: its routing policy "Developer default" does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.
 ```
 
-`create`, `update`, `setDefault`, and `delete` need the
-`routingPolicies:manage` permission. `list`, `get`, and
-`tierSuggestions` need `routingPolicies:view`.
+See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers the move to the next provider.
 
-## Keys that name no policy
+## Attach a policy to a key
 
-A key that names no policy uses its own routing mode. `NONE` sends
-the request to one provider and returns that provider's answer.
-`FALLBACK_ALL` tries the providers that the key can reach, in a set
-order.
+<Steps>
+  <Step title="Create the policy">
+    Click **New policy**, pick where it applies, add the providers in the order you want, set the tiers and the default model.
+  </Step>
+  <Step title="Point the key at it">
+    Open the key under **AI Gateway, Virtual Keys**. Under **Routing**, pick the policy. The other two choices, **Default: no fallback** and **Fall back to all eligible providers**, are the key's own routing when it uses no policy.
+  </Step>
+  <Step title="Verify">
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `400 model_not_allowed`.
+  </Step>
+</Steps>
 
-To move a key to a policy:
+**Make this the default where it applies** marks the policy as the default for its scopes; the policies list shows it with a **Default** badge.
 
-1. Make a policy with the providers that the key uses.
-2. Set the key's routing policy.
-3. Send a request. Make sure that it reaches the provider you
-   expect.
+## Propagation
 
-Point new keys to a policy. Then the routing decision stays in one
-place.
+Saving a policy writes a change event. The gateway picks it up on its next change-feed poll and rebuilds the bundles of every key on the policy. Requests already in flight finish on the old configuration.
+
+**Also check:** [Policy rules](/ai-gateway/policy-rules), [Model aliases](/ai-gateway/model-aliases), [Fallback chains](/ai-gateway/providers/fallback-chains), [Virtual keys](/ai-gateway/virtual-keys).

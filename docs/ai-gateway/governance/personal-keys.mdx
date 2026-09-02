@@ -1,256 +1,87 @@
 ---
-title: "Personal IDE keys: your AI tools, governed by your company"
-description: Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal budget, and no per-tool configuration.
+title: Personal keys
+description: Sign in from the LangWatch CLI and get a personal virtual key that Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI and OpenCode use, with your spend attributed to you and capped by your own budget.
 sidebarTitle: Personal keys
 ---
 
-A personal IDE key is a single virtual key that Claude Code, Codex,
-Cursor, Gemini CLI, and opencode all share. Your IT admin issues it through
-LangWatch Governance, and it is bound to your identity and governed by
-your team's policy.
+## What a personal key is
 
-This page is the **end-user** flow. If you're an admin setting it up
-for your organization, see [Admin setup](/ai-gateway/governance/admin-setup).
+A personal key is a virtual key that belongs to you. It is scoped to your personal project, it uses the routing policy your admin set for the organization, and the gateway attributes every request made with it to you. A personal key is like a virtual credit card that your admin can attach a budget to.
 
-<Note>On SaaS, governance rollout is managed per organization: if you don't see these surfaces, or `langwatch login --device` is refused with a governance error, ask your admin.</Note>
+You never see a provider secret. Your admin adds the providers once; your key inherits them.
 
-## Why this exists
+## Sign in
 
-Your IT or platform team gives you Claude Code, Cursor, Codex, and
-Gemini CLI, and asks for four things in return:
+Install the CLI and sign in with the device flow:
 
-- **Per-user spend attribution** so finance can stop staring at unnamed Anthropic invoices
-- **A personal budget** for the period your admin configures (monthly or weekly) so a runaway recursive prompt at 3 AM Saturday doesn't burn $10k overnight
-- **Audit trail** for SOC 2 / ISO 27001 / HIPAA / EU AI Act
-- **Zero-config provider setup**: your IT team wired up Anthropic + OpenAI + Gemini at the org level, and you inherit them
-
-LangWatch covers all four. After one `langwatch login`, the wrappers
-route every request through the gateway, attributed to you and
-governed by your company's policy.
-
-## What you get
-
-- One CLI command to sign in: `langwatch login`
-- Wrappers that let you keep using the tools you already know:
-  `langwatch claude`, `langwatch codex`, `langwatch cursor`,
-  `langwatch gemini`
-- A personal dashboard at <code>https://app.langwatch.ai/me</code>
-  showing your spending, requests, most-used models, and recent
-  activity
-- Budget enforcement at the gateway: if you go over that cap, the
-  request fails fast with an actionable error
-
-## Setup
-
-### 1. Install the CLI
-
-The `langwatch` CLI ships as an npm package. Today the supported install path is npm / npx:
-
-<CodeGroup>
-
-```bash npm (global install)
+```bash
 npm install -g langwatch
+langwatch login --device
 ```
 
-```bash npx (no install)
-# Run any command without globally installing
-npx langwatch --version
-npx langwatch login --device
-```
-
-</CodeGroup>
-
-<Note>The single-binary installers (`curl ... | sh`, Homebrew tap, PowerShell `iex`) are on the roadmap but not yet published. Until then, `npm install -g langwatch` is the canonical path on every OS where Node.js is available.</Note>
-
-Verify:
-
-```bash
-$ langwatch --version
-0.26.0
-```
-
-### 2. Sign in via your company SSO
-
-The CLI uses RFC 8628 device-flow OAuth. Pass `--device` to go straight to the SSO path. The bare `langwatch login` first asks how you want to use LangWatch, and picking "AI tools / agentic flows" reaches the same flow:
-
-```bash
-$ langwatch login --device
-🔐 LangWatch login
-Control plane: https://app.langwatch.ai
-Mode: device session (will write ~/.langwatch/config.json)
-
-Opening: https://app.langwatch.ai/cli/auth?user_code=ABCD-EFGH
-If your browser doesn't open, paste the URL above and enter code: ABCD-EFGH
-
-⠋ Waiting for you to approve in the browser
-```
-
-Your browser opens to a LangWatch page that asks for your work email,
-then redirects to your company's IdP (Okta, Azure AD, Auth0,
-whatever). After you complete SSO + MFA, control returns to the
-CLI with your inherited providers + budget already populated:
+This opens LangWatch in your browser to sign in and approve this device. Back in the terminal, you see the tools you can run, the model providers your key can use, and the budgets that apply to you:
 
 ```text
-✓ Logged in as jane@your-company.com @ your-company
+✓ Logged in as jane@acme.com @ ACME
 
 Your AI tools (run any of these):
-  $ langwatch claude  # Claude Code
-  $ langwatch codex   # Codex
-  $ langwatch cursor  # Cursor
-  $ langwatch gemini  # Gemini CLI
+  $ langwatch claude    # Claude Code
+  $ langwatch codex     # Codex
 
 Model providers you can issue a virtual key for:
-  • anthropic
-  • openai
-  • gemini
+  • anthropic  Anthropic
+  • openai     OpenAI
 
-Monthly budget: $500   |   Used: $0.00
+Budgets that apply to your key:
+  $2.43 used of $100.00 this month (personal budget), resets Sep 1
 
 Or open the app in your browser:
   $ langwatch open
-
-  Dashboard: https://app.langwatch.ai
 ```
 
-Behind the scenes:
+If the browser does not open, paste the URL the terminal prints and enter the code it shows. The device session is saved to `~/.langwatch/config.json`.
 
-1. The CLI ran an [RFC 8628 device-flow OAuth](https://datatracker.ietf.org/doc/html/rfc8628) handshake against the LangWatch control plane.
-2. Your browser ran the SSO flow your IT admin configured (Okta, Google Workspace, Azure AD, or password-only).
-3. LangWatch minted a **personal virtual key** scoped to your user identity, signed by the gateway, bound to your monthly budget, and audit-trailed per request.
-4. The CLI fetched your AI tools, inheritable providers, and budget from `/api/auth/cli/bootstrap` and rendered the ceremony you see above.
+<Note>Your organization needs at least one model provider before a key can be issued. Without one, the first tool run stops with `No personal virtual key on this account` and names the page where an admin adds a provider, **Settings > Model Providers**.</Note>
 
-Tokens persisted at `~/.langwatch/config.json` (mode 0600).
+## Start a tool
 
-<Note>You did **not** pick a model provider during setup. Your
-admin already wired up Anthropic, OpenAI, Gemini, etc. at the
-organization level. You just inherit them.</Note>
-
-### 3. Use your tools normally
+Run a coding tool through its wrapper:
 
 ```bash
-$ langwatch claude
-▲  Claude Code v2.1.0
-✓  Connected via LangWatch (jane@your-company.com)
-> help me refactor this auth middleware
+langwatch claude
 ```
 
-Same Claude Code experience as before: flags, terminal handling, and
-exit codes are all identical because `langwatch claude` `exec`'s
-the underlying tool with the right env vars pre-injected.
+The first run issues your personal key, prints `issued your personal virtual key for the gateway path`, and starts Claude Code with the gateway as its endpoint. Later runs reuse the key. The tool itself is unchanged: flags, terminal handling and exit codes pass through.
 
-The same pattern works for Codex, Cursor, Gemini CLI, and opencode:
+| Wrapper | Tool | Variables the wrapper sets |
+|---|---|---|
+| `langwatch claude` | Claude Code | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+| `langwatch codex` | Codex | `OPENAI_BASE_URL`, `OPENAI_API_KEY` |
+| `langwatch cursor` | Cursor | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+| `langwatch gemini` | Gemini CLI | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
+| `langwatch copilot` | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY` |
+| `langwatch opencode` | OpenCode | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
 
-```bash
-$ langwatch codex    "fix the failing tests"
-$ langwatch cursor                            # opens Cursor with gateway env
-$ langwatch gemini   "explain this stack trace"
-$ langwatch opencode                          # opens opencode with gateway env
-```
+**Also check:** [Coding Agents](/coding-agents/overview) for the setup pages per tool.
 
-<Info>**Verified end-to-end in CI.** `langwatch login` + each of the five wrappers above (`claude`, `codex`, `cursor`, `gemini`, `opencode`) is exercised in the `governance-wrapper.e2e.test.ts` Node-only e2e suite (fake control-plane, fake gateway, mocked tool binaries) covering login config write, env-var injection, routing with bearer-VK, budget pre-flight (402/200/5xx), and exit-code propagation. 16 scenarios, 3-second runtime, runs on every PR. See [CLI debug → e2e coverage](/ai-governance/cli-debug#cli-wrapper-e2e-coverage) for the assertion shape per tool.</Info>
+## Your keys and devices
 
-### 4. Or, set it up without the wrapper
+Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices** tab lists the CLI sessions signed in on your account.
 
-If typing `langwatch` every time is friction, `langwatch instrument
-<tool>` writes the telemetry wiring for a tool and exits. A plain
-`claude` or `codex` run then reports to LangWatch on its own:
+Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
-```bash
-langwatch instrument claude
-langwatch instrument codex
-```
+`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your keys stay valid until you revoke them.
 
-Claude Code takes an `env` block in `~/.claude/settings.json`, Codex
-takes an `[otel]` block in `~/.codex/config.toml`, and the other tools
-take a scoped function in your shell start file, which applies to that
-tool and to no other command. Add `--project <id-or-slug>` to send the
-telemetry to a team project, or `--key <ingest-key>` on a machine that
-never logs in. See the [Claude Code integration
-guide](/coding-agents/claude-code).
+## Your usage and budget
 
-The model calls keep going wherever the tool itself points them. To
-route them through the gateway, start the tool with the wrapper.
+Open **My Usage** (`/me`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
 
-## Your dashboard
+A budget applies to you when your admin creates one with **Applies to: Member** and picks you, or binds one to your personal team, your personal project or your key. Your admin sets the window: per day, per week, per calendar month, or a total with no reset.
 
-Open `https://app.langwatch.ai/me` (or run `langwatch me`) to see
-your usage:
+When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/me/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
 
-- Spent vs. budget for the month
-- Total requests, week-over-week
-- Most-used model
-- Spending breakdown by tool (Claude Code, Cursor, Codex)
-- Recent activity (last 10 requests with cost + summary)
+**Also check:** [Budgets](/ai-gateway/budgets) for the budget windows and the error body.
 
-Your dashboard shows **only** your usage. To switch to a team's
-view, use the workspace switcher in the top-left of the navbar.
+## Sessions and tokens
 
-## Hitting your budget
-
-If you cross 80% of your monthly cap, the dashboard shows a yellow
-warning banner. If you hit 100%, your next request fails with a
-clear message:
-
-```bash
-$ langwatch claude
-⚠  Budget limit reached
-
-   You've used $500.00 of your $500.00 monthly budget.
-   To continue, ask your team admin to raise your limit.
-
-   Admin: platform-team@your-company.com
-
-   Need urgent access? Request an increase:
-     https://app.langwatch.ai/me/budget/request?scope=user&scope_id=user_2a1f&limit_usd=500.00&spent_usd=500.00
-```
-
-The server builds that link and returns it with the budget response. It
-carries the blocked scope, the scope id, the limit and the spend as query
-parameters, so the budget-request page opens with the context already
-filled in and the admin can change your limit at once. On an older server
-that returns no link, the CLI prints the plain
-`https://app.langwatch.ai/me/budget/request` page instead, and the
-dashboard reads the same context from your signed-in session. No token
-re-issuance is required.
-
-Budgets reset on the period your admin configured (monthly or
-weekly).
-
-## Security
-
-- Your access token is short-lived (~1h) and refreshed automatically.
-- Your refresh token is stored at `~/.langwatch/config.json` with
-  mode 0600. We're working on OS keyring integration; for now,
-  protect that file as you would any local secret.
-- Revoking your account at the LangWatch admin console invalidates
-  both tokens immediately. Your CLI begins failing within 60s.
-- The CLI never sees a raw provider key. The gateway holds the
-  upstream credentials.
-
-## Sign out
-
-```bash
-$ langwatch logout
-Logged out. Credentials cleared.
-```
-
-This clears `~/.langwatch/config.json` locally **and** revokes your
-refresh token at the server, so leaked-state can't be reused. The
-`-device` suffix disambiguates from the older `langwatch login` API-
-key flow (which has its own logout via clearing the env var or
-re-running `langwatch login`).
-
-## What's behind the scenes
-
-If you're curious about the platform side:
-
-- [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified observability substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [Governance data retention](/ai-gateway/governance/retention): how long the activity recorded from your key is kept
-- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export): your security team's SIEM (Splunk, Datadog, Sentinel) pulls these events on a cron via the OCSF v1.1 read API
-- [Ingestion sources](/ai-governance/ingestion-sources/index): what other AI platforms feed into the same governance dashboard
-
-## For admins setting this up
-
-- [Admin setup](/ai-gateway/governance/admin-setup): SSO, gateway provider keys, org-wide monthly budget ceiling
-- [Verify it yourself](/ai-gateway/governance/admin-setup#verify-it-yourself): mint a personal virtual key, send a real completion, watch the spend land on `/me/usage`
-- [Control plane](/ai-gateway/governance/control-plane): the full Tier 1-5 governance dashboard architecture
+Your access token lives for one hour and refreshes on its own. The refresh token stays valid for 90 days without use, or less when the organization sets a maximum session length. When your access to the organization ends, the next refresh fails and the CLI asks you to sign in again.

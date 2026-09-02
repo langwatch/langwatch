@@ -1,0 +1,82 @@
+---
+title: Gemini native (/v1beta)
+description: Google's generative-language API paths, forwarded by the LangWatch AI Gateway to a Gemini or Vertex credential without translation.
+sidebarTitle: Gemini Native
+---
+
+## Endpoint
+
+```
+ALL /v1beta/*
+x-goog-api-key: vk-lw-<ULID>
+```
+
+Every path under `/v1beta` is forwarded to Google as written: method, path, query string, headers and body. The gateway does not translate the body and returns Google's answer, headers included, unchanged. `Authorization: Bearer <key>` works in place of `x-goog-api-key`.
+
+This is the route for gemini-cli and the `@google/genai` SDK. Set `GOOGLE_GEMINI_BASE_URL=https://gateway.langwatch.ai` and use the virtual key as the Gemini API key; see [Gemini CLI](/coding-agents/gemini-cli).
+
+## Request
+
+```bash
+curl https://gateway.langwatch.ai/v1beta/models/gemini-2.5-flash:generateContent \
+  -H "x-goog-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]}'
+```
+
+## Response
+
+```json
+{
+  "candidates": [
+    {"content": {"role": "model", "parts": [{"text": "Hello!"}]}, "finishReason": "STOP"}
+  ],
+  "usageMetadata": {"promptTokenCount": 2, "candidatesTokenCount": 2, "totalTokenCount": 4}
+}
+```
+
+## Which credentials serve it
+
+Only a Gemini or a Vertex credential. The body and the path are Google's own, so no other provider can read them. A key with neither answers `400 model_provider_not_bound` and no provider is called. A Vertex credential serves the request through Google's Vertex path form.
+
+## What the gateway reads and changes
+
+| Part of the request | What the gateway does |
+|---|---|
+| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside them: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
+| Body | Forwarded as written. No parameter policy applies, and `drop_tuning_params` is not read. |
+| Query string | Forwarded as written. |
+| `Authorization`, `x-api-key`, `x-goog-api-key` | Removed. The gateway adds the provider's own key. |
+| Hop-by-hop headers (`Connection`, `Transfer-Encoding`, `Upgrade`, and the rest) | Removed. |
+| Every other header | Forwarded as written. |
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+## Response headers
+
+Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+
+## Streaming
+
+A path ending in `:streamGenerateContent` or `:streamGenerateAnswer` streams. Google's SSE bytes reach the client exactly as Google framed them, with no `data: [DONE]` trailer and no re-wrapping. Pass the query string Google expects for SSE, for example `?alt=sse`, as you would against Google directly.
+
+```bash
+curl "https://gateway.langwatch.ai/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse" \
+  -H "x-goog-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]}'
+```
+
+A failure after the stream opened ends it with an `event: error` frame; see [Errors](/ai-gateway/api/errors#streaming-errors).
+
+## Errors
+
+| Code | Status | Cause |
+|---|---|---|
+| `model_provider_not_bound` | 400 | The key has no Gemini and no Vertex credential. |
+| `missing_model` | 400 | The path carries no `/models/{model}` segment. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+
+Google's own errors are forwarded with Google's status, body and headers, under `X-LangWatch-Provider`. The full table is on [Errors](/ai-gateway/api/errors).
+
+**Also check:** [Gemini](/ai-gateway/providers/gemini), [Vertex AI](/ai-gateway/providers/vertex).

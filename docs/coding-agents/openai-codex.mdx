@@ -111,7 +111,27 @@ cd "<repo>/.claude/worktrees/<name>" && codex
 
 ## Route through the LangWatch AI Gateway
 
-Everything above is telemetry: Codex keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and model aliases on top of the same telemetry. [Codex CLI through the gateway](/ai-gateway/cli/codex) covers that setup and the governance recipes.
+Everything above is telemetry: Codex keeps your own plan and your own login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and model aliases on top of the same telemetry.
+
+Codex ignores `OPENAI_API_KEY` unless the selected model provider reads its key from an `env_key`. So the wrapper writes a `[model_providers.langwatch]` block into `~/.codex/config.toml`, writes the profile file `~/.codex/langwatch-gateway.config.toml` with `model_provider = "langwatch"`, and starts Codex with `--profile langwatch-gateway` and `OPENAI_API_KEY` set to your virtual key. Your default model provider is unchanged. To route a plain `codex` run with a service virtual key, write the same block and select it:
+
+```toml
+# ~/.codex/config.toml
+model_provider = "langwatch"
+
+[model_providers.langwatch]
+name = "OpenAI"
+base_url = "https://gateway.langwatch.ai/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+```
+
+```bash
+export OPENAI_API_KEY="vk-lw-..."
+codex
+```
+
+`wire_api` must be `"responses"`: Codex no longer accepts `"chat"`, and the gateway serves the Responses API at `/v1/responses`. A bare `gpt-*`, `o1-*`, `o3-*` or `o4-*` model name routes to your OpenAI credential. Write `provider/model`, for example `azure/<deployment>`, to reach another provider, or map a name on the virtual key. See [Model naming](/ai-gateway/model-naming) and [Model aliases](/ai-gateway/model-aliases).
 
 The same rule decides what a long-lived session reports. A session resumed across days keeps the directory it was first started in, and commands that reach into a checkout from somewhere else, such as `git -C <repo>` or a `cd` inside a subshell, do not move it. So a standing review agent that lives in a scratch directory reports no repository, no branch and no pull request, no matter how many pull requests it reviews. Give such an agent a fresh `codex` session inside a worktree of the pull request's branch for each review:
 

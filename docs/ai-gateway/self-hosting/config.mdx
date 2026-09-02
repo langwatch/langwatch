@@ -4,135 +4,141 @@ description: Environment variables and configuration for self-hosted LangWatch A
 sidebarTitle: Config
 ---
 
-The gateway is configured entirely through environment variables, no YAML or config files. Defaults are safe for production.
+The gateway reads its configuration from environment variables only. There is no config file. The Helm chart sets the variables listed on [Helm chart](/ai-gateway/self-hosting/helm#what-the-chart-renders-into-the-pod); every other variable below keeps its default unless you add it to the pod yourself.
 
-The names below are the **canonical** names the Go service reads (resolved by `pkg/config.Hydrate`, which walks the Config struct in `services/aigateway/config.go` and concatenates parent/child `env:"…"` tags with `_`). The Helm chart's `templates/configmap.yaml` injects these names directly. If you're operating an older deployment that uses the `GATEWAY_*` legacy prefix (the names the chart shipped pre-v1 GA, see [Legacy aliases](#legacy-aliases)), `LoadConfig` recognises them as a backward-compat fallback.
+Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`, never `5m`. A value outside ±10 years is refused at startup.
 
-## Required secrets
+## Required
 
-These MUST be provided via a Kubernetes Secret (or equivalent), never baked into an image. The gateway refuses to start if any of the three required values are empty.
+The gateway refuses to start when any of these is empty.
 
-| Var                              | Purpose                                                                               | Shared with control plane? |
-|----------------------------------|---------------------------------------------------------------------------------------|----------------------------|
-| `LW_GATEWAY_INTERNAL_SECRET`     | HMAC secret for `/api/internal/gateway/*` calls between gateway and control plane.    | Yes, same value on both    |
-| `LW_GATEWAY_JWT_SECRET`          | HS256 secret for the short-lived JWTs the control plane returns from `/resolve-key`.  | Yes, same value on both    |
-| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Optional second JWT signing secret accepted during a rotation overlap window.         | Optional                    |
+| Var | Purpose |
+|---|---|
+| `LW_GATEWAY_BASE_URL` | Base URL of the LangWatch control plane. Default `http://localhost:5560`. When neither this nor its legacy alias is set, the gateway starts on the default and logs `aigateway_control_plane_base_url_not_explicit` |
+| `LW_GATEWAY_INTERNAL_SECRET` | HMAC secret that signs every `/api/internal/gateway/*` call and the spend ingest. The same value must be set on the control plane |
+| `LW_GATEWAY_JWT_SECRET` | HS256 secret that verifies the JWT the control plane issues for a resolved virtual key. The same value must be set on the control plane |
 
-`LW_VIRTUAL_KEY_PEPPER` is a control-plane secret used to peppered-hash virtual keys at rest. The gateway never sees it, do not configure it on gateway pods.
+## Server
 
-For the zero-downtime rotation procedure, see [Secret rotation](#secret-rotation) below.
+| Var | Default | Purpose |
+|---|---|---|
+| `SERVER_ADDR` | `:5563` | HTTP listen address for the API, the probes and `/metrics` |
+| `SERVER_MAX_REQUEST_BODY_BYTES` | `33554432` (32 MiB) | Request body cap. A larger body answers `413 payload_too_large` before any provider is contacted. The `/v1/audio/transcriptions` and `/v1/speech-to-text` uploads have their own fixed cap of 26 MB |
+| `SERVER_DRAIN_DELAY_SECONDS` | `3` | Wait between flipping `/readyz` to 503 and closing the listener. Must be zero or positive. The chart sets it from `shutdown.preDrainWaitSeconds` |
+| `SERVER_GRACEFUL_SECONDS` | `900` | Budget for in-flight requests after the listener closes. Starts after the drain delay, so size the pod grace period above the sum of the two. Must be zero or positive. The chart sets it from `shutdown.timeoutSeconds`. Below 45 the gateway logs `graceful_shutdown_shorter_than_heartbeat_interval`; below 840 it logs `graceful_shutdown_shorter_than_max_stream_duration` |
+| `NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS` | `45` | How often a non-streaming response writes a keep-alive byte while the provider call is still running, so an edge proxy does not close an idle connection. A negative value disables the heartbeat |
+| `ENVIRONMENT` | `local` | Environment label stamped on logs and returned as `version` by the probes. Any value other than `local` requires `BLOCK_LOCAL_HTTP_CALLS=true` and `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`, or the gateway refuses to start |
 
-## Server, listener
+## Provider endpoint security
 
-| Var                              | Default       | Purpose                                                                            |
-|----------------------------------|---------------|------------------------------------------------------------------------------------|
-| `SERVER_ADDR`                    | `:5563`       | HTTP listen address for the public + probe surface.                                |
-| `SERVER_GRACEFUL_SECONDS`        | `900`         | Graceful-stop window, which begins once `SERVER_DRAIN_DELAY_SECONDS` has elapsed. `/readyz` flips to 503 immediately; the listener then stops accepting, and in-flight work gets this many seconds to finish after it begins shutting down. The window covers request completion, response flushing, and draining the spend spool to the ingest endpoint. The default covers the 14-minute upstream provider timeout, which is the longest a streaming response can legitimately run, plus a minute of margin. It is a ceiling and not a sleep, so an idle gateway still exits immediately. Must be zero or positive: it is time spent waiting, so a negative value is refused at startup. The chart sets it from `shutdown.timeoutSeconds`. |
-| `SERVER_DRAIN_DELAY_SECONDS`     | `3`           | Pause between flipping `/readyz` to draining and closing the listener, so the load balancer stops routing here before the door shuts. Charged on top of `SERVER_GRACEFUL_SECONDS` rather than out of it, so size `terminationGracePeriodSeconds` above the sum of the two. Zero or positive, same as above. The chart sets it from `shutdown.preDrainWaitSeconds`. |
-| `SERVER_MAX_REQUEST_BODY_BYTES`  | `33554432` (32 MiB) | Hard cap on inbound request body size, enforced before auth. 32 MiB fits 1 M-context multimodal payloads with margin under a 512 Mi pod limit. Returns 413 immediately on declared `Content-Length` over the cap. |
+These apply to the base URLs customers configure on their own provider credentials. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
 
-## Control plane
+| Var | Default | Purpose |
+|---|---|---|
+| `BLOCK_LOCAL_HTTP_CALLS` | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address |
+| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme |
+| `ALLOWED_PROXY_HOSTS` | empty | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
 
-| Var                              | Default                 | Purpose                                                                  |
-|----------------------------------|-------------------------|--------------------------------------------------------------------------|
-| `LW_GATEWAY_BASE_URL`            | `http://localhost:5560` | Base URL for `/api/internal/gateway/*` calls. **Required** in any Kubernetes deployment, the in-pod localhost default is for local-dev only. Hydrated through `controlPlane.baseUrl` in the chart's `values.yaml`. |
+## Auth cache
 
-## Auth cache (stale-while-error)
+The gateway caches each resolved virtual key in process. When a cached entry passes its JWT expiry and the refresh fails for a transport reason (network error, timeout, 5xx, unparseable response), the entry keeps serving: its soft expiry is extended by `SOFT_BUMP_SECONDS` per failed refresh, up to the JWT expiry plus `HARD_GRACE_SECONDS`. A `401`, `403` or `404` from the control plane evicts the entry at once.
 
-The gateway is on the hot path of every LLM request, so a brief control-plane outage must not translate into mass authentication rejection. When a cached entry crosses its JWT exp AND the refresh fails for transport reasons (network/timeout/5xx/parse error), the entry's soft expiry is extended by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` and the cached bundle continues to serve, up to a hard cap of `(JWT exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS)`. Auth-class rejections (401/403/404) evict immediately, no grace for known-bad credentials. Setting `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` to a negative value disables stale-while-error entirely (legacy hard-fail behaviour at JWT exp); `0` means unset and takes the default.
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension granted per failed refresh during a control plane outage. `0` takes the default |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on stale serving, measured from the JWT expiry. `0` takes the default. A negative value disables stale serving, so a key fails at its JWT expiry |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Age at which a cached key's configuration (credentials, endpoints, routing) is re-fetched in the background. `0` takes the default. A negative value disables the refresh |
 
-The names without the `LW_GATEWAY_AUTH_CACHE_` prefix, and the duration-string forms they replaced (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE=6h`), are not read. The gateway refuses to start when it finds one still set, naming the variable to use instead, rather than booting on the default and leaving the old setting looking applied.
+The retired names `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` and `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL` are refused: the gateway stops at startup and names the `_SECONDS` variable to set instead.
 
-All three are a plain count of seconds, not a duration string: `300`, not `5m`.
+## Circuit breaker
 
-| Var                                          | Default        | Purpose                                                                                      |
-|----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
-| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+Each provider credential has its own breaker. Once `THRESHOLD` failures land inside `WINDOW_S`, the breaker opens and the credential is skipped for `COOLDOWN_S`, after which one probe request is let through. The state is exported as `gateway_circuit_state`.
 
-The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key that did not change is confirmed with a 304 instead of materialized and sent again. A key that did change still answers 200 with the whole bundle, which is the point of the refresh, so the saving is on the keys that were not edited. Lowering the TTL therefore costs one revision lookup per key per interval, and a full bundle only for the keys edited in it. The exception is a config the gateway holds no token for, which is what a response that arrived without an `ETag` leaves behind: that one is refreshed unconditionally and costs a full bundle every interval, so a proxy that strips `ETag` gives the saving up entirely.
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` | Failure counting window |
+| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` | Failures inside the window that open the breaker |
+| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` | Time the breaker stays open before a probe |
 
-See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
+## Spend emission
 
-## Tracing (OTel)
+Every request writes a spend record to an on-disk spool. A background drainer ships the spool to the control plane, which debits budgets from it.
 
-| Var                  | Default   | Purpose                                                                                      |
-|----------------------|-----------|----------------------------------------------------------------------------------------------|
-| `OTEL_OTLP_ENDPOINT` | unset     | OTLP HTTP exporter URL the gateway ships its own spans to. The exporter appends `/v1/traces` automatically if missing. Empty disables export, spans are still created in-process but never flushed. |
-| `OTEL_OTLP_HEADERS`  | unset     | W3C-Baggage style `key=value,key2=value2` (e.g. `Authorization=Bearer …`) to attach on every export. Use this for OTLP endpoints that require auth, there is no separate `*_AUTH_TOKEN` knob. |
-| `OTEL_SAMPLE_RATIO`  | `1.0` local, `0.1` non-local | Sampling fraction `[0.0, 1.0]`. Defaults to full sampling in `local`; tightened to 10 % when `ENVIRONMENT` is anything else. |
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_SPEND_ENABLED` | `true` | `false` or `0` stops emission. Budgets are then never debited |
+| `LW_GATEWAY_SPEND_SPOOL_DIR` | `<tmp>/langwatch-gateway-spend-spool` | Spool directory. Under the chart this is inside the `/tmp` emptyDir |
+| `LW_GATEWAY_SPEND_SPOOL_MAX_BYTES` | `67108864` (64 MiB) | Spool cap. When full, the oldest records are dropped and `gateway_spend_spool_dropped_total` increments |
+| `LW_GATEWAY_SPEND_FLUSH_INTERVAL_SECONDS` | `1` | Longest time a record waits before it becomes shippable |
+| `LW_GATEWAY_SPEND_INGEST_BASE_URL` | `LW_GATEWAY_BASE_URL` | Base URL of the spend ingest, when it is not the control plane |
 
-The gateway ALWAYS reads `project_id` from the resolved virtual-key bundle and tags every span with `langwatch.project_id` (plus team, org, principal). When you point `OTEL_OTLP_ENDPOINT` at LangWatch ingest, every trace files under the right project automatically, no per-tenant routing is needed on the gateway side.
+## JWT secret rotation
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | empty | Second secret tried when a JWT fails to verify against `LW_GATEWAY_JWT_SECRET`. Set it for the 15 minutes after you change the signing secret on the control plane, then remove it |
+
+The procedure is on [Helm chart](/ai-gateway/self-hosting/helm#rotate-the-jwt-secret-without-downtime). There is no previous-key variable for `LW_GATEWAY_INTERNAL_SECRET`.
+
+## Logging
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `LOG_FORMAT` | `json` | `json` or `pretty` |
+| `LOG_CONSOLE_LEVEL` | `LOG_LEVEL` | Console level when `OTEL_DEBUG_COLLECTOR_ENDPOINT` is set. Ignored otherwise |
+| `LOG_OTEL_LEVEL` | `debug` | Level shipped to the debug collector when `OTEL_DEBUG_COLLECTOR_ENDPOINT` is set. Ignored otherwise |
+
+## Telemetry
+
+These variables configure the gateway's own spans and metrics. Customer traces go through the trace bridge below and never read `OTEL_*`. The exporter speaks OTLP over HTTP/protobuf only.
+
+| Var | Default | Purpose |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Collector base URL. `/v1/traces` and `/v1/metrics` are appended. Empty turns export off |
+| `OTEL_EXPORTER_OTLP_HEADERS` | empty | Headers on every export, `key=value,key2=value2`. Use it for a collector that needs a token |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | empty | Full traces URL, used as is. Wins over the base endpoint for traces |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | empty | Headers for traces. Wins over `OTEL_EXPORTER_OTLP_HEADERS` |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | empty | Only `http/protobuf` is accepted. Any other value stops startup |
+| `OTEL_TRACES_EXPORTER` | `otlp` | `none` turns span export off and keeps metrics |
+| `OTEL_TRACES_SAMPLER` | `parentbased_always_on` | One of `always_on`, `always_off`, `traceidratio`, `parentbased_always_on`, `parentbased_always_off`, `parentbased_traceidratio` |
+| `OTEL_TRACES_SAMPLER_ARG` | empty | Ratio between 0 and 1. Required by the two `traceidratio` samplers |
+| `OTEL_SDK_DISABLED` | `false` | `true` turns every exporter off |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | empty | Read only to warn. Metrics always go to the base endpoint plus `/v1/metrics` |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | empty | Read only to warn. OTLP logs go to the debug collector only |
+| `OTEL_DEBUG_COLLECTOR_ENDPOINT` | empty | Second collector for local development. Must resolve to this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost` or `host.docker.internal`), or startup stops |
+| `OTEL_DEBUG_COLLECTOR_HEADERS` | empty | Headers for the debug collector |
+
+Three deprecated names still work and log a rename warning at boot: `OTEL_OTLP_ENDPOINT` (use `OTEL_EXPORTER_OTLP_ENDPOINT`), `OTEL_OTLP_HEADERS` (use `OTEL_EXPORTER_OTLP_HEADERS`) and `OTEL_SAMPLE_RATIO` (use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with `OTEL_TRACES_SAMPLER_ARG`). A deprecated name and its replacement set to different values stop startup.
+
+Every gateway span carries the `langwatch.project_id` of the virtual key, so an export pointed at a LangWatch ingest files the span under the right project. See [Observability](/ai-gateway/observability).
 
 ## Customer trace bridge
 
-The gateway exposes a customer-facing OTel ingest at `/api/otel/v1/traces` for VKs whose project has BYO-OTel configured. By default the bridge points at the same host as `LW_GATEWAY_BASE_URL`; override only if you proxy customer traces through a different ingest URL.
+| Var | Default | Purpose |
+|---|---|---|
+| `CUSTOMER_TRACE_BRIDGE_BASE_URL` | `LW_GATEWAY_BASE_URL` | Base URL that receives customer traces. The gateway exports to `<base>/api/otel` |
+| `LANGY_MIRROR_TRACE_ENDPOINT` | empty | OTLP endpoint that receives a mirror copy of spans produced for Langy virtual keys |
+| `LANGY_MIRROR_TRACE_KEY` | empty | API key sent with the mirror export |
+| `LANGY_MIRROR_PROJECT_ID` | empty | Project that receives the mirror copy. With all three empty the mirror is off |
 
-| Var                              | Default                                                  | Purpose                                                       |
-|----------------------------------|----------------------------------------------------------|---------------------------------------------------------------|
-| `CUSTOMER_TRACE_BRIDGE_BASE_URL` | matches `LW_GATEWAY_BASE_URL` if unset                   | Override base URL for customer trace exports.                 |
+## Debug
 
-## Logging + environment
+Never set these on a production pod. Both write request content to the log.
 
-| Var            | Default   | Purpose                                                                |
-|----------------|-----------|------------------------------------------------------------------------|
-| `LOG_LEVEL`    | `info`    | One of `debug`, `info`, `warn`, `error`. Surfaced through `clog`.   |
-| `ENVIRONMENT`  | `local`   | Free-form environment label propagated into every structured log + the `version` field of probe responses. Set to `prod`, `staging`, etc. on a deployed pod so the OTel sampler default switches from full to 10 %. |
-
-## Secret rotation
-
-### `LW_GATEWAY_JWT_SECRET` zero-downtime rotation
-
-Before the dual-key overlap shipped, rotating `LW_GATEWAY_JWT_SECRET` invalidated every outstanding bundle (~15 min TTL) instantly, every in-flight customer request got 401. Today, the resolver's `Keyfunc` returns `jwt.VerificationKeySet{current, previous}` whenever `LW_GATEWAY_JWT_SECRET_PREVIOUS` is set. `golang-jwt/jwt/v5` natively tries each key in order; current is first so it's the fast path in steady state.
-
-Four-step zero-downtime rotation:
-
-1. Flip the **control-plane** signing secret to the new value. New bundles get signed with `new`.
-2. Update the gateway's Kubernetes Secret: set `LW_GATEWAY_JWT_SECRET=new` and `LW_GATEWAY_JWT_SECRET_PREVIOUS=old` (chart values: `secrets.jwtSecretKey`, `secrets.jwtSecretPreviousKey`). Roll the gateway deployment.
-3. Pre-rotation bundles signed with `old` keep verifying via the previous-key fallback. New bundles sign+verify with `new`.
-4. After the longest pre-rotation bundle TTL has elapsed (~15 min default), remove `LW_GATEWAY_JWT_SECRET_PREVIOUS` entirely and roll again. Strict-mode resumes.
-
-The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever `JWTSecretPrevious` is set, with explicit "remove once ~15m elapsed" guidance, accepting a retired key forever is a posture regression.
-
-### `LW_GATEWAY_INTERNAL_SECRET` rotation
-
-There is no `LW_GATEWAY_INTERNAL_SECRET_PREVIOUS` overlap key in v1. Internal-RPC HMAC rotation today uses a brief synchronized cutover: roll both control-plane and gateway pods within seconds of each other so the HMAC verify on the receiving side never gets a request signed with a key it doesn't yet have. Acceptable in practice because the `/api/internal/gateway/*` traffic volume is dominated by the per-org long-poll which will reconnect on next iteration. Tracked as a v1.1 hardening follow-up.
-
-## Debug, development
-
-These env vars are intended for triage; never enable in production, they emit verbose data that may include sensitive prompt content.
-
-| Var                         | Purpose                                                                                                            |
-|-----------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `LW_LOG_MESSAGE_BODY=1`     | Logs a peek of every inbound `/v1/messages` and `/v1/responses` request body at INFO level. Useful for diagnosing CLI-shape-specific provider rejections (e.g. exact body structure that trips Anthropic's edge HTML response). |
-| `LW_GATEWAY_OUTBOUND_PROXY` | URL like `http://host:port` to route all outbound provider HTTP traffic through a logging proxy (mitmproxy, mitmdump, etc.). Bifrost's `ProxyConfig` is wired from this; covers OpenAI, Anthropic, Gemini, Azure (Bedrock uses the AWS SDK and bypasses HTTP proxy). |
-| `FEATURE_FLAG_FORCE_ENABLE` | Read by the **control plane** (not the gateway). Comma-separated list of feature flags to force-enable, bypassing PostHog targeting. Most common in dev: `release_ui_ai_gateway_menu_enabled`. Set on the langwatch-app deployment, not the gateway. |
-
-Worked example, capturing outbound provider traffic to debug a cache-hit hash mismatch:
-
-```bash
-mitmdump -p 8888 --ssl-insecure &
-export LW_GATEWAY_OUTBOUND_PROXY=http://localhost:8888
-export LW_LOG_MESSAGE_BODY=1
-make service svc=aigateway   # restart picks up both env vars
-```
-
-Replay the failing request via your client; the mitmdump session shows the exact bytes the gateway sends to `api.anthropic.com` (or any other provider), and the gateway log line `peek=...` shows what the client sent in. Diff side-by-side to localise body-mutation bugs.
+| Var | Purpose |
+|---|---|
+| `LW_LOG_MESSAGE_BODY=1` | Logs every inbound `/v1/messages` and `/v1/responses` body at `info` level |
+| `LW_GATEWAY_OUTBOUND_PROXY` | `http://host:port` proxy for outbound provider traffic on OpenAI, Anthropic, Gemini and Azure. Bedrock uses the AWS SDK and ignores it |
 
 ## Legacy aliases
 
-The chart shipped a different env-var prefix in early v1. The Go service maps these to the canonical names in [`services/aigateway/config.go: applyLegacyEnvAliases`](https://github.com/langwatch/langwatch/blob/main/services/aigateway/config.go) so existing deployments using the legacy names continue to work without a chart re-roll.
+Deployments that predate the canonical names can keep these. The canonical name wins when both are set.
 
-| Legacy name                     | Canonical name        | Notes                                  |
-|---------------------------------|-----------------------|----------------------------------------|
-| `GATEWAY_LISTEN_ADDR`           | `SERVER_ADDR`         |                                        |
-| `GATEWAY_CONTROL_PLANE_URL`     | `LW_GATEWAY_BASE_URL` |                                        |
-| `GATEWAY_LOG_LEVEL`             | `LOG_LEVEL`           |                                        |
-| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_OTLP_ENDPOINT`  |                                        |
-
-Canonical names always win when both are set. The aliases are scheduled for removal in v1.2, migrate any custom Helm overrides or operator runbooks that still reference the legacy names.
-
-## Forward-compat values.yaml knobs (v1.1)
-
-Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+| Legacy name | Canonical name |
+|---|---|
+| `GATEWAY_LISTEN_ADDR` | `SERVER_ADDR` |
+| `GATEWAY_CONTROL_PLANE_URL` | `LW_GATEWAY_BASE_URL` |
+| `GATEWAY_LOG_LEVEL` | `LOG_LEVEL` |
+| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_OTLP_ENDPOINT` |
