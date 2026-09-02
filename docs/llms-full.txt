@@ -4,10 +4,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 # FILE: ./introduction.mdx
 
 ---
-title: "LangWatch: The Complete LLMOps Platform"
-description: "Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent testing. Open-source platform, with over 3k stars on GitHub."
+title: "LangWatch: The Open-Source Platform for LLM Ops, Coding Agents, AI Gateway and AI Governance"
+description: "Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open source under Apache 2.0, with over 3.5k stars on GitHub."
 sidebarTitle: Introduction
-keywords: langwatch, llm, ai, observability, evaluation, prompt optimization, llmops, open-source, github
+keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt management, coding agents, ai gateway, ai governance, llmops, open-source, github
 ---
 
 <Frame>
@@ -54,52 +54,90 @@ LangWatch provides the missing operations platform for AI applications. Every LL
 
 ## What LangWatch Does
 
+LangWatch has four areas, and you can use each one on its own.
+
 <CardGroup cols={2}>
-  <Card title="Observability" description="Track every LLM call, tool usage, and user interaction with detailed traces." icon="chart-network" href="/observability/overview" />
-  <Card title="Evaluations" description="Test quality with experiments, monitor production, guard against harm." icon="square-check" href="/evaluations/overview" />
-  <Card title="Agent Testing" description="Test agent behavior in multi-turn conversations with a simulated user." icon="masks-theater" href="/agent-testing/overview" />
-  <Card title="Prompt Management" description="Version, test, and optimize prompts collaboratively." icon="code" href="/prompt-management/overview" />
-  <Card title="AI Gateway" description="Governed, observable, sub-millisecond-overhead OpenAI- and Anthropic-compatible endpoint for every LLM call in your org. Personal IDE keys, budgets, routing policies, anomaly detection." icon="route" href="/ai-gateway/overview" />
-  <Card title="AI Governance" description="One control plane above the gateway: per-user workspaces, ingestion sources, anomaly rules, OCSF/SIEM export, compliance architecture. The admin home for rolling LangWatch out company-wide." icon="shield-halved" href="/ai-governance/overview" />
+  <Card title="LLM Ops" icon="chart-network" href="/observability/overview">
+    Everything you need to ship and improve an LLM application:
+
+    - [Observability](/observability/overview): every LLM call, tool call and user interaction as a trace.
+    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
+    - [Agent Testing](/agent-testing/overview): multi-turn conversations against your agent with a simulated user.
+    - [Prompt Management](/prompt-management/overview): versioned prompts your code loads at runtime.
+  </Card>
+  <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
+    What Claude Code, Codex, Copilot, Gemini CLI and opencode do and cost, per session, per pull request and per team, with privacy controls for the people who use them.
+  </Card>
+  <Card title="LangWatch AI Gateway" icon="route" href="/ai-gateway/overview">
+    One OpenAI and Anthropic compatible endpoint for every LLM call in the company. Your provider keys, including Azure and Bedrock, stay in LangWatch. Each caller gets a virtual key with its own budget, and every request lands as a trace.
+  </Card>
+  <Card title="AI Governance" icon="shield-halved" href="/ai-governance/overview">
+    An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+  </Card>
 </CardGroup>
 
 ## Where to Start?
 
-Setting up the full process of online tracing, prompt management, production evaluations, and offline evaluations requires some time. Start with what matters most for your use case.
+Start with the area that matches what you are working on today. You can add the others later from the same account.
 
 <CardGroup cols={2}>
   <Card
-    title="Just Getting Started?"
-    description="Start with basic tracing to understand what's happening in your LLM applications."
+    title="Trace your LLM application"
+    description="Send your first trace with the Python or TypeScript SDK, then add evaluations and prompt management."
     icon="rocket"
     href="/integration/quick-start"
     arrow
     horizontal
   />
   <Card
-    title="Already Instrumented?"
-    description="Add prompt management and evaluation to optimize your existing setup."
-    icon="wrench"
-    href="/prompt-management/overview"
+    title="Track your coding agents"
+    description="Connect Claude Code, Codex or another coding agent in one command and see its sessions and cost."
+    icon="terminal"
+    href="/coding-agents/overview"
     arrow
     horizontal
   />
   <Card
-    title="Production Ready?"
-    description="Set up comprehensive monitoring, alerts, and cost tracking for production."
-    icon="chart-line"
-    href="/observability/overview"
+    title="Route LLM calls through the gateway"
+    description="Create a virtual key, point your base URL at LangWatch and send a request."
+    icon="route"
+    href="/ai-gateway/quickstart"
     arrow
     horizontal
   />
   <Card
-    title="Research & Development?"
-    description="Use datasets, experiments, and evaluation tools for systematic testing."
-    icon="flask"
-    href="/evaluations/overview"
+    title="Govern AI use across the company"
+    description="See every AI tool in use, who uses it, and set anomaly rules."
+    icon="shield-halved"
+    href="/ai-governance/overview"
     arrow
     horizontal
   />
+</CardGroup>
+
+## Open Source
+
+LangWatch is open source under the Apache 2.0 license. The self-hosted edition runs the same software as LangWatch Cloud, with no separate community build.
+
+<CardGroup cols={2}>
+  <Card
+    title="langwatch/langwatch on GitHub"
+    icon="github"
+    href="https://github.com/langwatch/langwatch"
+    arrow
+    horizontal
+  >
+    The full platform, the SDKs and the docs, in one repository.
+  </Card>
+  <Card
+    title="Self-host LangWatch"
+    icon="server"
+    href="/self-hosting/overview"
+    arrow
+    horizontal
+  >
+    Run LangWatch on your own infrastructure with Docker or Helm.
+  </Card>
 </CardGroup>
 
 LangWatch Cloud has a free plan: [sign up](https://app.langwatch.ai) to create a project.
