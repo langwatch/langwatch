@@ -84,39 +84,3 @@ export class IdentityErasedError extends HandledError {
     this.name = "IdentityErasedError";
   }
 }
-
-/** Postgres' unique-violation code, raised by the one-open-link index. */
-const UNIQUE_VIOLATION = "23505";
-
-/**
- * Prisma's own code for the same refusal: the client wraps a unique violation
- * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
- * SQLSTATE underneath. `IdentityMatch` has no other unique rule a write could
- * trip (the primary key is a fresh nanoid), so `P2002` on these writes means
- * the one-open-link index and nothing else.
- */
-const PRISMA_UNIQUE_VIOLATION = "P2002";
-
-/**
- * Whether a thrown value is the one-open-link index refusing a second open
- * link.
- *
- * Reads the code off whichever shape carried it: Prisma's `P2002` wrapper, a
- * raw driver error's SQLSTATE in `code` or `meta.code`, or — for the wrapper
- * shapes whose SQLSTATE lives only in the message — a word-bounded match on
- * the message. Never a `String(err).includes` over the whole message: that
- * would also match an error whose *payload* happened to contain the digits.
- */
-export function isOpenLinkViolation(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const code = (error as { code?: unknown }).code;
-  if (code === UNIQUE_VIOLATION || code === PRISMA_UNIQUE_VIOLATION)
-    return true;
-  const meta = (error as { meta?: { code?: unknown } }).meta;
-  if (meta?.code === UNIQUE_VIOLATION) return true;
-  const message = (error as { message?: unknown }).message;
-  return (
-    typeof message === "string" &&
-    new RegExp(`\\b${UNIQUE_VIOLATION}\\b`).test(message)
-  );
-}

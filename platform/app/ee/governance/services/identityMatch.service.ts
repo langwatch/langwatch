@@ -37,7 +37,6 @@ import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
-  isOpenLinkViolation,
 } from "./identityMatch.errors";
 import {
   decideMatch,
@@ -45,6 +44,7 @@ import {
   normalizeEmail,
   type OrganizationAccountIndex,
 } from "./logic/identityEvidence";
+import { isOpenLinkViolation } from "./logic/postgresConstraintErrors";
 
 const logger = createLogger("langwatch:governance:identity-match");
 
