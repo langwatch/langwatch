@@ -9,7 +9,7 @@ keywords: spend events, billing events, rebilling, reconciliation, nano USD, set
 
 A spend event is the record of one gateway request: the tokens by class, the cost, the virtual key, the end user and the metadata the request carried. LangWatch delivers spend events to your [webhook endpoints](/features/webhooks) and serves the same events over REST.
 
-Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
+Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit, a routing policy rule or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
 
 Spend events, spend summaries and the webhook endpoints are an Enterprise capability. The routes need an organization API key with `gatewaySpend:view`; replay needs `gatewaySpend:manage`. A project API key on these routes gets HTTP 401 `credential_class_mismatch`. See [RBAC](/ai-gateway/rbac).
 
@@ -105,7 +105,7 @@ curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-events?virtual_key_id=vk
 | `GET /api/gateway/v1/end-users/:id/spend` | `{ "data": { "end_user_id", "window", "from", "to", "cost", "request_count", "usage", "caps": [...] } }`. `window` is `day`, `week` or `month` (24 hours, 7 days, 30 days back from now), or pass `from` and `to`. `caps` lists the per-end-user budgets that apply, each with `budget_id`, `window`, `on_breach`, `limit_usd`, `spent_usd` and `period_started_at`. |
 | `POST /api/gateway/v1/spend-events/replay` | Body `{ "from", "to", "endpoint_id" }`, at most 7 days and 10,000 events. Re-delivers the events in the window to that endpoint with their original ids. Needs `gatewaySpend:manage`. |
 
-Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
+Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. The `status` filter also accepts `confirmed` for `success` and `failed` for `error`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
 
 A summary grouped by `model` or `provider`, or bucketed by time, is refused with `gateway_spend_group_by_unstable` when the window ends less than 30 minutes ago, because outcomes can still arrive. `meta.settles_at` says when the window is stable.
 
@@ -154,7 +154,13 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 
 ## See events in the UI
 
-**AI Gateway > Billing events** lists the events with filters on virtual key, end user, model, status and day range, and links each event to its trace.
+**AI Gateway > Billing Events** lists one row per request over the last 24 hours, 7 days or 30 days, with filters on virtual key id, end user id, model and status.
+
+<Frame caption="The Billing Events list: confirmed requests with tokens and cost, refused requests as failed at zero cost, and a realtime session mint still admitted.">
+  <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
+</Frame>
+
+The list labels a `success` event **confirmed** and an `error` event **failed**. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts and leaves out a counter at zero.
 
 <Note>
 **Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.

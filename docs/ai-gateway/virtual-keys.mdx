@@ -22,7 +22,7 @@ Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has
 | **Budget** | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
 | **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
 | **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
-| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. |
+| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. A date in the past is refused. |
 
 <Frame caption="The create drawer. Inherited budgets lists the organization budget that already applies to a project key.">
   <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing" />
@@ -90,7 +90,7 @@ The key detail page shows the spend of the last 30 days, the provider chain in t
 | **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
 | **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
 
-A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed.
+A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed. A revoked key cannot be rotated.
 
 Each transition emits a webhook event: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.virtual_key.disabled`, `gateway.virtual_key.enabled` and `gateway.virtual_key.revoked`. See [Webhooks](/features/webhooks).
 

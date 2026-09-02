@@ -15,6 +15,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **A
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Anthropic row: name, scope, ANTHROPIC_API_KEY, the optional base URL and the routing handle.">
+  <img src="/images/ai-gateway/model-provider-anthropic-form.png" alt="The Anthropic model provider drawer with ANTHROPIC_API_KEY filled in, ANTHROPIC_BASE_URL empty and the routing handle anthropic" />
+</Frame>
+
 ## Model names
 
 Write `anthropic/<model>`, for example `anthropic/claude-sonnet-4-5` or `anthropic/claude-haiku-4-5`. A bare name that starts with `claude-` resolves to Anthropic when the key reaches an Anthropic row.

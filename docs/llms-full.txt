@@ -3169,7 +3169,7 @@ keywords: spend events, billing events, rebilling, reconciliation, nano USD, set
 
 A spend event is the record of one gateway request: the tokens by class, the cost, the virtual key, the end user and the metadata the request carried. LangWatch delivers spend events to your [webhook endpoints](/features/webhooks) and serves the same events over REST.
 
-Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
+Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit, a routing policy rule or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
 
 Spend events, spend summaries and the webhook endpoints are an Enterprise capability. The routes need an organization API key with `gatewaySpend:view`; replay needs `gatewaySpend:manage`. A project API key on these routes gets HTTP 401 `credential_class_mismatch`. See [RBAC](/ai-gateway/rbac).
 
@@ -3265,7 +3265,7 @@ curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-events?virtual_key_id=vk
 | `GET /api/gateway/v1/end-users/:id/spend` | `{ "data": { "end_user_id", "window", "from", "to", "cost", "request_count", "usage", "caps": [...] } }`. `window` is `day`, `week` or `month` (24 hours, 7 days, 30 days back from now), or pass `from` and `to`. `caps` lists the per-end-user budgets that apply, each with `budget_id`, `window`, `on_breach`, `limit_usd`, `spent_usd` and `period_started_at`. |
 | `POST /api/gateway/v1/spend-events/replay` | Body `{ "from", "to", "endpoint_id" }`, at most 7 days and 10,000 events. Re-delivers the events in the window to that endpoint with their original ids. Needs `gatewaySpend:manage`. |
 
-Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
+Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. The `status` filter also accepts `confirmed` for `success` and `failed` for `error`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
 
 A summary grouped by `model` or `provider`, or bucketed by time, is refused with `gateway_spend_group_by_unstable` when the window ends less than 30 minutes ago, because outcomes can still arrive. `meta.settles_at` says when the window is stable.
 
@@ -3314,7 +3314,13 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 
 ## See events in the UI
 
-**AI Gateway > Billing events** lists the events with filters on virtual key, end user, model, status and day range, and links each event to its trace.
+**AI Gateway > Billing Events** lists one row per request over the last 24 hours, 7 days or 30 days, with filters on virtual key id, end user id, model and status.
+
+<Frame caption="The Billing Events list: confirmed requests with tokens and cost, refused requests as failed at zero cost, and a realtime session mint still admitted.">
+  <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
+</Frame>
+
+The list labels a `success` event **confirmed** and an `error` event **failed**. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts and leaves out a counter at zero.
 
 <Note>
 **Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.
@@ -10058,6 +10064,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **A
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Anthropic row: name, scope, ANTHROPIC_API_KEY, the optional base URL and the routing handle.">
+  <img src="/images/ai-gateway/model-provider-anthropic-form.png" alt="The Anthropic model provider drawer with ANTHROPIC_API_KEY filled in, ANTHROPIC_BASE_URL empty and the routing handle anthropic" />
+</Frame>
+
 ## Model names
 
 Write `anthropic/<model>`, for example `anthropic/claude-sonnet-4-5` or `anthropic/claude-haiku-4-5`. A bare name that starts with `claude-` resolves to Anthropic when the key reaches an Anthropic row.
@@ -10771,9 +10781,9 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with RPM, TPM and RPD fields, a fallback priority and a provider config JSON. The gateway does not enforce the TPM field.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority, a provider config JSON and a read-only health block.
 
-<Frame caption="Advanced (Gateway) on a Bedrock row: RPM, TPM, RPD, fallback priority and provider config.">
+<Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority, provider config and health.">
   <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
 </Frame> See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
@@ -11096,7 +11106,11 @@ A rate limit is a cap on how many requests a virtual key may send: requests per 
 
 ## Set a rate limit
 
-Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension. The third field, `tpm`, is disabled.
+Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension.
+
+<Frame caption="The Rate limits section of the Edit virtual key drawer: rpm set to 2 and rpd set to 500.">
+  <img src="/images/ai-gateway/vk-rate-limits.png" alt="The Edit virtual key drawer scrolled to Cache control, Rate limits, Realtime voice and Expiration, with rpm 2 and rpd 500" />
+</Frame>
 
 Over the API, set `config.rateLimits` on the key:
 
@@ -13923,7 +13937,7 @@ Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has
 | **Budget** | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
 | **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
 | **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
-| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. |
+| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. A date in the past is refused. |
 
 <Frame caption="The create drawer. Inherited budgets lists the organization budget that already applies to a project key.">
   <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing" />
@@ -13991,7 +14005,7 @@ The key detail page shows the spend of the last 30 days, the provider chain in t
 | **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
 | **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
 
-A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed.
+A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed. A revoked key cannot be rotated.
 
 Each transition emits a webhook event: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.virtual_key.disabled`, `gateway.virtual_key.enabled` and `gateway.virtual_key.revoked`. See [Webhooks](/features/webhooks).
 
