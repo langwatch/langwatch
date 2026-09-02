@@ -272,7 +272,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // workflow run, and reads as part of the same family.
     pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
-      "List, run, update, and archive the workflows you build in the LangWatch workflow editor.",
+      "List, run and archive the workflows you build in the LangWatch workflow editor, and update their name, icon and description.",
   },
   {
     name: "Dashboards",
