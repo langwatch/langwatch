@@ -12,6 +12,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
+- If you bring your own PostgreSQL: the `btree_gist` extension must be installable, and the migration user must be allowed to run `CREATE EXTENSION`. It ships with the standard `postgresql-contrib` package, so the chart-managed PostgreSQL already has it; on a managed provider, confirm it is on the allow-list before upgrading. Migrations fail with an explicit message rather than half-applying if it is missing.
 - **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
