@@ -131,6 +131,7 @@ export {
   type EventingLangyConversationAdapterOptions,
   type LangyConversationRuntimeCommands,
 } from "./adapters/eventing.langy-conversation-runtime.adapter";
+export { createLangyConversationProducerPipeline } from "./adapters/langy-conversation-producer.adapter";
 export {
   EventingLangyMaintenanceAdapter,
   type LangyMaintenancePipelineDeps,
@@ -204,3 +205,55 @@ export type {
   LangyTurnSettlementRedis,
   TurnSettlement,
 } from "./streaming/langy-turn-settlement-waiter";
+
+// ---------------------------------------------------------------------------
+// The four public and internal REST doors.
+//
+// The turn surface and the UI-action surface share one credential chain
+// (`langy-rest.credentials`), because the ORDER of its refusals — credential,
+// dark 404, ceiling, identity — is the contract rather than an implementation
+// detail, and two copies of it would drift into two different leaks.
+// ---------------------------------------------------------------------------
+export {
+  createLangyTurnsRestApp,
+  type LangyTurnsRestPorts,
+} from "./transport/api-rest/langy-turns.api";
+export {
+  createLangyUiActionsRestApp,
+  LangyUiActionRestCatalogPort,
+  type LangyUiActionsRestPorts,
+} from "./transport/api-rest/langy-ui-actions.api";
+export {
+  createLangyInternalRestApp,
+  type LangyInternalMetricsPort,
+  type LangyInternalRestPorts,
+} from "./transport/api-rest/langy-internal.api";
+export {
+  createLangyRelayRestApp,
+  type LangyRelayRestPorts,
+  type RelayTally,
+} from "./transport/api-rest/langy-relay.api";
+export {
+  resolveLangyRestActor,
+  resolveLangyRestCaller,
+  type LangyRestCaller,
+  type LangyRestCeilingPort,
+  type LangyRestCredentialPorts,
+  type LangyRestCredentialReader,
+} from "./transport/api-rest/langy-rest.credentials";
+export {
+  LANGY_API_KEY_TURNS_FLAG,
+  LANGY_UI_ACTIONS_FLAG,
+} from "./transport/api-rest/langy-rest.flags";
+export { hasLangyAccess, LANGY_RELEASE_FLAG } from "./services/langy-access.service";
+export {
+  resolveLangyActorSession,
+  type LangyActorResolution,
+  type LangyActorUserReader,
+} from "./services/langy-actor-session.service";
+export {
+  resolveLangyKeyIdentity,
+  type LangyIdentityDenialReason,
+  type LangyIdentityToken,
+  type LangyKeyIdentity,
+} from "./services/langy-key-identity.service";

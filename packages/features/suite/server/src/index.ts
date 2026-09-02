@@ -32,6 +32,7 @@ export {
   type SuiteRunProcessingPipeline,
   type SuiteRunProcessingPipelineDeps,
 } from "./adapters/suite-run-processing.adapter";
+export { createSuiteRunProcessingProducerPipeline } from "./adapters/suite-run-processing-producer.adapter";
 export {
   SUITE_RUN_PROJECTION_VERSIONS,
   type CompleteSuiteRunItemCommandData,

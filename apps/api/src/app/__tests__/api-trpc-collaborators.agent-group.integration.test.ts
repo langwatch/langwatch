@@ -34,6 +34,8 @@
  */
 import type { EventEmitter } from "node:events";
 import { EventEmitter as NodeEventEmitter } from "node:events";
+import { createTenantId, EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { AuthService } from "@langwatch/auth-contract";
 import type {
   AuthzGetDecisionInput,
@@ -74,6 +76,7 @@ const SESSION_USER = {
 const PROJECT_ID = "project-1";
 const ORGANIZATION_ID = "organization-1";
 const CONVERSATION_ID = "conversation-1";
+const SCENARIO_RUN_ID = "scenariorun-1";
 const TURN_ID = "turn-1";
 
 /**
@@ -299,6 +302,18 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
         saasBilling: false,
       },
     },
+    /**
+     * The gateway group and the GitHub door, stubbed with only what the record
+     * reads while it is BUILT: the virtual-key budget parser, which is fixed at
+     * build time because a tRPC input parser is, and the billing switch, which
+     * decides which router the two billing namespaces ARE.
+     */
+    gatewayGroup: {
+      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+      governanceHome: stub("gatewayGroup.governanceHome"),
+      saasBilling: false,
+    },
+    github: stub("github"),
     productInfra: {
       storedObjects: stub("productInfra.storedObjects"),
       dataRetention: stub("productInfra.dataRetention"),
@@ -312,8 +327,41 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
   } as unknown as AnyApiTrpcCollaborators;
 }
 
+/**
+ * This process's Eventing, as the API composes it — PRODUCER-only, over a fake
+ * event store instead of `EventStoreProducerOnly`.
+ *
+ * The store is the one substitution, and it is what makes an enqueued command
+ * observable in-process: the real API appends nothing, because the worker that
+ * drains the queue does. Everything else is the production shape, including
+ * `processManagerMode`, which is the whole reason the two pipelines that mount
+ * a process manager can be registered here at all.
+ */
+function producerEventing() {
+  const eventStore = EventStoreMemory.createForTesting();
+  const eventSourcing = new EventSourcing({
+    eventStore,
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+  });
+  const storedEvents = async (input: {
+    aggregateId: string;
+    aggregateType: "simulation_run" | "langy_conversation";
+  }) =>
+    eventStore.getEvents(
+      input.aggregateId,
+      { tenantId: createTenantId(PROJECT_ID) },
+      input.aggregateType,
+    );
+  return { eventSourcing, storedEvents };
+}
+
 function composeApplication(
-  options: { langyEnabled?: boolean; adminEmails?: readonly string[] } = {},
+  options: {
+    langyEnabled?: boolean;
+    adminEmails?: readonly string[];
+    eventing?: EventSourcing;
+  } = {},
 ) {
   const prisma = testPrisma();
   const authz = testAuthz();
@@ -342,6 +390,10 @@ function composeApplication(
     // reader answers the empty set and the live turn buffer is absent.
     resolveClickHouseClient: null,
     redis: null,
+    // Absent by default, which is a real deployment shape: with no queue every
+    // agent-side write refuses by name. The suite below composes one where the
+    // enqueued command is the thing under test.
+    eventing: options.eventing,
     defaultRetentionDays: 49,
     demoProjectId: "demo-project",
     adminEmails: options.adminEmails ?? [SESSION_USER.email],
@@ -638,6 +690,97 @@ describe("given the API process composed the agent-group half from its own graph
       expect(watched.status).toBe(200);
       expect(watched.frames[0]).toEqual({ type: "connected" });
       expect(watched.frames[1]).toEqual({ type: "complete" });
+    });
+  });
+
+  describe("when the agent-side pipelines are registered producer-only", () => {
+    /**
+     * The write path end to end: the real `/api/trpc` handler, this process's
+     * policy chain, the composed scenario application, the packaged
+     * `simulation_processing` definition registered PRODUCER-only, and the
+     * command's own handler appending onto the event store.
+     *
+     * `cancelJob` rather than `run`: both dispatch on the same registration,
+     * and `run` first has to resolve its target through a prefetcher this
+     * process does not compose — which is a DEPLOYMENT absence and has its own
+     * assertion below.
+     */
+    it("lands a scenario run command on the event store through the real handler", async () => {
+      const { eventSourcing, storedEvents } = producerEventing();
+      const { application } = composeApplication({ eventing: eventSourcing });
+
+      const { status, body } = await callTrpc(
+        application,
+        "scenarios.cancelJob",
+        {
+          projectId: PROJECT_ID,
+          scenarioSetId: "set-1",
+          batchRunId: "batch-1",
+          scenarioRunId: SCENARIO_RUN_ID,
+          scenarioId: "scenario-1",
+        },
+        "mutation",
+      );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ result: { data: { json: { cancelled: true } } } });
+      const appended = await storedEvents({
+        aggregateId: SCENARIO_RUN_ID,
+        aggregateType: "simulation_run",
+      });
+      expect(appended.map((event) => event.type)).toEqual(["lw.simulation_run.cancel_requested"]);
+      await eventSourcing.close();
+    });
+
+    /**
+     * The same proof on the other pipeline, whose sixteen commands were refused
+     * for the same one reason.
+     *
+     * Archiving rather than starting a turn, for the reason the refusal below
+     * states: a turn dispatches to an agent manager this process composes none
+     * of, which is a deployment absence rather than the framework one this
+     * suite is about. Both writes come off the SAME registration.
+     */
+    it("lands a Langy conversation command on the event store through the real handler", async () => {
+      const { eventSourcing, storedEvents } = producerEventing();
+      const { application } = composeApplication({ eventing: eventSourcing });
+
+      const { status, body } = await callTrpc(
+        application,
+        "langy.deleteConversation",
+        { projectId: PROJECT_ID, conversationId: CONVERSATION_ID },
+        "mutation",
+      );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ result: { data: { json: { success: true } } } });
+      const appended = await storedEvents({
+        aggregateId: CONVERSATION_ID,
+        aggregateType: "langy_conversation",
+      });
+      expect(appended.map((event) => event.type)).toEqual([
+        "lw.langy_conversation.conversation_archived",
+      ]);
+      await eventSourcing.close();
+    });
+
+    /**
+     * The discriminator between "registered" and "registered and half-running".
+     *
+     * Both definitions mount a process manager, and this process runs neither:
+     * their inbox, outbox and wakes are the worker's. The runtime names them
+     * rather than counting them, so a deployment reads WHICH manager is not
+     * running here.
+     */
+    it("declines the process managers by name rather than running them", async () => {
+      const { eventSourcing } = producerEventing();
+      composeApplication({ eventing: eventSourcing });
+
+      expect(eventSourcing.unrunProcessManagers).toEqual(
+        expect.arrayContaining(["simulation_run_execution"]),
+      );
+      expect(() => eventSourcing.processRuntime).toThrow(/producer-only/);
+      await eventSourcing.close();
     });
   });
 

@@ -44,9 +44,15 @@ Feature: The standalone API process dispatches commands and consumes none
     Scenario: The API process's Eventing runtime runs no process managers
       Given the API process composed its Eventing runtime
       When a pipeline declaring a process manager is registered on it
-      Then the registration is refused
-      # An inbox, an outbox and a wake are the consuming process's work. Half
-      # of that is a graph that claims work it never drains.
+      Then the pipeline registers whole, with its command dispatchers
+      And the process manager is declined by name
+      And the runtime has no process runtime to ask for
+      # An inbox, an outbox and a wake are the consuming process's work, and
+      # half of that is a graph that claims work it never drains. Refusing the
+      # whole PIPELINE was the wrong half to keep: one declaration inside a
+      # definition made every command on it unsendable from the tier a
+      # customer's action arrives at, which is how a scenario run and a Langy
+      # turn came to answer `service_unavailable` on a healthy deployment.
 
   Rule: Dispatch is released before the connection under it
 

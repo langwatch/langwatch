@@ -49,3 +49,46 @@ Feature: A producer-only process has no event log
       And the event store is never consulted
       # This is the whole point of the seat: registration has to succeed, or
       # the runtime substitutes a pipeline that drops commands silently.
+
+  # WHY THIS RULE EXISTS
+  #
+  # The seat above is only half the story. A pipeline that declares a process
+  # manager also needs a durable ProcessStore, and the runtime refused to
+  # register one without it — correctly for a consumer, and catastrophically for
+  # a producer, because ONE declaration in a definition made EVERY command on
+  # that pipeline unsendable from the tier a customer's action arrives at. The
+  # API answered `service_unavailable` for all eight simulation commands and all
+  # sixteen Langy turn commands on the strength of a process manager it was
+  # never going to run. Producing and running are separate jobs, so they are now
+  # separate decisions.
+
+  Rule: A producer registers a process-manager pipeline and declines the manager
+
+    @unit
+    Scenario: A pipeline declaring a process manager still registers
+      Given a runtime that registers pipelines producer-only
+      When a pipeline that declares a process manager is registered without a
+      durable process store
+      Then the pipeline registers whole, with its command dispatchers
+      And the runtime names the process manager it will not run
+
+    @unit
+    Scenario: A command on a process-manager pipeline appends and returns
+      Given a runtime that registers pipelines producer-only
+      When one of that pipeline's commands is dispatched
+      Then the command's events are appended and the dispatch returns
+
+    @unit
+    Scenario: The process manager is refused rather than half-run
+      Given a runtime that registers pipelines producer-only
+      When something asks that runtime for its process runtime
+      Then the request is refused by name
+      And no process instance is persisted for the declared manager, even where
+      a process store was supplied
+
+    @unit
+    Scenario: The consumer's requirement is unchanged
+      Given a runtime that runs the process managers it registers
+      When a pipeline that declares a process manager is registered without a
+      durable process store
+      Then the registration is refused

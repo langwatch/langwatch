@@ -36,19 +36,24 @@
  * to. All three subscriptions stream, because the emitters behind them are this
  * process's own.
  *
- * Every WRITE that has to enqueue work REFUSES BY NAME, and the reason is one
- * fact rather than six: this process's Eventing is producer-only and holds no
- * `ProcessStore`, and both the simulation pipeline and the Langy conversation
- * pipeline declare a process manager — so registering either here is refused by
- * the runtime rather than half-run (see
- * `api-eventing.infrastructure.ts`). Producing their commands needs a
- * producer-only variant of each definition, the way
- * `createTraceProcessingProducerPipeline` and
- * `createEvaluationProcessingProducerPipeline` are for their pipelines, and
- * that variant is its own slice. Until it lands, starting a simulation run,
- * starting a suite run and starting or continuing a Langy turn all answer
- * `service_unavailable` with the capability named — never a silent no-op, which
- * would leave a customer watching a run that was never queued.
+ * Every WRITE that has to enqueue work ENQUEUES IT, on the three pipelines
+ * `api-agent-pipelines.composition.ts` registers PRODUCER-only against this
+ * process's own Eventing: the eight simulation commands, the suite run's start
+ * and all sixteen Langy conversation commands. The worker drains them. Both the
+ * simulation and the Langy definition declare a process manager, and the
+ * runtime declines to RUN those by name rather than refusing the whole pipeline
+ * — producing a command and running a process manager were never the same
+ * decision. With no queue at all, every one of those writes refuses by name
+ * instead: never a silent no-op, which would leave a customer watching a run
+ * that was never queued.
+ *
+ * Two writes still refuse even with a queue, and both are DEPLOYMENT absences
+ * rather than framework ones. Preparing a scenario run resolves its target
+ * through ten other verticals' services, so `scenarios.run`'s prefetch refuses.
+ * Starting a Langy turn dispatches to the agent manager over HTTP, so a process
+ * with no Langy configuration answers the feature's own
+ * `langy_agent_unavailable`. Renaming, forking, archiving and importing into a
+ * conversation are pure commands and answer for real.
  *
  * The OPERATOR back office is the one surface that is mostly absence. Its
  * event-log explorer, its process-manager fleet explorer and its projection
@@ -60,8 +65,13 @@
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import type { AuthService } from "@langwatch/auth-contract";
-import { declareAuthzMiddleware, type AuthzPermission, type AuthzService } from "@langwatch/authz-contract";
+import {
+  declareAuthzMiddleware,
+  type AuthzPermission,
+  type AuthzService,
+} from "@langwatch/authz-contract";
 import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { EventSourcing } from "@langwatch/eventing";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   LangyApp,
@@ -71,7 +81,6 @@ import {
   LangyUiActionCatalogPort,
   LangyUiActionService,
   PostgresLangyAdapter,
-  type LangyConversationCommands,
   type LangyEgressTrpcPorts,
   type LangyTrpcPorts,
   type LangyTurnTechnicalPorts,
@@ -108,7 +117,6 @@ import {
   ScenarioTabRegistryService,
   ScenarioTabStorePort,
   SimulationClickHouseAdapter,
-  SimulationExecutionPort,
   SimulationWindowedReadPort,
   RedisScenarioTabStoreAdapter,
   type ScenarioTrpcPorts,
@@ -121,13 +129,16 @@ import {
   PostgresSuiteAdapter,
   SuiteApp,
   SuiteExecutionService,
-  SuiteRunCommandsPort,
   SuiteRunIdPort,
 } from "@langwatch/suite-server";
-import { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import { ScenarioExecutionService, type SimulationService } from "@langwatch/scenario-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
+import {
+  composeApiAgentPipelines,
+  type ApiAgentPipelines,
+} from "./api-agent-pipelines.composition";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { AppAgentGroupTrpcPorts } from "../app-trpc/app-trpc.agent-group";
@@ -196,18 +207,16 @@ export class LoggedApiAgentGroupAbsence extends ApiAgentGroupAbsenceReport {
     super();
   }
 
-  absent(
-    capability: "run-commands" | "turn-commands" | "operator-runtime" | "live-buffer",
-  ): void {
+  absent(capability: "run-commands" | "turn-commands" | "operator-runtime" | "live-buffer"): void {
     this.logger.warn({ capability }, CONSEQUENCE[capability]);
   }
 }
 
 const CONSEQUENCE = {
   "run-commands":
-    "API process registered no simulation pipeline: starting a scenario run, cancelling one and starting a suite run all refuse by name. Reading runs, suites and their messages is unaffected, and the live simulation subscription still streams.",
+    "API process holds no command queue, so it registered no simulation or suite pipeline: starting a scenario run, cancelling one and starting a suite run all refuse by name. Reading runs, suites and their messages is unaffected, and the live simulation subscription still streams.",
   "turn-commands":
-    "API process registered no Langy conversation pipeline: starting a turn, continuing one, renaming, forking and deleting a conversation all refuse by name. Reading conversations and messages is unaffected, and both live channels still stream.",
+    "API process holds no command queue, so it registered no Langy conversation pipeline: starting a turn, continuing one, renaming, forking and deleting a conversation all refuse by name. Reading conversations and messages is unaffected, and both live channels still stream.",
   "operator-runtime":
     "API process composed no operator runtime: the event-log explorer, the process-manager fleet, the replay runner and the scheduled-job store all refuse by name. The admin allow-list, the impersonation ledger and the back-office reads answer for real.",
   "live-buffer":
@@ -266,6 +275,12 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
     windowSeconds: number;
     max: number;
   }) => Promise<{ allowed: boolean; resetAt: number }>;
+  /**
+   * The producer-only eventing runtime the three agent-side pipelines are
+   * registered on, so a scenario run, a suite run and a Langy conversation
+   * write reach the worker that drains them. Absent refuses all three by name.
+   */
+  eventing: EventSourcing | undefined;
   /** Names this process in every refusal below. */
   processName: string;
   report?: ApiAgentGroupAbsenceReport;
@@ -277,6 +292,15 @@ export type ApiAgentGroupCollaborators = Readonly<{
   ports: AppAgentGroupTrpcPorts;
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
+  /**
+   * The canonical Simulation service, published so the run EXPORT can sweep
+   * through it.
+   *
+   * Taken rather than rebuilt: the export never receives or reconstructs
+   * Simulation's private ClickHouse repository, which is the whole reason it
+   * is a service and not a query.
+   */
+  simulations: SimulationService;
   /** For `ctx.app.suites`. */
   suites: SuiteApp;
   /** For `ctx.app.langy` — the same application both Langy doors read. */
@@ -291,12 +315,24 @@ export function composeApiAgentGroupCollaborators(
 ): ApiAgentGroupCollaborators {
   const logger = createLogger(`${options.processName}:agent-group`);
 
-  options.report?.absent("run-commands");
-  options.report?.absent("turn-commands");
+  // The three agent-side pipelines, registered PRODUCER-only on this process's
+  // own Eventing. Composed FIRST because every write below dispatches on them:
+  // the eight simulation commands, the suite run's start, and all sixteen
+  // conversation commands.
+  const pipelines = composeApiAgentPipelines({
+    eventing: options.eventing,
+    processName: options.processName,
+    report: {
+      withoutQueue: () => {
+        options.report?.absent("run-commands");
+        options.report?.absent("turn-commands");
+      },
+    },
+  });
   options.report?.absent("operator-runtime");
   if (!options.redis) options.report?.absent("live-buffer");
 
-  const simulations = composeSimulations(options);
+  const simulations = composeSimulations(options, pipelines);
   const scenarios = PrismaScenarioAdapter.create({
     prisma: options.prisma,
     simulations,
@@ -335,7 +371,7 @@ export function composeApiAgentGroupCollaborators(
     resolveClickHouseClient: options.resolveClickHouseClient,
     defaultRetentionDays: options.defaultRetentionDays,
     execution: SuiteExecutionService.create({
-      commands: new UnavailableApiSuiteRunCommands(),
+      commands: pipelines.suiteRuns,
       ids: new KsuidSuiteRunId(),
       scenarios,
     }),
@@ -349,11 +385,12 @@ export function composeApiAgentGroupCollaborators(
     simulations,
   });
 
-  const langyApp = composeLangy(options);
+  const langyApp = composeLangy(options, pipelines);
   const opsApp = composeOps(options, logger);
 
   return {
     scenarios: scenarioApp,
+    simulations,
     suites: suiteApp,
     langy: langyApp,
     ops: opsApp,
@@ -412,8 +449,11 @@ export function withApiAgentGroupCollaborators(
  * and that is correct rather than degraded — a deployment that stores no runs
  * has no run to show.
  */
-function composeSimulations(options: ApiAgentGroupCollaboratorsOptions) {
-  const execution = new UnavailableApiSimulationExecution();
+function composeSimulations(
+  options: ApiAgentGroupCollaboratorsOptions,
+  pipelines: ApiAgentPipelines,
+) {
+  const execution = pipelines.simulations;
   if (!options.resolveClickHouseClient) {
     return SimulationClickHouseAdapter.createNull({ execution });
   }
@@ -437,54 +477,6 @@ function composeSimulations(options: ApiAgentGroupCollaboratorsOptions) {
 class UnwindowedApiSimulationRead extends SimulationWindowedReadPort {
   query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
     return input.run(null);
-  }
-}
-
-/**
- * The eight simulation commands, refused by name.
- *
- * Not silent no-ops: each of these is the one place a customer's action becomes
- * queued work, and a swallowed `queueRun` is a run that never starts while the
- * page says it did.
- */
-class UnavailableApiSimulationExecution extends SimulationExecutionPort {
-  queueRun(): Promise<void> {
-    return this.refuse();
-  }
-  startRun(): Promise<void> {
-    return this.refuse();
-  }
-  messageSnapshot(): Promise<void> {
-    return this.refuse();
-  }
-  textMessageStart(): Promise<void> {
-    return this.refuse();
-  }
-  textMessageEnd(): Promise<void> {
-    return this.refuse();
-  }
-  finishRun(): Promise<void> {
-    return this.refuse();
-  }
-  cancelRun(): Promise<void> {
-    return this.refuse();
-  }
-  deleteRun(): Promise<void> {
-    return this.refuse();
-  }
-
-  private refuse(): Promise<never> {
-    return Promise.reject(new ApiAgentGroupUnavailableError("Running a simulation"));
-  }
-}
-
-/** The two suite-run commands, refused by name for the same reason. */
-class UnavailableApiSuiteRunCommands extends SuiteRunCommandsPort {
-  startSuiteRun(): Promise<void> {
-    return Promise.reject(new ApiAgentGroupUnavailableError("Running a suite"));
-  }
-  queueSimulationRun(): Promise<void> {
-    return Promise.reject(new ApiAgentGroupUnavailableError("Running a suite"));
   }
 }
 
@@ -631,7 +623,10 @@ function composeScenarioPorts(logger: Logger): ScenarioTrpcPorts {
  * store here is {@link EventStoreProducerOnly}, which holds no readable log, so
  * a conversation's durable event page is answered from the projections instead.
  */
-function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
+function composeLangy(
+  options: ApiAgentGroupCollaboratorsOptions,
+  pipelines: ApiAgentPipelines,
+): LangyApp {
   const adapter = PostgresLangyAdapter.create({ database: options.prisma });
   const redis = options.redis;
 
@@ -641,8 +636,7 @@ function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
     // choose. The worker composition makes the same call for its title
     // generator, and for the same reason.
     models: {
-      resolve: () =>
-        Promise.reject(new ApiAgentGroupUnavailableError("Resolving the Langy model")),
+      resolve: () => Promise.reject(new ApiAgentGroupUnavailableError("Resolving the Langy model")),
     },
     // No agent manager on a web process: dispatching is the worker's.
     worker: null,
@@ -658,8 +652,7 @@ function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
     // spend, and a positive cap would advertise one.
     perDayPrCap: 0,
     sessionKeys: {
-      mint: () =>
-        Promise.reject(new ApiAgentGroupUnavailableError("Minting a Langy session key")),
+      mint: () => Promise.reject(new ApiAgentGroupUnavailableError("Minting a Langy session key")),
       revoke: () => Promise.resolve(),
     },
     // The one turn port that answers for real here: rendering the composer's
@@ -680,9 +673,7 @@ function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
       },
       virtualKeys: {
         provision: () =>
-          Promise.reject(
-            new ApiAgentGroupUnavailableError("Provisioning a Langy virtual key"),
-          ),
+          Promise.reject(new ApiAgentGroupUnavailableError("Provisioning a Langy virtual key")),
       },
       github: {
         enabled: false,
@@ -694,7 +685,7 @@ function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
         mirrorProjectId: undefined,
       },
     },
-    commands: unavailableLangyConversationCommands(),
+    commands: pipelines.langyConversations,
     events: null,
     ...(redis ? { feedbackPromptRedis: redis } : {}),
   });
@@ -704,42 +695,6 @@ function composeLangy(options: ApiAgentGroupCollaboratorsOptions): LangyApp {
     redis: redis as unknown as Parameters<typeof LangyApp.create>[0]["redis"],
     broadcast: options.broadcast,
   });
-}
-
-/**
- * All sixteen conversation commands, refused by name.
- *
- * Built from one list rather than sixteen literals so a command added to the
- * pipeline cannot silently acquire a different refusal from its fifteen
- * siblings — and so this file states, once, that the whole write side is
- * absent rather than fifteen-sixteenths of it.
- */
-function unavailableLangyConversationCommands(): LangyConversationCommands {
-  const names = [
-    "createConversation",
-    "forkConversation",
-    "recordMessage",
-    "importMessage",
-    "acceptAgentTurn",
-    "initiateToolCall",
-    "succeedToolCall",
-    "failToolCall",
-    "updatePlan",
-    "failAgentResponse",
-    "recordAgentResponse",
-    "archiveConversation",
-    "updateConversationMetadata",
-    "recordTurnHandoff",
-    "consumeTurnHandoff",
-    "generateConversationTitle",
-  ] as const;
-
-  const refuse = (): Promise<never> =>
-    Promise.reject(new ApiAgentGroupUnavailableError("Writing to a Langy conversation"));
-
-  return Object.fromEntries(
-    names.map((name) => [name, refuse]),
-  ) as unknown as LangyConversationCommands;
 }
 
 /**
@@ -854,9 +809,7 @@ function composeLangyGates(options: ApiAgentGroupCollaboratorsOptions) {
     const userId = (ctx as ApiTrpcPortsContext).actor().id;
     const organizationId =
       input.organizationId ??
-      (input.projectId
-        ? await options.projects.getOrganizationId(input.projectId)
-        : undefined);
+      (input.projectId ? await options.projects.getOrganizationId(input.projectId) : undefined);
 
     const target: FeatureFlagTarget = input.projectId
       ? {
@@ -881,9 +834,7 @@ function composeLangyGates(options: ApiAgentGroupCollaboratorsOptions) {
 }
 
 /** The audit trail an egress allow-list change is recorded on. */
-function composeLangyEgressPorts(
-  options: ApiAgentGroupCollaboratorsOptions,
-): LangyEgressTrpcPorts {
+function composeLangyEgressPorts(options: ApiAgentGroupCollaboratorsOptions): LangyEgressTrpcPorts {
   const audit = options.audit;
   const logger = createLogger(`${options.processName}:langy-egress`);
   return {
@@ -942,9 +893,7 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
   return OpsApp.create({
     ops: Object.assign(operations, {
       eventExplorer: unavailableOperatorRuntime<OpsEventExplorer>("the event-log explorer"),
-      managerExplorer: unavailableOperatorRuntime<OpsProcessExplorer>(
-        "the process-manager fleet",
-      ),
+      managerExplorer: unavailableOperatorRuntime<OpsProcessExplorer>("the process-manager fleet"),
       replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
       snapshots: null,
     }) as OpsCapability,
@@ -1073,7 +1022,9 @@ function composeOpsCheck(ops: OpsApp) {
       },
       async ({ ctx, next }: { ctx: unknown; next: () => Promise<unknown> }) => {
         const context = ctx as {
-          session?: { user?: { email?: string | null; impersonator?: { email?: string | null } } } | null;
+          session?: {
+            user?: { email?: string | null; impersonator?: { email?: string | null } };
+          } | null;
           opsScope?: { kind: "platform" | "none" };
           permissionChecked?: boolean;
         };

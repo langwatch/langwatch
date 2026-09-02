@@ -20,10 +20,10 @@ cleanup backlog, not a gate.
 
 | Lane | Fact | Next |
 | --- | --- | --- |
-| API | `createAppTrpcFeatures` (22 namespaces) composes on `apps/api`'s own root behind its own policy chain, with ~40 ports lifted off platform; `/api/sse/*` serves subscriptions on that root. The ANALYTICS half of `trpcCollaborators` is satisfied: `apps/api/src/app/api-trpc-collaborators.analytics.composition.ts` builds `AnalyticsApp` and `DashboardApp` and the `analytics.{reads,workbench,savedCharts}` and `graphs` port groups over this process's own graph, and `withApiAnalyticsCollaborators` folds them into whatever the other halves supply. `apps/api` now owns ClickHouse: `platform/config/api.config.ts` reads `CLICKHOUSE_URL`, the `CLICKHOUSE_URL__<label>__<org>` private routes, the pool-sizing inputs and the five `LWQL_*` variables all-or-nothing, and `platform/infrastructure/api-clickhouse.infrastructure.ts` composes the routed, pooled, statement-limited connection over `@langwatch/clickhouse-client`. The application's connection and the RESTRICTED LangWatchQL identity are separate config values and separate options; neither can stand in for the other. Moved out of platform into `@langwatch/analytics-server`: the LangWatchQL vertical whole (26 modules under `src/langwatch-ql/**` plus `services/langwatch-ql.service.ts`), the filter-option service, its ClickHouse repository and the filter definitions, the shared analytics input schemas, and the four ClickHouse query refusals with the read-path translation that raises them. Into `@langwatch/dashboard-server`: the saved-workbench-chart policy, its transport errors and the workbench-aware graph-visibility policy. Three collaborators degrade FAIL-CLOSED because their verticals have not moved: the member's content protections resolve costs from AuthZ and captured content from the data-privacy policy, refusing a `restrict` rule whose audience names groups (group membership is unresolvable here); an absent graph-alert lookup shows no alert; an absent `redactActionParams` drops every parameter. Judgment calls recorded rather than deferred: the platform metric/group registry was NOT moved — its `colorSet` and number formatters are presentation and live in the browser package — so the wire's metric enum is now `z.string()` and the metric translator's own refusal is the narrowing; `PLATFORM_DEFAULT_RETENTION_DAYS` (49) is stated in the composition rather than imported; the feature-flag rows are read uncached because this process's Redis is the queue's; `lwqlKeyMap.repository.ts` and `lwql-key-map.service.ts` stayed in platform (ClickHouse ingestion side, and the second reaches the goose migration reader). Platform `root.ts` still holds the ports object as the reference for the halves that have not moved. The EXECUTION half is satisfied: `apps/api/src/app/api-trpc-collaborators.execution.composition.ts` builds `WorkflowApp`, `ExperimentApp` and the evaluation command surface plus the `workflows.{lifecycle,optimization}`, `experiments` and `evaluations` port groups over this process's own graph, and `withApiExecutionCollaborators` folds them into whatever the other halves supply. ONE workflow service serves the workflow application, the evaluator service built over it and the experiment service's reference set, so this process cannot hold two answers to "what is the current version of this workflow". `evaluations.reportEvaluation` dispatches on a PRODUCER-only registration of the SAME packaged `evaluation_processing` definition the worker drains: `createEvaluationProcessingProducerPipeline` (new, in `@langwatch/evaluation-server`) builds the whole definition with refuse-by-name stand-ins for the five consumer-side dependencies, so a fork that declared only a producer's commands — and therefore routed to names the worker's frozen job registry does not claim — is structurally impossible. `apps/api` gains `infrastructure.execution`: `LANGWATCH_NLP_SERVICE` and `BASE_HOST`, each blank-is-unconfigured. Moved out of platform into `@langwatch/workflow-server`: the NLP dispatch whole (`nlpgoFetch` becomes `HttpWorkflowNlpRuntimeAdapter` with the `/go` prefix, origin tag, causality-depth header and W3C `traceparent` byte-identical, plus `nlpProxyBaseUrl`), the project-environment and workflow-row Prisma adapters, the DSL-migration adapter, the Studio DSL preparation with `materializeNodeLlmConfigs` folded into it, and `autoComputeAgentMappings` with its 601-line suite. Into `@langwatch/evaluator-server`: the code-execution and audit-log adapters. Into `@langwatch/evaluation-server`: `evaluatorUnavailability` and the producer pipeline. Two cross-feature bridges stayed in `apps/api` because a feature server package may not depend on another feature's server package: the LiteLLM parameter resolution and the Azure Content Safety credential read, both of which reach `@langwatch/model-provider-server`. Named absences, each with its consequence: `modelProviders` arrives as a host OPTION and its absence makes the whole half absent (the six ports `PostgresModelProviderAdapter` needs are still platform classes, and a Studio node's model is resolved per run); the per-project NLP **Lambda ARN routing and S3 payload staging did NOT move** — the adapter takes a service URL, which is what every self-hosted install and local stack already runs; `runEvaluationForTrace` and `generateCommitMessage` refuse by name (the trace read pipeline and the model gateway have not moved); `mappingsSchema` and `coerceMonitorMappings` default to a PERMISSIVE parse because the trace-mapping registry now lives in `@langwatch/trace-web` and no server module may value-import a browser package; `workflowCreated` and `trackEvaluationRan` are no-ops without a product-analytics sink; `captureException` falls to the composition's own logger; the experiment adapter is composed with no `execution` and no `updates`, so this process starts no run and broadcasts no cell; DSPy retention is the deployment default (49) for every project because the retention vertical has not moved. `sendKeepAliveProbe` warms the engine over the SYNC route rather than the streaming Lambda one. Platform loses 14 files / 2,532 lines at zero insertions. apps/api 35 files/279 tests -> 37/290; workflow-server 7 files/35 tests -> 10/57; evaluator-server 6/78 unchanged; evaluation-server 24/191 -> 25/193. **The PRODUCT half is now composed by the process itself** (`api-trpc-collaborators.product.composition.ts`, folded by `withApiProductCollaborators` beside the other three): `annotation`, `bugReports`, `dataPrivacy`, `integrationsChecks`, and the `annotations` slice of `ctx.app`. It SEEDS the set rather than overlaying onto it — every one of its ports is a row read with an id already in hand, so there is no deployment shape in which the record is missing because of it — and a new `sealApiTrpcCollaborators` is what refuses a set any of the four halves left unfilled, naming each missing entry (`evaluations`, `application.workflows`, ...) instead of mounting twenty-two namespaces over the gaps. Moved out of `platform/app` at zero insertions: the bug-report repository and its two reads into `@langwatch/ops-server` (`BugReportRepository` port, `PrismaBugReportRepository`, `BugReportInboxService`); the data-privacy SNAPSHOT read model and the scope-write authorization into `@langwatch/data-privacy-server` (`DataPrivacySnapshotService`, `DataPrivacyScopeAuthorizationService`, a `DataPrivacyDirectoryPort` with its Prisma repository, a `DataPrivacyPermissionsPort` over `canBatchByIds`) — exactly the move `data-privacy.snapshot.ts` in the contract was declared against and waiting on; and the trace edit overlay (service + repository) plus `findExistingTraceIds` into `@langwatch/trace-server` (`TraceEditOverlayService`, `ClickHouseTraceExistenceRepository` behind a `TraceExistencePort`). `createTraceProcessingProducerPipeline` registers the SAME `trace_processing` definition the worker drains as a PRODUCER — ten refuse-by-name stand-ins, no consumer loop, no fold — so a reviewer's comment marks its trace through the routing triple the worker already routes on rather than through a forked definition. The privacy WRITE path now runs on the packaged `DataPrivacyService`, which already raised the contract's two errors, so the application's second implementation over the same table is no longer reached. **Named absences:** the reviewer's trace CONTENT (`annotation.loadTraces`) refuses `service_unavailable` because `TraceApp` takes twelve collaborators this process does not compose — `[]` would show a reviewer an empty queue and tell them their work was done; the two trace-side annotation markers refuse when no queue was composed; trace EXISTENCE answers the empty set with no ClickHouse, which is correct rather than degraded (no trace storage holds no trace to review); the simulations step of the setup checklist reports not started without a scenario read. **Judgement calls recorded:** the integrations-check rollup was composed IN the API rather than moved into `@langwatch/project-server` — the port's own docblock calls it the process's fan-out across nine verticals — and `platform/app/src/server/onboarding-checks/` was deleted rather than copied; the two scope-write refusals stayed `TRPCError` (`FORBIDDEN`/`NOT_FOUND`/`BAD_REQUEST`, the codes the application answered) rather than becoming new `HandledError` codes, because a new code needs an entry in a presentation registry that lives in a tree this migration only deletes from; `resolveScopeChain`'s three tiers were inlined in the checklist rather than dragging `@langwatch/data-retention-contract` into it; `data-privacy/contract`'s `data-privacy.snapshot.ts` docblock still says the read model lives in `platform/app` and is now stale, left alone because `*/contract` belongs to the UI lane. **`platform/app/src/server/api/root.ts` went 2,236 to 1,203 lines** — the `createAppTrpcFeatures` call and its 953-line ports object, the `...appTrpcFeatures` spread, the merged `user` namespace, the three annotation helpers and six now-dead imports, every one a deletion. Proof: `api-trpc-collaborators.product.integration.test.ts` (7 tests) drives `dataPrivacy.getSnapshot` (the whole moved read model, with the RBAC filter observable rather than assumed — a project in the organization's directory the caller cannot write is never offered), `annotation.createQueueItem` (queueing, with the id no trace answers to skipped) and `bugReports.getAll` (the moved repository plus its awaited audit row) through the real `/api/trpc` handler, `export.onExportProgress` through the real `/api/sse` lane on the same root, and both directions of the seal. What is left before `ApiProductionComposition` itself mounts the record: the model gateway, still host-supplied — with one handed in, all four halves compose and the seal passes. The `traces`, `tracesV2`, `scenarios` and `langy` namespaces remain OUTSIDE the record with the five remaining subscription procedures; that is a fifth half rather than the last line of this one, and this slice does not change it. **The MODEL GATEWAY is composed by the process itself** (`apps/api/src/app/api-model-provider.composition.ts`, resolved by `ApiProductionComposition.resolveModelProviders` and passed into `composeExecution`), so the execution half MOUNTS IN PRODUCTION with no host supplying anything: all six ports `PostgresModelProviderAdapter` takes are satisfied. Four come from services this process already held — the guarded Prisma client, the project/organization/AuthZ graph, the deployment's `SecretEncryptionPort` (the same cipher and the same `iv:ciphertext:authTag` format the platform app writes, so a credential row crosses processes unchanged) and the process's own fixed-window counter. Moved out of platform into `@langwatch/model-provider-server` at zero insertions: `providerValidation.ts` (1,230 lines) as `adapters/http.model-provider-credential-probe.adapter.ts` behind a new `ModelProviderEgressPort` (the `@langwatch/egress` fence, IP-pinned, redirects refused); `customKeys.ts`'s lenient read folded into `adapters/encrypted.model-provider-credential.adapter.ts` with its 19-test suite; `codexAccount.service.ts` as `adapters/codex-oauth.model-provider-token-refresher.adapter.ts` with its suite; `runtime/app/features/model-provider.ts`'s catalogue as `adapters/registry.model-provider-catalog.adapter.ts`, its limiter as `adapters/windowed.…-rate-limiter.adapter.ts` (both windows, 20/min per organization and 500/min globally, travel with the feature) and its id service as `adapters/prefixed.model-provider-id.adapter.ts`; and **`getVercelAIModel`'s whole resolution cascade** as `services/model-provider-execution-handle.service.ts` with explicit params — which is the harvest the langy-conversation blocker names. Judgment calls recorded rather than deferred: the onboarding grid's `providerApiRoots`/`providerDefaultBaseUrls` were NOT moved (that registry is a browser module with icons and labels), so the seven default endpoints and one API root are stated in the probe adapter; the CODEX handle is a named absence (`ModelProviderCodexHandlePort` unset) because a codex model executes on the AI gateway's Responses endpoint under a per-project virtual key and this process composes no provisioner, so a codex model refuses BY NAME rather than resolving to something else; managed providers are real, not defaulted — `@langwatch/enterprise-managed-provider-server` is composed here over the same project service, because a managed-Bedrock organization silently reading as unmanaged would send a run without the proxy credentials; `validateKeyWithCustomUrl` takes an explicit `environment` instead of reading `process.env`; `api.config.ts` gains `infrastructure.modelProvider` (`IS_SAAS`, `BLOCK_LOCAL_HTTP_CALLS`, `ALLOWED_PROXY_HOSTS` and the environment map a system provider's credential is read from) so the config module stays the process's only environment reader. One edit outside the vertical: `packages/egress/src/ssrf/fenced-fetch.ts` passes header ENTRIES rather than a `Headers` instance, because two copies of the undici types are reachable and a consumer with `@types/node` in scope (apps/api) could not assign one library's `Headers` to the other's parameter — a type-only fix that made apps/api's first use of the fence compile. apps/api 38 files/298 tests -> 40/305 (`api-model-provider.composition.integration.test.ts`, 5 tests, drives the composed gateway's cipher, counter and system-provider rules over fakes at the process seams; the execution integration test gains 2 that create a workflow through the real `/api/trpc` handler and prove the node's model came from a `ModelDefaultConfig` row the packaged repository read, with the no-default fallback as the discriminator); model-provider-server 15 files/146 tests -> 17/176 (the 30 in the two moved suites are the platform originals, adapted to the injected cipher and to a package with no DOM lib); egress 7/111 unchanged. Platform loses 8 more files at zero insertions. What is left on this row: `platform/app`'s own callers of the moved modules are LEFT BROKEN by ruling (presets.ts, root.ts, the internal-api model-provider router, ai-query, the three generate routes and langy-title-generation), and the model-provider tRPC/REST namespaces still do not appear in this process's record, so the moved credential probe is composed but unreachable here until they mount. **The OBSERVABILITY half is satisfied.** All sixteen of the trace/observability namespaces mount in the record — `traces`, `tracesV2`, `spans`, `traceEditOverlay`, `sharedTrace`, `share`, `pinnedTrace`, `savedViews`, `topics`, `costs`, `llmModelCost`, `modelProvider`, `translate`, `httpProxy`, `limits`, `plan` — through `apps/api/src/app-trpc/app-trpc.trace-group.ts` (one entry, one type parameter and one spread on the shared record file, so the group's twelve parameters live with the group) and `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts`. Both trace SUBSCRIPTIONS (`traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate`) are inside the record and served over `/api/sse`, streaming off the process's own tenant emitter — the one read by `withApiTraceGroupCollaborators` off the identity half rather than composed a second time. Three new mounts: `features/topic/topic-trpc.mount.ts`, `features/model-provider/model-provider-trpc.mount.ts` (the provider surface's two data-dependent tenant gates ride the process's `custom` chain, the cost-rule write its `serviceAuthorized` one) and `createCostTrpcRouter` beside `plan`/`limits`. Moved into packages: `platform/app/src/server/api/routers/costs.ts` -> `@langwatch/entitlement-server`'s `transport/api-trpc/cost.api.ts` (transport plus a `readOrganizationSpend` port, because the rollup is narrowed by membership); `internal-api/topic.router.ts` and `internal-api/model-provider.router.ts` deleted outright, their policy chains rebuilt from `createTrpcApiService`. Composed here from this process's own graph: the share ledger and its Redis viewer cache, the retention policy a pin is bounded by, the topic tree, the stored filter sets, the organization spend rollup, the provider application and the two tenant gates. FOUR named absences, each degrading at the call rather than making sixteen namespaces unmountable — `ApiTraceReadStackPort` (the ClickHouse trace read stack: `TraceApp`'s ten readers plus the redaction, display, content-privacy and coding-agent passes, ~50 modules still under `platform/app/src/server/{app-layer/traces,traces}/**`, which no core package owns yet), `ApiModelProviderHostPort` (vendor credential probes, Codex device flow, cost-rule span preview; its regex safety gate falls back to a conservative answer because the cost-rule schemas are BUILT from it), `ApiStudioHostPort` and `ApiUsageStatsPort`, plus `plans` for the plan provider. Tests: `api-trpc-collaborators.trace-group.integration.test.ts`, 21 tests — the sixteen-namespace membership assertion, thirteen procedures driven one per namespace through the real `/api/trpc` handler, the anonymous `sharedTrace.get` resolved on the public procedure, both subscriptions driven end to end over `/api/sse`, and four on the composition's absences. apps/api suite 337 -> 334 passing across 41 files with two REST-agent files failing on an unrelated `@langwatch/react-rum/constants` resolution; trace-server 1605, model-provider-server 176, entitlement-server 4. `root.ts` 1203 -> 1010 lines at zero insertions in `platform/app`. Judgment calls recorded: the trace read stack is a named absence rather than a move this pass (the move is ~50 platform modules and two more verticals' redaction rules); `costs` was given to Entitlement rather than a new package because spend is the reading taken against a plan's allowance; and the group's fold REFUSES rather than passing an absent half through, because unlike analytics/identity/execution it cannot be missing on a process holding a database. **The AGENT half is satisfied.** All six of the agent surfaces mount in the record — `scenarios`, `suites`, `langy`, `langyEgress`, `ops`, `setupSkills` — through `apps/api/src/app-trpc/app-trpc.agent-group.ts` (one entry, one type parameter and one spread on the shared record file) and `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts`, folded by `withApiAgentGroupCollaborators` beside the other folds and sealed with them. **All three remaining subscriptions are inside the record and served over `/api/sse`** — `scenarios.onSimulationUpdate`, `langy.onConversationUpdate` and `langy.onTurnStream` — which closes `ui-subscription-transport.md`: every one of the browser's ten live procedures now resolves on this process's own root. Two of the three stream off the SAME tenant emitter the trace group reads off the identity half, so a browser watching a simulation and a browser watching a conversation listen to the object the worker's own fan-out writes to. Composed here from this process's own graph: `ScenarioApp` (the packaged `PrismaScenarioAdapter`, the ClickHouse simulation reader on the same routed connection the charted reads use, Redis tab presence, the deployment's own cipher behind a `ScenarioSecretCipherPort`), `SuiteApp` (the packaged `PostgresSuiteAdapter` over the same connection), `LangyApp` (the Postgres conversation and message projections the worker writes, the Redis token buffer it appends to, the turn-access and handoff stores) and `OpsApp` (the Postgres half of `PostgresOpsAdapter`: the admin allow-list, the impersonation ledger and the back-office reads). Moved out of `platform/app` at zero insertions into `@langwatch/langy-server`: the setup-skill catalogue (`server/skills/setupSkills.service.ts` + `setupSkillBodies.generated.json` -> `services/setup-skills.service.ts` + `services/setup-skill-bodies.generated.ts`, with `scripts/generate-setup-skill-bodies.ts` moved beside it and proved byte-identical), a new `transport/api-trpc/setup-skills.api.ts` because no package transport existed, and the agent-to-page UI-action channel (`server/app-layer/langy/ui-actions/ui-action.service.ts` -> `services/langy-ui-action.service.ts`) with its seven handled errors moved into `@langwatch/langy-contract`'s `langy.errors.ts`. New mounts: `apps/api/src/features/langy/langy-trpc.mount.ts` (which appends the two Langy gates AFTER the process chain, demo refusal then rollout, the order the platform host pinned) and `features/langy/setup-skills-trpc.mount.ts`; the scenario, suite and ops mounts already existed and were reused. `ApiTrpcContext` gains two keys the six surfaces read: `signal` (the browser's own abort signal, threaded onto the context by the subscription lane as well as into the caller's options, so a v10-shaped caller cannot leave a generator suspended after the browser is gone) and `opsScope`. **Named absences, each with its consequence:** every write that has to ENQUEUE work refuses by name — the eight simulation commands, the two suite-run commands and all sixteen Langy conversation commands — for one structural reason rather than six: this process's Eventing is producer-only and holds no `ProcessStore`, and both the simulation and Langy pipelines declare a process manager, which such a runtime refuses to register rather than half-run. Producing them needs a producer-only variant of each definition, the way `createTraceProcessingProducerPipeline` is for its pipeline, and that is its own slice. The scenario RUNNER refuses too (its prefetcher reaches ten other verticals). A Langy turn-start refuses with the feature's OWN `langy_agent_unavailable` rather than this composition's code, because a web process composes no agent manager and Langy already has a typed refusal for that shape. The operator runtime is mostly absence: the event-log explorer, the process-manager fleet, the replay runner and the scheduled-job store have no packaged implementation anywhere, so all four refuse by name; `redis` is deliberately NOT passed to `PostgresOpsAdapter`, because its own invariant demands a queue payload decoder alongside and decoding an offloaded job needs the tiered blob store the stored-object vertical has not moved. The page-action catalogue is absent (it is the experiments workbench's, a browser module), so a UI-action DISPATCH refuses while `claim`/`complete` — the two procedures the record mounts — work whole. **Judgment calls recorded:** the setup-skill bodies became a TypeScript module rather than JSON because this package is consumed from source and a JSON import would need `resolveJsonModule` plus a runtime import attribute on Node; `findPageAction` became a `LangyUiActionCatalogPort` rather than travelling, because a Langy server package may not reach another feature's manifest; the Langy rollout flag key (`release_langy_enabled`), the two Langy budgets (30 messages and 60 warms per minute) and the two scenario ksuid prefixes (`scenario`, `scenariorun`) are STATED in the composition, each because the module that held it is a browser package or a tree this migration only deletes from — and all five are persisted or wire constants rather than decisions; the simulation partition-window read runs UNWINDOWED (`run(null)`), because the shared policy it called was deleted rather than moved and a second copy of a windowing heuristic is a second thing to keep true; a second `PostgresPromptAdapter` read is built for the suite adapter because the product-group half wraps its own in a `PromptApp` that does not expose the service, and both are stateless reads of one row; the operator allow-list is taken from the identity half's already-parsed `config.opsSidebarEmails` so the gate and the menu cannot disagree; and `platform/app/package.json` was left UNTOUCHED — its `generate:setup-skill-bodies` entry now points at a deleted script and `start:prepare:files` fails at that step — because editing the line would have been an insertion, and the artifact it produced is checked in and regenerated with `pnpm --filter @langwatch/langy-server generate:setup-skill-bodies`. Proof: `api-trpc-collaborators.agent-group.integration.test.ts`, 14 tests — the six-namespace membership assertion, six procedures driven one per namespace through the real `/api/trpc` handler (with the scenario read's project scope and archived filter observable rather than assumed, and a real ~100 kB skill body served from the moved catalogue), all three subscriptions driven end to end over `/api/sse` (including the user-scope gate that drops a tenant-wide Langy signal for a conversation the caller does not own), and four on the absences: the refused scenario runner, the refused Langy turn, the operator probe answering `{kind:"none"}` for a caller off the allow-list rather than refusing, and a project outside the rollout answering `langy_not_enabled` rather than an empty list. langy-server 49 files/473 tests, langy-contract 29/486, scenario-server 765 passing (two Redis-dependent files skip without one), suite-server 6/51, ops-server 180 passing. `root.ts` 998 -> 919 lines at zero insertions; twelve platform files deleted. What is left on this row: `platform/app/src/server/routes/langy-ui-actions.ts`, `uiActionBackendExecutor.ts` and `pageManifests.ts` are LEFT BROKEN by ruling (their import of the moved service and its errors), and the write side of all three verticals waits on the two producer-pipeline variants. **The ORG GROUP half is satisfied.** Nine more namespaces mount in the record — `organization`, `project`, `codingAgents`, `automation`, `emailSuppression` and the Enterprise four (`license`, `licenseEnforcement`, `scimToken`, `ssoConnections`) — through `apps/api/src/app-trpc/app-trpc.org-group.ts` (one import, one type parameter and one spread on the shared record file, the same shape the trace group settled on) and `apps/api/src/app/api-trpc-collaborators.org-group.composition.ts`. They are one group because every one of them is a WRITE against the TENANT rather than against what the tenant recorded. Three new mounts: `features/project/project-trpc.mount.ts` gains `createProjectTrpcRouter` (its two data-dependent gates — `create`'s custom tier resolution and the extra `project:manage` a trace-sharing flip demands — are built from this process's own AuthZ service, because `declaredCheckFrom` refuses to build a custom check from a description of one), `features/enterprise/enterprise-trpc.mount.ts` calls `EnterpriseTrpcComposition` (the one seam a core process may see an Enterprise feature package through) and forwards four of its six routers, and `app/api-automation.composition.ts` composes `AutomationApp` over the real `PostgresAutomationAdapter`. Composed here from this process's own graph: the project application (`ProjectApp` over the tenancy graph plus the trace group's OWN share ledger and topic tree — taken rather than built, so the settings form and the explorer cannot disagree about what a project holds), the coding-agent application (`CodingAgentRuntime` over this process's ClickHouse, with `clickHouse: null` a supported shape rather than a degradation because a session is a projection there), the GitHub App (`PostgresGithubAdapter` from five new `infrastructure.github` config leaves — composed unconditionally, blank credentials included, because the feature's own `configured` flag is what turns an install with no App into "not connected" rather than a failure), the automation application, the monitor directory (memoized, so a trigger's label and the monitor page it points at read one service) and both Enterprise plan gates over the SAME plan provider the usage panel reads. Moved out of platform at zero insertions: the automation provider registry — `registry.ts`, `types.ts`'s two hooks and the annotation-queue and email server halves — into `@langwatch/automation-server` as `adapters/registry.automation-provider.adapter.ts`, taking the cipher injected instead of the platform application's own `encrypt`/`decrypt`; and `resolveCallerProjectScope`'s two permission cuts into `@langwatch/coding-agent-server` as `CodingAgentCallerScopeService` behind a directory port and a batched permission port. `@langwatch/organization-server` gained nine exports its own services already held (`LITE_MEMBER_VIEWER_ONLY_ERROR`, `computeEffectiveTeamRoleUpdates`, `OrganizationNotFoundError` and the two invite messages among them), so the platform twins became unreachable. **Named absences, each with its consequence:** `ApiOrganizationInvitePort` — the whole invitation half of `organization.*` refuses by name, because the 1,660-line `InviteService` reaches the licence-enforcement repository, the plan provider, the mailer and the role service, four verticals that have not moved, and an empty invite list would tell an administrator nobody had been invited; `ApiViewerProtectionsPort` — the SAME resolution `ApiTraceReadStackPort.getViewerProtections` answers, so `codingAgents.sessionsList` and `project.getFieldRedactionStatus` refuse rather than guessing (guessing high shows a reader content they may not see, guessing low tells them their project is empty); `ApiEnterpriseApplicationPort` — the licensing, usage-limit and SCIM slices refuse by name while the four namespaces still MOUNT, because a client asking what its licence allows has to be told this deployment cannot answer rather than find the namespace missing; the automation running half (scheduling, graph delivery, runaway containment, test fire, the heartbeat's ClickHouse) refuses by name, because those are the WORKER's and a test fire that reported success having sent nothing is the failure that looks like success; the persist cap is the one exception and is composed for real, over the same Redis counter the worker spends against; `assertTeamRoleChangeWithinSeatLimits` refuses, the same refusal the identity half already answers with for `OrganizationSeatLicensePort`; and `provisionLangyVirtualKey` LOGS instead of refusing, because it is best-effort by the port's own contract and refusing would cost somebody the project they just created. **Judgment calls recorded:** `ctx.app.projects` widened from the flag surface's narrow `getOrganizationId` read to the whole `ProjectApp` — the narrow declaration in the flag package is unchanged and this satisfies it, and two project applications would let the settings form and the flag resolution disagree; `subscription` and `currency` are NOT forwarded from the Enterprise composition even though it builds all six, because with `saasBilling` false it hands back empty routers of the served type and an empty router under a real wire name is worse than no wire name; `req` is present and `undefined` on the API's tRPC context because the Enterprise composition constrains its context to all six of its surfaces, and the hosted edge's geo headers never reach this process; the caller-scope Prisma reads stayed in `apps/api` rather than moving into `@langwatch/coding-agent-server` because that package declares no Prisma dependency and the rule (the two cuts and the personal-workspace labelling) is the half worth moving; `project.triggerTopicClustering` refuses by name but the project transport DEGRADES every clustering failure to an unnamed error by its own deliberate contract, so the refusal is visible in this process's log and the caller sees a trace id; `FULL_MEMBER_LIMIT` and the automation persist ceilings (50/500/5,000) are stated in the composition rather than imported, because the licence-enforcement vertical has not moved and defaulting to an unset variable would give every free project the paid ceiling; `asResourceLimitExceeded` answers `null` always, which is correct rather than degraded because nothing on this process raises that class. Proof: `api-trpc-collaborators.org-group.integration.test.ts` (9 tests) drives `project.getHasFirstMessage`, `codingAgents.usageTotals`, `automation.getTriggers` and `emailSuppression.getAll` through the real `/api/trpc` handler over fakes at the ports, asserts the nine-namespace membership, and pins four absences — the invitation refusal, the protections refusal, the clustering failure and `license.getStatus` refusing while still mounted. `platform/app/src/server/api/root.ts` went 998 to 540 lines at zero insertions, and ten platform files went with it: `internal-api/project.router.ts` and its suite, `invites/invite-send-throttle.ts`, `app-layer/organizations/compute-effective-team-role-updates.ts` and its suite, and the five automation provider modules plus their two webhook suites. What is left on this row: the invitation service, the protections resolver and the Enterprise application are the three ports a deployment must hand in before `organization.*`'s invitation half, the two content-visibility reads and the Enterprise four answer for real. **The PRODUCT-INFRASTRUCTURE half is composed by the process itself** (`apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts`, folded by `withApiProductInfraCollaborators` beside the other halves). `storedObjects`, `dataRetention` and `monitors` mount INSIDE the record through `apps/api/src/app-trpc/app-trpc.product-infra.ts` — one entry, one type parameter and one spread on the shared record file, the same shape the trace, organization and agent groups take, so the group's parameters live with the group rather than on a file five other halves also edit. They are one group because they are one graph at a composition root: each is answered from a store the PROCESS operates — the object store's ClickHouse rows and byte backend, the retention window those rows are swept on, the evaluation monitors running beside them — and none of the three reaches the model gateway, the NLP engine or a mailer. Moved out of `platform/app` at zero insertions. Into `@langwatch/stored-object-server`: the CONTENT-ADDRESSED store whole — `StoredObjectsService` (`services/stored-objects.service.ts`), its ClickHouse repository and row schema (`repositories/clickhouse/stored-objects.{repository,row}.ts`), the S3 and local-filesystem byte drivers as `adapters/{s3,local-filesystem}.stored-object-driver.adapter.ts`, `ObjectNotFoundError`, and the five Prometheus series (unchanged names, so a dashboard reading `stored_object_write_failures_total` keeps reading the same counter) as `adapters/prometheus.stored-objects-telemetry.adapter.ts`. Four seams replaced what the platform module read directly: `getApp().clickhouse` became `StoredObjectsClickHousePort`, `~/server/metrics` became `StoredObjectsTelemetryPort`, `~/server/storage`'s `createS3Client` became `StoredObjectS3TargetPort` plus a structural client policy, and `~/env.mjs` became a REQUIRED `mintStorageUri` — required rather than defaulted, because a service that guessed a destination would spill a tenant's bytes into the wrong place on a misconfiguration instead of failing where the operator can see it. The plural `StoredObjectsService` sits beside the singular canonical `StoredObjectService` on purpose: an object written through one is not readable through the other, which is why both exist and neither wraps the other. Into `@langwatch/data-retention-server`: the retention POLICY whole — `DataRetentionPolicyService` (the write gates, the tiering rule, the enterprise custom floor and the paid presets), `DataRetentionSnapshotService` (the RBAC-filtered read model the settings page renders) and `StorageMeterScopeService` — over four new ports, `DataRetentionDirectoryPort` with `PrismaDataRetentionDirectoryRepository`, `DataRetentionPermissionsPort`, `DataRetentionPlanPort` and `DataRetentionAdministratorPort`. Into `@langwatch/analytics-server`: `currentVsPreviousDates` as `model/current-vs-previous-dates.ts`, the home its own docblock had already named. `apps/api` gains `infrastructure.storedObjects`: `STORED_OBJECTS_BACKEND`, `LANGWATCH_LOCAL_STORAGE_PATH`, the six `S3_*` values and the per-organization `DATAPLANE_S3__<label>__<org>` routes, read there because that module is the process's only environment reader — and the routes are read at all because a process that ignored them would resolve every project to the shared bucket, which still works, which is precisely the danger. **Named absences, each with its consequence:** `monitors.getPerformanceForProject` refuses `service_unavailable` because the evaluation-run read stack has not moved — `[]` reads as "your monitors caught nothing", which is the one answer a person acts on by switching a monitor off; the AZURE byte driver is not registered, so an `azure-blob://` URI refuses by SCHEME rather than being reported as gone; the legacy id-only stored-object OWNER lookup answers `null`, because resolving a project from an object id alone means scanning every ClickHouse instance and this process holds a ROUTED connection — nothing on the record asks, since the probe carries its own `projectId`; the PORTABLE stored-object capability (upload ceremony, delivery capability, metadata read) refuses by name rather than being wired to the content-addressed store, because an upload confirmed against one store and read back through the other is a file the customer uploaded and nobody can find; and every retention plan gate refuses without a plan provider rather than passing a gate it could not evaluate. **Judgment calls recorded rather than deferred:** the retention policy went to `@langwatch/data-retention-server` rather than `@langwatch/data-privacy-server` — the modules are `server/data-retention/**`, the catalogue owner is Data Retention, and `DataRetentionTrpcApi` already lived there; `DataRetentionPlanPort` answers `{free, uncapped}` rather than a `PlanInfo`, so the retention TIERING stays in the feature (which is what that map's own docblock asked for) and `isEnterpriseTier`/`IS_SAAS` stay in the composition; the policy's refusals stayed `TRPCError` (`FORBIDDEN`/`NOT_FOUND`) with the copy the application answered, for the same reason the product half's two scope writes did; `monitors.preconditionsSchema` falls back to the contract's own `monitorPreconditionsSchema` because `PRECONDITION_ALLOWED_RULES` now lives in `@langwatch/analytics-web` and no server module may value-import a browser package — the field/rule cross-check returns with the registry, exactly as `mappingsSchema` did; the monitor service is TAKEN from the execution half rather than built here, so an experiment's own monitor upsert and the monitors page cannot disagree; the trace-media extractors (`content-extractor.ts`, `value-media-extractor.ts`, `coerce-content-to-array.ts`, `binary-part.ts`) stayed in platform because they walk TRACE content parts and media markers and belong to that vertical rather than to Stored Objects; and the Azure driver, its credential resolution and its token provider (1,216 lines with an `@azure/identity` dependency and live platform importers) were not moved, which is what makes the scheme an absence. Backlog rather than blockers: `apps/worker` still carries its own S3 and filesystem drivers, which should collapse onto the package adapters; the `DATAPLANE_S3__*` reader is now stated in `api.config.ts` as well as `worker.config.ts` and wants a shared `@langwatch/config` helper; and `resolveMonitors` in `api-production.composition.ts`, added concurrently for the automation application, should collapse onto the execution half's service. Platform loses 30 files / 4,978 lines at zero insertions, and `platform/app/src/server/api/root.ts` went 540 to 532 on this slice. **All five named absences on the observability half are retired.** (1) The ClickHouse trace READ stack moved into `@langwatch/trace-server`: 46 modules / ~17,300 lines out of `platform/app/src/server/{traces,app-layer/traces}/**` under the layer grammar — `clickhouse-trace.service.ts` (3,655 lines) is `repositories/clickhouse/trace-legacy-read.repository.ts`, the ten readers are `services/trace-*-read.service.ts`, and the mappers, the blob store, the AI composer, the TTL cache, the windowed read and the cold-scan detector came with them, plus 33 test files. `trace-io-extraction.service.ts` and `trace-projection-lean.service.ts` were already byte-identical twins in the package, so the platform copies were DELETED and the imports repointed rather than moved. No data-privacy move was needed: the content-key catalogue, the visibility markers, `resolveDataPrivacy` and `ContentDropPolicyService` were already packaged, so the `contentPrivacy` mapper port is satisfied from `@langwatch/data-privacy-{contract,server}`. Three modules that had been moved into the BROWSER package `trace/web` but are read server-side (`trace-python-repr`, `trace-prompt-reference`, `trace-edit-overlay-apply`, plus the list window and the editable-metadata keys) moved into `@langwatch/trace-contract` and the six web importers were repointed. `apps/api/src/app/api-trace-read-stack.composition.ts` composes the stack over this process's own ClickHouse; the trace group takes a `traceReadsFrom` FACTORY rather than a finished port, because the stack needs the retention cascade and the topic tree the group itself composes and a second of either would be a second answer. (2) `ApiModelProviderHostPort` is filled from `@langwatch/model-provider-server`: the safe-regex gate, the model-limits registry and the cost-rule span preview moved out of `platform/app/src/{utils,server/app-layer/traces,server/modelProviders}` into `services/model-{cost-regex-safety,limits,cost-preview}.service.ts` and `services/ai-call-failure.service.ts`. The unmapped-cost hint is wired in the TRACE GROUP rather than the host, because it is the one reading that needs both the trace store and the gateway's stored rules. (3) `ApiUsageStatsPort` and the plan provider are filled from `@langwatch/entitlement-server`: `member-classification`, the membership repository, the usage-meter policy and `UsageStatsService` moved out of `platform/app/src/server/license-enforcement/**` and `app-layer/usage/**` behind two new abstract ports (`UsageCounterPort`, `UsageMembershipPort`). Judgment calls recorded: the free-tier message ceiling (`999_999_999`) and `MemberType` are STATED in the package rather than imported from the EE billing and licensing contracts, so an OSS build resolves a plan without them; the EE licence and subscription sources stay named absences that `LoggedApiEntitlementAbsence` writes down. (4) `ApiStudioHostPort` is filled by `apps/api/src/app/api-studio-host.composition.ts`: `platform/app/src/app/api/workflows/post_event/**` and `server/workflows/stripUnsupportedLLMParams.ts` were DELETED, and the behaviour they carried is now `WorkflowStudioStreamPort` + `HttpWorkflowStudioStreamAdapter` (the wire) and `WorkflowStudioDispatchService` (the SSE framing, the abort poll and the rule that a stream failure is reported AS a studio event) in `@langwatch/workflow-server`. The per-project Lambda routing and the S3 payload staging were deliberately not carried — they are the deployment's, and the platform Lambda runtime stays where it is. The sampling-parameter strip is `WorkflowNlpExecutionService.stripUnsupportedParams`, made public rather than duplicated, because there are now TWO dispatch chokepoints. The agent test's own trace write goes onto the SAME `trace_processing` producer registration the product half already made — the pipeline may only be registered once, so `composeApiProductCollaborators` now publishes `traceCommands` and the trace group and studio host both send on it. Also moved: `platform/app/src/server/tracer/spanToReadableSpan.ts` into `@langwatch/trace-server` as `services/trace-readable-span.service.ts`, whose lazy `import("@langwatch/scenario")` became a top-level import (the repo bans inline `import()`), which is why trace-server gained `@langwatch/scenario` and the two OTel SDK dependencies. The analytics ClickHouse filter translator is now exported from `@langwatch/analytics-server` and joined to the read stack at the process, because a feature server package may not reach into another feature's server package; without it a FILTERED legacy list refuses rather than answering the unfiltered set. Left named inside the read stack: the trace RENAME command, the query field-value read, the log canonicaliser, the summary projection store and the offloaded-payload resolver, all of which belong to verticals that have not moved. Proof: `api-trpc-collaborators.product-infra.integration.test.ts` drives all three of `storedObjects.headById`'s answers through the real `/api/trpc` handler over the moved repository, the storage registry and the local-filesystem driver against real bytes on disk (available / missing / not_found, which is the whole point of the probe), `dataRetention.getRules` with the RBAC filter observable rather than assumed (a team the caller cannot manage is neither offered as a writable scope nor allowed to name its own rule), `dataRetention.getScopeStorageUsage` narrowing an organization-wide reading to the one project the caller may view, `monitors.getAllForProject` off the execution half's own service, and both the performance-trend and plan-gate refusals. | Satisfy the remaining halves — the organization app service, sign-up/invite/provider-resolution, the trace pipeline, the evaluator/NLP ports and the evaluation_processing pipeline — each folding into the collaborator set the way `withApiAnalyticsCollaborators` does. Then fill the three fail-closed analytics ports from their own verticals (protections from trace/data-privacy, the graph-alert lookup and the action-parameter redaction from automation), delete the `root.ts` block, and cut haven's app lane to `apps/api`. The observability half's five named absences are RETIRED (see the fact column); what is left inside it is named there rather than here. |
+| API | `createAppTrpcFeatures` (22 namespaces) composes on `apps/api`'s own root behind its own policy chain, with ~40 ports lifted off platform; `/api/sse/*` serves subscriptions on that root. The ANALYTICS half of `trpcCollaborators` is satisfied: `apps/api/src/app/api-trpc-collaborators.analytics.composition.ts` builds `AnalyticsApp` and `DashboardApp` and the `analytics.{reads,workbench,savedCharts}` and `graphs` port groups over this process's own graph, and `withApiAnalyticsCollaborators` folds them into whatever the other halves supply. `apps/api` now owns ClickHouse: `platform/config/api.config.ts` reads `CLICKHOUSE_URL`, the `CLICKHOUSE_URL__<label>__<org>` private routes, the pool-sizing inputs and the five `LWQL_*` variables all-or-nothing, and `platform/infrastructure/api-clickhouse.infrastructure.ts` composes the routed, pooled, statement-limited connection over `@langwatch/clickhouse-client`. The application's connection and the RESTRICTED LangWatchQL identity are separate config values and separate options; neither can stand in for the other. Moved out of platform into `@langwatch/analytics-server`: the LangWatchQL vertical whole (26 modules under `src/langwatch-ql/**` plus `services/langwatch-ql.service.ts`), the filter-option service, its ClickHouse repository and the filter definitions, the shared analytics input schemas, and the four ClickHouse query refusals with the read-path translation that raises them. Into `@langwatch/dashboard-server`: the saved-workbench-chart policy, its transport errors and the workbench-aware graph-visibility policy. Three collaborators degrade FAIL-CLOSED because their verticals have not moved: the member's content protections resolve costs from AuthZ and captured content from the data-privacy policy, refusing a `restrict` rule whose audience names groups (group membership is unresolvable here); an absent graph-alert lookup shows no alert; an absent `redactActionParams` drops every parameter. Judgment calls recorded rather than deferred: the platform metric/group registry was NOT moved — its `colorSet` and number formatters are presentation and live in the browser package — so the wire's metric enum is now `z.string()` and the metric translator's own refusal is the narrowing; `PLATFORM_DEFAULT_RETENTION_DAYS` (49) is stated in the composition rather than imported; the feature-flag rows are read uncached because this process's Redis is the queue's; `lwqlKeyMap.repository.ts` and `lwql-key-map.service.ts` stayed in platform (ClickHouse ingestion side, and the second reaches the goose migration reader). Platform `root.ts` still holds the ports object as the reference for the halves that have not moved. The EXECUTION half is satisfied: `apps/api/src/app/api-trpc-collaborators.execution.composition.ts` builds `WorkflowApp`, `ExperimentApp` and the evaluation command surface plus the `workflows.{lifecycle,optimization}`, `experiments` and `evaluations` port groups over this process's own graph, and `withApiExecutionCollaborators` folds them into whatever the other halves supply. ONE workflow service serves the workflow application, the evaluator service built over it and the experiment service's reference set, so this process cannot hold two answers to "what is the current version of this workflow". `evaluations.reportEvaluation` dispatches on a PRODUCER-only registration of the SAME packaged `evaluation_processing` definition the worker drains: `createEvaluationProcessingProducerPipeline` (new, in `@langwatch/evaluation-server`) builds the whole definition with refuse-by-name stand-ins for the five consumer-side dependencies, so a fork that declared only a producer's commands — and therefore routed to names the worker's frozen job registry does not claim — is structurally impossible. `apps/api` gains `infrastructure.execution`: `LANGWATCH_NLP_SERVICE` and `BASE_HOST`, each blank-is-unconfigured. Moved out of platform into `@langwatch/workflow-server`: the NLP dispatch whole (`nlpgoFetch` becomes `HttpWorkflowNlpRuntimeAdapter` with the `/go` prefix, origin tag, causality-depth header and W3C `traceparent` byte-identical, plus `nlpProxyBaseUrl`), the project-environment and workflow-row Prisma adapters, the DSL-migration adapter, the Studio DSL preparation with `materializeNodeLlmConfigs` folded into it, and `autoComputeAgentMappings` with its 601-line suite. Into `@langwatch/evaluator-server`: the code-execution and audit-log adapters. Into `@langwatch/evaluation-server`: `evaluatorUnavailability` and the producer pipeline. Two cross-feature bridges stayed in `apps/api` because a feature server package may not depend on another feature's server package: the LiteLLM parameter resolution and the Azure Content Safety credential read, both of which reach `@langwatch/model-provider-server`. Named absences, each with its consequence: `modelProviders` arrives as a host OPTION and its absence makes the whole half absent (the six ports `PostgresModelProviderAdapter` needs are still platform classes, and a Studio node's model is resolved per run); the per-project NLP **Lambda ARN routing and S3 payload staging did NOT move** — the adapter takes a service URL, which is what every self-hosted install and local stack already runs; `runEvaluationForTrace` and `generateCommitMessage` refuse by name (the trace read pipeline and the model gateway have not moved); `mappingsSchema` and `coerceMonitorMappings` default to a PERMISSIVE parse because the trace-mapping registry now lives in `@langwatch/trace-web` and no server module may value-import a browser package; `workflowCreated` and `trackEvaluationRan` are no-ops without a product-analytics sink; `captureException` falls to the composition's own logger; the experiment adapter is composed with no `execution` and no `updates`, so this process starts no run and broadcasts no cell; DSPy retention is the deployment default (49) for every project because the retention vertical has not moved. `sendKeepAliveProbe` warms the engine over the SYNC route rather than the streaming Lambda one. Platform loses 14 files / 2,532 lines at zero insertions. apps/api 35 files/279 tests -> 37/290; workflow-server 7 files/35 tests -> 10/57; evaluator-server 6/78 unchanged; evaluation-server 24/191 -> 25/193. **The PRODUCT half is now composed by the process itself** (`api-trpc-collaborators.product.composition.ts`, folded by `withApiProductCollaborators` beside the other three): `annotation`, `bugReports`, `dataPrivacy`, `integrationsChecks`, and the `annotations` slice of `ctx.app`. It SEEDS the set rather than overlaying onto it — every one of its ports is a row read with an id already in hand, so there is no deployment shape in which the record is missing because of it — and a new `sealApiTrpcCollaborators` is what refuses a set any of the four halves left unfilled, naming each missing entry (`evaluations`, `application.workflows`, ...) instead of mounting twenty-two namespaces over the gaps. Moved out of `platform/app` at zero insertions: the bug-report repository and its two reads into `@langwatch/ops-server` (`BugReportRepository` port, `PrismaBugReportRepository`, `BugReportInboxService`); the data-privacy SNAPSHOT read model and the scope-write authorization into `@langwatch/data-privacy-server` (`DataPrivacySnapshotService`, `DataPrivacyScopeAuthorizationService`, a `DataPrivacyDirectoryPort` with its Prisma repository, a `DataPrivacyPermissionsPort` over `canBatchByIds`) — exactly the move `data-privacy.snapshot.ts` in the contract was declared against and waiting on; and the trace edit overlay (service + repository) plus `findExistingTraceIds` into `@langwatch/trace-server` (`TraceEditOverlayService`, `ClickHouseTraceExistenceRepository` behind a `TraceExistencePort`). `createTraceProcessingProducerPipeline` registers the SAME `trace_processing` definition the worker drains as a PRODUCER — ten refuse-by-name stand-ins, no consumer loop, no fold — so a reviewer's comment marks its trace through the routing triple the worker already routes on rather than through a forked definition. The privacy WRITE path now runs on the packaged `DataPrivacyService`, which already raised the contract's two errors, so the application's second implementation over the same table is no longer reached. **Named absences:** the reviewer's trace CONTENT (`annotation.loadTraces`) refuses `service_unavailable` because `TraceApp` takes twelve collaborators this process does not compose — `[]` would show a reviewer an empty queue and tell them their work was done; the two trace-side annotation markers refuse when no queue was composed; trace EXISTENCE answers the empty set with no ClickHouse, which is correct rather than degraded (no trace storage holds no trace to review); the simulations step of the setup checklist reports not started without a scenario read. **Judgement calls recorded:** the integrations-check rollup was composed IN the API rather than moved into `@langwatch/project-server` — the port's own docblock calls it the process's fan-out across nine verticals — and `platform/app/src/server/onboarding-checks/` was deleted rather than copied; the two scope-write refusals stayed `TRPCError` (`FORBIDDEN`/`NOT_FOUND`/`BAD_REQUEST`, the codes the application answered) rather than becoming new `HandledError` codes, because a new code needs an entry in a presentation registry that lives in a tree this migration only deletes from; `resolveScopeChain`'s three tiers were inlined in the checklist rather than dragging `@langwatch/data-retention-contract` into it; `data-privacy/contract`'s `data-privacy.snapshot.ts` docblock still says the read model lives in `platform/app` and is now stale, left alone because `*/contract` belongs to the UI lane. **`platform/app/src/server/api/root.ts` went 2,236 to 1,203 lines** — the `createAppTrpcFeatures` call and its 953-line ports object, the `...appTrpcFeatures` spread, the merged `user` namespace, the three annotation helpers and six now-dead imports, every one a deletion. Proof: `api-trpc-collaborators.product.integration.test.ts` (7 tests) drives `dataPrivacy.getSnapshot` (the whole moved read model, with the RBAC filter observable rather than assumed — a project in the organization's directory the caller cannot write is never offered), `annotation.createQueueItem` (queueing, with the id no trace answers to skipped) and `bugReports.getAll` (the moved repository plus its awaited audit row) through the real `/api/trpc` handler, `export.onExportProgress` through the real `/api/sse` lane on the same root, and both directions of the seal. What is left before `ApiProductionComposition` itself mounts the record: the model gateway, still host-supplied — with one handed in, all four halves compose and the seal passes. The `traces`, `tracesV2`, `scenarios` and `langy` namespaces remain OUTSIDE the record with the five remaining subscription procedures; that is a fifth half rather than the last line of this one, and this slice does not change it. **The MODEL GATEWAY is composed by the process itself** (`apps/api/src/app/api-model-provider.composition.ts`, resolved by `ApiProductionComposition.resolveModelProviders` and passed into `composeExecution`), so the execution half MOUNTS IN PRODUCTION with no host supplying anything: all six ports `PostgresModelProviderAdapter` takes are satisfied. Four come from services this process already held — the guarded Prisma client, the project/organization/AuthZ graph, the deployment's `SecretEncryptionPort` (the same cipher and the same `iv:ciphertext:authTag` format the platform app writes, so a credential row crosses processes unchanged) and the process's own fixed-window counter. Moved out of platform into `@langwatch/model-provider-server` at zero insertions: `providerValidation.ts` (1,230 lines) as `adapters/http.model-provider-credential-probe.adapter.ts` behind a new `ModelProviderEgressPort` (the `@langwatch/egress` fence, IP-pinned, redirects refused); `customKeys.ts`'s lenient read folded into `adapters/encrypted.model-provider-credential.adapter.ts` with its 19-test suite; `codexAccount.service.ts` as `adapters/codex-oauth.model-provider-token-refresher.adapter.ts` with its suite; `runtime/app/features/model-provider.ts`'s catalogue as `adapters/registry.model-provider-catalog.adapter.ts`, its limiter as `adapters/windowed.…-rate-limiter.adapter.ts` (both windows, 20/min per organization and 500/min globally, travel with the feature) and its id service as `adapters/prefixed.model-provider-id.adapter.ts`; and **`getVercelAIModel`'s whole resolution cascade** as `services/model-provider-execution-handle.service.ts` with explicit params — which is the harvest the langy-conversation blocker names. Judgment calls recorded rather than deferred: the onboarding grid's `providerApiRoots`/`providerDefaultBaseUrls` were NOT moved (that registry is a browser module with icons and labels), so the seven default endpoints and one API root are stated in the probe adapter; the CODEX handle is a named absence (`ModelProviderCodexHandlePort` unset) because a codex model executes on the AI gateway's Responses endpoint under a per-project virtual key and this process composes no provisioner, so a codex model refuses BY NAME rather than resolving to something else; managed providers are real, not defaulted — `@langwatch/enterprise-managed-provider-server` is composed here over the same project service, because a managed-Bedrock organization silently reading as unmanaged would send a run without the proxy credentials; `validateKeyWithCustomUrl` takes an explicit `environment` instead of reading `process.env`; `api.config.ts` gains `infrastructure.modelProvider` (`IS_SAAS`, `BLOCK_LOCAL_HTTP_CALLS`, `ALLOWED_PROXY_HOSTS` and the environment map a system provider's credential is read from) so the config module stays the process's only environment reader. One edit outside the vertical: `packages/egress/src/ssrf/fenced-fetch.ts` passes header ENTRIES rather than a `Headers` instance, because two copies of the undici types are reachable and a consumer with `@types/node` in scope (apps/api) could not assign one library's `Headers` to the other's parameter — a type-only fix that made apps/api's first use of the fence compile. apps/api 38 files/298 tests -> 40/305 (`api-model-provider.composition.integration.test.ts`, 5 tests, drives the composed gateway's cipher, counter and system-provider rules over fakes at the process seams; the execution integration test gains 2 that create a workflow through the real `/api/trpc` handler and prove the node's model came from a `ModelDefaultConfig` row the packaged repository read, with the no-default fallback as the discriminator); model-provider-server 15 files/146 tests -> 17/176 (the 30 in the two moved suites are the platform originals, adapted to the injected cipher and to a package with no DOM lib); egress 7/111 unchanged. Platform loses 8 more files at zero insertions. What is left on this row: `platform/app`'s own callers of the moved modules are LEFT BROKEN by ruling (presets.ts, root.ts, the internal-api model-provider router, ai-query, the three generate routes and langy-title-generation), and the model-provider tRPC/REST namespaces still do not appear in this process's record, so the moved credential probe is composed but unreachable here until they mount. **The OBSERVABILITY half is satisfied.** All sixteen of the trace/observability namespaces mount in the record — `traces`, `tracesV2`, `spans`, `traceEditOverlay`, `sharedTrace`, `share`, `pinnedTrace`, `savedViews`, `topics`, `costs`, `llmModelCost`, `modelProvider`, `translate`, `httpProxy`, `limits`, `plan` — through `apps/api/src/app-trpc/app-trpc.trace-group.ts` (one entry, one type parameter and one spread on the shared record file, so the group's twelve parameters live with the group) and `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts`. Both trace SUBSCRIPTIONS (`traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate`) are inside the record and served over `/api/sse`, streaming off the process's own tenant emitter — the one read by `withApiTraceGroupCollaborators` off the identity half rather than composed a second time. Three new mounts: `features/topic/topic-trpc.mount.ts`, `features/model-provider/model-provider-trpc.mount.ts` (the provider surface's two data-dependent tenant gates ride the process's `custom` chain, the cost-rule write its `serviceAuthorized` one) and `createCostTrpcRouter` beside `plan`/`limits`. Moved into packages: `platform/app/src/server/api/routers/costs.ts` -> `@langwatch/entitlement-server`'s `transport/api-trpc/cost.api.ts` (transport plus a `readOrganizationSpend` port, because the rollup is narrowed by membership); `internal-api/topic.router.ts` and `internal-api/model-provider.router.ts` deleted outright, their policy chains rebuilt from `createTrpcApiService`. Composed here from this process's own graph: the share ledger and its Redis viewer cache, the retention policy a pin is bounded by, the topic tree, the stored filter sets, the organization spend rollup, the provider application and the two tenant gates. FOUR named absences, each degrading at the call rather than making sixteen namespaces unmountable — `ApiTraceReadStackPort` (the ClickHouse trace read stack: `TraceApp`'s ten readers plus the redaction, display, content-privacy and coding-agent passes, ~50 modules still under `platform/app/src/server/{app-layer/traces,traces}/**`, which no core package owns yet), `ApiModelProviderHostPort` (vendor credential probes, Codex device flow, cost-rule span preview; its regex safety gate falls back to a conservative answer because the cost-rule schemas are BUILT from it), `ApiStudioHostPort` and `ApiUsageStatsPort`, plus `plans` for the plan provider. Tests: `api-trpc-collaborators.trace-group.integration.test.ts`, 21 tests — the sixteen-namespace membership assertion, thirteen procedures driven one per namespace through the real `/api/trpc` handler, the anonymous `sharedTrace.get` resolved on the public procedure, both subscriptions driven end to end over `/api/sse`, and four on the composition's absences. apps/api suite 337 -> 334 passing across 41 files with two REST-agent files failing on an unrelated `@langwatch/react-rum/constants` resolution; trace-server 1605, model-provider-server 176, entitlement-server 4. `root.ts` 1203 -> 1010 lines at zero insertions in `platform/app`. Judgment calls recorded: the trace read stack is a named absence rather than a move this pass (the move is ~50 platform modules and two more verticals' redaction rules); `costs` was given to Entitlement rather than a new package because spend is the reading taken against a plan's allowance; and the group's fold REFUSES rather than passing an absent half through, because unlike analytics/identity/execution it cannot be missing on a process holding a database. **The AGENT half is satisfied.** All six of the agent surfaces mount in the record — `scenarios`, `suites`, `langy`, `langyEgress`, `ops`, `setupSkills` — through `apps/api/src/app-trpc/app-trpc.agent-group.ts` (one entry, one type parameter and one spread on the shared record file) and `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts`, folded by `withApiAgentGroupCollaborators` beside the other folds and sealed with them. **All three remaining subscriptions are inside the record and served over `/api/sse`** — `scenarios.onSimulationUpdate`, `langy.onConversationUpdate` and `langy.onTurnStream` — which closes `ui-subscription-transport.md`: every one of the browser's ten live procedures now resolves on this process's own root. Two of the three stream off the SAME tenant emitter the trace group reads off the identity half, so a browser watching a simulation and a browser watching a conversation listen to the object the worker's own fan-out writes to. Composed here from this process's own graph: `ScenarioApp` (the packaged `PrismaScenarioAdapter`, the ClickHouse simulation reader on the same routed connection the charted reads use, Redis tab presence, the deployment's own cipher behind a `ScenarioSecretCipherPort`), `SuiteApp` (the packaged `PostgresSuiteAdapter` over the same connection), `LangyApp` (the Postgres conversation and message projections the worker writes, the Redis token buffer it appends to, the turn-access and handoff stores) and `OpsApp` (the Postgres half of `PostgresOpsAdapter`: the admin allow-list, the impersonation ledger and the back-office reads). Moved out of `platform/app` at zero insertions into `@langwatch/langy-server`: the setup-skill catalogue (`server/skills/setupSkills.service.ts` + `setupSkillBodies.generated.json` -> `services/setup-skills.service.ts` + `services/setup-skill-bodies.generated.ts`, with `scripts/generate-setup-skill-bodies.ts` moved beside it and proved byte-identical), a new `transport/api-trpc/setup-skills.api.ts` because no package transport existed, and the agent-to-page UI-action channel (`server/app-layer/langy/ui-actions/ui-action.service.ts` -> `services/langy-ui-action.service.ts`) with its seven handled errors moved into `@langwatch/langy-contract`'s `langy.errors.ts`. New mounts: `apps/api/src/features/langy/langy-trpc.mount.ts` (which appends the two Langy gates AFTER the process chain, demo refusal then rollout, the order the platform host pinned) and `features/langy/setup-skills-trpc.mount.ts`; the scenario, suite and ops mounts already existed and were reused. `ApiTrpcContext` gains two keys the six surfaces read: `signal` (the browser's own abort signal, threaded onto the context by the subscription lane as well as into the caller's options, so a v10-shaped caller cannot leave a generator suspended after the browser is gone) and `opsScope`. **Named absences, each with its consequence:** every write that has to ENQUEUE work refuses by name — the eight simulation commands, the two suite-run commands and all sixteen Langy conversation commands — for one structural reason rather than six: this process's Eventing is producer-only and holds no `ProcessStore`, and both the simulation and Langy pipelines declare a process manager, which such a runtime refuses to register rather than half-run. Producing them needs a producer-only variant of each definition, the way `createTraceProcessingProducerPipeline` is for its pipeline, and that is its own slice. The scenario RUNNER refuses too (its prefetcher reaches ten other verticals). A Langy turn-start refuses with the feature's OWN `langy_agent_unavailable` rather than this composition's code, because a web process composes no agent manager and Langy already has a typed refusal for that shape. The operator runtime is mostly absence: the event-log explorer, the process-manager fleet, the replay runner and the scheduled-job store have no packaged implementation anywhere, so all four refuse by name; `redis` is deliberately NOT passed to `PostgresOpsAdapter`, because its own invariant demands a queue payload decoder alongside and decoding an offloaded job needs the tiered blob store the stored-object vertical has not moved. The page-action catalogue is absent (it is the experiments workbench's, a browser module), so a UI-action DISPATCH refuses while `claim`/`complete` — the two procedures the record mounts — work whole. **Judgment calls recorded:** the setup-skill bodies became a TypeScript module rather than JSON because this package is consumed from source and a JSON import would need `resolveJsonModule` plus a runtime import attribute on Node; `findPageAction` became a `LangyUiActionCatalogPort` rather than travelling, because a Langy server package may not reach another feature's manifest; the Langy rollout flag key (`release_langy_enabled`), the two Langy budgets (30 messages and 60 warms per minute) and the two scenario ksuid prefixes (`scenario`, `scenariorun`) are STATED in the composition, each because the module that held it is a browser package or a tree this migration only deletes from — and all five are persisted or wire constants rather than decisions; the simulation partition-window read runs UNWINDOWED (`run(null)`), because the shared policy it called was deleted rather than moved and a second copy of a windowing heuristic is a second thing to keep true; a second `PostgresPromptAdapter` read is built for the suite adapter because the product-group half wraps its own in a `PromptApp` that does not expose the service, and both are stateless reads of one row; the operator allow-list is taken from the identity half's already-parsed `config.opsSidebarEmails` so the gate and the menu cannot disagree; and `platform/app/package.json` was left UNTOUCHED — its `generate:setup-skill-bodies` entry now points at a deleted script and `start:prepare:files` fails at that step — because editing the line would have been an insertion, and the artifact it produced is checked in and regenerated with `pnpm --filter @langwatch/langy-server generate:setup-skill-bodies`. Proof: `api-trpc-collaborators.agent-group.integration.test.ts`, 14 tests — the six-namespace membership assertion, six procedures driven one per namespace through the real `/api/trpc` handler (with the scenario read's project scope and archived filter observable rather than assumed, and a real ~100 kB skill body served from the moved catalogue), all three subscriptions driven end to end over `/api/sse` (including the user-scope gate that drops a tenant-wide Langy signal for a conversation the caller does not own), and four on the absences: the refused scenario runner, the refused Langy turn, the operator probe answering `{kind:"none"}` for a caller off the allow-list rather than refusing, and a project outside the rollout answering `langy_not_enabled` rather than an empty list. langy-server 49 files/473 tests, langy-contract 29/486, scenario-server 765 passing (two Redis-dependent files skip without one), suite-server 6/51, ops-server 180 passing. `root.ts` 998 -> 919 lines at zero insertions; twelve platform files deleted. What is left on this row: `platform/app/src/server/routes/langy-ui-actions.ts`, `uiActionBackendExecutor.ts` and `pageManifests.ts` are LEFT BROKEN by ruling (their import of the moved service and its errors), and the write side of all three verticals waits on the two producer-pipeline variants. **The ORG GROUP half is satisfied.** Nine more namespaces mount in the record — `organization`, `project`, `codingAgents`, `automation`, `emailSuppression` and the Enterprise four (`license`, `licenseEnforcement`, `scimToken`, `ssoConnections`) — through `apps/api/src/app-trpc/app-trpc.org-group.ts` (one import, one type parameter and one spread on the shared record file, the same shape the trace group settled on) and `apps/api/src/app/api-trpc-collaborators.org-group.composition.ts`. They are one group because every one of them is a WRITE against the TENANT rather than against what the tenant recorded. Three new mounts: `features/project/project-trpc.mount.ts` gains `createProjectTrpcRouter` (its two data-dependent gates — `create`'s custom tier resolution and the extra `project:manage` a trace-sharing flip demands — are built from this process's own AuthZ service, because `declaredCheckFrom` refuses to build a custom check from a description of one), `features/enterprise/enterprise-trpc.mount.ts` calls `EnterpriseTrpcComposition` (the one seam a core process may see an Enterprise feature package through) and forwards four of its six routers, and `app/api-automation.composition.ts` composes `AutomationApp` over the real `PostgresAutomationAdapter`. Composed here from this process's own graph: the project application (`ProjectApp` over the tenancy graph plus the trace group's OWN share ledger and topic tree — taken rather than built, so the settings form and the explorer cannot disagree about what a project holds), the coding-agent application (`CodingAgentRuntime` over this process's ClickHouse, with `clickHouse: null` a supported shape rather than a degradation because a session is a projection there), the GitHub App (`PostgresGithubAdapter` from five new `infrastructure.github` config leaves — composed unconditionally, blank credentials included, because the feature's own `configured` flag is what turns an install with no App into "not connected" rather than a failure), the automation application, the monitor directory (memoized, so a trigger's label and the monitor page it points at read one service) and both Enterprise plan gates over the SAME plan provider the usage panel reads. Moved out of platform at zero insertions: the automation provider registry — `registry.ts`, `types.ts`'s two hooks and the annotation-queue and email server halves — into `@langwatch/automation-server` as `adapters/registry.automation-provider.adapter.ts`, taking the cipher injected instead of the platform application's own `encrypt`/`decrypt`; and `resolveCallerProjectScope`'s two permission cuts into `@langwatch/coding-agent-server` as `CodingAgentCallerScopeService` behind a directory port and a batched permission port. `@langwatch/organization-server` gained nine exports its own services already held (`LITE_MEMBER_VIEWER_ONLY_ERROR`, `computeEffectiveTeamRoleUpdates`, `OrganizationNotFoundError` and the two invite messages among them), so the platform twins became unreachable. **Named absences, each with its consequence:** `ApiOrganizationInvitePort` — the whole invitation half of `organization.*` refuses by name, because the 1,660-line `InviteService` reaches the licence-enforcement repository, the plan provider, the mailer and the role service, four verticals that have not moved, and an empty invite list would tell an administrator nobody had been invited; `ApiViewerProtectionsPort` — the SAME resolution `ApiTraceReadStackPort.getViewerProtections` answers, so `codingAgents.sessionsList` and `project.getFieldRedactionStatus` refuse rather than guessing (guessing high shows a reader content they may not see, guessing low tells them their project is empty); `ApiEnterpriseApplicationPort` — the licensing, usage-limit and SCIM slices refuse by name while the four namespaces still MOUNT, because a client asking what its licence allows has to be told this deployment cannot answer rather than find the namespace missing; the automation running half (scheduling, graph delivery, runaway containment, test fire, the heartbeat's ClickHouse) refuses by name, because those are the WORKER's and a test fire that reported success having sent nothing is the failure that looks like success; the persist cap is the one exception and is composed for real, over the same Redis counter the worker spends against; `assertTeamRoleChangeWithinSeatLimits` refuses, the same refusal the identity half already answers with for `OrganizationSeatLicensePort`; and `provisionLangyVirtualKey` LOGS instead of refusing, because it is best-effort by the port's own contract and refusing would cost somebody the project they just created. **Judgment calls recorded:** `ctx.app.projects` widened from the flag surface's narrow `getOrganizationId` read to the whole `ProjectApp` — the narrow declaration in the flag package is unchanged and this satisfies it, and two project applications would let the settings form and the flag resolution disagree; `subscription` and `currency` are NOT forwarded from the Enterprise composition even though it builds all six, because with `saasBilling` false it hands back empty routers of the served type and an empty router under a real wire name is worse than no wire name; `req` is present and `undefined` on the API's tRPC context because the Enterprise composition constrains its context to all six of its surfaces, and the hosted edge's geo headers never reach this process; the caller-scope Prisma reads stayed in `apps/api` rather than moving into `@langwatch/coding-agent-server` because that package declares no Prisma dependency and the rule (the two cuts and the personal-workspace labelling) is the half worth moving; `project.triggerTopicClustering` refuses by name but the project transport DEGRADES every clustering failure to an unnamed error by its own deliberate contract, so the refusal is visible in this process's log and the caller sees a trace id; `FULL_MEMBER_LIMIT` and the automation persist ceilings (50/500/5,000) are stated in the composition rather than imported, because the licence-enforcement vertical has not moved and defaulting to an unset variable would give every free project the paid ceiling; `asResourceLimitExceeded` answers `null` always, which is correct rather than degraded because nothing on this process raises that class. Proof: `api-trpc-collaborators.org-group.integration.test.ts` (9 tests) drives `project.getHasFirstMessage`, `codingAgents.usageTotals`, `automation.getTriggers` and `emailSuppression.getAll` through the real `/api/trpc` handler over fakes at the ports, asserts the nine-namespace membership, and pins four absences — the invitation refusal, the protections refusal, the clustering failure and `license.getStatus` refusing while still mounted. `platform/app/src/server/api/root.ts` went 998 to 540 lines at zero insertions, and ten platform files went with it: `internal-api/project.router.ts` and its suite, `invites/invite-send-throttle.ts`, `app-layer/organizations/compute-effective-team-role-updates.ts` and its suite, and the five automation provider modules plus their two webhook suites. What is left on this row: the invitation service, the protections resolver and the Enterprise application are the three ports a deployment must hand in before `organization.*`'s invitation half, the two content-visibility reads and the Enterprise four answer for real. **The PRODUCT-INFRASTRUCTURE half is composed by the process itself** (`apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts`, folded by `withApiProductInfraCollaborators` beside the other halves). `storedObjects`, `dataRetention` and `monitors` mount INSIDE the record through `apps/api/src/app-trpc/app-trpc.product-infra.ts` — one entry, one type parameter and one spread on the shared record file, the same shape the trace, organization and agent groups take, so the group's parameters live with the group rather than on a file five other halves also edit. They are one group because they are one graph at a composition root: each is answered from a store the PROCESS operates — the object store's ClickHouse rows and byte backend, the retention window those rows are swept on, the evaluation monitors running beside them — and none of the three reaches the model gateway, the NLP engine or a mailer. Moved out of `platform/app` at zero insertions. Into `@langwatch/stored-object-server`: the CONTENT-ADDRESSED store whole — `StoredObjectsService` (`services/stored-objects.service.ts`), its ClickHouse repository and row schema (`repositories/clickhouse/stored-objects.{repository,row}.ts`), the S3 and local-filesystem byte drivers as `adapters/{s3,local-filesystem}.stored-object-driver.adapter.ts`, `ObjectNotFoundError`, and the five Prometheus series (unchanged names, so a dashboard reading `stored_object_write_failures_total` keeps reading the same counter) as `adapters/prometheus.stored-objects-telemetry.adapter.ts`. Four seams replaced what the platform module read directly: `getApp().clickhouse` became `StoredObjectsClickHousePort`, `~/server/metrics` became `StoredObjectsTelemetryPort`, `~/server/storage`'s `createS3Client` became `StoredObjectS3TargetPort` plus a structural client policy, and `~/env.mjs` became a REQUIRED `mintStorageUri` — required rather than defaulted, because a service that guessed a destination would spill a tenant's bytes into the wrong place on a misconfiguration instead of failing where the operator can see it. The plural `StoredObjectsService` sits beside the singular canonical `StoredObjectService` on purpose: an object written through one is not readable through the other, which is why both exist and neither wraps the other. Into `@langwatch/data-retention-server`: the retention POLICY whole — `DataRetentionPolicyService` (the write gates, the tiering rule, the enterprise custom floor and the paid presets), `DataRetentionSnapshotService` (the RBAC-filtered read model the settings page renders) and `StorageMeterScopeService` — over four new ports, `DataRetentionDirectoryPort` with `PrismaDataRetentionDirectoryRepository`, `DataRetentionPermissionsPort`, `DataRetentionPlanPort` and `DataRetentionAdministratorPort`. Into `@langwatch/analytics-server`: `currentVsPreviousDates` as `model/current-vs-previous-dates.ts`, the home its own docblock had already named. `apps/api` gains `infrastructure.storedObjects`: `STORED_OBJECTS_BACKEND`, `LANGWATCH_LOCAL_STORAGE_PATH`, the six `S3_*` values and the per-organization `DATAPLANE_S3__<label>__<org>` routes, read there because that module is the process's only environment reader — and the routes are read at all because a process that ignored them would resolve every project to the shared bucket, which still works, which is precisely the danger. **Named absences, each with its consequence:** `monitors.getPerformanceForProject` refuses `service_unavailable` because the evaluation-run read stack has not moved — `[]` reads as "your monitors caught nothing", which is the one answer a person acts on by switching a monitor off; the AZURE byte driver is not registered, so an `azure-blob://` URI refuses by SCHEME rather than being reported as gone; the legacy id-only stored-object OWNER lookup answers `null`, because resolving a project from an object id alone means scanning every ClickHouse instance and this process holds a ROUTED connection — nothing on the record asks, since the probe carries its own `projectId`; the PORTABLE stored-object capability (upload ceremony, delivery capability, metadata read) refuses by name rather than being wired to the content-addressed store, because an upload confirmed against one store and read back through the other is a file the customer uploaded and nobody can find; and every retention plan gate refuses without a plan provider rather than passing a gate it could not evaluate. **Judgment calls recorded rather than deferred:** the retention policy went to `@langwatch/data-retention-server` rather than `@langwatch/data-privacy-server` — the modules are `server/data-retention/**`, the catalogue owner is Data Retention, and `DataRetentionTrpcApi` already lived there; `DataRetentionPlanPort` answers `{free, uncapped}` rather than a `PlanInfo`, so the retention TIERING stays in the feature (which is what that map's own docblock asked for) and `isEnterpriseTier`/`IS_SAAS` stay in the composition; the policy's refusals stayed `TRPCError` (`FORBIDDEN`/`NOT_FOUND`) with the copy the application answered, for the same reason the product half's two scope writes did; `monitors.preconditionsSchema` falls back to the contract's own `monitorPreconditionsSchema` because `PRECONDITION_ALLOWED_RULES` now lives in `@langwatch/analytics-web` and no server module may value-import a browser package — the field/rule cross-check returns with the registry, exactly as `mappingsSchema` did; the monitor service is TAKEN from the execution half rather than built here, so an experiment's own monitor upsert and the monitors page cannot disagree; the trace-media extractors (`content-extractor.ts`, `value-media-extractor.ts`, `coerce-content-to-array.ts`, `binary-part.ts`) stayed in platform because they walk TRACE content parts and media markers and belong to that vertical rather than to Stored Objects; and the Azure driver, its credential resolution and its token provider (1,216 lines with an `@azure/identity` dependency and live platform importers) were not moved, which is what makes the scheme an absence. Backlog rather than blockers: `apps/worker` still carries its own S3 and filesystem drivers, which should collapse onto the package adapters; the `DATAPLANE_S3__*` reader is now stated in `api.config.ts` as well as `worker.config.ts` and wants a shared `@langwatch/config` helper; and `resolveMonitors` in `api-production.composition.ts`, added concurrently for the automation application, should collapse onto the execution half's service. Platform loses 30 files / 4,978 lines at zero insertions, and `platform/app/src/server/api/root.ts` went 540 to 532 on this slice. **All five named absences on the observability half are retired.** (1) The ClickHouse trace READ stack moved into `@langwatch/trace-server`: 46 modules / ~17,300 lines out of `platform/app/src/server/{traces,app-layer/traces}/**` under the layer grammar — `clickhouse-trace.service.ts` (3,655 lines) is `repositories/clickhouse/trace-legacy-read.repository.ts`, the ten readers are `services/trace-*-read.service.ts`, and the mappers, the blob store, the AI composer, the TTL cache, the windowed read and the cold-scan detector came with them, plus 33 test files. `trace-io-extraction.service.ts` and `trace-projection-lean.service.ts` were already byte-identical twins in the package, so the platform copies were DELETED and the imports repointed rather than moved. No data-privacy move was needed: the content-key catalogue, the visibility markers, `resolveDataPrivacy` and `ContentDropPolicyService` were already packaged, so the `contentPrivacy` mapper port is satisfied from `@langwatch/data-privacy-{contract,server}`. Three modules that had been moved into the BROWSER package `trace/web` but are read server-side (`trace-python-repr`, `trace-prompt-reference`, `trace-edit-overlay-apply`, plus the list window and the editable-metadata keys) moved into `@langwatch/trace-contract` and the six web importers were repointed. `apps/api/src/app/api-trace-read-stack.composition.ts` composes the stack over this process's own ClickHouse; the trace group takes a `traceReadsFrom` FACTORY rather than a finished port, because the stack needs the retention cascade and the topic tree the group itself composes and a second of either would be a second answer. (2) `ApiModelProviderHostPort` is filled from `@langwatch/model-provider-server`: the safe-regex gate, the model-limits registry and the cost-rule span preview moved out of `platform/app/src/{utils,server/app-layer/traces,server/modelProviders}` into `services/model-{cost-regex-safety,limits,cost-preview}.service.ts` and `services/ai-call-failure.service.ts`. The unmapped-cost hint is wired in the TRACE GROUP rather than the host, because it is the one reading that needs both the trace store and the gateway's stored rules. (3) `ApiUsageStatsPort` and the plan provider are filled from `@langwatch/entitlement-server`: `member-classification`, the membership repository, the usage-meter policy and `UsageStatsService` moved out of `platform/app/src/server/license-enforcement/**` and `app-layer/usage/**` behind two new abstract ports (`UsageCounterPort`, `UsageMembershipPort`). Judgment calls recorded: the free-tier message ceiling (`999_999_999`) and `MemberType` are STATED in the package rather than imported from the EE billing and licensing contracts, so an OSS build resolves a plan without them; the EE licence and subscription sources stay named absences that `LoggedApiEntitlementAbsence` writes down. (4) `ApiStudioHostPort` is filled by `apps/api/src/app/api-studio-host.composition.ts`: `platform/app/src/app/api/workflows/post_event/**` and `server/workflows/stripUnsupportedLLMParams.ts` were DELETED, and the behaviour they carried is now `WorkflowStudioStreamPort` + `HttpWorkflowStudioStreamAdapter` (the wire) and `WorkflowStudioDispatchService` (the SSE framing, the abort poll and the rule that a stream failure is reported AS a studio event) in `@langwatch/workflow-server`. The per-project Lambda routing and the S3 payload staging were deliberately not carried — they are the deployment's, and the platform Lambda runtime stays where it is. The sampling-parameter strip is `WorkflowNlpExecutionService.stripUnsupportedParams`, made public rather than duplicated, because there are now TWO dispatch chokepoints. The agent test's own trace write goes onto the SAME `trace_processing` producer registration the product half already made — the pipeline may only be registered once, so `composeApiProductCollaborators` now publishes `traceCommands` and the trace group and studio host both send on it. Also moved: `platform/app/src/server/tracer/spanToReadableSpan.ts` into `@langwatch/trace-server` as `services/trace-readable-span.service.ts`, whose lazy `import("@langwatch/scenario")` became a top-level import (the repo bans inline `import()`), which is why trace-server gained `@langwatch/scenario` and the two OTel SDK dependencies. The analytics ClickHouse filter translator is now exported from `@langwatch/analytics-server` and joined to the read stack at the process, because a feature server package may not reach into another feature's server package; without it a FILTERED legacy list refuses rather than answering the unfiltered set. Left named inside the read stack: the trace RENAME command, the query field-value read, the log canonicaliser, the summary projection store and the offloaded-payload resolver, all of which belong to verticals that have not moved. Proof: `api-trpc-collaborators.product-infra.integration.test.ts` drives all three of `storedObjects.headById`'s answers through the real `/api/trpc` handler over the moved repository, the storage registry and the local-filesystem driver against real bytes on disk (available / missing / not_found, which is the whole point of the probe), `dataRetention.getRules` with the RBAC filter observable rather than assumed (a team the caller cannot manage is neither offered as a writable scope nor allowed to name its own rule), `dataRetention.getScopeStorageUsage` narrowing an organization-wide reading to the one project the caller may view, `monitors.getAllForProject` off the execution half's own service, and both the performance-trend and plan-gate refusals. | Satisfy the remaining halves — the organization app service, sign-up/invite/provider-resolution, the trace pipeline, the evaluator/NLP ports and the evaluation_processing pipeline — each folding into the collaborator set the way `withApiAnalyticsCollaborators` does. Then fill the three fail-closed analytics ports from their own verticals (protections from trace/data-privacy, the graph-alert lookup and the action-parameter redaction from automation), and cut haven's app lane to `apps/api`. **`root.ts` is DELETED** (2026-09-02): its last twenty-two namespaces — the six core gateway surfaces, the fifteen Enterprise gateway, governance and billing ones, and `github` — mount on `apps/api`, and `composeGatewayApp` moved out of `app-layer/presets.ts` with them. The observability half's five named absences are RETIRED (see the fact column); what is left inside it is named there rather than here. |
 | Worker | Packaged registry is the one consumer since `4542cdc38c`. Trace conversion: g1 (projection collaborators) and g2 (project-metadata, model-cost-catalog, monitor-catalog, data-privacy-resolution seams) landed; worker suite 365. | g3–g7 and the 29-key trace conversion (in flight), then scenario, langy-conversation, gateway-spend, automation-half on the g2 seams. |
 | UI | 39 loader keys left of 149. Out: governance, gateway, me, automations, ops, analytics, evaluators, integrations, unsubscribe, workflows list+chat, auth front door (8 keys). | Studio, traces + share, chrome layout route (dashboard layout, project switcher, drawer mount; unblocks the authorize pages and every recorded drawer gap) in flight; then onboarding, org/members/teams, billing, experiments workbench, simulations, langy layout. |
-| Platform residue | ~471,700 non-test lines. A reachability census from the live roots (loader keys, `root.ts`, worker registry, REST mounts) is in flight to bulk-delete what nothing reaches. | Delete tiers as the census lands; refresh the inventory below from it. |
+| Platform residue | ~471,700 non-test lines. A reachability census from the live roots (loader keys, the now-deleted `root.ts`, worker registry, REST mounts) is in flight to bulk-delete what nothing reaches. | Delete tiers as the census lands; refresh the inventory below from it. |
 
 The long rows under "Active and residual slices" and the worker blocker graph
 are the historical record of how each seam was found; read them for evidence,
@@ -2565,10 +2565,10 @@ dispatches through is not in `apps/api`'s composed graph.
 | POST | `/api/ops/clickhouse/explain` | hma([], internal) — Bearer `LANGWATCH_OPS_API_KEY`, constant-time | 200 `{type, rows}`; 400 ×3; 401; 502; 503 ×2 | — | no | blocked: `opsExplain.service`, `ops/explain-core` |
 | POST,DELETE | `/api/admin/impersonate` | hma([], session) — `ops.isAdmin` | 200 `{message}`; raises `AdminSurfaceHiddenError` / `AdminSessionExpiredError` / `ValidationError` | — | no | moved to `@langwatch/ops-server`; **not mounted** — the API process's session port answers no `impersonator` |
 | POST | `/api/admin/:resource` | hma([], session) | 200 operation result; 400 malformed body; `ValidationError` unknown resource | body `resource` wins over path param | no | moved to `@langwatch/ops-server`; not mounted, same reason |
-| POST | `/api/unsubscribe` | pub (HMAC token in `?token=`) | 200 `{ok}`; 400 `{error}` ×2; 429; 500 | **before** the method guard below | no | blocked: `automation.confirmUnsubscribe` |
-| ALL | `/api/unsubscribe` | pub | 405 `{error}` + `Allow: POST` | **after** the POST | no | blocked: same |
+| POST | `/api/unsubscribe` | pub (HMAC token in `?token=`) | 200 `{ok}`; 400 `{error}` ×2; 429; 500 | **before** the method guard below | no | **moved** → `@langwatch/automation-server`, over the org-group's automation application |
+| ALL | `/api/unsubscribe` | pub | 405 `{error}` + `Allow: POST` | **after** the POST | no | **moved**, same family |
 | POST | `/api/rum/v1/traces` | pub | 202 empty; 400/404/413/429/500 `{error, code}` | — | no | **moved** |
-| POST | `/api/bug-reports` | pub (API key optional, only links a project) | 201 `{id}`; 400 ×2; handled 400/429/500 `{error, code}` | 12 MB body cap | no | blocked: `bug-report.service` |
+| POST | `/api/bug-reports` | pub (API key optional, only links a project) | 201 `{id}`; 400 ×2; handled 400/429/500 `{error, code}` | 12 MB body cap | no | **moved** → `@langwatch/ops-server`, over this process's Prisma and its one counter |
 
 ###### Ingestion, OTEL and the collector
 
@@ -2588,10 +2588,10 @@ dispatches through is not in `apps/api`'s composed graph.
 
 | Method | Path | Auth | Response | Ordering | OpenAPI | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/auth/validate` | pub | 200 `{projectSlug}`; 401 `{message}` | — | no | blocked: `getServerAuthSession`, `prisma` |
-| GET | `/api/auth/session` | pub | 200 `null` or `{session, user}`, `Cache-Control: no-store` | — | no | blocked: `betterAuth.api.getSession` |
-| GET,POST | `/api/auth/logout` | pub | GET 302; POST 200 `{success}`; 405 otherwise; clears both bare and `__Secure-` cookies | **before** the catch-all | no | blocked: `auth.revokeBrowserSession` |
-| ALL | `/api/auth/*` | pub | Better Auth's own response; 403 `{message, code:"INVALID_ORIGIN"}` on the origin gate | **registered last**; swallows every `/auth/*` sibling registered after it | no | blocked: `browserSessions` transport |
+| POST | `/api/auth/validate` | pub | 200 `{projectSlug}`; 401 `{message}` | — | no | moved → `@langwatch/auth-server`; **not mounted** — the family's Better Auth port has no value on this process |
+| GET | `/api/auth/session` | pub | 200 `null` or `{session, user}`, `Cache-Control: no-store` | — | no | moved with the family; not mounted, same reason |
+| GET,POST | `/api/auth/logout` | pub | GET 302; POST 200 `{success}`; 405 otherwise; clears both bare and `__Secure-` cookies | **before** the catch-all | no | moved with the family; not mounted, same reason |
+| ALL | `/api/auth/*` | pub | Better Auth's own response; 403 `{message, code:"INVALID_ORIGIN"}` on the origin gate | **registered last**; swallows every `/auth/*` sibling registered after it | no | moved with the family; not mounted — `API_UNAVAILABLE_PRODUCT_ADAPTERS` still names the Better Auth transport |
 | POST | `/api/auth/cli/device-code` | hma([], session) | 200 RFC 8628 device grant | **whole family before `/api/auth/*`** | no | blocked: `governance`, `apiKeys` CLI methods, `redis` |
 | POST | `/api/auth/cli/exchange` | hma([], session) | 200 `device_session` or `api_key` kind; 400/408/410/428/429/500 | same | no | blocked: same |
 | POST | `/api/auth/cli/refresh` | hma([], session) | 200 token pair; 400; 401 `invalid_grant` | same | no | blocked: same |
@@ -2678,19 +2678,19 @@ dispatches through is not in `apps/api`'s composed graph.
 | GET | `/api/traces/:traceId` | req(traces:view) | 200 trace | — | yes | blocked: same |
 | PATCH | `/api/traces/:traceId/metadata` | req(traces:update) | 200 | — | yes | blocked: same |
 | POST | `/api/export/traces/download` | hma(traces:view, session) | streamed CSV/JSONL, `X-Export-Id`, `X-Total-Traces` | mounted directly, **outside** the audited list | no | service moved → `@langwatch/trace-server` (`TraceExportService`); mount blocked on the read stack, session and broadcast reaching `composeDoors` |
-| POST | `/api/export/scenario-runs/download` | hma(scenarios:view, session) | streamed gzipped CSV, `X-Export-Id`, `X-Total-Runs` | mounted directly, outside the audited list | no | service moved → `@langwatch/scenario-server`; mount blocked on `simulations` and session resolution |
+| POST | `/api/export/scenario-runs/download` | hma(scenarios:view, session) | streamed gzipped CSV, `X-Export-Id`, `X-Total-Runs` | inside `createApiProcessRestFeatures` | no | **moved** — mounted where the process holds BOTH a browser-session transport and the simulation store; absent otherwise |
 
 ###### Langy, gateway, GitHub and vendor webhooks
 
 | Method | Path | Auth | Response | Ordering | OpenAPI | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/langy/conversations` | hma(langy:create, apiKey), canonical envelope | 202 turn, or 200 settled under `Prefer: wait=N`; **`c.notFound()`** when dark | credential (401) → dark 404 → ceiling (403) → service; the dark check must NEVER throw | no | blocked: `langy.langyService`, `redis`, feature flags |
-| POST | `/api/langy/conversations/:conversationId/messages` | hma(langy:create, apiKey) | same; `adoptConversationId` valid only here | same | no | blocked: same |
-| POST | `/api/langy/ui/actions` | hma(experiments:view, experiments:update, evaluations:create; apiKey) + per-action ceiling | 200 dispatch outcome; `notFound()` when dark | **unknown `kind` before the per-action ceiling**, so the error names the real problem | no | blocked: `LangyUiActionService` (being moved to `langy-server` by a sibling — import from there once it lands) |
-| GET | `/api/langy/ui/actions` | same policy | 200 `{actions:[{kind, permission, backend, payloadSchema}]}` | same dark check | no | blocked: same |
-| POST | `/api/internal/langy/turn/:turnId/result` | int (builder `verifySecret`) | 202 `{status:"accepted"}`; 404 `{error}`; raises `ValidationError` | turn-existence cross-check **before** the ingest write, to reject forged cross-tenant triples | no | blocked: `langy.langyService`, `metrics` |
-| POST | `/api/internal/langy/credentials/revoke` | int | 200 `{outcome}`; 404 `{outcome:"not_found"}`; 403 `{error}` | — | no | blocked: same |
-| POST | `/api/internal/langy/relay/frames` | int | 200 `RelayTally` once the ndjson stream ends; 400 `{error}`; 503 `{error}` | shares the secret gate with `langy-internal` under the same basePath | no | blocked: `redis`, relay |
+| POST | `/api/langy/conversations` | hma(langy:create, apiKey), canonical envelope | 202 turn, or 200 settled under `Prefer: wait=N`; **`c.notFound()`** when dark | credential (401) → dark 404 → ceiling (403) → service; the dark check must NEVER throw | no | **moved** → `@langwatch/langy-server`, over the agent group's own `LangyApp` |
+| POST | `/api/langy/conversations/:conversationId/messages` | hma(langy:create, apiKey) | same; `adoptConversationId` valid only here | same | no | **moved**, same family |
+| POST | `/api/langy/ui/actions` | hma(experiments:view, experiments:update, evaluations:create; apiKey) + per-action ceiling | 200 dispatch outcome; `notFound()` when dark | **unknown `kind` before the per-action ceiling**, so the error names the real problem | no | **moved**; mounted where this process has Redis, over an EMPTY catalogue — every kind refuses by name |
+| GET | `/api/langy/ui/actions` | same policy | 200 `{actions:[{kind, permission, backend, payloadSchema}]}` | same dark check | no | **moved**; answers `{actions: []}` here, honestly — the only catalogue is the workbench's browser module |
+| POST | `/api/internal/langy/turn/:turnId/result` | int (builder `verifySecret`) | 202 `{status:"accepted"}`; 404 `{error}`; raises `ValidationError` | turn-existence cross-check **before** the ingest write, to reject forged cross-tenant triples | no | **moved**; `LANGY_INTERNAL_SECRET` is now an `api.config` value |
+| POST | `/api/internal/langy/credentials/revoke` | int | 200 `{outcome}`; 404 `{outcome:"not_found"}`; 403 `{error}` | — | no | **moved**, same family |
+| POST | `/api/internal/langy/relay/frames` | int | 200 `RelayTally` once the ndjson stream ends; 400 `{error}`; 503 `{error}` | shares the secret gate with `langy-internal` under the same basePath | no | **moved**; mounted only with Redis — a relay with no live buffer refuses rather than drops |
 | GET | `/api/internal/gateway/health` | int (HMAC `verifyGatewaySignature`) | 200 `{status:"ok"}` | signature compared **before** the timestamp check (timing side-channel) | no | blocked: gateway stores |
 | POST | `/api/internal/gateway/resolve-key` | int | 200 `{jwt, revision, key_id, display_prefix}`; 400/401/403 `{error:{type, code, message}}` | — | no | blocked: same |
 | POST | `/api/internal/gateway/codex/refresh` | int | 200 `{access_token, account_id}`; 400/401/404 | — | no | blocked: same |
@@ -2703,25 +2703,25 @@ dispatches through is not in `apps/api`'s composed graph.
 | PATCH | `/api/internal/gateway/realtime-sessions/:session_id` | int | 200 `{session_id, updated}`; 400/404 | — | no | blocked: same |
 | POST | `/api/internal/gateway/realtime-sessions/:session_id/usage` | int | 200 `{session_id, status:"CLOSED"}`; 400/404 | — | no | blocked: same |
 | GET | `/api/internal/gateway/bootstrap` | int | 501 `{error:{code:"not_implemented"}}` | — | no | blocked: stub |
-| GET | `/api/github/install` | hma(organization:manage, session) | 302 to GitHub; 400/401/403 ×2/503 | membership check **first**, then the permission probe | no | blocked: `github` service |
-| GET | `/api/github/setup` | pub (protocol-mandated; HMAC state verified in-handler) | 200 popup HTML or 302; 400/401/403/502 | state → session rebind → nonce → membership → permission, in that order | no | blocked: same |
-| POST | `/api/github/webhook` | pub (`X-Hub-Signature-256` verified in-handler) | 200 `{received}` for everything acknowledged; 400/401/404 | HMAC over the **raw** body before any parse | no | blocked: same |
-| GET | `/api/github-langy/setup` | pub | alias of `/api/github/setup` | kept until a deprecation path exists | no | blocked: same |
-| POST | `/api/github-langy/webhook` | pub | alias of `/api/github/webhook` | same | no | blocked: same |
+| GET | `/api/github/install` | hma(organization:manage, session) | 302 to GitHub; 400/401/403 ×2/503 | membership check **first**, then the permission probe | no | **moved** → `@langwatch/github-server`; mounted only where a host supplied the Better Auth transport |
+| GET | `/api/github/setup` | pub (protocol-mandated; HMAC state verified in-handler) | 200 popup HTML or 302; 400/401/403/502 | state → session rebind → nonce → membership → permission, in that order | no | **moved**, same family |
+| POST | `/api/github/webhook` | pub (`X-Hub-Signature-256` verified in-handler) | 200 `{received}` for everything acknowledged; 400/401/404 | HMAC over the **raw** body before any parse | no | **moved**, same family |
+| GET | `/api/github-langy/setup` | pub | alias of `/api/github/setup` | kept until a deprecation path exists | no | **moved**, same family |
+| POST | `/api/github-langy/webhook` | pub | alias of `/api/github/webhook` | same | no | **moved**, same family |
 | POST | `/api/elevenlabs/webhook/:modelProviderId` | pub (`ElevenLabs-Signature` HMAC, per-tenant secret) | 200 `{received}`; 400/401/404 | 404 for an unknown provider id doubles as anti-enumeration | no | blocked: `elevenLabsCredential.service` |
-| POST | `/api/webhooks/auth0-scim` | int | 200 `{received}`; 400/401/404 | — | no | blocked: SCIM |
+| POST | `/api/webhooks/auth0-scim` | int | 200 `{received}`; 400/401/404 | — | no | moved → `@langwatch/enterprise-scim-server`; not mounted, same reason |
 
 ###### Transports and the packaged families still mounted from platform
 
 | Method | Path | Auth | Response | Ordering | OpenAPI | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET,POST | `/api/trpc/*` | hma([], both) | tRPC fetch-adapter response; escaped throws become a tRPC-shaped 500 envelope | GET before POST | no | superseded — `apps/api` serves its own `/api/trpc` |
+| GET,POST | `/api/trpc/*` | hma([], both) | tRPC fetch-adapter response; escaped throws become a tRPC-shaped 500 envelope | GET before POST | no | superseded — `apps/api` serves its own `/api/trpc`; `routes/trpc.ts` **deleted** |
 | GET | `/api/sse/*` | hma([], session) | `text/event-stream`; 400/404 `{message}` | — | no | superseded — `createSseSubscriptionApp` |
-| — | `/api/scim/v2/*` (15 routes) | 3× pub discovery, 12× int | SCIM protocol errors as `application/scim+json` | — | yes | blocked: `ScimApp` |
-| POST | `/api/analytics/timeseries` | req(analytics:view) | 200 `{currentPeriod, previousPeriod}` | — | yes | blocked: mount needs the packaged list |
-| — | `/api/v1/projects/:projectId/analytics/*` (9 routes) | req(analytics:view/create/update/delete) | canonical envelope | LangWatchQL routes then saved-chart routes | yes | blocked: governed SQL |
-| — | `/api/organization/*` (10 routes) | org policy + Enterprise gate on every route | versioned management envelope | plan gate after RBAC | yes | blocked: packaged list |
-| — | `/api/prompts/*` (13 routes) | req(prompts:view/create/update/manage) | — | `:id{.+?}` sub-resources before the bare `:id{.+}` | yes | blocked: packaged list |
+| — | `/api/scim/v2/*` (15 routes) | 3× pub discovery, 12× int | SCIM protocol errors as `application/scim+json` | — | yes | moved → `@langwatch/enterprise-scim-server`; **not mounted** — this process refuses the Enterprise SCIM application by name |
+| POST | `/api/analytics/timeseries` | req(analytics:view) | 200 `{currentPeriod, previousPeriod}` | — | yes | **moved** — over the analytics half's own `AnalyticsApp`; the body is the package's `timeseriesInputSchema` (metric/group-by no longer enum-narrowed at the wire) |
+| — | `/api/v1/projects/:projectId/analytics/*` (9 routes) | req(analytics:view/create/update/delete) | canonical envelope | LangWatchQL routes then saved-chart routes | yes | **moved** — the whole family into `@langwatch/analytics-server`; the saved-chart half arrives through a port over `DashboardApp` |
+| — | `/api/organization/*` (10 routes) | org policy + Enterprise gate on every route | versioned management envelope | plan gate after RBAC | yes | **moved** — 7 of 10 answer; the 3 invitation routes refuse `service_unavailable` (no `InviteService`) |
+| — | `/api/prompts/*` (13 routes) | req(prompts:view/create/update/manage) | — | `:id{.+?}` sub-resources before the bare `:id{.+}` | yes | **moved** — over the product-group half's `PromptApp`; the nurturing trail logs instead of firing |
 | — | `/api/v1/secret`, `/api/v1/secrets`, `/api/secret` (5 ops × 3 bases) | per-op RBAC | — | — | yes | **already served by `apps/api`** (`ApiSecretRestFeature`, plus `/api/secrets`) |
 | — | the 32 families of `createAppRestFeatures` | mixed | — | mounted as one spread | mixed | blocked: `apps/api` composes none of the 32 services |
 
@@ -2776,7 +2776,10 @@ Landed:
   asserts the producer received the command, with the two encodings agreeing on
   the trace id.
 
-17 of the 156 rows are serving from `apps/api`.
+51 of the 156 rows are serving from `apps/api` — the 17 the OTLP/export/webhook
+slice left, plus the 34 product REST wave 3b moved: 1 analytics timeseries,
+9 governed SQL, 13 prompts, 10 organization management (7 answering, 3
+refusing by name) and the bulk run export.
 
 ##### Decisions recorded while moving
 
@@ -4486,6 +4489,478 @@ rows for deleted files, the same residue every previous lane left; the baseline
 only shrinks, and trimming it is a shared-file edit better done in one pass at
 the end.
 
+## Producer-only process managers: the API's agent-side write path, 2026-09-02
+
+**The refusal was in the framework, not the deployment.** `apps/api` composes
+Eventing producer-only and holds no `ProcessStore`, and `EventSourcing.register`
+refused outright any pipeline declaring a process manager on that basis. Both
+`simulation_processing` and `langy_conversation_processing` declare one, so ONE
+declaration inside each definition made EVERY command on it unsendable from the
+tier a customer's action actually arrives at: eight simulation commands, two
+suite-run commands and sixteen Langy conversation commands all answered
+`service_unavailable`, and the agent-group half's own header attributed that to
+a producer variant nobody had written. The variant was never the blocker.
+
+**The mechanism.** `EventSourcingOptions.processManagerMode` (`"run"` |
+`"producer-only"`, default `"run"`) separates PRODUCING a command from RUNNING a
+process manager. In producer-only mode `register` skips `requireProcessStore`,
+generates none of the live subscribers that feed a process inbox, and records
+each declined manager BY NAME on `EventSourcing.unrunProcessManagers` while
+logging it once per pipeline at boot; `processRuntime` refuses with the same
+fact rather than lazily building a runtime over a store this process was never
+meant to drive. The consumer path is untouched: a `"run"`-mode registration with
+no durable store still fails at boot, and that is pinned beside the new
+scenarios. `ApiEventingInfrastructure` declares the mode next to
+`EventStoreProducerOnly` and `consumersEnabled: false`, so the property is
+structural rather than something a composition root must remember.
+
+**Three producer variants, in the packages that own the definitions.**
+`createSimulationProcessingProducerPipeline`,
+`createSuiteRunProcessingProducerPipeline` and
+`createLangyConversationProducerPipeline` follow
+`createTraceProcessingProducerPipeline` exactly: the SAME packaged definition,
+with stand-ins for every consumer-side dependency that exist so the definition
+can be CONSTRUCTED and refuse by name if one is ever CALLED. No definition is
+forked, so the routing triple each job carries stays identical to the one the
+worker routes on. `apps/worker/src/features/job-registry.json` is unchanged and
+`apps/worker` is 419/419.
+
+**`apps/api/src/app/api-agent-pipelines.composition.ts`** registers all three on
+this process's own Eventing and publishes their senders: the eight simulation
+writes as `SimulationExecutionPort`, `startSuiteRun` plus the simulation
+pipeline's own `queueRun` as `SuiteRunCommandsPort` (a suite run fans out into
+one simulation run per case, and both tiers have always written those onto the
+simulation stream), and the sixteen conversation writes as
+`LangyConversationCommands`. A command the registration did not produce fails at
+BOOT, named, rather than at the customer's first press. With no Eventing at all
+every surface still refuses by name, and the agent-group half reports it through
+its existing `run-commands` / `turn-commands` absence entries.
+
+**Absences closed.** `UnavailableApiSimulationExecution` (all eight simulation
+commands), `UnavailableApiSuiteRunCommands` (both), and
+`unavailableLangyConversationCommands` (all sixteen) are deleted from
+`api-trpc-collaborators.agent-group.composition.ts` and replaced by the real
+dispatchers. Cancelling a run, deleting a run, starting a suite run, and
+renaming, forking, archiving, importing into and titling a conversation are now
+real writes on the API.
+
+**Absences remaining, and why.** `UnavailableApiScenarioExecution` stays: it is
+the run EXECUTOR and PREFETCHER, not a command — `scenarios.run` resolves its
+target through workflows, prompts, agents, model providers, secrets and the
+trace tree before anything is queued, and none of that is a queue registration.
+Starting a Langy turn stays on the feature's own `langy_agent_unavailable`: the
+turn-start service dispatches to an agent manager over HTTP and additionally
+requires the turn access and handoff stores, so a process with no Langy
+configuration and no Redis has neither. Both are DEPLOYMENT absences; this lane
+closed the framework one. The same mode also unblocks the identity ledgers'
+staged senders — `join_requests` and `sso_connections` both declare a process
+manager, neither is registered on `apps/api`, and `ApiEventingIdentityAdapter`
+answers `null` for an unregistered pipeline, which the join-request ledger reads
+as a refusal — but those files belong to the app-layer lane and are recorded
+rather than taken. Nothing else in `apps/api/src/app` shares the mechanism: the
+automation scheduled-job store, the graph-alert notifier, the topic-clustering
+wake read, the operator explorers and the scheduler ops repository are stores
+and transports, not command dispatchers.
+
+**One incident worth recording.** A concurrent lane's commit `1830b8d663` swept
+three of this lane's in-flight files into its own commit
+(`api-eventing.infrastructure.ts`, `scenario/server/src/index.ts` and the new
+`simulation-processing-producer.adapter.ts`), which is the `git add -A`-while-
+agents-edit hazard landing for real. Nothing was lost and nothing needed undoing,
+but it is why those three files show no working-tree diff.
+
+**Judgment calls.**
+`SimulationProcessingPipelineDeps.simulationRunMetricsStore` is narrowed from
+the concrete `SimulationRunMetricsStoreAdapter` to the
+`AppendStore<SimulationRunMetricsProjectionRecord>` the map projection already
+takes; the worker's ClickHouse adapter satisfies it unchanged, and naming the
+class was what stopped a producer supplying a refusing store.
+`api-agent-pipelines.composition.ts` declares its own
+`ApiAgentPipelineUnavailableError` rather than importing the agent-group half's,
+which would have made the two modules circular; the `code` is the same
+`service_unavailable` the presentation registry is keyed by, which is the part
+that reaches a customer. The simulation producer's `simulations` seat is
+`SimulationClickHouseAdapter.createNull` over a refusing
+`SimulationExecutionPort` rather than a hand-written 25-method refusal: the only
+member the process manager's `finish` intent reaches is `finishRun`, and that
+one refuses by name.
+
+**Gates.** `packages/eventing` typechecks clean (`tsc --noEmit` and
+`tsconfig.tests.json`) and is 113 files / 990 + 2 todo, from 112 / 984 + 2.
+`apps/worker` is 56 files / 423, all passing, with `job-registry.json` byte
+unchanged. The three feature packages whose definitions gained a producer
+variant are green: `scenario-server` 60 passed / 2 skipped / 808 tests (the two
+failures are `cancellation-channel` and `scenario-tab-registry`, both refusing
+by name because no Redis is running), `langy-server` 52 / 483, `suite-server`
+6 / 51. On `apps/api`, `tsc -p tsconfig.json` is 0 errors and
+`tsc -p tsconfig.test.json` has 4, none in a file this lane touched
+(`app-trpc.features.unit.test.ts` missing the concurrent gateway lane's new
+`gatewayGroup` and `github` port groups, and `api-client-address.unit.test.ts`
+importing a module that has not landed). The two `apps/api` suites this lane
+owns are 21/21 — the agent-group integration suite gains three cases that drive
+`scenarios.cancelJob` and `langy.deleteConversation` through the REAL
+`/api/trpc` handler onto a fake event store's append and assert the declined
+process manager by name, and `api-eventing.infrastructure.unit.test.ts` now pins
+the registration rather than the refusal (its spec scenario in
+`specs/server/api-process-eventing.feature` is rewritten to match). The whole
+`apps/api` run settled at 62 of 68 files and 558 of 566 tests once the
+concurrent lanes' installs landed; the six that fail are the two standalone
+boot suites timing out on absent local infrastructure, `api-client-address`
+importing a module that has not landed, the experiments and product-infra
+suites missing the gateway lane's new collaborator entries, and the execution
+suite's own stale count of its lane's second producer registration. None is a
+file this lane touched, and both files this lane owns pass inside that run.
+Read the intermediate numbers with care: across four runs an hour apart the
+same suite swung between 6 and 46 failing FILES purely on other lanes'
+half-installed dependencies. `git diff
+--numstat -- platform/app` shows zero rows for this lane; the single
+nonzero-insertion row in the shared tree is another lane's import consolidation
+in `runtime/app/features/secret.ts` (1 insertion, 61 deletions).
+
+
+## The router root's last twenty-two namespaces, 2026-09-02
+
+**`platform/app/src/server/api/root.ts` is DELETED.** 532 lines, and with it the
+last tRPC surface the retired application mounted. Every namespace it carried is
+served by `apps/api` on that process's own root, behind that process's own
+policy chain.
+
+### Namespace to mount
+
+| Namespaces | Mounted by |
+| --- | --- |
+| `secrets` | Already there: `apps/api/src/api.application.ts` mounts `SecretTrpcApi` on its own root beside `agents`. The root.ts line and `runtime/app/internal-api/secrets.router.ts` were deletions, not moves. |
+| `virtualKeys`, `gatewayBudgets`, `gatewayCacheRules`, `gatewayGuardrails`, `gatewayUsage`, `gatewaySpendEvents` | `features/gateway/gateway-trpc.mount.ts`, over the `GatewayApp` this lane composes |
+| `personalVirtualKeys`, `routingPolicy`, `webhookEndpoints` | `features/enterprise/enterprise-governance-trpc.mount.ts` (`EnterpriseGatewayTrpcComposition`) |
+| `ingestionSources`, `ingestionTemplates`, `ingestionKey`, `departments`, `aiTools`, `activityMonitor`, `anomalyRules`, `personalSessions`, `sessionPolicy` | the same mount (`EnterpriseGovernanceTrpcComposition`) |
+| `governance` | that composition's `governance` router, merged with `features/enterprise/governance-home.mount.ts` — one wire name, two owners, merged inside the group so nothing outside it can add a third |
+| `subscription`, `currency` | `features/enterprise/enterprise-billing-trpc.mount.ts` |
+| `github` | `features/github/github-trpc.mount.ts` |
+
+All twenty-one gateway and governance namespaces arrive as ONE group entry —
+`apps/api/src/app-trpc/app-trpc.gateway-group.ts` — for the reason the trace,
+org, agent and product-infrastructure groups did: they are one graph (a virtual
+key is minted by the governance console, priced by the budget ledger, delivered
+on by a webhook endpoint and billed through a subscription), and one entry keeps
+their ports off a file five other halves of the record also edit. `github` is
+its own record entry: one namespace, two ports, and no graph shared with
+anything beside it.
+
+### What moved
+
+| From | To |
+| --- | --- |
+| `server/app-layer/presets.ts` `composeGatewayApp` (~195 lines) with `gatewayVirtualKeyActor`, `membershipForProjectCredential` and `isBrowserSession` | `apps/api/src/app/api-gateway.composition.ts` |
+| `server/api/routers/governance/governance.ts` (`governance.resolveHome`, 141 lines) | `apps/api/src/features/enterprise/governance-home.mount.ts` |
+| `runtime/app/internal-api/github.router.ts` (54) | `apps/api/src/features/github/github-trpc.mount.ts` plus the two ports in the gateway-group composition |
+| `runtime/app/internal-api/__tests__/github.access-order.unit.test.ts` (281) | the permission assertion it existed for travelled into `packages/features/github/server/src/transport/api-trpc/__tests__/github-trpc-api.unit.test.ts`, where the permissions are DECLARED; the rest of that suite was already covered there |
+| `runtime/app/internal-api/secrets.router.ts` (51), `server/api/root.ts` (532) | deleted, not moved |
+
+`composeGatewayApp` was the one composition the previous lane named as the
+blocker for the gateway REST families, and it moved WHOLE rather than as ports:
+every store the old `gatewayStores` bag held is opened in the new composition
+off `apps/api`'s own Prisma connection and its own ClickHouse —
+`VirtualKeyService`, `PrismaGatewayAdapter`, `GatewayBudgetLedgerAdapter`,
+`GatewayVirtualKeySpendAdapter`, `GatewaySpendEventsService` and
+`GatewayUsageService`. The `GatewayScopePermissionsPort` the move exposed is
+answered by this process's own AuthZ service, with the session cascade and the
+API-key ceiling kept apart exactly as the port demands.
+
+**`createGatewayPlatformRestApp` is now mounted on `apps/api`**, over the SAME
+`GatewayApp` the six tRPC namespaces read, so the SDK's door and the browser's
+door cannot enforce different rules. It is routed AFTER the process-owned REST
+families, because one of those owns a literal path inside `/api/gateway/v1` and
+these routes claim parameterised segments at the root of that namespace.
+
+Ten symbols the composition needs were added to `@langwatch/gateway-server`'s
+index — they already existed in the package and were simply unexported
+(`assertScopesBelongToOrg`, `assertTraceProjectBelongsToOrg`,
+`assertGuardrailAttachmentsAllowed`, `resolveVkProjectId`, `requireExistingVk`,
+`requireVisibleVk`, `isVisibleToMembership`, `loadDirectBudgetsForKeys`,
+`resolveApplicableBudgetsForDraftKey`, `virtualKeyBudgetInputSchema`).
+`@langwatch/enterprise-api` gained four re-exports for the same reason it
+already re-exports the governance REST family: an api-role application may name
+that composition and nothing enterprise below it (`GovernanceService`,
+`OrganizationSessionPolicyService`, `PersonaHomeResolverService`,
+`PersonaResolution`).
+
+### Named absences
+
+**`ApiEnterpriseApplicationPort.governance`** — the four `ctx.app` slices the
+fifteen Enterprise governance and gateway-governance namespaces read
+(`governance`, `governanceApp`, `sessionPolicy`, `webhooks`). It EXTENDS the
+port the org-group lane added rather than adding a second, because the
+deployment decision is one. It is a port rather than a composition and the
+reason is a fence: `AppGovernanceRuntime.create` requires a
+`GovernanceEventingPort` built from the ingestion-pull and pulled-usage COMMAND
+registrations, and the event-sourcing runtime that owns them has not left the
+retired application. The only in-tree alternative is that package's no-op
+eventing port, which would accept every ingestion-pull command and queue none of
+them — a silent drop, which is the one thing a named absence exists to prevent.
+Absent, all fifteen namespaces MOUNT and every call refuses `service_unavailable`
+naming the capability.
+
+**`ApiGatewayIdempotencyPort`** — the receipt ledger the three keyed gateway REST
+creates dispatch through. `withIdempotency` is
+`platform/app/src/server/api/idempotency.ts`, 752 lines of claim, heartbeat and
+takeover logic that four other REST families still read and another lane owns.
+Copying it would give the deployment two receipt stores with two takeover
+clocks. Absent, those three creates refuse by name rather than executing
+unguarded — a create sent twice with one `Idempotency-Key` would otherwise mint
+two virtual keys, which is the failure the key exists to prevent.
+
+**`createGatewaySpendRestApp` is still not mounted.** `GatewaySpendRestPorts`
+wants the three raw Enterprise webhook services (`webhookEndpoints`,
+`webhookEvents`, `webhookDelivery`) rather than the `WebhookApp` the port above
+carries, plus `assertWebhookEndpointsEntitled` for its billing gate and the REST
+lane's `canonicalError` envelope. Three of those cross into another lane's
+files, so the family stays off rather than being mounted over a half-filled
+port bag.
+
+**`server/routes/gateway-internal.ts` is still not moved** — 1,508 lines, and
+the blockers are named: `rateSpendNanoUsd` from
+`server/event-sourcing/pipelines/gateway-spend-processing/**`, `runEvaluation`
+from `server/evaluations/**`, and `getApp()`. Two of those verticals have not
+moved and the third is the service locator this migration exists to delete. Its
+HMAC verifier for the Go data plane travels with it.
+
+**Therefore `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` were still
+NOT added to `api.config.ts`.** Nothing on `apps/api` reads either yet, and a
+config leaf nothing reads is a wiring bug that reads as done. `LW_VIRTUAL_KEY_PEPPER`
+WAS added, because its reader — `VirtualKeyCryptoAdapter`, inside the gateway
+composition — is composed in this same change. It follows the file's stated
+convention for credentials (`Config.value(optionalEnvironmentString, …)` rather
+than `Config.secret`, which refuses a whole boot over a blank export); what a
+blank pepper means is the cipher's own rule and it raises `pepper_missing` at the
+first hash rather than at boot.
+
+**`personalDashboard` is not forwarded.** The governance composition builds
+fourteen routers and the mount forwards thirteen: `personalDashboard` answers on
+`user.personalUsage`, `user.budgetOverview` and `user.cliBootstrap`, and `user.*`
+is the identity half's. Merging a second owner into that namespace from here
+would put two mounts on one wire name.
+
+### Judgment calls
+
+- **`subscription` and `currency` mount directly from
+  `@langwatch/enterprise-billing-server`** rather than through
+  `EnterpriseTrpcComposition`, which the org-group's Enterprise mount already
+  builds and deliberately drops them from. A second call to that composition
+  would build four unused routers; `apps/api` already depends on the billing
+  server package (`api-usage.composition.ts`), so the SaaS gate is restated once
+  in `enterprise-billing-trpc.mount.ts` — the same construction, in the one
+  place that serves the two names. The org-group mount's docblock was corrected
+  to say where they went; nothing else in that lane's files changed except the
+  port extension above.
+- **`saasBilling` is read from `config.infrastructure.modelProvider.isSaas`.**
+  That leaf already carries `IS_SAAS`, which is the variable the platform
+  application's `env.IS_SAAS` read. One variable, one meaning, rather than a
+  second leaf that could be exported differently.
+- **`resolveHome`'s Enterprise test comes from the plan provider**, not from
+  `UsageStatsService.getUsageStats(...).activePlan.type`. It is the same
+  question — is this organization's active plan the Enterprise one — asked of
+  the one provider every allowance banner on this process already reads, rather
+  than a second licence-enforcement service that would be a second answer.
+- **All six of `resolveHome`'s other signals became ports.** The platform
+  version read four of them straight off a service locator (`ctx.prisma`, an
+  imperative permission probe, the flag store, the organization service), and a
+  mount that reaches for a connection cannot be composed twice. Only the setup
+  rollup stays on `ctx.app.governance`, because that is the slice the five
+  packaged `governance.*` procedures beside it read.
+- **`isBrowserSession` narrowed.** It asserted a whole NextAuth `Session`
+  including its `expires` string; `VirtualKeySessionActor` is
+  `{ user: { id: string } } | null` and the extra member was never read. The new
+  `sessionActor` reads the one member the authorization vocabulary uses. A value
+  that fails is a null session, and every gateway check refuses one — so this
+  cannot widen an authorization.
+- **`secrets` keeps `apps/api`'s existing mount**, which passes no declared
+  policy and falls back to the feature's own `ctx.authorize`. The platform
+  router passed the full chain, so `secrets.create` and `secrets.update` no
+  longer run `auditLogMutations` and its `REDACTED_SCALAR_FIELDS_BY_ACTION`
+  redaction. That is `api.application.ts`'s standing decision — it mounts the
+  secret router before the policy chain exists, so a process with no features
+  port still serves secrets — and this lane did not change it. **Recorded as a
+  coverage loss on the secret audit trail**, to be closed by whichever lane moves
+  the secret family onto the feature record.
+- **`ApiTrpcCollaborators` grew two entries and `ApiTrpcFeatureApplication` six
+  slices**, all six added to the seal's required lists, so a deployment that
+  composes the gateway group and forgets one reads a named gap rather than
+  mounting twenty-two namespaces over it.
+
+### Gates
+
+`apps/api`: `tsc -p tsconfig.json` and `tsc -p tsconfig.test.json` both ZERO
+errors. `pnpm exec vitest run` for the new suite —
+`api-trpc-collaborators.gateway-group.integration.test.ts`, 13 tests over the
+real `/api/trpc` handler: a guardrail read all the way down to a `findMany`, the
+membership-based virtual-key visibility, the budget list, the landing decision
+with and without the governance capability, the GitHub connection status, the
+governance refusals and both billing shapes — green. The record-membership
+assertion in `api-trpc-collaborators.product.integration.test.ts` and the
+namespace list in `app-trpc.features.unit.test.ts` both moved 69 to 91. The
+seven sibling collaborator suites gained the two new stub entries. `packages/features/github/server` 15 files/126 tests green.
+`git diff --numstat -- platform/app` shows zero insertions on every row.
+
+
+## Product REST wave 3b: the analytics, prompt, organization and export doors, 2026-09-02
+
+Five route families left `platform/app/src/server/api-router.ts` for
+`apps/api`'s own `createApiProcessRestFeatures`, and every one of them is served
+over a service the process had ALREADY composed for its tRPC half rather than
+over a second copy built at the mount. That is the whole shape of this slice:
+the packaged families existed, the platform "compositions" were forty-line
+files binding them to a global application container, and what moved is the
+binding.
+
+### Family → mount
+
+| Family | Routes | Mount | Service it binds to |
+| --- | --- | --- | --- |
+| `POST /api/analytics/timeseries` | 1 | `features/analytics/analytics-rest.mount.ts` | the analytics half's `AnalyticsApp` |
+| `/api/v1/projects/:projectId/analytics/*` (governed SQL + saved charts) | 9 | `features/analytics/langwatch-ql-rest.mount.ts` | the analytics half's `LangWatchQLService` and `DashboardApp` |
+| `/api/prompts/*` | 13 | `features/prompt/prompt-rest.mount.ts` | the product-group half's `PromptApp` |
+| `/api/organization/*` | 10 | `features/organization/organization-rest.mount.ts` | the identity half's merged organization object |
+| `POST /api/export/scenario-runs/download` | 1 | `features/export/scenario-run-export-rest.mount.ts` | the agent half's `SimulationService` + the identity half's broadcast fabric |
+| `GET|HEAD /api/health` | 2 | — | already `ApiProcessLifecycleRoutes`; the platform twin was deleted |
+| `/api/v1/secret`, `/api/v1/secrets`, `/api/secret` | 15 | — | already `ApiSecretRestFeature`; the platform twin was deleted |
+
+### What moved
+
+- `platform/app/src/app/api/analytics-sql/[[...route]]/**` (4 modules, 916
+  lines) → `@langwatch/analytics-server`'s
+  `transport/api-rest/{langwatch-ql.api,langwatch-ql-query.api,saved-workbench-chart.api,langwatch-ql-route-guards}.ts`.
+  The family is one Hono app because both halves sit behind one experimental
+  switch and one project guard; the DASHBOARD half arrives as
+  `SavedWorkbenchChartRestService`, a port typed against
+  `@langwatch/dashboard-contract`, because a feature server package may not
+  reach into another feature's server package.
+- `platform/app/src/server/api/ports/organization-settings.effects.ts` and its
+  suite → `apps/api/src/features/organization/`. It crosses two features
+  (every project in the organization, and every share link on it) and the
+  organization feature owns neither, so it is the process's.
+- `platform/app/src/server/{analytics/analytics-rest,api/management/organization-rest,api/prompts-rest,routes/health,export/scenario-runs/scenario-run-export-rest}.ts`
+  DELETED — each was a binding, and the binding is now in `apps/api`.
+  `runtime/app/features/secret.ts` lost its REST half (`buildSecretRestApp` and
+  the three-base app) for the same reason; `AppSecretRuntime` stays because
+  `presets.ts` still constructs it.
+- `platform/app/src/server/api/ports/{lwqlCaller,workbenchAccessMiddleware}.ts`
+  deleted: the move took their last consumer.
+- `apps/api` gained three shared modules the families dispatch through:
+  `app/api-rest-ports.ts` (the organization middleware, the platform-URL
+  builder, the unique-constraint decoder and the REST absence error) and
+  `app/api-handler-managed-session.ts` — the SESSION sibling of
+  `ApiHandlerManagedCredentials`, resolving through the same Better Auth
+  transport and the same `AuthService` the tRPC boundary authenticates on, and
+  checking permissions through the same `AuthzService`.
+
+Three collaborator sets grew, each to publish something a REST door needs and
+the tRPC ports did not expose: the analytics half publishes `langWatchQL`,
+`featureFlags` and an `apiKeyProtections` resolver; the identity half publishes
+`organizationRest` (the merged canonical + membership object `OrganizationApp`
+already reads, with `listMembers`/`getMember` added to the routed set) and the
+`BroadcastService` it composed; the agent half publishes `simulations`.
+
+### Named absences
+
+- **The organization INVITATION half** — `listInvites`, `createInvites` and
+  `revokeInvite` refuse `service_unavailable` naming the capability. The
+  1,660-line `InviteService` reaches the licence-enforcement repository, the
+  plan provider, the mailer and the role service, four verticals that have not
+  moved. An empty invitation list would tell an administrator nobody had been
+  invited, which is the one answer they act on by inviting the same person
+  twice. The other seven routes answer for real.
+- **The bulk run export is mounted only where a browser-session transport is
+  composed.** A bulk export lifts a project's whole run history and is
+  attributable to a person by design; a process that cannot name one leaves the
+  family off rather than mounting a door that refuses every caller.
+- **The prompt nurturing trail LOGS instead of firing.** It is a marketing
+  signal and this process composes no product-analytics sink; refusing would
+  cost somebody the prompt they just wrote — the same call the tRPC half made.
+- **The analytics timeseries wire no longer enum-narrows `metric` and
+  `groupBy`.** The registry that enumerated them carries colour sets and number
+  formatters and stayed in `@langwatch/analytics-web`; the narrowing is now the
+  metric translator's own refusal, which is where the meaning is. Same
+  judgment the charted tRPC reads already record.
+
+### Judgment calls recorded
+
+- `rethrowSeatLimit` matches the handled CODE `resource_limit_exceeded` rather
+  than the licence layer's `LimitExceededError` class: that class lives in a
+  tree this migration only deletes from, and a code comparison is what the repo
+  asks for anywhere an error may have crossed a serialisation boundary.
+- The saved-chart route's definition ceiling STATES `262_144` (the Vega-Lite
+  policy's own `maxSpecBytes`) and measures UTF-8 bytes locally, rather than
+  importing `LWQL_VEGA_LIMITS`/`measureSpecBytes` from `@langwatch/analytics-web`.
+  What the route enforces is an envelope size, not a meaning — the policy still
+  runs behind the composed Dashboard service — and no server module may
+  value-import a browser package.
+- The export id's ksuid prefix (`"export"`) is STATED in the mount, for the same
+  reason the two scenario prefixes are: the resource catalogue that names it is
+  a browser module, and the prefix is a persisted wire constant rather than a
+  decision.
+- An API KEY's content protections are resolved as `canSeeCosts: true` plus the
+  project's data-privacy policy read for a caller with no session
+  (`isContentVisibleToPublic`), which is what `getProtectionsForProject` did.
+  Fail-closed on a resolution failure.
+- The analytics REST body is built from the analytics package's own
+  `timeseriesInputSchema`, not restated: a constraint added to the filter half
+  reaches the charted reads, this body and the traces filter input together.
+- `platformUrl` degrades to a path-only link when `BASE_HOST` is unset rather
+  than refusing, which is what the builder it replaces did: a response whose
+  payload is already correct must not fail for want of an absolute convenience
+  link.
+
+### Not moved this slice, and why
+
+`routes/{traces,traces-legacy,collector,workflows,experiments-v3,scenario-generate,dataset-generate,playground,elevenlabs,health-checks,cron,misc,ops,sse,evaluations-legacy}.ts`
+and `app/api/{traces,dataset,copilotkit,agent-cache,agents,simulation-runs,scenario-events,files,gateway-spend,middleware,shared,prompts,secrets,experiments,workflows}`
+stay mounted from platform. Each is a vertical rather than a binding: the
+traces family alone reaches `createTraceViewReadPorts`, the projection
+compiler, the evaluation enricher and the trace formatters; `misc.ts` is 1,847
+lines across five unrelated verticals; `ops.ts` stays put by the ruling already
+recorded above. The session port this slice added is what unblocks
+`playground`, `dataset-generate` and `scenario-generate` next, and the
+`ApiHandlerManagedSession` shape is the seam to build them on.
+
+### Gates
+
+`apps/api`: `tsc -p tsconfig.json` and `tsc -p tsconfig.test.json` ZERO errors
+in this lane's files. Six remain in the tree and every one belongs to the
+concurrent REST wave-3a lane's in-flight work:
+`packages/features/auth/server/src/transport/api-rest/auth.api.ts` (2, its
+`@langwatch/identity-server/better-auth` subpath is not published yet) and, in
+the test project, `src/app-trpc/__tests__/app-trpc.features.unit.test.ts` (3,
+its namespace list) and `src/app/__tests__/api-client-address.unit.test.ts` (1,
+a moved module). The same unresolved auth subpath is why 17 of `apps/api`'s 67
+suite files fail to LOAD in a whole-suite run while 354 tests pass and none
+fail on an assertion.
+
+`packages/features/analytics/server` 28 files / 654 tests green;
+`scenario/server` 808 passing (the two Redis-dependent files fail without a
+Redis, as recorded); `organization/server` 180; `prompt/server` 197. New suites,
+all green (4 files / 16 tests):
+`app-rest/__tests__/api-rest.product-families.integration.test.ts` (8 tests —
+the timeseries golden path with the project taken from the credential and the
+ISO date coerced, the schema refusal, the family absent without an application,
+the prompt listing with the resolved organization, the organization-resolution
+failure, the settings read, the invitation refusal and the plan gate refusing
+before anything is read), `features/analytics/__tests__/langwatch-ql-rest.integration.test.ts`
+(4 tests — the statement running as the credential's project with the tenant
+key read server-side, the path-vs-credential refusal proving the flag is never
+consulted, the rollout refusal by the feature's own code, and the saved-chart
+listing) and `features/export/__tests__/scenario-run-export-rest.integration.test.ts`
+(3 tests — the audit row written before a byte is streamed, and the signed-out
+and unpermitted refusals told apart with the store never reached).
+`git diff --numstat -- platform/app` shows zero insertions on every row.
+
+`api-router.ts` stands at 297 lines. Eighteen of the fall are this lane's:
+six import lines and six `api.route` lines for the analytics, governed-SQL,
+organization, prompts, secret and health families, the four-line comment on
+the organization mount that is gone, and the export pair. The rest are the
+concurrent REST wave-3a lane's, removed from the same file in the same
+working tree.
+
+
 ## Progress accounting
 
 Only committed deletions count. After each migration commit, record the hash in
@@ -4500,3 +4975,212 @@ rg -n "platform/app|@langwatch/web" apps packages infra .github package.json pnp
 ```
 
 The end state is zero old application files, not a lower forecast.
+
+## REST wave 3a: auth, Langy, GitHub, SCIM, bug reports and the tRPC transport, 2026-09-02
+
+**Eleven mounts left `platform/app/src/server/api-router.ts` (342 → 297 lines)
+and fifteen platform modules were deleted.** Every one of them moved into the
+package that owns it, keeping its shape; the API process mounts seven of the
+families for real and names why it does not mount the other three.
+
+### Route family → mount
+
+| Family | Moved to | Mounted in `apps/api` |
+| --- | --- | --- |
+| `POST /api/bug-reports` | `@langwatch/ops-server` `transport/api-rest/bug-report.api.ts` | **yes** — over this process's Prisma, its one rate limiter and a silent notifier |
+| `POST\|ALL /api/unsubscribe` | `@langwatch/automation-server` `transport/api-rest/unsubscribe.api.ts` | **yes** — over the org group's `AutomationApp` |
+| `POST /api/langy/conversations{,/:id/messages}` | `@langwatch/langy-server` `transport/api-rest/langy-turns.api.ts` | **yes** — over the agent group's own `LangyApp` |
+| `POST\|GET /api/langy/ui/actions` | `.../langy-ui-actions.api.ts` | **yes, with Redis** — over an EMPTY page-action catalogue |
+| `POST /api/internal/langy/{turn/:id/result,credentials/revoke}` | `.../langy-internal.api.ts` | **yes** — `LANGY_INTERNAL_SECRET` is now an `api.config` value |
+| `POST /api/internal/langy/relay/frames` | `.../langy-relay.api.ts` | **yes, with Redis** |
+| `GET /api/github/{install,setup}`, `POST /api/github/webhook`, + the two `github-langy` aliases | `@langwatch/github-server` `transport/api-rest/github.api.ts` | **yes, where a host supplied the Better Auth transport** |
+| `/api/auth/{validate,session,logout}` + the `/auth/*` catch-all | `@langwatch/auth-server` `transport/api-rest/auth.api.ts` | no — named absence |
+| `/api/scim/v2/*` (15 routes) | `@langwatch/enterprise-scim-server` `transport/api-rest/scim-protocol.api.ts` | no — named absence |
+| `POST /api/webhooks/auth0-scim` | `.../scim-webhook-intake.api.ts` | no — same absence |
+| `GET\|POST /api/trpc/*` | **deleted** | n/a — `apps/api` has served its own `/api/trpc` since `0fc9e4120d` |
+
+### What moved, beyond the transports
+
+- **`submitBugReport` did NOT move — `@langwatch/ops-server` already held the
+  frozen twin.** The platform route was importing
+  `~/server/app-layer/bug-reports/bug-report.service`, a path that no longer
+  exists, against a signature that had already changed (the repository, the
+  limiter and the notifier are parameters now). So this is the webhooks
+  precedent: delete the platform copy, mount the twin. The route's only new
+  seam is `BugReportRestCredentialReader` — reading a project credential off a
+  request is the deployment's published precedence (Basic, then Bearer, then
+  `X-Auth-Token`), and a second reading inside the family is how the two drift.
+- **Three Langy runtime adapters moved into `langy-server` as services**:
+  `langy-access.adapter` → `services/langy-access.service.ts`,
+  `langy-api-key-identity.adapter` → `services/langy-key-identity.service.ts`,
+  `langy-api-key-actor-session.adapter` → `services/langy-actor-session.service.ts`,
+  with their three unit suites. `langy-turn-settlement.adapter` was DELETED
+  rather than moved: it was a one-line pass-through to `awaitTurnSettlement`,
+  which the transport now calls directly.
+- **`LANGY_RELEASE_FLAG` is declared in `langy-server`, not imported.** Its only
+  other holder is `useShowLangy`, a browser module a server package may not
+  reach. The flag registry is what pins the two to one key.
+- **The credential chain both public Langy doors share is ONE module**
+  (`langy-rest.credentials.ts`), because the ORDER of its refusals is the
+  contract: credential (401) → dark 404 → ceiling (403) → identity. Two copies
+  would drift into two different leaks, and the leak this order prevents is a
+  dark surface answering 403 to a key that lacks a permission — a refusal no
+  unmounted route can produce.
+- **`ApiHandlerManagedCredentials` grew `enforceCeiling`.** The Langy doors
+  cannot use `authenticate`: they must read the resolved key's PROJECT before
+  they know whether the surface is open for it, and the UI-action door only
+  learns which permission to check once the dispatched action names one. The
+  new method is the same AuthZ read and the same two refusals as the combined
+  form — it throws instead of answering, because its callers sit inside a
+  canonical-envelope family whose error boundary renders a handled error.
+- **`api.config.ts` reads `LANGY_INTERNAL_SECRET`**, unvalidated and optional
+  for the reason every credential beside it is: blank means unconfigured, and
+  the internal family answers 503 `Not configured` rather than falling open.
+- **`apiClientAddress` is new, not a copy.** The unsubscribe door counts a
+  caller by a HEADER-PRIORITY list (`cf-connecting-ip` first, then the
+  forwarded chain) with the raw socket address as the fallback — a different
+  rule from the nearest-hop reading the bug-report and RUM doors use, and one
+  that needs the Node server's own connection info. The platform module that
+  held it (`utils/getClientIp.ts`) is shaped for `NextApiRequest` and belongs to
+  another lane; `apps/api/src/app/api-client-address.ts` is the process's own
+  adapter over `Headers` + `getConnInfo`.
+- **The SCIM protocol family takes `ScimService`, not `ScimApp`.** `ScimApp` is
+  the token-management surface; the fifteen protocol routes read the service
+  under it, which is what `c.app.scim` always was.
+
+### Named absences
+
+- **`/api/auth/*` is moved but NOT mounted.** `API_UNAVAILABLE_PRODUCT_ADAPTERS`
+  still names the deployment's Better Auth transport, and this family IS that
+  transport's door: the catch-all forwards to `betterAuth.handler`, and logout
+  reads `betterAuth.api.getSession`. Composing an instance here to fill the gap
+  is exactly the thing `ApiAuthComposition`'s docblock refuses — a second
+  instance built from a different option set verifies nothing and answers
+  `null`, which every caller reads as "signed out". The family's ports are
+  declared and its behaviour is package-owned; supplying a value for
+  `betterAuth` is the whole of what is left.
+- **`/api/scim/v2/*` and `/api/webhooks/auth0-scim` are moved but NOT mounted.**
+  `apps/api` refuses the Enterprise SCIM application by name
+  (`api-trpc-collaborators.org-group.composition.ts`: "Enterprise SCIM
+  application, so it can neither list nor mint a token"). Fifteen protocol
+  routes over a refusing service would answer 500 to an identity provider's
+  provisioning run, which is worse than the 404 it gets now.
+- **The Langy page-action catalogue is EMPTY on this process.** The only
+  catalogue that exists is the experiments workbench's, and it is a browser
+  module. `GET /api/langy/ui/actions` therefore answers `{actions: []}` and a
+  dispatch refuses with `langy_ui_action_unknown`. Both are true of this
+  process: no page on it can run one. The port the door takes
+  (`LangyUiActionRestCatalogPort`) is one method wider than the service's —
+  the door enumerates, the service only ever resolves a named kind.
+- **The Langy UI-action and relay doors are absent without Redis.** The channel
+  IS a claim key, a result list and a blocking pop; the relay IS a stream plus
+  a dedup set. Mounting either without Redis would accept a dispatch nothing
+  can deliver and a frame nothing can read back — neither detectable by the
+  caller. The TURN door has no such dependency (`Prefer: wait` degrades to fold
+  reads) and mounts either way.
+- **The GitHub pull-request backfill is not supplied.** It lives on the
+  coding-agent SERVICE and this process composes only the application above it.
+  Its effect is a cache of what GitHub already knows and the periodic branch
+  recheck rebuilds the same mapping, so the port is optional rather than a
+  stand-in that throws: the linkage arrives later, not never.
+- **`/api/github/*` is absent without a browser session.** `/install` and
+  `/setup` are both bound to the session that started the flow, and `/webhook`
+  alone is not a family — GitHub only delivers to it for an installation
+  `/setup` recorded.
+
+### Judgment calls
+
+- **`/api/unsubscribe` went to `@langwatch/automation-server`, not to the
+  Enterprise governance server the brief named.** It calls
+  `automation.confirmUnsubscribe`, automation-server already owns the tRPC twin
+  of that operation (`email-suppression.api.ts`), and nothing on the route is
+  governance's. Putting it behind a governance package would have made a
+  self-hosted install's unsubscribe link an Enterprise surface.
+- **`routes/auth-cli.ts` (2,875 lines, 21 routes) was NOT moved.** It is an
+  Enterprise GOVERNANCE family wearing an auth path: eighteen of its routes are
+  `/api/auth/cli/governance/*`, the personal virtual key, the budget overview
+  and the ingestion-key mint, and it reads `GovernanceService`,
+  `OrganizationApp`, `assertEnterprisePlan`, `probeOrganizationPermission`,
+  `resolveSupportContact` and `env` directly. Moving it into `auth-server`
+  would put Enterprise governance behind an auth package's door, and moving it
+  into `enterprise-governance-server` is that package's lane, not this one. It
+  is unmountable either way — `apps/api` composes no governance — so the cost
+  of leaving it is one platform module, not a served route.
+- **`routes/ingest/**` (968 lines) was NOT moved, for the same reason plus
+  one.** It is the Activity Monitor's governance receiver, and two of its
+  imports are ALREADY broken on this branch:
+  `./ingest-key-provenance.utils` no longer exists, and
+  `~/server/otel/parseOtlpBody` was superseded by `@langwatch/otlp`. Moving it
+  would mean repairing another lane's half-finished demolition inside a package
+  whose tsc gate someone else owns.
+- **`createAppRestFeatures` is NOT being broken up.** Read in full: it is one
+  enumeration over thirty-two product services and ~25 ports, all-or-nothing.
+  `apps/api` already has the answer the plan recorded — a SECOND list
+  (`createApiProcessRestFeatures`) that families join one at a time as their
+  service lands on this process. Six have joined so far. Splitting the packaged
+  list would mount thirty-two families over services this process does not hold.
+
+### Coverage
+
+Four integration suites drive the real Hono apps over fakes at every port, and
+each pins the refusal ORDER rather than only the golden path:
+
+- `apps/api/src/features/bug-report/__tests__/bug-report-rest.integration.test.ts`
+  (5) — 201 with the stored id, the unlinked write a credential-less report
+  makes, both 400s, the handled 429, and the nearest-hop rate-limit bucket.
+- `apps/api/src/features/automation/__tests__/unsubscribe-rest.integration.test.ts`
+  (5) — 200 on a spent token, 400 on a missing one, the 400/500 split that
+  keeps a database blip from reading as a dead link, the 429, and the 405 with
+  `Allow: POST` that the second registration produces.
+- `apps/api/src/features/langy/__tests__/langy-rest.integration.test.ts` (13) —
+  202 with `markUsed`, the dark surface answering Hono's own plain-text
+  `404 Not Found` with no ceiling check, the 401 before any project is read,
+  the ceiling refusal, the unknown-kind refusal BEFORE the ceiling, the empty
+  catalogue, 503 on an unconfigured internal secret, 401 on a wrong bearer,
+  404 on an unknown turn triple, 202 on a known one, the relay's 503 with no
+  live buffer, and both composition gaps.
+- `apps/api/src/features/github/__tests__/github-rest.integration.test.ts` (12)
+  — non-member refused before the permission probe, member without
+  `organization:manage` refused after it, 401 with no session, 503 with no App,
+  the signed state carrying user and org, the mid-flow session change in both
+  popup and redirect modes, 404 on an unconfigured webhook secret, 401 on a bad
+  signature, the applied installation event, and the `github-langy` alias.
+
+### Gates
+
+- `apps/api` `tsc --noEmit`: **0 errors**. `tsc --noEmit -p tsconfig.test.json`:
+  5 errors in three files, none of them this lane's —
+  `app-trpc/__tests__/app-trpc.features.unit.test.ts` (its `TestContext` names
+  no `github` on `ctx.app`, which the gateway-group lane's tRPC mount added),
+  `app/__tests__/api-client-address.unit.test.ts` (a test committed against
+  `src/app/getClientIp.ts`, a module the utils lane has not landed yet) and
+  `features/export/__tests__/scenario-run-export-rest.integration.test.ts`
+  (REST wave 3b's).
+- `apps/api` vitest: **35 new tests across four files, all green**, and the
+  whole suite went from 20 failed files / 120 failed tests before this lane to
+  **6 failed files / 7 failed tests** (68 files, 566 tests) after it. Sixteen of
+  the twenty baseline failures now pass (other lanes' fixes landing
+  underneath), and exactly two files fail that did not before — both UNTRACKED
+  files belonging to other lanes: `app/__tests__/api-client-address.unit.test.ts`
+  (a test for a module the utils lane has not landed) and
+  `app/__tests__/api-experiment-run.composition.integration.test.ts` (a 10s
+  timeout under two concurrent whole-suite runs, not an assertion). The other
+  four — the analytics, execution, gateway-group and product collaborator
+  suites — were red at baseline and are red for the same reasons.
+- Package suites, all green: `@langwatch/ops-server` 306, `@langwatch/automation-server`
+  225, `@langwatch/github-server` 126, `@langwatch/auth-server` 57,
+  `@langwatch/enterprise-scim-server` 80. `@langwatch/langy-server` is 482/483 —
+  the one failure, `langy-outbox-lease-fencing`, is a pre-existing `vi.waitFor`
+  race this lane does not touch.
+- `tsc --noEmit` clean in all six: `langy-server`, `github-server`,
+  `ops-server`, `automation-server`, `auth-server`, `enterprise-scim-server`.
+- `git diff --numstat -- platform/app`: **0 insertions** on every row.
+
+### Follow-up this lane created
+
+`apps/api/src/app/api-client-address.ts` and the utils lane's in-flight
+`apps/api/src/app/getClientIp.ts` are two readings of one header list. The
+unsubscribe door needed an answer before that move landed; whoever lands
+`getClientIp.ts` should delete `api-client-address.ts` and bind
+`UnsubscribeRestPorts.clientAddress` to `getClientIpFromHonoContext`. The file
+says so in its own docblock.

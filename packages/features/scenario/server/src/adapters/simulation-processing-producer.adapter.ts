@@ -183,16 +183,11 @@ export function createSimulationProcessingProducerPipeline(input: { processName:
       "simulation run metrics",
     ),
     finishRunCommand: new FinishRunCommand({
-      loadPriorEvents: () =>
-        Promise.reject(producerOnly(processName, "read a run's prior events")),
+      loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
     }),
     computeRunMetricsCommand: new ComputeRunMetricsCommand({
-      traceSummaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(
-        processName,
-        "trace summary",
-      ),
-      scheduleRetry: () =>
-        Promise.reject(producerOnly(processName, "schedule a metrics retry")),
+      traceSummaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(processName, "trace summary"),
+      scheduleRetry: () => Promise.reject(producerOnly(processName, "schedule a metrics retry")),
       deriveScenarioRoleMetrics: () =>
         Promise.reject(producerOnly(processName, "derive per-role scenario metrics")),
     }),

@@ -79,16 +79,21 @@ describe("ApiEventingInfrastructure", () => {
     });
 
     /** @scenario "The API process's Eventing runtime runs no process managers" */
-    it("refuses a pipeline whose process managers it could not drain", () => {
+    it("registers the pipeline and declines the process manager it could not drain", () => {
       const composed = ApiEventingInfrastructure.create({
         resources: new ResourceScope(),
         queue: stubQueue(),
         processName: "langwatch-api-test",
       });
 
-      expect(() => composed.eventSourcing.register(processPipeline())).toThrow(
-        /durable ProcessStore/,
-      );
+      const registered = composed.eventSourcing.register(processPipeline());
+
+      // Registering the pipeline is the whole point: refusing it took every
+      // COMMAND on the definition down with the one process manager, and a
+      // customer's action is a command.
+      expect(registered.name).toBe("api-process-manager-pipeline");
+      expect(composed.eventSourcing.unrunProcessManagers).toEqual(["durable-process"]);
+      expect(() => composed.eventSourcing.processRuntime).toThrow(/producer-only/);
     });
 
     /** @scenario "The runtime is released before the connection under it" */

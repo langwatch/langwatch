@@ -121,6 +121,13 @@ import {
   type ApiOrganizationInvitePort,
   type ApiViewerProtectionsPort,
 } from "./api-trpc-collaborators.org-group.composition";
+import {
+  composeApiGatewayGroupCollaborators,
+  withApiGatewayGroupCollaborators,
+  type ApiGatewayGroupCollaborators,
+} from "./api-trpc-collaborators.gateway-group.composition";
+import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
+import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
@@ -147,6 +154,7 @@ import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators
 import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
 import { composeApiModelProviderHost } from "./api-model-provider-host.composition";
 import { composeApiStudioHost } from "./api-studio-host.composition";
+import { ApiExperimentRunAbsenceReport } from "./api-experiment-run.composition";
 import { composeApiTraceReadStack } from "./api-trace-read-stack.composition";
 import {
   apiEntitlementAbsenceReport,
@@ -185,12 +193,28 @@ import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
 import type { ApiSubscriptionMount } from "../api.application";
 import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
+import { ApiHandlerManagedSession } from "./api-handler-managed-session";
 import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features";
 import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
+import { apiClientAddress } from "./api-client-address";
+import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 import {
   composeApiTraceIngest,
   LoggedApiTraceIngestAbsence,
 } from "./api-trace-ingest.composition";
+import {
+  PrismaBugReportRepository,
+  SilentBugReportNotifier,
+  type BugReportRestPorts,
+} from "@langwatch/ops-server";
+import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
+import {
+  apiLangyRestMetrics,
+  composeApiLangyRest,
+  type ApiLangyRestComposition,
+} from "../features/langy/langy-rest.mount";
+import { composeApiGithubRest } from "../features/github/github-rest.mount";
+import type { GithubRestPorts } from "@langwatch/github-server";
 
 /**
  * The `AppRestFeaturePorts` entries the API process supplies out of its own
@@ -398,12 +422,20 @@ export type ApiProductionCompositionOptions = {
    */
   viewerProtections?: ApiViewerProtectionsPort;
   /**
-   * The Enterprise application the licence, licence-enforcement, SCIM-token
-   * and single sign-on surfaces read. Absent, all four MOUNT and refuse by
-   * name: a client asking what its licence allows must be told this deployment
-   * cannot answer, not find the namespace missing.
+   * The Enterprise application the licence, licence-enforcement, SCIM-token,
+   * single sign-on and fifteen governance surfaces read. Absent, all nineteen
+   * MOUNT and refuse by name: a client asking what its licence allows must be
+   * told this deployment cannot answer, not find the namespace missing.
    */
   enterprise?: ApiEnterpriseApplicationPort;
+  /**
+   * The receipt ledger the three keyed gateway REST creates dispatch through.
+   *
+   * Absent, each of them refuses by name rather than executing unguarded: a
+   * create sent twice with one `Idempotency-Key` would mint two virtual keys,
+   * which is the failure the key exists to prevent.
+   */
+  gatewayIdempotency?: ApiGatewayIdempotencyPort;
 };
 
 /** The credential pair every product transport on this process is built from. */
@@ -445,6 +477,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedProductInfra: ApiProductInfraCollaborators | undefined;
   private composedAgentGroup: ApiAgentGroupCollaborators | undefined;
   private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
+  private composedGatewayGroup: ApiGatewayGroupCollaborators | undefined;
+  private composedGithub: GithubService | undefined;
   private composedMonitors: MonitorService | undefined;
   private composedModelProviders: ModelProviderService | undefined;
   private composedPlanProvider: PlanProvider | undefined;
@@ -460,6 +494,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   });
 
   private composedQueueRedis: RedisConnection | undefined;
+  /**
+   * The shared bearer the Langy agent presents on its callbacks, held from
+   * `compose` because the doors that read it are built by {@link composeDoors},
+   * which is handed a request policy rather than a configuration.
+   */
+  private composedLangyInternalSecret: string | undefined;
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -533,7 +573,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // workflow service serves all four plus the evaluator service built over
     // it, and the evaluation re-score reports through a PRODUCER-only
     // registration of the same pipeline the worker drains.
-    this.composedExecution = this.composeExecution(options, agents, encryption);
+    this.composedExecution = this.composeExecution(
+      options,
+      agents,
+      encryption,
+      tenancy,
+      queueInfrastructure,
+    );
     // The product half: a reviewer's annotations, the support inbox, the
     // project's privacy rules and its setup checklist. It composes FIRST
     // because it is the one half that cannot be missing on a process holding a
@@ -573,6 +619,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // their monitor service, evaluator service and evaluator replication —
     // one graph per answer, rather than a second one that could disagree.
     this.composedProductInfra = this.composeProductInfra(options, authz);
+    // The gateway-group half: the twenty-one surfaces the AI Gateway and the
+    // governance console that steers it are administered through, plus the
+    // GitHub App beside them. It composes LAST because it reads what the
+    // execution and trace halves opened — this process's evaluator service,
+    // its monitor directory and its ClickHouse — and because the gateway
+    // application it builds is also what the public REST door is given.
+    this.composedGatewayGroup = this.composeGatewayGroup(options, authz, queueInfrastructure);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: this.composedDatabase?.connection,
       // The SAME AuthZ service the REST doors authorize through: a permission
@@ -585,6 +638,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // the seal is what refuses a set any of them left incomplete, naming the
       // entries rather than mounting every namespace over the gaps.
       collaborators: sealApiTrpcCollaborators(
+        withApiGatewayGroupCollaborators(
         withApiProductInfraCollaborators(
         withApiOrgGroupCollaborators(
         withApiAgentGroupCollaborators(
@@ -613,6 +667,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ),
           this.composedProductInfra,
         ),
+          this.composedGatewayGroup,
+        ),
         LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
       ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
@@ -635,7 +691,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(features ? { features } : {}),
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
-      ...this.composeDoors(authz, tenancy, options.config.serviceName),
+      ...this.composeDoors(
+        authz,
+        tenancy,
+        options.config.serviceName,
+        options.config.infrastructure.execution.publicBaseUrl,
+      ),
       observability: options.observability,
       graph: options.graph,
       featureDrain: this.options.featureDrain,
@@ -819,8 +880,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     authz: AuthzService,
     tenancy: ApiResolvedTenancy,
     serviceName: string,
+    publicBaseUrl: string | undefined,
   ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
     const secrets = this.secrets;
+    const gatewayApp = this.composedGatewayGroup?.gatewayApp;
     // One credential resolution for both doors: the framework-shaped
     // `AppRestSecurity` every packaged REST family is built from, and the
     // four-callable projection the additive public-REST builder takes. Both
@@ -860,15 +923,128 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: serviceName,
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
+    // The gateway's public family, over the SAME application the six gateway
+    // tRPC namespaces read, so the SDK's door and the browser's door cannot
+    // enforce different rules. Absent where this process composed no gateway
+    // group: the family is left off rather than mounted over an application
+    // that is not there, which is the rule the secret family follows too.
+    const gatewayRest = gatewayApp
+      ? // The family declares its own project-scoped `Variables`, and a Hono
+        // env parameter is contravariant in its handlers, so the narrower app
+        // is not assignable to the bare `Hono` this router mounts. The
+        // variables are the SECURITY chain's, set before any handler here
+        // runs; nothing on this side reads them.
+        (createGatewayPlatformRestApp({
+          security: restSecurity,
+          gateway: () => gatewayApp,
+        }).hono as unknown as Hono)
+      : undefined;
+    const bugReports = this.composeBugReports(tenancy);
+    const unsubscribe = this.composeUnsubscribe();
+    const langyRest = this.composeLangyRest();
+    const githubRest = this.composeGithubRest(authz);
+    // The charted reads and the prompt library, over the SAME applications the
+    // browser's `analytics.getTimeseries` and `prompts.*` procedures resolve
+    // on. Taken from the halves rather than built a second time: two analytics
+    // applications would let the public door and the dashboard disagree about
+    // what a metric means, and two prompt services about what a project holds.
+    const analytics = this.composedAnalytics?.analytics;
+    const prompts = this.composedProductGroup?.promptApp.promptService;
+    // The governed-SQL family. Every collaborator is the analytics half's own,
+    // so the API key's door and the workbench's door run one validator against
+    // one catalogue; the saved charts sit on the same Dashboard application
+    // the browser's dashboards do.
+    const analyticsHalf = this.composedAnalytics;
+    const projects = this.composedTenancy?.projects;
+    const langWatchQL =
+      analyticsHalf && projects
+        ? {
+            collaborators: {
+              featureFlags: () => analyticsHalf.featureFlags,
+              projects: () => projects,
+              langWatchQL: () => analyticsHalf.langWatchQL,
+              protectionsFor: (input: { projectId: string }) =>
+                analyticsHalf.apiKeyProtections(input),
+            },
+            dashboard: () => analyticsHalf.dashboard,
+          }
+        : undefined;
+    // The management family's five collaborators, or none. The organization
+    // object is the identity half's own merged one — the canonical settings
+    // reads plus the membership operations the contract does not declare — so
+    // the management door and the members screen answer from one service. The
+    // share ledger and the plan provider are TAKEN from the halves that
+    // composed them for the same reason.
+    const organizationRest = this.composedIdentity?.organizationRest;
+    const shares = this.composedTraceGroup?.share;
+    const plans = this.composedPlanProvider;
+    // The bulk run export. Composed only where this process holds BOTH a
+    // browser-session transport and the simulation store: the session is what
+    // makes a download attributable to a person, and the store is what it
+    // sweeps. Without either the family is left off.
+    const authSession = this.composedAuth?.compose();
+    const simulations = this.composedAgentGroup?.simulations;
+    const exportBroadcast = this.composedIdentity?.broadcast;
+    const scenarioRunExport =
+      authSession && simulations && exportBroadcast
+        ? {
+            simulations: () => simulations,
+            broadcast: () => exportBroadcast,
+            session: ApiHandlerManagedSession.create({
+              auth: authSession.auth,
+              sessions: authSession.sessions,
+              authz,
+            }),
+            recordExportRequested: async (entry: {
+              userId: string;
+              projectId: string;
+              action: "scenarioRuns.export";
+              targetKind: "project";
+              targetId: string;
+              args: Record<string, unknown>;
+            }) => {
+              await this.options.audit?.record({
+                actorId: entry.userId,
+                path: entry.action,
+                input: { projectId: entry.projectId, ...entry.args },
+                error: null,
+              });
+            },
+          }
+        : undefined;
+    const organizationManagement =
+      organizationRest && shares && plans && projects
+        ? {
+            organizations: () => organizationRest,
+            permissions: () => authz,
+            plans: () => plans,
+            shares: () => shares,
+            projects: () => projects,
+            audit: this.composeManagementAudit(),
+          }
+        : undefined;
     for (const processRestApp of createApiProcessRestFeatures({
       security: restSecurity,
-      services: { ...(annotations ? { annotations: () => annotations } : {}) },
+      services: {
+        ...(annotations ? { annotations: () => annotations } : {}),
+        ...(analytics ? { analytics: () => analytics } : {}),
+        ...(langWatchQL ? { langWatchQL } : {}),
+        ...(prompts ? { prompts: () => prompts } : {}),
+        ...(organizationManagement ? { organizationManagement } : {}),
+        ...(scenarioRunExport ? { scenarioRunExport } : {}),
+        organizations: () => tenancy.organizations,
+      },
       ports: {
         handlerManagedCredential: (input) => handlerManagedCredentials.authenticate(input),
         // The SAME counter the packaged REST families and the identity
         // throttles meter through, so a caller has one budget per rule.
         rateLimit: (request) => this.rateLimiter.consume(request),
         ...(otlpIngest ? { otlpIngest } : {}),
+        ...(bugReports ? { bugReports } : {}),
+        ...(unsubscribe ? { unsubscribe } : {}),
+        ...(langyRest ? { langy: langyRest } : {}),
+        ...(githubRest ? { github: githubRest } : {}),
+        ...(publicBaseUrl ? { publicBaseUrl } : {}),
       },
     })) {
       rest.route("/", processRestApp);
@@ -889,7 +1065,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             permissions: () => authz,
             audit: this.composeManagementAudit(),
           }).hono,
-        ),
+        )
+        // The gateway's public family, mounted AFTER the process-owned
+        // families because one of those owns a literal path inside
+        // `/api/gateway/v1` — the spec document — and these routes claim
+        // parameterised segments at the root of that namespace.
+        .route("/", gatewayRest ?? new Hono()),
       // The subscription lane declares its access policy on the same security
       // every REST family does, so the one streaming route on this process is
       // a registry entry rather than an unaccounted-for endpoint. It is a
@@ -1035,6 +1216,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // through a graph none of this process's other doors read.
       organizations: tenancy.organizations,
       browserSessions: this.options.browserSessions,
+      // The deployment's own browser-session identity, used only when no host
+      // supplied a transport. Absent means this process composes no Better
+      // Auth instance and mounts no transports that authenticate a browser
+      // caller — never one built over a guessed secret, which would answer
+      // "signed out" to everybody rather than fail.
+      browserSession: options.config.browserSession,
+      authProvider: this.options.identity?.authProvider,
+      isSaas: this.options.identity?.isSaas,
+      // The grant ledger a domain auto-join writes its membership through.
+      // The pair this process composed, for the reason `resolveTenancy` gives.
+      authzGrants: this.composedAuthz?.grants,
       // The SAME Redis Better Auth's own session cache lives in, so revoking a
       // session through this process clears the entry the other tier reads.
       redis: queueInfrastructure?.redis ?? null,
@@ -1062,6 +1254,113 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       queue: queueInfrastructure,
       processName: options.config.serviceName,
       report: LoggedApiEventingAbsence.create(logger),
+    });
+  }
+
+  /**
+   * The public issue-report intake's collaborators, or none.
+   *
+   * `undefined` without a database, and the family is then left off rather
+   * than mounted: a reporter who is already struggling must not be told their
+   * report was filed by a door that had nowhere to write it.
+   *
+   * The team alert is silent here on purpose. The Slack transport is a
+   * deployment credential this process does not read, and a report that
+   * reaches the inbox without pinging a channel is a delayed alert, not a lost
+   * report — the back office lists it either way.
+   */
+  private composeBugReports(tenancy: ApiResolvedTenancy): BugReportRestPorts | undefined {
+    const database = this.composedDatabase?.connection;
+    if (!database) return undefined;
+    const reports = PrismaBugReportRepository.create({ prisma: database.client });
+    return {
+      reports: () => reports,
+      // The process's ONE counter, the same one every other public rule meters
+      // through: two limiters would give one address two flood budgets.
+      rateLimiter: { consume: (input) => this.rateLimiter.consume(input) },
+      notifier: new SilentBugReportNotifier(),
+      credentials: (request) => extractApiKeyRequestCredentials(request),
+      apiKeys: () => tenancy.apiKeys,
+    };
+  }
+
+  /**
+   * The one-click unsubscribe door's collaborators, or none.
+   *
+   * `undefined` where this process composed no org-group half, because the
+   * automation application lives there. The address a caller is counted as is
+   * resolved here rather than in the family: header priority is one half of
+   * the answer and the raw socket address — which only the Node server's
+   * connection info carries — is the other, and a family that read headers
+   * alone would drop every caller sending none into one bucket.
+   */
+  private composeUnsubscribe(): UnsubscribeRestPorts | undefined {
+    const automation = this.composedOrgGroup?.application.automation;
+    if (!automation) return undefined;
+    return {
+      automation: () => automation,
+      // The process's ONE counter: two limiters would give one address two
+      // budgets for the same rule.
+      rateLimit: (input) => this.rateLimiter.consume(input),
+      clientAddress: (c) => apiClientAddress(c),
+    };
+  }
+
+  /**
+   * The Langy REST doors' collaborators, or none.
+   *
+   * Every one of them comes from a half this process already composed — the
+   * application and its Redis from the agent group, the credential directory
+   * from tenancy, the flag store from the product group — so this method
+   * gathers rather than builds. The one thing it does decide is the ceiling:
+   * the doors resolve their own credential (they must read the key's PROJECT
+   * before they know whether the surface is open for it), so they take the
+   * SAME `ApiHandlerManagedCredentials` the other handler-managed families
+   * authenticate through rather than a second AuthZ read that could disagree.
+   */
+  private composeLangyRest(): ApiLangyRestComposition | undefined {
+    const database = this.composedDatabase?.connection;
+    const tenancy = this.composedTenancy;
+    const authz = this.composedAuthz?.permissions ?? this.options.authz;
+    if (!database || !tenancy || !authz) return undefined;
+    const credentials = ApiHandlerManagedCredentials.create({
+      apiKeys: tenancy.apiKeys,
+      authz,
+    });
+    return composeApiLangyRest({
+      langy: this.composedAgentGroup?.langy,
+      apiKeys: tenancy.apiKeys,
+      featureFlags: this.composedProductGroup?.featureFlagService,
+      // The guarded client this process already opened, read through the two
+      // fields the actor bridge selects. A second directory would be a second
+      // answer to "who owns this key".
+      actors: database.client,
+      enforceCeiling: (input) => credentials.enforceCeiling(input),
+      redis: this.composedQueueRedis,
+      internalSecret: this.composedLangyInternalSecret,
+      metrics: apiLangyRestMetrics(),
+    });
+  }
+
+  /**
+   * The GitHub App installation door's collaborators, or none.
+   *
+   * The session is the gate. `ApiAuthComposition` only exists where the
+   * deployment handed this process a Better Auth transport, and both
+   * `/install` and `/setup` are bound to the session that started the flow —
+   * so without one the family is left off entirely rather than mounted with a
+   * `/webhook` GitHub would never call.
+   */
+  private composeGithubRest(authz: AuthzService): GithubRestPorts | undefined {
+    const auth = this.composedAuth?.compose();
+    return composeApiGithubRest({
+      github: this.composedGatewayGroup?.application.github,
+      session: auth
+        ? (request) =>
+            AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        : undefined,
+      authz,
+      audit: this.options.audit,
     });
   }
 
@@ -1108,6 +1407,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): ApiOwnedRestFeaturePorts {
     const instanceAdminKey = ApiInstanceAdminKeyAdapter.create({ config: options.config });
     this.composedQueueRedis = queueInfrastructure?.redis;
+    this.composedLangyInternalSecret = options.config.langyInternalSecret;
     return {
       instanceAdminKey: () => instanceAdminKey.read(),
       rateLimit: (request) => this.rateLimiter.consume(request),
@@ -1645,6 +1945,75 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The gateway-group half, over this process's own graph.
+   *
+   * It needs four things nothing else on this composition can stand in for: the
+   * evaluator service a guardrail runs, the monitor directory an attachment
+   * names, this process's ClickHouse — where the spend ledger is projected —
+   * and its flag store, which the `/` landing decision reads the governance
+   * rollout from. Absent any of them there is no gateway to administer, so the
+   * half is absent and the seal names it rather than mounting twenty-two
+   * namespaces over the gap.
+   */
+  private composeGatewayGroup(
+    options: ApiRuntimeCompositionOptions,
+    authz: AuthzService,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ApiGatewayGroupCollaborators | undefined {
+    const database = this.composedDatabase?.connection;
+    const tenancy = this.composedTenancy;
+    const featureFlags = this.composedProductGroup?.featureFlagService;
+    const evaluators = this.composedExecution?.evaluators;
+    if (!database || !tenancy || !featureFlags || !evaluators) return undefined;
+
+    return composeApiGatewayGroupCollaborators({
+      prisma: database.client,
+      authz,
+      projects: tenancy.projects,
+      apiKeys: tenancy.apiKeys,
+      evaluators,
+      // The SAME monitor directory the automation application and the monitor
+      // surface read: a guardrail attachment and the monitor page it points at
+      // must agree about what one runs.
+      monitors: this.resolveMonitors(database.client, evaluators),
+      featureFlags,
+      // The SAME plan provider every allowance banner reads, for the landing
+      // decision's Enterprise test.
+      plans: this.resolvePlanProvider(options),
+      github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
+      audit: this.options.audit,
+      // The SAME ClickHouse the charted reads and the traces run on: the
+      // gateway ledger is a projection in that instance, and a second
+      // connection would be a second pool.
+      clickhouse: this.resolveGatewayClickHouse(),
+      virtualKeyPepper: options.config.virtualKeyPepper,
+      // One variable, one meaning: `IS_SAAS` is what decides whether this
+      // installation bills through Stripe, and it is read from the one leaf
+      // that already carries it rather than from a second of its own.
+      saasBilling: options.config.infrastructure.modelProvider.isSaas,
+      ...(this.options.gatewayIdempotency
+        ? { idempotency: this.options.gatewayIdempotency }
+        : {}),
+      ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+      processName: options.config.serviceName,
+    });
+  }
+
+  /**
+   * The gateway ledger's ClickHouse, over this process's own resolution.
+   *
+   * `null` where the process opened none, which is a supported shape rather
+   * than a degradation: spend is a projection in that instance, and a
+   * deployment holding no trace storage has no spend to price a budget
+   * against — the application answers `spend_source_unavailable` by name.
+   */
+  private resolveGatewayClickHouse() {
+    const clickhouse = this.composedClickHouse;
+    if (!clickhouse) return null;
+    return { resolve: (tenantId: string) => clickhouse.resolveClient(tenantId) };
+  }
+
+  /**
    * The coding-agent session store, over this process's own ClickHouse.
    *
    * `null` where the process opened none, which is a supported shape rather
@@ -1693,8 +2062,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     tenancy: ApiTenancyComposition,
   ): GithubService {
+    // Memoized: two halves ask for it — the org group's coding-agent reads and
+    // the gateway group's `github.*` surface — and two adapters would be two
+    // installation caches over one App.
+    if (this.composedGithub) return this.composedGithub;
     const github = options.config.infrastructure.github;
-    return PostgresGithubAdapter.create({
+    this.composedGithub = PostgresGithubAdapter.create({
       database: prisma,
       config: {
         appId: github.appId,
@@ -1711,6 +2084,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       organization: tenancy.organizations,
       project: tenancy.projects,
     });
+    return this.composedGithub;
   }
 
   /**
@@ -1833,11 +2207,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * reported, and no cipher means a project's run secrets cannot be decrypted.
    * None of them makes the four namespaces unmountable, because each is a
    * capability of one operation rather than of the surface.
+   *
+   * The TENANCY graph and the QUEUE are passed for the workbench run loop
+   * composed inside it: a run mints its sandbox key through the same API-key
+   * service every other credential goes through, and its abort flag and
+   * progress live in the same Redis the queue owns. Neither gates this half —
+   * a process with no Redis mounts every namespace and refuses only to START a
+   * run, by name.
    */
   private composeExecution(
     options: ApiRuntimeCompositionOptions,
     agents: AgentService | undefined,
     encryption: SecretEncryptionPort | undefined,
+    tenancy: ApiResolvedTenancy,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
   ): ApiExecutionCollaborators | undefined {
     const database = this.composedDatabase?.connection;
     const modelProviders = this.resolveModelProviders(options, encryption);
@@ -1868,6 +2251,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
       secretDecryptor: encryption,
       eventing: this.composedEventing?.eventSourcing,
+      // The SAME Redis the queue owns, which the workbench run's abort flag
+      // and its progress both live in: a stop asked for on one replica has to
+      // reach the loop running on another, and a poll has to find the run
+      // whichever replica takes it.
+      redis: queueInfrastructure?.redis ?? null,
+      // The SAME API-key service every credential in this process is minted
+      // and verified through: a run's sandbox key is a narrower key, not a
+      // second kind of key.
+      apiKeys: tenancy.apiKeys,
+      experimentRunReport: LoggedApiExperimentRunAbsence.create(
+        createLogger(options.config.serviceName),
+      ),
     });
   }
 
@@ -2178,6 +2573,37 @@ export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
     this.logger.info(
       { reason },
       "API composed without Redis: Group Queue dispatch and the Redis readiness gate are absent",
+    );
+  }
+}
+
+/**
+ * Names the workbench run loop's own absences once, at boot.
+ *
+ * Both are worth a line rather than an inference, because the surfaces they
+ * disable still mount and answer every read: a deployment reads here that it
+ * cannot start a run, instead of on the first person who presses Run.
+ */
+export class LoggedApiExperimentRunAbsence extends ApiExperimentRunAbsenceReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiExperimentRunAbsence {
+    return new LoggedApiExperimentRunAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutProgressStore(): void {
+    this.logger.warn(
+      { reason: "no-redis" },
+      "API composed no workbench run loop: with no Redis a started run has nowhere to record its progress, so a poll could never find it. Every experiments surface still answers; only starting a run refuses",
+    );
+  }
+
+  withoutPublicBaseUrl(): void {
+    this.logger.warn(
+      { reason: "no-public-base-url" },
+      "API composed no workbench run loop: with no public base URL a run cannot answer with the link to its own results. Set BASE_HOST",
     );
   }
 }

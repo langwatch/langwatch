@@ -53,6 +53,23 @@ export interface EventSourcingOptions {
    * InMemoryProcessStore.
    */
   processStore?: ProcessStore;
+  /**
+   * Whether this process RUNS the process managers the pipelines it registers
+   * declare, or only PRODUCES commands onto them.
+   *
+   * `"run"` (the default) is the consumer's shape: a pipeline that declares a
+   * process manager needs a durable {@link ProcessStore}, and registering one
+   * without it fails at boot rather than half-running.
+   *
+   * `"producer-only"` is the shape a process that sends commands and claims no
+   * queue actually has. It is not a weaker `"run"`: the pipeline registers
+   * whole — every command dispatcher, every routing key the definition
+   * declares — and the runtime refuses BY NAME, once, to run the process
+   * managers rather than refusing the whole pipeline. The alternative was a
+   * process where one declaration in a definition made every command on it
+   * unsendable, which reads to a customer as a write that vanished.
+   */
+  processManagerMode?: "run" | "producer-only";
 }
 
 /**
@@ -107,7 +124,10 @@ export class EventSourcing {
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
   private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
+  private readonly _processManagerMode: "run" | "producer-only";
   private _processRuntimeInstance?: ProcessRuntime;
+  /** The process managers this producer registered and will not run. */
+  private readonly _unrunProcessManagers = new Set<string>();
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
@@ -120,6 +140,7 @@ export class EventSourcing {
     this._retentionPolicyResolver = options.retentionPolicyResolver;
     this._warnWhenProjectionsRunInline = options.warnWhenProjectionsRunInline ?? false;
     this._processStore = options.processStore;
+    this._processManagerMode = options.processManagerMode ?? "run";
 
     this.projectionRegistry = new ProjectionRegistry<Event>();
     options.configureGlobalProjections?.(this.projectionRegistry);
@@ -135,6 +156,13 @@ export class EventSourcing {
    * composition root can feed lifecycle envelopes from outside a pipeline.
    */
   get processRuntime(): ProcessRuntime {
+    if (this._processManagerMode === "producer-only") {
+      throw new ConfigurationError(
+        "EventSourcing",
+        "This runtime registers pipelines producer-only, so it runs no process managers and has no process runtime. Ask the process that claims the shared queue.",
+        { unrunProcessManagers: [...this._unrunProcessManagers] },
+      );
+    }
     const processStore = this.requireProcessStore();
     if (!this._processRuntimeInstance) {
       this._processRuntimeInstance = new ProcessRuntime({
@@ -143,6 +171,11 @@ export class EventSourcing {
       });
     }
     return this._processRuntimeInstance;
+  }
+
+  /** The process managers this runtime registered producer-only and will not run. */
+  get unrunProcessManagers(): readonly string[] {
+    return [...this._unrunProcessManagers];
   }
 
   get eventStore(): EventStore | undefined {
@@ -210,7 +243,11 @@ export class EventSourcing {
       },
       () => {
         if (definition.processManagers.size > 0) {
-          this.requireProcessStore();
+          if (this._processManagerMode === "producer-only") {
+            this.declineProcessManagers(definition);
+          } else {
+            this.requireProcessStore();
+          }
         }
         createEventCatalogue([
           ...this._definitions.map((registered) => registered.aggregate),
@@ -251,8 +288,10 @@ export class EventSourcing {
         const serviceOptions = buildServiceOptions(definition);
 
         // Process managers consume their declaring pipeline's committed
-        // events directly through generated live subscribers.
-        if (definition.processManagers.size > 0) {
+        // events directly through generated live subscribers. A producer folds
+        // nothing and subscribes to nothing, so it generates neither — the
+        // decline above is what says so, once, by name.
+        if (definition.processManagers.size > 0 && this._processManagerMode === "run") {
           const artifacts = this.processRuntime.registerPipeline<EventType>({
             pipelineName: definition.metadata.name,
             processManagers: definition.processManagers,
@@ -360,6 +399,27 @@ export class EventSourcing {
     }
 
     this.initializeStores();
+  }
+
+  /**
+   * Says, once per process manager, that this process registered its pipeline
+   * and will not run it.
+   *
+   * Once rather than per command, because the fact is a property of the
+   * registration rather than of any dispatch, and a producer sends thousands.
+   * By name rather than by count, because "one process manager is not running
+   * here" is unactionable — which one it is, is the whole answer.
+   */
+  private declineProcessManagers(definition: StaticPipelineDefinition<any, any, any>): void {
+    const declined = [...definition.processManagers.keys()].filter(
+      (name) => !this._unrunProcessManagers.has(name),
+    );
+    if (declined.length === 0) return;
+    for (const name of declined) this._unrunProcessManagers.add(name);
+    logger.info(
+      { pipeline: definition.metadata.name, processManagers: declined },
+      "Registered producer-only: this process sends commands on the pipeline and does not run its process managers. Their inbox, outbox and wakes belong to the process that claims the shared queue.",
+    );
   }
 
   private requireProcessStore(): ProcessStore {
