@@ -386,6 +386,12 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     Then the stamped tokens count toward the branch's tenure winner only
 
   @unit
+  Scenario: A session too small to divide is never counted twice
+    Given a session that spent one token, split evenly across two pull requests
+    When each pull request's usage is read
+    Then the two together report the one token, not one each
+
+  @unit
   Scenario: A discovered pull request with no stamped work still dates itself
     Given a session that drove two branches, each with a live pull request
     And its fact rows stamp all of its tokens on one branch

@@ -1365,6 +1365,64 @@ describe("PullRequestUsageService", () => {
     });
   });
 
+  describe("given a session too small to divide between two pull requests", () => {
+    // One input token and nothing else, stamped half on each branch. Rounding
+    // each share on its own would report that token twice.
+    const oneTokenFixture = () => ({
+      pullRequests: [
+        pullRequestRow(),
+        pullRequestRow({
+          prNumber: 8,
+          headBranch: "feat/next",
+          htmlUrl: "https://github.com/acme/widgets/pull/8",
+          prCreatedAt: new Date(NOW - 8 * HOUR),
+        }),
+      ],
+      sessions: [
+        sessionRow({
+          gitBranches: ["feat/linkage", "feat/next"],
+          inputTokens: 1,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.02,
+        }),
+      ],
+      modelTotals: [
+        stampedTotalsRow({
+          inputTokens: 1,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.01,
+        }),
+        stampedTotalsRow({
+          branch: "feat/next",
+          inputTokens: 1,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.01,
+        }),
+      ],
+    });
+
+    /** @scenario "A session too small to divide is never counted twice" */
+    it("hands the one token to a single pull request, never to both", async () => {
+      const first = await serviceWith(
+        oneTokenFixture(),
+      ).service.getPullRequestUsage(QUERY);
+      const second = await serviceWith(
+        oneTokenFixture(),
+      ).service.getPullRequestUsage({ ...QUERY, prNumber: 8 });
+
+      expect(first.totals.totalTokens + second.totals.totalTokens).toBe(1);
+      // Cost is a currency amount, so it stays exact and splits evenly.
+      expect(first.totals.costUsd).toBeCloseTo(0.01, 10);
+      expect(second.totals.costUsd).toBeCloseTo(0.01, 10);
+    });
+  });
+
   describe("given a session whose fact rows report cost but no token counts", () => {
     // Some agents price a call without telling us its token counts. The
     // stamps still have to decide where the money lands, so the ratio falls

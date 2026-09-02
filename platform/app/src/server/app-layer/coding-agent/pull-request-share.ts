@@ -26,6 +26,13 @@
  * A session with no event rows at all keeps the legacy rule whole: its full
  * total lands on its single winner, so nothing regresses to zero.
  *
+ * The token counters are whole numbers, so the split hands out whole units by
+ * the largest-remainder method across all of a session's buckets at once,
+ * rather than rounding each pull request's share on its own. Rounding
+ * separately would let a one-token session split two ways report a token to
+ * each, and on a page about cost, understating is survivable where
+ * overstating is not. Cost is a currency amount and stays exact.
+ *
  * Pure and synchronous, like `pull-request-assignment.ts`: it decides from the
  * rows it is handed, so the same rule answers the same way in the rollup and
  * in a test.
@@ -92,7 +99,7 @@ export function attributeSessionsToPullRequest({
     const key = sessionKey(session);
     const rows = totalsBySession.get(key) ?? [];
     const rowMatched = rowMatchedSessionKeys.has(key);
-    const { share, prRows } = shareOfPullRequest({
+    const share = shareOfPullRequest({
       session,
       rows,
       rowMatched,
@@ -101,15 +108,18 @@ export function attributeSessionsToPullRequest({
       repositoryHost,
       repositoryFullName,
     });
-    if (share <= 0) continue;
-    scaled.push(scaleSession({ session, share }));
-    attributedTotals.push(...prRows);
+    if (share === null) continue;
+    scaled.push(share.session);
+    attributedTotals.push(...share.prRows);
   }
 
   return { sessions: scaled, modelTotals: attributedTotals };
 }
 
-/** One session's share of the pull request, and the event rows behind it. */
+/**
+ * One session's share of the pull request: the session scaled to it, and the
+ * event rows behind it. Null when this pull request gets none of the session.
+ */
 function shareOfPullRequest({
   session,
   rows,
@@ -126,7 +136,10 @@ function shareOfPullRequest({
   prNumber: number;
   repositoryHost: string;
   repositoryFullName: string;
-}): { share: number; prRows: SessionModelTotalsRow[] } {
+}): {
+  session: CodingAgentBranchSessionRow;
+  prRows: SessionModelTotalsRow[];
+} | null {
   const { weightOf, totalWeight } = weighing(rows);
 
   // The stamps may name branches the session row's bounded branch set no
@@ -160,43 +173,141 @@ function shareOfPullRequest({
   // divide by, so the legacy whole-session rule stands — and only where the
   // session's own row lives, like always.
   if (totalWeight === 0) {
-    return {
-      share: rowMatched && legacyWinner === prNumber ? 1 : 0,
-      prRows: [],
-    };
+    if (!rowMatched || legacyWinner !== prNumber) return null;
+    return { session, prRows: [] };
   }
 
-  const prRows = rows.filter((row) => {
-    if (isUnstamped(row)) {
+  // Bucket the rows by a key that depends on the SESSION alone, never on
+  // which pull request is being asked about. That is what makes the integer
+  // allocation below the same answer in every read: each pull request takes a
+  // disjoint set of whole buckets, so their counters cannot sum past the
+  // session's own however many reads ask.
+  const buckets = new Map<string, number>();
+  const bucketOf = new Map<SessionModelTotalsRow, string>();
+  for (const row of rows) {
+    const key = bucketKeyOf({ row, repositoryHost, repositoryFullName });
+    bucketOf.set(row, key);
+    buckets.set(key, (buckets.get(key) ?? 0) + weightOf(row));
+  }
+
+  const ownsBucket = (key: string): boolean => {
+    if (key === ELSEWHERE_BUCKET) return false;
+    if (key === UNSTAMPED_BUCKET) {
       return rowMatched && legacyWinner === prNumber;
     }
-    return (
-      isStampedOnRepository({ row, repositoryHost, repositoryFullName }) &&
-      perBranch.get(row.branch) === prNumber
-    );
-  });
-  const prWeight = sum(prRows, weightOf);
+    return perBranch.get(branchOfBucketKey(key)) === prNumber;
+  };
 
-  return { share: prWeight / totalWeight, prRows };
+  const ownKeys = [...buckets.keys()].filter(ownsBucket);
+  const prWeight = ownKeys.reduce((total, key) => total + buckets.get(key)!, 0);
+  if (prWeight <= 0) return null;
+
+  const prRows = rows.filter((row) => ownsBucket(bucketOf.get(row)!));
+  const allocated = allocateCounters({
+    session,
+    buckets,
+    totalWeight,
+    ownKeys,
+  });
+
+  return {
+    session: {
+      ...session,
+      ...allocated,
+      // Cost is never rounded: it is a currency amount, so the share stays
+      // exact and only the integer counters need whole units handed out.
+      costUsd: (session.costUsd * prWeight) / totalWeight,
+    },
+    prRows,
+  };
 }
 
-/** The session's counters and cost scaled to its share of the pull request. */
-function scaleSession({
+/** The bucket a row falls in, named without reference to any pull request. */
+const UNSTAMPED_BUCKET = " unstamped";
+const ELSEWHERE_BUCKET = " elsewhere";
+const BRANCH_BUCKET_PREFIX = "branch ";
+
+function bucketKeyOf({
+  row,
+  repositoryHost,
+  repositoryFullName,
+}: {
+  row: SessionModelTotalsRow;
+  repositoryHost: string;
+  repositoryFullName: string;
+}): string {
+  if (isUnstamped(row)) return UNSTAMPED_BUCKET;
+  if (!isStampedOnRepository({ row, repositoryHost, repositoryFullName })) {
+    return ELSEWHERE_BUCKET;
+  }
+  return `${BRANCH_BUCKET_PREFIX}${row.branch}`;
+}
+
+function branchOfBucketKey(key: string): string {
+  return key.slice(BRANCH_BUCKET_PREFIX.length);
+}
+
+const COUNTER_FIELDS = [
+  "inputTokens",
+  "outputTokens",
+  "cacheReadTokens",
+  "cacheCreationTokens",
+] as const;
+
+/**
+ * This pull request's whole-token share of each of the session's counters.
+ *
+ * Each counter is handed out across ALL of the session's buckets by the
+ * largest-remainder method, and this pull request keeps the buckets it owns.
+ * Rounding each share on its own instead would let a one-token session split
+ * two ways report a token to each, and a page about cost may understate but
+ * must never overstate.
+ */
+function allocateCounters({
   session,
-  share,
+  buckets,
+  totalWeight,
+  ownKeys,
 }: {
   session: CodingAgentBranchSessionRow;
-  share: number;
-}): CodingAgentBranchSessionRow {
-  if (share >= 1) return session;
-  return {
-    ...session,
-    inputTokens: Math.round(session.inputTokens * share),
-    outputTokens: Math.round(session.outputTokens * share),
-    cacheReadTokens: Math.round(session.cacheReadTokens * share),
-    cacheCreationTokens: Math.round(session.cacheCreationTokens * share),
-    costUsd: session.costUsd * share,
-  };
+  buckets: ReadonlyMap<string, number>;
+  totalWeight: number;
+  ownKeys: readonly string[];
+}): Pick<CodingAgentBranchSessionRow, (typeof COUNTER_FIELDS)[number]> {
+  // Sorted so the allocation never depends on the order rows arrived in.
+  const keys = [...buckets.keys()].sort();
+  const owned = new Set(ownKeys);
+  const allocated = {} as Record<(typeof COUNTER_FIELDS)[number], number>;
+
+  for (const field of COUNTER_FIELDS) {
+    const amount = Math.max(0, Math.floor(session[field]));
+    const floors = new Map<string, number>();
+    const remainders: Array<{ key: string; remainder: number }> = [];
+    let handedOut = 0;
+
+    for (const key of keys) {
+      const exact = (amount * buckets.get(key)!) / totalWeight;
+      const whole = Math.floor(exact);
+      floors.set(key, whole);
+      handedOut += whole;
+      remainders.push({ key, remainder: exact - whole });
+    }
+
+    // What rounding down left over goes to the largest remainders first, ties
+    // broken by key so two reads of the same session agree.
+    remainders.sort(
+      (a, b) => b.remainder - a.remainder || (a.key < b.key ? -1 : 1),
+    );
+    for (const { key } of remainders.slice(0, amount - handedOut)) {
+      floors.set(key, floors.get(key)! + 1);
+    }
+
+    allocated[field] = keys
+      .filter((key) => owned.has(key))
+      .reduce((total, key) => total + floors.get(key)!, 0);
+  }
+
+  return allocated;
 }
 
 /**

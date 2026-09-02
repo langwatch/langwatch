@@ -51,44 +51,48 @@ describe("InMemorySessionContextMemo", () => {
   });
 
   describe("given more sessions than the memo holds", () => {
-    /** @scenario "The no-Redis memo stops growing at its bound" */
-    it("evicts the oldest and keeps the newest", async () => {
-      const memo = new InMemorySessionContextMemo(() => 0);
-      // One past the bound, so exactly the first write is evicted.
-      for (let index = 0; index <= 10_000; index++) {
-        await memo.set({
-          tenantId: "p1",
-          sessionId: `s${index}`,
-          context,
-        });
-      }
+    describe("when the oldest session's context is read", () => {
+      /** @scenario "The no-Redis memo stops growing at its bound" */
+      it("evicts the oldest and keeps the newest", async () => {
+        const memo = new InMemorySessionContextMemo(() => 0);
+        // One past the bound, so exactly the first write is evicted.
+        for (let index = 0; index <= 10_000; index++) {
+          await memo.set({
+            tenantId: "p1",
+            sessionId: `s${index}`,
+            context,
+          });
+        }
 
-      expect(await memo.get({ tenantId: "p1", sessionId: "s0" })).toBeNull();
-      expect(await memo.get({ tenantId: "p1", sessionId: "s1" })).toEqual(
-        context,
-      );
-      expect(await memo.get({ tenantId: "p1", sessionId: "s10000" })).toEqual(
-        context,
-      );
+        expect(await memo.get({ tenantId: "p1", sessionId: "s0" })).toBeNull();
+        expect(await memo.get({ tenantId: "p1", sessionId: "s1" })).toEqual(
+          context,
+        );
+        expect(await memo.get({ tenantId: "p1", sessionId: "s10000" })).toEqual(
+          context,
+        );
+      });
     });
   });
 
   describe("given two tenants that share a session id", () => {
-    it("keeps their contexts apart", async () => {
-      const memo = new InMemorySessionContextMemo(() => 0);
-      await memo.set({ tenantId: "p1", sessionId: "shared", context });
-      await memo.set({
-        tenantId: "p2",
-        sessionId: "shared",
-        context: { ...context, branch: "feat/other" },
-      });
+    describe("when each tenant's context is read", () => {
+      it("keeps their contexts apart", async () => {
+        const memo = new InMemorySessionContextMemo(() => 0);
+        await memo.set({ tenantId: "p1", sessionId: "shared", context });
+        await memo.set({
+          tenantId: "p2",
+          sessionId: "shared",
+          context: { ...context, branch: "feat/other" },
+        });
 
-      expect(
-        (await memo.get({ tenantId: "p1", sessionId: "shared" }))?.branch,
-      ).toBe("feat/split");
-      expect(
-        (await memo.get({ tenantId: "p2", sessionId: "shared" }))?.branch,
-      ).toBe("feat/other");
+        expect(
+          (await memo.get({ tenantId: "p1", sessionId: "shared" }))?.branch,
+        ).toBe("feat/split");
+        expect(
+          (await memo.get({ tenantId: "p2", sessionId: "shared" }))?.branch,
+        ).toBe("feat/other");
+      });
     });
   });
 });
