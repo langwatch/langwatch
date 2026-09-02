@@ -139,6 +139,34 @@ export class DiscoveredPersonRepository {
   }
 
   /**
+   * Declares the daily cost rows unfinished, and records which day a rebuild
+   * would have to start from.
+   *
+   * Written BEFORE the rows are deleted, and that is the whole point of it.
+   * Afterwards there is nothing left to ask which days carried the identifier,
+   * so a crash between the delete and the rebuild would otherwise leave those
+   * days permanently short with no record that anything was owed.
+   */
+  async markMoneyRowsPending(
+    client: Client,
+    params: {
+      id: string;
+      organizationId: string;
+      at: Date;
+      rebuildSince: string | null;
+    },
+  ): Promise<number> {
+    const result = await client.discoveredPerson.updateMany({
+      where: { id: params.id, organizationId: params.organizationId },
+      data: {
+        moneyRowsPendingAt: params.at,
+        moneyRebuildSince: params.rebuildSince,
+      },
+    });
+    return result.count;
+  }
+
+  /**
    * Replaces the identifier and the display text with the pseudonym, in place.
    *
    * The row itself survives on purpose (ADR-128 §9 step 3): its spend is still
@@ -162,6 +190,25 @@ export class DiscoveredPersonRepository {
         displayText: params.pseudonym,
         erasedAt: params.erasedAt,
       },
+    });
+    return result.count;
+  }
+
+  /**
+   * Records that the daily cost rows are dealt with: removed, and their rebuild
+   * asked for.
+   *
+   * The last write of an erasure, and the only thing that makes a later call a
+   * genuine no-op. Until it lands, every call picks the unfinished work back
+   * up.
+   */
+  async settleMoneyRows(
+    client: Client,
+    params: { id: string; organizationId: string },
+  ): Promise<number> {
+    const result = await client.discoveredPerson.updateMany({
+      where: { id: params.id, organizationId: params.organizationId },
+      data: { moneyRowsPendingAt: null, moneyRebuildSince: null },
     });
     return result.count;
   }

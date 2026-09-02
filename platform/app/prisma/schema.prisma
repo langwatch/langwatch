@@ -5057,7 +5057,20 @@ model DiscoveredPerson {
   lastSeenAt      DateTime
   /// Set when this row's identity has been erased. The row survives so its
   /// spend stays attributable to *someone*; the identifier does not.
-  erasedAt        DateTime?
+  erasedAt           DateTime?
+  /// Set alongside `erasedAt` and cleared once the daily cost rows have been
+  /// removed and their rebuild requested. Non-null means the ClickHouse half
+  /// of the erasure did not finish — a crash between the delete and the
+  /// replay leaves days short by the erased amount, and without this marker a
+  /// re-run reads `erasedAt`, short-circuits, and reports a clean erasure that
+  /// did no work. The re-run resumes at that step instead.
+  moneyRowsPendingAt DateTime?
+  /// The earliest day to rebuild from, recorded BEFORE the rows are deleted.
+  /// Once they are gone there is nothing left to ask which days they were on,
+  /// so a resume with no record of this could only replay everything or
+  /// nothing. Null means nothing was rebuildable — either no day carried the
+  /// identifier, or every one of them is older than the event log keeps.
+  moneyRebuildSince  String?
   /// ADR-128 §12 conflict rule: automatic linking has stopped for this
   /// identity because evidence pointed at two candidates, or contradicted an
   /// existing link. Stored HERE rather than on the suggestion rows, because a

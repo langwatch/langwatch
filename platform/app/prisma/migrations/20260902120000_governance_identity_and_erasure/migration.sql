@@ -53,6 +53,15 @@ CREATE TABLE "DiscoveredPerson" (
     "firstSeenAt" TIMESTAMP(3) NOT NULL,
     "lastSeenAt" TIMESTAMP(3) NOT NULL,
     "erasedAt" TIMESTAMP(3),
+    -- Set with "erasedAt" and cleared once the daily cost rows have been
+    -- removed and their rebuild requested. Non-null means the ClickHouse half
+    -- of the erasure is unfinished, so a re-run resumes there instead of
+    -- reading "erasedAt", short-circuiting, and reporting a clean erasure that
+    -- did no work.
+    "moneyRowsPendingAt" TIMESTAMP(3),
+    -- The earliest day to rebuild from, recorded before the rows are deleted:
+    -- afterwards there is nothing left to ask which days they were on.
+    "moneyRebuildSince" TEXT,
     "suspendedAt" TIMESTAMP(3),
     "suspendedReason" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -26,6 +26,9 @@ interface FakePerson {
   rawActorId: string;
   displayText: string;
   erasedAt: Date | null;
+  /** Non-null means an earlier attempt removed the money rows and stopped. */
+  moneyRowsPendingAt?: Date | null;
+  moneyRebuildSince?: string | null;
 }
 
 /**
@@ -39,8 +42,16 @@ function buildService(
     days?: { tenantId: string; day: string }[];
     tenants?: string[];
     replayHorizon?: Date | null;
+    /** How many times the ClickHouse delete throws before it starts working. */
+    failDeleteTimes?: number;
+    /** How many times the rebuild request throws before it starts working. */
+    failReplayTimes?: number;
   } = {},
 ) {
+  const failures = {
+    delete: overrides.failDeleteTimes ?? 0,
+    replay: overrides.failReplayTimes ?? 0,
+  };
   const person: FakePerson | null =
     overrides.person === undefined
       ? {
@@ -61,6 +72,7 @@ function buildService(
     deletedTenants?: string[];
     replayedSince?: string;
     replayedTenants?: string[];
+    markedRebuildSince?: string | null;
   } = { suppressionHashes: [] };
 
   // Installed rather than injected: the service reaches the process's one
@@ -93,11 +105,37 @@ function buildService(
         return params.identifierHashes.length;
       }),
     } as unknown as IdentityErasureDeps["suppression"],
+    // Each write lands on the same `person` object the read returns, so a
+    // second `erase()` sees what the first one actually committed. Without
+    // that, a test of "the re-run resumes" would be reading the state it
+    // wished for rather than the state a crash would have left.
     discoveredPeople: {
-      findById: vi.fn().mockResolvedValue(person),
+      findById: vi.fn(async () => person),
+      markMoneyRowsPending: vi.fn(async (_client, params) => {
+        calls.push("people.markMoneyRowsPending");
+        recorded.markedRebuildSince = params.rebuildSince;
+        if (person) {
+          person.moneyRowsPendingAt = params.at;
+          person.moneyRebuildSince = params.rebuildSince;
+        }
+        return 1;
+      }),
       pseudonymize: vi.fn(async (_client, params) => {
         calls.push("people.pseudonymize");
         recorded.pseudonym = params.pseudonym;
+        if (person) {
+          person.rawActorId = params.pseudonym;
+          person.displayText = params.pseudonym;
+          person.erasedAt = params.erasedAt;
+        }
+        return 1;
+      }),
+      settleMoneyRows: vi.fn(async () => {
+        calls.push("people.settleMoneyRows");
+        if (person) {
+          person.moneyRowsPendingAt = null;
+          person.moneyRebuildSince = null;
+        }
         return 1;
       }),
     } as unknown as IdentityErasureDeps["discoveredPeople"],
@@ -119,6 +157,10 @@ function buildService(
         calls.push("rollup.delete");
         recorded.deletedActor = params.rawActorId;
         recorded.deletedTenants = params.tenantIds;
+        if (failures.delete > 0) {
+          failures.delete -= 1;
+          throw new Error("ClickHouse went away mid-mutation");
+        }
       }),
     } as unknown as IdentityErasureDeps["rollupErasure"],
     replay: {
@@ -126,6 +168,10 @@ function buildService(
         calls.push("replay");
         recorded.replayedSince = params.since;
         recorded.replayedTenants = params.tenantIds;
+        if (failures.replay > 0) {
+          failures.replay -= 1;
+          throw new Error("A replay is already running");
+        }
       }),
     },
     replayHorizon: () => overrides.replayHorizon ?? null,
@@ -284,6 +330,75 @@ describe("given a provider-named person an organization has asked us to erase", 
       expect(outcome.suppressionRowsRecorded).toBe(0);
       expect(deps.suppression.recordAll).not.toHaveBeenCalled();
       expect(deps.rollupErasure.deleteRowsCarryingActor).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the first attempt dies after removing the daily totals", () => {
+    /** @scenario "An erasure interrupted after the totals were removed finishes on the next attempt" */
+    it("picks the rebuild back up rather than reporting a clean erasure", async () => {
+      const { service, calls, recorded } = buildService({
+        failReplayTimes: 1,
+      });
+
+      await expect(
+        service.erase({ organizationId: ORG, discoveredPersonId: PERSON }),
+      ).rejects.toThrow("A replay is already running");
+      // The rows are gone, and the day to rebuild from was written down before
+      // they went — which is the only reason the next attempt can do anything.
+      expect(calls).toContain("rollup.delete");
+      expect(recorded.markedRebuildSince).toBe("2026-08-20");
+      expect(calls).not.toContain("people.settleMoneyRows");
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(outcome.resumed).toBe(true);
+      expect(outcome.rebuiltFrom).toBe("2026-08-20");
+      expect(recorded.replayedSince).toBe("2026-08-20");
+      expect(calls).toContain("people.settleMoneyRows");
+    });
+
+    it("is a genuine no-op only once the rebuild has actually been asked for", async () => {
+      const { service, deps } = buildService({ failReplayTimes: 1 });
+
+      await expect(
+        service.erase({ organizationId: ORG, discoveredPersonId: PERSON }),
+      ).rejects.toThrow();
+      await service.erase({ organizationId: ORG, discoveredPersonId: PERSON });
+
+      const third = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(third.resumed).toBe(false);
+      expect(third.rebuiltFrom).toBeNull();
+      // Two calls asked for a rebuild; the third found nothing outstanding.
+      expect(deps.replay.replaySince).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when the first attempt dies during the removal itself", () => {
+    it("re-runs the whole erasure and still rebuilds the right days", async () => {
+      const { service, recorded } = buildService({ failDeleteTimes: 1 });
+
+      await expect(
+        service.erase({ organizationId: ORG, discoveredPersonId: PERSON }),
+      ).rejects.toThrow("ClickHouse went away mid-mutation");
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      // The identity was never destroyed, so this is the full path again, not a
+      // resume — and the day recorded before the failed delete is still what
+      // the rebuild starts from even though the rows may already be gone.
+      expect(outcome.resumed).toBe(false);
+      expect(outcome.rebuiltFrom).toBe("2026-08-20");
+      expect(recorded.replayedSince).toBe("2026-08-20");
     });
   });
 
