@@ -15,24 +15,24 @@
       "default": "./src/index.ts"
     },
     "./components/checks/DynamicZodForm": {
-      "types": "./src/components/checks/DynamicZodForm.tsx",
-      "default": "./src/components/checks/DynamicZodForm.tsx"
+      "types": "./src/components/checks/dynamic-zod-form.tsx",
+      "default": "./src/components/checks/dynamic-zod-form.tsx"
     },
     "./components/evaluations/EvaluatorTracesMapping": {
-      "types": "./src/components/evaluations/EvaluatorTracesMapping.tsx",
-      "default": "./src/components/evaluations/EvaluatorTracesMapping.tsx"
+      "types": "./src/components/evaluations/evaluator-traces-mapping.tsx",
+      "default": "./src/components/evaluations/evaluator-traces-mapping.tsx"
     },
     "./components/evaluators/EvaluatorEditorContent": {
-      "types": "./src/components/evaluators/EvaluatorEditorContent.tsx",
-      "default": "./src/components/evaluators/EvaluatorEditorContent.tsx"
+      "types": "./src/components/evaluators/evaluator-editor-content.tsx",
+      "default": "./src/components/evaluators/evaluator-editor-content.tsx"
     },
     "./components/evaluators/EvaluatorEditorShared": {
-      "types": "./src/components/evaluators/EvaluatorEditorShared.tsx",
-      "default": "./src/components/evaluators/EvaluatorEditorShared.tsx"
+      "types": "./src/components/evaluators/evaluator-editor-shared.tsx",
+      "default": "./src/components/evaluators/evaluator-editor-shared.tsx"
     },
     "./components/shared/EvaluatorResultChip": {
-      "types": "./src/components/shared/EvaluatorResultChip.tsx",
-      "default": "./src/components/shared/EvaluatorResultChip.tsx"
+      "types": "./src/components/shared/evaluator-result-chip.tsx",
+      "default": "./src/components/shared/evaluator-result-chip.tsx"
     },
     "./drawers": {
       "types": "./src/ui/sections/drawers.ts",
@@ -43,8 +43,8 @@
       "default": "./src/ui/sections/editor-drawers.ts"
     },
     "./hooks/useAvailableEvaluators": {
-      "types": "./src/hooks/useAvailableEvaluators.ts",
-      "default": "./src/hooks/useAvailableEvaluators.ts"
+      "types": "./src/hooks/use-available-evaluators.ts",
+      "default": "./src/hooks/use-available-evaluators.ts"
     },
     "./screens/evaluation-edit": {
       "types": "./src/screens/evaluation-edit/index.ts",
@@ -59,8 +59,8 @@
       "default": "./src/server/evaluations/types.ts"
     },
     "./utils/evaluationResults": {
-      "types": "./src/utils/evaluationResults.ts",
-      "default": "./src/utils/evaluationResults.ts"
+      "types": "./src/utils/evaluation-results.ts",
+      "default": "./src/utils/evaluation-results.ts"
     }
   },
   "scripts": {

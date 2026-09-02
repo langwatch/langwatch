@@ -10,7 +10,7 @@
  * lands durable on the message (each call is a `tool-todowrite` part carrying its
  * input). The panel MIRRORS that list as a live checklist. Nothing is scraped
  * from prose; the tool IS the plan (see the killed `[langy:progress:*]` sentinels
- * in MessageContent.tsx for why prose protocols are not an option here).
+ * in message-content.tsx for why prose protocols are not an option here).
  *
  * This module is the pure, JSX-free fold: a message's tool parts → the latest
  * plan snapshot + the OTHER tool calls attributed to the plan item that was

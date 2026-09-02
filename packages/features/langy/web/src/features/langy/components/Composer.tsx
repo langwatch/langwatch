@@ -28,15 +28,15 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../hooks/use-reduced-motion";
-import type { LangySkill } from "../../../shared/langy/langySkills";
+import type { LangySkill } from "../../../shared/langy/langy-skills";
 import {
   describeChipContext,
   type LangyContextChip,
   useLangyContextTargetStore,
   useLangyStore,
 } from "../../../index";
-import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
-import { LangyModelPill } from "./LangyModelPill";
+import { LangyComposerPalette, type PaletteMode } from "./langy-composer-palette";
+import { LangyModelPill } from "./langy-model-pill";
 
 // The composer's corner. Lives here (not in the theme) because the sheen ring
 // inherits it — one value, two places that must agree. It is also what sells

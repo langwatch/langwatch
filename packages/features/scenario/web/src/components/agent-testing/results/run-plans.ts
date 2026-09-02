@@ -22,8 +22,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import type { RunGroupSummary } from "@langwatch/suite-web";
-import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/useSuiteRouting";
-import { ONE_OFF_RUNS_PLAN_SLUG, RESULTS_SEGMENT } from "../useAgentTestingRouting";
+import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing";
+import { ONE_OFF_RUNS_PLAN_SLUG, RESULTS_SEGMENT } from "../use-agent-testing-routing";
 
 /** What the one-off run plan reads as in the v2 interface. */
 export const ONE_OFF_RUNS_DISPLAY_NAME = "One-off runs";

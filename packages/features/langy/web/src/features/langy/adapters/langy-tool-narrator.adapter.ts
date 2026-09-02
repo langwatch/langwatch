@@ -1,5 +1,5 @@
 import type { LangyToolNarrator } from "../../../index";
-import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import { describeToolCall, effectiveToolName } from "../logic/langy-tool-label";
 
 export const langyToolNarrator: LangyToolNarrator = {
   describe({ name, toolInput }) {

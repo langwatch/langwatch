@@ -8,7 +8,7 @@ import {
 } from "@trpc/client";
 import superjson from "superjson";
 
-import { sseLink } from "./sseLink";
+import { sseLink } from "./sse-link";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin;

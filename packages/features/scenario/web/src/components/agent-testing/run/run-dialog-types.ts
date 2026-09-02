@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { TargetValue } from "../../scenarios/TargetSelector";
+import type { TargetValue } from "../../scenarios/target-selector";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 
 /** What the dialog is about to run. */

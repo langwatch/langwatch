@@ -21,10 +21,10 @@ import {
   XCircle,
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
-import { RenderCode } from "../../components/code/RenderCode";
+import { RenderCode } from "../../components/code/render-code";
 import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import type { Project } from "../../model/prisma-types";
-import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
+import { langwatchEndpoint } from "../../components/code/langwatch-endpoint-env";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../studio-host/link";
@@ -33,7 +33,7 @@ import { toaster } from "../../studio-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project";
 import { api } from "../../studio-host/api";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { useModelProviderKeys } from "../hooks/use-model-provider-keys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
 import {
@@ -41,9 +41,9 @@ import {
   inMemoryDatasetToNodeDataset,
 } from "@langwatch/workflow-web";
 import { getEntryInputs } from "@langwatch/workflow-contract";
-import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState } from "./History";
-import { VersionToBeUsed } from "./VersionToBeUsed";
+import { AddModelProviderKey } from "./add-model-provider-key";
+import { useVersionState } from "./history";
+import { VersionToBeUsed } from "./version-to-be-used";
 
 // Type with dataset property
 interface NodeDataWithDataset {

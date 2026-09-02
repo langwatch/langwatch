@@ -17,8 +17,8 @@ import {
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "../../ui/sections/dashboard-layout";
-import { ScenarioCreateModal } from "../../components/scenarios/ScenarioCreateModal";
-import { ScenarioTable } from "../../components/scenarios/ScenarioTable";
+import { ScenarioCreateModal } from "../../components/scenarios/scenario-create-modal";
+import { ScenarioTable } from "../../components/scenarios/scenario-table";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { toaster } from "@langwatch/design-system/toaster";
 import { HandledErrorAlert, showErrorToast } from "../../behavior/errors";

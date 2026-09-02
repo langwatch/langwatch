@@ -4,9 +4,9 @@ import { Children, isValidElement, memo, type ReactNode, useState } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useRouter } from "../studio-host/next-router";
-import { stringifyIfObject } from "../utils/stringifyIfObject";
-import { RenderCode } from "./code/RenderCode";
-import { getProxiedImageUrl } from "./ExternalImage";
+import { stringifyIfObject } from "../utils/stringify-if-object";
+import { RenderCode } from "./code/render-code";
+import { getProxiedImageUrl } from "./external-image";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Link as UiLink } from "../studio-host/link";
 import { Prose } from "./ui/prose";

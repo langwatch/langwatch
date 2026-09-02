@@ -2,7 +2,7 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "@langwatch/design-system/close-button";
-import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
+import { IsolatedErrorBoundary } from "./isolated-error-boundary";
 
 interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;

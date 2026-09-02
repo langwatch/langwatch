@@ -13,40 +13,40 @@
       "default": "./src/components/llmPromptConfigs/constants.ts"
     },
     "./components/llmPromptConfigs/LlmConfigField": {
-      "types": "./src/components/llmPromptConfigs/LlmConfigField.tsx",
-      "default": "./src/components/llmPromptConfigs/LlmConfigField.tsx"
+      "types": "./src/components/llmPromptConfigs/llm-config-field.tsx",
+      "default": "./src/components/llmPromptConfigs/llm-config-field.tsx"
     },
     "./components/llmPromptConfigs/LLMConfigPopover": {
-      "types": "./src/components/llmPromptConfigs/LLMConfigPopover.tsx",
-      "default": "./src/components/llmPromptConfigs/LLMConfigPopover.tsx"
+      "types": "./src/components/llmPromptConfigs/llm-config-popover.tsx",
+      "default": "./src/components/llmPromptConfigs/llm-config-popover.tsx"
     },
     "./components/llmPromptConfigs/LLMModelDisplay": {
-      "types": "./src/components/llmPromptConfigs/LLMModelDisplay.tsx",
-      "default": "./src/components/llmPromptConfigs/LLMModelDisplay.tsx"
+      "types": "./src/components/llmPromptConfigs/llm-model-display.tsx",
+      "default": "./src/components/llmPromptConfigs/llm-model-display.tsx"
     },
     "./components/outputs/OutputsSection": {
-      "types": "./src/components/outputs/OutputsSection.tsx",
-      "default": "./src/components/outputs/OutputsSection.tsx"
+      "types": "./src/components/outputs/outputs-section.tsx",
+      "default": "./src/components/outputs/outputs-section.tsx"
     },
     "./components/prompts/PromptEditorDrawer": {
-      "types": "./src/components/prompts/PromptEditorDrawer.tsx",
-      "default": "./src/components/prompts/PromptEditorDrawer.tsx"
+      "types": "./src/components/prompts/prompt-editor-drawer.tsx",
+      "default": "./src/components/prompts/prompt-editor-drawer.tsx"
     },
     "./drawers": {
       "types": "./src/ui/sections/drawers.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
     "./prompts/hooks/useLatestPromptVersion": {
-      "types": "./src/prompts/hooks/useLatestPromptVersion.ts",
-      "default": "./src/prompts/hooks/useLatestPromptVersion.ts"
+      "types": "./src/prompts/hooks/use-latest-prompt-version.ts",
+      "default": "./src/prompts/hooks/use-latest-prompt-version.ts"
     },
     "./prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground": {
-      "types": "./src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts",
-      "default": "./src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts"
+      "types": "./src/prompts/prompt-playground/hooks/use-load-span-into-prompt-playground.ts",
+      "default": "./src/prompts/prompt-playground/hooks/use-load-span-into-prompt-playground.ts"
     },
     "./prompts/utils/llmPromptConfigUtils": {
-      "types": "./src/prompts/utils/llmPromptConfigUtils.ts",
-      "default": "./src/prompts/utils/llmPromptConfigUtils.ts"
+      "types": "./src/prompts/utils/llm-prompt-config-utils.ts",
+      "default": "./src/prompts/utils/llm-prompt-config-utils.ts"
     },
     "./screens/prompt-studio": {
       "types": "./src/screens/prompt-studio/index.ts",

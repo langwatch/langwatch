@@ -5487,7 +5487,7 @@ unconditionally would put two dialogs on any page where the two nest.
 | `features/briefing/**` (11) | `screens/home/briefing/**` |
 | `pages/[project]/index.tsx` | DELETED — its `return_to` redirect is `apps/ui`'s |
 
-`packages/features/langy/web/src/components/home/useProjectReach.ts` also
+`packages/features/langy/web/src/components/home/use-project-reach.ts` also
 travelled, and then came BACK: `LangyPanel` reads it too, so the panel keeps
 Langy's copy asked through Langy's transport and the home has its own asked
 through the home's. Two families, two ports, one question — which is the port

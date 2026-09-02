@@ -6,7 +6,7 @@
  * which surface it belongs to, what the thing is called, and which body widget
  * draws the result. It is DATA ONLY — no JSX, no functions — so adding a new
  * CLI resource to the panel is adding one row here, and the coverage test
- * (`capabilityCatalog.coverage.unit.test.ts`) fails the build when this map
+ * (`capability-catalog.coverage.unit.test.ts`) fails the build when this map
  * and the CLI's own command tree drift in either direction.
  *
  * WHICH card kind a verb produces and its tone are NOT here: those are CLI
@@ -26,7 +26,7 @@ import type { DigestStrategy } from "@langwatch/langy-contract";
 /**
  * Every platform surface a card can point at. The label, path, icon and
  * deep-link rules for each live in `langy-capability-registry.ts` /
- * `LangyCapabilityCard.tsx`; this is the vocabulary they key off.
+ * `langy-capability-card.tsx`; this is the vocabulary they key off.
  *
  * `gateway` covers the AI Gateway's org-level pages (virtual keys, budgets,
  * governance, ingestion) — settings surfaces, so never deep-linked.
@@ -64,7 +64,7 @@ export type CapabilitySurface = (typeof CAPABILITY_SURFACES)[number];
 
 /**
  * The widget vocabulary a card body can be drawn with. Rendering lives in
- * `LangyDeclarativeCard.tsx`; the catalog only names which one.
+ * `langy-declarative-card.tsx`; the catalog only names which one.
  *
  *   - `stats` — labelled figures that roll up on mount (counts, pass rates).
  *   - `rows`  — a short list of items, each with a primary/secondary line.
@@ -78,7 +78,7 @@ export type CapabilityBodyWidget = "stats" | "rows" | "facts" | "diff" | "text" 
  * Icon overrides a catalog row may name when the surface's own icon is wrong
  * for the resource (a virtual key on the gateway surface is a key, not a
  * network). The name→glyph binding lives with the JSX in
- * `LangyCapabilityCard.tsx`, keyed exhaustively off this union.
+ * `langy-capability-card.tsx`, keyed exhaustively off this union.
  */
 export type CapabilityIconName =
   | "key"

@@ -24,7 +24,7 @@
  * layout is the application's business, and the application already has one.
  */
 
-export { default as ProjectLangyLayout } from "../../features/langy/ProjectLangyLayout";
+export { default as ProjectLangyLayout } from "../../features/langy/project-langy-layout";
 export { api as langyApi, setLangyTrpcClient, trpcClient as langyTrpcClient } from "../../behavior/langy-api";
 export type { LangyApiMap, RouterOutputs as LangyRouterOutputs } from "../../behavior/langy-api";
 export { setLangyErrorHost } from "../../behavior/errors";

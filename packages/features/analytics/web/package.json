@@ -15,25 +15,33 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./analytics-registry": {
+      "types": "./src/model/analytics-registry.ts",
+      "default": "./src/model/analytics-registry.ts"
+    },
     "./chart": {
       "types": "./src/ui/sections/chart.ts",
       "default": "./src/ui/sections/chart.ts"
     },
+    "./components/CustomGraph": {
+      "types": "./src/ui/sections/custom-graph.tsx",
+      "default": "./src/ui/sections/custom-graph.tsx"
+    },
     "./components/PeriodSelector": {
-      "types": "./src/components/PeriodSelector.tsx",
-      "default": "./src/components/PeriodSelector.tsx"
+      "types": "./src/components/period-selector.tsx",
+      "default": "./src/components/period-selector.tsx"
     },
     "./components/filters/FilterSidebar": {
-      "types": "./src/components/filters/FilterSidebar.tsx",
-      "default": "./src/components/filters/FilterSidebar.tsx"
+      "types": "./src/components/filters/filter-sidebar.tsx",
+      "default": "./src/components/filters/filter-sidebar.tsx"
     },
     "./components/filters/FilterToggle": {
-      "types": "./src/components/filters/FilterToggle.tsx",
-      "default": "./src/components/filters/FilterToggle.tsx"
+      "types": "./src/components/filters/filter-toggle.tsx",
+      "default": "./src/components/filters/filter-toggle.tsx"
     },
     "./hooks/useFilterParams": {
-      "types": "./src/hooks/useFilterParams.ts",
-      "default": "./src/hooks/useFilterParams.ts"
+      "types": "./src/hooks/use-filter-params.ts",
+      "default": "./src/hooks/use-filter-params.ts"
     },
     "./screens/analytics": {
       "types": "./src/screens/analytics/index.ts",

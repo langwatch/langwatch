@@ -1,4 +1,4 @@
-import type { FilterParam } from "../../hooks/useFilterParams";
+import type { FilterParam } from "../../hooks/use-filter-params";
 import type { FilterField } from "../filters/types";
 
 export const filterOutEmptyFilters = (

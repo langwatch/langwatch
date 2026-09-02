@@ -36,7 +36,7 @@
  * is not.
  *
  * Run:  pnpm generate:langy-skills
- * Pinned by: src/shared/langy/__tests__/langySkills.unit.test.ts, which re-derives
+ * Pinned by: src/shared/langy/__tests__/langy-skills.unit.test.ts, which re-derives
  * from disk and fails if the committed catalogue has drifted from the image.
  */
 import fs from "node:fs";

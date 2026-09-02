@@ -1,13 +1,13 @@
-export { addColumn } from "./addColumn";
+export { addColumn } from "./add-column";
 export {
   addEvaluator,
   assertComparisonColumnAllowed,
   attachEvaluator,
   newEvaluatorId,
-} from "./addEvaluator";
-export { addRows } from "./addRows";
-export { addTarget, attachTarget, newTargetId } from "./addTarget";
-export { duplicateTarget } from "./duplicateTarget";
+} from "./add-evaluator";
+export { addRows } from "./add-rows";
+export { addTarget, attachTarget, newTargetId } from "./add-target";
+export { duplicateTarget } from "./duplicate-target";
 export {
   inlineRowCount,
   requireDataset,
@@ -15,11 +15,11 @@ export {
   requireInlineDataset,
   requireTarget,
 } from "./helpers";
-export { removeTarget } from "./removeTarget";
-export { setCellValue } from "./setCellValue";
-export { setEvaluatorMapping } from "./setEvaluatorMapping";
-export { setTargetMapping } from "./setTargetMapping";
-export { setTargetPrompt } from "./setTargetPrompt";
+export { removeTarget } from "./remove-target";
+export { setCellValue } from "./set-cell-value";
+export { setEvaluatorMapping } from "./set-evaluator-mapping";
+export { setTargetMapping } from "./set-target-mapping";
+export { setTargetPrompt } from "./set-target-prompt";
 export {
   type AnyTransform,
   isTransformError,
@@ -29,4 +29,4 @@ export {
   type TransformErrorCode,
   type WorkbenchState,
 } from "./types";
-export { updateTargetModel } from "./updateTargetModel";
+export { updateTargetModel } from "./update-target-model";

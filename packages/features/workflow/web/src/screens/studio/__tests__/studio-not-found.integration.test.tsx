@@ -52,11 +52,11 @@ vi.mock("../../../studio-host/link", () => ({
   ),
 }));
 
-vi.mock("../../../optimization_studio/hooks/useLoadWorkflow", () => ({
+vi.mock("../../../optimization_studio/hooks/use-load-workflow", () => ({
   useLoadWorkflow: () => ({ workflow: workflowRef.current }),
 }));
 
-vi.mock("../../../optimization_studio/components/OptimizationStudio", () => ({
+vi.mock("../../../optimization_studio/components/optimization-studio", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 

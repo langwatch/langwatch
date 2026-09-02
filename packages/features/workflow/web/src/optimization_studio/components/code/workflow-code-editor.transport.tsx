@@ -9,7 +9,7 @@ import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useMemo } from "react";
 
-import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
+import { SecretsIndicator } from "../../../components/secrets/secrets-indicator";
 import { Dialog } from "../../../components/ui/dialog";
 import { useOrganizationTeamProject } from "../../../studio-host/use-organization-team-project";
 import { api } from "../../../studio-host/api";

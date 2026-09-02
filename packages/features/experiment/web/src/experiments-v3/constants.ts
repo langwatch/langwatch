@@ -10,7 +10,7 @@ export const DRAWER_WIDTH = 456;
 
 /**
  * Hover copy for the "missing variable mappings" alert icon shown on both
- * target headers (TargetHeader.tsx) and evaluator chips (EvaluatorChip.tsx).
+ * target headers (target-header.tsx) and evaluator chips (evaluator-chip.tsx).
  * Keep the two sites in lock-step — clicking the alert jumps the user to the
  * mappings editor in both cases.
  */

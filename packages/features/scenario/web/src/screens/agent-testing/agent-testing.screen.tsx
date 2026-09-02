@@ -13,7 +13,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { AgentTestingPage } from "../../components/agent-testing/AgentTestingPage";
+import { AgentTestingPage } from "../../components/agent-testing/agent-testing-page";
 
 function AgentTestingRoutePage() {
   return <AgentTestingPage />;

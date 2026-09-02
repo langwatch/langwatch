@@ -2,7 +2,7 @@
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "@langwatch/design-system/close-button";
-import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
+import { IsolatedErrorBoundary } from "./isolated-error-boundary";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants.

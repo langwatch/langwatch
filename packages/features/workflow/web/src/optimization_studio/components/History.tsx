@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
-import { UserAvatar } from "../../components/UserAvatar";
+import { UserAvatar } from "../../components/user-avatar";
 import type { Project } from "../../model/prisma-types";
 
 import { HistoryIcon } from "@langwatch/model-provider-web/components/icons/History";
@@ -27,7 +27,7 @@ import {
   parseStudioWorkflow,
   studioWorkflowSchema,
 } from "@langwatch/workflow-contract";
-import { NewVersionFields } from "./VersionToBeUsed";
+import { NewVersionFields } from "./version-to-be-used";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();

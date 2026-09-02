@@ -26,14 +26,14 @@ import { toaster } from "../../studio-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project";
 import { api } from "../../studio-host/api";
-import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { useEvaluationExecution } from "../hooks/use-evaluation-execution";
+import { useGetDatasetData } from "../hooks/use-get-dataset-data";
+import { useModelProviderKeys } from "../hooks/use-model-provider-keys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry } from "@langwatch/workflow-contract";
 import { trainTestSplit } from "@langwatch/workflow-web";
-import { AddModelProviderKey } from "./AddModelProviderKey";
-import { VersionToBeUsed } from "./VersionToBeUsed";
+import { AddModelProviderKey } from "./add-model-provider-key";
+import { VersionToBeUsed } from "./version-to-be-used";
 
 export function Evaluate() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();

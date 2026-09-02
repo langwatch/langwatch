@@ -120,14 +120,14 @@ vi.mock("../../../studio-host/api", () => {
 });
 
 
-vi.mock("../../hooks/useModelProviderKeys", () => ({
+vi.mock("../../hooks/use-model-provider-keys", () => ({
   useModelProviderKeys: () => ({
     hasProvidersWithoutCustomKeys: false,
     nodeProvidersWithoutCustomKeys: [],
   }),
 }));
 
-vi.mock("../History", () => ({
+vi.mock("../history", () => ({
   useVersionState: () => ({
     canSaveNewVersion: false,
     versionToBeEvaluated: { version: "1.0.0" },
@@ -135,11 +135,11 @@ vi.mock("../History", () => ({
   }),
 }));
 
-vi.mock("../VersionToBeUsed", () => ({
+vi.mock("../version-to-be-used", () => ({
   VersionToBeUsed: () => null,
 }));
 
-vi.mock("../AddModelProviderKey", () => ({
+vi.mock("../add-model-provider-key", () => ({
   AddModelProviderKey: () => null,
 }));
 
@@ -204,7 +204,7 @@ vi.mock("../../../studio-host/link", () => ({
   ),
 }));
 
-const { Publish } = await import("../Publish");
+const { Publish } = await import("../publish");
 
 function renderPublish() {
   return render(

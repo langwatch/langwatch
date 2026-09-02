@@ -21,7 +21,7 @@
  *   - It carries nothing out. A suggestion is an offer; showing one must not
  *     create, mutate or persist anything (see the spec). Where an offer LANDS —
  *     the automation drawer with the search as its subject, or the plain
- *     surface when nothing can carry it — is `followUpChips.ts`'s job (via the
+ *     surface when nothing can carry it — is `follow-up-chips.ts`'s job (via the
  *     shared `logic/traceExplorerLink.ts` reader). This module answers "which
  *     offers"; that one answers "to where".
  *

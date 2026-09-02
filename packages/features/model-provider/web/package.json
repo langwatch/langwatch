@@ -9,48 +9,48 @@
   "type": "module",
   "exports": {
     "./components/ModelSelector": {
-      "types": "./src/components/ModelSelector.tsx",
-      "default": "./src/components/ModelSelector.tsx"
+      "types": "./src/components/model-selector.tsx",
+      "default": "./src/components/model-selector.tsx"
     },
     "./components/NoModelsConfiguredCallout": {
-      "types": "./src/components/NoModelsConfiguredCallout.tsx",
-      "default": "./src/components/NoModelsConfiguredCallout.tsx"
+      "types": "./src/components/no-models-configured-callout.tsx",
+      "default": "./src/components/no-models-configured-callout.tsx"
     },
     "./components/ProviderModelSelector": {
-      "types": "./src/components/ProviderModelSelector.tsx",
-      "default": "./src/components/ProviderModelSelector.tsx"
+      "types": "./src/components/provider-model-selector.tsx",
+      "default": "./src/components/provider-model-selector.tsx"
     },
     "./components/icons/AISparklesLoader": {
-      "types": "./src/components/icons/AISparklesLoader.tsx",
-      "default": "./src/components/icons/AISparklesLoader.tsx"
+      "types": "./src/components/icons/ai-sparkles-loader.tsx",
+      "default": "./src/components/icons/ai-sparkles-loader.tsx"
     },
     "./components/icons/Copy": {
-      "types": "./src/components/icons/Copy.tsx",
-      "default": "./src/components/icons/Copy.tsx"
+      "types": "./src/components/icons/copy.tsx",
+      "default": "./src/components/icons/copy.tsx"
     },
     "./components/icons/History": {
-      "types": "./src/components/icons/History.tsx",
-      "default": "./src/components/icons/History.tsx"
+      "types": "./src/components/icons/history.tsx",
+      "default": "./src/components/icons/history.tsx"
     },
     "./components/modelProviders/iconsMap": {
-      "types": "./src/components/modelProviders/iconsMap.tsx",
-      "default": "./src/components/modelProviders/iconsMap.tsx"
+      "types": "./src/components/modelProviders/icons-map.tsx",
+      "default": "./src/components/modelProviders/icons-map.tsx"
     },
     "./hooks/useModelLimits": {
-      "types": "./src/hooks/useModelLimits.ts",
-      "default": "./src/hooks/useModelLimits.ts"
+      "types": "./src/hooks/use-model-limits.ts",
+      "default": "./src/hooks/use-model-limits.ts"
     },
     "./hooks/useModelProvidersSettings": {
-      "types": "./src/hooks/useModelProvidersSettings.ts",
-      "default": "./src/hooks/useModelProvidersSettings.ts"
+      "types": "./src/hooks/use-model-providers-settings.ts",
+      "default": "./src/hooks/use-model-providers-settings.ts"
     },
     "./screens/model-provider": {
       "types": "./src/screens/model-provider/index.ts",
       "default": "./src/screens/model-provider/index.ts"
     },
     "./utils/clampMaxTokens": {
-      "types": "./src/utils/clampMaxTokens.ts",
-      "default": "./src/utils/clampMaxTokens.ts"
+      "types": "./src/utils/clamp-max-tokens.ts",
+      "default": "./src/utils/clamp-max-tokens.ts"
     }
   },
   "scripts": {

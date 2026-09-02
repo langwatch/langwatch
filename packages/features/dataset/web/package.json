@@ -15,32 +15,32 @@
       "default": "./src/index.ts"
     },
     "./components/AddOrEditDatasetDrawer": {
-      "types": "./src/components/AddOrEditDatasetDrawer.tsx",
-      "default": "./src/components/AddOrEditDatasetDrawer.tsx"
+      "types": "./src/components/add-or-edit-dataset-drawer.tsx",
+      "default": "./src/components/add-or-edit-dataset-drawer.tsx"
     },
     "./components/datasets/DatasetPickerList": {
-      "types": "./src/components/datasets/DatasetPickerList.tsx",
-      "default": "./src/components/datasets/DatasetPickerList.tsx"
+      "types": "./src/components/datasets/dataset-picker-list.tsx",
+      "default": "./src/components/datasets/dataset-picker-list.tsx"
     },
     "./components/datasets/editor/DatasetEditorTable": {
-      "types": "./src/components/datasets/editor/DatasetEditorTable.tsx",
-      "default": "./src/components/datasets/editor/DatasetEditorTable.tsx"
+      "types": "./src/components/datasets/editor/dataset-editor-table.tsx",
+      "default": "./src/components/datasets/editor/dataset-editor-table.tsx"
     },
     "./components/datasets/editor/DatasetPreviewTable": {
-      "types": "./src/components/datasets/editor/DatasetPreviewTable.tsx",
-      "default": "./src/components/datasets/editor/DatasetPreviewTable.tsx"
+      "types": "./src/components/datasets/editor/dataset-preview-table.tsx",
+      "default": "./src/components/datasets/editor/dataset-preview-table.tsx"
     },
     "./components/datasets/editor/renderDatasetImage": {
-      "types": "./src/components/datasets/editor/renderDatasetImage.tsx",
-      "default": "./src/components/datasets/editor/renderDatasetImage.tsx"
+      "types": "./src/components/datasets/editor/render-dataset-image.tsx",
+      "default": "./src/components/datasets/editor/render-dataset-image.tsx"
     },
     "./components/datasets/editor/useDatasetRecordSync": {
-      "types": "./src/components/datasets/editor/useDatasetRecordSync.ts",
-      "default": "./src/components/datasets/editor/useDatasetRecordSync.ts"
+      "types": "./src/components/datasets/editor/use-dataset-record-sync.ts",
+      "default": "./src/components/datasets/editor/use-dataset-record-sync.ts"
     },
     "./components/datasets/UploadCSVDrawer": {
-      "types": "./src/components/datasets/UploadCSVDrawer.tsx",
-      "default": "./src/components/datasets/UploadCSVDrawer.tsx"
+      "types": "./src/components/datasets/upload-csv-drawer.tsx",
+      "default": "./src/components/datasets/upload-csv-drawer.tsx"
     },
     "./drawers": {
       "types": "./src/ui/sections/drawers.ts",

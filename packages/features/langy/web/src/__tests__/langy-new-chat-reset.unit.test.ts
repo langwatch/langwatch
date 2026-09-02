@@ -8,7 +8,7 @@ import { useLangyStore } from "../langy.store";
  * card sitting under an otherwise-empty panel, and the half-typed draft was
  * still in the composer. Two separate leaks, in two separate places — the chat
  * ENGINE's error (useChat state, cleared in the panel via `clearError()`; see
- * `resetChatEngine` in LangyPanel.tsx) and the STORE's draft, pinned here.
+ * `resetChatEngine` in langy-panel.tsx) and the STORE's draft, pinned here.
  *
  * The store half is what this file guards: `startNewConversation` must leave no
  * field of the abandoned conversation behind, so that adding a field tomorrow

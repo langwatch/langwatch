@@ -16,20 +16,20 @@
       "default": "./src/index.ts"
     },
     "./components/experiments/BatchEvaluationV2": {
-      "types": "./src/components/experiments/BatchEvaluationV2.tsx",
-      "default": "./src/components/experiments/BatchEvaluationV2.tsx"
+      "types": "./src/components/experiments/batch-evaluation-v2.tsx",
+      "default": "./src/components/experiments/batch-evaluation-v2.tsx"
     },
     "./components/experiments/BatchEvaluationV2/EvaluationProgressBar": {
-      "types": "./src/components/experiments/BatchEvaluationV2/EvaluationProgressBar.tsx",
-      "default": "./src/components/experiments/BatchEvaluationV2/EvaluationProgressBar.tsx"
+      "types": "./src/components/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
+      "default": "./src/components/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx"
     },
     "./experiments-v3/components/EvaluatorPanel/ComparisonConfigForm": {
-      "types": "./src/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm.tsx",
-      "default": "./src/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm.tsx"
+      "types": "./src/experiments-v3/components/EvaluatorPanel/comparison-config-form.tsx",
+      "default": "./src/experiments-v3/components/EvaluatorPanel/comparison-config-form.tsx"
     },
     "./experiments-v3/hooks/useEvaluationMappings": {
-      "types": "./src/experiments-v3/hooks/useEvaluationMappings.ts",
-      "default": "./src/experiments-v3/hooks/useEvaluationMappings.ts"
+      "types": "./src/experiments-v3/hooks/use-evaluation-mappings.ts",
+      "default": "./src/experiments-v3/hooks/use-evaluation-mappings.ts"
     },
     "./experiments-v3/types": {
       "types": "./src/experiments-v3/types.ts",
@@ -40,16 +40,16 @@
       "default": "./src/experiments-v3/types/persistence.ts"
     },
     "./experiments-v3/utils/cellFailure": {
-      "types": "./src/experiments-v3/utils/cellFailure.ts",
-      "default": "./src/experiments-v3/utils/cellFailure.ts"
+      "types": "./src/experiments-v3/utils/cell-failure.ts",
+      "default": "./src/experiments-v3/utils/cell-failure.ts"
     },
     "./experiments-v3/utils/evaluatorEditorCallbacks": {
-      "types": "./src/experiments-v3/utils/evaluatorEditorCallbacks.ts",
-      "default": "./src/experiments-v3/utils/evaluatorEditorCallbacks.ts"
+      "types": "./src/experiments-v3/utils/evaluator-editor-callbacks.ts",
+      "default": "./src/experiments-v3/utils/evaluator-editor-callbacks.ts"
     },
     "./experiments-v3/utils/mappingValidation": {
-      "types": "./src/experiments-v3/utils/mappingValidation.ts",
-      "default": "./src/experiments-v3/utils/mappingValidation.ts"
+      "types": "./src/experiments-v3/utils/mapping-validation.ts",
+      "default": "./src/experiments-v3/utils/mapping-validation.ts"
     },
     "./screens/experiments": {
       "types": "./src/screens/experiments/index.ts",

@@ -3,9 +3,9 @@ import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { ExperimentType } from "../../model/prisma-types";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { BatchEvaluationResults } from "../../components/batch-evaluation-results";
-import BatchEvaluation from "../../components/experiments/BatchEvaluation";
+import BatchEvaluation from "../../components/experiments/batch-evaluation";
 // Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification
-import { DSPyExperiment } from "../../components/experiments/DSPyExperiment";
+import { DSPyExperiment } from "../../components/experiments/ds-py-experiment";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { isNotFound } from "@langwatch/trace-web/utils/trpcError";

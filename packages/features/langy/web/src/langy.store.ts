@@ -113,7 +113,7 @@ export interface LangyContextChip {
  * binding resolves to nothing rather than to a lie.
  */
 export interface LangySkillChip {
-  /** Feature-map feature id, or agent skill name. See ~/shared/langy/langySkills.ts. */
+  /** Feature-map feature id, or agent skill name. See ~/shared/langy/langy-skills.ts. */
   id: string;
   label: string;
   targetChipId: string | null;

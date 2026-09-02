@@ -32,19 +32,19 @@ import { useOrganizationTeamProject } from "../../studio-host/use-organization-t
 import { api } from "../../studio-host/api";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import { workflowApi } from "../../utils/workflow-api";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
-import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { useGetDatasetData } from "../hooks/use-get-dataset-data";
+import { useModelProviderKeys } from "../hooks/use-model-provider-keys";
+import { useOptimizationExecution } from "../hooks/use-optimization-execution";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry } from "@langwatch/workflow-contract";
 import { OPTIMIZERS } from "@langwatch/workflow-web";
 import { trainTestSplit } from "@langwatch/workflow-web";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 
-import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState } from "./History";
-import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
-import { VersionToBeUsed } from "./VersionToBeUsed";
+import { AddModelProviderKey } from "./add-model-provider-key";
+import { useVersionState } from "./history";
+import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/optimization-studio-llm-config-field";
+import { VersionToBeUsed } from "./version-to-be-used";
 
 const optimizerOptions: {
   label: string;

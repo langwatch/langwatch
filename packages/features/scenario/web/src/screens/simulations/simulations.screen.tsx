@@ -17,8 +17,8 @@
  */
 
 import { useEffect } from "react";
-import SimulationsPage from "../../components/suites/SimulationsPage";
-import { resolveSimulationsRedirect } from "../../components/suites/useSuiteRouting";
+import SimulationsPage from "../../components/suites/simulations-page";
+import { resolveSimulationsRedirect } from "../../components/suites/use-suite-routing";
 import { useRouter } from "../../behavior/next-router";
 
 function SimulationsRoutePage() {

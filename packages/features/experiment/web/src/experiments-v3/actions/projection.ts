@@ -7,9 +7,9 @@ import type {
   DatasetReference,
   EvaluationResults,
 } from "../types";
-import { computeTargetAggregates } from "../utils/computeAggregates";
-import { toComparisonConfig } from "../utils/normalizeComparison";
-import { disambiguateNames } from "../utils/variantDisambiguation";
+import { computeTargetAggregates } from "../utils/compute-aggregates";
+import { toComparisonConfig } from "../utils/normalize-comparison";
+import { disambiguateNames } from "../utils/variant-disambiguation";
 import type { WorkbenchState } from "./transforms";
 
 /**
