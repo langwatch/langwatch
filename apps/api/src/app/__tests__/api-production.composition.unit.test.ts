@@ -55,6 +55,12 @@ const queueMocks = vi.hoisted(() => {
     // Registering a Group Queue producer stages the queue's own key set. It
     // enqueues nothing here; no test in this file sends a job.
     sadd: vi.fn(async () => 1),
+    // The GitHub App's installation-token cache reads and writes three plain
+    // string commands. It is behind the feature's own port, which refuses a
+    // connection that cannot answer them.
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => "OK"),
+    del: vi.fn(async () => 1),
     // The presence broadcast fabric takes a SECOND connection for its
     // subscriber, because one ioredis client in subscriber mode cannot serve
     // ordinary commands. The double answers itself: nothing in this file

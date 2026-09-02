@@ -32,13 +32,20 @@ import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
 import type { FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
+import type { AuthzTrpcContext } from "@langwatch/authz-server";
 import type {
   DashboardTrpcContext,
   GraphTrpcContext,
   SavedWorkbenchChartTrpcContext,
 } from "@langwatch/dashboard-server";
 import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
+import type {
+  BatchRecordTrpcContext,
+  DatasetRecordTrpcContext,
+  DatasetTrpcContext,
+} from "@langwatch/dataset-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
+import type { EvaluatorTrpcContext } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { ExportTrpcContext } from "../../features/export/export-trpc.mount";
 import type { BugReportTrpcContext } from "@langwatch/ops-server";
@@ -46,9 +53,14 @@ import type {
   GroupTrpcContext,
   JoinRequestTrpcContext,
   OnboardingTrpcContext,
+  PersonalWorkspaceFeaturesTrpcContext,
+  TeamTrpcContext,
 } from "@langwatch/organization-server";
+import type { RoleBindingTrpcContext, RoleTrpcContext } from "@langwatch/role-server";
 import type { PresenceTrpcContext } from "@langwatch/presence-server";
-import type { IntegrationsChecksTrpcContext } from "@langwatch/project-server";
+import type { FeatureFlagTrpcContext } from "@langwatch/feature-flag-server";
+import type { HomeTrpcContext, IntegrationsChecksTrpcContext } from "@langwatch/project-server";
+import type { PromptTrpcContext } from "@langwatch/prompt-server";
 import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcContext,
@@ -58,6 +70,19 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
+import type { AppAgentGroupTrpcContext } from "../app-trpc.agent-group";
+import type {
+  AnyAppProductInfraTrpcPorts,
+  AppProductInfraTrpcContext,
+} from "../app-trpc.product-infra";
+import type {
+  AnyAppOrgGroupTrpcPorts,
+  AppOrgGroupTrpcContext,
+} from "../app-trpc.org-group";
+import type {
+  AnyAppTraceGroupTrpcPorts,
+  AppTraceGroupTrpcContext,
+} from "../app-trpc.trace-group";
 
 /**
  * The intersection every mounted surface constrains the process's context to.
@@ -65,29 +90,50 @@ import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.fea
  * in this suite rather than a surprise in the app.
  */
 type TestContext = AnalyticsTrpcContext &
+  AuthzTrpcContext &
   AnnotationTrpcContext &
   AnnotationScoreTrpcContext &
   ApiKeyTrpcContext &
   BugReportTrpcContext &
   DashboardTrpcContext &
+  BatchRecordTrpcContext &
   DataPrivacyTrpcContext &
+  DatasetRecordTrpcContext &
+  DatasetTrpcContext &
   EvaluationTrpcContext &
+  EvaluatorTrpcContext &
   ExperimentTrpcContext &
   ExportTrpcContext &
   FrontDoorTrpcContext &
   GraphTrpcContext &
   GroupTrpcContext &
+  HomeTrpcContext &
   IdentityTrpcContext &
   IntegrationsChecksTrpcContext &
   JoinRequestTrpcContext &
   LangWatchQLTrpcContext &
   OnboardingTrpcContext &
+  PersonalWorkspaceFeaturesTrpcContext &
   PresenceTrpcContext &
+  RoleBindingTrpcContext &
+  RoleTrpcContext &
+  TeamTrpcContext &
   PublicEnvTrpcContext &
   SavedWorkbenchChartTrpcContext &
   UserTrpcContext &
+  FeatureFlagTrpcContext &
+  PromptTrpcContext &
   WorkflowOptimizationTrpcContext &
-  WorkflowTrpcContext;
+  WorkflowTrpcContext &
+  // The sixteen observability surfaces arrive as ONE intersection, stated by
+  // the group itself, for the same reason the record mounts them as one entry.
+  AppTraceGroupTrpcContext &
+  // The three product-infrastructure surfaces, for the same reason.
+  AppProductInfraTrpcContext &
+  // The nine tenant-administration surfaces, for the same reason.
+  AppOrgGroupTrpcContext &
+  // The six agent surfaces, for the same reason.
+  AppAgentGroupTrpcContext;
 
 /** A pass-through stand-in for one of the process's policy middlewares. */
 const passThrough =
@@ -203,7 +249,9 @@ function refusingPorts(): AppTrpcFeaturePorts<
     },
     annotation: refuseEvery("annotation"),
     apiKeyAudit: refuse("apiKeyAudit"),
+    batchRecord: refuseEvery("batchRecord"),
     bugReports: refuseEvery("bugReports"),
+    dataset: refuseEvery("dataset"),
     auth: refuseEvery("auth"),
     dataPrivacy: refuseEvery("dataPrivacy"),
     // Read while the two writes are BUILT — the policy chain lifts each
@@ -221,11 +269,13 @@ function refusingPorts(): AppTrpcFeaturePorts<
       ...(refuseEvery("experiments") as object),
       workbenchStateSchema: z.object({ rows: z.array(z.unknown()) }),
     } as never,
+    evaluators: refuseEvery("evaluators"),
     graphs: {
       ...(refuseEvery("graphs") as object),
       filterFieldSchema: z.enum(["metadata.user_id"]),
     } as never,
     group: refuseEvery("group"),
+    home: refuseEvery("home"),
     identity: refuseEvery("identity"),
     integrationsChecks: refuseEvery("integrationsChecks"),
     joinRequests: refuseEvery("joinRequests"),
@@ -237,6 +287,103 @@ function refusingPorts(): AppTrpcFeaturePorts<
       signUpDataSchema: testSignUpDataSchema,
     } as never,
     prisma: refuseEvery("prisma"),
+    prompts: refuseEvery("prompts"),
+    role: {
+      ...(refuseEvery("role") as object),
+      customRolePermission: z.string(),
+    } as never,
+    team: refuseEvery("team"),
+    // The observability group, as one entry. Its build-time members are the
+    // two trace grid schemas, the evaluator and precondition schemas, the
+    // cost-rule safety gate the write and preview schemas are constructed
+    // from, and the two provider tenant gates the policy chain lifts a
+    // declaration off. Everything else refuses.
+    /**
+     * The agent and product-infrastructure groups, stubbed with only what the
+     * record reads while it is BUILT: the two Langy gates and the operator
+     * check the mounts chain onto a procedure. Their own suites are what prove
+     * they answer.
+     */
+    agentGroup: {
+      langy: refuseEvery("agentGroup.langy"),
+      langyGates: {
+        refuseDemoProject: passThrough(),
+        enforceLangyAccess: passThrough(),
+      },
+      langyEgress: refuseEvery("agentGroup.langyEgress"),
+      ops: refuseEvery("agentGroup.ops"),
+      opsCheck: () => refusingCheck("agentGroup.opsCheck"),
+      scenarios: refuseEvery("agentGroup.scenarios"),
+    },
+    /**
+     * The nine tenant-administration surfaces, stubbed with only what the
+     * record reads while it is BUILT: the sign-up questionnaire the
+     * organization ceremony parses against, and the three data-dependent
+     * gates the mounts chain onto a procedure. Its own suite is what proves it
+     * answers.
+     */
+    orgGroup: {
+      organization: {
+        ...(refuseEvery("orgGroup.organization") as object),
+        signUpDataSchema: testSignUpDataSchema,
+        isCustomRole: () => false,
+      } as unknown as AnyAppOrgGroupTrpcPorts["organization"],
+      organizationAuditLogCheck: refusingCheck("orgGroup.organizationAuditLogCheck"),
+      project: refuseEvery("orgGroup.project"),
+      projectChecks: {
+        create: refusingCheck("orgGroup.projectChecks.create"),
+        traceSharing: refusingCheck("orgGroup.projectChecks.traceSharing"),
+      },
+      codingAgents: refuseEvery("orgGroup.codingAgents"),
+      automation: {
+        ...(refuseEvery("orgGroup.automation") as object),
+        providers: refuseEvery("orgGroup.automation.providers"),
+      } as unknown as AnyAppOrgGroupTrpcPorts["automation"],
+      emailSuppression: refuseEvery("orgGroup.emailSuppression"),
+      enterprise: {
+        scimToken: refuseEvery("orgGroup.enterprise.scimToken"),
+        ssoConnections: refuseEvery("orgGroup.enterprise.ssoConnections"),
+      },
+    },
+    traceGroup: {
+      traces: {
+        ...(refuseEvery("traceGroup.traces") as object),
+        listInputSchema: z.object({ projectId: z.string() }),
+        filterInputSchema: z.object({ projectId: z.string() }),
+        evaluatorTypeSchema: z.string(),
+        preconditionSchema: z.object({ field: z.string() }),
+      },
+      tracesV2: refuseEvery("traceGroup.tracesV2"),
+      spans: refuseEvery("traceGroup.spans"),
+      traceEditOverlay: refuseEvery("traceGroup.traceEditOverlay"),
+      sharedTrace: refuseEvery("traceGroup.sharedTrace"),
+      savedViews: { savedViews: refuseEvery("traceGroup.savedViews") },
+      costs: refuseEvery("traceGroup.costs"),
+      llmModelCost: {
+        ...(refuseEvery("traceGroup.llmModelCost") as object),
+        isSafeRegex: () => true,
+      },
+      modelProvider: refuseEvery("traceGroup.modelProvider"),
+      modelProviderChecks: {
+        tenantWrite: (permission: string) =>
+          refusingCheck(`traceGroup.modelProviderChecks.tenantWrite.${permission}`),
+        credentialProbe: refusingCheck("traceGroup.modelProviderChecks.credentialProbe"),
+      },
+      translate: refuseEvery("traceGroup.translate"),
+      httpProxy: refuseEvery("traceGroup.httpProxy"),
+      limits: refuseEvery("traceGroup.limits"),
+    } as unknown as AnyAppTraceGroupTrpcPorts,
+    // The product-infrastructure group. Its one build-time member is the
+    // monitor precondition parser, which the create and update inputs are
+    // constructed from; everything else refuses. `storedObjects` is absent
+    // because it takes no ports at all.
+    productInfra: {
+      dataRetention: refuseEvery("productInfra.dataRetention"),
+      monitors: {
+        ...(refuseEvery("productInfra.monitors") as object),
+        preconditionsSchema: z.array(z.object({ field: z.string() })),
+      },
+    } as unknown as AnyAppProductInfraTrpcPorts,
     user: refuseEvery("user"),
     workflows: {
       lifecycle: refuseEvery("workflows.lifecycle"),
@@ -294,22 +441,69 @@ describe("the app tRPC feature list", () => {
         "annotation",
         "annotationScore",
         "apiKey",
+        "authz",
+        "automation",
+        "batchRecord",
         "bugReports",
+        "codingAgents",
+        "costs",
         "dashboards",
         "dataPrivacy",
+        "dataRetention",
+        "dataset",
+        "datasetRecord",
+        "emailSuppression",
         "evaluations",
+        "evaluators",
         "experiments",
         "export",
+        "featureFlag",
         "frontDoor",
         "graphs",
         "group",
+        "home",
+        "httpProxy",
         "identity",
         "integrationsChecks",
         "joinRequests",
+        "langy",
+        "langyEgress",
+        "license",
+        "licenseEnforcement",
+        "limits",
+        "llmModelCost",
+        "modelProvider",
+        "monitors",
         "onboarding",
+        "ops",
         "optimization",
+        "organization",
+        "personalWorkspaceFeatures",
+        "pinnedTrace",
+        "plan",
         "presence",
+        "project",
+        "promptTags",
+        "prompts",
         "publicEnv",
+        "role",
+        "roleBinding",
+        "savedViews",
+        "scenarios",
+        "scimToken",
+        "setupSkills",
+        "share",
+        "sharedTrace",
+        "spans",
+        "ssoConnections",
+        "storedObjects",
+        "suites",
+        "team",
+        "topics",
+        "traceEditOverlay",
+        "traces",
+        "tracesV2",
+        "translate",
         "user",
         "workflow",
       ]);

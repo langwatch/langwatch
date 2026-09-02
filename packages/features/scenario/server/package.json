@@ -34,6 +34,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -56,12 +57,14 @@
     "langwatch": "workspace:*",
     "liquidjs": "^10.27.1",
     "nanoid": "^5.1.6",
+    "papaparse": "^5.5.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@langwatch/redis-client": "workspace:*",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@types/papaparse": "^5.5.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

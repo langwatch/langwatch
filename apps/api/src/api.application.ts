@@ -24,7 +24,11 @@ import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
 import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy";
-import type { ApiTrpcFeatureApplication, ApiTrpcSession } from "./app-trpc/app-trpc.context";
+import type {
+  ApiTrpcEnterpriseRequest,
+  ApiTrpcFeatureApplication,
+  ApiTrpcSession,
+} from "./app-trpc/app-trpc.context";
 
 export type ApiActor = Readonly<{ id: string }>;
 export type ApiServices = Readonly<{ agents: AgentApp; secrets: SecretApp }>;
@@ -114,8 +118,36 @@ type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
    * missing entirely is a third state none of them describe.
    */
   session: ApiTrpcSession | null;
+  /**
+   * The browser's own abort signal on a SUBSCRIPTION, and `undefined` on every
+   * ordinary request.
+   *
+   * It rides the context as well as the caller's own options because a
+   * subscription procedure may be resolved by a v10-shaped caller that leaves
+   * `opts.signal` undefined, and a generator that never learns the browser is
+   * gone stays suspended with its emitter listener attached and its tab
+   * registered forever. Present-and-undefined rather than optional: the
+   * surfaces that read it describe two states, not three.
+   */
+  signal: AbortSignal | undefined;
+  /**
+   * The operator scope the platform-tier check resolves.
+   *
+   * Written by that check and read by the surface behind it. `undefined` means
+   * the check never ran, which is a third state the surface describes: it is
+   * how `ops.getScope` tells "not an operator" apart from "this procedure was
+   * reached without the gate".
+   */
+  opsScope: { kind: "platform" | "none" } | undefined;
 } & AgentTrpcContext &
-  SecretTrpcContext & {
+  SecretTrpcContext &
+  /**
+   * `undefined` on every request here, deliberately: see
+   * {@link ApiTrpcEnterpriseRequest}. It is present rather than absent because
+   * the Enterprise composition names it, and a key that may be missing
+   * entirely is a third state its surface does not describe.
+   */
+  ApiTrpcEnterpriseRequest & {
     app: ApiServices & ApiTrpcFeatureApplication;
   };
 
@@ -485,6 +517,14 @@ export class ApiApplication {
       // call would be a procedure that passes because another one was checked.
       permissionChecked: false,
       session: context.session ?? null,
+      // Replaced by the real one on the subscription lane, which is the only
+      // transport that has a browser to lose.
+      signal: undefined,
+      // Written by the operator check when one runs; absent says it did not.
+      opsScope: undefined,
+      // The hosted edge's geo headers, which this process never sees and never
+      // quotes a currency from.
+      req: undefined,
       app: {
         ...this.requireServices(),
         ...(this.features?.application ?? unavailableFeatureApplication),
@@ -561,7 +601,10 @@ export class ApiApplication {
     const subscriptions = http.subscriptions?.({
       createCaller: async ({ request, signal }) =>
         this.trpc.createCaller(
-          this.withServices(await http.createContext(request)),
+          // On the context AND in the caller's options: a subscription
+          // procedure reads whichever its own transport gives it, and only the
+          // context reaches one resolved through a v10-shaped caller.
+          { ...this.withServices(await http.createContext(request)), signal },
           signal ? { signal } : {},
         ),
     });

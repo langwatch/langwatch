@@ -1,6 +1,7 @@
 import {
   Config,
   environmentBooleanSchema,
+  resolveTelemetryConfiguration,
   RuntimeConfig,
   portSchema,
   type ConfigValue,
@@ -12,7 +13,11 @@ import {
   type LoggerConfiguration,
 } from "@langwatch/observability";
 import { parseRoutingTable, poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
-import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
+import {
+  otlpMetricsExportOptionsFrom,
+  type OtlpMetricsExportOptions,
+  type ProcessObservabilityOptions,
+} from "@langwatch/observability/node";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import {
   resolveFeatureFlagConfig,
@@ -189,6 +194,15 @@ export const apiConfigDefinition = RuntimeConfig.define({
   authz: {
     epochCache: Config.value(optionalEnvironmentString, { env: "AUTHZ_EPOCH_CACHE" }),
     demoProjectId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_ID" }),
+    /**
+     * The account the demo project's own work is attributed to.
+     *
+     * Read beside the project id rather than derived from it: the demo project
+     * is readable by everybody, and the person it belongs to is a separate
+     * fact. Both blank on a deployment with no demo project, which is the
+     * shape the organization surface already answers for.
+     */
+    demoProjectUserId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_USER_ID" }),
   },
   infrastructure: {
     /**
@@ -292,6 +306,63 @@ export const apiConfigDefinition = RuntimeConfig.define({
       allowedProxyHosts: Config.value(optionalEnvironmentString, {
         env: "ALLOWED_PROXY_HOSTS",
       }),
+    },
+    /**
+     * The GitHub App this deployment reads coding-agent pull requests through.
+     *
+     * All five optional and read together: an install that never registered a
+     * GitHub App has none of them, and the feature's own `configured` flag is
+     * what turns that into "not connected" on the screen rather than a failure
+     * at the call. `host` is empty for github.com and names the Enterprise
+     * Server host otherwise.
+     *
+     * Read here because this module is the process's only environment reader.
+     */
+    github: {
+      appId: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_ID" }),
+      privateKey: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_PRIVATE_KEY" }),
+      appSlug: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_SLUG" }),
+      webhookSecret: Config.value(optionalEnvironmentString, {
+        env: "GITHUB_LANGY_WEBHOOK_SECRET",
+      }),
+      host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
+    },
+    /**
+     * Where this deployment keeps the bytes it externalized out of traces,
+     * datasets, scenarios and evaluation payloads.
+     *
+     * The BACKEND is a selection rather than a fallback chain: a deployment
+     * that named `azure` means it, and resolving one of its projects to S3
+     * because an S3 bucket also happens to be configured would write a
+     * tenant's bytes into a bucket nothing reads them back from. The absence
+     * of every S3 value is likewise not "use the shared bucket" — it is the
+     * documented single-replica filesystem fallback, which the destination
+     * policy owns and this module only supplies the root for.
+     *
+     * The per-organization ROUTES are read separately, off the variable names
+     * (`DATAPLANE_S3__<label>__<organizationId>`), because a declarative
+     * projection can only name variables it knows in advance. A process that
+     * ignored them would resolve every project to the shared bucket: it would
+     * still work, which is exactly the danger — one tenant's objects would be
+     * addressed in an account they do not own and cannot read.
+     */
+    storedObjects: {
+      backend: Config.value(z.enum(["s3", "azure"]).optional(), {
+        env: "STORED_OBJECTS_BACKEND",
+      }),
+      localFilesystemRoot: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_LOCAL_STORAGE_PATH",
+      }),
+      s3: {
+        bucket: Config.value(optionalEnvironmentString, { env: "S3_BUCKET_NAME" }),
+        endpoint: Config.value(optionalEnvironmentString, { env: "S3_ENDPOINT" }),
+        region: Config.value(optionalEnvironmentString, { env: "S3_REGION" }),
+        accessKeyId: Config.value(optionalEnvironmentString, { env: "S3_ACCESS_KEY_ID" }),
+        secretAccessKey: Config.value(optionalEnvironmentString, {
+          env: "S3_SECRET_ACCESS_KEY",
+        }),
+        sessionToken: Config.value(optionalEnvironmentString, { env: "S3_SESSION_TOKEN" }),
+      },
     },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
@@ -405,11 +476,61 @@ export type ApiExecutionConfigResolution = Readonly<{
   publicBaseUrl: string | undefined;
 }>;
 
+/**
+ * The GitHub App credentials, blank where a deployment registered none.
+ *
+ * Blank rather than `undefined` because that is what the feature's adapter
+ * takes, and what its own `configured` flag is computed from: a connection
+ * screen on an install with no App says "not connected", which is true, rather
+ * than failing.
+ */
+export type ApiGithubConfigResolution = Readonly<{
+  appId: string;
+  privateKey: string;
+  appSlug: string;
+  webhookSecret: string;
+  /** The Enterprise Server host, or absent for github.com. */
+  host: string | undefined;
+}>;
+
+/** One organization's own S3 account, as a `DATAPLANE_S3__*` variable declares it. */
+export type ApiDataplaneS3Route = Readonly<{
+  endpoint: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}>;
+
+/**
+ * The object storage this process reads externalized bytes back through.
+ *
+ * `backend` is the deployment's selection, `localFilesystemRoot` the
+ * documented single-replica fallback, `s3` the shared account, and `routes`
+ * the per-organization accounts BYOC tenants own. All four travel together
+ * because the destination precedence reads all four: a route first, then the
+ * selected backend, then the shared bucket, then the filesystem.
+ */
+export type ApiStoredObjectsConfigResolution = Readonly<{
+  backend: "s3" | "azure" | undefined;
+  localFilesystemRoot: string | undefined;
+  s3: Readonly<{
+    bucket: string | undefined;
+    endpoint: string | undefined;
+    region: string | undefined;
+    accessKeyId: string | undefined;
+    secretAccessKey: string | undefined;
+    sessionToken: string | undefined;
+  }>;
+  routes: ReadonlyMap<string, ApiDataplaneS3Route>;
+}>;
+
 export type ApiInfrastructureConfig = Readonly<{
   database: ApiDatabaseConfigResolution;
   clickhouse: ApiClickHouseConfigResolution;
   execution: ApiExecutionConfigResolution;
+  github: ApiGithubConfigResolution;
   modelProvider: ApiModelProviderConfigResolution;
+  storedObjects: ApiStoredObjectsConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
 }>;
@@ -420,6 +541,8 @@ export type ApiAuthzConfig = Readonly<{
   epochCacheEnabled: boolean;
   /** The project every caller may read, where a deployment names one. */
   demoProjectId: string | undefined;
+  /** The account that project's work is attributed to. */
+  demoProjectUserId: string | undefined;
 }>;
 
 export type ApiShutdownConfig = Readonly<{
@@ -440,6 +563,16 @@ export type ApiConfig = Readonly<
      */
     featureFlags: FeatureFlagConfig;
     infrastructure: ApiInfrastructureConfig;
+    /**
+     * Where this process pushes its own metrics, if it was told to push any.
+     *
+     * Its own leaf rather than part of `observability`: that block is the
+     * LangWatch SDK's identity for traces, and these are the OTLP collector's
+     * for metrics. They are configured by different variables, can be
+     * configured independently, and a deployment that set one and not the
+     * other means exactly that.
+     */
+    otlpMetrics: OtlpMetricsExportOptions;
     shutdown: ApiShutdownConfig;
   }
 >;
@@ -459,11 +592,16 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   return {
     ...value,
     featureFlags: resolveFeatureFlagConfig(source),
+    otlpMetrics: otlpMetricsExportOptionsFrom({
+      telemetry: resolveTelemetryConfiguration(source),
+      serviceName: value.serviceName,
+    }),
     authz: {
       // The platform app's exact rule, so one variable means one thing across
       // the deployment rather than one thing per tier.
       epochCacheEnabled: value.authz.epochCache === "1" || value.authz.epochCache === "true",
       demoProjectId: value.authz.demoProjectId?.trim() || undefined,
+      demoProjectUserId: value.authz.demoProjectUserId?.trim() || undefined,
     },
     shutdown: {
       processDeadlineMs:
@@ -485,6 +623,28 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         value.infrastructure.modelProvider,
         environmentStrings(source),
       ),
+      github: {
+        appId: value.infrastructure.github.appId?.trim() ?? "",
+        privateKey: value.infrastructure.github.privateKey?.trim() ?? "",
+        appSlug: value.infrastructure.github.appSlug?.trim() ?? "",
+        webhookSecret: value.infrastructure.github.webhookSecret?.trim() ?? "",
+        host: value.infrastructure.github.host?.trim() || undefined,
+      },
+      storedObjects: {
+        backend: value.infrastructure.storedObjects.backend,
+        localFilesystemRoot:
+          value.infrastructure.storedObjects.localFilesystemRoot?.trim() || undefined,
+        s3: {
+          bucket: value.infrastructure.storedObjects.s3.bucket?.trim() || undefined,
+          endpoint: value.infrastructure.storedObjects.s3.endpoint?.trim() || undefined,
+          region: value.infrastructure.storedObjects.s3.region?.trim() || undefined,
+          accessKeyId: value.infrastructure.storedObjects.s3.accessKeyId?.trim() || undefined,
+          secretAccessKey:
+            value.infrastructure.storedObjects.s3.secretAccessKey?.trim() || undefined,
+          sessionToken: value.infrastructure.storedObjects.s3.sessionToken?.trim() || undefined,
+        },
+        routes: resolveDataplaneS3Routes(source),
+      },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
@@ -655,4 +815,72 @@ function firstDefined(
     if (value !== undefined) return value;
   }
   return undefined;
+}
+
+
+const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
+
+const dataplaneS3RouteSchema = z.object({
+  endpoint: z.string().min(1),
+  bucket: z.string().min(1),
+  accessKeyId: z.string().min(1),
+  secretAccessKey: z.string().min(1),
+});
+
+/**
+ * The per-organization S3 routes this deployment declares.
+ *
+ * Read straight off the source because the variable NAMES carry the
+ * organization id — `DATAPLANE_S3__<label>__<organizationId>` — and the
+ * declarative projection can only name variables it knows in advance.
+ *
+ * A malformed entry is SKIPPED rather than failing the boot, matching the
+ * application byte for byte: one customer's bad JSON must not stop the process
+ * that serves everyone else. A DUPLICATE organization id does fail, also
+ * matching, because two routes for one tenant is a question this process
+ * cannot answer, and answering it wrong addresses their data somewhere they
+ * cannot read it.
+ */
+function resolveDataplaneS3Routes(
+  source: Readonly<Record<string, unknown>>,
+): ReadonlyMap<string, ApiDataplaneS3Route> {
+  const routes = new Map<string, ApiDataplaneS3Route>();
+
+  for (const [key, raw] of Object.entries(source)) {
+    if (!key.startsWith(DATAPLANE_S3_ENV_PREFIX) || typeof raw !== "string" || !raw) continue;
+
+    const suffix = key.slice(DATAPLANE_S3_ENV_PREFIX.length);
+    const separator = suffix.lastIndexOf("__");
+    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
+    if (!organizationId) continue;
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(raw);
+    } catch {
+      configLogger().warn(
+        { envVar: key },
+        "Ignoring a private S3 route variable that is not valid JSON",
+      );
+      continue;
+    }
+
+    const parsed = dataplaneS3RouteSchema.safeParse(decoded);
+    if (!parsed.success) {
+      configLogger().warn(
+        { envVar: key },
+        "Ignoring a private S3 route variable that is missing required fields",
+      );
+      continue;
+    }
+
+    if (routes.has(organizationId)) {
+      throw new Error(
+        `Duplicate private S3 config for organization "${organizationId}": "${key}" conflicts with an earlier definition.`,
+      );
+    }
+    routes.set(organizationId, parsed.data);
+  }
+
+  return routes;
 }

@@ -36,14 +36,20 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1080.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",
+    "langwatch": "workspace:*",
+    "prom-client": "^15.1.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

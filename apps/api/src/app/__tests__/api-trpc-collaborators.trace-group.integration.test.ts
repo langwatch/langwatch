@@ -38,6 +38,15 @@ import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
 } from "../api-trpc-collaborators.trace-group.composition";
+import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
+import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
+import { composeApiStudioHost } from "../api-studio-host.composition";
+import { composeApiTraceReadStack } from "../api-trace-read-stack.composition";
+import { composeApiPlanProvider, composeApiUsageStats } from "../api-usage.composition";
+import {
+  HttpWorkflowStudioStreamAdapter,
+  WorkflowStudioDispatchService,
+} from "@langwatch/workflow-server";
 
 /**
  * The sixteen namespaces this half owns, as the wire names them.
@@ -147,6 +156,8 @@ function testApplication(broadcast: PresenceEmitterPort): ApiTrpcFeatureApplicat
   return {
     ...stub<ApiTrpcFeatureApplication>("app"),
     ops: { isAdmin: () => true },
+    monitors: stub("app.monitors"),
+    storedObjectApp: stub("app.storedObjectApp"),
     config: {},
     broadcast,
     traces: testTraceApp(broadcast),
@@ -260,14 +271,67 @@ function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborat
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
     graphs: stub("graphs", { filterFieldSchema: anySchema }),
     group: stub("group"),
+    batchRecord: stub("batchRecord"),
+    dataset: stub("dataset"),
+    evaluators: stub("evaluators"),
     home: stub("home"),
     identity: stub("identity"),
     integrationsChecks: stub("integrationsChecks"),
     joinRequests: stub("joinRequests"),
     onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
     prompts: stub("prompts"),
+    role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
+    // The three product-infrastructure surfaces, as one entry. Only the
+    // monitor precondition parser is read while the record is BUILT; the
+    // retention policy and the rest refuse by name if a call reaches them.
+    productInfra: {
+      dataRetention: stub("productInfra.dataRetention"),
+      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
+    },
+    /**
+     * The nine tenant-administration surfaces, stubbed with only what the
+     * record reads while it is BUILT: the sign-up questionnaire the
+     * organization ceremony parses against, and the three data-dependent gates
+     * the mounts chain onto a procedure. Their own suite is what proves they
+     * answer.
+     */
+    orgGroup: {
+      organization: stub("orgGroup.organization", {
+        signUpDataSchema: anySchema,
+        isCustomRole: () => false,
+      }),
+      organizationAuditLogCheck: passthroughCheck,
+      project: stub("orgGroup.project"),
+      projectChecks: { create: passthroughCheck, traceSharing: passthroughCheck },
+      codingAgents: stub("orgGroup.codingAgents"),
+      automation: stub("orgGroup.automation", {
+        providers: stub("orgGroup.automation.providers"),
+      }),
+      emailSuppression: stub("orgGroup.emailSuppression"),
+      enterprise: {
+        scimToken: stub("orgGroup.enterprise.scimToken"),
+        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
+      },
+    },
     traceGroup: testTraceGroupPorts(),
+    /**
+     * The six agent surfaces, stubbed with only what the record reads while it
+     * is being BUILT. Their own suite is what proves they answer.
+     */
+    agentGroup: {
+      scenarios: stub("agentGroup.scenarios"),
+      langy: stub("agentGroup.langy"),
+      langyGates: {
+        refuseDemoProject: passthroughCheck,
+        enforceLangyAccess: passthroughCheck,
+      },
+      langyEgress: stub("agentGroup.langyEgress"),
+      ops: stub("agentGroup.ops"),
+      // Read at BUILD time — the mount asks it for a middleware — so it
+      // answers one rather than being one.
+      opsCheck: () => passthroughCheck,
+    },
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
@@ -607,5 +671,348 @@ describe("given a process that composed no trace read stack", () => {
       "usage",
       "plans",
     ]);
+  });
+});
+
+/**
+ * A Prisma double whose every model answers the shape its caller reads.
+ *
+ * A table rather than a class: the reads below touch eight models across three
+ * packages, and writing a stub per model would be eight declarations of
+ * somebody else's query. Anything not named answers empty, which is a real
+ * answer for a tenant with no rows rather than a refusal.
+ */
+function testPrisma(rows: Record<string, Record<string, unknown>> = {}): PrismaClient {
+  const defaults: Record<string, Record<string, unknown>> = {
+    project: { findMany: [], findUnique: null },
+    organization: { findUnique: { pricingModel: null } },
+    organizationUser: { findMany: [] },
+    organizationInvite: { findMany: [] },
+    customRole: { findMany: [] },
+    team: { findMany: [] },
+    roleBinding: { findMany: [] },
+    cost: { aggregate: { _sum: { amount: null } }, groupBy: [] },
+  };
+  const answers = { ...defaults, ...rows };
+  return new Proxy(
+    {},
+    {
+      get: (_target, model) =>
+        new Proxy(
+          {},
+          {
+            get: (_inner, method) => async () => {
+              const forModel = answers[String(model)];
+              if (!forModel || !(String(method) in forModel)) return null;
+              return forModel[String(method)];
+            },
+          },
+        ),
+      has: () => true,
+    },
+  ) as unknown as PrismaClient;
+}
+
+/**
+ * The process's ClickHouse, answering one canned result set per query shape.
+ *
+ * Matched on a fragment of the SQL rather than on the whole statement: the
+ * statements are hundreds of characters of generated SQL, and a test that
+ * pinned them would fail on every formatting change without ever noticing a
+ * behavioural one.
+ */
+function testClickHouse(answers: ReadonlyArray<readonly [string, unknown[]]>) {
+  const queries: string[] = [];
+  const client = {
+    query: async ({ query }: { query: string }) => {
+      queries.push(query);
+      const matched = answers.find(([fragment]) => query.includes(fragment));
+      return { json: async () => matched?.[1] ?? [] };
+    },
+  };
+  return {
+    queries,
+    resolveClient: async () => client as never,
+  };
+}
+
+describe("given an API process that composed the real observability collaborators", () => {
+  const plans = composeApiPlanProvider({ isSaas: false });
+
+  function composeRealGroup(clickHouse: ReturnType<typeof testClickHouse>) {
+    const { broadcast } = testBroadcast();
+    const prisma = testPrisma();
+    return composeApiTraceGroupCollaborators({
+      prisma,
+      authz: testAuthz(),
+      grants: stub<AuthzGrantsService>("grants"),
+      projects: {
+        tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
+        tryGetById: async () => ({ id: "project-1" }),
+      } as unknown as ProjectService,
+      organizations: stub("organizations"),
+      broadcast,
+      defaultRetentionDays: 49,
+      resolveClickHouseClient: clickHouse.resolveClient,
+      redis: null,
+      modelProviders: undefined,
+      processName: "langwatch-api",
+      traceReadsFrom: ({ dataRetention, topics }) =>
+        composeApiTraceReadStack({
+          prisma,
+          resolveClickHouseClient: clickHouse.resolveClient,
+          authz: testAuthz(),
+          projects: {
+            tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
+            tryGetById: async () => ({ id: "project-1" }),
+          } as unknown as ProjectService,
+          // The PLATFORM's own default policy, resolved by the real resolver
+          // against an empty rule set: a hand-written policy shape here would
+          // be a second declaration of Data Privacy's own contract.
+          dataPrivacy: {
+            getResolvedForProject: async () =>
+              resolveDataPrivacy({
+                rows: [],
+                facts: {
+                  organizationId: "org-1",
+                  teamId: "team-1",
+                  projectId: "project-1",
+                  departmentId: null,
+                  isPersonal: false,
+                },
+              }),
+          },
+          plans,
+          dataRetention,
+          topics,
+          modelProviders: undefined,
+          executionProxyBaseUrl: "http://127.0.0.1:5561",
+          processName: "langwatch-api",
+        }),
+      modelProviderHost: composeApiModelProviderHost({
+        egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
+        environment: {},
+        processName: "langwatch-api",
+      }),
+      studio: composeApiStudioHost({
+        nlpServiceUrl: undefined,
+        modelProviders: undefined,
+        processName: "langwatch-api",
+      }),
+      usage: composeApiUsageStats({
+        prisma,
+        plans,
+        resolveClickHouseClient: clickHouse.resolveClient,
+        processName: "langwatch-api",
+      }),
+      plans,
+    });
+  }
+
+  /** The record, with the observability half composed for real. */
+  function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
+    const { broadcast } = testBroadcast();
+    const group = composeRealGroup(clickHouse);
+    const collaborators = {
+      ...testCollaborators(broadcast),
+      traceGroup: group.ports,
+      application: {
+        ...testApplication(broadcast),
+        traces: group.traces,
+        share: group.share,
+        dataRetention: group.dataRetention,
+        topics: group.topics,
+        modelProviders: group.modelProviders,
+        planProvider: group.planProvider,
+      } as unknown as ApiTrpcFeatureApplication,
+    } as AnyApiTrpcCollaborators;
+
+    const features = ApiTrpcFeaturesComposition.tryCompose({
+      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
+      authz: testAuthz(),
+      audit: undefined,
+      collaborators,
+    });
+    if (!features) throw new Error("the record refused to compose against its real collaborators");
+
+    return {
+      group,
+      application: ApiApplication.create({
+        features,
+        http: {
+          createContext: async () => ({
+            actor: () => ({ id: "user-1" }),
+            tryActor: () => ({ id: "user-1" }),
+            authorize: async () => undefined,
+            session: { user: { id: "user-1", email: "person@example.com" } },
+          }),
+        },
+      }),
+    };
+  }
+
+  describe("when the live-count read is called through the real handler", () => {
+    it("answers the count its own ClickHouse returned rather than refusing", async () => {
+      const clickHouse = testClickHouse([["SELECT count() AS cnt", [{ cnt: 12 }]]]);
+      const { application } = composeRealApplication(clickHouse);
+
+      const { status, body } = await callTrpc(application, "tracesV2.newCount", {
+        projectId: "project-1",
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        since: 0,
+      });
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ result: { data: { json: { count: 12 } } } });
+      // The read really went to this process's connection, tenant-first.
+      expect(clickHouse.queries[0]).toContain("TenantId");
+    });
+  });
+
+  describe("when the reader's protections are resolved for a project", () => {
+    it("answers the real redactions rather than refusing by name", async () => {
+      const clickHouse = testClickHouse([]);
+      const group = composeRealGroup(clickHouse);
+
+      const protections = (await group.ports.traces.getViewerProtections(
+        { tryActor: () => ({ id: "user-1" }) },
+        { projectId: "project-1" },
+      )) as {
+        canSeeCosts: boolean;
+        contentCategories: Record<string, { canSee: boolean; restrictVisibleTo: string | null }>;
+      };
+      // No caller at all: the redactions are the anonymous reader's, which is
+      // the fail-closed direction rather than the permissive one.
+      const anonymous = (await group.ports.traces.getViewerProtections(
+        {},
+        { projectId: "project-1" },
+      )) as { canSeeCosts: boolean };
+
+      expect(protections).toMatchObject({ canSeeCosts: true });
+      expect(protections.contentCategories.input).toMatchObject({ canSee: true });
+      expect(anonymous.canSeeCosts).toBe(false);
+    });
+  });
+
+  describe("when the legacy grid's own ports are asked for", () => {
+    it("carries a real input parser and a real span digest", async () => {
+      const clickHouse = testClickHouse([]);
+      const group = composeRealGroup(clickHouse);
+
+      const parsed = group.ports.traces.listInputSchema.parse({
+        projectId: "project-1",
+        startDate: 1_700_000_000_000,
+        endDate: 1_700_000_600_000,
+      });
+      const digest = await group.ports.traces.formatSpansDigest([]);
+
+      expect(parsed).toMatchObject({ projectId: "project-1" });
+      expect(() =>
+        group.ports.traces.listInputSchema.parse({
+          projectId: "project-1",
+          startDate: 1_700_000_000_000,
+          endDate: 1_700_000_600_000,
+          pageOffset: 3,
+        }),
+      ).toThrow();
+      expect(typeof digest).toBe("string");
+    });
+  });
+
+  describe("when a model's ceilings are read through the real handler", () => {
+    it("answers the registry's own limits rather than null", async () => {
+      const clickHouse = testClickHouse([]);
+      const { application } = composeRealApplication(clickHouse);
+
+      const { status, body } = await callTrpc(application, "llmModelCost.getModelLimits", {
+        projectId: "project-1",
+        model: "openai/gpt-5-mini",
+      });
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        result: { data: { json: { maxInputTokens: expect.any(Number) } } },
+      });
+    });
+  });
+
+  describe("when a catastrophic-backtracking pattern is checked", () => {
+    it("uses the package's real gate rather than the conservative stand-in", () => {
+      const clickHouse = testClickHouse([]);
+      const group = composeRealGroup(clickHouse);
+
+      expect(group.ports.llmModelCost.isSafeRegex("^gpt-5")).toBe(true);
+      expect(group.ports.llmModelCost.isSafeRegex("(a+)+$")).toBe(false);
+    });
+  });
+
+  describe("when the usage panel and the plan banner are read through the real handler", () => {
+    it("answers a real reading taken against a real plan", async () => {
+      const clickHouse = testClickHouse([]);
+      const { application } = composeRealApplication(clickHouse);
+
+      const usage = await callTrpc(application, "limits.getUsage", { organizationId: "org-1" });
+      const plan = await callTrpc(application, "plan.getActivePlan", { organizationId: "org-1" });
+
+      expect(usage.status).toBe(200);
+      expect(usage.body).toMatchObject({
+        result: { data: { json: { membersCount: 0, activePlan: { name: expect.any(String) } } } },
+      });
+      expect(plan.status).toBe(200);
+      expect(plan.body).toMatchObject({ result: { data: { json: { name: expect.any(String) } } } });
+    });
+  });
+
+  describe("when the studio dispatches an event to an engine that answers", () => {
+    it("relays the engine's own server events back to the watcher", async () => {
+      const frames = [
+        'data: {"type":"component_state_change","payload":{"component_id":"node-1"}}\n\n',
+        'data: {"type":"done","payload":{}}\n\n',
+      ];
+      const encoder = new TextEncoder();
+      const engine = vi.fn(async () => ({
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const frame of frames) controller.enqueue(encoder.encode(frame));
+            controller.close();
+          },
+        }),
+      })) as unknown as typeof fetch;
+
+      const seen: Array<{ type: string }> = [];
+      const dispatch = WorkflowStudioDispatchService.create({
+        stream: HttpWorkflowStudioStreamAdapter.create({
+          serviceUrl: "http://127.0.0.1:5561",
+          fetch: engine,
+        }),
+        modelProviders: { getForProject: async () => ({}) } as never,
+      });
+
+      await dispatch.postEvent({
+        projectId: "project-1",
+        event: { type: "execute_flow", payload: { node_id: "node-1" } } as never,
+        onEvent: (event) => seen.push(event as { type: string }),
+      });
+
+      expect(seen.map((event) => event.type)).toEqual(["component_state_change", "done"]);
+    });
+  });
+
+  describe("when the studio is asked for on a process that composed no gateway", () => {
+    it("refuses the dispatch by name rather than dispatching without one", async () => {
+      const clickHouse = testClickHouse([]);
+      const group = composeRealGroup(clickHouse);
+
+      await expect(
+        group.ports.httpProxy.postStudioEvent(undefined, {
+          projectId: "project-1",
+          event: { type: "is_alive", payload: {} } as never,
+          onEvent: noop,
+        }),
+      ).rejects.toMatchObject({
+        code: "service_unavailable",
+        meta: { capability: "the studio event dispatch" },
+      });
+    });
   });
 });

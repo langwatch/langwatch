@@ -68,6 +68,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
 import {
   AZURE_SAFETY_PROVIDER_KEY,
   type ReportEvaluationCommandData,
@@ -94,6 +95,7 @@ import {
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -221,6 +223,30 @@ export type ApiExecutionCollaborators = Readonly<{
   evaluationPorts: EvaluationMountPorts<unknown, unknown>;
   /** The evaluator service the workflow application publishes evaluators through. */
   evaluators: EvaluatorService;
+  /**
+   * The monitor service an experiment upserts its own monitor through.
+   *
+   * Published rather than kept private for the same reason the dataset service
+   * is: the `monitors.*` surface answers from this ONE service, and a second
+   * one over the same table would let the wizard's list disagree with what an
+   * experiment just created.
+   */
+  monitors: MonitorService;
+  /**
+   * The dataset service the workflow and experiment applications read rows
+   * through.
+   *
+   * Published rather than kept private because `dataset.*`, `datasetRecord.*`
+   * and `batchRecord.*` answer from the SAME service: a project's rows are one
+   * set, and a second connection-level service over them would be a second
+   * answer to what a dataset contains.
+   */
+  datasets: DatasetService;
+  /**
+   * The experiment lookup a dataset resolves a borrowed name through, as the
+   * dataset application asks for it.
+   */
+  experimentLookup: DatasetExperimentLookup;
 }>;
 
 /**
@@ -375,6 +401,9 @@ export function composeApiExecutionCollaborators(
     experiments: experimentApp,
     evaluations: { reportEvaluation: reportEvaluation as (data: never) => Promise<unknown> },
     evaluators,
+    monitors,
+    datasets,
+    experimentLookup: experiments,
 
     workflowPorts: {
       lifecycle: {

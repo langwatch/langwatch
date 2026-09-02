@@ -73,6 +73,12 @@ function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
 const anySchema = z.any();
 const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
 
+/**
+ * A middleware that does nothing, for the custom checks a mount installs while
+ * the record is being BUILT.
+ */
+const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
+
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
 const ORGANIZATION_ID = "organization-1";
@@ -84,22 +90,69 @@ const RECORD_NAMESPACES = [
   "annotation",
   "annotationScore",
   "apiKey",
+  "authz",
+  "automation",
+  "batchRecord",
   "bugReports",
+  "codingAgents",
+  "costs",
   "dashboards",
   "dataPrivacy",
+  "dataRetention",
+  "dataset",
+  "datasetRecord",
+  "emailSuppression",
   "evaluations",
+  "evaluators",
   "experiments",
   "export",
+  "featureFlag",
   "frontDoor",
   "graphs",
   "group",
+  "home",
+  "httpProxy",
   "identity",
   "integrationsChecks",
   "joinRequests",
+  "langy",
+  "langyEgress",
+  "license",
+  "licenseEnforcement",
+  "limits",
+  "llmModelCost",
+  "modelProvider",
+  "monitors",
   "onboarding",
+  "ops",
   "optimization",
+  "organization",
+  "personalWorkspaceFeatures",
+  "pinnedTrace",
+  "plan",
   "presence",
+  "project",
+  "promptTags",
+  "prompts",
   "publicEnv",
+  "role",
+  "roleBinding",
+  "savedViews",
+  "scenarios",
+  "scimToken",
+  "setupSkills",
+  "share",
+  "sharedTrace",
+  "spans",
+  "ssoConnections",
+  "storedObjects",
+  "suites",
+  "team",
+  "topics",
+  "traceEditOverlay",
+  "traces",
+  "tracesV2",
+  "translate",
   "user",
   "workflow",
 ] as const;
@@ -289,13 +342,35 @@ function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
       },
       analytics: stub("app.analytics"),
       apiKeys: stub("app.apiKeys"),
+      authzApp: stub("app.authzApp"),
       config: {},
       dashboard: stub("app.dashboard"),
+      dataset: stub("app.dataset"),
       evaluations: stub("app.evaluations"),
+      evaluatorApp: stub("app.evaluatorApp"),
       experiments: stub("app.experiments"),
+      featureFlags: stub("app.featureFlags"),
       organizations: stub("app.organizations"),
+      permissions: stub("app.permissions"),
       presence: stub("app.presence"),
+      projects: stub("app.projects"),
+      prompts: stub("app.prompts"),
+      roles: stub("app.roles"),
       users: stub("app.users"),
+      monitors: stub("app.monitors"),
+      // The four slices the agent half writes. Its own suite is what proves
+      // they answer; here they only have to be present, because the seal
+      // refuses a set any fold left unfilled.
+      langy: stub("app.langy"),
+      scenarios: stub("app.scenarios"),
+      suites: stub("app.suites"),
+      storedObjectApp: stub("app.storedObjectApp"),
+      // The six slices the org-group half writes, present for the same reason.
+      automation: stub("app.automation"),
+      codingAgentApp: stub("app.codingAgentApp"),
+      licensing: stub("app.licensing"),
+      scimApp: stub("app.scimApp"),
+      usageLimits: stub("app.usageLimits"),
       workflows: stub("app.workflows"),
     } as unknown as ApiTrpcFeatureApplication,
     analytics: {
@@ -317,13 +392,99 @@ function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
       }),
     },
     auth: stub("auth"),
+    batchRecord: stub("batchRecord"),
+    dataset: stub("dataset"),
+    evaluators: stub("evaluators"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
     graphs: stub("graphs", { filterFieldSchema: anySchema }),
     group: stub("group"),
+    home: stub("home"),
     identity: stub("identity"),
     joinRequests: stub("joinRequests"),
     onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
+    prompts: stub("prompts"),
+    role: stub("role", { customRolePermission: anySchema }),
+    team: stub("team"),
+    // The three product-infrastructure surfaces, as one entry. Only the
+    // monitor precondition parser is read while the record is BUILT; the
+    // retention policy and the rest refuse by name if a call reaches them.
+    productInfra: {
+      dataRetention: stub("productInfra.dataRetention"),
+      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
+    },
+    /**
+     * The trace group, stubbed with only what the record reads while it is
+     * being BUILT: the input schemas its procedures are parsed with, and the
+     * two custom checks its model-provider mount wraps a procedure in. Its own
+     * suite is what proves it answers.
+     */
+    /**
+     * The nine tenant-administration surfaces, stubbed with only what the
+     * record reads while it is BUILT: the sign-up questionnaire the
+     * organization ceremony parses against, and the three data-dependent
+     * gates the mounts chain onto a procedure. Its own suite is what proves it
+     * answers.
+     */
+    orgGroup: {
+      organization: stub("orgGroup.organization", {
+        signUpDataSchema: anySchema,
+        isCustomRole: () => false,
+      }),
+      organizationAuditLogCheck: passThroughMiddleware,
+      project: stub("orgGroup.project"),
+      projectChecks: {
+        create: passThroughMiddleware,
+        traceSharing: passThroughMiddleware,
+      },
+      codingAgents: stub("orgGroup.codingAgents"),
+      automation: stub("orgGroup.automation", {
+        providers: stub("orgGroup.automation.providers"),
+      }),
+      emailSuppression: stub("orgGroup.emailSuppression"),
+      enterprise: {
+        scimToken: stub("orgGroup.enterprise.scimToken"),
+        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
+      },
+    },
+    traceGroup: {
+      traces: stub("traceGroup.traces", {
+        listInputSchema: anySchema,
+        filterInputSchema: anySchema,
+        evaluatorTypeSchema: anySchema,
+        preconditionSchema: anySchema,
+      }),
+      tracesV2: stub("traceGroup.tracesV2", { traceMetadataUpdateSchema: anySchema }),
+      spans: stub("traceGroup.spans"),
+      traceEditOverlay: stub("traceGroup.traceEditOverlay"),
+      sharedTrace: stub("traceGroup.sharedTrace"),
+      savedViews: stub("traceGroup.savedViews"),
+      costs: stub("traceGroup.costs"),
+      llmModelCost: stub("traceGroup.llmModelCost"),
+      modelProvider: stub("traceGroup.modelProvider"),
+      modelProviderChecks: {
+        tenantWrite: () => passThroughMiddleware,
+        credentialProbe: passThroughMiddleware,
+      },
+      translate: stub("traceGroup.translate"),
+      httpProxy: stub("traceGroup.httpProxy"),
+      limits: stub("traceGroup.limits"),
+    },
+    /**
+     * The six agent surfaces, stubbed with only what the record reads while it
+     * is being BUILT. Their own suite is what proves they answer.
+     */
+    agentGroup: {
+      scenarios: stub("agentGroup.scenarios"),
+      langy: stub("agentGroup.langy"),
+      langyGates: {
+        refuseDemoProject: passThroughMiddleware,
+        enforceLangyAccess: passThroughMiddleware,
+      },
+      langyEgress: stub("agentGroup.langyEgress"),
+      ops: stub("agentGroup.ops"),
+      opsCheck: () => passThroughMiddleware,
+    },
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
@@ -654,7 +815,7 @@ describe("given an API process composed with the product half of the record", ()
       const record = features.build(stubMount());
 
       expect(Object.keys(record).sort()).toEqual([...RECORD_NAMESPACES].sort());
-      expect(RECORD_NAMESPACES).toHaveLength(22);
+      expect(RECORD_NAMESPACES).toHaveLength(69);
     });
   });
 
@@ -730,7 +891,11 @@ function stubMount(): never {
     },
   });
   const root = {
-    router: (routes: Record<string, unknown>) => routes,
+    // `_def.procedures` as well as the routes themselves: a real tRPC router
+    // carries both, and the surfaces that merge sub-routers flat — the scenario
+    // and suite transports — read the routes back off `_def`.
+    router: (routes: Record<string, unknown>) =>
+      Object.assign({}, routes, { _def: { procedures: routes } }),
     mergeRouters: (...routers: Array<Record<string, unknown>>) =>
       Object.assign({}, ...routers) as Record<string, unknown>,
     procedure: chain,

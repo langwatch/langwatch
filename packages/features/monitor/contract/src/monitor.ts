@@ -29,7 +29,16 @@ const monitorPreconditionSchema = z
     subkey: z.string().optional(),
   })
   .strict();
-const monitorPreconditionsSchema = z.union([
+/**
+ * The precondition shape a monitor persists.
+ *
+ * Exported because a process that composes no trace-filter registry parses
+ * against this and nothing narrower: which RULES a given FIELD accepts is the
+ * registry's answer, and it now lives in a browser package no server module
+ * may value-import. Parsing the shape here is what the wire has always
+ * required; the field/rule cross-check returns with the registry.
+ */
+export const monitorPreconditionsSchema = z.union([
   z.array(monitorPreconditionSchema),
   // Some legacy monitors persisted `{}` rather than the newer array form.
   z.record(z.string(), z.unknown()),

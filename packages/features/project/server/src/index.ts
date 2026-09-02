@@ -10,6 +10,12 @@ export {
   PostgresProjectMetadataAdapter,
   type ProjectMetadataDatabase,
 } from "./adapters/postgres.project-metadata.adapter";
+export { PostgresRecentItemsAdapter } from "./adapters/postgres.recent-items.adapter";
+export { RecentItemsService } from "./services/recent-items.service";
+export type {
+  GetRecentItemsParams,
+  RecentItemType,
+} from "./services/recent-items.types";
 export { ProjectMetadataService } from "./services/project-metadata.service";
 export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter";
 export {

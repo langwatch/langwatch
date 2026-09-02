@@ -17,6 +17,12 @@ export type {
   WebhookStoredActionParams,
 } from "./adapters/webhook-provider.adapter";
 export { WebhookDeliveryAdapter } from "./adapters/webhook-delivery.adapter";
+export { AutomationProviderRegistryAdapter } from "./adapters/registry.automation-provider.adapter";
+export type {
+  PersistActionParamsArgs,
+  ServerDef,
+  ServerEntry,
+} from "./adapters/registry.automation-provider.adapter";
 export { AutomationPersistActionService } from "./services/persist-action.service";
 export {
   AutomationDatasetMapperPort,
@@ -218,3 +224,18 @@ export {
  * delegation are the feature's.
  */
 export { createTriggerRestApp } from "./transport/api-rest/automation.api";
+
+/** The scheduled-report handler and the two readers it renders from. */
+export {
+  dispatchScheduledReport,
+  reportWindowMs,
+  type ReportDispatchDeps,
+  type ReportProject,
+} from "./services/report-dispatch.service";
+export {
+  loadReportCharts,
+  REPORT_CHART_QUERY_CONCURRENCY,
+  type ReportChartDeps,
+  type ReportGraphInput,
+} from "./services/report-chart.service";
+export { toReportTraceRow } from "./services/report-trace-row.service";

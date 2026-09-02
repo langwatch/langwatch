@@ -301,9 +301,17 @@ export function createApiTrpcPorts<
         }),
     },
 
+    batchRecord: collaborators.batchRecord,
+
+    dataset: collaborators.dataset,
+
+    evaluators: collaborators.evaluators,
+
     graphs: collaborators.graphs,
 
     group: collaborators.group,
+
+    home: collaborators.home,
 
     identity: collaborators.identity,
 
@@ -327,6 +335,47 @@ export function createApiTrpcPorts<
      * every caller.
      */
     prisma,
+
+    prompts: collaborators.prompts,
+
+    role: collaborators.role,
+
+    team: collaborators.team,
+
+    /**
+     * The sixteen observability surfaces, forwarded whole.
+     *
+     * Nothing is lifted out of this group onto the process's own connection the
+     * way the workflow and user row reads were: the group is COMPOSED against
+     * that connection already, by `composeApiTraceGroupCollaborators`, which is
+     * also where each capability it cannot build names its own absence.
+     */
+    traceGroup: collaborators.traceGroup,
+
+    /**
+     * The three product-infrastructure surfaces, forwarded whole, for the same
+     * reason the group above is: they are COMPOSED against this process's own
+     * connections by `composeApiProductInfraCollaborators`, which is also where
+     * each capability it cannot build names its own absence.
+     */
+    productInfra: collaborators.productInfra,
+
+    /**
+     * The nine tenant-administration surfaces, forwarded whole, for the same
+     * reason the sixteen above are: the group is COMPOSED against this
+     * process's connection already, by `composeApiOrgGroupCollaborators`,
+     * which is also where each capability it cannot build names its own
+     * absence.
+     */
+    orgGroup: collaborators.orgGroup,
+
+    /**
+     * The six agent surfaces, forwarded whole, for the same reason: the group
+     * is COMPOSED against this process's Prisma, ClickHouse and Redis already,
+     * by `composeApiAgentGroupCollaborators`, which is also where each
+     * capability it cannot build names its own absence.
+     */
+    agentGroup: collaborators.agentGroup,
 
     user: {
       ...collaborators.user,

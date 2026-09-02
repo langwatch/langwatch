@@ -107,3 +107,21 @@ export {
   createSimulationRunsRestApp,
   type ScenarioRunPlatformUrlBuilder,
 } from "./transport/api-rest/simulation-run.api";
+
+// ---------------------------------------------------------------------------
+// The run-history download
+//
+// The keyset sweep behind `POST /api/export/scenario-runs/download`, its two
+// CSV row axes, and the two refusals the transport publishes. The request
+// vocabulary is `@langwatch/scenario-contract`'s, shared with the drawer that
+// composes the request.
+// ---------------------------------------------------------------------------
+export { ScenarioRunExportService } from "./services/scenario-run-export.service";
+export {
+  serializeRunsToCriteriaCsv,
+  serializeRunsToFullCsv,
+} from "./services/scenario-run-export-csv.rules";
+export {
+  ScenarioRunExportForbiddenError,
+  ScenarioRunExportUnauthenticatedError,
+} from "./services/scenario-run-export-error.service";

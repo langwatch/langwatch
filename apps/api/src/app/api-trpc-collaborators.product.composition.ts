@@ -171,6 +171,20 @@ export type ApiProductCollaborators = Readonly<{
   dataPrivacyPorts: DataPrivacyTrpcPorts<DataPrivacySnapshot, DataPrivacyPolicy>;
   /** The `integrationsChecks` entry. */
   integrationsChecksPorts: IntegrationsChecksTrpcPorts<ApiOnboardingCheckStatus>;
+  /**
+   * The trace-side commands this process produces, published so the halves
+   * composed after this one send on the SAME registration rather than making a
+   * second, which the pipeline does not allow.
+   */
+  traceCommands: ApiTraceProducerCommands;
+}>;
+
+/** What a process can send on the `trace_processing` pipeline it produces to. */
+export type ApiTraceProducerCommands = Readonly<{
+  add(input: TraceAnnotationMarker): Promise<void>;
+  remove(input: TraceAnnotationMarker): Promise<void>;
+  /** One raw OTLP span, as the collector enqueues them. */
+  recordSpan(input: unknown): Promise<void>;
 }>;
 
 /**
@@ -248,6 +262,7 @@ export function composeApiProductCollaborators(
 
   return {
     annotations,
+    traceCommands: traceAnnotations,
 
     annotationPorts: {
       writeTraceSuggestion: (_ctx, input) =>
@@ -383,19 +398,29 @@ export function withApiProductCollaborators(
 
 /** The entries a complete collaborator set carries, in the order it declares them. */
 const REQUIRED_COLLABORATORS = [
+  "agentGroup",
   "analytics",
   "annotation",
   "auth",
+  "batchRecord",
   "bugReports",
   "dataPrivacy",
+  "dataset",
   "evaluations",
+  "evaluators",
   "experiments",
   "graphs",
   "group",
+  "home",
   "identity",
   "integrationsChecks",
   "joinRequests",
   "onboarding",
+  "orgGroup",
+  "productInfra",
+  "prompts",
+  "role",
+  "team",
   "user",
   "workflows",
 ] as const;
@@ -405,14 +430,32 @@ const REQUIRED_APPLICATION_SLICES: ReadonlyArray<keyof ApiTrpcFeatureApplication
   "analytics",
   "annotations",
   "apiKeys",
+  "authzApp",
+  "automation",
+  "codingAgentApp",
   "broadcast",
   "config",
   "dashboard",
+  "dataset",
   "evaluations",
+  "evaluatorApp",
   "experiments",
+  "featureFlags",
+  "langy",
+  "licensing",
+  "monitors",
   "ops",
   "organizations",
+  "permissions",
   "presence",
+  "projects",
+  "prompts",
+  "roles",
+  "scenarios",
+  "storedObjectApp",
+  "scimApp",
+  "suites",
+  "usageLimits",
   "users",
   "workflows",
 ];
@@ -508,8 +551,14 @@ function composeTraceExistence(options: ApiProductCollaboratorsOptions): TraceEx
 type TraceAnnotationMarker = Readonly<{ tenantId: string; traceId: string; annotationId: string; occurredAt: number }>;
 
 /**
- * The two trace-side annotation commands, sent on the SAME `trace_processing`
- * pipeline the worker drains.
+ * The trace-side commands this process PRODUCES, sent on the SAME
+ * `trace_processing` pipeline the worker drains: a reviewer's comment marker,
+ * and the raw span an agent test writes.
+ *
+ * All three come off ONE registration because the pipeline may only be
+ * registered once — a second `register` of the same definition re-declares its
+ * aggregate and its event catalogue — so the process registers here, where the
+ * first producer needed it, and publishes the senders the other halves need.
  *
  * Registered PRODUCER-only: this process starts no consumer loop and folds
  * nothing. Registering the packaged definition rather than a local one is what
@@ -517,10 +566,9 @@ type TraceAnnotationMarker = Readonly<{ tenantId: string; traceId: string; annot
  * routes on — two descriptions of one event stream drift into jobs nothing can
  * pick up.
  */
-function composeTraceAnnotationCommands(options: ApiProductCollaboratorsOptions): Readonly<{
-  add(input: TraceAnnotationMarker): Promise<void>;
-  remove(input: TraceAnnotationMarker): Promise<void>;
-}> {
+function composeTraceAnnotationCommands(
+  options: ApiProductCollaboratorsOptions,
+): ApiTraceProducerCommands {
   if (!options.eventing) {
     const refuse = (): Promise<never> =>
       Promise.reject(
@@ -528,7 +576,7 @@ function composeTraceAnnotationCommands(options: ApiProductCollaboratorsOptions)
           "command queue, so it cannot record a reviewer's comment on the trace it was left on",
         ),
       );
-    return { add: refuse, remove: refuse };
+    return { add: refuse, remove: refuse, recordSpan: refuse };
   }
 
   const registered = options.eventing.register(
@@ -537,9 +585,10 @@ function composeTraceAnnotationCommands(options: ApiProductCollaboratorsOptions)
   const commands = registered.commands as Record<string, unknown>;
   const add = commands.addAnnotation;
   const remove = commands.removeAnnotation;
-  if (!isSender(add) || !isSender(remove)) {
+  const recordSpan = commands.recordSpan;
+  if (!isSender(add) || !isSender(remove) || !isSender(recordSpan)) {
     throw new Error(
-      'The trace_processing registration produced no "addAnnotation" and "removeAnnotation" command senders; the pipeline was registered incompletely.',
+      'The trace_processing registration produced no "addAnnotation", "removeAnnotation" and "recordSpan" command senders; the pipeline was registered incompletely.',
     );
   }
   return {
@@ -548,6 +597,9 @@ function composeTraceAnnotationCommands(options: ApiProductCollaboratorsOptions)
     },
     remove: async (input) => {
       await remove.send(input);
+    },
+    recordSpan: async (input) => {
+      await recordSpan.send(input);
     },
   };
 }

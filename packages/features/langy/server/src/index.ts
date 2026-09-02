@@ -53,6 +53,38 @@ export {
   type LangyEgressTrpcContext,
   type LangyEgressTrpcPorts,
 } from "./transport/api-trpc/langy-egress.api";
+// The setup-skill catalogue and the door onto it. Langy's because the BODIES
+// are: they are generated from the compiled skills the Langy image ships, so
+// the prompt a customer copies and the skill Langy runs cannot disagree.
+export {
+  SetupSkillsTrpcApi,
+  type SetupSkillsTrpcContext,
+} from "./transport/api-trpc/setup-skills.api";
+export {
+  isSetupSkillId,
+  setupSkillBody,
+  type SetupSkillId,
+} from "./services/setup-skills.service";
+// The agent-to-page UI-action channel. Moved here whole from the application
+// that used to hold it; the one thing it could not bring is the workbench's
+// action manifest, which arrives as {@link LangyUiActionCatalogPort}.
+export {
+  LangyUiActionService,
+  uiActionKeys,
+  UI_ACTION_CLAIM_WINDOW_MS,
+  UI_ACTION_DEFAULT_BUDGET_MS,
+  UI_ACTION_MAX_BUDGET_MS,
+  type UiActionBackendRunner,
+  type UiActionBlockingRedis,
+  type UiActionCompletion,
+  type UiActionConversations,
+  type UiActionOutcome,
+  type UiActionRedis,
+} from "./services/langy-ui-action.service";
+export {
+  LangyUiActionCatalogPort,
+  type LangyUiActionDefinition,
+} from "./ports/langy-ui-action-catalog.port";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to

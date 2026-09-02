@@ -86,7 +86,11 @@ export {
   type OrganizationRestPorts,
   type OrganizationRestService,
 } from "./transport/api-rest/organization.api";
-export { TeamTrpcApi, type TeamTrpcContext } from "./transport/api-trpc/team.api";
+export {
+  TeamTrpcApi,
+  type TeamTrpcContext,
+  type TeamTrpcPorts,
+} from "./transport/api-trpc/team.api";
 export {
   GroupTrpcApi,
   type GroupTrpcContext,
@@ -133,10 +137,21 @@ export {
 export {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
+  INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
   InviteExpiredError,
   InviteNotFoundError,
   InviteNotReadyError,
   InviteThrottledError,
   InviteWrongAccountError,
+  OrganizationNotFoundError,
   TeamNotInOrganizationError,
 } from "./services/invite.errors";
+export {
+  LITE_MEMBER_VIEWER_ONLY_ERROR,
+  computeEffectiveTeamRoleUpdates,
+  type CurrentTeamMembership,
+  type EffectiveTeamRoleUpdate,
+  type TeamRoleUpdate,
+  type TeamRoleUpdateOrigin,
+} from "./services/compute-effective-team-role-updates";

@@ -85,7 +85,7 @@ type TeamTrpcProcedures<
  * The process capabilities this transport needs that are not the
  * organization's own.
  */
-type TeamTrpcPorts = Readonly<{
+export type TeamTrpcPorts = Readonly<{
   /**
    * Whether the caller may administer the organization. Not a gate: the two
    * member reads pass it to the service, which widens or narrows what each

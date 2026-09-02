@@ -8,7 +8,6 @@ import {
   retroactiveMutationProjectInputSchema,
   ScopeTargetNotFoundError,
   type DataRetentionService,
-  type RetentionScopeType,
 } from "@langwatch/data-retention-contract";
 import {
   TRPCError,
@@ -20,11 +19,9 @@ import { z } from "zod";
 
 type DataRetentionApplication = Readonly<{ dataRetention: DataRetentionService }>;
 
-/** One retention target: the tier plus the organization, team or project id. */
-export type RetentionScopeTarget = Readonly<{
-  scopeType: RetentionScopeType;
-  scopeId: string;
-}>;
+import type { RetentionScopeTarget } from "../../ports/data-retention-directory.port";
+
+export type { RetentionScopeTarget };
 
 /** The process supplies authentication; authorization arrives as `authz`. */
 export type DataRetentionTrpcContext = Readonly<{

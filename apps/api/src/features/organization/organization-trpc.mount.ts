@@ -17,6 +17,7 @@ import {
   OnboardingTrpcApi,
   OrganizationTrpcApi,
   PersonalWorkspaceFeaturesTrpcApi,
+  TeamTrpcApi,
   type PersonalWorkspaceFeaturesTrpcContext,
   type GroupTrpcContext,
   type GroupTrpcPorts,
@@ -26,6 +27,8 @@ import {
   type OnboardingTrpcPorts,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
+  type TeamTrpcContext,
+  type TeamTrpcPorts,
 } from "@langwatch/organization-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { z } from "zod";
@@ -93,4 +96,20 @@ export function createPersonalWorkspaceFeaturesTrpcRouter<
   TRoot extends AnyTRPCRootTypes,
 >(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
   return PersonalWorkspaceFeaturesTrpcApi.create(mount.root, createTrpcApiService(mount));
+}
+
+/**
+ * Mounts `team.*` on the app process's tRPC root.
+ *
+ * Two ports, and both are the deployment's rather than the team's: whether the
+ * caller may administer the organization — which widens or narrows what each
+ * member row shows rather than gating the read — and the Enterprise plan gate a
+ * member list assigning a custom role has to clear.
+ */
+export function createTeamTrpcRouter<
+  TContext extends TeamTrpcContext,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TeamTrpcPorts>) {
+  return TeamTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

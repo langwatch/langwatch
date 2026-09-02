@@ -47,22 +47,33 @@ const RECORD_NAMESPACES = [
   "annotation",
   "annotationScore",
   "apiKey",
+  "authz",
+  "batchRecord",
   "bugReports",
   "dashboards",
   "dataPrivacy",
+  "dataset",
+  "datasetRecord",
   "evaluations",
+  "evaluators",
   "experiments",
   "export",
   "frontDoor",
+  "featureFlag",
   "graphs",
   "group",
+  "home",
   "identity",
   "integrationsChecks",
   "joinRequests",
   "onboarding",
   "optimization",
+  "personalWorkspaceFeatures",
   "presence",
+  "promptTags",
+  "prompts",
   "publicEnv",
+  "team",
   "user",
   "workflow",
 ] as const;
@@ -94,6 +105,12 @@ const anySchema = z.any();
 
 /** The rollout gate, open: the closed case is the workbench feature's own suite. */
 const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
+
+/**
+ * A middleware that does nothing, for the custom checks a mount installs while
+ * the record is being BUILT.
+ */
+const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
 
 const workflowRow = {
   id: "workflow-1",
@@ -158,6 +175,8 @@ function testApplication(): ApiTrpcFeatureApplication {
       getAll: async () => [dashboardRow],
     },
     ops: { isAdmin: () => true },
+    monitors: stub("app.monitors"),
+    storedObjectApp: stub("app.storedObjectApp"),
     config: { opsSidebarEmails: ["staff@langwatch.ai"] },
   } as unknown as ApiTrpcFeatureApplication;
 }
@@ -206,20 +225,106 @@ function testCollaborators(): AnyApiTrpcCollaborators {
       }),
     },
     annotation: stub("annotation"),
+    batchRecord: stub("batchRecord"),
     auth: testAuthApp(),
     bugReports: {
       getAll: async () => bugReportPage,
       getById: async () => null,
     },
     dataPrivacy: stub("dataPrivacy"),
+    dataset: stub("dataset"),
+    evaluators: stub("evaluators"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
     graphs: stub("graphs", { filterFieldSchema: anySchema }),
     group: stub("group"),
+    home: stub("home"),
     identity: stub("identity"),
     integrationsChecks: stub("integrationsChecks"),
     joinRequests: stub("joinRequests"),
     onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
+    prompts: stub("prompts"),
+    role: stub("role", { customRolePermission: anySchema }),
+    team: stub("team"),
+    // The three product-infrastructure surfaces, as one entry. Only the
+    // monitor precondition parser is read while the record is BUILT; the
+    // retention policy and the rest refuse by name if a call reaches them.
+    productInfra: {
+      dataRetention: stub("productInfra.dataRetention"),
+      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
+    },
+    /**
+     * The trace group, stubbed with only what the record reads while it is
+     * being BUILT: the input schemas its procedures are parsed with, and the
+     * two custom checks its model-provider mount wraps a procedure in. Its own
+     * suite is what proves it answers.
+     */
+    /**
+     * The nine tenant-administration surfaces, stubbed with only what the
+     * record reads while it is BUILT: the sign-up questionnaire the
+     * organization ceremony parses against, and the three data-dependent
+     * gates the mounts chain onto a procedure. Its own suite is what proves it
+     * answers.
+     */
+    orgGroup: {
+      organization: stub("orgGroup.organization", {
+        signUpDataSchema: anySchema,
+        isCustomRole: () => false,
+      }),
+      organizationAuditLogCheck: passThroughMiddleware,
+      project: stub("orgGroup.project"),
+      projectChecks: {
+        create: passThroughMiddleware,
+        traceSharing: passThroughMiddleware,
+      },
+      codingAgents: stub("orgGroup.codingAgents"),
+      automation: stub("orgGroup.automation", {
+        providers: stub("orgGroup.automation.providers"),
+      }),
+      emailSuppression: stub("orgGroup.emailSuppression"),
+      enterprise: {
+        scimToken: stub("orgGroup.enterprise.scimToken"),
+        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
+      },
+    },
+    traceGroup: {
+      traces: stub("traceGroup.traces", {
+        listInputSchema: anySchema,
+        filterInputSchema: anySchema,
+        evaluatorTypeSchema: anySchema,
+        preconditionSchema: anySchema,
+      }),
+      tracesV2: stub("traceGroup.tracesV2", { traceMetadataUpdateSchema: anySchema }),
+      spans: stub("traceGroup.spans"),
+      traceEditOverlay: stub("traceGroup.traceEditOverlay"),
+      sharedTrace: stub("traceGroup.sharedTrace"),
+      savedViews: stub("traceGroup.savedViews"),
+      costs: stub("traceGroup.costs"),
+      llmModelCost: stub("traceGroup.llmModelCost"),
+      modelProvider: stub("traceGroup.modelProvider"),
+      modelProviderChecks: {
+        tenantWrite: () => passThroughMiddleware,
+        credentialProbe: passThroughMiddleware,
+      },
+      translate: stub("traceGroup.translate"),
+      httpProxy: stub("traceGroup.httpProxy"),
+      limits: stub("traceGroup.limits"),
+    },
+    /**
+     * The six agent surfaces, stubbed with only what the record reads while it
+     * is being BUILT. Their own suite is what proves they answer.
+     */
+    agentGroup: {
+      scenarios: stub("agentGroup.scenarios"),
+      langy: stub("agentGroup.langy"),
+      langyGates: {
+        refuseDemoProject: passThroughMiddleware,
+        enforceLangyAccess: passThroughMiddleware,
+      },
+      langyEgress: stub("agentGroup.langyEgress"),
+      ops: stub("agentGroup.ops"),
+      opsCheck: () => passThroughMiddleware,
+    },
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),

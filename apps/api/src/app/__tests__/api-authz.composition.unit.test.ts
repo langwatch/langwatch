@@ -55,7 +55,11 @@ class RecordingAbsence extends ApiAuthzAbsenceReportPort {
   }
 }
 
-const config = { epochCacheEnabled: false, demoProjectId: undefined } as const;
+const config = {
+  epochCacheEnabled: false,
+  demoProjectId: undefined,
+  demoProjectUserId: undefined,
+} as const;
 
 describe("ApiAuthzComposition", () => {
   describe("when the process has a database and its own dispatch", () => {

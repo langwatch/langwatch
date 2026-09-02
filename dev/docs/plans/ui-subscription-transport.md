@@ -259,41 +259,50 @@ When `apps/api` becomes the origin, that slice needs:
 
 Nothing above is in scope here and none of it was touched.
 
-## Which of the nine the record serves
+## Which of the nine the record serves — all of them, since 2026-09-02
 
 The subscription lane resolves a path on a caller built from the process's own
 root, so a procedure is watchable exactly when its namespace is in
-`apps/api/src/app-trpc/app-trpc.features.ts`. Four of the nine are:
+`apps/api/src/app-trpc/app-trpc.features.ts`. Every one of the ten call sites'
+nine procedures is now in that record, and each is driven end to end over the
+real `/api/sse` lane by the suite that mounted it:
 
-| in the record | why it was cheap |
-| ------------- | ---------------- |
-| `export.onExportProgress`, `export.onScenarioRunExportProgress` | the mount owns its procedures and takes no ports |
-| `presence.onPresenceUpdate`, `presence.onPresenceCursor` | `PresenceTrpcApi` takes no ports; every answer is read off `ctx.app` |
+| in the record | mounted by | proved by |
+| ------------- | ---------- | --------- |
+| `export.onExportProgress`, `export.onScenarioRunExportProgress` | the export mount, which owns its procedures and takes no ports | `api-trpc-collaborators.product.integration.test.ts` |
+| `presence.onPresenceUpdate`, `presence.onPresenceCursor` | `PresenceTrpcApi`, which takes no ports; every answer is read off `ctx.app` | the identity half's suite |
+| `traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate` | `app-trpc.trace-group.ts` | `api-trpc-collaborators.trace-group.integration.test.ts` |
+| `scenarios.onSimulationUpdate`, `langy.onConversationUpdate`, `langy.onTurnStream` | `app-trpc.agent-group.ts` | `api-trpc-collaborators.agent-group.integration.test.ts` |
 
-The other five are `traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate`,
-`scenarios.onSimulationUpdate`, `langy.onConversationUpdate` and
-`langy.onTurnStream`, and they are all blocked by the same thing: their
-transports take PORTS, the record's ports object is supplied by
-`platform/app/src/server/api/root.ts`, and `platform/app` is deletes-only —
-a new port group there is an insertion. What each wants:
+What unblocked the last five was not the lane — the lane was finished when this
+document was written — but the PORTS their transports take, which were supplied
+by `platform/app/src/server/api/root.ts` while `platform/app` is deletes-only.
+Each was resolved by composing the vertical in `apps/api` rather than by adding
+a port group there:
 
-- `scenarios` — `trackServerEvent`, `fireScenarioCreatedNurturing`,
-  `captureException`.
-- `traces` — the two filter schemas built on the app's analytics vocabulary,
-  the evaluator/precondition engine, `formatSpansDigest`, and
-  `getUserProtectionsForProject` (data-privacy policy service + plan
-  visibility window + `resolveOrganizationId`).
-- `tracesV2` — `createTracesV2TrpcPorts()`: the AI composer, the ClickHouse
-  query translator, the reserved-metadata write and the ancestor-prompt walk.
-- `langy` / `langyEgress` — a Redis rate limiter, the product-analytics sink,
-  the audit sink, the two platform-private gates (`refuseDemoProject`,
-  `enforceLangyAccess`) and `LangyUiActionService`. The service has a second
-  platform consumer (`server/routes/langy-ui-actions.ts`), so it cannot be
-  moved into `@langwatch/langy-server` either without that file's import line
-  gaining a name.
+- `traces` and `tracesV2` moved with the observability half.
+- `scenarios` — `trackScenarioCreated`, `fireScenarioCreatedNurturing` and
+  `captureException` are logged rather than sent, because this process composes
+  no product-analytics sink and refusing would cost a customer the test case
+  they just wrote to protect an email nobody was waiting on.
+- `langy` / `langyEgress` — the two budgets meter through the process's own
+  shared counter, the audit sink is the process's own, and the two gates
+  (`refuseDemoProject`, `enforceLangyAccess`) are built in the composition
+  because neither is a permission a declaration could describe.
+  `LangyUiActionService` MOVED into `@langwatch/langy-server`, with the one
+  thing it could not bring — the experiments workbench's action manifest —
+  arriving as `LangyUiActionCatalogPort`. Its second platform consumer
+  (`server/routes/langy-ui-actions.ts`) is left broken by the migration ruling.
 
-So the record entry is the LAST line of each of those verticals' port
-migration, not a mount move that can be done ahead of it.
+Three properties the agent group's suite pins that the others do not: the
+tenant-wide Langy signal is DROPPED for a conversation the caller does not own
+(the user-scope gate, read off the broadcast payload rather than the input);
+`onTurnStream` passes its watch gate and then completes cleanly on a process
+with no Redis, which is the transport's documented answer — the browser falls
+back to the Postgres conversation read rather than seeing an error; and the
+request's own abort signal now rides the tRPC CONTEXT as well as the caller's
+options, so a procedure resolved by a v10-shaped caller still learns the browser
+is gone instead of holding its emitter listener forever.
 
 ## Not done, and why
 

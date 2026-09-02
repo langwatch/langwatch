@@ -1,5 +1,8 @@
 import { configureLogger, createLogger, type Logger } from "@langwatch/observability";
-import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
+import {
+  startOtlpMetricsExport,
+  type ProcessObservabilityOptions,
+} from "@langwatch/observability/node";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { ApiProcessGraphPort } from "./api.process";
 import {
@@ -63,10 +66,17 @@ export class ApiRuntimeBootstrap {
     const config = resolveApiConfig(options.source);
     const loggerConfiguration = apiLoggerConfiguration(config);
     const configuredObservability = apiObservabilityConfiguration(config);
+    // Metrics are their own provider, installed before anything records into
+    // it: the instruments resolve a meter once at module scope, so a counter
+    // touched before this line writes into a no-op for the life of the
+    // process. The handle it returns is a shutdown phase, not a signal
+    // handler — the drain below is what decides when this process ends.
+    const metrics = startOtlpMetricsExport(config.otlpMetrics);
     const observability: ProcessObservabilityOptions = {
       ...configuredObservability,
       ...options.observability,
       setup: options.observability?.setup ?? configuredObservability.setup,
+      flushers: [...(options.observability?.flushers ?? []), ...(metrics ? [metrics] : [])],
     };
     configureLogger(loggerConfiguration);
 

@@ -93,7 +93,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
@@ -101,6 +102,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
+    "nanoid": "^5.1.5",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

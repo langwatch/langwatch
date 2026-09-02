@@ -32,14 +32,25 @@ import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AuthApp } from "@langwatch/auth-server";
 import type { SavedWorkbenchChartTrpcPorts, GraphTrpcPorts } from "@langwatch/dashboard-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
+import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
+import type {
+  BatchRecordTrpcPorts,
+  DatasetTrpcPorts,
+} from "@langwatch/dataset-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 import type {
   GroupTrpcPorts,
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
+  TeamTrpcPorts,
 } from "@langwatch/organization-server";
-import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
+import type {
+  HomeTrpcPorts,
+  IntegrationsChecksTrpcPorts,
+} from "@langwatch/project-server";
+import type { PromptTrpcPorts } from "@langwatch/prompt-server";
+import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcPorts,
@@ -48,6 +59,10 @@ import type {
 import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
+import type { AnyAppAgentGroupTrpcPorts } from "./app-trpc.agent-group";
+import type { AnyAppOrgGroupTrpcPorts } from "./app-trpc.org-group";
+import type { AnyAppProductInfraTrpcPorts } from "./app-trpc.product-infra";
+import type { AnyAppTraceGroupTrpcPorts } from "./app-trpc.trace-group";
 
 /**
  * The `user.*` entries this process answers from its own Prisma connection:
@@ -114,6 +129,10 @@ export type ApiTrpcCollaborators<
   TWorkbenchState,
   TTimeseriesInputWire = unknown,
   TReadInputWire = unknown,
+  TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
+  TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
+  TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
+  TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
 > = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.
@@ -143,6 +162,19 @@ export type ApiTrpcCollaborators<
   /** The composed auth application both signed-out doors answer from. */
   auth: AuthApp;
 
+  /**
+   * The two batch-evaluation rollups. They are the PROCESS's rather than the
+   * dataset package's because the table is: `BatchEvaluation` records what an
+   * experiment run scored, and the dataset it ran against is a join.
+   */
+  batchRecord: BatchRecordTrpcPorts<unknown, unknown>;
+
+  /**
+   * The permission probe a dataset COPY runs against the source project — the
+   * second project the declared check on the procedure never covered.
+   */
+  dataset: DatasetTrpcPorts;
+
   /** The support inbox itself; the audit trail beside it is this process's. */
   bugReports: Omit<BugReportTrpcPorts<TBugReportPage, TBugReport>, "recordAudit">;
 
@@ -150,11 +182,27 @@ export type ApiTrpcCollaborators<
 
   evaluations: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
 
+  /**
+   * The workflow behind a WORKFLOW evaluator: its linked row, the monitors
+   * running it, and the copy that replicates its graph into another project.
+   * All of it is the host's, because a studio graph is Workflow's and the
+   * evaluator package never reaches into one.
+   */
+  evaluators: EvaluatorTrpcPorts;
+
   experiments: Omit<ExperimentTrpcPorts<TWorkbenchState>, ApiOwnedExperimentPorts>;
 
   graphs: GraphTrpcPorts<TFilterField>;
 
   group: GroupTrpcPorts;
+
+  /**
+   * The home screen's recent-activity strip: this process's own audit trail,
+   * hydrated with the name and link each entity it names renders as. Five
+   * verticals' rows behind one read, which is nobody's service but the
+   * application's.
+   */
+  home: HomeTrpcPorts;
 
   identity: IdentityTrpcPorts;
 
@@ -163,6 +211,77 @@ export type ApiTrpcCollaborators<
   joinRequests: Omit<JoinRequestTrpcPorts, "listUserNames">;
 
   onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
+
+  /**
+   * The lifecycle signal a project's new prompt fires. The whole entry, because
+   * it is the whole port: everything else `prompts.*` needs is a row read on
+   * `ctx.app.prompts`.
+   */
+  prompts: PromptTrpcPorts;
+
+  /**
+   * The organization probe a role-scoped check runs — the role's organization
+   * is a row loaded by its id, so no procedure input names it — plus the
+   * Enterprise plan gate a custom role has to clear and the permission
+   * vocabulary its entries are parsed against.
+   */
+  role: RoleTrpcPorts;
+
+  /**
+   * The organization-administration probe the two member reads widen or narrow
+   * a row with, and the Enterprise plan gate a custom-role assignment clears.
+   */
+  team: TeamTrpcPorts;
+
+  /**
+   * The sixteen observability surfaces' ports, as one entry.
+   *
+   * Unlike every other entry here this one is not a leftover the process could
+   * not build: the API process composes the whole group for itself — the share
+   * ledger, the topic tree, the retention policy, the saved views, the spend
+   * rollup and the provider gateway all run on its own connection. What it
+   * cannot build is named INSIDE the group, by the ports its composition
+   * declares, so a deployment reads one absence per capability rather than one
+   * absence for sixteen namespaces.
+   */
+  traceGroup: TTraceGroup;
+
+  /**
+   * The nine tenant-administration surfaces' ports, as one entry.
+   *
+   * Like the trace group and unlike everything else here, this is not a
+   * leftover the process could not build: the API composes the whole group for
+   * itself — the project application, the coding-agent reads, the automation
+   * application and the four Enterprise routers all run on its own connection.
+   * What it cannot build is named INSIDE the group, so a deployment reads one
+   * absence per capability rather than one absence for nine namespaces.
+   */
+  orgGroup: TOrgGroup;
+
+  /**
+   * The six agent surfaces' ports, as one entry.
+   *
+   * Like the two groups above, this is not a leftover: the API composes the
+   * scenario, suite and Langy applications for itself off its own Prisma,
+   * ClickHouse and Redis connections. What it cannot compose is named INSIDE
+   * the group — the queue-backed commands a run or a turn is STARTED with, and
+   * the operator runtime's three explorers — so a deployment reads one absence
+   * per capability rather than one absence for six namespaces.
+   */
+  agentGroup: TAgentGroup;
+
+  /**
+   * The three product-infrastructure surfaces' ports, as one entry.
+   *
+   * Like the three groups above, this is not a leftover: the API composes the
+   * object store, the retention policy and the monitor application for itself,
+   * off its own Prisma and ClickHouse connections and the byte backend its
+   * configuration names. What it cannot compose is named INSIDE the group —
+   * the Azure byte driver, the plan reading and the evaluation-run trend — so
+   * a deployment reads one absence per capability rather than one absence for
+   * three namespaces.
+   */
+  productInfra: TProductInfra;
 
   user: Omit<UserTrpcPorts, ApiOwnedUserPorts>;
 
@@ -215,5 +334,9 @@ export type AnyApiTrpcCollaborators = ApiTrpcCollaborators<
   AnalyticsTimeseriesInput,
   unknown,
   unknown,
-  unknown
+  unknown,
+  AnyAppTraceGroupTrpcPorts,
+  AnyAppOrgGroupTrpcPorts,
+  AnyAppAgentGroupTrpcPorts,
+  AnyAppProductInfraTrpcPorts
 >;

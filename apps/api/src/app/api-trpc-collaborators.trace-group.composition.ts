@@ -81,12 +81,16 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  deriveUnmappedCostSuggestion,
   ModelProviderApp,
   type LlmModelCostTrpcPorts,
   type ModelProviderTrpcPorts,
   type TranslateTrpcPorts,
 } from "@langwatch/model-provider-server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  getStaticModelCostRates,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { Cost, PrismaClient, Project } from "@langwatch/prisma-client/generated";
@@ -262,6 +266,21 @@ export type ApiTraceGroupCollaboratorsOptions = Readonly<{
 
   /** The ClickHouse trace read stack; absent refuses every trace read. */
   traceReads?: ApiTraceReadStackPort;
+  /**
+   * Builds the read stack over the two collaborators THIS composition owns.
+   *
+   * A factory rather than a finished port because the read stack needs the
+   * retention cascade a span read's floor is widened to and the topic tree the
+   * grid labels its rows with, and both are composed here. Handing the process
+   * a second retention adapter or a second topic reader would be two answers
+   * to one question, and the one that drifts is always the copy.
+   *
+   * `traceReads` still wins where a host supplies a finished one, which is how
+   * a test names the stack it wants.
+   */
+  traceReadsFrom?: (
+    deps: Readonly<{ dataRetention: DataRetentionService; topics: TopicService }>,
+  ) => ApiTraceReadStackPort;
   /** The vendor probes and cost-rule preview; absent refuses each. */
   modelProviderHost?: ApiModelProviderHostPort;
   /** The studio dispatch and agent-test ingest; absent refuses both. */
@@ -355,7 +374,8 @@ export function composeApiTraceGroupCollaborators(
     schedule: new UnscheduledTopicClustering(),
   });
 
-  const traceReads = options.traceReads;
+  const traceReads =
+    options.traceReads ?? options.traceReadsFrom?.({ dataRetention, topics });
   if (!traceReads) options.report?.absent("trace-reads");
 
   const traces = TraceApp.create({
@@ -434,6 +454,19 @@ export function composeApiTraceGroupCollaborators(
           refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")),
         ...(traceReads?.explorerPorts() ??
           refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(refuse, "the trace explorer")),
+        // The unmapped-cost hint is the MODEL PROVIDER feature's reading, not
+        // the trace store's: it asks whether any rule — stored or static —
+        // already prices this model, and only the gateway holds the stored
+        // ones. It is filled in HERE because this is the one composition that
+        // holds both halves.
+        deriveUnmappedCostSuggestion: (input) =>
+          deriveUnmappedCostSuggestion({
+            ...input,
+            costs: {
+              listCosts: ({ projectId }) => modelProviders.listCosts({ projectId }),
+              staticCostRates: getStaticModelCostRates,
+            },
+          }),
         getViewerProtections: viewerProtections,
       },
       spans: { getViewerProtections: viewerProtections } satisfies SpansTrpcPorts,

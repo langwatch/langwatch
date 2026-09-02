@@ -81,9 +81,30 @@ export {
 } from "../features/export/export-trpc.mount";
 export { createHomeTrpcRouter } from "../features/project/project-trpc.mount";
 export {
+  createCostTrpcRouter,
   createLimitsTrpcRouter,
   createPlanTrpcRouter,
 } from "../features/entitlement/entitlement-trpc.mount";
+export { createTopicTrpcRouter } from "../features/topic/topic-trpc.mount";
+export {
+  createLlmModelCostTrpcRouter,
+  createModelProviderTrpcRouter,
+  type ModelProviderTrpcChecks,
+} from "../features/model-provider/model-provider-trpc.mount";
+export {
+  createAppProductInfraTrpcFeatures,
+  type AnyAppProductInfraTrpcPorts,
+  type AppProductInfraTrpcContext,
+  type AppProductInfraTrpcPorts,
+} from "./app-trpc.product-infra";
+export { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
+export { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
+export {
+  createAppTraceGroupTrpcFeatures,
+  type AnyAppTraceGroupTrpcPorts,
+  type AppTraceGroupTrpcContext,
+  type AppTraceGroupTrpcPorts,
+} from "./app-trpc.trace-group";
 export {
   permissionPolicy,
   policyForCheck,

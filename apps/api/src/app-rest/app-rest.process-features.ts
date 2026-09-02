@@ -32,6 +32,11 @@ import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-opena
 import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest";
 import type { RumRateLimiter } from "../features/rum/rum-ingest.service";
 import { createRumRestApp } from "../features/rum/rum-rest";
+import {
+  createOtlpIngestRestApp,
+  createOtlpPathAliasRestApp,
+  type OtlpIngestRestPorts,
+} from "@langwatch/trace-server";
 
 /**
  * The project credential a handler-managed family resolves through.
@@ -69,6 +74,16 @@ export type ApiProcessRestPorts = Readonly<{
    * instances would give one caller two budgets for the same rule.
    */
   rateLimit: RumRateLimiter;
+  /**
+   * The OTLP receiver's collaborators, or none.
+   *
+   * None when this process composed no command queue: a receiver that accepts
+   * a span and has nowhere to send it answers 200 to data it then drops, which
+   * is the one failure an exporter can neither detect nor retry. Its own
+   * per-signal ports say which of traces, logs and metrics are served — a
+   * signal whose collection is absent is not mounted at all.
+   */
+  otlpIngest?: OtlpIngestRestPorts | undefined;
 }>;
 
 /**
@@ -85,6 +100,13 @@ export type ApiProcessRestPorts = Readonly<{
  *  3. `rum`, which owns `/api/rum` outright.
  *  4. The product families. `/api/annotations` owns a literal first segment,
  *     so it neither shadows nor is shadowed by anything above it.
+ *  5. The OTLP receiver, then — LAST of all — its path-alias re-dispatcher.
+ *     The alias forwards INTO the receiver, so it must be registered after it;
+ *     and its wildcards (`/api/otel/*`, `/api/collector/*`, `/api/v1/*`,
+ *     `/v1/*`) are broad on purpose, so it must also come after anything else
+ *     claiming those namespaces. It declines every path its allow-list does not
+ *     recognise, so a family mounted after it keeps its own routing and its own
+ *     404 — which is what `/api/v1/secret` depends on.
  */
 export function createApiProcessRestFeatures(options: {
   security: AppRestSecurity;
@@ -109,6 +131,17 @@ export function createApiProcessRestFeatures(options: {
         credential: ports.handlerManagedCredential,
       }),
     );
+  }
+
+  const otlpIngest = ports.otlpIngest;
+  if (otlpIngest) {
+    const receiver = createOtlpIngestRestApp({ security, ports: otlpIngest });
+    features.push(receiver);
+    // Last, and forwarding into the app immediately above it. An exporter that
+    // posts to a path nobody serves gets one silent, unretryable data loss per
+    // batch, so the aliases exist wherever the receiver does — never on their
+    // own, which is why they take the receiver rather than importing it.
+    features.push(createOtlpPathAliasRestApp({ canonical: receiver }));
   }
 
   return features;

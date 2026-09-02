@@ -40,6 +40,17 @@ export {
  * doors get.
  */
 export {
+  CodingAgentCallerScopeService,
+  type CallerProjectDisplay,
+  type CallerProjectScope,
+  type CodingAgentCallerScopeDependencies,
+} from "./services/coding-agent-caller-scope.service";
+export {
+  CodingAgentCallerScopeDirectoryPort,
+  CodingAgentScopePermissionsPort,
+  type CodingAgentScopeProject,
+} from "./ports/coding-agent-caller-scope.port";
+export {
   CodingAgentApp,
   type CodingAgentAppDependencies,
   type CodingAgentCaller,

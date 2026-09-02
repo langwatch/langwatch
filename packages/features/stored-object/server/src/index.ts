@@ -78,3 +78,40 @@ export {
   StoredObjectTrpcApi,
   type StoredObjectTrpcContext,
 } from "./transport/api-trpc/stored-object.api";
+/**
+ * The CONTENT-ADDRESSED store, moved here whole from the platform application.
+ *
+ * Plural where the canonical store above is singular, and the plural is the
+ * distinction rather than a typo: `StoredObjectsService` reads and writes the
+ * ClickHouse `stored_objects` table every trace attachment, dataset upload and
+ * evaluation payload written before the Postgres store still lives in. An
+ * object written through one is not readable through the other.
+ */
+export { ObjectNotFoundError } from "./errors";
+export {
+  StoredObjectsClickHousePort,
+  type StoredObjectsClickHouseClient,
+} from "./ports/stored-objects-clickhouse.port";
+export { StoredObjectsTelemetryPort } from "./ports/stored-objects-telemetry.port";
+export {
+  StoredObjectS3TargetPort,
+  type StoredObjectS3Credentials,
+  type StoredObjectS3Target,
+} from "./ports/stored-object-s3-target.port";
+export {
+  storedObjectSchema,
+  type StoredObject,
+} from "./repositories/clickhouse/stored-objects.row";
+export { StoredObjectsRepository } from "./repositories/clickhouse/stored-objects.repository";
+export {
+  StoredObjectsService,
+  deriveStoredObjectId,
+  type MintStorageUri,
+  type StoredObjectsServiceOptions,
+} from "./services/stored-objects.service";
+export { PrometheusStoredObjectsTelemetry } from "./adapters/prometheus.stored-objects-telemetry.adapter";
+export { LocalFilesystemStoredObjectDriver } from "./adapters/local-filesystem.stored-object-driver.adapter";
+export {
+  S3StoredObjectDriver,
+  type StoredObjectS3ClientPolicy,
+} from "./adapters/s3.stored-object-driver.adapter";

@@ -37,7 +37,11 @@ describe("API process configuration", () => {
       },
       instanceAdminApiKey: undefined,
       apiKeyPepper: undefined,
-      authz: { epochCacheEnabled: false, demoProjectId: undefined },
+      authz: {
+        epochCacheEnabled: false,
+        demoProjectId: undefined,
+        demoProjectUserId: undefined,
+      },
       // The rollout switches this deployment set, which is none: an empty
       // override map and an empty force-enable set, so every flag answers from
       // the registry default.
@@ -71,6 +75,33 @@ describe("API process configuration", () => {
             API_PORT: "6560",
             API_HTTP_DRAIN_GRACE_MS: "9000",
           },
+        },
+        // Blank rather than absent: an install that registered no GitHub App
+        // has none of the five, and the feature's own `configured` flag is
+        // what turns that into "not connected" rather than a failure.
+        github: {
+          appId: "",
+          privateKey: "",
+          appSlug: "",
+          webhookSecret: "",
+          host: undefined,
+        },
+        // The object storage this deployment addresses its externalized bytes
+        // in. Absent everywhere is not "use the shared bucket": it is the
+        // documented single-replica filesystem fallback, which the destination
+        // policy owns and this module only supplies the root for.
+        storedObjects: {
+          backend: undefined,
+          localFilesystemRoot: undefined,
+          s3: {
+            bucket: undefined,
+            endpoint: undefined,
+            region: undefined,
+            accessKeyId: undefined,
+            secretAccessKey: undefined,
+            sessionToken: undefined,
+          },
+          routes: new Map(),
         },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
@@ -323,6 +354,13 @@ describe("API process configuration", () => {
           LANGWATCH_DISPATCH_GLOBAL_BUDGET: "48",
         },
       },
+      github: {
+        appId: "",
+        privateKey: "",
+        appSlug: "",
+        webhookSecret: "",
+        host: undefined,
+      },
       redis: {
         configured: true,
         mode: "standalone",
@@ -330,6 +368,19 @@ describe("API process configuration", () => {
         db: 4,
         tls: undefined,
         warnings: [],
+      },
+      storedObjects: {
+        backend: undefined,
+        localFilesystemRoot: undefined,
+        s3: {
+          bucket: undefined,
+          endpoint: undefined,
+          region: undefined,
+          accessKeyId: undefined,
+          secretAccessKey: undefined,
+          sessionToken: undefined,
+        },
+        routes: new Map(),
       },
       groupQueue: {
         globalConcurrency: 12,

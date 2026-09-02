@@ -25,6 +25,20 @@ export {
   type ApiProductionCompositionOptions,
 } from "./app/api-production.composition";
 export {
+  ApiModelProviderHostPort,
+  ApiStudioHostPort,
+  ApiTraceGroupAbsenceReport,
+  ApiTraceReadStackPort,
+  ApiUsageStatsPort,
+  composeApiTraceGroupCollaborators,
+  LoggedApiTraceGroupAbsence,
+  withApiTraceGroupCollaborators,
+  type ApiProjectSpendRollup,
+  type ApiTraceGroupCollaborators,
+  type ApiTraceGroupCollaboratorsOptions,
+  type ApiTraceGroupPorts,
+} from "./app/api-trpc-collaborators.trace-group.composition";
+export {
   ApiAgentsAbsenceReportPort,
   ApiAgentsComposition,
   type ApiAgentsCompositionOptions,

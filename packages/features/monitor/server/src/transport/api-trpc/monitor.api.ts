@@ -95,7 +95,7 @@ type MonitorTrpcProcedures<
  * Each is handed the request context where it resolves per-request state, so
  * the process performs the work exactly as it always did.
  */
-type MonitorTrpcPorts = Readonly<{
+export type MonitorTrpcPorts = Readonly<{
   preconditionsSchema: MonitorApiPreconditionsParser;
   /**
    * The start of the window the performance trend compares against, from the
