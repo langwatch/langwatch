@@ -265,12 +265,21 @@ export function qualified(
  */
 export function lwqlKeyMapTableStatement({
   names,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
+  /**
+   * Database the key-map table actually lives in. Defaults to
+   * {@link LangWatchQLNames.database} — the test harness's own convention,
+   * where the suite provisions its key map alongside everything else. A real
+   * deploy passes the app's ClickHouse database here instead, matching
+   * migration 00084's table.
+   */
+  sourceDatabase?: string;
 }): string {
   assertNames(names);
   return (
-    `CREATE TABLE IF NOT EXISTS ${qualified(names, names.keyMapTable)} ` +
+    `CREATE TABLE IF NOT EXISTS ${qualified(names, names.keyMapTable, sourceDatabase)} ` +
     `(${KEY_MAP_COLUMNS.keyHash} String, ${KEY_MAP_COLUMNS.tenantId} String) ` +
     `ENGINE = MergeTree ORDER BY ${KEY_MAP_COLUMNS.keyHash}`
   );
@@ -380,13 +389,16 @@ export function lwqlGrantStatement({
 function tenantPredicate({
   names,
   tenantColumn,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
   tenantColumn: string;
+  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
+  sourceDatabase?: string;
 }): string {
   return (
     `${assertIdentifier(tenantColumn, "tenantColumn")} IN (` +
-    `SELECT any(${KEY_MAP_COLUMNS.tenantId}) FROM ${qualified(names, names.keyMapTable)} ` +
+    `SELECT any(${KEY_MAP_COLUMNS.tenantId}) FROM ${qualified(names, names.keyMapTable, sourceDatabase)} ` +
     `WHERE ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)}) ` +
     `HAVING uniqExact(${KEY_MAP_COLUMNS.tenantId}) = 1)`
   );
@@ -409,13 +421,16 @@ function keyMapPolicyName(keyMapTable: string): string {
  */
 export function lwqlKeyMapRowPolicyStatement({
   names,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
+  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
+  sourceDatabase?: string;
 }): string {
   assertNames(names);
   return (
     `CREATE ROW POLICY OR REPLACE ${keyMapPolicyName(names.keyMapTable)} ` +
-    `ON ${qualified(names, names.keyMapTable)}\n` +
+    `ON ${qualified(names, names.keyMapTable, sourceDatabase)}\n` +
     `  USING ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)})\n` +
     `  TO ${names.restrictedUser}`
   );
@@ -431,15 +446,18 @@ export function lwqlKeyMapRowPolicyStatement({
 export function lwqlRowPolicyStatement({
   names,
   lwqlTable,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
   lwqlTable: LangWatchQLTable;
+  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
+  sourceDatabase?: string;
 }): string {
   assertNames(names);
   return (
     `CREATE ROW POLICY OR REPLACE ${policyName(lwqlTable.table)} ` +
     `ON ${qualified(names, lwqlTable.table, lwqlTable.database)}\n` +
-    `  USING ${tenantPredicate({ names, tenantColumn: lwqlTable.tenantColumn })}\n` +
+    `  USING ${tenantPredicate({ names, tenantColumn: lwqlTable.tenantColumn, sourceDatabase })}\n` +
     `  TO ${names.restrictedUser}`
   );
 }
@@ -481,25 +499,42 @@ export function lwqlClickHouseSetupStatements({
   password,
   lwqlTables,
   limits = DEFAULT_LWQL_RESOURCE_LIMITS,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
   password: string;
   lwqlTables: LangWatchQLTable[];
   limits?: LangWatchQLResourceLimits;
+  /**
+   * Database the key-map table actually lives in. Defaults to
+   * {@link LangWatchQLNames.database}, matching the test harness's convention
+   * of provisioning its own key map alongside the rest of the suite. A real
+   * deploy must pass the app's ClickHouse database here — migration 00084
+   * creates the key-map table there, not in `names.database`, and every
+   * statement below that reads or writes the key map (the table itself, its
+   * grant, its self-policy, and every LangWatchQL row policy's tenant lookup)
+   * has to agree on which database that is, or the policies resolve against
+   * an empty table and every governed query returns zero rows.
+   */
+  sourceDatabase?: string;
 }): string[] {
   assertNames(names);
   return [
     `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-    lwqlKeyMapTableStatement({ names }),
+    lwqlKeyMapTableStatement({ names, sourceDatabase }),
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),
-    lwqlGrantStatement({ names, table: names.keyMapTable }),
+    lwqlGrantStatement({
+      names,
+      table: names.keyMapTable,
+      database: sourceDatabase,
+    }),
     ...lwqlTables.map((lwqlTable) =>
       lwqlGrantStatement({ names, table: lwqlTable.table }),
     ),
-    lwqlKeyMapRowPolicyStatement({ names }),
+    lwqlKeyMapRowPolicyStatement({ names, sourceDatabase }),
     ...lwqlTables.map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable }),
+      lwqlRowPolicyStatement({ names, lwqlTable, sourceDatabase }),
     ),
   ];
 }
