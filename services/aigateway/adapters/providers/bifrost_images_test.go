@@ -107,6 +107,7 @@ func TestImageEndpointSupported_RefusesTheOpenAICompatibleProvider(t *testing.T)
 	assert.NoError(t, imageEndpointSupported(context.Background(), bfschemas.Azure))
 }
 
+// @scenario "response_format is forwarded only when the caller sent it"
 func TestImageGenerationWireRequest_MapsOnlyWhatTheCallerSent(t *testing.T) {
 	var wire imageGenerationWireRequest
 	require.NoError(t, json.Unmarshal(
@@ -132,6 +133,7 @@ func TestImageGenerationWireRequest_MapsOnlyWhatTheCallerSent(t *testing.T) {
 	assert.Equal(t, "b64_json", *params.ResponseFormat)
 }
 
+// @scenario "Only the allowlisted text fields reach the provider"
 func TestImageEditParams_MapsTheAllowlistedFormFields(t *testing.T) {
 	params := imageEditParams(&domain.ImageEditUpload{
 		Mask: []byte("mask-bytes"),
