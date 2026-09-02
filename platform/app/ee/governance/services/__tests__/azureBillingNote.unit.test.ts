@@ -1,23 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * What the spend panel says about an Azure bill that shows nothing.
+ * What the spend panel decides about an Azure bill that shows nothing.
  *
- * The decision and its sentences live together because they fail together: a
- * reason the copy cannot say is a blank panel, and copy no decision produces
- * is dead text. Every sentence here explains an ABSENCE — the one thing this
- * module must never do is put a figure, or anything that reads as one, where
- * the bill put nothing.
+ * Only the DECISION lives here. The sentences each note renders as are panel
+ * copy, tested where they live —
+ * `src/components/governance/__tests__/costLaneFormat.unit.test.ts`.
  *
  * Spec: specs/governance/azure-billing-identity.feature
  * Decision: ADR-128 §21.3, §21.4 (v3.4).
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  azureBillingNoteFrom,
-  azureBillingNoteSentence,
-} from "../azureBillingNote";
+import { azureBillingNoteFrom } from "../azureBillingNote";
 
 /** A source that reads a bill and has read it clean: no rows, no hold. */
 const READ_CLEAN = {
@@ -95,37 +90,5 @@ describe("azureBillingNoteFrom", () => {
         }),
       ).toBeNull();
     });
-  });
-});
-
-describe("azureBillingNoteSentence", () => {
-  /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
-  it("explains that prepaid packs do not appear on the bill", () => {
-    const sentence = azureBillingNoteSentence("prepaid_declared");
-    expect(sentence).toMatch(/prepaid/i);
-    expect(sentence).toMatch(/bill/i);
-  });
-
-  /** @scenario "A tenant that declared nothing is never told it is prepaid" */
-  it("says nothing was billed without ever mentioning prepaid", () => {
-    const sentence = azureBillingNoteSentence("no_spend_recorded");
-    expect(sentence).toMatch(/no .*charges|nothing .*billed/i);
-    expect(sentence).not.toMatch(/prepaid/i);
-  });
-
-  it("reports a failed read as missing data, never as an empty bill", () => {
-    const sentence = azureBillingNoteSentence("billing_read_failed");
-    expect(sentence).toMatch(/could not|failed/i);
-    expect(sentence).not.toMatch(/nothing was billed/i);
-  });
-
-  it("keeps every sentence free of digits, so none can read as a figure", () => {
-    for (const note of [
-      "prepaid_declared",
-      "no_spend_recorded",
-      "billing_read_failed",
-    ] as const) {
-      expect(azureBillingNoteSentence(note)).not.toMatch(/\d/);
-    }
   });
 });

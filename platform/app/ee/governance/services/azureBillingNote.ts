@@ -13,8 +13,12 @@
  *
  * `no_billing_credentials` is deliberately not here: a save that names a
  * subscription without the billing pair is refused at write time
- * (`assertAzureBillHasItsOwnCredential`), so the state this reason would
- * explain cannot be stored.
+ * (`assertAzureBillHasItsOwnCredential`) — on create, and on an edit that
+ * adds the claim while the stored secrets are carried across unread — so the
+ * state this reason would explain cannot be stored.
+ *
+ * The sentences these notes render as live with the rest of the panel copy
+ * in `src/components/governance/costLaneFormat.ts`.
  *
  * Spec: specs/governance/azure-billing-identity.feature
  */
@@ -42,7 +46,12 @@ export function azureBillingNoteFrom(params: {
   claimsSubscription: boolean;
   /** The customer's own declaration — never inferred (ADR-128 §21.4). */
   prepaidDeclared: boolean;
-  /** Whether the window holds any Azure-billed rollup rows at all. */
+  /**
+   * Whether the window holds rollup rows from the CLAIMING SOURCE's bill
+   * read. Scoped to that one source, never to the whole pulled lane: the
+   * lane is fed by every pulled provider, and another provider's rows must
+   * not silence a note about the Azure bill.
+   */
   hasAzureSpendRows: boolean;
   /** How far the bill has been priced, or null before the first read. */
   costPricedThroughDay: string | null;
@@ -62,26 +71,4 @@ export function azureBillingNoteFrom(params: {
   if (costHeldSinceMs !== null) return "billing_read_failed";
   if (costPricedThroughDay === null) return null;
   return prepaidDeclared ? "prepaid_declared" : "no_spend_recorded";
-}
-
-/**
- * The sentence the panel shows for each note.
- *
- * Digit-free on purpose, like the seat lane's absence copy: these sentences
- * explain why there is NO figure, and a digit in one is a figure waiting to
- * be misread. Each is honest about what happened — a failed read says the
- * data is missing, never that the bill was empty, because those ask the
- * reader for opposite things.
- */
-export function azureBillingNoteSentence(
-  note: GovernanceAzureBillingNote,
-): string {
-  switch (note) {
-    case "prepaid_declared":
-      return "This Copilot is declared as running on prepaid message packs, which never appear on the Azure bill — an empty bill here is expected.";
-    case "no_spend_recorded":
-      return "The Azure bill was read and holds no Copilot charges for this period.";
-    case "billing_read_failed":
-      return "The Azure bill could not be read, so its charges are missing here rather than empty. They appear as soon as a read succeeds.";
-  }
 }

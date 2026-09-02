@@ -7,7 +7,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { azureBillingNoteSentence } from "@ee/governance/services/azureBillingNote";
 import type {
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
@@ -20,6 +19,7 @@ import {
   SeatLanePanel,
 } from "~/components/governance/CostLanePanel";
 import { CostLanesChart } from "~/components/governance/CostLanesChart";
+import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
   CostForecastArea,

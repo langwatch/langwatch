@@ -42,11 +42,15 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
-import { readClaimedSubscription } from "./activity-monitor/azureBillOwnership";
+import {
+  readClaimedSubscription,
+  readPrepaidDeclared,
+} from "./activity-monitor/azureBillOwnership";
 import {
   azureBillingNoteFrom,
   type GovernanceAzureBillingNote,
 } from "./azureBillingNote";
+import { readStoredCostCursor } from "./pullers/copilotStudioDataverse.puller";
 
 const logger = createLogger("langwatch:governance:cost");
 
@@ -294,17 +298,18 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources] = await Promise.all([
+    const [rows, seats, staleSources, azureBilling] = await Promise.all([
       costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
       this.readSeats({ tenantId }),
       this.readStaleSources({ organizationId }),
+      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
     ]);
 
     return {
       unavailableReason: null,
       billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
-      azureBilling: await this.readAzureBillingNote({ organizationId, rows }),
+      azureBilling,
       seats,
       series: seriesFrom(rows),
       windowDays,
@@ -362,26 +367,35 @@ export class GovernanceCostService {
   /**
    * The Azure billing note, from the source that claims the bill.
    *
-   * The rollup's `costSource` is the LANE (`pulled`), not the provider, and
-   * Azure is wave 1's only pulled producer — so pulled-lane content means
-   * Azure content today. The day a second pulled provider ships, this needs
-   * provider granularity from the rollup or it will read that provider's
-   * rows as Azure's; flagged in ADR-128 §21's open questions.
+   * The spend check is scoped to the CLAIMING SOURCE's rows, not to the
+   * pulled lane: the lane is fed by every pulled provider on the picker, so
+   * an org running Copilot beside another pulled source would otherwise have
+   * that provider's rows silence every sentence about the Azure bill —
+   * including the warning that its read failed.
    *
-   * At most one live source can claim a given subscription (the ownership
-   * guard refuses a second), and one claiming source is the whole deployed
-   * shape — so the first claim found speaks for the bill.
+   * At most one live source can claim a given SUBSCRIPTION (the ownership
+   * guard refuses a second), but nothing stops two sources claiming two
+   * different ones. `createdAt` order makes which claim speaks deterministic
+   * — the oldest — rather than Postgres row order; one note for two bills is
+   * recorded as an open question in ADR-128 §21.
    */
   private async readAzureBillingNote({
     organizationId,
-    rows,
+    tenantId,
+    fromDay,
+    toDay,
   }: {
     organizationId: string;
-    rows: readonly LaneRow[];
+    tenantId: string;
+    fromDay: string;
+    toDay: string;
   }): Promise<GovernanceAzureBillingNote | null> {
-    const sources = await this.deps.prisma.ingestionSource.findMany({
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) return null;
+    const sources = await prisma.ingestionSource.findMany({
       where: { organizationId, archivedAt: null },
-      select: { parserConfig: true, pollerCursor: true },
+      select: { id: true, parserConfig: true, pollerCursor: true },
+      orderBy: { createdAt: "asc" },
     });
     const claiming = sources.find(
       (source) =>
@@ -391,16 +405,21 @@ export class GovernanceCostService {
     );
     if (!claiming) return null;
 
-    const parserConfig = claiming.parserConfig as Record<string, unknown>;
-    const cursor = parseCostCursor(claiming.pollerCursor);
+    const parserConfig = claiming.parserConfig as Record<
+      string,
+      unknown
+    > | null;
+    const cursor = readStoredCostCursor(claiming.pollerCursor);
     return azureBillingNoteFrom({
       claimsSubscription: true,
-      prepaidDeclared: parserConfig.azureBillingIsPrepaid === true,
-      hasAzureSpendRows: rows.some(
-        (row) =>
-          row.costSource === GOVERNANCE_COST_SOURCE.PULLED &&
-          (row.amountNanoUsd !== null || row.cellsWithoutAmount > 0),
-      ),
+      prepaidDeclared: readPrepaidDeclared(parserConfig),
+      hasAzureSpendRows: await costRollup.hasRowsForSource({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+        ingestionSourceId: claiming.id,
+      }),
       costPricedThroughDay: cursor.costPricedThroughDay,
       costHeldSinceMs: cursor.costHeldSinceMs,
     });
@@ -484,42 +503,6 @@ type LaneRow = {
   cellsWithoutAmount: number;
   currenciesWithoutUsdAmount: string[];
 };
-
-/**
- * The two cost fields off a source's poller cursor, read defensively.
- *
- * The column stores the cursor the puller handed back — a JSON string — but
- * it is `Json?`, older writers stored objects, and a source that never pulled
- * has null. Anything unreadable answers "no read has completed", which keeps
- * the note silent rather than wrong: the failure mode of guessing here is a
- * sentence about a bill nobody read.
- */
-function parseCostCursor(pollerCursor: unknown): {
-  costPricedThroughDay: string | null;
-  costHeldSinceMs: number | null;
-} {
-  const none = { costPricedThroughDay: null, costHeldSinceMs: null };
-  let cursor: unknown = pollerCursor;
-  if (typeof cursor === "string") {
-    try {
-      cursor = JSON.parse(cursor);
-    } catch {
-      return none;
-    }
-  }
-  if (cursor === null || typeof cursor !== "object") return none;
-  const record = cursor as Record<string, unknown>;
-  return {
-    costPricedThroughDay:
-      typeof record.costPricedThroughDay === "string"
-        ? record.costPricedThroughDay
-        : null,
-    costHeldSinceMs:
-      typeof record.costHeldSinceMs === "number"
-        ? record.costHeldSinceMs
-        : null,
-  };
-}
 
 /**
  * The figure for a set of rows, withheld unless every cell behind it is priced

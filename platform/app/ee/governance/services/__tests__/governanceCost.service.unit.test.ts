@@ -30,6 +30,7 @@ type SourceRow = {
 
 /** One ingestion source, as the Azure billing note's read selects it. */
 type BillingSourceRow = {
+  id?: string;
   parserConfig: Record<string, unknown> | null;
   pollerCursor: unknown;
 };
@@ -52,10 +53,11 @@ function prismaWithGovProject(
   return {
     project: { findFirst: vi.fn().mockResolvedValue(id ? { id } : null) },
     ingestionSource: {
-      findMany: vi.fn(async ({ select }: { select: Record<string, boolean> }) =>
-        select.parserConfig
-          ? sources.filter((source) => "parserConfig" in source)
-          : sources.filter((source) => "name" in source),
+      findMany: vi.fn(
+        async ({ select }: { select: Record<string, boolean> }) =>
+          select.parserConfig
+            ? sources.filter((source) => "parserConfig" in source)
+            : sources.filter((source) => "name" in source),
       ),
     },
   } as unknown as Parameters<typeof GovernanceCostService.create>[0]["prisma"];
@@ -96,9 +98,18 @@ function createService(deps: {
   return GovernanceCostService.create({ ocsfEvents: undefined, ...deps });
 }
 
-function rollupReturning(rows: LaneRow[]) {
+/**
+ * `sourceHasRows` answers the SOURCE-scoped existence read the billing note
+ * makes, independently of the lane rows: the whole point of that read is that
+ * another provider's lane rows say nothing about the Azure bill.
+ */
+function rollupReturning(
+  rows: LaneRow[],
+  opts: { sourceHasRows?: boolean } = {},
+) {
   return {
     sumDaysByLane: vi.fn().mockResolvedValue(rows),
+    hasRowsForSource: vi.fn().mockResolvedValue(opts.sourceHasRows ?? false),
   } as unknown as GovernanceCostRollupClickHouseRepository;
 }
 
@@ -740,6 +751,7 @@ describe("GovernanceCostService.summary", () => {
       azureBillingIsPrepaid?: boolean;
       pollerCursor?: unknown;
     }) => ({
+      id: "src-azure",
       parserConfig: {
         adapter: "copilot_studio_dataverse",
         azureSubscriptionId: SUBSCRIPTION,
@@ -799,9 +811,10 @@ describe("GovernanceCostService.summary", () => {
           prisma: prismaWithGovProject("gov-1", [
             azureSource({ azureBillingIsPrepaid: true }),
           ]),
-          costRollup: rollupReturning([
-            laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO }),
-          ]),
+          costRollup: rollupReturning(
+            [laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO })],
+            { sourceHasRows: true },
+          ),
         });
 
         const result = await service.summary({
@@ -811,6 +824,95 @@ describe("GovernanceCostService.summary", () => {
 
         expect(result.azureBilling).toBeNull();
         expect(result.billed.amountUsd).toBe(7);
+      });
+    });
+
+    describe("when another pulled provider fills the lane while the bill is empty", () => {
+      /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
+      it("still carries the prepaid note — the lane's rows are not the bill's", async () => {
+        // The defect this exists to catch: judging "has the bill been read"
+        // off the whole pulled lane. An org running Copilot beside any other
+        // pulled source always has lane rows, and the note would fall
+        // permanently silent for exactly the tenants it was built for.
+        const rollup = rollupReturning(
+          [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
+          { sourceHasRows: false },
+        );
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({ azureBillingIsPrepaid: true }),
+          ]),
+          costRollup: rollup,
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-30T12:00:00.000Z"),
+        });
+
+        expect(result.azureBilling).toBe("prepaid_declared");
+        // And the read must have been scoped to the claiming source, not the
+        // lane — otherwise the fake above answered a different question.
+        expect(rollup.hasRowsForSource).toHaveBeenCalledWith({
+          tenantId: "gov-1",
+          fromDay: "2026-08-01",
+          toDay: "2026-08-30",
+          costSource: "pulled",
+          ingestionSourceId: "src-azure",
+        });
+      });
+
+      it("still warns about a failed read the other provider's rows would have masked", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({
+              pollerCursor: JSON.stringify({
+                costPricedThroughDay: null,
+                costHeldSinceMs: 1_700_000_000_000,
+              }),
+            }),
+          ]),
+          costRollup: rollupReturning(
+            [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
+            { sourceHasRows: false },
+          ),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBe("billing_read_failed");
+      });
+    });
+
+    describe("when the stored cursor is one the puller itself would refuse", () => {
+      it("stays silent rather than claiming a read the puller will redo", async () => {
+        // The cursor is read through the puller's own schema. A hand-rolled
+        // reader here accepted this malformed day and told the customer the
+        // bill was read while the puller, refusing the same cursor, started
+        // over from scratch.
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1", [
+            azureSource({
+              azureBillingIsPrepaid: true,
+              pollerCursor: JSON.stringify({
+                costPricedThroughDay: "August 30, 2026",
+                costHeldSinceMs: null,
+              }),
+            }),
+          ]),
+          costRollup: rollupReturning([]),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+        });
+
+        expect(result.azureBilling).toBeNull();
       });
     });
 

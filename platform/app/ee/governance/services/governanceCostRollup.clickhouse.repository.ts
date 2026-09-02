@@ -382,6 +382,58 @@ export class GovernanceCostRollupClickHouseRepository {
   }
 
   /**
+   * Whether ONE source put any cell at all into a lane over a day range —
+   * priced or not.
+   *
+   * This exists for the Azure billing note: the pulled lane is fed by every
+   * pulled provider, so "does the lane hold rows" answers a different question
+   * from "did THIS source's bill produce rows", and the note is only honest
+   * about the second. `IngestionSourceId` is a key column, so the read stays
+   * on the sort key.
+   *
+   * Existence needs no dedup pass: versions of a cell only ever add rows for
+   * a key that already exists, so any row under the current `Version` stamp
+   * proves the cell does. The stamp filter is the same trust rule
+   * `sumDaysByLane` applies — a row written by an older shape must not be the
+   * only evidence the bill was read.
+   */
+  async hasRowsForSource(input: {
+    tenantId: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    fromDay: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    toDay: string;
+    costSource: string;
+    ingestionSourceId: string;
+  }): Promise<boolean> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT 1 AS RowExists
+        FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+        WHERE TenantId = {tenantid:String}
+          AND Day >= {fromday:Date}
+          AND Day <= {today:Date}
+          AND CostSource = {costsource:String}
+          AND IngestionSourceId = {ingestionsourceid:String}
+          AND Version = {version:String}
+        LIMIT 1
+      `,
+      query_params: {
+        tenantid: input.tenantId,
+        fromday: input.fromDay,
+        today: input.toDay,
+        costsource: input.costSource,
+        ingestionsourceid: input.ingestionSourceId,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as unknown[];
+    return rows.length > 0;
+  }
+
+  /**
    * The newest business time any cell of a lane has summarized, for the lag
    * gauge. Null when the lane has summarized nothing yet.
    */
