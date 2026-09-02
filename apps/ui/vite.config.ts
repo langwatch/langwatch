@@ -1,47 +1,35 @@
-import dotenv from "dotenv";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import dotenv from "dotenv";
+import { readFileSync } from "fs";
 import path from "path";
-import { generate as generateSelfsigned } from "selfsigned";
-import { shikiManualChunk } from "@langwatch/trace-web";
-import { havenHmrGate } from "./vite/havenHmrGate";
-import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
-import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
-import {
-  injectPublicAppConfigIntoHtml,
-  type PublicAppConfig,
-} from "@langwatch/ui/public-config";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
+import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
+import { injectPublicAppConfigIntoHtml, type PublicAppConfig } from "./src/behavior/public-config";
 // The resolver reads the server environment, so it deliberately lives on the
-// projection subpath rather than being re-exported to browser code.
-import { resolveUiPublicBootstrap } from "@langwatch/ui/public-config/projection";
+// projection module rather than being re-exported to browser code.
+import { resolveUiPublicBootstrap } from "./src/behavior/public-config.projection";
+import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
+import { havenHmrGate } from "./vite/havenHmrGate";
+import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
+
+// This package declares `"type": "module"`, so Vite bundles the config as ESM
+// and `__dirname` does not exist. `import.meta.dirname` is the same directory.
+const here = import.meta.dirname;
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
 // runs in Node and needs access to flags like `LANGWATCH_DEV_HTTP2`.
-// The API server (`server.mts`) loads its own copy via `dotenv.config()`
-// the same way; doing it here keeps both processes reading from one
-// source of truth.
-const rootEnvPath = path.resolve(__dirname, "../../.env");
-const legacyEnvPath = path.resolve(__dirname, ".env");
-const rootOverlayPath = path.resolve(__dirname, "../../.env.portless");
-const legacyOverlayPath = path.resolve(__dirname, ".env.portless");
+// The API process loads its own copy the same way; doing it here keeps both
+// processes reading from one source of truth.
+const rootEnvPath = path.resolve(here, "../../.env");
+const rootOverlayPath = path.resolve(here, "../../.env.portless");
 
-dotenv.config({
-  path: existsSync(rootEnvPath) ? rootEnvPath : legacyEnvPath,
-  quiet: true,
-});
+dotenv.config({ path: rootEnvPath, quiet: true });
 // Portless (haven) overlay wins: loaded after .env with override so the
 // resolved app port + api hostname take effect. Absent in non-portless runs.
-dotenv.config({
-  path: existsSync(rootOverlayPath) ? rootOverlayPath : legacyOverlayPath,
-  override: true,
-  quiet: true,
-});
+dotenv.config({ path: rootOverlayPath, override: true, quiet: true });
 
-const FRONTEND_PORT = parseInt(
-  process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560",
-);
+const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -62,13 +50,22 @@ const API_TARGET =
     : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
- * Load (and lazily generate) the dev TLS credentials. Mirrors
- * `loadDevHttpsCredentials` in `src/start.ts`. Both processes race to
- * write on first boot; existence checks + atomic-ish file writes keep
- * the race benign — whichever loses the race overwrites with the same
- * effective contents, and subsequent reads find a valid pair.
+ * The dev TLS credentials, when the developer supplies a pair.
+ *
+ * `platform/app` generated a pair here with `selfsigned` when none was
+ * configured, so `LANGWATCH_DEV_HTTP2=1` was zero-setup. That import is gone,
+ * and not as a simplification: `selfsigned` cannot be loaded in this workspace
+ * at all. Two copies of `@peculiar/asn1-schema` are installed, so
+ * `@peculiar/asn1-rsa` registers against one schema store and reads from the
+ * other, and `import("selfsigned")` throws `Cannot get schema for
+ * 'AlgorithmIdentifier'` before any code of ours runs. Importing it from a Vite
+ * config therefore fails the config load outright — with HTTP/2 off as much as
+ * on — which is why the old config could not be loaded either.
+ *
+ * `DEV_HTTPS_CERT` + `DEV_HTTPS_KEY` still work, and generation comes back with
+ * one root `pnpm-workspace.yaml` override that collapses the duplicate.
  */
-async function loadDevHttpsCredentials(): Promise<{ cert: Buffer; key: Buffer } | null> {
+function loadDevHttpsCredentials(): { cert: Buffer; key: Buffer } | null {
   if (!USE_HTTP2) return null;
 
   if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
@@ -78,37 +75,10 @@ async function loadDevHttpsCredentials(): Promise<{ cert: Buffer; key: Buffer } 
     };
   }
 
-  const cacheDir =
-    process.env.LANGWATCH_DEV_CERT_DIR ?? path.join(__dirname, ".dev-certs");
-  const certPath = path.join(cacheDir, "dev.pem");
-  const keyPath = path.join(cacheDir, "dev-key.pem");
-
-  if (existsSync(certPath) && existsSync(keyPath)) {
-    return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
-  }
-
-  // selfsigned v5 dropped the `days` option; use an explicit not-after date.
-  const notAfterDate = new Date();
-  notAfterDate.setDate(notAfterDate.getDate() + 825);
-  const pems = await generateSelfsigned([{ name: "commonName", value: "localhost" }], {
-    notAfterDate,
-    keySize: 2048,
-    extensions: [
-      {
-        name: "subjectAltName",
-        altNames: [
-          { type: 2, value: "localhost" },
-          { type: 2, value: "*.localhost" },
-          { type: 7, ip: "127.0.0.1" },
-          { type: 7, ip: "::1" },
-        ],
-      },
-    ],
-  });
-  mkdirSync(cacheDir, { recursive: true });
-  writeFileSync(certPath, pems.cert);
-  writeFileSync(keyPath, pems.private);
-  return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
+  console.warn(
+    "[vite-config] LANGWATCH_DEV_HTTP2=1 but no DEV_HTTPS_CERT/DEV_HTTPS_KEY pair; serving over plain HTTP.",
+  );
+  return null;
 }
 
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
@@ -125,7 +95,7 @@ async function loadDevHttpsCredentials(): Promise<{ cert: Buffer; key: Buffer } 
 // from one specific importer. A `resolveId` plugin with an importer check is
 // the right tool.
 function patchObjectInspectBrowserStub(): Plugin {
-  const noopPath = path.resolve(__dirname, "./src/noop-css.cjs");
+  const noopPath = path.resolve(here, "./vite/noop-module.cjs");
   return {
     name: "patch-object-inspect-browser-stub",
     enforce: "pre",
@@ -139,9 +109,9 @@ function patchObjectInspectBrowserStub(): Plugin {
 }
 
 /**
- * Production receives public configuration from the Node static handler. In
- * development Vite owns the HTML shell, so it performs the same explicit boot
- * mapping during its own executable config phase.
+ * Production receives public configuration from the process that serves the
+ * HTML shell. In development Vite owns the shell, so it performs the same
+ * explicit boot mapping during its own executable config phase.
  */
 function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
   return {
@@ -154,23 +124,24 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
 }
 
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
-  const devHttpsCredentials = await loadDevHttpsCredentials();
+  const devHttpsCredentials = loadDevHttpsCredentials();
   const publicConfig =
     command === "serve" ? resolveUiPublicBootstrap(process.env).publicConfig : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server
   // listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
-  // makes the post-restart scheme observable in `server.log`, so a "blank
-  // page after editing config" failure mode is easy to diagnose without
-  // digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
-  // module graph and `.dev-certs/` if the cert pair is suspected.
-  if (USE_HTTP2) {
-    console.log(
-      `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
-    );
-  } else {
-    console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+  // makes the post-restart scheme observable in `server.log`, so a "blank page
+  // after editing config" failure mode is easy to diagnose without digging into
+  // TLS errors.
+  if (command === "serve") {
+    if (USE_HTTP2) {
+      console.log(
+        `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+      );
+    } else {
+      console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+    }
   }
 
   return {
@@ -181,24 +152,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       havenHmrGate(),
     ],
     resolve: {
-      alias: {
-        // The generated Prisma client's `client.ts` entry hard-imports the node
-        // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
-        // externalizes — evaluating it in the browser throws and blanks every
-        // page. Frontend files import it for enums and types; the old
-        // `@prisma/client` package routed those through its `browser` package
-        // field, but the generated client is plain source with no package.json,
-        // so the browser bundle is pointed at the generated browser entry here.
-        // Must precede the bare "~" alias — vite matches aliases in order.
-        "~/generated/prisma/client": path.resolve(
-          __dirname,
-          "../../packages/prisma-client/src/generated/browser.ts",
-        ),
-        // Path aliases (matching tsconfig paths)
-        "~": path.resolve(__dirname, "./src"),
-        "@app": path.resolve(__dirname, "./src/server/app-layer"),
-        "@ee": path.resolve(__dirname, "./ee"),
-      },
       // ONE zod instance for the app AND linked workspace packages
       // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
       // z.record's key/value overload detection), so a second physical copy
@@ -241,11 +194,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
-            // its guard test can exercise the real logic. It keeps the core + base
-            // grammars/themes eager and splits the other ~340 grammars into lazy
-            // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
-            // that used to load on every page. See that file for the boot-cycle
+            // Shiki chunk-splitting lives in the Design System's
+            // `shiki-chunking` module (dependency-free) so its guard test can
+            // exercise the real logic. It keeps the core + base grammars/themes
+            // eager and splits the other ~340 grammars into lazy chunks —
+            // removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk that
+            // used to load on every page. See that file for the boot-cycle
             // rationale.
             return shikiManualChunk(id);
           },
@@ -256,10 +210,11 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // ADR-086: the base for content-hashed assets is chosen at container start,
       // not build time — one image serves self-host same-origin and SaaS from a
       // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
-      // runtime resolver defined by the served HTML shell (src/server/asset-base.ts);
-      // keep CSS-referenced assets relative to the CSS file (which lives under the
-      // same base, so fonts/images resolve on the CDN); leave HTML entry refs
-      // base-absolute for the server to rewrite; leave public/ assets same-origin.
+      // runtime resolver defined by the served HTML shell
+      // (src/model/ui-asset-base.ts); keep CSS-referenced assets relative to the
+      // CSS file (which lives under the same base, so fonts/images resolve on the
+      // CDN); leave HTML entry refs base-absolute for the server to rewrite;
+      // leave public/ assets same-origin.
       renderBuiltUrl(filename, { type, hostType }) {
         if (type === "public") return undefined;
         if (hostType === "js") {
@@ -272,7 +227,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
           // is configured.
           return {
-            runtime: `(globalThis.${ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
+            runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
               filename,
             )})`,
           };
@@ -304,9 +259,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           // worktree only .claude/tmp is ignored (worktrees do not nest);
           // from the main root the entire .claude tree, nested worktree
           // copies included, stays ignored as before.
-          ...(process.cwd().includes("/.claude/")
-            ? ["**/.claude/tmp/**"]
-            : ["**/.claude/**"]),
+          ...(process.cwd().includes("/.claude/") ? ["**/.claude/tmp/**"] : ["**/.claude/**"]),
         ],
         // Docker-on-macOS bind mounts don't surface inotify events reliably,
         // so Vite's default fs.watch sits silent on edits made from the host.
@@ -338,12 +291,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
       //
       // The MCP routes (/mcp, /sse, /messages, /oauth/*, /.well-known/oauth-*)
-      // are registered directly on the Node HTTP server in start.ts (NOT
+      // are registered directly on the API process's Node HTTP server (NOT
       // mounted under /api), so they need explicit proxy entries here for
       // external MCP clients (e.g. Claude Code adding the LangWatch MCP
       // server in dev) to reach them via the canonical FRONTEND_PORT. The
-      // production server (start.ts) listens on a single port so this
-      // splitting is dev-only.
+      // production server listens on a single port so this splitting is
+      // dev-only.
       proxy: {
         // The tRPC WS transport enforces a same-origin allowlist (built from
         // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
@@ -366,7 +319,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           secure: false,
         },
         // An exporter given the site root as its OTLP endpoint posts to
-        // `/v1/traces`. In production start.ts routes those into the API; in dev
+        // `/v1/traces`. In production the API process routes those; in dev
         // the frontend owns the root, so they need an entry of their own or they
         // fall through to the SPA. Exact-match, same reasoning as /mcp below.
         "^/v1/(?:traces|logs|metrics)/?(?:\\?.*)?$": {
@@ -374,27 +327,22 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`
-        // (src/server/routes/root-discovery.ts). Same split as the OTLP paths
-        // above: start.ts routes them in production, the frontend owns the root
-        // in dev. Left out, they fall to the SPA, which answers an agent's
-        // discovery request with the HTML shell and a 200.
-        //
-        // The pattern is DERIVED from the same list start.ts dispatches on, not
-        // written out again here: a path added there and missed here would work
-        // in production and return HTML in development, which is the shape of
-        // bug that only shows up where nobody is looking for it.
-        [ROOT_DISCOVERY_PROXY_PATTERN]: {
+        // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`.
+        // Same split as the OTLP paths above: the API process routes them in
+        // production, the frontend owns the root in development. Left out, they
+        // fall to the SPA, which answers an agent's discovery request with the
+        // HTML shell and a 200.
+        [rootDiscoveryProxyPattern()]: {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,
         },
         // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
-        // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
-        // sending it to the API server, which has no dev-mode page fallback.
-        // server.proxy regexes test against the full req.url (path + query),
-        // so the optional "(?:\?.*)?" is required or a query-bearing request
-        // like "/mcp?sessionId=..." falls through to the frontend instead.
+        // /mcp/authorize frontend page route, sending it to the API server,
+        // which has no dev-mode page fallback. server.proxy regexes test against
+        // the full req.url (path + query), so the optional "(?:\?.*)?" is
+        // required or a query-bearing request like "/mcp?sessionId=..." falls
+        // through to the frontend instead.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,

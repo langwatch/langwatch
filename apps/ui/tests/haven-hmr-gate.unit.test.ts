@@ -3,7 +3,7 @@ import { tmpdir } from "os";
 import path from "path";
 import type { HmrContext, ViteDevServer } from "vite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { havenHmrGate } from "./havenHmrGate";
+import { havenHmrGate } from "../vite/havenHmrGate";
 
 describe("havenHmrGate", () => {
   let dir: string;

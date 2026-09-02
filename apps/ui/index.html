@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- data-crisp-suppressed keeps the Crisp support bubble hidden from the
-     first paint; the bubble policy (src/utils/crispBubblePolicy.ts) lifts it
-     only while the chat is deliberately open. -->
+     first paint; the bubble policy (@langwatch/workflow-web,
+     src/behavior/crisp-bubble-policy.ts) lifts it only while the chat is
+     deliberately open. -->
 <html lang="en" data-crisp-suppressed>
   <head>
     <meta charset="UTF-8" />
@@ -11,6 +12,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/ui.entrypoint.tsx"></script>
   </body>
 </html>

@@ -217,10 +217,18 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
     return definition;
   }
 
-  private constructor(
-    readonly value: Readonly<Value>,
-    readonly schema: z.ZodType<Value>,
-  ) {
+  // Written as declarations plus assignments rather than constructor parameter
+  // properties, which are the one TypeScript construct Node's built-in
+  // type-stripping refuses. This module is imported by name from a Vite config,
+  // and Vite externalises every bare specifier when it bundles one — so Node
+  // loads this file itself, and a parameter property here fails the whole
+  // browser build with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`.
+  readonly value: Readonly<Value>;
+  readonly schema: z.ZodType<Value>;
+
+  private constructor(value: Readonly<Value>, schema: z.ZodType<Value>) {
+    this.value = value;
+    this.schema = schema;
     deepFreeze(value);
   }
 }
