@@ -3655,7 +3655,7 @@ Run it on a schedule so a broken credential or an expired secret shows up before
 
 ## Prerequisites
 
-- An API key for the calling project, in `CI_LANGWATCH_TOKEN`. It needs the `virtualKeys:create` and `virtualKeys:revoke` permissions.
+- An API key for the calling project, in `CI_LANGWATCH_TOKEN`. It needs the `virtualKeys:create` and `virtualKeys:delete` permissions.
 - The scope the CI key lives at, in `CI_SCOPE`, written as `type:id`. The types are `org`, `team` and `project`, for example `org:acme`.
 - At least one model provider credential visible from that scope, configured under **Settings → Model Providers**.
 - `jq` on the runner.
@@ -3755,7 +3755,7 @@ Wall-clock time is one provider completion plus three short API calls, so it is 
 
 | Failure | Cause | Where to look |
 |---|---|---|
-| `FAIL: no virtual key id` | The CI token lacks `virtualKeys:create`, or the scope id is wrong | Run `langwatch virtual-keys list` with the same token |
+| `FAIL: no virtual key id` | The token lacks `virtualKeys:create`, or the scope id is wrong | Run `langwatch virtual-keys list` with the same token |
 | `curl` exits 7 | The gateway hostname does not resolve or does not answer | DNS and the load balancer. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) |
 | `401 invalid_api_key` | The gateway could not resolve the secret | [Troubleshooting](/ai-gateway/troubleshooting#401-on-every-request) |
 | `FAIL: the key can route to no models` | No provider credential is visible from `CI_SCOPE` | Add a credential at that scope under **Settings → Model Providers** |
@@ -5706,7 +5706,7 @@ sidebarTitle: Admin setup
 
 ## Before you start
 
-An organization owner or admin does this once. After it, every member signs in from the LangWatch CLI and gets a personal virtual key that routes through your providers, under your routing policy and your budgets.
+Do this once as an organization owner or admin. After it, every member signs in from the LangWatch CLI and gets a personal virtual key that routes through your providers, under your routing policy and your budgets.
 
 You need:
 
