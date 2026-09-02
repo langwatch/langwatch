@@ -54,15 +54,15 @@ func TestRawResponseFromBifrostError_UnmarshalFailure(t *testing.T) {
 		},
 	}
 
-	body, gotStatus, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr)
 	if !ok {
 		t.Fatalf("rawResponseFromBifrostError returned ok=false despite populated RawResponse")
 	}
-	if gotStatus != status {
-		t.Fatalf("status mismatch: got %d, want %d", gotStatus, status)
+	if raw.status != status {
+		t.Fatalf("status mismatch: got %d, want %d", raw.status, status)
 	}
-	if string(body) != `{"id":"resp_abc","object":"response"}` {
-		t.Fatalf("body mismatch: got %q", body)
+	if string(raw.body) != `{"id":"resp_abc","object":"response"}` {
+		t.Fatalf("body mismatch: got %q", raw.body)
 	}
 }
 

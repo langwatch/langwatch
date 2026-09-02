@@ -101,12 +101,8 @@ func (r *BifrostRouter) dispatchSpeech(
 
 	resp, berr := r.bf.SpeechRequest(bfCtx, bfReq)
 	if berr != nil {
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -163,12 +159,8 @@ func (r *BifrostRouter) dispatchTranscription(
 
 	resp, berr := r.bf.TranscriptionRequest(bfCtx, bfReq)
 	if berr != nil {
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}

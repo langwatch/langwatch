@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -181,6 +182,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 			v1.Post("/embeddings", embeddingsHandler(deps))
 			v1.Post("/audio/speech", speechHandler(deps))
 			v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
+			v1.Post("/images/generations", imageGenerationsHandler(deps))
+			v1.Post("/images/edits", imageEditsHandler(deps))
 			v1.Get("/models", modelsHandler(deps))
 			// Realtime voice session mints (ADR-097). Both paths mirror the
 			// vendor's own, so a vendor SDK pointed at the gateway base URL
@@ -516,6 +519,233 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 		setMetaHeaders(hw, result.Meta)
 		writeJSONResponse(hw, result.Response)
 	}
+}
+
+// imageGenerationsHandler terminates POST /v1/images/generations (OpenAI-wire
+// image generation). The request body is small JSON; the response is the
+// OpenAI images JSON, whose data[] entries carry the base64 images. Never
+// streams.
+func imageGenerationsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		if err := rejectImageStreaming(r.Context(),
+			gjson.GetBytes(peek, "stream").Bool(),
+			int(gjson.GetBytes(peek, "partial_images").Int())); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleImageGeneration(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// maxImageEditBodyBytes caps a /v1/images/edits upload. OpenAI accepts at
+// most 50 MB per input image on the gpt-image family, and the SDK sends up to
+// 16 of them; 64 MiB holds a realistic multi-image edit with its mask and
+// multipart framing. Requests over the cap get 413 before any provider is
+// contacted.
+const maxImageEditBodyBytes = 64 << 20
+
+// imageEditFormFields are the OpenAI-wire optional text fields forwarded to
+// the provider. Anything else in the form is dropped rather than sent blind.
+var imageEditFormFields = []string{
+	"prompt", "n", "size", "quality", "background", "input_fidelity",
+	"output_format", "output_compression", "response_format", "user",
+}
+
+// imageEditFileFields are the form fields a source image arrives under. The
+// OpenAI Node SDK posts an array of files as "image[]"; a caller sending a
+// single file, and curl, use "image".
+var imageEditFileFields = []string{"image[]", "image"}
+
+// imageEditsHandler terminates POST /v1/images/edits (OpenAI-wire multipart
+// image edit). Like /v1/audio/transcriptions the body is multipart/form-data,
+// so the handler parses the form here, the only layer with the *http.Request,
+// and hands the app a normalized upload. Never streams.
+func imageEditsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		if err := parseImageEditMultipart(w, r); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		form, err := imageEditFormFrom(r)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleImageEdit(r.Context(), bundle, form.upload, form.model)
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// imageEditForm is one parsed /v1/images/edits body: the upload the dispatcher
+// sends, and the model it resolves under. The prompt and the end user ride on
+// the upload's own parameters.
+type imageEditForm struct {
+	upload *domain.ImageEditUpload
+	model  string
+}
+
+// parseImageEditMultipart applies the size cap and parses the form, turning a
+// parse failure into the status the caller should see.
+func parseImageEditMultipart(w http.ResponseWriter, r *http.Request) error {
+	if err := prepareRequestBody(w, r, maxImageEditBodyBytes); err != nil {
+		return err
+	}
+	// Memory threshold: files up to 10 MB stay in memory, larger ones spill
+	// to a temp file ParseMultipartForm cleans up on r.Body close.
+	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxImageEditBodyBytes
+	err := r.ParseMultipartForm(10 << 20)
+	if err == nil {
+		return nil
+	}
+	if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+		return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+			"message": "image upload exceeds the 64 MiB edit limit",
+		})
+	}
+	return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+		"message": "malformed multipart/form-data body: " + err.Error(),
+	})
+}
+
+// imageEditFormFrom reads the parsed form into the normalized shape the app
+// layer takes, refusing a request the provider could only reject.
+func imageEditFormFrom(r *http.Request) (*imageEditForm, error) {
+	images, err := readImageEditFiles(r)
+	if err != nil {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": err.Error()})
+	}
+	if len(images) == 0 {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing required multipart field: "image"`,
+		})
+	}
+
+	mask, err := readMultipartFile(r, "mask")
+	if err != nil {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": err.Error()})
+	}
+
+	prompt := r.FormValue("prompt")
+	if prompt == "" {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing required multipart field: "prompt"`,
+		})
+	}
+
+	partial, _ := strconv.Atoi(r.FormValue("partial_images"))
+	if err := rejectImageStreaming(r.Context(), r.FormValue("stream") == "true", partial); err != nil {
+		return nil, err
+	}
+
+	params := make(map[string]string, len(imageEditFormFields))
+	for _, f := range imageEditFormFields {
+		if v := r.FormValue(f); v != "" {
+			params[f] = v
+		}
+	}
+
+	return &imageEditForm{
+		upload: &domain.ImageEditUpload{Images: images, Mask: mask, Params: params},
+		model:  r.FormValue("model"),
+	}, nil
+}
+
+// readImageEditFiles reads every source image out of the parsed form, in the
+// order the caller sent them.
+func readImageEditFiles(r *http.Request) ([][]byte, error) {
+	if r.MultipartForm == nil {
+		return nil, nil
+	}
+	var images [][]byte
+	for _, field := range imageEditFileFields {
+		for _, header := range r.MultipartForm.File[field] {
+			data, err := readMultipartHeader(header)
+			if err != nil {
+				return nil, err
+			}
+			images = append(images, data)
+		}
+	}
+	return images, nil
+}
+
+// readMultipartHeader reads one file part into memory.
+func readMultipartHeader(header *multipart.FileHeader) ([]byte, error) {
+	file, err := header.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed opening uploaded file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading uploaded file: %w", err)
+	}
+	return data, nil
+}
+
+// readMultipartFile reads one optional file part, nil when the caller sent
+// none.
+func readMultipartFile(r *http.Request, field string) ([]byte, error) {
+	file, _, err := r.FormFile(field)
+	if err != nil {
+		return nil, nil
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading uploaded %s: %w", field, err)
+	}
+	return data, nil
+}
+
+// rejectImageStreaming refuses a request that asks for a streamed image. The
+// image routes answer with one JSON body, so a caller expecting partial-image
+// events would otherwise wait for frames that never come.
+func rejectImageStreaming(ctx context.Context, stream bool, partialImages int) error {
+	if stream {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": "streaming image generation is not supported; omit \"stream\" or set it to false",
+		})
+	}
+	if partialImages > 0 {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": "streaming image generation is not supported; omit \"partial_images\" or set it to 0",
+		})
+	}
+	return nil
 }
 
 // maxRealtimeMintBodyBytes caps a session-mint body. An OpenAI session
