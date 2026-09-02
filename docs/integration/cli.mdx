@@ -277,11 +277,11 @@ langwatch agent delete <id>
 
 ### Point an HTTP agent at your machine
 
-`langwatch agent dev` (alias `langwatch agent tunnel`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.
+`langwatch agent tunnel` (alias `langwatch agent dev`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.
 
 ```bash
-langwatch agent dev --port 8010
-langwatch agent dev --port 8010 --agent <id or name>
+langwatch agent tunnel --port 8010
+langwatch agent tunnel --port 8010 --agent <id or name>
 ```
 
 | Flag | Effect |
@@ -296,6 +296,14 @@ langwatch agent dev --port 8010 --agent <id or name>
 The command is a live session with no machine-readable output, so it refuses `-o json`.
 
 A connected agent needs none of this: it reaches out from your machine, so a local process is already a target. See [Other ways to connect](/agent-testing/other-ways-to-connect) for when each one applies.
+
+## Share your local folder with Langy
+
+`langwatch langy --share-control` shares this folder with the Langy conversation that asked for it, so Langy can read and change files here.
+
+```bash
+langwatch langy --share-control
+```
 
 ## Run scenario tests
 

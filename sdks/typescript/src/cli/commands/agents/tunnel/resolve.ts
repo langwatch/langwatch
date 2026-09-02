@@ -1,5 +1,5 @@
 /**
- * Input resolution for a dev tunnel session: which local URL to expose and
+ * Input resolution for a tunnel session: which local URL to expose and
  * which registered HTTP agent to repoint.
  */
 
@@ -139,7 +139,7 @@ function agentFromFlag({
   }
   if (!byId && byName.length > 1) {
     fail(
-      `More than one HTTP agent is named "${agentFlag}". Pass the agent id instead: langwatch agent dev --agent <id>`,
+      `More than one HTTP agent is named "${agentFlag}". Pass the agent id instead: langwatch agent tunnel --agent <id>`,
     );
   }
   return match;
@@ -221,7 +221,7 @@ async function pickHttpAgent({
   }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     fail(
-      "More than one HTTP agent is registered. Pass which one to use: langwatch agent dev --agent <id|name>",
+      "More than one HTTP agent is registered. Pass which one to use: langwatch agent tunnel --agent <id|name>",
     );
   }
 

@@ -21,6 +21,7 @@ dashboards/          — Custom analytics dashboards
 triggers/            — Automations / alerts
 ai-gateway/          — Virtual Keys, Budgets, Governance, Inventory (ingestion)
 settings/            — Model Providers, Model Defaults, Project Secrets
+support/             — Bug reports, Langy local control
 ```
 
 Design principles:
@@ -102,6 +103,9 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Custom Roles | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
 | Role Bindings | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
 | SCIM Provisioning | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| **Support** | | | | | | | | | | |
+| Bug reports | — | — | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| Langy local control | — | — | — | ✅ | ✅ | — | — | — | — | ✅ |
 
 ### Coverage notes
 
@@ -115,6 +119,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
   - The organization-scoped families (everything above except Teams) need an Enterprise plan, and answer `402 enterprise_plan_required` on any plan below it. Teams is ungated.
   - `langwatch organizations create|list|get` is a separate, plan-ungated family. It provisions organizations on a **self-hosted** instance and authenticates with the instance administrator credential (`LANGWATCH_INSTANCE_ADMIN_API_KEY`) rather than an organization API key, so it answers `404` wherever that credential is unset and on LangWatch Cloud, where the family does not exist at all. It is listed under Organization because it addresses the same resource.
 - **Skills (platform side)** — Only `analytics`, `scenarios`, and `evaluators` have dedicated platform-side skills. Most features use shared platform skill conventions through MCP tools directly.
+- **Langy local control** — CLI-only by design: `langwatch langy --share-control` shares the developer's local folder with the Langy conversation that asked for it, so Langy can read and change files on the machine. No SDK, UI, or MCP surface.
 - **Docs**: The column tracks the feature's canonical guide page, not its API reference: every REST family gets generated reference pages under `docs/api-reference/`, so counting those would make the column say `✅` everywhere and measure nothing. A handful of features (suites, dashboards, triggers, secrets, model defaults) still lack canonical public docs pages, as do the organization management features.
 - **CLI hints** — `surfaces.code.hints` is an optional per-command map (`"trace search" → example invocation`) on the agent-critical groups. It powers the CLI's machine-readable catalog (`langwatch commands`) and compact help tree (`langwatch help-tree`); additive only, consumers that don't know it ignore it.
 

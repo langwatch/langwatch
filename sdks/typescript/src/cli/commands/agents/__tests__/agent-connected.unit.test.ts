@@ -302,12 +302,14 @@ describe("runAgentCommand()", () => {
 describe("the agent command help", () => {
   const program = readFileSync(join(__dirname, "../../../program.ts"), "utf8");
 
-  /** @scenario "The dev command help points code agents to connectAgent" */
-  it("says agent dev is for HTTP agents and names connectAgent and connect_agent", () => {
-    const devHelp = program.slice(program.indexOf('.command("dev")'), program.indexOf('.option("--port <number>"'));
-    expect(devHelp).toContain("For HTTP agents");
-    expect(devHelp).toContain("connectAgent");
-    expect(devHelp).toContain("connect_agent");
+  /** @scenario "The tunnel command help points code agents to connectAgent" */
+  it("says agent tunnel is for HTTP agents and names connectAgent and connect_agent", () => {
+    const tunnelStart = program.indexOf('.command("tunnel")');
+    const tunnelEnd = program.indexOf(").action(runAgentTunnel)", tunnelStart);
+    const tunnelHelp = program.slice(tunnelStart, tunnelEnd);
+    expect(tunnelHelp).toContain("For HTTP agents");
+    expect(tunnelHelp).toContain("connectAgent");
+    expect(tunnelHelp).toContain("connect_agent");
   });
 
   /** @scenario "The target help names the connected forms" */
@@ -315,5 +317,26 @@ describe("the agent command help", () => {
     const targetHelp = program.slice(program.indexOf("const TARGET_FLAG_HELP"), program.indexOf("const RUN_NAME_FLAG_HELP"));
     expect(targetHelp).toContain("connected:agent_abc123");
     expect(targetHelp).toContain("connected:<name>@<environment>");
+  });
+});
+
+describe("the agent dev alias", () => {
+  // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant,
+  // which no test runner defines (see help-topic.unit.test.ts).
+  (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
+
+  /** @scenario "The hidden `agent dev` alias still runs the tunnel session" */
+  it("keeps `agent dev` as a hidden command wired to the same tunnel flags as `agent tunnel`", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const agentCmd = buildProgram().commands.find((cmd) => cmd.name() === "agent");
+    const tunnelCmd = agentCmd?.commands.find((cmd) => cmd.name() === "tunnel");
+    const devCmd = agentCmd?.commands.find((cmd) => cmd.name() === "dev");
+
+    expect(tunnelCmd).toBeDefined();
+    expect(devCmd).toBeDefined();
+    expect((devCmd as unknown as { _hidden?: boolean })._hidden).toBe(true);
+    expect(devCmd!.options.map((option) => option.long)).toEqual(
+      tunnelCmd!.options.map((option) => option.long),
+    );
   });
 });

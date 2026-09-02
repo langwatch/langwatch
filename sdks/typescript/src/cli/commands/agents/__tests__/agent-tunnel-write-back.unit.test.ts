@@ -5,7 +5,7 @@ import {
   deriveSimulationsUrl,
   restoreDevTunnel,
   touchDevTunnel,
-} from "../dev/write-back";
+} from "../tunnel/write-back";
 
 const TUNNEL_URL = "https://lively-otter.trycloudflare.com";
 

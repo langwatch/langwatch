@@ -1,10 +1,10 @@
 /**
- * `langwatch agent dev` (alias `agent tunnel`): expose a local agent server
- * through a public tunnel and repoint a registered HTTP agent at it, so
- * platform scenarios run against the local process. Ctrl-C restores the
+ * `langwatch agent tunnel` (hidden alias `agent dev`): expose a local agent
+ * server through a public tunnel and repoint a registered HTTP agent at it,
+ * so platform scenarios run against the local process. Ctrl-C restores the
  * previous URL.
  *
- * The session phases live in `./dev/`: input resolution, the local auth
+ * The session phases live in `./tunnel/`: input resolution, the local auth
  * proxy, quick-tunnel provisioning, and the config write-back / restore.
  */
 
@@ -17,20 +17,20 @@ import {
 import { resolveCredentials } from "../../utils/apiKey";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import { type AuthProxy, startAuthProxy } from "./dev/auth-proxy";
-import { startQuickTunnel, type TunnelHandle } from "./dev/quick-tunnel";
+import { type AuthProxy, startAuthProxy } from "./tunnel/auth-proxy";
+import { startQuickTunnel, type TunnelHandle } from "./tunnel/quick-tunnel";
 import {
   fail,
   rememberAgentForDirectory,
   resolveLocalUrl,
   resolveTargetAgent,
-} from "./dev/resolve";
+} from "./tunnel/resolve";
 import {
   applyDevTunnel,
   deriveSimulationsUrl,
   restoreDevTunnel,
   touchDevTunnel,
-} from "./dev/write-back";
+} from "./tunnel/write-back";
 
 /** How often the session probes the tunnel end to end. */
 const HEALTH_INTERVAL_MS = 30_000;
@@ -55,7 +55,7 @@ const FORCE_EXIT_GRACE_MS = 2_000;
  */
 const KEEP_ALIVE_INTERVAL_MS = 60_000;
 
-export interface AgentDevOptions {
+export interface AgentTunnelOptions {
   port?: string;
   url?: string;
   agent?: string;
@@ -67,14 +67,14 @@ export interface AgentDevOptions {
   apiKey?: string;
 }
 
-export interface AgentDevSession {
+export interface AgentTunnelSession {
   /** Resolves with the exit code once shutdown finishes. */
   done: Promise<number>;
   shutdown: (code?: number) => Promise<void>;
 }
 
-/** Test hooks for `startAgentDevSession`; sessions use the defaults. */
-export interface AgentDevSessionHooks {
+/** Test hooks for `startAgentTunnelSession`; sessions use the defaults. */
+export interface AgentTunnelSessionHooks {
   healthIntervalMs?: number;
   healthProbeTimeoutMs?: number;
 }
@@ -118,14 +118,14 @@ function printBanner({
 }
 
 /**
- * Start a dev tunnel session. Exported separately from the command so tests
+ * Start a tunnel session. Exported separately from the command so tests
  * can drive the full lifecycle (write-back, restore, shutdown) without
  * process signals or `process.exit`.
  */
-export async function startAgentDevSession(
-  options: AgentDevOptions,
-  hooks: AgentDevSessionHooks = {},
-): Promise<AgentDevSession> {
+export async function startAgentTunnelSession(
+  options: AgentTunnelOptions,
+  hooks: AgentTunnelSessionHooks = {},
+): Promise<AgentTunnelSession> {
   const localUrl = resolveLocalUrl(options);
   if (options.tunnelUrl) {
     try {
@@ -382,7 +382,7 @@ export async function startAgentDevSession(
     if (!canReprovision) {
       console.error(
         chalk.yellow(
-          `The tunnel at ${currentTunnelUrl} stopped answering. This session cannot replace it. Restart your tunnel, or restart \`agent dev\`.`,
+          `The tunnel at ${currentTunnelUrl} stopped answering. This session cannot replace it. Restart your tunnel, or restart \`agent tunnel\`.`,
         ),
       );
       return;
@@ -416,11 +416,11 @@ export async function startAgentDevSession(
   return { done, shutdown };
 }
 
-/** The `agent dev` command action: run the session until a signal ends it. */
-export const agentDevCommand = async (
-  options: AgentDevOptions,
+/** The `agent tunnel` command action: run the session until a signal ends it. */
+export const agentTunnelCommand = async (
+  options: AgentTunnelOptions,
 ): Promise<void> => {
-  const session = await startAgentDevSession(options);
+  const session = await startAgentTunnelSession(options);
 
   // A session is event-driven, and with `--tunnel-url` there is neither a
   // tunnel child process nor a local auth proxy to hold the event loop open —

@@ -1787,6 +1787,27 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // A live, human-only session: it never returns a CommandResult, so it is
+  // registered with a plain action. It owns `-o/--output` so the refusal can
+  // name the reason instead of the generic "no structured output yet".
+  program
+    .command("langy")
+    .description(
+      "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the LangWatch panel before anything that is not read-only",
+    )
+    .option(
+      "--share-control",
+      "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
+    )
+    .option(
+      "-o, --output <format>",
+      "Not available: this command is an interactive session and prints as it goes",
+    )
+    .action(async (options: { shareControl?: boolean; output?: string }) => {
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl(options);
+    });
+
   // Add agent command group
   const agentCmd = program
     .command("agent")
@@ -1856,31 +1877,44 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // A live, human-only session: it never returns a CommandResult, so it is
   // registered with a plain action and the format gate honestly refuses
   // `-o json` instead of accepting a format the command never renders.
-  agentCmd
-    .command("dev")
-    .alias("tunnel")
-    .description("For HTTP agents: expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL). An agent written in code needs no tunnel: wrap it with connectAgent (langwatch/agent) or connect_agent (Python) and it connects itself")
-    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
-    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
-    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
-    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
-    .option("--no-update-url", "Print the tunnel URL without changing the agent")
-    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
-    .option("--api-key <key>", "API key to use for this run")
-    .action(
-      async (options: {
-        port?: string;
-        url?: string;
-        agent?: string;
-        tunnelUrl?: string;
-        updateUrl?: boolean;
-        auth?: boolean;
-        apiKey?: string;
-      }) => {
-        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
-        return impl(options);
-      },
-    );
+  //
+  // `agent dev` is the same command under its earlier name. Commander cannot
+  // hide an alias from help, so it is registered as its own hidden command
+  // that runs the same action.
+  interface AgentTunnelFlags {
+    port?: string;
+    url?: string;
+    agent?: string;
+    tunnelUrl?: string;
+    updateUrl?: boolean;
+    auth?: boolean;
+    apiKey?: string;
+  }
+  const runAgentTunnel = async (options: AgentTunnelFlags) => {
+    const { agentTunnelCommand: impl } = await import("./commands/agents/tunnel.js");
+    return impl(options);
+  };
+  const withTunnelFlags = (command: Command): Command =>
+    command
+      .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+      .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+      .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")
+      .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+      .option("--no-update-url", "Print the tunnel URL without changing the agent")
+      .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
+      .option("--api-key <key>", "API key to use for this run");
+
+  withTunnelFlags(
+    agentCmd
+      .command("tunnel")
+      .description("For HTTP agents: expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL). An agent written in code needs no tunnel: wrap it with connectAgent (langwatch/agent) or connect_agent (Python) and it connects itself"),
+  ).action(runAgentTunnel);
+
+  withTunnelFlags(
+    agentCmd
+      .command("dev", { hidden: true })
+      .description("The earlier name of `agent tunnel`, kept so existing scripts keep working"),
+  ).action(runAgentTunnel);
 
   emitsResult(
     agentCmd

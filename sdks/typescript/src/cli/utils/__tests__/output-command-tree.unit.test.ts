@@ -152,7 +152,10 @@ describe("the real command tree", () => {
 
       // A live session that runs until Ctrl-C: it produces status prose and
       // exits via process.exit, never a result document.
+      ["agent tunnel", "live tunnel session until Ctrl-C, no result document"],
+      // Hidden compatibility name for `agent tunnel`, same wiring.
       ["agent dev", "live tunnel session until Ctrl-C, no result document"],
+      ["langy", "live shared-folder session until Ctrl-C, no result document"],
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(

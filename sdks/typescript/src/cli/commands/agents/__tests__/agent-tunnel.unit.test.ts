@@ -67,8 +67,8 @@ vi.mock("cloudflared", () => ({
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { agentDevCommand, startAgentDevSession } from "../dev";
-import { DEV_SECRET_HEADER } from "../dev/write-back";
+import { agentTunnelCommand, startAgentTunnelSession } from "../tunnel";
+import { DEV_SECRET_HEADER } from "../tunnel/write-back";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -94,7 +94,7 @@ const makeAgent = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("agent dev session", () => {
+describe("agent tunnel session", () => {
   // Typed as async on purpose: the bare `ReturnType<typeof vi.fn>` declares a
   // void return, so an implementation that returns a promise reads as a
   // misused promise.
@@ -121,7 +121,7 @@ describe("agent dev session", () => {
     // ~/.langwatch/config.json.
     process.env.LANGWATCH_CLI_CONFIG = path.join(
       os.tmpdir(),
-      `lw-agent-dev-test-${process.pid}-${Math.random().toString(36).slice(2)}.json`,
+      `lw-agent-tunnel-test-${process.pid}-${Math.random().toString(36).slice(2)}.json`,
     );
 
     mockGet = vi.fn().mockResolvedValue(makeAgent());
@@ -159,7 +159,7 @@ describe("agent dev session", () => {
   describe("when the session starts against a local port", () => {
     /** @scenario "URL write-back replaces the agent URL and stashes the previous one" */
     it("PATCHes the agent with the tunnel URL, the stash, and the secret header", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -183,7 +183,7 @@ describe("agent dev session", () => {
 
     /** @scenario "Ending the session restores the agent and clears the tunnel marker" */
     it("restores the previous URL and clears the stash on shutdown, once", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -214,7 +214,7 @@ describe("agent dev session", () => {
     });
 
     it("reports the manual fix when the restore PATCH fails, without throwing", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -246,7 +246,7 @@ describe("agent dev session", () => {
       });
       try {
         await expect(
-          startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
+          startAgentTunnelSession({ port: "8000", agent: "agent_abc123" }),
         ).rejects.toThrow(ProcessExitError);
         expect(mockUpdate).not.toHaveBeenCalled();
       } finally {
@@ -261,7 +261,7 @@ describe("agent dev session", () => {
   describe("when --no-update-url is passed", () => {
     /** @scenario "Opting out of the URL update touches nothing" */
     it("never PATCHes the agent, on start or on shutdown", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
         updateUrl: false,
@@ -277,7 +277,7 @@ describe("agent dev session", () => {
   describe("when --tunnel-url is passed", () => {
     /** @scenario "Bringing your own tunnel URL skips tunnel provisioning" */
     it("provisions no tunnel and points the agent at the supplied URL", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
         tunnelUrl: "https://my-own-tunnel.example.com",
@@ -301,7 +301,7 @@ describe("agent dev session", () => {
 
     it("rejects a tunnel URL that does not parse", async () => {
       await expect(
-        startAgentDevSession({
+        startAgentTunnelSession({
           port: "8000",
           agent: "agent_abc123",
           tunnelUrl: "not a url",
@@ -314,7 +314,7 @@ describe("agent dev session", () => {
   describe("when --port and --url are both passed", () => {
     it("fails validation before touching the API", async () => {
       await expect(
-        startAgentDevSession({
+        startAgentTunnelSession({
           port: "8000",
           url: "http://localhost:8000",
           agent: "agent_abc123",
@@ -328,7 +328,7 @@ describe("agent dev session", () => {
   describe("when neither --port nor --url is passed", () => {
     it("fails with guidance instead of guessing a port", async () => {
       await expect(
-        startAgentDevSession({ agent: "agent_abc123" }),
+        startAgentTunnelSession({ agent: "agent_abc123" }),
       ).rejects.toThrow(ProcessExitError);
     });
   });
@@ -336,7 +336,7 @@ describe("agent dev session", () => {
   describe("when the --agent flag matches nothing", () => {
     it("fails with guidance to list agents", async () => {
       await expect(
-        startAgentDevSession({ port: "8000", agent: "no-such-agent" }),
+        startAgentTunnelSession({ port: "8000", agent: "no-such-agent" }),
       ).rejects.toThrow(ProcessExitError);
       expect(mockUpdate).not.toHaveBeenCalled();
     });
@@ -350,7 +350,7 @@ describe("agent dev session", () => {
       });
 
       await expect(
-        startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
+        startAgentTunnelSession({ port: "8000", agent: "agent_abc123" }),
       ).rejects.toThrow(ProcessExitError);
       expect(mockUpdate).not.toHaveBeenCalled();
     });
@@ -358,7 +358,7 @@ describe("agent dev session", () => {
 
   describe("when the tunnel process exits behind the session", () => {
     it("restores the agent and resolves the session", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -415,7 +415,7 @@ describe("agent dev session", () => {
   const startCommandUntilWriteBack = async (): Promise<{
     outcome: Promise<unknown>;
   }> => {
-    const outcome = agentDevCommand({
+    const outcome = agentTunnelCommand({
       port: "8000",
       agent: "agent_abc123",
     }).catch((error: unknown) => error);
@@ -458,7 +458,7 @@ describe("agent dev session", () => {
             .getActiveResourcesInfo()
             .filter((resource) => resource === "Timeout").length;
 
-        const outcome = agentDevCommand({
+        const outcome = agentTunnelCommand({
           port: "8000",
           agent: "agent_abc123",
           tunnelUrl: "https://my-own-tunnel.example.com",
@@ -539,7 +539,7 @@ describe("agent dev session", () => {
   describe("when shutdown is called again while the restore is in flight", () => {
     /** @scenario "A second shutdown during restore does not restore twice" */
     it("restores exactly once and both shutdowns finish", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -569,7 +569,7 @@ describe("agent dev session", () => {
   describe("when the tunnel reports an error behind the session", () => {
     /** @scenario "A tunnel error ends the session like a tunnel exit" */
     it("restores the agent and resolves the session nonzero", async () => {
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });
@@ -590,7 +590,7 @@ describe("agent dev session", () => {
     it("provisions a replacement tunnel and re-points the agent", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("edge down"));
 
-      const session = await startAgentDevSession(
+      const session = await startAgentTunnelSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
@@ -627,7 +627,7 @@ describe("agent dev session", () => {
           })) as unknown as typeof fetch,
       );
 
-      const session = await startAgentDevSession(
+      const session = await startAgentTunnelSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5, healthProbeTimeoutMs: 10 },
       );
@@ -643,7 +643,7 @@ describe("agent dev session", () => {
     it("restores and ends the session when re-provisioning fails", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("edge down"));
 
-      const session = await startAgentDevSession(
+      const session = await startAgentTunnelSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
@@ -667,7 +667,7 @@ describe("agent dev session", () => {
     it("only warns for a bring-your-own tunnel, without provisioning", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("edge down"));
 
-      const session = await startAgentDevSession(
+      const session = await startAgentTunnelSession(
         {
           port: "8000",
           agent: "agent_abc123",
@@ -698,7 +698,7 @@ describe("agent dev session", () => {
         new Response("unauthorized", { status: 401 }),
       );
 
-      const session = await startAgentDevSession(
+      const session = await startAgentTunnelSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
@@ -744,7 +744,7 @@ describe("agent dev session", () => {
       });
       mockGet.mockResolvedValue(stale);
 
-      const session = await startAgentDevSession({
+      const session = await startAgentTunnelSession({
         port: "8000",
         agent: "agent_abc123",
       });

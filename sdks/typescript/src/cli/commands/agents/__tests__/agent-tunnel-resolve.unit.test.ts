@@ -1,10 +1,10 @@
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { resolveLocalUrl, resolveTargetAgent } from "../dev/resolve";
+import { resolveLocalUrl, resolveTargetAgent } from "../tunnel/resolve";
 
 /**
- * Agent selection for `langwatch agent dev` when `--agent` is omitted.
+ * Agent selection for `langwatch agent tunnel` when `--agent` is omitted.
  *
  * The selection order (flag, remembered agent, lone agent, picker) mostly
  * needs no test double beyond a fake service, but the edges do: with no HTTP
@@ -98,7 +98,7 @@ function restoreTTY() {
 	}
 }
 
-describe("agent dev target resolution", () => {
+describe("agent tunnel target resolution", () => {
 	let consoleError: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
