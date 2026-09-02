@@ -74,6 +74,25 @@ const SECRET_PAGE_KEYS = [
   "pages/settings/secrets",
 ];
 
+const AUTH_PAGE_KEYS = [
+  // The front door: eight addresses a person reaches with NO SESSION AT ALL,
+  // which is what makes them one family however differently they are wired.
+  // The only family in this package whose loaders carry no page guard, and
+  // deliberately so — a grant in front of these would be a gate in front of the
+  // way in.
+  "pages/auth/signin",
+  "pages/auth/signup",
+  "pages/auth/forgot-password",
+  "pages/auth/reset-password",
+  "pages/auth/verify-email",
+  "pages/auth/error",
+  "pages/auth/join",
+  // `/invite/accept` is the eighth: it is not under `/auth`, and it is the
+  // front door all the same — an invitation link is the way in for somebody
+  // who has no account yet.
+  "pages/invite/accept",
+];
+
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
   // page-level grant — `organization:manage` — because both pages read
@@ -192,6 +211,16 @@ const PROMPT_PAGE_KEYS = [
   "pages/[project]/prompts",
 ];
 
+const WORKFLOW_PAGE_KEYS = [
+  // TWO keys of the ranking row's three. `pages/[project]/studio/[workflow]`
+  // is deliberately absent: the optimization studio's copy set is 220 files and
+  // 40,543 lines of `platform/app`, including the trace feature's mapping
+  // vocabulary and three `~/server` modules a browser package may not name, so
+  // it stays where it is and the route table still serves it.
+  "pages/[project]/workflows",
+  "pages/[project]/chat/[workflow]",
+];
+
 const OPS_PAGE_KEYS = [
   "pages/ops/index",
   "pages/ops/dejaview",
@@ -264,6 +293,7 @@ describe("given what apps/ui serves itself", () => {
           ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
+          ...AUTH_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -278,20 +308,22 @@ describe("given what apps/ui serves itself", () => {
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Twenty-one for twenty features: the personal workspace mounts two,
-      // because the coding-agent tables its screens render call procedures of
-      // their own and `apps/ui` may not import the package they live in.
+      // Twenty-three for twenty-two features: the personal workspace mounts
+      // two, because the coding-agent tables its screens render call procedures
+      // of their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
         "@langwatch/analytics-web",
         "@langwatch/annotation-web",
         "@langwatch/api-key-web",
+        "@langwatch/auth-web",
         "@langwatch/authz-web",
         "@langwatch/automation-web",
         "@langwatch/data-privacy-web",
@@ -307,6 +339,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/organization-web",
         "@langwatch/prompt-web",
         "@langwatch/secret-web",
+        "@langwatch/workflow-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
       ]);
@@ -358,6 +391,7 @@ describe("given what apps/ui serves itself", () => {
           ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
+          ...AUTH_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -372,10 +406,11 @@ describe("given what apps/ui serves itself", () => {
           ...ORGANIZATION_PAGE_KEYS,
           ...PROMPT_PAGE_KEYS,
           ...SECRET_PAGE_KEYS,
+          ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(21);
+      expect(merged.apis).toHaveLength(23);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

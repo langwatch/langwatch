@@ -20,6 +20,7 @@ import { agentApiBinding, agentPageLoaders } from "./agent";
 import { analyticsApiBinding, analyticsPageLoaders } from "./analytics";
 import { apiKeyApiBinding, apiKeyPageLoaders } from "./api-key";
 import { annotationApiBinding, annotationPageLoaders } from "./annotation";
+import { authApiBinding, authPageLoaders } from "./auth";
 import { authzApiBinding, authzPageLoaders } from "./authz";
 import { automationsAllPageLoaders, automationsApiBinding } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
@@ -35,6 +36,7 @@ import { opsApiBinding, opsPageLoaders } from "./ops";
 import { organizationApiBinding, organizationPageLoaders } from "./organization";
 import { promptApiBinding, promptPageLoaders } from "./prompt";
 import { secretApiBinding, secretPageLoaders } from "./secret";
+import { workflowApiBinding, workflowPageLoaders } from "./workflows";
 import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
 
 export const installedUiFeatures: UiFeatureInstall = {
@@ -43,6 +45,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...analyticsPageLoaders,
     ...annotationPageLoaders,
     ...apiKeyPageLoaders,
+    ...authPageLoaders,
     ...authzPageLoaders,
     ...automationsAllPageLoaders,
     ...dataPrivacyPageLoaders,
@@ -58,6 +61,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...organizationPageLoaders,
     ...promptPageLoaders,
     ...secretPageLoaders,
+    ...workflowPageLoaders,
     ...personalWorkspacePageLoaders,
   },
   apis: [
@@ -65,6 +69,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     analyticsApiBinding,
     annotationApiBinding,
     apiKeyApiBinding,
+    authApiBinding,
     authzApiBinding,
     automationsApiBinding,
     dataPrivacyApiBinding,
@@ -80,6 +85,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     organizationApiBinding,
     promptApiBinding,
     secretApiBinding,
+    workflowApiBinding,
     ...personalWorkspaceApiBindings,
   ],
   capabilities: { feedback: BrowserUiFeedback.create() },

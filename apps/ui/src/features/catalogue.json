@@ -5,6 +5,7 @@
     "@langwatch/analytics-web",
     "@langwatch/annotation-web",
     "@langwatch/api-key-web",
+    "@langwatch/auth-web",
     "@langwatch/authz-web",
     "@langwatch/automation-web",
     "@langwatch/data-privacy-web",
@@ -61,6 +62,16 @@
       "uses": {
         "screens": [
           "@langwatch/api-key-web/screens/api-key"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "auth",
+      "root": "auth",
+      "uses": {
+        "screens": [
+          "@langwatch/auth-web/screens/auth"
         ],
         "surfaces": []
       }
@@ -222,6 +233,16 @@
       "uses": {
         "screens": [
           "@langwatch/secret-web/screens/secret"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "workflows",
+      "root": "workflows",
+      "uses": {
+        "screens": [
+          "@langwatch/workflow-web/screens/workflows"
         ],
         "surfaces": []
       }

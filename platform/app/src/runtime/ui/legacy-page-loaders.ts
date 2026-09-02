@@ -25,16 +25,8 @@
 import type { UiPageLoaderRegistry } from "@langwatch/ui";
 
 export const legacyPageLoaders: UiPageLoaderRegistry = {
-  "pages/auth/signin": () => import("~/pages/auth/signin"),
-  "pages/auth/signup": () => import("~/pages/auth/signup"),
-  "pages/auth/forgot-password": () => import("~/pages/auth/forgot-password"),
-  "pages/auth/reset-password": () => import("~/pages/auth/reset-password"),
-  "pages/auth/verify-email": () => import("~/pages/auth/verify-email"),
-  "pages/auth/error": () => import("~/pages/auth/error"),
-  "pages/auth/join": () => import("~/pages/auth/join"),
   "pages/index": () => import("~/pages/index"),
   "pages/authorize": () => import("~/pages/authorize"),
-  "pages/invite/accept": () => import("~/pages/invite/accept"),
   "pages/mcp/authorize": () => import("~/pages/mcp/authorize"),
   "pages/share/[id]": () => import("~/pages/share/[id]"),
   "pages/onboarding": () => import("~/pages/onboarding"),
@@ -62,8 +54,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
     import("~/pages/[project]/evaluations/[id]/edit"),
   "pages/[project]/traces": () => import("~/pages/[project]/traces"),
   "pages/[project]/setup": () => import("~/pages/[project]/setup"),
-  "pages/[project]/workflows": () => import("~/pages/[project]/workflows"),
-  "pages/[project]/chat/[workflow]": () => import("~/pages/[project]/chat/[workflow]"),
   "pages/[project]/studio/[workflow]": () => import("~/pages/[project]/studio/[workflow]"),
   "pages/[project]/annotations/my-queue": () => import("~/pages/[project]/annotations/my-queue"),
   // /experiments and /evaluations are one module: the experiments address
