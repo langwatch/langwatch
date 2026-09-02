@@ -56,7 +56,7 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/ai-gateway/api/management#retrying-a-create-safely) and a retry that lost its response returns the original secret instead of stranding it.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/gateway-virtual-keys/create-virtual-key) and a retry that lost its response returns the original secret instead of stranding it.
 
 ### What a receiver URL must look like
 

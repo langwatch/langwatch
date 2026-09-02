@@ -2020,13 +2020,13 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `not_found` | 404 | The resource the request named does not exist. | Check the path. |
 | `provider_error` | 502 | An upstream provider failed and no credential in the chain answered. | Retry with backoff, then check the provider's status page. |
 | `provider_timeout` | 504 | The provider accepted the request and did not answer in time. | Retry with backoff. |
-| `provider_connection_failed` | 502 | Nothing answered at the provider's address, so the request never reached it. | Retry. Check a custom base URL is correct and reachable. |
+| `provider_connection_failed` | 502 | The provider's address did not answer, so the request never reached it. | Retry. Check a custom base URL is correct and reachable. |
 | `chain_exhausted` | 502 | Every credential in the fallback chain failed. | Retry, then check the providers on the key. |
 | `circuit_open` | 503 | Repeated upstream failures opened the credential's circuit breaker, so the gateway declined to dial the provider. | Retry after the cooldown. Answered 4xx responses never open the breaker. |
 | `codex_session_expired` | 401 | The codex provider's OpenAI sign-in is dead. | Sign in with OpenAI again on the model provider. |
 | `request_abandoned` | 499 | The caller disconnected, or its deadline expired before the provider answered. | Send the request again if you still need the answer. |
 | `auth_upstream_unavailable` | 503 | The gateway could not reach the LangWatch control plane to resolve the key. | Retry. |
-| `realtime_registry_unavailable` | 503 | The control plane could not record a realtime voice session, so the gateway minted nothing. | Retry. |
+| `realtime_registry_unavailable` | 503 | The control plane could not record a realtime voice session, so the gateway did not mint a session. | Retry. |
 | `internal_error` | 500 | An unclassified gateway failure. | Retry, and quote `trace_id` in a support ticket. |
 
 ## Provider errors
@@ -2046,7 +2046,7 @@ When only the status and the message are available, the gateway writes the same 
 | `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id, and the `gateway_request_id` on spend events. |
 | `X-LangWatch-Budget-Warning` | A budget is at or over its warning threshold | `<scope>:<percent>`, or `<scope>/<model provider id>:<percent>` for a provider-filtered budget. Comma separated. |
 
-`X-LangWatch-Budget-Warning` rides on successful responses. A budget in warning never becomes an error envelope.
+`X-LangWatch-Budget-Warning` is set on successful responses. A budget in warning never becomes an error envelope.
 
 <Note>A non-streaming call that runs long writes a keep-alive byte, which commits status `200` before the outcome is known. The response then carries `X-LangWatch-Heartbeat-Active: true`, and the body still holds an `error` key when the call failed. Read the body rather than the status on those responses.</Note>
 
@@ -2181,9 +2181,7 @@ Send a LangWatch API key on every request:
 Authorization: Bearer $LANGWATCH_API_KEY
 ```
 
-`X-Auth-Token: $LANGWATCH_API_KEY` is accepted in its place.
-
-Virtual keys, budgets and cache rules authenticate with a project API key. Spend authenticates with an organization API key.
+`X-Auth-Token` is accepted in its place. Virtual keys, budgets and cache rules authenticate with a project API key. Spend authenticates with an organization API key.
 
 ## Permissions
 
@@ -2365,7 +2363,7 @@ OpenAI's own `list` shape:
 }
 ```
 
-Entries are sorted by `id` and deduplicated. `data` is always an array, empty rather than null when the key can reach nothing.
+Entries are sorted by `id` and deduplicated. `data` is always an array, empty rather than null when the key reaches no models.
 
 | Field | Value |
 |---|---|
@@ -2394,7 +2392,7 @@ A model from a provider that has an [instance handle](/ai-gateway/model-naming#i
 
 ## Incomplete discovery
 
-A provider the key can dispatch to can contribute nothing to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
+A provider the key can dispatch to can contribute no models to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
 
 ```
 X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
@@ -2429,23 +2427,16 @@ title: "Realtime voice"
 description: "Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor."
 ---
 
-The gateway brokers realtime voice sessions. Your client asks the gateway for
-a session, the gateway checks the budget, resolves your stored provider key,
-calls the vendor's own mint endpoint and hands back what the vendor answered,
-plus a LangWatch session id.
+## How the broker works
 
-The media socket then runs from your client straight to the vendor. The
-gateway is not in the audio path, so it adds nothing to turn latency.
+The gateway mints the vendor's own session credential. Your client asks the gateway for a session, the gateway admits it against the key's budgets and caps, calls the vendor's mint endpoint with your stored provider key, and hands back what the vendor answered plus a LangWatch session id.
 
-What you get: the session is billed against the virtual key like every other
-request, it is admitted against the key's budgets, and one key can be limited
-in how many calls it runs at once.
+The audio never passes through the gateway. The media socket runs from your client straight to the vendor, so the gateway does not add to turn latency and cannot see, record or end a call in progress.
+
+One session is one spend record: admitted at the mint, settled when the call's usage arrives.
 
 <Note>
-The gateway does not carry the voice socket, so it cannot end a call that is
-already running. A voice budget admits at session start and reconciles when
-the call ends. Overshoot for voice is bounded by the length of a call, not by
-the size of one request.
+Because the gateway is not in the audio path, a voice budget admits at session start and reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
 </Note>
 
 ## ElevenLabs Conversational AI
@@ -2453,95 +2444,55 @@ the size of one request.
 Mint a signed URL for one hosted agent.
 
 ```bash
-curl "$LANGWATCH_GATEWAY_URL/v1/convai/conversation/get-signed-url?agent_id=agent_123" \
+curl "https://gateway.langwatch.ai/v1/convai/conversation/get-signed-url?agent_id=agent_123" \
   -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
 ```
 
-The path and the header are ElevenLabs' own, so a client that already speaks
-to ElevenLabs changes its base URL and its key, and nothing else. The answer
-is the vendor's, with one added key:
+The path and the header are ElevenLabs' own, so a client that already talks to ElevenLabs changes only its base URL and its key. `agent_id` is required: a signed URL is bound to one agent, and a request without it answers `400 bad_request`.
+
+The answer is the vendor's own body with one added key:
 
 ```json
 {
-  "signed_url": "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=…&conversation_signature=…&conversation_id=…",
-  "langwatch": { "session_id": "req_…" }
+  "signed_url": "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_123&conversation_signature=...&conversation_id=conv_456",
+  "langwatch": { "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A" }
 }
 ```
 
-The same id is on the `X-LangWatch-Session-Id` response header, so a client
-that parses the vendor shape strictly can read it there instead.
+The same id is on the `X-LangWatch-Session-Id` response header, so a client that parses the vendor shape strictly reads it there instead.
 
-Open the socket with `signed_url` exactly as returned. The gateway asks
-ElevenLabs for the conversation id at mint time, so the call is already joined
-to its spend record before the socket exists.
+Open the socket with `signed_url` exactly as returned. The gateway asks ElevenLabs for the conversation id at mint time, so the call is joined to its spend record before the socket exists.
 
-### Closing the session
+### Closing an ElevenLabs session
 
-ElevenLabs reports cost and duration after the call, not over the socket. The
-gateway reads that report in two ways, and either one is enough:
+ElevenLabs reports cost and duration after the call, not over the socket. LangWatch reads that report two ways, and either one settles the session:
 
-1. **The post-call webhook.** Point your workspace webhook at
-   `$LANGWATCH_GATEWAY_URL/v1/convai/webhook/<model-provider-id>`
-   and store the webhook secret on the ElevenLabs provider in Settings ->
-   Model Providers, under `ELEVENLABS_WEBHOOK_SECRET`. The model provider id
-   is the row id shown on that provider. Deliveries are verified against that
-   secret; a provider with no secret stored answers 404.
+1. **The post-call webhook.** Point your ElevenLabs workspace webhook at `https://gateway.langwatch.ai/v1/convai/webhook/<model-provider-id>` and store the webhook secret on that provider row. See [ElevenLabs](/ai-gateway/api/elevenlabs#post-call-webhook) for the route, the signature check and the status codes.
+2. **The poller.** Two minutes after a mint, LangWatch reads the conversation back from ElevenLabs by its own id.
 
-   The URL is on the gateway, the same host as the two mints and the usage
-   report. The gateway is built to be public, so a delivery reaches it in any
-   topology where voice already works. Verification stays on the LangWatch
-   app, which holds the secret; the gateway passes the raw bytes through
-   untouched, because the signature covers them.
-2. **The reconciler.** If no webhook arrives, LangWatch reads the conversation
-   back from ElevenLabs by its own id, a couple of minutes after the mint. The
-   webhook is faster; it is not required.
+A session neither of them closes settles as cost unknown, and a report arriving later replaces that record.
 
-A session neither of them closes settles as cost unknown and is flagged for
-reconciliation, and a report arriving later still replaces that record.
-
-<Note>
-The reconciler exists because webhook delivery cannot be relied on as the only
-path. A retry is not guaranteed: ElevenLabs does not retry every failed
-delivery, and retries are off for HIPAA workflows. On top of that, a webhook
-is disabled once it has 10 or more consecutive failures **and** its last
-success is either older than 7 days or has never happened, which would stop
-delivery for every session on it.
-
-So if the webhook were the only path, one rejected delivery would lose that
-call's billing data. It is not the only path. The reconciler asks the vendor
-for the same numbers on its own schedule, so a lost delivery costs a couple of
-minutes rather than a charge, and a workspace whose single webhook slot is
-already used for something else still bills correctly.
-</Note>
-
-Only the `post_call_transcription` event is acted on. If you enable
-`post_call_audio` or `call_initiation_failure` on the same webhook, LangWatch
-acknowledges them and does nothing: they name the conversation but carry no
-duration, and a call confirmed at zero cannot be corrected afterwards.
+Only the `post_call_transcription` event is applied. `post_call_audio` and `call_initiation_failure` are acknowledged and not applied: they name the conversation and carry no duration.
 
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
 
 ```bash
-curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/client_secrets" \
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/client_secrets" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{"session":{"type":"realtime","model":"gpt-realtime"},
        "expires_after":{"anchor":"created_at","seconds":600}}'
 ```
 
-This is OpenAI's own path and its own body. Your session declaration reaches
-OpenAI as you wrote it, with two edits: the model is resolved through the
-key's aliases and allowlist, and `expires_after.seconds` is held inside the
-range OpenAI accepts, 10 seconds to 2 hours.
+This is OpenAI's own path and its own body. The gateway reads `session.model` as the model and forwards your declaration as you wrote it, with two edits: the resolved model is written back into `session.model`, and `expires_after.seconds` is held between 10 and 7200. A body that names no expiry is forwarded untouched, so OpenAI's own default applies. The voice, the tools, the turn detection and the audio formats reach OpenAI unchanged. The request body is capped at 256 KiB.
 
-Open the socket with the returned secret. Which form you use depends on where
-the code runs, because a browser `WebSocket` takes only a URL and a
-subprotocol list and cannot set request headers.
+The answer is OpenAI's own body plus `langwatch.session_id`, and the same id is on `X-LangWatch-Session-Id`.
 
-From a server, with the `ws` package (or any Node websocket client that
-accepts headers):
+Open the socket with the returned secret. Which form you use depends on where the code runs, because a browser `WebSocket` takes only a URL and a subprotocol list and cannot set request headers.
+
+From a server, with the `ws` package or any Node websocket client that accepts headers:
 
 ```js
 import WebSocket from "ws";
@@ -2560,76 +2511,56 @@ const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", 
 ]);
 ```
 
-Both were run against the live API on 2026-08-16 and both reached
-`session.created`. The older `openai-beta.realtime-v1` subprotocol is refused
-by OpenAI itself with "The Realtime Beta API is no longer supported".
+### Closing an OpenAI session
 
-### Closing the session
-
-OpenAI reports usage over the socket, in `response.done`, and that socket does
-not pass through the gateway. Post what you read back:
+OpenAI reports usage over the socket, in `response.done`, and that socket does not pass through the gateway. Post what you read back:
 
 ```bash
-curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/sessions/$SESSION_ID/usage" \
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"usage": { … the usage object from response.done … }}'
+  -d '{"usage":{"input_tokens":1204,"output_tokens":318,
+       "input_token_details":{"cached_tokens":900,"text_tokens":104,"audio_tokens":1100},
+       "output_token_details":{"text_tokens":18,"audio_tokens":300}}}'
 ```
 
-`SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. The whole
-`response.done` event is accepted too, so you can forward the frame unchanged.
+```json
+{"received":true}
+```
 
-Audio tokens are taken out of the text totals before pricing, because audio
-tokens cost several times what text tokens cost and charging both the total
-and the audio on top would bill the audio portion twice.
+The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
 
-A session that never reports settles as cost unknown when the settlement grace
-expires, and a report arriving after that replaces the settled record.
+Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost.
+
+A session that never reports settles as cost unknown when the settlement grace expires, and a report arriving after that replaces the settled record.
 
 ## Limiting how many calls a key runs at once
 
-Set **max open sessions** on the virtual key. The request-rate limits do not
-bound voice: one mint is a single request that opens a call billing for as
-long as it runs, so a key at 60 requests per minute can hold sixty ten-minute
-calls without tripping anything.
+Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
 
-A mint over the cap is refused with `429 realtime_session_limit`, and the
-refusal is recorded in the spend surface so it is visible rather than silent.
-A slot frees when the call's report arrives. A session older than the longest
-call a vendor allows stops holding a slot, which matters for OpenAI, whose
-socket never signals that it closed.
+A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the call's report arrives. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
 
 ## What the broker does not do
 
-- **It does not proxy the voice socket.** No frame-level tracing, and no way
-  to end a call in progress.
-- **It does not enforce the session's tools.** A hosted agent's tools live at
-  the vendor, and an OpenAI session declares its own.
-- **Guardrails do not run on a mint.** The body is a session declaration, not
-  a prompt, and the conversation never reaches the gateway. The response says
-  so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` rather than
-  reporting a check that could not mean anything.
+- **It does not proxy the voice socket.** There is no frame-level tracing, and no way to end a call in progress.
+- **It does not enforce the session's tools.** A hosted agent's tools live at the vendor, and an OpenAI session declares its own.
+- **Guardrails do not run on a mint.** The body is a session declaration, not a prompt, and the conversation never reaches the gateway. The response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` instead of reporting a check that could not mean anything.
 
-Turn-level transcripts and latency reach LangWatch through the SDK in your own
-application, which is where voice tracing lives.
+Turn-level transcripts and latency reach LangWatch through the SDK in your own application.
 
 ## Errors
 
-| Code | Status | Meaning |
+| Code | Status | Cause |
 |---|---|---|
-| `realtime_session_limit` | 429 | The key holds its maximum open voice sessions. Retry when a call ends. |
-| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so nothing was minted. Retry. |
+| `bad_request` | 400 | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
 | `model_provider_not_bound` | 400 | The key has no credential for the vendor this route serves. |
-| `budget_exceeded` | 402 | A budget the key is under is out of money. |
+| `budget_exceeded` | 402 | A budget that applies to the key is over its limit. |
+| `realtime_session_limit` | 429 | The key holds its maximum of open voice sessions. Retry when a call ends. |
+| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so no session was minted. Retry. |
 
-Both mint routes serve one vendor each: `/v1/realtime/client_secrets` needs an
-OpenAI credential and `/v1/convai/conversation/get-signed-url` needs an
-ElevenLabs one. A mint never falls back to another credential, because a
-session credential is bound to one account and a fallback would sign for an
-agent that does not exist there.
+Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 
-The decision behind this design is
-[ADR-097](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/097-realtime-voice-session-broker.md).
+**Also check:** [ElevenLabs](/ai-gateway/api/elevenlabs), [Budgets](/ai-gateway/budgets), [Errors](/ai-gateway/api/errors).
 
 ---
 
@@ -2743,72 +2674,91 @@ A provider's own error is forwarded with its status and body, under `X-LangWatch
 
 ---
 title: Audit log
-description: Who did what, when, to which resource, gateway mutations land in the same audit log as the rest of the platform.
+description: Who changed which gateway resource, when, and what the values were before and after.
 sidebarTitle: Audit log
 ---
 
-Every gateway-resource mutation (Virtual Key, Budget, ModelProvider, Routing Policy, Cache Rule) writes a row to the platform-wide `AuditLog` table. There is no separate gateway-only audit table, gateway events live alongside org-level platform events (member changes, settings, RBAC, billing) in **/settings/audit-log**, with a Source badge distinguishing the two.
+## Where the rows live
 
-<Note>**One audit log, two write shapes.** Gateway-shape rows carry `targetKind`, `targetId`, `before`, `after`. Platform-shape rows carry `args`, `metadata`, `error`. The viewer renders both with the same row template, computes `source` from the presence of `targetKind`, and offers a target-kind filter for narrowing to gateway events only.</Note>
+Gateway mutations write to the same `AuditLog` table as the rest of the platform. Open **Settings, Audit Log** to read them. Gateway rows carry a purple **Gateway** badge; platform rows, such as a member change or a project edit, carry a grey **Platform** badge.
 
-## What's logged
+A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. Virtual-key rows leave the hashed secret out of both halves.
 
-Action codes for gateway mutations (TypeScript `const` union in `platform/app/src/server/gateway/auditLog.repository.ts`):
+The actor is the user who made the change. A write that arrives on a legacy project API key, which carries no user, records the machine actor `svc_<projectId>`.
 
-Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe, GitHub, Slack, Datadog audit conventions.
+## What is logged
 
-| Action code | Actor | Target |
+Action codes read `gateway.<resource>.<verb>`, with the verb in the past tense.
+
+| Action code | Written when | Target kind |
 |---|---|---|
-| `gateway.virtual_key.{created, updated, rotated, revoked, deleted}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key`, `targetId=<vk_id>` |
-| `gateway.budget.{created, updated, deleted}` | same | `targetKind=budget`, `targetId=<budget_id>` (`deleted` is the soft-archive) |
-| `gateway.provider_binding.{created, updated, deleted}` | same | `targetKind=provider_binding`, `targetId=<binding_id>` |
-| `gateway.cache_rule.{created, updated, deleted}` | same | `targetKind=cache_rule`, `targetId=<rule_id>` |
+| `gateway.virtual_key.created` | A virtual key is created | `virtual_key` |
+| `gateway.virtual_key.updated` | A key's configuration is edited | `virtual_key` |
+| `gateway.virtual_key.guardrail_attached` | A guardrail is added to a key. One row per guardrail | `virtual_key` |
+| `gateway.virtual_key.guardrail_detached` | A guardrail is removed from a key. One row per guardrail | `virtual_key` |
+| `gateway.virtual_key.rotated` | The key's secret is replaced | `virtual_key` |
+| `gateway.virtual_key.revoked` | The key is revoked, which is terminal | `virtual_key` |
+| `gateway.virtual_key.disabled` | The key is turned off and can be turned back on | `virtual_key` |
+| `gateway.virtual_key.enabled` | A disabled key is turned back on | `virtual_key` |
+| `gateway.budget.created` | A budget is created, including one created directly on a virtual key | `budget` |
+| `gateway.budget.updated` | A budget's limit, scope or period is edited | `budget` |
+| `gateway.budget.reset` | A budget's spend period is reset | `budget` |
+| `gateway.budget.deleted` | A budget is archived | `budget` |
+| `gateway.cache_rule.created` | A cache-control rule is created | `cache_rule` |
+| `gateway.cache_rule.updated` | A cache-control rule is edited | `cache_rule` |
+| `gateway.cache_rule.deleted` | A cache-control rule is archived | `cache_rule` |
+| `gateway.guardrail.created` | A guardrail is created | `guardrail` |
+| `gateway.guardrail.updated` | A guardrail is edited | `guardrail` |
+| `gateway.guardrail.archived` | A guardrail is archived | `guardrail` |
 
-<Info>Guardrail attach/detach events are NOT recorded as standalone audit rows, guardrail configuration changes flow through `gateway.virtual_key.updated` (the guardrail list is a field on `VirtualKey.config`). Standalone `gateway.guardrail.{attached, detached}` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
+Each row is written inside the same database transaction as the change it records, so a change either lands with its audit row or does not land at all.
 
-Reads are **not** logged, the volume would swamp the ledger without adding governance value. If you need read-access attribution for compliance, use OTel trace logs (every request has `langwatch.principal_id`).
+Revoking a virtual key also archives the budgets scoped to that key, so a revocation writes a `gateway.virtual_key.revoked` row and one `gateway.budget.deleted` row per archived budget.
 
-## Viewing in the UI
+<Note>Attaching or detaching a guardrail writes two rows. The guardrail list is a field on the key, so the edit itself produces `gateway.virtual_key.updated`, and each added or removed guardrail produces its own `gateway.virtual_key.guardrail_attached` or `gateway.virtual_key.guardrail_detached` row carrying the guardrail id and its direction.</Note>
 
-Go to **/settings/audit-log** (Enterprise plan, gated on `auditLog:view`, granted by default to all four TeamUser roles incl. CUSTOM) and use the filters to narrow:
+Reads are not logged. For read attribution, use the trace on each request, which carries the virtual key that made the call. See [Observability](/ai-gateway/observability).
 
-1. **Source badge**: purple "Gateway", grey "Platform" on every row.
-2. **Filter by action**: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, etc. for gateway rows; platform rows use the same dotted style (e.g. `organization.member.add`, `project.update`). All gateway codes share the `gateway.` prefix so a single `LIKE 'gateway.%'` clause filters the entire gateway surface for SIEM exports.
-3. **Filter by Target**: `virtual_key`, `budget`, `provider_binding`, `cache_rule`. Selecting any value implicitly hides platform rows (which have null targetKind).
-4. **Expand with changed-fields diff summary**: UPDATE rows expand to show a compact top-level diff (e.g. `priority 200 → 300`, `action.ttl 300 → 600` as red/green code badges) above the raw Before/After JSON panels.
-5. **CREATE/DELETE events show the full field list**: since those events have a null Before (or null After), the diff summary renders the relevant half as a field list instead of leaving the panel blank for the most common audit event class.
-6. **Deep-link IN from resource detail pages**: every VK detail and budget detail page carries an **Audit history** button that takes you to `/settings/audit-log?targetKind=<kind>&targetId=<id>` with a pre-filled filter chip scoped to just that resource. Clear the chip with the `×` icon to re-expand the view. The pattern stays reachable on revoked VKs and archived budgets so forensic investigations start from the current state, not some "active only" fork.
+## Reading the log in the app
+
+The Audit Log page is at **Settings, Audit Log**. It needs the `auditLog:view` permission at the organization and the Enterprise plan.
+
+Filter by user name or email, by action code, by project, and by date range. All gateway codes start with `gateway.`, so typing `gateway.` in the action filter narrows the page to gateway rows.
+
+Every virtual key and every budget detail page carries an **Audit history** button. It opens the Audit Log page filtered to that resource, and the filter shows as a chip you can clear. The button stays available on a revoked key and on an archived budget, so a forensic review starts from the resource itself.
 
 ## Querying programmatically
 
-There is **no public REST endpoint** for audit log retrieval, gateway audit reads share the same tRPC procedure (`organization.getAuditLogs`) that powers `/settings/audit-log`. Three paths, ranked by typical operator use case:
+**Export CSV** on the Audit Log page downloads the rows the current filters select. The file carries these columns:
 
-1. **One-off, human review**: open `/settings/audit-log`, set the filters you want (Source, Action, Target), then hit **Export CSV** to download the filtered rows. The CSV carries gateway-shape fields (`targetKind`, `targetId`, `before`, `after`) for gateway rows and platform-shape fields (`args`, `metadata`) for platform rows.
-2. **Scripted, scheduled SIEM export**: query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment. The schema is documented in `platform/app/prisma/schema.prisma → model AuditLog`.
-3. **In-app integrations**: call the tRPC procedure from a TypeScript client that already has a session: `await trpc.organization.getAuditLogs.query({ organizationId, targetKind, targetId, since, limit })`. Mirrors what the UI does. Not intended for cross-network REST consumers.
+| Column | Content |
+|---|---|
+| `Timestamp` | ISO 8601 |
+| `Source` | `gateway` or `platform` |
+| `User Name`, `User Email` | The actor |
+| `Action` | The action code |
+| `Target Kind`, `Target Id` | The resource the action changed |
+| `Project` | Project name, when the row names one |
+| `IP Address`, `User Agent` | Request origin, on platform rows |
+| `Error` | Error text, on platform rows |
+| `Args` | Call arguments, on platform rows |
+| `Before`, `After` | The gateway row's state either side of the change |
 
-A first-class REST audit-export endpoint is a v1.2 follow-up; until then, the CSV download is the supported export path for governance, compliance use cases.
+`Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
-## Retention
+For a scheduled export into a SIEM, read the `AuditLog` table in the application Postgres database directly. Filter on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` to select gateway rows, and join `User` on `userId` for the actor. There is no REST endpoint for reading audit rows.
 
-Default: 7 years, extendable on request. Stored in the primary app Postgres under `AuditLog`. The table is indexed on `(organizationId, createdAt)` and `(targetKind, targetId)` to keep both org-tail queries and per-resource queries fast.
+## Retention and integrity
 
-## Migration note (v3.1)
+Rows live in the application Postgres database, indexed on `(organizationId, createdAt)` and on `(targetKind, targetId)`, which is what keeps both the organization-wide view and the per-resource view fast.
 
-Earlier v3.0 builds wrote gateway audit rows to a dedicated `GatewayAuditLog` table with a `GatewayAuditAction` Postgres enum. The consolidation migration `20260425000000_consolidate_gateway_audit_into_audit_log` extends `AuditLog` with `targetKind`, `targetId`, `before`, `after` columns and drops the gateway-only table. Self-hosters upgrading from v3.0 should run pending Prisma migrations on app boot per the standard upgrade procedure, the gateway audit log table goes away and downstream gateway services start writing to `AuditLog` directly. Per the v3.0 release note no audit rows were retained.
+The application only ever inserts into this table. It exposes no update and no delete path, so a row that lands stays as written.
 
-## Security considerations
+## Also check
 
-- **Can the audit log be tampered with?** Writes are append-only at the service layer, no UPDATE or DELETE is exposed. Deletions are only possible via direct database access, which is control-plane-operator-only and also audit-logged (via Postgres' built-in `pgaudit` extension, configured in the self-hosted deployment guide).
-- **Can an audit entry be forged?** No. Gateway writes happen inside the same transaction as the resource mutation; either both land or neither lands. A caller cannot emit a fake audit entry via REST or CLI.
-- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org).
-
-## See also
-
-- [AI Governance → Compliance Architecture](/ai-governance/compliance-architecture): how audit events get OCSF-mapped and exported to your SIEM (Splunk, Datadog, Sentinel, Elastic, Sumo).
-- [Security](/ai-gateway/security): how audit fits into the broader governance story.
-- [RBAC](/ai-gateway/rbac): who can view the unified audit log.
-- [Virtual Keys → Rotation](/ai-gateway/virtual-keys#rotation): the operation behind the `gateway.virtual_key.rotated` action code.
+- [Virtual keys](/ai-gateway/virtual-keys) for the rotation and revocation operations behind those action codes.
+- [RBAC](/ai-gateway/rbac) for who can read the log.
+- [Security](/ai-gateway/security) for the rest of the gateway's security boundary.
 
 ---
 
@@ -6710,12 +6660,12 @@ An alias whose target is not reachable from the key is not listed, because a req
 
 ## Trace attributes
 
-Every gateway span records how the model was resolved:
+Two attributes on the gateway span tell you which name the client sent and which model served it:
 
-- `langwatch.model`: the model that was sent to the provider, after the alias was applied.
-- `langwatch.model_source`: `alias` when the client sent an alias name, `explicit` when it sent `provider/model` or `handle/model`, `implicit` when it sent a bare model name.
+- `gen_ai.request.model`: the model the gateway sent to the provider, after the alias was applied.
+- `langwatch.requested_model`: the name the client sent. Present only when it differs from the model that was served, so it is the mark of a request that went through an alias or a tier.
 
-Filter Trace Explorer on `langwatch.model_source = alias` to see which requests went through the mapping.
+Filter Trace Explorer on `langwatch.requested_model` to find the traffic still sending an old name.
 
 ---
 
@@ -6871,232 +6821,206 @@ Every refusal is a JSON error with `error.code`, and the HTTP status is fixed pe
 
 ---
 title: Observability
-description: Every gateway request emits a per-tenant LangWatch trace, what attributes, how routing works, how to use them.
+description: The trace attributes, response headers and Prometheus metrics the LangWatch AI Gateway emits for every request.
 sidebarTitle: Observability
 ---
 
-The LangWatch AI Gateway is a shared multi-tenant service, but observability is per-tenant: tenant A's traces land in tenant A's LangWatch project, tenant B's land in tenant B's, and no cross-tenant data leaks in either direction.
+## Where each signal lands
 
-## Per-tenant OTel routing: how it works
+Every request produces three things you can read.
 
-Every request passing through the gateway emits an OTLP trace. The pattern is borrowed from Bifrost's `ObservabilityPlugin.Inject(ctx, trace)` primitive, adapted for LangWatch's attribution model:
+| Signal | Where you read it |
+|---|---|
+| Trace span | Trace Explorer, in the project the virtual key writes its traces to |
+| Response headers | On the HTTP response your client already receives |
+| Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
 
-1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
-2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
-3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries `project_id`, the gateway uses it to tag every span on the trace.
-4. The gateway ships all traces to a single endpoint (`OTEL_DEFAULT_EXPORT_ENDPOINT`, default `https://app.langwatch.ai/otel/v1/traces`).
-5. LangWatch's ingest pipeline reads `langwatch.project_id` off each span and stores the trace under the owning project, the attribution happens at ingest, not at export.
+The gateway starts one span per request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
-So the gateway has a single egress path, but attribution is still per-tenant: tenant A's traces file under tenant A's project, tenant B's under tenant B's. There is no customer-facing override, we sell observability, so everything routes to the LangWatch pipeline by design.
+## Trace attributes
 
-## Self-hosted
-
-On self-hosted deployments, set `OTEL_DEFAULT_EXPORT_ENDPOINT` to your in-cluster OTel collector (or LangWatch ingestion endpoint for hybrid setups). Attribution works the same way: per-project span attributes are filed at ingest.
-
-## Attributes on every gateway span
-
-Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gateway emits these attributes on every span (via the `*chi.Context` helper and the dispatch handlers):
+The table lists every attribute the gateway sets. An attribute whose value the gateway does not have is left off the span.
 
 | Attribute | Meaning |
 |---|---|
-| `langwatch.virtual_key_id` | Virtual key id that authed this request. |
-| `langwatch.project_id` | Owning project. |
-| `langwatch.team_id` | Owning team. |
-| `langwatch.organization_id` | Owning organisation. |
-| `langwatch.principal_id` | User or service account that made the call. |
-| `langwatch.vk_display_prefix` | First 16 chars of the VK's display form (for correlation with 401 traces where the full VK isn't known). |
-| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
-| `langwatch.model` | Final resolved model name dispatched to the provider. |
-| `langwatch.provider` | Provider name (`openai`, `anthropic`, `gemini`, etc.). |
-| `langwatch.model_source` | How the model was resolved: `alias`, `explicit_slash`, `implicit`. |
-| `langwatch.streaming` | `true` when the request opted into SSE. |
-| `langwatch.usage.input_tokens`, `langwatch.usage.output_tokens` | Regular input/output tokens. |
-| `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` | Cache-read and cache-creation counters, following the OTel GenAI semconv. |
-| `langwatch.cost_usd` | Computed cost for this request. |
-| `langwatch.duration_ms` | Wall-clock time the gateway spent on the request. |
-| `langwatch.status` | Final status: `success`, `provider_error`, `blocked_by_guardrail`, `budget_exceeded`, etc. |
-| `langwatch.budget.decision` | Budget precheck outcome: `allowed`, `soft_warn`, `blocked`. |
+| `gen_ai.operation.name` | Request type: `chat`, `messages`, `responses`, `embeddings`, `speech`, `transcription`, `passthrough` or `realtime_session` |
+| `gen_ai.provider.name` | Provider the request was dispatched to |
+| `gen_ai.request.model` | Model dispatched, in the provider-prefixed spelling (`anthropic/claude-haiku-4-5`) |
+| `langwatch.requested_model` | Model name the client sent. Set only when a routing policy rewrote it |
+| `gen_ai.input.messages` | Request messages |
+| `gen_ai.output.messages` | Response messages |
+| `gen_ai.usage.input_tokens` | Input tokens the provider billed fresh, with cache reads and cache writes excluded |
+| `gen_ai.usage.output_tokens` | Completion tokens |
+| `gen_ai.usage.total_tokens` | Total the provider reported |
+| `gen_ai.usage.cache_read.input_tokens` | Input tokens served from the provider's prompt cache |
+| `gen_ai.usage.cache_creation.input_tokens` | Input tokens written to the provider's prompt cache |
+| `gen_ai.usage.cache_creation_1h.input_tokens` | The part of the cache writes that bought a one-hour entry, when the provider reports it |
+| `gen_ai.usage.input_audio_tokens` | Audio input tokens, counted apart from `gen_ai.usage.input_tokens` |
+| `gen_ai.usage.output_audio_tokens` | Audio output tokens, counted apart from `gen_ai.usage.output_tokens` |
+| `gen_ai.usage.input_chars` | Characters a text-to-speech call synthesized |
+| `gen_ai.usage.audio_seconds` | Seconds of audio a speech-to-text call transcribed |
+| `gen_ai.usage.cost` | Cost the gateway computed for the call |
+| `gen_ai.conversation.id` | Session id the client sent, so multi-turn calls group into one thread |
+| `langwatch.project_id` | Project the span is filed under |
+| `langwatch.virtual_key_id` | Virtual key that authenticated the request |
+| `langwatch.gateway_request_id` | Same value as the `X-LangWatch-Gateway-Request-Id` response header |
+| `langwatch.model_provider_id` | Model provider row the request was dispatched to. Provider-filtered budgets match on it |
+| `langwatch.labels` | The virtual key's tags. Trace Explorer filters these as **Label** |
+| `langwatch.end_user_id` | End-user id from `X-LangWatch-End-User-Id`, its LiteLLM alias, or the `user` body field |
+| `langwatch.reserved.request_metadata` | The `X-LangWatch-Metadata` JSON object, echoed back verbatim |
+| `http.response.status_code` | Upstream status, set when the provider answered 400 or above |
+| `error.type` | Error class on a failed request: `rate_limited`, `provider_timeout`, `provider_error`, `not_found`, `bad_request`, or the gateway error code that refused the call |
 
-## Per-feature attributes (when applicable)
+<Note>A successful chat or messages call that returns no output, no cost and no completion tokens is dropped before export. These are the empty probe calls coding agents send, and they would otherwise fill the trace list with rows that carry no data.</Note>
 
-- `langwatch.cache.rule_id`, `langwatch.cache.rule_priority`, `langwatch.cache.mode_applied`, emitted when a bundle-baked cache-control rule matches and determines the final effective cache mode (post header-vs-rule-vs-default precedence). See [Cache control](/ai-gateway/cache-control#rules-engine).
-- `langwatch.guardrail.verdict`, aggregate verdict from pre/post guardrail evaluation.
-- `langwatch.fallback.attempts_count`, total attempts before success (1 = no fallback).
-- `langwatch.fallback.winning_provider`, provider that ultimately served the request.
-- `langwatch.fallback.winning_credential`, credential ID of the winning provider slot.
-- `langwatch.thread_id`, thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
+## Response headers
 
-<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+| Header | Value | Set when |
+|---|---|---|
+| `X-LangWatch-Gateway-Request-Id` | `req_` plus 30 hex characters, or the `X-Request-Id` you sent | Every dispatched request |
+| `X-LangWatch-Trace-Id` | 32 hex characters | Every request |
+| `X-LangWatch-Span-Id` | 16 hex characters | Every request |
+| `Traceparent` | W3C traceparent for the span written to your project | Every dispatched request |
+| `X-LangWatch-Gateway-Version` | Gateway version string | Every request, when the deployment sets a version |
+| `X-LangWatch-Fallback-Count` | Number of failed attempts before the one that served the request | One or more attempts failed |
+| `X-LangWatch-Cache-Mode` | `respect`, `force`, `disable` or `auto` | Cache control resolved a mode |
+| `X-LangWatch-Budget-Warning` | Comma-separated `<scope>:<percent>` entries, for example `project:95`. A provider-filtered budget reads `<scope>/<modelProviderId>:<percent>` | A budget crossed its warning threshold |
+| `X-LangWatch-Params-Dropped` | Comma-separated parameter names the parameter policy removed | A translated request dropped parameters |
+| `X-LangWatch-Guardrails-Not-Applied` | Reason the key's guardrails did not run, for example `realtime_session` | Guardrails were skipped |
+| `X-LangWatch-Session-Id` | LangWatch id of the voice session a mint opened | Realtime session mints |
+| `X-LangWatch-Provider` | Provider that returned the error | The gateway forwards a provider error |
+| `X-Langwatch-Models-Discovery-Incomplete` | Providers that contributed no models, with the reason | `GET /v1/models` returned a partial list |
 
-## Filtering in the LangWatch UI
+## Debugging a single request
 
-Attribute-based filters in the Messages view compose into dashboards:
+Read `X-LangWatch-Gateway-Request-Id` off the response or the client's error, then search that value in Trace Explorer. The span it opens carries the model, the provider, the token counts, the cost and the upstream status.
 
-- "All gateway traffic this week": `attr.langwatch.endpoint != ""`.
-- "Claude Code usage by engineer": `attr.langwatch.client.name = "claude-code"`, group by `principal_id`.
-- "Cache-economics dashboard": sum `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.input_tokens` over 7 days.
-- "Fallback incidents": `attr.langwatch.fallback.attempt > 0`, group by `fallback.reason`.
-- "Blocked by policy": `attr.langwatch.policy.blocked != ""`.
+```bash
+curl -sD- -o /dev/null \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' \
+  | grep -i '^x-langwatch-'
+```
+
+## Trace ID propagation
+
+Send a `Traceparent` request header and the span written to your project becomes a child of your trace, under your trace id. Send no header and the span starts a trace of its own.
+
+The `Traceparent` response header names that span. Forward it to the next hop in your system and everything stitches into one trace in Trace Explorer.
+
+`X-LangWatch-Trace-Id` and `X-LangWatch-Span-Id` name the gateway's own operational span, which stays separate from your trace. Use them when you report a problem to LangWatch support.
 
 ## Metrics (Prometheus)
 
-The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the same listener that serves `/v1/*` and the health probes). No separate admin port.
+`GET /metrics` needs no authentication and runs on the same port as the API. Scrape it with a `ServiceMonitor` or a plain scrape config. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
 
 ### Traffic and lifecycle
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_http_requests_total` | counter | `route`, `status`, `provider`, `model` | Requests served. `route` is the chi route pattern (`/v1/chat/completions`), `status` is the numeric HTTP status as a string (`"200"`, `"429"`, `"500"`) |
-| `gateway_http_request_duration_seconds` | histogram | `route`, `provider` | End-to-end latency, client connect to last byte |
-| `gateway_in_flight_requests` | gauge | none | Requests currently being served |
-| `gateway_draining` | gauge | none | `1` while the pod is draining after SIGTERM, `0` otherwise |
+| `gateway_http_requests_total` | counter | `route`, `status`, `provider`, `model` | Requests served. `route` is the route pattern (`/v1/chat/completions`), `status` the HTTP status as a string |
+| `gateway_http_request_duration_seconds` | histogram | `route`, `provider` | End-to-end latency, including auth, guardrails and the provider round trip |
+| `gateway_in_flight_requests` | gauge | none | Requests this pod is handling now |
+| `gateway_draining` | gauge | none | `1` while the pod drains after SIGTERM, `0` otherwise |
+| `gateway_streaming_active` | gauge | none | Streaming responses open on this pod |
+| `gateway_streaming_usage_missing_total` | counter | `provider`, `model` | Streams that closed without the provider reporting usage. They debit no budget, so alert on any positive rate |
 
 ### Provider dispatch and fallback
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_provider_duration_seconds` | histogram | `provider`, `model` | Upstream round-trip per attempt (excludes gateway overhead) |
-| `gateway_provider_attempts_total` | counter | `credential_id`, `outcome` | One increment per attempt against a credential slot |
-| `gateway_fallback_events_total` | counter | `from_credential`, `to_credential` | Chain hops taken |
-| `gateway_circuit_state` | gauge | `credential_id` | Breaker state encoded in the value: `0` closed, `1` open, `2` half-open |
+| `gateway_provider_duration_seconds` | histogram | `provider`, `model` | Upstream round trip per attempt. Subtract it from the request duration to isolate gateway overhead |
+| `gateway_provider_attempts_total` | counter | `credential_id`, `outcome` | One increment per dispatch attempt against a credential |
+| `gateway_fallback_events_total` | counter | `from_credential`, `to_credential` | Failovers, by the credential that failed and the one that served the request |
+| `gateway_circuit_state` | gauge | `credential_id` | Circuit breaker state: `0` closed, `1` open, `2` half-open |
 
 `outcome` is one of `success`, `fallback_success`, `retryable_5xx`, `not_found`, `rate_limit`, `timeout`, `network`, `circuit_open`, `non_retryable`, `chain_exhausted`, `context_done`.
 
-### Auth cache
+### Authentication cache
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
 | `gateway_auth_cache_hits_total` | counter | `tier` | Virtual-key resolutions served from cache |
 | `gateway_auth_cache_misses_total` | counter | `tier` | Resolutions that fell through to the control plane |
-| `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
-| `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
+| `gateway_auth_cache_lookups_total` | counter | none | Resolutions attempted. The denominator for the hit rate |
+| `gateway_auth_cache_size` | gauge | `tier` | Virtual keys held in the cache |
 
-`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
+`tier` always reads `l1`. The cache is an in-process LRU, private to each pod.
 
 ### Governance
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_budget_blocks_total` | counter | `scope` | Requests rejected by the local budget precheck |
-| `gateway_cache_hits_total` | counter | `outcome` | Prompt-cache outcome (`hit` or `miss`), derived from provider cache-read token counts |
-| `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Bundle-baked cache rule matches. `mode_applied` is `RESPECT`, `FORCE`, or `DISABLE` |
-| `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response`, or `stream_chunk`; `verdict` is `allow`, `block`, `modify`, or `fail_open`. `fail_open` means the traffic passed unchecked, on any direction. It is the default outcome for `stream_chunk`, which never stalls a stream on policy, and opt-in for the other two |
-| `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
-| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Realtime voice session mints. `outcome` is `minted`, `session_limit`, `registry_unavailable`, or `provider_error`. One mint is one billable voice call, so this is the call rate |
-| `gateway_realtime_session_limit_blocks_total` | counter | `virtual_key_id` | Mints refused because the key already held its maximum open voice sessions. A rising count on one key means its cap is too low for its traffic, or that its sessions are not being closed |
-| `gateway_realtime_registry_errors_total` | counter | `operation` | Failed calls to the control plane's voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint outright; a `correlate` failure costs the session its exact join key to the vendor's post-call report, so it falls back to a time-window match |
-| `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests **the gateway itself** rejected as the caller's fault after authentication, by gateway error code (`missing_model`, `bad_request`, `model_not_allowed`, `budget_exceeded`, `payload_too_large`, …) and by the virtual key that sent them. These are logged at `info`, so this counter is the only signal that will move when one client loops on a malformed body. Alert on a sustained per-key rate rather than on any single rejection |
+| `gateway_budget_blocks_total` | counter | `scope` | Requests rejected by the budget precheck, by the scope whose limit was breached |
+| `gateway_cache_hits_total` | counter | `outcome` | Prompt-cache result: `hit` when the provider reported cache-read tokens, `miss` otherwise |
+| `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Cache-control rule matches. `mode_applied` is `RESPECT`, `FORCE` or `DISABLE` |
+| `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response` or `stream_chunk`; `verdict` is `allow`, `block`, `modify` or `fail_open`. `fail_open` means the guardrail service could not be reached and the traffic passed unchecked |
+| `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by a rate limit. `dimension` is `rpm` or `rpd` |
+| `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests the gateway itself rejected as the caller's fault after authentication, by gateway error code and virtual key |
 
-Three things this counter deliberately excludes, because all three would make a per-key alert on it fire for keys doing nothing wrong:
+`gateway_client_rejects_total` counts only what the gateway refused. Three cases stay off it on purpose, because each would make a per-key alert fire for a key doing its job:
 
-- **Authentication failures.** A missing or unresolvable key is rejected before the request has a key to attribute it to. Watch `gateway_http_requests_total{status="401"}` instead.
-- **Provider rejections.** An upstream 4xx (an OpenAI 429, an Anthropic 402) is the caller's fault too, but it is not the gateway rejecting the client, and counting it would turn a bad hour at a provider into an alert that reads as client misbehaviour. Those live on `gateway_provider_attempts_total{outcome="rate_limit"}` and the upstream status on `gateway_http_requests_total`.
-- **Gateway rate limiting.** A key legitimately sustained at its RPM/RPD ceiling would otherwise pin this counter too, muting the exact alert it exists for. Watch `gateway_rate_limit_denied_total` instead.
+- Authentication failures, which have no key to attribute yet. Watch `gateway_http_requests_total{status="401"}`.
+- Provider rejections, such as an upstream 429. Watch `gateway_provider_attempts_total{outcome="rate_limit"}`.
+- Rate limiting, which a key at its ceiling would pin. Watch `gateway_rate_limit_denied_total`.
 
-To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
+To find a client stuck in a rejection loop, rank the keys first:
 
 ```promql
 topk(5, sum by (vk_id) (rate(gateway_client_rejects_total{code!=""}[15m])))
 ```
 
-Copy the complete `vk_id` from that result, then replace `<full-vk-id>` for the code breakdown:
+Then break the top key down by code, with the full key id in place of `<vk-id>`:
 
 ```promql
-sum by (code) (rate(gateway_client_rejects_total{vk_id="<full-vk-id>"}[15m]))
+sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 ```
 
-### Streaming
+### Realtime voice
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_streaming_usage_missing_total` | counter | `provider`, `model` | Streams that finished without the provider reporting usage. These debit nothing, so they bypass budget enforcement silently: alert on any positive rate |
-| `gateway_streaming_active` | gauge | none | Streams currently open |
+| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted, which is a session count and not a bill |
+| `gateway_realtime_session_limit_blocks_total` | counter | none | Mints refused because a key already held its maximum open sessions. A rise means the cap is too low for the key's traffic, or its sessions stay open. The key is in the trace and the log line |
+| `gateway_realtime_registry_errors_total` | counter | `operation` | Failed calls to the voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint; a `correlate` failure costs the session its exact join to the vendor's report |
 
 ### Control plane
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_internal_rtt_seconds` | histogram | `endpoint` | Round-trip to the control plane |
-| `gateway_control_plane_requests_total` | counter | `endpoint`, `status` | Control-plane calls by outcome |
+| `gateway_internal_rtt_seconds` | histogram | `endpoint` | Round trip to the control plane. Separates a slow control plane from a slow provider |
+| `gateway_control_plane_requests_total` | counter | `endpoint`, `status` | Control-plane calls by outcome. `status` reads `error` when the call got no response |
 
-`endpoint` is one of `resolve-key`, `guardrail-check`, `config`, `codex-refresh`. The change-feed long poll is deliberately excluded: it blocks until an event or its own timeout, so timing it would say nothing about control-plane health.
+`endpoint` is one of `resolve-key`, `guardrail-check`, `config`, `codex-refresh`. The change-feed long poll is excluded, because it blocks until an event or its own timeout and its timing says little about control-plane health.
 
 ### Spend emission
 
-Every request writes a spend record to a bounded on-disk spool, which a background drainer ships to the control plane. Those records are what the control plane debits budgets from, so a record the spool never took is spend that is never billed and never enforced against.
+Every request writes a spend record to a bounded on-disk spool, and a background drainer ships the spool to the control plane. The control plane debits budgets from those records, so a record the spool drops is spend that is never billed and never enforced against.
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_spend_spool_appended_total` | counter | none | Spend records written to the spool. The denominator for the drop counters |
+| `gateway_spend_spool_appended_total` | counter | none | Spend records written to the spool. The denominator for the drop counter |
 | `gateway_spend_spool_dropped_total` | counter | `reason` | Records lost before they could ship |
 
-`reason` is `intake` (the spool's writer could not take the record: its queue was full, or the pod is already shutting down) or `overflow` (the oldest sealed segments were deleted to keep the spool inside its 64 MiB bound, which means the drainer is not keeping up with the pod). Alert on any sustained positive rate:
+`reason` is `intake` when the spool's writer could not take the record, and `overflow` when the oldest sealed segments were deleted to keep the spool inside its 64 MiB bound. Alert on any sustained positive rate:
 
 ```promql
 sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
 ```
 
-Both counters read `0` on a pod whose spool failed to open, which is a pod serving traffic with no spend emission at all. It logs that at startup, and the flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
+Both counters read `0` on a pod whose spool failed to open. That pod serves traffic and emits no spend at all. It logs the failure at startup, and a flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
 
-The spool is pod-local and deliberately not on a volume: a pod deleted with records still unshipped loses them, bounded by the drain lag of roughly a second of traffic. The alternative is a per-pod PersistentVolume, which buys back that second at the price of a stateful gateway.
+The spool is pod-local and stays off a volume. A pod deleted with records still unshipped loses them, bounded by the drain lag of about a second of traffic.
 
 The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
-Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config, see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).
+## Also check
 
-## When OTel and metrics disagree
-
-OTel traces are sampled (configurable at the collector level), metrics are exact counters. If your metrics show 1k requests but the LangWatch UI only has 100 traces for a given window, check the OTel sampling rate on your collector.
-
-The gateway itself exports all spans, sampling is applied downstream at the collector or ingest layer.
-
-## Debugging a single request
-
-From a log line or an error at the client, grab the `X-LangWatch-Gateway-Request-Id` (`req_c2bf5df0b8449f1d1838c4b98dd850`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
-
-## Trace-id propagation: concrete handshake
-
-Every gateway response carries the following headers for W3C traceparent propagation and per-tenant OTel routing:
-
-| Response header | Format | Semantics |
-|---|---|---|
-| `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
-| `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
-| `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching, forward to any further hop you call |
-| `X-LangWatch-Gateway-Request-Id` | `req_<30 hex characters>` | Gateway-scoped id; use this in support tickets |
-| `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request. Present on every response, success and error, so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
-
-### Client already has a trace
-
-Set `traceparent` on the outbound request (OpenAI/Anthropic SDKs do this automatically when OTel instrumentation is active, or pass `default_headers={"traceparent": ...}`). The gateway:
-
-1. Extracts the trace id from `traceparent`.
-2. Creates its gateway span as a **child** of that trace id with a fresh span id.
-3. Returns `X-LangWatch-Trace-Id` equal to the caller's trace id (no new trace is created, no double cost attribution).
-4. Re-injects `traceparent` on the response with the gateway's span id so you can chain further hops.
-
-### Client has no trace
-
-No `traceparent` sent. The gateway mints a new trace and returns its id via `X-LangWatch-Trace-Id`. The response `traceparent` carries that id; propagate it to downstream services to stitch everything into one trace.
-
-### Verifying the handshake end-to-end
-
-```bash
-# With an existing trace context
-curl -sD- -o/dev/null \
-  -H "Authorization: Bearer $VK" \
-  -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1111111111111111-01" \
-  -H "Content-Type: application/json" \
-  -X POST https://gateway.langwatch.ai/v1/chat/completions \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
-  grep -iE '^(x-langwatch-(trace|span|request)-id|traceparent)'
-```
-
-Expect `x-langwatch-trace-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` (same 32-hex as input) and a new 16-hex `x-langwatch-span-id`. The `traceparent` on the response will chain under that same trace id.
-
-Without the incoming `traceparent` you'll get a fresh 32-hex trace id instead.
-
-See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for language-specific recipes.
+- [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the environment variables that point the gateway at your collector.
+- [Troubleshooting](/ai-gateway/troubleshooting) for reading a failed request end to end.
+- [Security](/ai-gateway/security) for what the gateway records and what it never logs.
 
 ---
 
@@ -7255,15 +7179,19 @@ description: "How every OpenAI chat-completions parameter behaves on each provid
 sidebarTitle: "Parameter mapping"
 ---
 
-The gateway speaks the OpenAI chat-completions wire format to every provider. OpenAI-compatible targets (OpenAI, Azure OpenAI, self-hosted vLLM and other custom OpenAI-compatible endpoints) bypass the policy on this page entirely: the request body is forwarded byte-for-byte apart from the gateway-only `drop_tuning_params` field, which is consumed before forwarding, so whatever the provider accepts, you get. For the translated lanes (Anthropic, Bedrock, Gemini, Vertex) the gateway builds the provider-native request itself, and every parameter follows an explicit policy:
+A lane is the wire format the gateway uses to reach one kind of provider. OpenAI, Azure OpenAI and OpenAI-compatible custom endpoints share one lane; Anthropic, Bedrock, and Gemini with Vertex have a lane each.
 
-- **mapped**: translated faithfully to the provider's native field.
-- **dropped**: a tuning parameter with no equivalent on the lane. By default it is removed, the request proceeds, and the drop is signaled (see below). It is never silently ignored.
-- **refused**: the request depends on the parameter functionally; honoring the request without it would change what you observably get. These always fail with a clear `400 unsupported_parameter` error naming the parameter, the lane, and why.
+On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body byte for byte. It removes only the gateway's own `drop_tuning_params` field. Whatever the provider accepts, you get.
+
+On the other lanes the gateway builds the provider-native request itself, so every parameter has one of three dispositions:
+
+- **mapped**: translated to the provider's own field.
+- **dropped**: a tuning parameter the lane has no field for. The gateway removes it, the request proceeds, and the drop is reported on the response and on the trace.
+- **refused**: the request depends on the parameter, and serving it without the parameter would give you a different answer than you asked for. The request fails with `400 unsupported_parameter`, naming the parameter, the lane and the reason.
 
 ## drop_tuning_params
 
-Send `"drop_tuning_params": false` in the request body to opt into strict mode: any parameter the lane cannot map then refuses instead of dropping. The default is `true`. The field itself is consumed by the gateway and never reaches a provider.
+Send `"drop_tuning_params": false` in the request body for strict mode. A parameter the lane cannot map is then refused instead of dropped. The default is `true`. The gateway removes the field before the request leaves, so no provider sees it.
 
 ```json
 {
@@ -7286,11 +7214,11 @@ Send `"drop_tuning_params": false` in the request body to opt into strict mode: 
 
 ## Drop signals
 
-When a parameter is dropped, the drop is visible in three places:
+A dropped parameter is reported in three places:
 
-- Response body: `extra_fields.params_dropped` lists the dropped parameter names (on streams, on the final usage-bearing chunk).
+- Response body: `extra_fields.params_dropped` lists the dropped parameter names. On a stream it is on the final usage-bearing chunk.
 - Response header: `X-LangWatch-Params-Dropped` carries the same list, comma separated.
-- Trace: the gateway span records `langwatch.gateway.params_dropped`.
+- Trace: the gateway span carries `langwatch.gateway.params_dropped`.
 
 ## The table
 
@@ -7334,7 +7262,13 @@ When a parameter is dropped, the drop is visible in three places:
 
 ## The codex lane
 
-Codex models (your own ChatGPT subscription, model prefix `openai_codex/`) speak the Responses API. The gateway builds the outgoing body itself, so every provider-bound field you send is mapped, dropped or refused by the table below, exactly as above. The codex backend accepts only a fixed set of fields and answers `400 Unsupported parameter` to anything else, which is why every key the table does not list is dropped rather than forwarded. The gateway also pins three invariants the backend requires: the bare model name, `stream` on, and `store` off. Dropped fields are signaled on the `X-LangWatch-Params-Dropped` header and the gateway span; the response body is the backend's own SSE stream, so `extra_fields.params_dropped` is not injected into it. `drop_tuning_params` works on this lane too.
+Codex models run on your own ChatGPT subscription under the model prefix `openai_codex/`, and they speak the Responses API. The gateway builds the outgoing body itself, so the table below gives every field the same three dispositions as above.
+
+The codex backend accepts a fixed set of fields and answers `400 Unsupported parameter` to anything else. That is why every key the table does not list is dropped instead of forwarded.
+
+The gateway pins three values the backend requires: the bare model name, `stream` on, and `store` off.
+
+Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on the gateway span. The response is the backend's own SSE stream, so `extra_fields.params_dropped` is not added to it. `drop_tuning_params` works on this lane too.
 
 {/* codex-param-table:begin generated from codexParamPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
 
@@ -7373,7 +7307,26 @@ Codex models (your own ChatGPT subscription, model prefix `openai_codex/`) speak
 
 ## reasoning_effort budgets
 
-On lanes that map `reasoning_effort` to a thinking budget (Anthropic models without adaptive thinking, on both the anthropic and bedrock lanes), the budget is derived from your output cap: `budget = 1024 + ratio x (max_tokens - 1024)` with ratios `minimal 0.025`, `low 0.15`, `medium 0.425`, `high 0.80`, `xhigh 0.92`, `max 1.0`. Claude Opus and Sonnet 4.6+ use the provider's adaptive thinking with your effort passed through (`minimal` maps to `low`). Gemini thinking models receive the effort natively. Thinking tokens count inside `usage.completion_tokens`.
+Anthropic and Bedrock take a thinking budget in tokens, not an effort level, so the gateway derives the budget from your output cap:
+
+```
+budget = 1024 + ratio x (max_tokens - 1024)
+```
+
+| `reasoning_effort` | ratio |
+|---|---|
+| `minimal` | 0.025 |
+| `low` | 0.15 |
+| `medium` | 0.425 |
+| `high` | 0.80 |
+| `xhigh` | 0.92 |
+| `max` | 1.0 |
+
+`"reasoning_effort": "none"` sends no thinking budget at all.
+
+Claude Opus and Sonnet from 4.6 on take the effort itself, through the provider's adaptive thinking. `minimal` is sent as `low`, because Anthropic accepts `low`, `medium`, `high` and `max`.
+
+Gemini 3 and later take the effort as a native thinking level. Earlier Gemini models get a budget from the same formula, against the model's own budget range.
 
 ---
 
@@ -10277,11 +10230,11 @@ data: {"id":"chatcmpl-...","choices":[{"delta":{"content":"1"}}]}
 data: [DONE]
 ```
 
-`POST /v1/messages` sends the Anthropic Messages event union: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`. When an Anthropic credential serves the request, the provider's own SSE bytes reach the client unchanged and the gateway appends no `[DONE]` trailer. When another provider serves it, the gateway builds the same event union from the provider's response.
+`POST /v1/messages` sends the Anthropic Messages event union: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`. When an Anthropic credential serves the request, the provider's own SSE bytes reach the client unchanged. When another provider serves it, the gateway builds the same event union from that provider's response.
 
-`POST /v1/responses` sends the OpenAI Responses events (`response.created`, `response.output_text.delta`, `response.completed`) and closes with `data: [DONE]`.
+`POST /v1/responses` sends the OpenAI Responses events: `response.created`, `response.output_text.delta`, `response.completed`.
 
-The `/v1beta` Gemini routes forward the provider's bytes unchanged, with no `[DONE]` trailer.
+The `/v1beta` Gemini routes forward the provider's bytes unchanged.
 
 Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v1/messages` a tool call is a `content_block_start` with `"type": "tool_use"`, then `input_json_delta` frames whose `partial_json` strings concatenate into the argument object, then `content_block_stop`. On `/v1/chat/completions` the same call arrives as `delta.tool_calls[]` entries whose `function.arguments` strings concatenate.
 
@@ -10294,15 +10247,13 @@ event: error
 data: {"type":"error","error":{"type":"provider_error","message":"upstream connection closed"}}
 ```
 
-`error.type` carries the provider's own discriminant when the provider named one, for example `insufficient_quota` or `overloaded_error`. For a failure the gateway itself raised, it carries the gateway error code, for example `budget_exceeded`. When the provider sent its own error event body, that body is forwarded unchanged instead of the frame above.
+`error.type` carries the provider's own discriminant when the provider named one, for example `insufficient_quota` or `overloaded_error`. For a failure the gateway raised, it carries the gateway error code. When the provider sent an error event of its own, that event body is forwarded unchanged instead of the frame above.
 
-Read `error.type` to decide what to do. A provider failure is worth a retry after a backoff. A gateway code such as `policy_violation` or `budget_exceeded` needs the request or the key to change first.
-
-The error index for every code is on [Troubleshooting](/ai-gateway/troubleshooting).
+Read `error.type` to decide what to do next. A provider failure is worth a retry after a backoff. The error index for every gateway code is on [Troubleshooting](/ai-gateway/troubleshooting).
 
 ## When a guardrail stops a stream
 
-A stream chunk guardrail runs on every chunk before the gateway forwards it. On a fail verdict the gateway closes the upstream stream at that chunk and forwards nothing more. The caller keeps the chunks already sent and gets no `event: error` frame, because the guardrail stops the stream rather than raising an error on it.
+A stream chunk guardrail runs on every chunk before the gateway forwards it. On a fail verdict the gateway closes the upstream stream at that chunk and forwards no further frame. The caller keeps the chunks already sent and gets no `event: error` frame, because the guardrail stops the stream rather than raising an error on it.
 
 Stream chunk guardrails always fail open. The gateway waits 50 milliseconds for the verdict; a timeout or an evaluator error lets the chunk through and records `langwatch.guardrail.stream_chunk_fail_open` with the cause on the span.
 
@@ -10332,7 +10283,7 @@ Providers report usage at the end of a stream, in their own shape.
 
 The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.
 
-On `/v1/chat/completions` to OpenAI, Azure OpenAI or a custom OpenAI-compatible endpoint, the gateway sets `stream_options.include_usage` to `true` when the body does not carry it. Without the flag those providers report no usage at all and the request would debit nothing. A body that sets the flag itself, to `true` or to `false`, is left as sent.
+On `/v1/chat/completions` to OpenAI, Azure OpenAI or a custom OpenAI-compatible endpoint, the gateway sets `stream_options.include_usage` to `true` when the body does not carry it. Without the flag those providers report no usage at all, and the request debits zero tokens. A body that sets the flag itself, to `true` or to `false`, is left as sent.
 
 You can still set it yourself to keep the call explicit:
 
@@ -10346,14 +10297,14 @@ for chunk in client.chat.completions.create(
     pass
 ```
 
-When a stream closes with zero total tokens, the gateway sends one more frame before the end:
+On `/v1/chat/completions`, a stream that closes with zero total tokens carries one more frame before `data: [DONE]`:
 
 ```
 event: warning
 data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
 
-That stream debits nothing, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
+That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
 
 ## Requests without `stream`
 
@@ -38964,7 +38915,7 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/ai-gateway/api/management#retrying-a-create-safely) and a retry that lost its response returns the original secret instead of stranding it.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/gateway-virtual-keys/create-virtual-key) and a retry that lost its response returns the original secret instead of stranding it.
 
 ### What a receiver URL must look like
 

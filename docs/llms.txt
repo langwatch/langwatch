@@ -435,7 +435,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Guardrails](https://langwatch.ai/docs/ai-gateway/guardrails.md): Run LangWatch evaluators on gateway traffic and block a request, a response or a stream before it reaches the other side.
 - [Security & Trust](https://langwatch.ai/docs/ai-gateway/security.md): How the LangWatch AI Gateway protects secrets, isolates tenants, and audits privileged actions.
 - [Policy Rules](https://langwatch.ai/docs/ai-gateway/policy-rules.md): Regex deny and allow lists on a routing policy that refuse a request by the tools, MCP servers, web addresses or models it names.
-- [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who did what, when, to which resource, gateway mutations land in the same audit log as the rest of the platform.
+- [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who changed which gateway resource, when, and what the values were before and after.
 
 - [Model Naming](https://langwatch.ai/docs/ai-gateway/model-naming.md): How to name a model in a request, and which provider the gateway sends it to.
 - [Parameter mapping](https://langwatch.ai/docs/ai-gateway/parameter-mapping.md): How every OpenAI chat-completions parameter behaves on each provider lane, and how to control dropping with drop_tuning_params.
@@ -443,7 +443,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Operations
 
-- [Observability](https://langwatch.ai/docs/ai-gateway/observability.md): Every gateway request emits a per-tenant LangWatch trace, what attributes, how routing works, how to use them.
+- [Observability](https://langwatch.ai/docs/ai-gateway/observability.md): The trace attributes, response headers and Prometheus metrics the LangWatch AI Gateway emits for every request.
 - [Troubleshooting](https://langwatch.ai/docs/ai-gateway/troubleshooting.md): Diagnostic paths for the most common LangWatch AI Gateway failure modes.
 
 ## API Reference

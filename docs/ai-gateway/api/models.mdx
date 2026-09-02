@@ -4,59 +4,82 @@ description: List the models a virtual key can access through the LangWatch AI G
 sidebarTitle: Models
 ---
 
-Returns the effective model list for the virtual key presented on the request. Entries are deduplicated and stable-sorted across **three groups**: OpenAI-compatible tools (Cursor, Codex, `openai models list`, etc.) treat the whole list uniformly.
-
 ## Request
 
+```bash
+curl https://gateway.langwatch.ai/v1/models \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
 ```
-GET /v1/models
-Authorization: Bearer vk-lw-<ULID>
-```
+
+A valid virtual key is the only requirement. The list is what that key can dispatch, so two keys in the same project can return different lists.
 
 ## Response
 
-OpenAI-shape `list` object:
+OpenAI's own `list` shape:
 
 ```json
 {
   "object": "list",
   "data": [
-    { "id": "claude",             "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "gpt-4o",             "object": "model", "created": 1712000000, "owned_by": "azure_openai" },
-    { "id": "gpt-5-mini",         "object": "model", "created": 1712000000, "owned_by": "openai"       },
-    { "id": "claude-haiku-*",     "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "anthropic/*",        "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "openai/*",           "object": "model", "created": 1712000000, "owned_by": "openai"       }
+    { "id": "claude-sonnet-4-5", "object": "model", "created": 0, "owned_by": "anthropic" },
+    { "id": "complex",           "object": "model", "created": 0, "owned_by": "anthropic" },
+    { "id": "europe/gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai" },
+    { "id": "gpt-5-mini",        "object": "model", "created": 0, "owned_by": "openai" }
   ]
 }
 ```
 
-### The three groups
+Entries are sorted by `id` and deduplicated. `data` is always an array, empty rather than null when the key reaches no models.
 
-1. **Aliases** from the VK's `model_aliases` map, e.g. `claude` resolves to `anthropic/claude-haiku-4-5-20251001`, `gpt-4o` routes to the VK's Azure deployment. `owned_by` reflects the **resolved** provider so UIs can render "gpt-4o (Azure)" correctly.
-2. **`models_allowed` entries** shown verbatim, including globs like `claude-haiku-*`. Clients that support pattern matching (most) pass these through; simpler pickers render them for the human to edit.
-3. **Provider-type shortcuts**: one entry per provider bound on the VK (`openai/*`, `anthropic/*`, `bedrock/*`, `azure/*`, `vertex/*`, `gemini/*`). Tools like Cursor that let the user type the exact model id can pick a concrete model under the shortcut (e.g. `openai/gpt-5-mini`) without waiting for the alias table to be updated. See [Model Aliases → Aliases always win over explicit form](/ai-gateway/model-aliases#aliases-always-win-over-explicit-form--if-both-are-defined) for how the `provider/model` form interacts with aliases.
+| Field | Value |
+|---|---|
+| `id` | The exact string to send as `model`. |
+| `object` | Always `model`. |
+| `created` | Always `0`. A gateway model list has no creation date to report. |
+| `owned_by` | The provider family that serves the model: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, and the rest. `langwatch` when the entry carries no provider. |
 
-### Providers with a routing handle
+## What the list holds
 
-A discovered model from a provider that has a [routing handle](/ai-gateway/model-naming#routing-handles) is listed under the handle-qualified id, for example `europe/claude-sonnet-5`. That is the name that reaches that exact provider, so two providers of the same type keep separate entries instead of collapsing into one. `owned_by` stays the provider type in both entries, because it is what a picker groups by.
+Three sources, filtered to what the key can actually call:
 
-<Note>The list is deliberately permissive, it covers everything the VK could plausibly route, not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream models until you send a real request. The gateway's per-request model resolution remains the source of truth for "will this actually route?"</Note>
+1. **Model aliases** on the key, under the alias name. An alias whose target the key cannot dispatch to is left out.
+2. **Allowlist entries**, when the key sets `models_allowed`. The allowlist is authoritative, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out and the concrete ids come from discovery instead.
+3. **Discovered models** from every credential the key can reach, read from each provider's own catalog.
 
-## Permissions
+Every candidate is then dropped when the key's allowlist or its policy rules refuse it, and when the key holds no credential for the provider that would serve it. A listed model is one a request for it can reach.
 
-Only requires a valid VK; no extra permission. The returned list is scoped to what the VK can actually dispatch, engineers don't need `virtualKeys:view` to call this.
+### Model tiers
 
-## Use cases
+When the key runs on a routing policy, the reserved tier names `complex`, `reasoning` and `fast` are in the list. A tier is an alias the policy sets, and it falls through to the policy's default model when the policy names no target for it. A tier with no target and no default model is not listed.
 
-- **Model pickers** in UIs that speak the OpenAI API, they call `/v1/models` and render the list.
-- **Pre-flight check** in CI: assert the CI's VK has access to the models your tests depend on.
-- **Debugging aliases**: see what each VK exposes by hitting this with its token.
-- **CLI probes**: coding tools like Codex and Cursor call `/v1/models` on startup to auto-configure completion and model picking. The provider shortcuts (`openai/*`, `anthropic/*`) mean the user can type `openai/gpt-5-mini` directly in the picker without first adding an alias server-side. See [Coding CLI integrations](/ai-gateway/cli/codex).
+### Providers with an instance handle
+
+A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-5-mini`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
+
+## Incomplete discovery
+
+A provider the key can dispatch to can contribute no models to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
+
+```
+X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
+```
+
+| Reason | Meaning |
+|---|---|
+| `not-enumerable` | The provider has no catalog endpoint for this credential shape, and no deployment mapping to read model names from. |
+| `probe-failed` | The provider has a catalog endpoint and this round's probe did not deliver: the endpoint was down or slow, the key was rejected, or the endpoint policy refused the URL. |
+
+The header is absent when the list is complete, and when the key sets a literal allowlist, since no catalog is read then.
 
 ## Errors
 
-- `401 invalid_api_key`, unknown or malformed VK.
-- `403 virtual_key_revoked`, VK revoked.
+| Code | Status | Cause |
+|---|---|---|
+| `invalid_api_key` | 401 | The presented credential matches no virtual key. |
+| `virtual_key_revoked` | 403 | The key was revoked. |
+| `virtual_key_disabled` | 403 | The key was disabled. |
+| `virtual_key_expired` | 403 | The key's expiration date has passed. |
 
-See [API: Errors](/ai-gateway/api/errors) for the full table.
+The full table is on [Errors](/ai-gateway/api/errors).
+
+**Also check:** [Model naming](/ai-gateway/model-naming), [Model aliases](/ai-gateway/model-aliases), [Routing policies](/ai-gateway/governance/routing-policies).
