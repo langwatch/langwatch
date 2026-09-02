@@ -1,21 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
 
-/**
- * The D01 backfill's name — the stable `SystemMigrationTenantState` key the
- * latch reads and the migration registers under, so the two share one
- * constant.
- *
- * It is a STORED key, not a label: renaming it orphans every record an
- * operator has already enrolled, which reads to this process as a fleet where
- * nobody has finalized. What operators read is the migration's own title. The
- * platform application declares the same string beside its own migration
- * (`server/app-layer/identity/migration-name.ts`); the two are pinned to each
- * other by this package's tests rather than by attention, because a
- * disagreement is silent — both tiers would simply answer "nobody is
- * latched".
- */
-export const IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME =
-  "identity-d01-identifier-backfill" as const;
 
 /**
  * Whether a user's identifier history is in the log and proven — the one fact

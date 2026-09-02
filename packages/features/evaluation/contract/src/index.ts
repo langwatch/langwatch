@@ -10,3 +10,4 @@ export * from "./evaluation.errors";
 export * from "./evaluation.performance";
 export * from "./evaluation.queries";
 export * from "./evaluation.service";
+export * from "./evaluation-execution.errors";

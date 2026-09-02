@@ -27,6 +27,8 @@
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@trpc/server": "^11.18.0",
     "zod": "^4.4.3"
   },

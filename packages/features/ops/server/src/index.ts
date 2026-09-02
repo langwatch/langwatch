@@ -81,3 +81,103 @@ export {
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
 } from "./ports/ops-worker.port";
+
+/** The operations explorers and the replay runner, moved off the application. */
+export { EventExplorerService } from "./services/event-explorer.service";
+export {
+  ManagerExplorerService,
+  OVERDUE_PENDING_MS,
+  OVERDUE_WAKE_MS,
+} from "./services/manager-explorer.service";
+export { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "./services/replay.service";
+export {
+  buildPipelineTree,
+  getOpsMetricsCollector,
+  mapJobTypeToPhase,
+  OpsMetricsCollector,
+} from "./services/ops-metrics-collector.service";
+export { totalInFlight, type InFlightCounts } from "./ops.in-flight";
+export {
+  OpsEventingIntrospectionPort,
+  type OpsDejaViewProjection,
+  type OpsProcessManagerMetadata,
+  type OpsProjectionMetadata,
+} from "./ports/eventing-introspection.port";
+export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter";
+export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port";
+export {
+  NullEventExplorerRepository,
+  type AggregateDiscoveryRow,
+  type EventExplorerRepository,
+  type RawEventRow,
+} from "./ports/event-explorer.repository";
+export {
+  NullProcessOpsRepository,
+  type ProcessNameCounts,
+  type ProcessOpsRepository,
+} from "./ports/process-ops.repository";
+export { NullReplayRepository, type ReplayRepository } from "./ports/replay.repository";
+export {
+  NullProcessAuditSink,
+  ProcessAuditRepository,
+  type ProcessAuditSink,
+  type ProcessControlAction,
+} from "./repositories/prisma/prisma.process-audit.repository";
+export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
+export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
+export {
+  OpsExplainClickHouseRepository,
+  OpsExplainClientResolver,
+  type OpsExplainClientResolution,
+} from "./repositories/clickhouse/clickhouse.ops-explain.repository";
+export { ReplayRedisRepository } from "./repositories/redis/redis.replay.repository";
+
+/** Public intake for the reports customers' coding agents file. */
+export {
+  BugReportRateLimitedError,
+  submitBugReport,
+  type SubmitBugReportInput,
+} from "./services/bug-report-intake.service";
+export {
+  BugReportNotifierPort,
+  BugReportRateLimiterPort,
+  SilentBugReportNotifier,
+} from "./ports/bug-report-intake.ports";
+export {
+  SlackBugReportNotifierAdapter,
+  type OpsSlackAlertTransport,
+  type SlackBugReportNotifierConfig,
+} from "./adapters/slack.bug-report-notifier.adapter";
+
+// The system-migration ops model, its cohort policy and the Prisma/Redis
+// implementations of the runner's repository interfaces. All were
+// `platform/app/src/server/app-layer/system-migrations/`; the generic runner
+// stays in `@langwatch/system-migrations`.
+export {
+  SystemMigrationsService,
+  type MigrationEnrollmentRecord,
+  type SystemMigrationEnrollmentStore,
+  type SystemMigrationStateReader,
+} from "./services/system-migrations.service";
+export {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "./ops.system-migration-cohort";
+export { PrismaSystemMigrationStateRepository } from "./repositories/prisma/prisma.system-migration-state.repository";
+export { PrismaSystemMigrationEnrollmentRepository } from "./repositories/prisma/prisma.system-migration-enrollment.repository";
+export { PrismaOrganizationTenantSource } from "./repositories/prisma/prisma.organization-tenant-source.repository";
+export {
+  PrismaOrganizationMemberTenantSource,
+  PrismaUserTenantSource,
+} from "./repositories/prisma/prisma.user-tenant-source.repository";
+export { RedisMigrationLeaseRepository } from "./repositories/redis/redis.migration-lease.repository";
+
+// The back-office REST transport: impersonation, and the React Admin resource
+// operations. Its two session reads are ports, because who is acting and which
+// auth row they are acting on are the deployment's facts, not this feature's.
+export {
+  createAdminRestApp,
+  type AdminRestActor,
+  type AdminRestPorts,
+  type AdminRestSessionPorts,
+} from "./transport/api-rest/admin.api";

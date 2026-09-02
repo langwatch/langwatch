@@ -285,3 +285,72 @@ export {
   PrismaIdentityReservationRepository,
   type PrismaIdentityReservationsDatabase,
 } from "./repositories/prisma/prisma.identity-reservations.repository";
+
+// The identity graph's remaining application half: the birth entrance, the
+// newborn sweep, the write-gate latch, the SCIM sync ledger and projection,
+// the operator back office, the teardown dispatcher, the three system
+// migrations and the Prisma repositories behind them. All were
+// `platform/app/src/server/app-layer/identity/`.
+export {
+  IdentityBirthService,
+  type IdentityBirthServiceDeps,
+} from "./services/identity-birth.service";
+export {
+  IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
+  IdentityNewbornReconciliationService,
+  type IdentityNewbornReconciliationDeps,
+  type IdentityNewbornSweepSummary,
+} from "./services/identity-newborn-reconciliation.service";
+export {
+  forgetIdentityWriteGate,
+  IDENTITY_WRITE_GATE_TTL_MS,
+  isAnyoneOnIdentityWrites,
+  isUserOnIdentityWrites,
+  resetIdentityWriteGateForTests,
+} from "./services/identity-write-gate.service";
+export {
+  SsoConnectionBackofficeService,
+  toBackofficeConnection,
+  type BackofficeSsoConnection,
+  type BackofficeSsoConnectionList,
+  type OperatorActor,
+} from "./services/sso-connection-backoffice.service";
+export {
+  MAX_CACHE_ENTRIES,
+  perSubjectCachedFlag,
+  type PerSubjectCachedFlag,
+} from "./per-subject-cached-gate";
+export {
+  IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+  IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+} from "./identity-migration-names";
+export { IdentitySsoConnectionGrandfatherMigration } from "./migrations/identity-connection-grandfather.migration";
+export { IdentityIdentifierBackfillMigration } from "./migrations/identity-identifier-backfill.migration";
+export {
+  IDENTITY_SECRET_HEAL_MIGRATION_NAME,
+  IdentitySecretHealMigration,
+} from "./migrations/identity-secret-heal.migration";
+export {
+  ScimSyncLedgerWriter,
+  type ScimSyncLedgerWriterDeps,
+  type ScimSyncStagedSender,
+} from "./adapters/eventing.scim-sync-ledger.adapter";
+export {
+  SsoConnectionTeardownDispatcher,
+  type ConnectionDirectoryRevocation,
+} from "./adapters/sso-connection-teardown.adapter";
+export { PrismaIdentityAccountsRepository } from "./repositories/prisma/prisma.identity-accounts.repository";
+export { PrismaIdentityBackfillRepository } from "./repositories/prisma/prisma.identity-backfill.repository";
+export {
+  IDENTITY_BORN_REPORT_KIND,
+  PrismaIdentityNewbornRepository,
+  type AbandonedNewborn,
+} from "./repositories/prisma/prisma.identity-newborn.repository";
+export { PrismaIdentityResolutionRepository } from "./repositories/prisma/prisma.identity-resolution.repository";
+export { PrismaIdentitySecretCarryRepository } from "./repositories/prisma/prisma.identity-secret-carry.repository";
+export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository";
+export { PrismaMfaEnrollmentProjectionRepository } from "./repositories/prisma/prisma.mfa-enrollment-projection.repository";
+export {
+  PrismaScimSyncProjectionRepository,
+  rowToScimSync,
+} from "./repositories/prisma/prisma.scim-sync-projection.repository";

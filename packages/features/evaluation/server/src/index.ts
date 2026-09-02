@@ -78,3 +78,11 @@ export {
   type EvaluatorUnavailability,
 } from "./transport/api-trpc/evaluation.api";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service";
+export {
+  EvaluationPreconditionService,
+  PRECONDITION_FIELDS,
+} from "./services/evaluation-precondition.service";
+
+/** The Postgres cost ledger an evaluation run writes into. Was
+ * `platform/app/src/server/app-layer/evaluations/evaluation-cost.recorder.ts`. */
+export { PrismaEvaluationCostRecorder } from "./adapters/prisma.evaluation-cost-recorder.adapter";

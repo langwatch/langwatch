@@ -132,3 +132,60 @@ export {
   type MeterEventResult,
   type UsageSummary,
 } from "./services/usage-reporting.service";
+
+// The Stripe webhook and the Customer.io lifecycle signals, moved off
+// `platform/app/src/server/app-layer/billing/`.
+export {
+  EEWebhookService,
+  type HandleEventResult,
+  type LicensePurchaseHandler,
+  type WebhookService,
+} from "./services/billing-webhook.service";
+export { BillingWebhookOrganizationPort } from "./ports/billing-webhook-organization.port";
+export {
+  BillingWebhookHostPort,
+  SilentBillingWebhookHost,
+} from "./ports/billing-webhook-host.port";
+export {
+  NullSubscriptionRepository,
+  type CancelledSubscription,
+  type SubscriptionRepository,
+  type SubscriptionWithOrg,
+} from "./ports/billing-webhook-subscription.port";
+export {
+  setNurturingDatabase,
+  setNurturingOrganizationAdminResolver,
+  setNurturingSink,
+  tryNurturingDatabase,
+  tryNurturingOrganizationAdminResolver,
+  tryNurturingSink,
+  type OrganizationAdminResolver,
+} from "./services/nurturing-sink";
+export {
+  fireActivityTrackingNurturing,
+  getActivityTrackingCacheSize,
+  resetActivityTrackingCache,
+} from "./services/nurturing-activity-tracking.service";
+export {
+  fireExperimentRanNurturing,
+  fireScenarioCreatedNurturing,
+  fireTeamMemberInvitedNurturing,
+  fireWorkflowCreatedNurturing,
+} from "./services/nurturing-feature-adoption.service";
+export {
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
+  type IntegrationMethodValue,
+} from "./services/nurturing-product-interest.service";
+export {
+  afterPromptCreated,
+  firePromptCreatedNurturing,
+} from "./services/nurturing-prompt-creation.service";
+export { fireSignupNurturingCalls } from "./services/nurturing-signup-identification.service";
+export { fireSsoAutoAddNurturingCalls } from "./services/nurturing-sso-auto-add.service";
+export { fireSubscriptionSyncNurturing } from "./services/nurturing-subscription-sync.service";
+export {
+  ensureUserSyncedToCio,
+  getUserSyncCacheSize,
+  resetUserSyncCache,
+} from "./services/nurturing-user-sync.service";

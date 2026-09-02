@@ -17,3 +17,4 @@ export * from "./ops-scheduler";
 export * from "./ops-scheduler.errors";
 export * from "./ops-snapshot";
 export * from "./ops-snapshot.service";
+export * from "./ops-system-migration.errors";

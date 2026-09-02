@@ -32,3 +32,15 @@ export {
   type LicenseServiceConfigurationInput,
   type LicenseServiceOptions,
 } from "./services/license.service";
+
+/**
+ * The one point every resolved plan passes through, so a tier's entitlements
+ * are applied once and hold everywhere. Was
+ * `platform/app/src/server/app-layer/subscription/plan-provider.ts`.
+ */
+export {
+  PlanProviderService,
+  type PlanProvider,
+  type PlanProviderUser,
+  type PlanResolver,
+} from "./services/plan-provider.service";

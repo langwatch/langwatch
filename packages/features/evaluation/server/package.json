@@ -40,6 +40,7 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "^11.18.0",

@@ -87,3 +87,22 @@ export {
   computeCatchUp,
   computeNextRunAt,
 } from "./schedule/next-run-at";
+export {
+  SchedulerRegistry,
+  schedulerRegistry,
+} from "./schedule/scheduler.registry";
+export {
+  SchedulerService,
+  type SchedulerServiceDeps,
+} from "./schedule/scheduler.service";
+export type {
+  ScheduledJobFire,
+  ScheduledJobRecord,
+  ScheduledJobStore,
+  SchedulerHandler,
+} from "./schedule/scheduler.types";
+export {
+  NullScheduledJobStore,
+  PrismaScheduledJobStore,
+} from "./adapters/postgres/prisma-scheduled-job-store";
+export { toPgTimestampUtc } from "./adapters/postgres/pg-timestamp";

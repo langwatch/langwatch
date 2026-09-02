@@ -5,7 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { PostgresIdentityEmailAdapter } from "../postgres.identity-email.adapter";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../repositories/prisma/prisma.identity-latch.repository";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
 
 type Row = Record<string, unknown>;
 

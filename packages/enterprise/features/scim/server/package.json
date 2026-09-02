@@ -33,6 +33,8 @@
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

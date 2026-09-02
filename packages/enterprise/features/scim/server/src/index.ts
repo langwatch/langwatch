@@ -24,3 +24,14 @@ export {
   type ScimUserPushOperation,
 } from "./ports/scim-sync-lifecycle.port";
 export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service";
+
+/**
+ * The durable directory-sync history: the SCIM boundary's own implementation
+ * of `ScimSyncLifecyclePort`, stating what happened as facts on the
+ * connection's identity aggregate. Was
+ * `platform/app/src/server/app-layer/identity/scim-sync-lifecycle.ts`.
+ */
+export {
+  ScimSyncLifecycle,
+  type ScimSyncLifecycleDeps,
+} from "./adapters/identity.scim-sync-lifecycle.adapter";

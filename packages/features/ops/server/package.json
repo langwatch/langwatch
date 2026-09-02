@@ -24,6 +24,9 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
@@ -34,8 +37,11 @@
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "ioredis": "5.10.1",
     "ra-data-simple-prisma": "3.1.3",
     "zod": "^4.4.3"
