@@ -19,6 +19,17 @@ Feature: How long governance data lives, and what that costs when it goes
     # fixed bound. A holding period for personal data is not a customer
     # setting.
 
+  @unit
+  Scenario: A day the screen says can still change is a day we can still act on
+    Given a cost day the screen shows as still able to change
+    When the shortest retention a customer can set is applied to it
+    Then that day's history outlives the period the screen calls it changeable
+    # Otherwise we tell the customer a figure can still move on a day whose
+    # history has already gone, so the restatement that arrives cannot be
+    # folded and an erasure on that day cannot be rebuilt. The two periods are
+    # set in unrelated places and clear each other by five days entirely by
+    # accident, which is the reason to pin it.
+
   @unit @integration
   Scenario: Each area is judged against how far its own log reaches
     Given an organization whose spend was recorded in two areas
