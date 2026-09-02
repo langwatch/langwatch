@@ -82,14 +82,12 @@ interface PlaygroundWidgetCardProps {
   widget: PlaygroundWidget;
   projectId: string;
   projectSlug: string;
-  dashboards: { id: string; name: string }[];
   onDelete: () => void;
   onSizeChange: (size: SizeOption) => void;
   onSave: (
     input: { id: string; code: string; queries: PlaygroundQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
-  onPin: (dashboardId: string, dashboardName: string) => void;
   isDeleting: boolean;
   isSaving: boolean;
 }
@@ -98,11 +96,9 @@ export function PlaygroundWidgetCard({
   widget,
   projectId,
   projectSlug,
-  dashboards,
   onDelete,
   onSizeChange,
   onSave,
-  onPin,
   isDeleting,
   isSaving,
 }: PlaygroundWidgetCardProps) {
