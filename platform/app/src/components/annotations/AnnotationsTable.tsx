@@ -18,6 +18,7 @@ import {
   flexRender,
   getCoreRowModel,
   type RowSelectionState,
+  type VisibilityState,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -49,6 +50,7 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
+import { HoverableBigText } from "../HoverableBigText";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { Checkbox } from "../ui/checkbox";
 import { ListTable } from "../ui/ListTable";
@@ -56,15 +58,22 @@ import { Pagination } from "../ui/Pagination";
 import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { toaster } from "../ui/toaster";
+import { AnnotationColumnsMenu } from "./AnnotationColumnsMenu";
 import { AnnotationCommentsChip } from "./AnnotationCommentsChip";
 import { AnnotationSuggestionsChip } from "./AnnotationSuggestionsChip";
 import UserAvatarGroup from "./AvatarGroup";
+import {
+  annotationColumnOptions,
+  isColumnVisible,
+  scoreColumnId,
+} from "./annotationColumns";
 import {
   type AnnotationRow,
   type AnnotationWithUser,
   queueItemsToRows,
   suggestionExportLine,
 } from "./annotationRow";
+import { useAnnotationColumnChoices } from "./useAnnotationColumnChoices";
 
 const ChakraButton = chakra("button");
 
@@ -126,6 +135,22 @@ function SelectCheckbox({
   );
 }
 
+/**
+ * A trace's input or output as the list shows it: enough to judge the row at a
+ * glance, the rest one hover away and the whole thing one click away. These two
+ * are what the reviewer is being asked about, so they get the room — a cell
+ * clamped to a couple of ellipsised words is not something anyone can review.
+ */
+function ReviewedText({ value }: { value?: string | null }) {
+  return (
+    <Box minWidth="220px" maxWidth="420px">
+      <HoverableBigText lineClamp={3} wordBreak="break-word">
+        {value ?? "<empty>"}
+      </HoverableBigText>
+    </Box>
+  );
+}
+
 /** Page number and size, kept in the URL so a list survives a reload. */
 function useListPaging() {
   const router = useRouter();
@@ -173,8 +198,51 @@ function useListPaging() {
   };
 }
 
+/**
+ * The row's actions, pinned to the right edge of the table's own scroll.
+ *
+ * A project that collects many score types makes this table wider than the
+ * page, and the overflow menu is the last column: unpinned, "View trace" and
+ * "Remove from queue" sit off screen behind a sideways scroll nobody thinks to
+ * make. Pinned, the only way to act on one row is always where the eye is.
+ */
+const stickyActionsCell = {
+  position: "sticky" as const,
+  right: 0,
+  zIndex: 1,
+  borderLeftWidth: "1px",
+  borderLeftColor: "border.muted",
+};
+
+/** The status filter's choices, as the control names them. */
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  completed: "Completed",
+  all: "All",
+};
+
 const formatRowDate = (date: Date | null): string =>
   date ? date.toLocaleDateString() : "-";
+
+/**
+ * Every score given on the row, named by its type. The folded "Scores" column
+ * renders this: one column that says what the reviewers answered, in place of
+ * one column per score type that a project with a dozen of them could not read.
+ */
+const givenScores = ({
+  annotations,
+  activeScoreTypes,
+}: {
+  annotations: AnnotationWithUser[];
+  activeScoreTypes: ActiveScoreType[];
+}) =>
+  activeScoreTypes.flatMap((scoreType) =>
+    scoreValuesFor(annotations, scoreType.id).map((score) => ({
+      ...score,
+      key: `${score.annotationId}-${scoreType.id}`,
+      name: scoreType.name,
+    })),
+  );
 
 const scoreValuesFor = (
   annotations: AnnotationWithUser[],
@@ -307,6 +375,27 @@ export const AnnotationsTable = ({
         .filter((scoreType) => scoreType.active)
         .map((scoreType) => ({ id: scoreType.id, name: scoreType.name })),
     [scoreTypes.data],
+  );
+
+  const columnOptions = useMemo(
+    () =>
+      annotationColumnOptions({
+        dateColumnLabel,
+        scoreTypes: activeScoreTypes,
+      }),
+    [dateColumnLabel, activeScoreTypes],
+  );
+  const { choices, setColumnVisible, resetColumns, hasChoices } =
+    useAnnotationColumnChoices({ projectId: project?.id });
+  const columnVisibility: VisibilityState = useMemo(
+    () =>
+      Object.fromEntries(
+        columnOptions.map((column) => [
+          column.id,
+          isColumnVisible({ column, choices }),
+        ]),
+      ),
+    [columnOptions, choices],
   );
 
   // A page that brings its own rows brings all of them, so the pager slices
@@ -480,16 +569,7 @@ export const AnnotationsTable = ({
         header: "Input",
         cell: ({ row }) => (
           <RedactedField field="input">
-            <Tooltip content={row.original.trace?.input?.value ?? "<empty>"}>
-              <Text
-                lineClamp={2}
-                maxWidth="320px"
-                textOverflow="ellipsis"
-                wordBreak="break-word"
-              >
-                {row.original.trace?.input?.value ?? "<empty>"}
-              </Text>
-            </Tooltip>
+            <ReviewedText value={row.original.trace?.input?.value} />
           </RedactedField>
         ),
       }),
@@ -498,17 +578,29 @@ export const AnnotationsTable = ({
         header: "Output",
         cell: ({ row }) => (
           <RedactedField field="output">
-            <Tooltip content={row.original.trace?.output?.value ?? "<empty>"}>
-              <Text
-                lineClamp={2}
-                maxWidth="320px"
-                textOverflow="ellipsis"
-                wordBreak="break-word"
-              >
-                {row.original.trace?.output?.value ?? "<empty>"}
-              </Text>
-            </Tooltip>
+            <ReviewedText value={row.original.trace?.output?.value} />
           </RedactedField>
+        ),
+      }),
+      columnHelper.display({
+        id: "scores",
+        header: "Scores",
+        cell: ({ row }) => (
+          <HStack gap={1} wrap="wrap" minWidth="140px">
+            {givenScores({
+              annotations: row.original.annotations,
+              activeScoreTypes,
+            }).map((score) => (
+              <Badge key={score.key} whiteSpace="normal">
+                {score.name}: {score.value.join(", ")}
+                {score.reason && (
+                  <Tooltip content={score.reason}>
+                    <MessageCircle size={14} />
+                  </Tooltip>
+                )}
+              </Badge>
+            ))}
+          </HStack>
         ),
       }),
       columnHelper.display({
@@ -533,7 +625,7 @@ export const AnnotationsTable = ({
       }),
       ...activeScoreTypes.map((scoreType) =>
         columnHelper.display({
-          id: `score-${scoreType.id}`,
+          id: scoreColumnId(scoreType.id),
           header: scoreType.name,
           cell: ({ row }) => (
             <VStack align="start" gap={2}>
@@ -619,7 +711,7 @@ export const AnnotationsTable = ({
   const table = useReactTable({
     data: pageRows,
     columns,
-    state: { rowSelection },
+    state: { rowSelection, columnVisibility },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
@@ -711,8 +803,11 @@ export const AnnotationsTable = ({
         {showStatusFilter && (
           <Menu.Root>
             <Menu.Trigger asChild>
+              {/* The chosen status is on the trigger: a filter nobody can read
+                  off the page is one that quietly hides rows. */}
               <Button variant="outline">
-                Status <ChevronDown size={16} />
+                Status: {STATUS_LABELS[statusFilter] ?? statusFilter}{" "}
+                <ChevronDown size={16} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
@@ -729,6 +824,13 @@ export const AnnotationsTable = ({
             </Menu.Content>
           </Menu.Root>
         )}
+        <AnnotationColumnsMenu
+          columns={columnOptions}
+          choices={choices}
+          onColumnVisibleChange={setColumnVisible}
+          onReset={resetColumns}
+          hasChoices={hasChoices}
+        />
         <PeriodSelector
           period={{ startDate, endDate }}
           mode={periodMode}
@@ -797,6 +899,12 @@ export const AnnotationsTable = ({
                               : undefined
                         }
                         paddingX={header.id === "select" ? 0 : undefined}
+                        {...(header.id === "actions"
+                          ? {
+                              ...stickyActionsCell,
+                              backgroundColor: "bg.subtle",
+                            }
+                          : {})}
                       >
                         {flexRender(
                           header.column.columnDef.header,
@@ -829,6 +937,15 @@ export const AnnotationsTable = ({
                           key={cell.id}
                           paddingX={cell.column.id === "select" ? 0 : undefined}
                           verticalAlign="top"
+                          {...(cell.column.id === "actions"
+                            ? {
+                                ...stickyActionsCell,
+                                // Inherits the row's own background, so the
+                                // pinned cell keeps following the row through
+                                // its done and hover states.
+                                backgroundColor: "inherit",
+                              }
+                            : {})}
                         >
                           {flexRender(
                             cell.column.columnDef.cell,

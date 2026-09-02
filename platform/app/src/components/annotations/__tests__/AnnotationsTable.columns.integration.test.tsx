@@ -239,6 +239,9 @@ beforeEach(() => {
   mocks.scoreTypes = [];
   mocks.periodIsDefault = true;
   mocks.queueReadArgs = null;
+  // Column choices live in the browser, so one test's picks must not decide
+  // what the next one starts from.
+  window.localStorage.clear();
   setItems([{ id: "item-1", traceId: "trace-1" }]);
 });
 afterEach(cleanup);
@@ -349,6 +352,28 @@ describe("AnnotationsTable columns and row actions", () => {
 
       expect(columnHeaders()).toContain("Date queued");
       expect(columnHeaders()).not.toContain("Date annotated");
+    });
+
+    /** @scenario "The row's actions stay reachable however wide the table is" */
+    it("pins the actions column to the edge of the table's own scroll", () => {
+      renderQueuePage();
+
+      const actionsHeader = screen.getAllByRole("columnheader").at(-1)!;
+      const actionsCell = screen.getAllByRole("row")[1]!.lastElementChild!;
+      for (const cell of [actionsHeader, actionsCell]) {
+        const style = getComputedStyle(cell);
+        expect(style.position).toBe("sticky");
+        expect(style.right).toBe("0px");
+      }
+    });
+
+    /** @scenario "A queue page filters by status" */
+    it("names the status it is filtering by", () => {
+      renderQueuePage();
+
+      expect(
+        screen.getByRole("button", { name: /Status: Pending/ }),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "A queue page filters by status" */
@@ -591,26 +616,69 @@ describe("AnnotationsTable columns and row actions", () => {
   });
 
   describe("given the project collects scores", () => {
-    /** @scenario "One column per active score type" */
-    it("adds one column per active score type and one cell per row", () => {
+    const twoActiveScoreTypes = () => {
       mocks.scoreTypes = [
         { id: "score-1", name: "Helpfulness", active: true },
         { id: "score-2", name: "Tone", active: true },
         { id: "score-3", name: "Retired", active: false },
       ];
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [
+            annotation({
+              scoreOptions: {
+                "score-1": { value: "good", reason: "on point" },
+              },
+            }),
+          ],
+        },
+      ]);
+    };
+
+    /** @scenario "Every score is folded into one Scores column" */
+    it("folds the scores into one column instead of one column per type", () => {
+      twoActiveScoreTypes();
       renderQueuePage();
 
       const headers = columnHeaders();
-      expect(headers).toContain("Helpfulness");
-      expect(headers).toContain("Tone");
+      expect(headers).toContain("Scores");
+      // One column per type is what made a project with a dozen of them
+      // unreadable; they are on offer in the columns menu, not on by default.
+      expect(headers).not.toContain("Helpfulness");
+      expect(headers).not.toContain("Tone");
       expect(headers).not.toContain("Retired");
+      expect(screen.getByText("Helpfulness: good")).toBeInTheDocument();
       expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
         headers.length,
       );
     });
 
+    /** @scenario "A score type can be given its own column" */
+    it("adds a column for a score type the reviewer picks", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      twoActiveScoreTypes();
+      renderQueuePage();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Helpfulness" }),
+      );
+
+      expect(columnHeaders()).toContain("Helpfulness");
+      expect(columnHeaders()).not.toContain("Tone");
+      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
+        columnHeaders().length,
+      );
+    });
+
     /** @scenario "Score types that are all inactive add no columns" */
-    it("adds no score column when none is active", () => {
+    it("offers no score type when none is active", () => {
       mocks.scoreTypes = [
         { id: "score-1", name: "Retired", active: false },
         { id: "score-2", name: "Also retired", active: false },
@@ -622,6 +690,35 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
         headers.length,
       );
+    });
+  });
+
+  describe("given the reviewer wants fewer columns", () => {
+    /** @scenario "A column the reviewer hides stays hidden" */
+    it("hides a column it is told to hide and remembers the choice", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const view = renderQueuePage();
+      expect(columnHeaders()).toContain("Suggestions");
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Suggestions" }),
+      );
+
+      expect(columnHeaders()).not.toContain("Suggestions");
+
+      view.unmount();
+      renderQueuePage();
+
+      expect(columnHeaders()).not.toContain("Suggestions");
+      // Input and output are what the reviewer is judging, so they are never
+      // the thing a stored choice quietly drops.
+      expect(columnHeaders()).toContain("Input");
+      expect(columnHeaders()).toContain("Output");
     });
   });
 

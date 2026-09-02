@@ -275,17 +275,66 @@ Rule: The columns say what the reviewer needs to judge a row
     Given a row carries no comment
     Then its comments cell is empty
 
+  # A project that collects a dozen score types used to get a dozen columns,
+  # nearly all empty on any given row, which squeezed input and output into a
+  # strip and pushed the row's actions off the right edge.
   @integration
-  Scenario: One column per active score type
+  Scenario: Every score is folded into one Scores column
     Given the project has two active score types and one inactive one
-    Then the table carries a column for each active score type
+    Then the table carries one "Scores" column and no column per score type
+    And a score shows there as its type's name and the answer given
+    And every row has exactly one cell per column
+
+  @integration
+  Scenario: A score type can be given its own column
+    Given the project has two active score types
+    When the reviewer picks one of them in the columns menu
+    Then the table carries a column for that score type only
     And every row has exactly one cell per column
 
   @integration
   Scenario: Score types that are all inactive add no columns
     Given the project has score types and none of them is active
     Then the table carries no score column
+    And the columns menu offers none of them
     And every row has exactly as many cells as the header has columns
+
+Rule: The reviewer chooses which columns the list shows
+
+  The list is read differently by different people, and one project's score
+  types are another's noise. The choice is per project and kept in the browser:
+  it is how one person likes to read the list, not something the project agrees
+  on.
+
+  Background:
+    Given the user is authenticated with "annotations:view" permission
+    And the annotations list shows rows
+
+  @integration
+  Scenario: A column the reviewer hides stays hidden
+    When the reviewer turns a column off in the columns menu
+    Then the table stops carrying it
+    And it is still off when they come back to the list
+
+  @integration
+  Scenario: A column added after the reviewer chose still appears
+    Given the reviewer has hidden a column
+    When the project gains a column that shows by default
+    Then that new column shows
+
+Rule: The row's actions are always within reach
+
+  Background:
+    Given the user is authenticated with "annotations:update" permission
+    And the annotations list shows rows
+
+  # Unpinned, the overflow menu is the last column of a table that can be wider
+  # than the page, so "View trace" and "Remove from queue" sit off screen behind
+  # a sideways scroll nobody thinks to make.
+  @integration
+  Scenario: The row's actions stay reachable however wide the table is
+    When the annotations list renders
+    Then the actions column is pinned to the edge of the table's own scroll
 
   @integration
   Scenario: Input and output stay behind the redaction marker
@@ -302,6 +351,7 @@ Rule: Every page carries the same header controls
   Scenario: A queue page filters by status
     When a queue page renders
     Then the header offers Pending, Completed and All
+    And the control names the status it is filtering by
 
   @integration
   Scenario: The all annotations page has no status filter
