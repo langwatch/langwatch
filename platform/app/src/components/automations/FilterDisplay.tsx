@@ -10,7 +10,7 @@ interface FilterDisplayProps {
    * off where the chip is already inside a tooltip: there is no room for a
    * second hover, so the value has to wrap instead.
    */
-  clampValues?: boolean;
+  shouldClampValues?: boolean;
 }
 
 const FilterContainer = ({
@@ -61,12 +61,12 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
 
 const FilterValue = ({
   children,
-  clamp = true,
+  shouldClamp = true,
 }: {
   children: React.ReactNode;
-  clamp?: boolean;
+  shouldClamp?: boolean;
 }) => {
-  if (!clamp) {
+  if (!shouldClamp) {
     // Already inside a tooltip: wrap instead, and break mid-token so an
     // unbreakable id cannot run past the tooltip edge.
     return (
@@ -91,7 +91,7 @@ const FilterValue = ({
 export const FilterDisplay = ({
   filters,
   hasBorder = false,
-  clampValues = true,
+  shouldClampValues = true,
 }: FilterDisplayProps) => {
   const applyFilters = (filters: string | Record<string, any>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
@@ -102,7 +102,9 @@ export const FilterDisplay = ({
         result.push(
           <FilterContainer key={key} hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue clamp={clampValues}>{value.join(", ")}</FilterValue>
+            <FilterValue shouldClamp={shouldClampValues}>
+              {value.join(", ")}
+            </FilterValue>
           </FilterContainer>,
         );
       } else if (typeof value === "object" && value !== null) {
@@ -126,7 +128,7 @@ export const FilterDisplay = ({
         result.push(
           <FilterContainer key={key} hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue clamp={clampValues}>
+            <FilterValue shouldClamp={shouldClampValues}>
               {nestedResult.join("; ")}
             </FilterValue>
           </FilterContainer>,
@@ -135,7 +137,9 @@ export const FilterDisplay = ({
         result.push(
           <FilterContainer key={key} fontSize="xs" hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue clamp={clampValues}>{String(value)}</FilterValue>
+            <FilterValue shouldClamp={shouldClampValues}>
+              {String(value)}
+            </FilterValue>
           </FilterContainer>,
         );
       }
