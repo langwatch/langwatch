@@ -24,9 +24,7 @@ describe("coerceContentToArray", () => {
 
     it("handles None, True, False", () => {
       const repr = "[{'type': 'flag', 'a': None, 'b': True, 'c': False}]";
-      expect(coerceContentToArray(repr)).toEqual([
-        { type: "flag", a: null, b: true, c: false },
-      ]);
+      expect(coerceContentToArray(repr)).toEqual([{ type: "flag", a: null, b: true, c: false }]);
     });
 
     it("handles input_audio shape from openai-realtime sdk", () => {
@@ -113,9 +111,7 @@ describe("coerceContentToArray", () => {
       // escaped doubles. JSON needs the inner quotes escaped under double
       // quotes as well.
       const repr = "[{'type': 'text', 'text': 'he said \"hi\" loudly'}]";
-      expect(coerceContentToArray(repr)).toEqual([
-        { type: "text", text: 'he said "hi" loudly' },
-      ]);
+      expect(coerceContentToArray(repr)).toEqual([{ type: "text", text: 'he said "hi" loudly' }]);
     });
 
     it("translates Python \\xHH byte escapes to JSON \\u00HH", () => {
@@ -123,9 +119,7 @@ describe("coerceContentToArray", () => {
       // accepts \uHHHH (4 hex digits). Without translation, JSON.parse
       // rejects the otherwise-valid recovery output.
       const repr = "[{'type': 'text', 'text': 'pre\\x00mid\\x1fpost'}]";
-      expect(coerceContentToArray(repr)).toEqual([
-        { type: "text", text: "pre\u0000midpost" },
-      ]);
+      expect(coerceContentToArray(repr)).toEqual([{ type: "text", text: "pre\u0000midpost" }]);
     });
 
     it("translates \\xHH inside a python double-quoted string", () => {

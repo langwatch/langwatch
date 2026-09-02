@@ -31,6 +31,24 @@ export {
   type StoredObjectStorageDriver,
   type StoredObjectStorageDriverFactory,
 } from "./adapters/stored-object-storage.registry";
+export { AzureBlobStoredObjectDriver } from "./adapters/azure-blob.stored-object-driver.adapter";
+export {
+  ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
+  AzureBackendMisconfiguredError,
+  assertTokenModeTransportSafety,
+  resolveAzureCredentials,
+  type AzureBlobCredentialsConfig,
+  type AzureCredentials,
+  type AzureInjectedIdentity,
+  type AzureTokenAuthMode,
+} from "./adapters/azure-blob-credentials";
+export {
+  AzureTokenExchangeError,
+  getAzureBlobToken,
+  invalidateAzureBlobToken,
+  resetAzureTokenCacheForTests,
+  type TokenModeCredentials,
+} from "./adapters/azure-blob-token-provider";
 export {
   StoredObjectProjectDestinationResolverPort,
   StoredObjectStorageRuntime,

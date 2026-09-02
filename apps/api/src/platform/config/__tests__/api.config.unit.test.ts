@@ -48,6 +48,19 @@ describe("API process configuration", () => {
       },
       instanceAdminApiKey: undefined,
       apiKeyPepper: undefined,
+      // The credentials this process reads and never logs. Every one of them
+      // is an unvalidated optional string on purpose: an operator who exports
+      // a variable blank has NOT configured a secret, and refusing the whole
+      // boot over it would refuse deployments that run none of these surfaces.
+      // What blank MEANS is each reader's own rule, and lives with it.
+      storedSecretEncryptionKey: undefined,
+      virtualKeyPepper: undefined,
+      gatewayInternalSecret: undefined,
+      gatewayJwtSecret: undefined,
+      langyInternalSecret: undefined,
+      metricsApiKey: undefined,
+      spendSettlementGraceMs: undefined,
+      browserSession: undefined,
       authz: {
         epochCacheEnabled: false,
         demoProjectId: undefined,
@@ -111,6 +124,24 @@ describe("API process configuration", () => {
             accessKeyId: undefined,
             secretAccessKey: undefined,
             sessionToken: undefined,
+          },
+          // Read but unconfigured: the Azure driver is registered as a lazy
+          // factory, so an install with no Azure block never resolves these.
+          azure: {
+            backend: undefined,
+            authMode: undefined,
+            accountName: undefined,
+            accountKey: undefined,
+            container: undefined,
+            endpoint: undefined,
+            authorityHost: undefined,
+            tokenAudience: undefined,
+            allowInsecureTokenEndpointForTests: false,
+            identity: {
+              tenantId: undefined,
+              clientId: undefined,
+              federatedTokenFile: undefined,
+            },
           },
           routes: new Map(),
         },
@@ -390,6 +421,22 @@ describe("API process configuration", () => {
           accessKeyId: undefined,
           secretAccessKey: undefined,
           sessionToken: undefined,
+        },
+        azure: {
+          backend: undefined,
+          authMode: undefined,
+          accountName: undefined,
+          accountKey: undefined,
+          container: undefined,
+          endpoint: undefined,
+          authorityHost: undefined,
+          tokenAudience: undefined,
+          allowInsecureTokenEndpointForTests: false,
+          identity: {
+            tenantId: undefined,
+            clientId: undefined,
+            federatedTokenFile: undefined,
+          },
         },
         routes: new Map(),
       },

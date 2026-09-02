@@ -9,15 +9,24 @@
  * organization-to-team role default, the seat-limit rename, the trace-share
  * revocation a settings change triggers, and the audit sink.
  *
- * The invitation half is a NAMED ABSENCE. `InviteService` reaches the licence
- * enforcement repository, the plan provider, the mailer and the role service —
- * four verticals that have not moved — so the three invitation routes refuse
- * with `service_unavailable` naming the capability. An empty invitation list
- * would tell an administrator nobody had been invited, which is the one answer
- * they act on by inviting the same person twice.
+ * The invitation half arrives as an INJECTED SERVICE rather than being built
+ * here, and it is the same one `organization.*` administers over tRPC. That is
+ * the point: a provisioning tool that creates an invitation through this family
+ * and an administrator who lists them in the app must see one set of
+ * invitations, with one acceptance link each and one seat census behind them.
+ *
+ * A process that composed no invitation service still mounts the family: the
+ * three invitation routes refuse with `service_unavailable` naming the
+ * capability. An empty invitation list would tell an administrator nobody had
+ * been invited, which is the one answer they act on by inviting the same
+ * person twice.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { AppRestManagementAuditPort, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import type {
+  AppRestManagementAuditPort,
+  AppRestSecurity,
+  MountableRestApp,
+} from "@langwatch/api/rest";
 import { createEnterprisePlanGate } from "@langwatch/enterprise-plan-gate";
 import { HandledError } from "@langwatch/handled-error";
 import {

@@ -155,3 +155,22 @@ export {
   type TeamRoleUpdate,
   type TeamRoleUpdateOrigin,
 } from "./services/compute-effective-team-role-updates";
+export {
+  INVITE_EXPIRATION_MS,
+  InviteService,
+  classifyInvitesByMemberType,
+  maskInvitedAddress,
+  matchInviteToAcceptor,
+  resolveInviteTeamMemberships,
+  type InviteServiceDependencies,
+} from "./services/invite.service";
+export {
+  INVITE_SENDS_PER_WINDOW,
+  INVITE_SEND_WINDOW_SECONDS,
+  InviteSendThrottleService,
+} from "./services/invite-send-throttle.service";
+export {
+  OrganizationInviteMailPort,
+  OrganizationInviteRateLimitPort,
+  OrganizationInviteSeatCensusPort,
+} from "./ports/invite.port";

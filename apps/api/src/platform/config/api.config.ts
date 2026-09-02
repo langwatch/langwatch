@@ -1,6 +1,7 @@
 import {
   Config,
   environmentBooleanSchema,
+  parseDataplaneS3RoutingTable,
   resolveTelemetryConfiguration,
   RuntimeConfig,
   portSchema,
@@ -12,18 +13,23 @@ import {
   type Logger,
   type LoggerConfiguration,
 } from "@langwatch/observability";
-import { parseRoutingTable, poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
+import {
+  parseRoutingTable,
+  poolSizingFromEnv,
+  type PoolSizingInput,
+} from "@langwatch/clickhouse-client";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
-import {
-  resolveFeatureFlagConfig,
-  type FeatureFlagConfig,
-} from "@langwatch/feature-flag-contract";
+import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
+import type {
+  AzureBlobCredentialsConfig,
+  AzureInjectedIdentity,
+} from "@langwatch/stored-object-server";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
@@ -493,6 +499,49 @@ export const apiConfigDefinition = RuntimeConfig.define({
         }),
         sessionToken: Config.value(optionalEnvironmentString, { env: "S3_SESSION_TOKEN" }),
       },
+      /**
+       * The Azure Blob account this deployment reads and writes through, and
+       * the federated identity it authenticates as.
+       *
+       * Read together and interpreted nowhere here: which of the four auth
+       * modes applies, which variables each one requires, and whether a
+       * plaintext endpoint or a sovereign cloud is admissible are the stored
+       * object feature's own rules, and `resolveAzureCredentials` is the one
+       * place that decides. This module only supplies what it read.
+       *
+       * `identity` is the AKS azure-workload-identity webhook's own three
+       * variables. They are named here because this module is the process's
+       * only environment reader, not because an operator sets them: their
+       * absence means the webhook never mutated this pod, which is what the
+       * credential resolver's refusal says.
+       */
+      azure: {
+        authMode: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_AUTH_MODE" }),
+        accountName: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ACCOUNT_NAME",
+        }),
+        accountKey: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ACCOUNT_KEY",
+        }),
+        container: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_CONTAINER" }),
+        endpoint: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_ENDPOINT" }),
+        authorityHost: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_AUTHORITY_HOST",
+        }),
+        tokenAudience: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_TOKEN_AUDIENCE",
+        }),
+        allowInsecureTokenEndpointForTests: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
+        }),
+        identity: {
+          tenantId: Config.value(optionalEnvironmentString, { env: "AZURE_TENANT_ID" }),
+          clientId: Config.value(optionalEnvironmentString, { env: "AZURE_CLIENT_ID" }),
+          federatedTokenFile: Config.value(optionalEnvironmentString, {
+            env: "AZURE_FEDERATED_TOKEN_FILE",
+          }),
+        },
+      },
     },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
@@ -651,6 +700,12 @@ export type ApiStoredObjectsConfigResolution = Readonly<{
     secretAccessKey: string | undefined;
     sessionToken: string | undefined;
   }>;
+  /**
+   * The Azure Blob block, as read. Every rule about which of these a given
+   * auth mode requires lives in `@langwatch/stored-object-server`, so this is
+   * the raw shape its resolver takes rather than a validated credential.
+   */
+  azure: AzureBlobCredentialsConfig & { identity: AzureInjectedIdentity };
   routes: ReadonlyMap<string, ApiDataplaneS3Route>;
 }>;
 
@@ -796,6 +851,35 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
           secretAccessKey:
             value.infrastructure.storedObjects.s3.secretAccessKey?.trim() || undefined,
           sessionToken: value.infrastructure.storedObjects.s3.sessionToken?.trim() || undefined,
+        },
+        azure: {
+          backend: value.infrastructure.storedObjects.backend,
+          authMode: value.infrastructure.storedObjects.azure.authMode?.trim() || undefined,
+          accountName: value.infrastructure.storedObjects.azure.accountName?.trim() || undefined,
+          accountKey: value.infrastructure.storedObjects.azure.accountKey?.trim() || undefined,
+          container: value.infrastructure.storedObjects.azure.container?.trim() || undefined,
+          endpoint: value.infrastructure.storedObjects.azure.endpoint?.trim() || undefined,
+          authorityHost:
+            value.infrastructure.storedObjects.azure.authorityHost?.trim() || undefined,
+          tokenAudience:
+            value.infrastructure.storedObjects.azure.tokenAudience?.trim() || undefined,
+          // The escape hatch is refused outright in production, so a value set
+          // on a real deployment cannot put a bearer token on the wire in
+          // plaintext no matter who sets it. This is where that is decided:
+          // the guard downstream is handed a boolean, not a variable to read.
+          allowInsecureTokenEndpointForTests:
+            process.env.NODE_ENV !== "production" &&
+            value.infrastructure.storedObjects.azure.allowInsecureTokenEndpointForTests?.trim() ===
+              "1",
+          identity: {
+            tenantId:
+              value.infrastructure.storedObjects.azure.identity.tenantId?.trim() || undefined,
+            clientId:
+              value.infrastructure.storedObjects.azure.identity.clientId?.trim() || undefined,
+            federatedTokenFile:
+              value.infrastructure.storedObjects.azure.identity.federatedTokenFile?.trim() ||
+              undefined,
+          },
         },
         routes: resolveDataplaneS3Routes(source),
       },
@@ -1006,70 +1090,28 @@ function firstDefined(
   return undefined;
 }
 
-
-const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
-
-const dataplaneS3RouteSchema = z.object({
-  endpoint: z.string().min(1),
-  bucket: z.string().min(1),
-  accessKeyId: z.string().min(1),
-  secretAccessKey: z.string().min(1),
-});
-
 /**
  * The per-organization S3 routes this deployment declares.
  *
- * Read straight off the source because the variable NAMES carry the
- * organization id — `DATAPLANE_S3__<label>__<organizationId>` — and the
- * declarative projection can only name variables it knows in advance.
+ * Parsed by the shared helper rather than by a second reader here: the
+ * variable NAMES carry the organization id — `DATAPLANE_S3__<label>__<organizationId>`
+ * — so the declarative projection can only name variables it knows in advance,
+ * and a process splitting `<label>__<organizationId>` differently from another
+ * would address a tenant's objects somewhere they cannot read them.
  *
- * A malformed entry is SKIPPED rather than failing the boot, matching the
- * application byte for byte: one customer's bad JSON must not stop the process
- * that serves everyone else. A DUPLICATE organization id does fail, also
- * matching, because two routes for one tenant is a question this process
- * cannot answer, and answering it wrong addresses their data somewhere they
- * cannot read it.
+ * A malformed entry is skipped and named in the log; a duplicate organization
+ * id is raised by the helper, because two routes for one tenant is a question
+ * this process cannot answer.
  */
 function resolveDataplaneS3Routes(
   source: Readonly<Record<string, unknown>>,
 ): ReadonlyMap<string, ApiDataplaneS3Route> {
-  const routes = new Map<string, ApiDataplaneS3Route>();
-
-  for (const [key, raw] of Object.entries(source)) {
-    if (!key.startsWith(DATAPLANE_S3_ENV_PREFIX) || typeof raw !== "string" || !raw) continue;
-
-    const suffix = key.slice(DATAPLANE_S3_ENV_PREFIX.length);
-    const separator = suffix.lastIndexOf("__");
-    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
-    if (!organizationId) continue;
-
-    let decoded: unknown;
-    try {
-      decoded = JSON.parse(raw);
-    } catch {
-      configLogger().warn(
-        { envVar: key },
-        "Ignoring a private S3 route variable that is not valid JSON",
-      );
-      continue;
-    }
-
-    const parsed = dataplaneS3RouteSchema.safeParse(decoded);
-    if (!parsed.success) {
-      configLogger().warn(
-        { envVar: key },
-        "Ignoring a private S3 route variable that is missing required fields",
-      );
-      continue;
-    }
-
-    if (routes.has(organizationId)) {
-      throw new Error(
-        `Duplicate private S3 config for organization "${organizationId}": "${key}" conflicts with an earlier definition.`,
-      );
-    }
-    routes.set(organizationId, parsed.data);
+  const table = parseDataplaneS3RoutingTable(source);
+  for (const skipped of table.skipped) {
+    configLogger().warn(
+      { envVar: skipped.envVar, reason: skipped.reason },
+      "Ignoring a malformed private S3 route variable",
+    );
   }
-
-  return routes;
+  return table.routes;
 }

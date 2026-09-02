@@ -118,6 +118,7 @@
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@slack/webhook": "^7.1.0",
+    "ioredis": "5.10.1",
     "nanoid": "^6.0.0",
     "node-fetch-cache": "^5.1.0",
     "posthog-node": "^5.39.4",

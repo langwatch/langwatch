@@ -32,12 +32,6 @@
  * asks it: `storedObjects.headById` carries its own `projectId`, and the
  * id-only path is the `/api/files` REST family's.
  *
- * `azure-blob` — the Azure byte driver is not registered here. A deployment
- * whose objects live in Azure gets the registry's own refusal, naming the
- * scheme, rather than a wrong answer. Recorded rather than defaulted: reading
- * an `azure-blob://` URI through the S3 driver would answer "the file is gone"
- * about a file that is not.
- *
  * `getMonitorPerformance` — the seven-day trend reads the evaluation RUN
  * stack, which has not moved out of the platform application. It refuses by
  * name rather than answering `[]`: an empty trend reads as "your monitors
@@ -78,10 +72,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { EvaluatorReplicationApi, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import {
-  monitorPreconditionsSchema,
-  type MonitorService,
-} from "@langwatch/monitor-contract";
+import { monitorPreconditionsSchema, type MonitorService } from "@langwatch/monitor-contract";
 import { MonitorApp, type MonitorTrpcPorts } from "@langwatch/monitor-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -92,8 +83,10 @@ import {
   StoredObjectService,
 } from "@langwatch/stored-object-contract";
 import {
+  AzureBlobStoredObjectDriver,
   LocalFilesystemStoredObjectDriver,
   PrometheusStoredObjectsTelemetry,
+  resolveAzureCredentials,
   S3StoredObjectDriver,
   StoredObjectApp,
   StoredObjectDestinationPolicy,
@@ -107,10 +100,7 @@ import {
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
-import type {
-  ApiTrpcFeatureApplication,
-  ApiTrpcPortsContext,
-} from "../app-trpc/app-trpc.context";
+import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { AppProductInfraTrpcPorts } from "../app-trpc/app-trpc.product-infra";
 import type { ApiStoredObjectsConfigResolution } from "../platform/config/api.config";
 
@@ -195,7 +185,7 @@ export type ApiProductInfraCollaborators = Readonly<{
 
 /** What this half could not compose, and therefore which answer degrades. */
 export abstract class ApiProductInfraAbsenceReport {
-  abstract absent(capability: "clickhouse" | "azure-blob" | "plans" | "evaluation-runs"): void;
+  abstract absent(capability: "clickhouse" | "plans" | "evaluation-runs"): void;
 }
 
 /** Composes the product-infrastructure half from this process's graph. */
@@ -251,7 +241,7 @@ export class LoggedApiProductInfraAbsence extends ApiProductInfraAbsenceReport {
     super();
   }
 
-  absent(capability: "clickhouse" | "azure-blob" | "plans" | "evaluation-runs"): void {
+  absent(capability: "clickhouse" | "plans" | "evaluation-runs"): void {
     this.logger.warn({ capability }, CONSEQUENCE[capability]);
   }
 }
@@ -259,8 +249,6 @@ export class LoggedApiProductInfraAbsence extends ApiProductInfraAbsenceReport {
 const CONSEQUENCE = {
   clickhouse:
     "API process composed no ClickHouse connection: every stored-object probe refuses by name rather than reporting a file missing that is not.",
-  "azure-blob":
-    "API process registered no Azure Blob driver: a stored object addressed by an azure-blob:// URI refuses by scheme rather than being reported as gone.",
   plans:
     "API process composed no plan provider: every retention write refuses by name, because a plan gate that cannot read a plan must not pass.",
   "evaluation-runs":
@@ -285,15 +273,16 @@ function composeStoredObjects(
 ): { app: StoredObjectApp; close(): Promise<void> } {
   const { storage } = options;
   if (!options.resolveClickHouseClient) options.report?.absent("clickhouse");
-  if (storage.backend === "azure") options.report?.absent("azure-blob");
 
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new ApiNoOutboundProxy() });
   const targets = ApiStoredObjectS3Targets.create(options.prisma, storage);
   const destinations = StoredObjectDestinationPolicy.create({
     selection: {
-      // An `azure` selection with no driver registered still resolves its
-      // destination, so a write refuses at the byte layer naming the scheme
-      // rather than silently landing in the shared S3 bucket.
+      // The `azure` selection now has a driver behind it, so a write to an
+      // Azure destination reaches Azure Blob rather than refusing at the byte
+      // layer. It is still a SELECTION and not a fallback: a deployment that
+      // named `azure` resolves to Azure, and a misconfigured Azure block
+      // refuses by name rather than landing in the shared S3 bucket.
       backend: storage.backend === "azure" ? "azure" : "s3",
       ...(storage.s3.bucket ? { globalS3Bucket: storage.s3.bucket } : {}),
       localFilesystemRoot: storage.localFilesystemRoot ?? DEFAULT_LOCAL_FILESYSTEM_ROOT,
@@ -313,6 +302,20 @@ function composeStoredObjects(
           policy: { build: (input) => aws.build(input) },
         }),
         file: LocalFilesystemStoredObjectDriver.create(),
+        // A FACTORY rather than a driver, which is the registry's own Azure
+        // policy: a deployment that never reads an `azure-blob://` URI never
+        // resolves credentials, so an install with no Azure block configured
+        // is not made to fail at boot over a backend it does not use. The
+        // resolver's `purpose: "read"` is what lets an operator who migrated
+        // OFF Azure keep reading what was written before.
+        "azure-blob": () =>
+          AzureBlobStoredObjectDriver.create(
+            resolveAzureCredentials({
+              config: storage.azure,
+              purpose: "read",
+              identity: storage.azure.identity,
+            }),
+          ),
       }),
     mintStorageUri: async ({ projectId, sha256 }) =>
       mintStoredObjectUri({
@@ -461,9 +464,7 @@ class ApiStoredObjectsClickHouse extends StoredObjectsClickHousePort {
     return new ApiStoredObjectsClickHouse(resolveClient);
   }
 
-  private constructor(
-    private readonly resolve: ((projectId: string) => Promise<unknown>) | null,
-  ) {
+  private constructor(private readonly resolve: ((projectId: string) => Promise<unknown>) | null) {
     super();
   }
 
@@ -596,12 +597,10 @@ function composeRetentionPolicy(
   });
 
   return {
-    assertCanWriteScope: (ctx, scope) =>
-      policy.assertCanWriteScope({ actor: actorOf(ctx), scope }),
+    assertCanWriteScope: (ctx, scope) => policy.assertCanWriteScope({ actor: actorOf(ctx), scope }),
     assertWriteAllowed: (ctx, scope, retentionDays) =>
       policy.assertWriteAllowed({ actor: actorOf(ctx), scope, retentionDays }),
-    assertCanDisableRetention: (ctx) =>
-      policy.assertCanDisableRetention({ actor: actorOf(ctx) }),
+    assertCanDisableRetention: (ctx) => policy.assertCanDisableRetention({ actor: actorOf(ctx) }),
     assertPlanForScope: (ctx, scope) => policy.assertPlanForScope({ actor: actorOf(ctx), scope }),
     assertPlanForProject: (ctx, projectId) =>
       policy.assertPlanForProject({ actor: actorOf(ctx), projectId }),
@@ -654,10 +653,7 @@ class ApiDataRetentionPermissions extends DataRetentionPermissionsPort {
     super();
   }
 
-  canManageOrganization(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.authz.hasPermission({
       userId: input.userId,
       permission: "organization:manage",
@@ -792,9 +788,10 @@ class ApiDataRetentionAdministrators extends DataRetentionAdministratorPort {
 // Monitors
 // ---------------------------------------------------------------------------
 
-function composeMonitors(
-  options: ApiProductInfraCollaboratorsOptions,
-): { app: MonitorApp; ports: MonitorTrpcPorts } {
+function composeMonitors(options: ApiProductInfraCollaboratorsOptions): {
+  app: MonitorApp;
+  ports: MonitorTrpcPorts;
+} {
   options.report?.absent("evaluation-runs");
 
   const app = MonitorApp.create({

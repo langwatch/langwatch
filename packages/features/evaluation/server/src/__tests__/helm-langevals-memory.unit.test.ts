@@ -189,14 +189,11 @@ describe("Helm sizing for the evaluations service", () => {
     );
 
     /** @scenario "The evaluations service asks for at least what it uses at rest" */
-    it.each(SMALL_PROFILES)(
-      "requests at least the resting footprint in %s",
-      (profile) => {
-        const { request } = langevalsMemory(profile);
+    it.each(SMALL_PROFILES)("requests at least the resting footprint in %s", (profile) => {
+      const { request } = langevalsMemory(profile);
 
-        expect(request).toBeGreaterThanOrEqual(RESTING_MIB);
-      },
-    );
+      expect(request).toBeGreaterThanOrEqual(RESTING_MIB);
+    });
 
     /** @scenario "Shrinking the footprint shrinks the reservation, not the ceiling" */
     it.each(SMALL_PROFILES)(
@@ -214,12 +211,9 @@ describe("Helm sizing for the evaluations service", () => {
 
   describe("when the sizing page quotes a profile's figures", () => {
     /** @scenario "The sizing documentation quotes the profile it is describing" */
-    it.each(DOCUMENTED_PROFILES)(
-      "matches $values under $heading",
-      ({ heading, values }) => {
-        expect(documentedLangevalsMemory(heading)).toEqual(langevalsMemory(values));
-      },
-    );
+    it.each(DOCUMENTED_PROFILES)("matches $values under $heading", ({ heading, values }) => {
+      expect(documentedLangevalsMemory(heading)).toEqual(langevalsMemory(values));
+    });
   });
 
   describe("when no profile is layered on top", () => {

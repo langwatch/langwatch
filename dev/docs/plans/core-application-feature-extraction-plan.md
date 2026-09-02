@@ -6120,11 +6120,10 @@ delete.
 
 ## The gateway spend producer and the webhook platform, 2026-09-03
 
-The slice above left four gateway routes mounted and refusing, and a fifth
-answering a customer that their webhook endpoint could not be found. All four
-now serve, and the fifth reaches the real endpoint registry. Nothing moved out
-of `platform/app` this pass — every module was already in a package — so this
-is composition alone.
+The slice above left five gateway routes mounted and refusing by name: the
+spend-command ingest, the three realtime-session routes, and the billing
+replay. All five now serve. Nothing moved out of `platform/app` this pass —
+every module was already in a package — so this is composition alone.
 
 ### What was composed
 
@@ -6209,8 +6208,8 @@ No new configuration. The three leaves the previous slice added
 `LW_SPEND_SETTLEMENT_GRACE_MS`) were never added to
 `api.config.unit.test.ts`'s exhaustive `toEqual`, which had been red at HEAD
 for that reason plus five other lanes' leaves; all eight scalars are now
-declared there. The `storedObjects.azure` block still missing from it is the
-stored-object lane's in-flight leaf.
+declared there, and the stored-object lane closed the ninth
+(`storedObjects.azure`) in the same window. That test is green again.
 
 `api-production.composition.unit.test.ts`'s Prisma double gained `$executeRaw`,
 `$queryRaw` and `$transaction` as FUNCTIONS. The durable process store refuses a
@@ -6232,6 +6231,26 @@ Three suites, sixteen cases:
   alone degrades without ClickHouse, no cipher means no platform, and the spend
   family's ports read these rather than the refusing registry.
 
+Three scenarios were added to `specs/ai-gateway/billing-spend-events.feature`,
+under the Rule that already says a command the control plane accepted is never
+dropped in silence, and all three are bound: the door accepting and pricing a
+batch, the door refusing one with no registration, and the producer-only
+property. `check-feature-parity.ts` reports that file at **59/82**, up from
+56/79; the 23 that remain were unbound before this pass.
+
+**A recorded coverage loss, carried rather than closed.**
+`specs/ai-gateway/idempotency.feature` reports **5/14**. Its bindings used to
+live in `platform/app/src/app/api/gateway-platform/__tests__/` and
+`.../webhooks/__tests__/`, which the reachability sweep `379b452def` deleted
+before this lane touched the module; the moved ledger's own suite and the
+gateway integration case re-bound five, including the two that matter most —
+a retry replays the first response, and two concurrent requests under one key
+execute once. The nine still unbound are all `@integration @rest`: they assert
+response headers, per-family header acceptance and receipt expiry over the real
+Hono apps and a real Postgres, which is a REST-level slice over
+`createGatewayPlatformRestApp` and `createWebhookRestApp` rather than anything
+the ledger can answer for on its own.
+
 ### Gates
 
 `packages/api`: `tsc --noEmit` **0 errors** (it had six, all in this lane's
@@ -6244,17 +6263,15 @@ passing**.
 `packages/enterprise/features/webhook/server`: `tsc --noEmit` **0 errors**;
 `vitest run` **9 files / 90 tests, all passing**.
 `packages/enterprise/composition/api`: `tsc --noEmit` **0 errors**.
-`apps/api`: `tsc -p tsconfig.json --noEmit` — **0 errors in this lane's files**;
-the four in the tree are two other lanes' in-flight packages
-(`experiment/server` naming `slugify` and `@langwatch/config`, which are not
-linked, and `stored-object/server`'s Azure driver passing a `Uint8Array` to
-`fetch`). `tsc -p tsconfig.test.json --noEmit` — **0 errors in this lane's
-files**; the three that remain are `app-trpc.features.unit.test.ts`'s context
-drift, already recorded. `vitest run` — **768 tests, 4 failing, none in this
-lane's files**: two are `api.config.unit.test.ts`'s Azure block above, one is
-the org-group half's clustering scheduler, one is the organization-invitations
-door.
-`git diff --numstat -- platform/app`: **0 insertions on every row**, 144 rows.
+`apps/api`: `tsc -p tsconfig.json --noEmit` — **0 errors** (mid-pass it carried
+four from two other lanes' in-flight packages, `experiment/server` naming
+`slugify` and `@langwatch/config` and `stored-object/server`'s Azure driver
+passing a `Uint8Array` to `fetch`; both closed while this ran).
+`tsc -p tsconfig.test.json --noEmit` — **0 errors in this lane's files**; the
+three that remain are `app-trpc.features.unit.test.ts`'s context drift, already
+recorded. `vitest run` — **770 tests, 1 failing, not in this lane's files**:
+the org-group half's clustering scheduler.
+`git diff --numstat -- platform/app`: **0 insertions on every row**, 175 rows.
 
 
 ## REST wave 3c: the trace and evaluation verticals, 2026-09-02
@@ -7023,3 +7040,259 @@ the image proxy. Each waits on a different owner, and three of them
 which no lane in this wave may touch. `ops.ts` stays by the recorded ruling.
 The seven surviving `app/api/**` directories are ports of the platform
 `createAppRestFeatures` call and are unreachable only once that call is.
+
+## The tenant-data verticals: privacy, retention, Azure and the invitation half, 2026-09-03
+
+The last twelve `platform/app/src/server` subtrees this migration held for the
+data a tenant OWNS rather than the product it runs: `data-privacy`,
+`data-retention`, `stored-objects`, `invites`, `organizations`, `api-key`,
+`auth`, `scopes`, `agents`, `webhooks`, `evaluations` and `langevals`. Eight of
+the twelve were already empty when this lane resumed — earlier slices had moved
+the code and this lane found only the deletions and the tests still to place.
+Two absences that earlier lanes recorded by name are CLOSED here rather than
+carried: the invitation service and the Azure Blob driver.
+
+`platform/app/src/server` no longer holds any of the twelve.
+
+### Subtree → package
+
+| Subtree | Went to | Lines |
+| --- | --- | --- |
+| `data-privacy/**` (8 modules, 6 tests) | twins already stood in `@langwatch/data-privacy-contract` and `@langwatch/data-privacy-server`; 4 tests moved beside them, the rest deleted | 735 moved |
+| `stored-objects/azure-*` (3 modules, 5 tests) | `@langwatch/stored-object-server` `adapters/azure-blob{,-credentials,-token-provider}` + 4 tests | 2,937 |
+| `tasks/migrate-object-storage.*` + `objectStorageMigration` + `groupQueueMigrationAudit` (5 modules, 2 tests) | `apps/worker/src/tasks/migrate-object-storage.*` | 1,838 |
+| `langevals/stagedFetch.ts` | `@langwatch/topic-server` `adapters/langevals-staged-payload.adapter.ts` + a new staging port | 287 |
+| `data-retention/retentionPolicy.schema*` (1 module, 2 tests) | twin already in `@langwatch/data-retention-contract`; the schema suite moved beside it | 209 moved |
+| `evaluations/__tests__/**` (3 tests) | `@langwatch/evaluator-contract` (2) and `@langwatch/evaluation-server` (1) | 522 |
+| `stored-objects/__tests__/coerce-content-to-array` | `@langwatch/trace-server` `services/__tests__` | 136 |
+| `invites`, `organizations`, `api-key`, `auth`, `scopes`, `agents`, `webhooks` | already moved by earlier slices; nothing left to place | — |
+
+### The invitation absence, closed
+
+Recorded by the org-group tRPC lane and again by the organization REST mount:
+`InviteService` reached the licence-enforcement counts, the plan provider, the
+role service and the mailer, so eleven tRPC ports and three REST routes refused
+with `service_unavailable`. All four reaches have moved, and each arrived as
+something `apps/api` already holds:
+
+- the seat census is `PrismaUsageMembershipRepository` from
+  `@langwatch/entitlement-server` — the SAME reading the usage panel shows, so
+  a seat refused on an invitation and a seat counted on the usage card cannot
+  be two numbers;
+- the plan is the one every allowance banner reads;
+- the roles are `this.composedProductGroup.roles`, the service `role.*` and
+  `roleBinding.*` mount, which is why that field was exposed beside the
+  application in the first place;
+- the grant ledger is `this.composedAuthz.grants`.
+
+`composeApiOrganizationInvites` now returns `{ trpc, rest, buildInviteAcceptUrl }`
+and `ApiProductionComposition` composes it ONCE, right after the product-group
+half opens, holding it on `composedOrganizationInvites`. The tRPC half takes
+`.trpc`; the management REST family takes `.rest` and the link builder. One
+service behind both doors is the point: a provisioning tool that creates an
+invitation over REST and an administrator who lists them in the app must see
+one set of invitations, with one acceptance link each and one seat census
+behind them.
+
+`ApiOrganizationInvitePort` survives as the injection seam — a host that
+composes its own service still wins — and the org-group half keeps its own fold
+for a host that composes that half directly.
+
+The mail gateway stays a PORT and stays unfilled, and that is a supported state
+rather than a degradation: rendering a LangWatch message is react-email, which
+`frontend-boundary.unit.test.ts` exists to keep off a backend graph. An
+invitation is written either way, it carries its accept URL in the listing, and
+the caller is told `emailNotSent` so the screen can show the link to copy —
+byte for byte what the platform application did on a deployment with no
+`SENDGRID_API_KEY`.
+
+### The Azure Blob absence, closed
+
+Recorded by the product-infra lane: no Azure driver was registered, so a
+deployment whose objects live in Azure got the registry's refusal by scheme.
+The driver, the credential resolver and the token cache now live in
+`@langwatch/stored-object-server/adapters`, and
+`api-trpc-collaborators.product-infra.composition.ts` registers the driver as
+the registry's lazy `azure-blob` FACTORY. An install that never reads an
+`azure-blob://` URI never resolves credentials, so a deployment with no Azure
+block is not made to fail at boot over a backend it does not use; the
+resolver's `purpose: "read"` arm is what lets an operator who migrated OFF
+Azure keep reading what was written before. `LoggedApiProductInfraAbsence` lost
+its `azure-blob` arm.
+
+Three env reads were moved to the composition root at the seam, because a
+feature package reads no environment:
+
+- `resolveAzureCredentials` took `env.AZURE_BLOB_*` and
+  `env.STORED_OBJECTS_BACKEND`; it now takes an `AzureBlobCredentialsConfig`
+  record, and `api.config.ts` reads the seven variables plus the three the AKS
+  azure-workload-identity webhook injects.
+- the plaintext-endpoint escape hatch read
+  `process.env.AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS` and
+  `NODE_ENV` from inside the guard; the composition root now resolves it to a
+  boolean, and it is `false` in production by construction rather than by a
+  check the guard could be called without.
+- the token provider read `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and
+  `AZURE_FEDERATED_TOKEN_FILE` off process globals. They now travel ON the
+  credential, which is exactly what the module's own #6088 caveat asked for:
+  the cache key varies with the identity, so two identities can no longer share
+  one cached bearer token. `mode` is still not part of the key, and no
+  composition resolves two modes against one identity.
+
+### Named absences and recorded losses
+
+**The Redis-shared data-privacy cache, and its version gate.** The platform
+`DataPrivacyPolicyCache` was a Redis `TtlCache` shared by every pod across a
+rolling deploy, with a `reviveCached` gate that defaulted collections a blob
+written by an older pod could be missing — the read-back that dropped span
+processing in production on 2026-07-31. `@langwatch/data-privacy-server`'s
+cache is a per-process in-memory `Map` with a TTL, already wired into two
+services. On that design the hazard cannot occur — a value is written and read
+by one process version — so the four cases guarding it have no subject and the
+suite was deleted rather than rewritten against a cache that cannot fail that
+way. **The loss is throughput, not correctness:** with N ingestion pods the
+PROJECT → DEPARTMENT → TEAM → ORGANIZATION cascade is now walked N times per
+TTL window instead of once. Nobody has measured that.
+
+**The `LANGWATCH_DEFAULT_RETENTION_DAYS` production refusal.** The platform
+resolver refused the variable outright outside development and test — "lowering
+it would silently expire customer data" — and refused a value that was not a
+whole number of weeks or that would wrap the `UInt16` retention column. The
+contract now reads no environment and exposes
+`platformDefaultRetentionDaysSchema` for a boot-time reader to validate
+against; `apps/worker`'s reader deliberately does the opposite on a bad value
+("unparseable is the default rather than a refusal … a typo must not stop the
+fleet folding"). **No process refuses the variable in production any more.**
+Four of the eight platform cases were rebound to the schema (whole weeks, the
+ceiling, zero and negative); the production refusal and the
+unrecognized-environment refusal are gone and have no owner.
+
+**The staged-payload upload, as a port.** `stagedFetch` reached
+`~/server/s3/stagePayload`, which a sibling lane deleted from `platform/app`
+with no packaged twin. The moved adapter takes `LangevalsPayloadStagingPort`
+instead, and no process composes one yet: a deployment that configures
+`LANGEVALS_STAGING_THRESHOLD_BYTES` and composes no staging now gets
+`LangevalsPayloadStagingUnavailableError` naming the gap rather than posting a
+payload the Lambda would reject with a 413. Below the threshold — every
+self-hosted install — nothing changes.
+
+**The object-storage migration's composed entrypoint.** `execute()` read
+`~/env.mjs`, `~/server/db`, `~/server/dataplane-s3` and
+`~/server/outboundProxy`. Three have equivalents `apps/worker` already
+composes; the fourth does not — the migration's inventory reads live
+stored-object rows out of ClickHouse through `StoredObjectsRepository`, and the
+worker composes no stored-object ClickHouse connection. Only the API does. The
+runner is absent and the reason is on the module, in the same shape
+`backfill-dataset-content-to-object-storage.task.ts` already uses; everything
+below it takes its collaborators as parameters, so a runner is a few lines the
+moment a repository is composable there. Defaulting it would have been worse
+than absent: an inventory over a connection that resolved the wrong tenant
+would report a project's objects as already migrated and let `finalize` flip a
+cutover over rows it never copied.
+
+**The `platform/app/package.json` zod-generation guard.** The first block of
+`zod-source-of-truth.unit.test.ts` asserted that `start:prepare:files` no longer
+runs `types:zod:generate`, that `ts-to-zod` is in neither dependency list, and
+that two config files are absent — all of `platform/app`, which is being
+deleted. It was dropped; the other six blocks moved whole into
+`@langwatch/evaluator-contract`.
+
+### Judgment calls
+
+- **`applyOtlpSpanContentDrop.unit.test.ts` deleted rather than moved.** The
+  packaged `otlp-span-content-drop.service.unit.test.ts` is a rewrite covering
+  14 cases against the platform file's 9, and every behaviour class in the 9
+  appears in the 14. Two platform cases name attributes the packaged file
+  covers by category rather than by key (`gen_ai.prompt`, the tool-call
+  argument keys); that specificity is not preserved.
+- **`dropKeyCatalog`'s four free functions became four methods.** The packaged
+  subject is `ContentDropPolicyService`, so the moved suite calls
+  `service.droppedKeys(...)` where it called `computeDroppedKeys(...)`. The
+  assertions are unchanged.
+- **The rich `resolveDataPrivacy` suite landed beside the thin one** as
+  `data-privacy.resolution.cascade.unit.test.ts` rather than replacing
+  `data-privacy.resolution.unit.test.ts`. The 51-line file is another slice's
+  and deleting it is not this lane's call; the 335-line one is a strict
+  superset and both pass.
+- **The Azure helm guards went to `@langwatch/stored-object-server`**, not to
+  `charts/`, following the precedent
+  `packages/features/auth/server/.../helm-auth-base-url.unit.test.ts` already
+  set. Their repo-root resolution was changed from counting `..` off
+  `process.cwd()` to walking up for `charts/langwatch` — the count was correct
+  for exactly one package directory. Two source-reading guards inside them were
+  repointed at the moved files (`stored-objects.service.ts` →
+  `packages/features/stored-object/server/src/services/`, migration 00023 →
+  `apps/api/src/tasks/clickhouse-migrate/migrations/`); left alone they would
+  have thrown ENOENT and taken the whole suite with them.
+- **`groupQueueMigrationAudit.ts` travelled with the migration** even though
+  the leftovers-B split names `tasks/` generally. Its only consumer is
+  `migrate-object-storage.redis.adapter.ts`; leaving it behind would have left
+  a moved module importing a platform file.
+- **`stagedLangevalsFetch`, the free env-reading entrypoint, was dropped.**
+  Nothing imported it — every caller went through
+  `LangevalsStagedPayloadClient`, which already took its configuration as a
+  value.
+- **`safeUrlHost` was inlined** into the moved adapter. It was three lines in
+  the `server/s3` module a sibling lane deleted, and it is what keeps a
+  presigned URL's signature out of the log line.
+- **`AzureBlobDriver.signedFetch`'s `body` is `Uint8Array<ArrayBuffer>`, not
+  `BodyInit`.** A process compiled without the DOM lib has no name for
+  `BodyInit`, and `ArrayBufferLike` admits a `SharedArrayBuffer` that `fetch`
+  refuses. Every caller passes exactly this shape.
+
+### Coverage
+
+- `packages/features/data-privacy/contract/src/__tests__/data-privacy.{visibility,config-schema,resolution.cascade}.unit.test.ts`
+  — the audience check a `restrict` category is read through, the config
+  schema's entity and level rules, and the whole
+  PROJECT → DEPARTMENT → TEAM → ORGANIZATION cascade including the
+  personal-project narrowing and the PII exception-pattern union.
+- `packages/features/data-privacy/server/src/services/__tests__/content-drop-policy.service.unit.test.ts`
+  — which keys a `drop` category covers, which custom patterns compile, and the
+  wildcard strip reporting the keys it removed.
+- `packages/features/stored-object/server/src/adapters/__tests__/azure-blob-token-provider.unit.test.ts`
+  (13) — rewritten so the identity varies by CREDENTIAL rather than by an
+  environment variable, which is what now proves two identities never share a
+  cached token.
+- `apps/api/src/app/__tests__/api-trpc-collaborators.product-infra.integration.test.ts`
+  (+2) — an `azure-blob://` object probed end to end with `fetch` stubbed: the
+  request goes to the configured account endpoint, as a `HEAD`, under a
+  `SharedKey` signature, and the probe answers `available`. And the same object
+  on a deployment with no Azure block refusing rather than reporting the file
+  missing — the two answers lead an operator to opposite actions.
+- `apps/api/src/app/__tests__/api-trpc-collaborators.org-group.integration.test.ts`
+  (+2) — with the grant ledger and role service composed, the pending-invite
+  read answers FROM THE ROW rather than merely stopping refusing, and the
+  acceptance link is built on this deployment's own origin.
+- `apps/api/src/app-rest/__tests__/api-rest.product-families.integration.test.ts`
+  (+1) — `GET /api/organization/latest/invites` reaching the injected service
+  and returning what it holds. The refusal case beside it is unchanged.
+
+### Gates
+
+- `apps/api` `tsc --noEmit`: CLEAN.
+- Package `tsc --noEmit`: clean for `@langwatch/data-privacy-{contract,server}`,
+  `@langwatch/data-retention-contract`, `@langwatch/stored-object-server`,
+  `@langwatch/topic-server`, `@langwatch/evaluator-contract`,
+  `@langwatch/organization-server`, `@langwatch/evaluation-server`,
+  `@langwatch/worker`.
+- Package vitest: data-privacy contract 49, data-privacy server 136,
+  data-retention contract 31, stored-object server 124, topic server 158,
+  evaluator contract 19, organization server 185, worker `src/tasks` 17,
+  `@langwatch/evaluation-server` helm suite 21,
+  `@langwatch/trace-server` content-array 18 — all green.
+- `@langwatch/trace-server` `tsc` reports 4 errors, all in two untracked files
+  under `transport/api-trpc/__tests__/trace-read-mappers.*` that belong to the
+  trace REST lane; none is in a file this lane touched.
+- `apps/api` vitest, whole suite: 88 files / 770 tests, 767 pass. The one
+  failure is another lane's — the topic-clustering refusal case in
+  `api-trpc-collaborators.org-group.integration.test.ts`, which now reads "An
+  unknown error occurred" because `api.application.ts` was rewired to the
+  untracked `app-trpc/app-trpc.error-formatter.ts`. No assertion in a file this
+  lane touched fails.
+- `git diff --numstat -- platform/app`: **0 insertions** on every row, 166 rows.
+- `platform/app/src/server` no longer contains `data-privacy/`,
+  `data-retention/`, `stored-objects/`, `invites/`, `organizations/`,
+  `api-key/`, `auth/`, `scopes/`, `agents/`, `webhooks/`, `evaluations/` or
+  `langevals/`.
+

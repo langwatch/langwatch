@@ -88,6 +88,11 @@ const OTHER_TEAM_ID = "team-2";
 const ORGANIZATION_ID = "organization-1";
 const OBJECT_ID = "so_present";
 const MISSING_OBJECT_ID = "so_bytes_gone";
+const AZURE_OBJECT_ID = "so_on_azure";
+const AZURE_ACCOUNT = "lwacct";
+const AZURE_CONTAINER = "stored-objects";
+const AZURE_ENDPOINT = "https://lwacct.blob.core.windows.test";
+const AZURE_OBJECT_URI = `azure-blob://${AZURE_ACCOUNT}/${AZURE_CONTAINER}/${PROJECT_ID}/abc123`;
 
 /** A directory holding one object's real bytes, and one address with none. */
 function testObjectStorage() {
@@ -223,6 +228,22 @@ function testClickHouse(storage: ReturnType<typeof testObjectStorage>) {
         size_bytes: 5,
         sha256: "deadbeef",
         storage_uri: storage.presentUri,
+        created_at: "2026-09-01T00:00:00.000Z",
+        inserted_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    [
+      AZURE_OBJECT_ID,
+      {
+        id: AZURE_OBJECT_ID,
+        project_id: PROJECT_ID,
+        purpose: "trace_content",
+        owner_kind: "span",
+        owner_id: "span-3",
+        media_type: "image/jpeg",
+        size_bytes: 12,
+        sha256: "0badcafe",
+        storage_uri: AZURE_OBJECT_URI,
         created_at: "2026-09-01T00:00:00.000Z",
         inserted_at: "2026-09-01T00:00:00.000Z",
       },
@@ -421,6 +442,51 @@ function testStorageConfig(): ApiStoredObjectsConfigResolution {
       secretAccessKey: undefined,
       sessionToken: undefined,
     },
+    // No Azure block either. The registry registers the Azure driver as a
+    // FACTORY, so an unconfigured deployment never resolves these — which is
+    // exactly what this stub proves by being empty and still composing.
+    azure: emptyAzureConfig(),
+    routes: new Map(),
+  };
+}
+
+function emptyAzureConfig(): ApiStoredObjectsConfigResolution["azure"] {
+  return {
+    backend: undefined,
+    authMode: undefined,
+    accountName: undefined,
+    accountKey: undefined,
+    container: undefined,
+    endpoint: undefined,
+    authorityHost: undefined,
+    tokenAudience: undefined,
+    allowInsecureTokenEndpointForTests: false,
+    identity: {},
+  };
+}
+
+/** A deployment whose bytes live in an Azure Blob account, shared-key. */
+function azureStorageConfig(): ApiStoredObjectsConfigResolution {
+  return {
+    backend: "azure",
+    localFilesystemRoot: undefined,
+    s3: {
+      bucket: undefined,
+      endpoint: undefined,
+      region: undefined,
+      accessKeyId: undefined,
+      secretAccessKey: undefined,
+      sessionToken: undefined,
+    },
+    azure: {
+      ...emptyAzureConfig(),
+      backend: "azure",
+      authMode: "sharedKey",
+      accountName: AZURE_ACCOUNT,
+      accountKey: Buffer.from("an-account-key").toString("base64"),
+      container: AZURE_CONTAINER,
+      endpoint: AZURE_ENDPOINT,
+    },
     routes: new Map(),
   };
 }
@@ -428,11 +494,14 @@ function testStorageConfig(): ApiStoredObjectsConfigResolution {
 /** The organization's plan, as every retention gate reads it. */
 const PAID_PLAN = { free: false, type: "LAUNCH" } as never;
 
-function composeHalf(options: { plans?: undefined } = {}) {
+function composeHalf(
+  options: { plans?: undefined; storage?: ApiStoredObjectsConfigResolution } = {},
+) {
   const storage = testObjectStorage();
   const prisma = testPrisma();
   const authz = testAuthz();
   const clickHouse = testClickHouse(storage);
+  const { storage: storageConfig, ...rest } = options;
 
   const half = composeApiProductInfraCollaborators({
     prisma: prisma.client,
@@ -453,15 +522,17 @@ function composeHalf(options: { plans?: undefined } = {}) {
     } as never,
     ops: { isAdmin: () => false } as never,
     resolveClickHouseClient: clickHouse.resolveClient,
-    storage: testStorageConfig(),
+    storage: storageConfig ?? testStorageConfig(),
     plans: { getActivePlan: async () => PAID_PLAN },
-    ...options,
+    ...rest,
   });
 
   return { half, storage, prisma, authz, clickHouse };
 }
 
-function composeApplication(options: { plans?: undefined } = {}) {
+function composeApplication(
+  options: { plans?: undefined; storage?: ApiStoredObjectsConfigResolution } = {},
+) {
   const composed = composeHalf(options);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
@@ -536,6 +607,72 @@ describe("given an API process composed with the product-infrastructure half", (
         expect(body).toMatchObject({
           result: { data: { json: { status: "missing", mediaType: "audio/wav" } } },
         });
+      });
+    });
+
+    describe("and this deployment keeps its bytes in Azure Blob", () => {
+      /**
+       * The registry registers the Azure driver as a FACTORY, so nothing is
+       * constructed until an `azure-blob://` URI is actually read. What this
+       * pins is that reading one reaches AZURE — the request goes to the
+       * configured account endpoint under a shared-key signature — rather than
+       * being refused by scheme or answered by the S3 driver, which would
+       * report a file gone that is not.
+       */
+      it("probes the bytes through the Azure driver, at the configured account", async () => {
+        const requests: Array<{ url: string; method: string; authorization: string }> = [];
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url: string, init: { method: string; headers: Record<string, string> }) => {
+            requests.push({
+              url: String(url),
+              method: init.method,
+              authorization: init.headers.Authorization ?? "",
+            });
+            return new Response(null, { status: 200, headers: { "content-length": "12" } });
+          }),
+        );
+        try {
+          const { application } = composeApplication({ storage: azureStorageConfig() });
+
+          const { status, body } = await callTrpc(application, "storedObjects.headById", {
+            projectId: PROJECT_ID,
+            id: AZURE_OBJECT_ID,
+          });
+
+          expect(status).toBe(200);
+          expect(body).toMatchObject({
+            result: { data: { json: { status: "available", mediaType: "image/jpeg" } } },
+          });
+          expect(requests).toHaveLength(1);
+          expect(requests[0]?.url).toBe(
+            `${AZURE_ENDPOINT}/${AZURE_CONTAINER}/${PROJECT_ID}/abc123`,
+          );
+          expect(requests[0]?.method).toBe("HEAD");
+          expect(requests[0]?.authorization).toContain(`SharedKey ${AZURE_ACCOUNT}:`);
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+    });
+
+    describe("and the object is on Azure but this deployment configured no account", () => {
+      /**
+       * The credential resolver refuses BY NAME rather than the read reporting
+       * the object gone. A deployment that lost its Azure configuration has
+       * files it cannot reach, not files that were deleted, and the two answers
+       * lead an operator to opposite actions.
+       */
+      it("refuses rather than reporting the file missing", async () => {
+        const { application } = composeApplication();
+
+        const { body } = await callTrpc(application, "storedObjects.headById", {
+          projectId: PROJECT_ID,
+          id: AZURE_OBJECT_ID,
+        });
+
+        expect(JSON.stringify(body)).not.toContain('"status":"missing"');
+        expect(JSON.stringify(body)).toContain("error");
       });
     });
 

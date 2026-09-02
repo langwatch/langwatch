@@ -74,6 +74,19 @@ export {
 } from "./ports/topic-clustering-clickhouse.port";
 export { TopicClusteringCommandsPort } from "./ports/topic-clustering-commands.port";
 export {
+  LangevalsPayloadStagingPort,
+  STAGED_PAYLOAD_HEADER,
+  type StagedLangevalsPayload,
+} from "./ports/langevals-payload-staging.port";
+export {
+  LangevalsPayloadStagingUnavailableError,
+  LangevalsStagedPayloadClient,
+  PayloadTooLargeError,
+  type LangevalsCallKind,
+  type LangevalsStagedPayloadConfig,
+  type StagedFetchOptions,
+} from "./adapters/langevals-staged-payload.adapter";
+export {
   TopicClusteringLangevalsPort,
   type TopicClusteringLangevalsKind,
   type TopicClusteringLangevalsResponse,

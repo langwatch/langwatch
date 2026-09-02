@@ -25,12 +25,16 @@
  *
  * ## The named absences
  *
- * `ApiOrganizationInvitePort` — the whole invitation half of `organization.*`.
- * The invitation service still lives in `platform/app` and reaches four
- * verticals that have not moved (the licence-enforcement repository, the plan
- * provider, the mailer and the role service), so it is a port rather than a
- * copy. Absent, the twelve invitation ports refuse BY NAME: an empty invite
- * list would tell an administrator nobody had been invited.
+ * `ApiOrganizationInvitePort` — the injection seam for the invitation half of
+ * `organization.*`, and no longer an absence. The invitation service moved
+ * into `@langwatch/organization-server` and its four reaches all resolve here:
+ * the licence-enforcement counts through `@langwatch/entitlement-server`'s
+ * membership repository, the plan provider this half already holds, the role
+ * service `role.*` mounts, and the mailer as a port
+ * (`api-organization-invites.composition.ts`). An injected port still wins; a
+ * process that injects none composes one, and only a process with no grant
+ * ledger or no role service still refuses BY NAME — an empty invite list would
+ * tell an administrator nobody had been invited.
  *
  * `ApiViewerProtectionsPort` — the caller's read-time redactions for one
  * project. It is the SAME resolution `ApiTraceReadStackPort.getViewerProtections`
@@ -68,6 +72,7 @@ import {
 import {
   declareAuthzMiddleware,
   type AuthzBindingForSynthesis,
+  type AuthzGrantsService,
   type AuthzPermission,
   type AuthzService,
 } from "@langwatch/authz-contract";
@@ -112,6 +117,7 @@ import {
 } from "@langwatch/organization-server";
 import { RoleBindingScopeType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { RoleService } from "@langwatch/role-contract";
 import { ProjectApp, type ProjectTrpcContext } from "@langwatch/project-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -124,6 +130,7 @@ import type { AnyAppOrgGroupTrpcPorts } from "../app-trpc/app-trpc.org-group";
 import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
 import type { ProjectTrpcChecks, ProjectTrpcMountPorts } from "../features/project/project-trpc.mount";
 import { composeApiAutomationApp } from "./api-automation.composition";
+import { composeApiOrganizationInvites } from "./api-organization-invites.composition";
 import { signUpDataSchema } from "./api-trpc-collaborators.identity.composition";
 
 /**
@@ -251,6 +258,18 @@ export type ApiOrgGroupCollaboratorsOptions = Readonly<{
   prisma: PrismaClient;
   /** The permission service this process authorizes every other surface with. */
   authz: AuthzService;
+  /**
+   * The grant ledger an accepted invitation's role bindings are written
+   * through. Absent, the invitation half is not composed here and the
+   * injected port — or the refusal — stands.
+   */
+  authzGrants?: AuthzGrantsService | undefined;
+  /**
+   * The SAME role service `role.*` and `roleBinding.*` mount. An invitation
+   * validated against a second copy of assignability would be accepted on
+   * write and silently dropped on acceptance.
+   */
+  roles?: RoleService | undefined;
   /** The organization directory the tenancy graph composed. */
   organizations: OrganizationService;
   /** The project directory the tenancy graph composed. */
@@ -420,7 +439,21 @@ function organizationPorts(
   logger: Logger,
 ): OrganizationTrpcPorts<typeof signUpDataSchema> {
   const { prisma, authz } = options;
-  const invites = options.invites;
+  // Injected wins, so a host that composed its own invitation service keeps
+  // it. Otherwise this process composes one over its own graph, and only a
+  // process missing the grant ledger or the role service still refuses.
+  const invites =
+    options.invites ??
+    (options.authzGrants && options.roles
+      ? composeApiOrganizationInvites({
+          prisma,
+          grants: options.authzGrants,
+          roles: options.roles,
+          plans: options.plans,
+          rateLimit: (input) => options.rateLimit(input),
+          baseHost: options.baseHost,
+        }).trpc
+      : undefined);
   const refuseInvitations = (what: string): Promise<never> =>
     Promise.reject(
       new ApiCapabilityUnavailableError(`invitation service, so it cannot ${what}`),

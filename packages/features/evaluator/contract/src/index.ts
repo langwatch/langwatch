@@ -22,3 +22,5 @@ export type {
   Money,
   SingleEvaluationResult,
 } from "./evaluators.generated";
+
+export * from "./evaluator-mappings";

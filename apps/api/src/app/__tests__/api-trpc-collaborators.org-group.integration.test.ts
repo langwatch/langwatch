@@ -92,7 +92,23 @@ function testPrisma() {
     trigger: { findMany: vi.fn(async () => []) },
     triggerSent: { findMany: vi.fn(async () => []) },
     emailSuppression: { findMany: vi.fn(async () => []) },
-    organizationInvite: { findUnique: vi.fn(async () => null) },
+    organizationInvite: {
+      findUnique: vi.fn(async () => null),
+      findMany: vi.fn(async () => [
+        {
+          id: "invite-1",
+          organizationId: ORGANIZATION_ID,
+          email: "newcomer@acme.test",
+          inviteCode: "code-1",
+          role: "MEMBER",
+          status: "PENDING",
+          teamIds: "",
+          expiration: new Date("2099-01-01T00:00:00.000Z"),
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          requestedByUser: null,
+        },
+      ]),
+    },
     organizationUser: { findUnique: vi.fn(async () => null) },
     team: { findUnique: vi.fn(async () => ({ organizationId: ORGANIZATION_ID })) },
     teamUser: { findMany: vi.fn(async () => []) },
@@ -246,7 +262,14 @@ function testOrganizationApp() {
   };
 }
 
-function composeApplication() {
+/**
+ * The two collaborators the invitation half is composed over.
+ *
+ * Absent, the half is not composed and the eleven invitation ports refuse by
+ * name — the case below the answering one. Present, this process builds the
+ * service itself, which is what the injected port used to stand in for.
+ */
+function composeApplication(options: { withInvitations?: boolean } = {}) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const organizations = testOrganizationApp();
@@ -282,6 +305,15 @@ function composeApplication() {
     // No ClickHouse: a coding-agent session is a projection there, so the
     // package's own null repositories answer emptily.
     codingAgentClickHouse: null,
+    ...(options.withInvitations
+      ? {
+          authzGrants: {
+            grant: vi.fn(async () => undefined),
+            revoke: vi.fn(async () => undefined),
+          } as never,
+          roles: { listAssignableCustomRoles: vi.fn(async () => []) } as never,
+        }
+      : {}),
     processName: "langwatch-api-test",
   });
 
@@ -305,7 +337,13 @@ function composeApplication() {
     },
   });
 
-  return { application, prisma, authz, organizations, projects, group, audit };
+  const invites = (
+    prisma.client as unknown as {
+      organizationInvite: { findMany: ReturnType<typeof vi.fn> };
+    }
+  ).organizationInvite;
+
+  return { application, prisma, authz, organizations, projects, group, audit, invites };
 }
 
 async function callTrpc(
@@ -414,6 +452,51 @@ describe("given an API process composed with the org-group half of the record", 
       });
 
       expect(refusal(body)).toContain("service_unavailable");
+    });
+  });
+
+  describe("when the grant ledger and the role service are composed", () => {
+    /**
+     * The absence above is closed by this process building the service itself
+     * rather than by a host injecting one. What that has to prove is that the
+     * read reaches the ROW — a port that answered `[]` would pass a test which
+     * only checked the call stopped refusing, and an empty invitation list is
+     * the one answer an administrator acts on by inviting the same person
+     * twice.
+     */
+    it("answers the pending-invite read from the invitation rows", async () => {
+      const { application, invites } = composeApplication({ withInvitations: true });
+
+      const { status, body } = await callTrpc(
+        application,
+        "organization.getOrganizationPendingInvites",
+        { organizationId: ORGANIZATION_ID },
+      );
+
+      expect(status).toBe(200);
+      expect(refusal(body)).not.toContain("service_unavailable");
+      expect(refusal(body)).toContain("newcomer@acme.test");
+      expect(invites.findMany).toHaveBeenCalled();
+    });
+
+    /**
+     * The acceptance link is the thing an administrator hands somebody when no
+     * mail gateway is composed, and it is minted from the deployment's public
+     * origin. A link built against a default host would look right in the
+     * listing and open nothing.
+     */
+    it("carries an acceptance link on this deployment's own origin", async () => {
+      const { application } = composeApplication({ withInvitations: true });
+
+      const { body } = await callTrpc(
+        application,
+        "organization.getOrganizationPendingInvites",
+        { organizationId: ORGANIZATION_ID },
+      );
+
+      expect(refusal(body)).toContain(
+        "https://app.langwatch.test/invite/accept?inviteCode=code-1",
+      );
     });
   });
 
