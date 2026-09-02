@@ -338,6 +338,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   ErasedIdentifierSuppression: {
     platformScopeActions: ["findMany"],
   },
+  // Which gateway keys a connected provider bill pays for (ADR-128 §7). Every
+  // access names the organization: an administrator edits their own mapping,
+  // and the combined view resolves it for the organization whose chart is being
+  // drawn. A bare read across tenants would be one organization's bill claiming
+  // another's spend, which is exactly what the row-level trigger also refuses.
+  IngestionSourceKeyCoverage: {},
   // The grants ledger's projection tables (ADR-092 §13). Written only by
   // the authz_grants fold (plus revocation enforcement); read by the engine
   // per organization. Row id / organizationId cover every access pattern.
