@@ -264,10 +264,12 @@ not the rollup's inputs. Projections register per-pipeline, so this is
 two registrations (one on each money pipeline) writing one table; replay
 means replaying both aggregates from the log.
 
-- **`governance_cost_rollup_1d`** — one row per day × org × ingestion
+- **`governance_cost_rollup_1d`** — one row per tenant × day × ingestion
   source × cost_source × provider × model × agent × currency ×
   raw-actor-id (see Schema). **Every one of those dimensions is in the
-  table's dedup key** — in a ReplacingMergeTree the ORDER BY tuple *is*
+  table's dedup key** — `OrganizationId` is deliberately payload rather
+  than a dimension, because `TenantId` already addresses the row
+  (Schema) — in a ReplacingMergeTree the ORDER BY tuple *is*
   the row's identity, and a dimension left out of it is not "stored for
   drill-down", it is silently collapsed on merge (this codebase already
   shipped that bug once: migration 00069's comment documents two budgets
@@ -277,6 +279,16 @@ means replaying both aggregates from the log.
   event *updates* the affected old day instead of adding to it — the
   known MV failure mode on corrected rows (and the reason ADR-034 already
   made this exact choice for trace analytics).
+- **A pull that changes nothing still appends an event.** Re-reading a
+  day and finding the same figure is not a no-op to be optimized away: it
+  is the observation that says the provider has stopped moving that day,
+  and it is the only thing that advances `LastObservedAt` and lets §15
+  ever call a day settled. The event carries the pull's observation
+  timestamp, so the fold takes that value off the event rather than off
+  the clock and a replay lands on the same number (Invariants,
+  "Rebuild = replay"). Suppressing confirming events would leave the
+  provisional marker anchored on the last *change*, which is the calendar
+  bug §15 already rejected wearing a different hat.
 - **All columns on day one, wave-2 ones included** (raw actor id,
   department at time of spend). Summed rows cannot grow dimensions later.
 - **Thin service in front**: computes seat money at read (§6), attaches
@@ -285,8 +297,12 @@ means replaying both aggregates from the log.
   ledger) — per-*person* aggregates come from the rollup itself, since
   raw-actor-id is a rollup dimension — joins puller health (§4a) so a
   missing day renders as "no data", and enforces §18's permissions.
-- **Every read of this table must be dedup-safe** (`argMax` by `Version`
-  or the IN-tuple pattern — ADR-015:98). ReplacingMergeTree dedups
+- **Every read of this table must be dedup-safe** (`argMax` by
+  `EventTimestamp` — the ReplacingMergeTree's replacement version — or
+  the IN-tuple pattern, ADR-015:98). The shipped table's column named
+  `Version` is *not* that: it is the fold's schema-snapshot stamp
+  (Schema), and taking `argMax` over it would dedup on the wrong axis
+  entirely. ReplacingMergeTree dedups
   eventually, in background merges, not on write: after a restatement,
   the old and new row versions coexist until a merge runs, and a plain
   `SUM … GROUP BY` double-counts the restated day for exactly that
@@ -582,12 +598,19 @@ When a provider-supplied raw actor id contains personal data (e.g. an
 email address), GDPR erasure:
 
 1. **records the erased identifiers on a suppression list** — a hash of
-   each identifier the erasure covers, scoped to the organization
-   (`ErasedIdentifierSuppression`, Schema). Without this the erasure is
+   each identifier the erasure covers, scoped to the organization *and
+   the provider* (`ErasedIdentifierSuppression`, Schema), so erasing an
+   address a customer holds at one provider does not silently suppress
+   the same string arriving from another. Without this the erasure is
    undone by the pipeline that produced it: the pullers look 30 days
    back, so the next day's pull re-ingests the same email and re-writes
    what we erased. The list stores hashes, never the identifier, so it
-   is not itself a copy of the data it exists to keep out.
+   is not itself a copy of the data it exists to keep out. The stored
+   `identifierHash` and the pseudonym written in step 5 are **the same
+   function of the same input** — `SHA-256(secret ‖ original)` — so a
+   write path computes that digest once and uses it twice: as the
+   membership test against this list, and, on a hit, as the value it
+   writes in place of the original.
 
    **The check gates every write path that carries the identifier, not
    just the identity tables.** Suppressing only `DiscoveredPerson`
@@ -617,10 +640,18 @@ email address), GDPR erasure:
    different row rather than an edited one, and the engine will not
    pretend otherwise. Erasure goes through the rebuild path the rollup
    already has (§4: "a rebuild is a replay"): record the identifier on
-   the suppression list (step 1), `ALTER TABLE … DELETE` this
-   organization's rows carrying the original value, then replay the
-   affected days, which re-derives them with the pseudonym in place of
-   the original. The pseudonym is deterministic (e.g.
+   the suppression list (step 1), `ALTER TABLE … DELETE` the rows
+   carrying the original value, then replay the affected days, which
+   re-derives them with the pseudonym in place of the original. **The
+   delete is scoped by `TenantId`, not by `OrganizationId`** — the same
+   predicate §11 lands on, `TenantId IN` every tenant this organization
+   has ever written under per `GovernanceTenantHistory`, and for the same
+   reason: `OrganizationId` is payload carrying a `DEFAULT ''`, so a
+   predicate on it misses any row
+   written before the column was populated and leaves the erased
+   identifier sitting in the table. `TenantId` leads the ORDER BY and is
+   never empty, and the history table is what makes the scope survive an
+   org that has been renamed or re-tenanted. The pseudonym is deterministic (e.g.
    `SHA-256(secret ‖ original)`) so every replay lands on one stable key
    rather than minting a new one per run.
 
@@ -646,7 +677,10 @@ email address), GDPR erasure:
    needs are a **membership test** and a **recomputation**: hash the
    value it is about to write, test that hash against
    `ErasedIdentifierSuppression` for this `(organizationId, provider)`,
-   and on a hit write `SHA-256(secret ‖ original)` instead. Because the
+   and on a hit write that same digest in place of the original — the
+   suppression list's `identifierHash` and the pseudonym are one
+   `SHA-256(secret ‖ original)`, computed once per write and used for
+   both the lookup and the replacement (step 1). Because the
    pseudonym is deterministic in the original, every replay of every day
    lands on the same key without anything ever having been stored.
    `ErasedIdentifierSuppression` is therefore the only table erasure
@@ -955,7 +989,15 @@ Three rules make the marker mean what it says.
   test reads that anchor from **`LastObservedAt`** on the rollup row
   (Schema), which every fold write touching the day moves forward —
   including a re-pull that confirms an unchanged figure, which is
-  precisely the case a correction-only timestamp would miss.
+  precisely the case a correction-only timestamp would miss. The value
+  is **the pull's own observation timestamp, carried on the event**, not
+  the wall clock at fold time: taking the clock would mean a replay
+  stamped every day as observed today, breaking the rebuild-equals-replay
+  invariant, and would let §9's delete-then-replay erasure quietly flip
+  long-settled days back to provisional. It is also not the shipped
+  `LastEventOccurredAt`, which is the newest *provider-side* event time
+  folded into the row — that one stands still exactly when a re-pull
+  re-confirms old events, which is the case this marker exists to see.
 - **Revised and provisional render together, because together is the
   normal case.** Anthropic restates within 30 days and the window is 30
   days, so essentially every revision we see lands on a day that is
@@ -1359,7 +1401,7 @@ drift apart).
 | Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
 | Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNano` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
-| Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
+| Dedup-safe reads | every query on the rollup uses `argMax` over `EventTimestamp` — the ReplacingMergeTree's replacement version, *not* the `Version` schema-snapshot stamp — or the IN-tuple pattern (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
 | Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
 | One dollar, one home | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
@@ -1392,7 +1434,7 @@ drift apart).
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds `RevisedAt`, `PreviousAmountNano`, `LastObservedAt`) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
 | Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the migration is also the repo's first `CREATE EXTENSION` (`btree_gist`, §7) — it must check availability and fail actionably, and the self-host docs and Helm chart must state the requirement |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
@@ -1406,12 +1448,25 @@ drift apart).
 
 ## Schema
 
-Sketches; exact DDL lands with the first migration PR.
+Sketches, not DDL — the exact shipped statement is the migration.
+
+`governance_cost_rollup_1d` **already exists**: it shipped with wave 1 as
+migration `00087`, and the `CREATE TABLE` below is shown whole only
+because a column list is the readable way to say what the table means.
+Wave 2 does not create it. The three columns wave 2 adds — `RevisedAt`,
+`PreviousAmountNano`, `LastObservedAt` — arrive by **`ALTER TABLE … ADD
+COLUMN`**, and their defaults are what a reader should check: existing
+rows get `LastObservedAt` = epoch, so every pre-migration day reads as
+long since observed and therefore *settled*. That is the right answer
+rather than a compromise, because the pullers look 30 days back: any day
+still genuinely in its settling window gets re-stamped on the next daily
+pull, and any day the backfill "wrongly" called settled was one no pull
+was ever going to touch again.
 
 ```sql
 -- ClickHouse: the one summed table (fed by fold projection, NOT an MV).
 -- As shipped in migration 00087 — read that file, not this block, when
--- the two ever disagree.
+-- the two ever disagree. Wave 2 ALTERs it, it does not create.
 CREATE TABLE governance_cost_rollup_1d (
     -- ---- the sort key: the fold's group key, exactly ----
     TenantId           String,        -- the org's hidden governance project
@@ -1445,12 +1500,29 @@ CREATE TABLE governance_cost_rollup_1d (
                                       -- unchanged figure still moves it, which is exactly
                                       -- the fact the provisional test needs. Read with
                                       -- argMax like every other payload column.
+                                      -- Its value is the PULL'S OBSERVATION TIMESTAMP, taken
+                                      -- off the event, never the wall clock at fold time: a
+                                      -- clock read would stamp every day with today on replay,
+                                      -- breaking "Rebuild = replay" and its equality gate, and
+                                      -- would let §9 step 4's delete-then-replay flip a
+                                      -- settled day back to provisional just because we
+                                      -- erased someone. Off the event, replay reproduces it.
+                                      -- Not the shipped LastEventOccurredAt: that is the max
+                                      -- occurred-at of the events folded in — provider-side
+                                      -- event time — and the two diverge in precisely the
+                                      -- case that matters, a re-pull re-confirming old
+                                      -- events. Our observation moved; theirs did not.
     PulledItemsJson    String DEFAULT '',       -- latest contribution per item
-    Version            LowCardinality(String) DEFAULT '',  -- schema snapshot
+    Version            LowCardinality(String) DEFAULT '',  -- schema snapshot:
+                                      -- it filters read-back to rows written by the current
+                                      -- fold schema. It is payload, NOT the dedup version;
+                                      -- the two must never be confused in a query.
     AppliedEventIds    Array(String) DEFAULT [],  -- redelivery dedup (00054)
     CreatedAt          UInt64 DEFAULT 0,
     LastEventOccurredAt UInt64 DEFAULT 0,
-    EventTimestamp     UInt64                   -- RMT replacement version
+    EventTimestamp     UInt64                   -- the ReplacingMergeTree's replacement version
+                                      -- (the fold's monotonic updatedAt). This is the column
+                                      -- every dedup-safe read takes argMax over.
 ) ENGINE = ReplacingMergeTree(EventTimestamp)   -- via the
                                          -- CLICKHOUSE_ENGINE_REPLACING_PREFIX
                                          -- envsub, never a bare literal
@@ -1789,8 +1861,17 @@ money tables, only the identity tables and read paths.
     the same section. None is needed, because the pseudonym is
     deterministic — at replay the fold already holds the original value,
     tests its hash for membership, and on a hit recomputes
-    `SHA-256(secret ‖ original)`. `ErasedIdentifierSuppression` is the
-    only table erasure adds.
+    `SHA-256(secret ‖ original)` — one digest, computed once per write and
+    used both as the membership key and as the replacement value, since
+    the suppression list's `identifierHash` and the pseudonym are the same
+    function of the same input. Scope is `(organizationId, provider)`
+    throughout, on the list and on the lookup alike, so an address erased
+    at one provider is not suppressed when a different provider reports
+    it. The rollup half of the erasure deletes by **`TenantId`** — every
+    tenant in `GovernanceTenantHistory` for the org — not by
+    `OrganizationId`, which is payload carrying `DEFAULT ''` and would let
+    the predicate skip rows and leave the erased identifier in place.
+    `ErasedIdentifierSuppression` is the only table erasure adds.
   - **Match suggestions are computed in the background and stored** (§12,
     Schema, Gates): this **reverses** v3.8's compute-at-read ruling.
     Measured at the ADR's own example size, 2,000 discovered people × 500
@@ -1811,7 +1892,16 @@ money tables, only the identity tables and read paths.
     `LastObservedAt` payload column (Schema), moved forward by every fold
     write that touches the day — a re-pull confirming an unchanged figure
     included, which is exactly what `RevisedAt` would miss; the flag stays
-    computed at read, now *from* that stored timestamp.
+    computed at read, now *from* that stored timestamp. Its value is the
+    **pull's observation timestamp, carried on the event**, never the wall
+    clock at fold time: a clock read would make replay non-deterministic,
+    breaking "Rebuild = replay" and its equality gate, and would let §9's
+    delete-then-replay erasure flip settled days back to provisional. §4
+    states the mechanism the marker depends on — a pull that confirms an
+    unchanged figure still appends an event — and the Schema records why
+    the shipped `LastEventOccurredAt` cannot serve as the anchor: it is
+    provider-side event time, which stands still in exactly the
+    re-confirmation case this marker exists to notice.
     revised ∧ provisional is the **normal** case, not a contradiction —
     Anthropic revises within 30 days and the window is 30 days — and the
     cell shows both: *"revised, was $X — may still change"*; the v3.8
@@ -1844,9 +1934,32 @@ money tables, only the identity tables and read paths.
     `OrganizationId` as a payload column defaulting to `''` — ownership is
     an attribute of the row, its address is the tenant. §11 and the new
     `GovernanceTenantHistory` design already assumed the shipped shape, so
-    only the sketch and the "full-grain dedup key" invariant were wrong;
-    both now match, and the invariant states which columns are payload by
-    design rather than implying every column belongs in the key. §11's
+    the drift was confined to the sketch and the "full-grain dedup key"
+    invariant. The invariant now matches the shipped table exactly and
+    states which columns are payload by design rather than implying every
+    column belongs in the key; the sketch is **corrected in tenancy, dedup
+    key and replacement version** but remains a sketch — it still names
+    `PreviousAmountNano` where 00087 says `PreviousAmountNanoUsd`, and
+    omits `RevisionCount`, `PulledItemsJson`, `AppliedEventIds`,
+    `CreatedAt` and `LastEventOccurredAt` entirely. **The exact DDL is
+    00087**, and the Schema section now says so rather than reading like
+    a specification of a table wave 2 is about to create. The same pass
+    fixed the sketch's `Version UInt64` replacement column: shipped 00087
+    replaces on `EventTimestamp UInt64` and keeps `Version` as a
+    `LowCardinality(String)` schema-snapshot stamp — payload, not the
+    dedup version — so every `argMax`-on-`Version` instruction in §4, the
+    Invariants and the sketch pointed readers at the wrong column. §4 also
+    still enumerated `org` as a rollup dimension and asserted every listed
+    dimension was in the key; both corrected. And the migration this
+    implies is stated for the first time: the rollup **shipped in wave 1**,
+    so wave 2's three columns land by `ALTER TABLE … ADD COLUMN`, not a
+    create — `LastObservedAt` backfilling as epoch, which reads every
+    pre-migration day as settled and is correct rather than merely
+    tolerable, since a day still in its window is re-stamped by the next
+    30-day-lookback pull. The Gates row that promised a "migration adding
+    `governance_cost_rollup_1d`" is corrected along with its rollback,
+    which is now `DROP COLUMN` rather than a `DROP TABLE` of a table wave 2
+    does not own. §11's
     "three Postgres tables" is likewise restated as six, the fold having
     added `GovernanceTenantHistory`, `ErasedIdentifierSuppression` and
     `IdentityMatchSuggestion` to the original three.
