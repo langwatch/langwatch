@@ -27,6 +27,7 @@ export function CostLanePanel({
   amountUsd,
   cellsWithoutAmount,
   currenciesWithoutUsdAmount,
+  laneNote,
   testId,
 }: {
   label: string;
@@ -37,6 +38,12 @@ export function CostLanePanel({
   cellsWithoutAmount: number;
   /** Which currencies those cells were billed in. May be empty. */
   currenciesWithoutUsdAmount: readonly string[];
+  /**
+   * A read-side sentence explaining this lane's figure or its absence — the
+   * Azure billing note today. Rendered verbatim: the panel never composes
+   * copy about money, it shows what the read side decided to say.
+   */
+  laneNote?: string | null;
   testId: string;
 }) {
   return (
@@ -66,6 +73,15 @@ export function CostLanePanel({
         {cellsWithoutAmount > 0 ? (
           <Text fontSize="xs" color="fg.subtle" data-testid={`${testId}-note`}>
             {laneWithheldTotalNote({ currenciesWithoutUsdAmount })}
+          </Text>
+        ) : null}
+        {laneNote ? (
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            data-testid={`${testId}-lane-note`}
+          >
+            {laneNote}
           </Text>
         ) : null}
       </VStack>

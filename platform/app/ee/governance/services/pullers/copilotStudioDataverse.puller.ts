@@ -152,6 +152,18 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    */
   azureSubscriptionId: z.string().uuid().optional(),
   /**
+   * The customer's declaration that this Copilot runs on prepaid message
+   * packs (ADR-128 §21.4).
+   *
+   * Prepaid packs create no Azure resource, so the cost feed returns nothing
+   * — indistinguishable from a quiet pay-as-you-go month. The adapter never
+   * reads this field; it exists so the spend panel can explain an empty bill
+   * with the customer's own words rather than inferring a contract from
+   * silence. Optional because a source without a subscription has no bill to
+   * explain.
+   */
+  azureBillingIsPrepaid: z.boolean().optional(),
+  /**
    * Whether to read the tenant's seat licences beside the conversations.
    *
    * On unless switched off. Seats are the half of the money the conversations
@@ -349,6 +361,38 @@ function parseCursor(raw: string | null): StoredCursor {
     // survivable because identifiers are derived, but skipping one is not.
   }
   return NO_CURSOR;
+}
+
+/**
+ * The two cost fields of a STORED position, for readers outside this puller —
+ * today the cost screen's Azure billing note.
+ *
+ * Exposed as a function over the same schema the puller itself reads back,
+ * rather than letting callers hand-parse the stored JSON: a hand-rolled
+ * reader accepts positions this schema refuses (a malformed day, a negative
+ * hold), and on exactly those rows the puller would start over while the
+ * panel claimed the bill had been read. One reader, one answer.
+ *
+ * The column is `Json?`: this build stores the encoded string, but older
+ * writers stored objects and an unpulled source holds null, so anything is
+ * accepted and anything unreadable answers "no read has completed" — the
+ * same collapse to `NO_CURSOR` a run applies.
+ */
+export function readStoredCostCursor(pollerCursor: unknown): {
+  costPricedThroughDay: string | null;
+  costHeldSinceMs: number | null;
+} {
+  const raw =
+    typeof pollerCursor === "string"
+      ? pollerCursor
+      : pollerCursor !== null && typeof pollerCursor === "object"
+        ? JSON.stringify(pollerCursor)
+        : null;
+  const cursor = parseCursor(raw);
+  return {
+    costPricedThroughDay: cursor.cost.pricedThroughDay,
+    costHeldSinceMs: cursor.cost.heldSinceMs,
+  };
 }
 
 /** The position a run hands back, as the string that is stored. */
@@ -969,6 +1013,16 @@ export class CopilotStudioDataversePuller
     // permission grant to ask the customer for.
     if (!subscriptionId) return { events: [], cost: previous };
 
+    // The bill is read with its own registered app or not at all (ADR-128
+    // §21.1). Falling back to the bot's credential here would quietly
+    // re-create the one broad grant the split exists to break — and would do
+    // it precisely for the customer who declined to hand out billing access.
+    const billingClientId = options.credentials?.billingClientId;
+    const billingClientSecret = options.credentials?.billingClientSecret;
+    if (!billingClientId || !billingClientSecret) {
+      return { events: [], cost: previous };
+    }
+
     const nowMs = Date.now();
     // Neither of the two skips above and below is a failed read. Azure
     // publishes this bill once a day and refuses a caller that asks too often,
@@ -986,7 +1040,13 @@ export class CopilotStudioDataversePuller
 
     try {
       const token = await resolveEnvironmentToken({
-        credentials: options.credentials,
+        // Same tenant, different registered app: the billing identity holds
+        // Cost Management Reader and nothing an employee ever typed.
+        credentials: {
+          tenantId: options.credentials?.tenantId ?? "",
+          clientId: billingClientId,
+          clientSecret: billingClientSecret,
+        },
         environmentUrl: config.environmentUrl,
         scope: AZURE_MANAGEMENT_SCOPE,
         signal: options.signal,
