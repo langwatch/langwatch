@@ -679,6 +679,13 @@
               "ai-gateway/providers/bedrock",
               "ai-gateway/providers/vertex",
               "ai-gateway/providers/gemini",
+              "ai-gateway/providers/xai",
+              "ai-gateway/providers/groq",
+              "ai-gateway/providers/cerebras",
+              "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/voyage",
+              "ai-gateway/providers/elevenlabs",
+              "ai-gateway/providers/openai-account",
               "ai-gateway/providers/custom-openai-compatible",
               "ai-gateway/providers/fallback-chains"
             ]
@@ -745,6 +752,7 @@
               "ai-gateway/cookbooks/ci-smoke-test",
               "ai-gateway/cookbooks/migrate-from-direct",
               "ai-gateway/cookbooks/migrate-from-portkey",
+              "ai-gateway/cookbooks/migrate-from-litellm",
               "ai-gateway/cookbooks/credential-leak-incident",
               "ai-gateway/cookbooks/multi-tenant-reseller",
               "ai-gateway/cookbooks/cache-control-rollout",

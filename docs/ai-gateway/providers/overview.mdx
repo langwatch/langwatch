@@ -1,49 +1,58 @@
 ---
 title: Providers
-description: Every LLM provider the LangWatch AI Gateway can dispatch to.
+description: The LLM providers the LangWatch AI Gateway dispatches to, the credential each one needs and the endpoints each one serves.
 sidebarTitle: Overview
 ---
 
-The gateway delegates provider-specific dispatch to [`bifrost/core`](https://github.com/maximhq/bifrost), which LangWatch embeds as a Go library. This page lists the providers the gateway can talk to today and the path to configuring each.
+## Where credentials live
 
-## Configure a provider credential once, use from many VKs
+A provider credential is a row under **Settings > Model Providers**. The row belongs to an organization, a team or a project, and every virtual key whose scope can see the row can dispatch through it. The same rows serve evaluators, the playground and the rest of LangWatch.
 
-Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground, no separate "gateway providers" store.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON. See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
-Gateway-only settings (rate limits, fallback priority, providerConfig overrides) live directly on the **ModelProvider** itself, on the **Advanced (Gateway)** tab of the editor. There is no separate binding wrapper. VKs reference ModelProviders by id; the order in the bound routing policy drives primary + fallback selection.
+## Supported providers
 
-```
-ModelProvider (raw credential + Advanced/Gateway settings)
-  └── RoutingPolicy.modelProviderIds[] (ordered primary + fallback)
-       └── VirtualKey.routingPolicyId (or default policy from the org)
-```
+Model names are `provider/model`. The provider segment is the id in the first column. See [Model naming](/ai-gateway/model-naming).
 
-This means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit only affects gateway traffic (it's on the Advanced tab, not the basic credential); changing a VK's provider mix is one edit to the routing policy it references.
-
-## Supported providers (v1)
-
-| Provider | Routes supported | Auth methods | Caching passthrough |
+| Provider | Id | Credential | Endpoints served |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
-| [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | messages, chat | GCP ADC, SA JSON | implicit context cache |
-| [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
-| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream) | Bearer, custom header | opaque |
+| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, speech, transcription, realtime, models |
+| [Anthropic](/ai-gateway/providers/anthropic) | `anthropic` | API key, optional base URL | Messages, Chat, models |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, models |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, models |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, Gemini native, models |
+| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, Gemini native, models |
+| [xAI](/ai-gateway/providers/xai) | `xai` | API key | Chat, Messages, models |
+| [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
+| [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
+| [DeepSeek](/ai-gateway/providers/deepseek) | `deepseek` | API key | Chat, Messages, models |
+| [Voyage AI](/ai-gateway/providers/voyage) | `voyage` | API key | Embeddings only |
+| [ElevenLabs](/ai-gateway/providers/elevenlabs) | `elevenlabs` | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native |
+| [OpenAI account](/ai-gateway/providers/openai-account) | `openai_codex` | Sign in with a ChatGPT account | Responses, Messages |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | `custom` | Base URL, optional API key | Chat, Messages, embeddings |
 
-Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. Each appears in the UI once LangWatch ships its configuration form.
+The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and `google_gemini` are accepted as aliases of `azure`, `bedrock`, `vertex` and `gemini`.
 
-## Picking a primary + fallback
+## What each endpoint family means
 
-Pick one or two fallback providers. Guidelines:
+| Family | Route | Note |
+|---|---|---|
+| Chat | `POST /v1/chat/completions` | OpenAI wire format. The gateway translates for providers with another native format. |
+| Responses | `POST /v1/responses` | OpenAI Responses API. OpenAI, Azure OpenAI and the OpenAI account provider. |
+| Messages | `POST /v1/messages` | Anthropic wire format. Forwarded as is to Anthropic, translated for the others. |
+| Embeddings | `POST /v1/embeddings` | OpenAI wire format. |
+| Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | OpenAI and ElevenLabs. |
+| Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
+| Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
+| ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
+| Models | `GET /v1/models` | Lists the models the key can call. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
 
-- **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
-- **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
-- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency until a configured fallback trigger (by default `5xx`, `timeout`, `rate_limit`) moves it to OpenAI direct.
+A request to an endpoint the provider does not serve gets the provider's own error back. For example, `POST /v1/embeddings` with an Anthropic model returns Anthropic's rejection.
 
-See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
+## More than one row of the same provider
 
-## Multi-region, multi-account
+Create one row per account, region or endpoint, for example an Azure OpenAI row per Azure resource. Give each row a **Routing handle**, for example `eu`, and pin a request to that row with `eu/gpt-5-mini`. A routing policy orders the rows a key tries. See [Routing policies](/ai-gateway/governance/routing-policies).
 
-Each ModelProvider row pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create sibling ModelProvider rows of the same family with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right ModelProvider id.
+<Note>
+**Also check:** [Model naming](/ai-gateway/model-naming) for how a model name selects a provider, and [Fallback chains](/ai-gateway/providers/fallback-chains) for what happens when a provider fails.
+</Note>

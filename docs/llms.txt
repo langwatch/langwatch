@@ -381,11 +381,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Python
 
-- [Python SDK integration](https://langwatch.ai/docs/ai-gateway/sdks/python.md): Use the LangWatch AI Gateway with the official OpenAI + Anthropic Python SDKs, with proper trace propagation.
+- [Python](https://langwatch.ai/docs/ai-gateway/sdks/python.md): Call the LangWatch AI Gateway from Python with the OpenAI SDK, the Anthropic SDK, the Google GenAI SDK, LangChain or LlamaIndex, and link the gateway span to your own trace.
 
 ### TypeScript
 
-- [TypeScript SDK integration](https://langwatch.ai/docs/ai-gateway/sdks/typescript.md): Use the LangWatch AI Gateway with the official OpenAI + Anthropic TypeScript SDKs, with proper trace propagation.
+- [TypeScript](https://langwatch.ai/docs/ai-gateway/sdks/typescript.md): Call the LangWatch AI Gateway from TypeScript with the OpenAI SDK, the Anthropic SDK, the Vercel AI SDK or LangChain.js, and link the gateway span to your own trace.
 
 ## Coding CLI Integrations
 
@@ -421,14 +421,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
 - [Gateway provider settings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md): Gateway-specific settings (rate limits, fallback priority, provider config overrides) now live on each ModelProvider's Advanced tab.
 - [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): Requests per minute and requests per day on a virtual key, enforced by each LangWatch AI Gateway replica.
-- [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): Role-based access control for the LangWatch AI Gateway, resources, actions, and default role mappings.
+- [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): The permissions that gate the LangWatch AI Gateway, the resources they cover and what each built-in role holds.
 
 ## Billing & Metering
 
-- [Billing & Spend Events](https://langwatch.ai/docs/ai-gateway/billing-events.md): One spend event per gateway request, delivered by signed webhooks and reconcilable over REST. The money contract, settled requests, supersession, and the two-grain reconciliation workflow.
+- [Billing and spend events](https://langwatch.ai/docs/ai-gateway/billing-events.md): One spend event per LangWatch AI Gateway request, with token counts, cost and attribution, delivered to your webhook endpoints and served over REST for reconciliation and rebilling.
 - [Webhooks](https://langwatch.ai/docs/features/webhooks.md): Signed, retried, replayable event delivery to your endpoints, with per-endpoint subscriptions, a delivery log, health, and automatic disabling of dead receivers.
 - [Metering and rebilling your customers through the gateway](https://langwatch.ai/docs/ai-gateway/cookbooks/metering-and-rebilling.md): The end-to-end pattern for platforms that rebill their own customers, provision a tenant key and caps, ingest signed spend events, reconcile, handle breaches, and close periods.
-- [Demo: a rebilling agent platform](https://langwatch.ai/docs/ai-gateway/demo-agent-platform.md): The open-source agent-billing-demo repo, a tiny agent SaaS that meters and rebills its customers entirely through LangWatch, in TypeScript and Python.
+- [Demo: a rebilling agent platform](https://langwatch.ai/docs/ai-gateway/demo-agent-platform.md): The open-source agent-billing-demo repository, a small agent SaaS that meters and rebills its customers through the LangWatch AI Gateway, in TypeScript and Python.
 
 ## Governance
 
@@ -443,14 +443,21 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Providers
 
-- [Providers](https://langwatch.ai/docs/ai-gateway/providers/overview.md): Every LLM provider the LangWatch AI Gateway can dispatch to.
-- [OpenAI](https://langwatch.ai/docs/ai-gateway/providers/openai.md): Configure OpenAI as a provider behind the LangWatch AI Gateway.
-- [Anthropic](https://langwatch.ai/docs/ai-gateway/providers/anthropic.md): Configure Anthropic (Claude) as a provider behind the LangWatch AI Gateway.
-- [Azure OpenAI](https://langwatch.ai/docs/ai-gateway/providers/azure-openai.md): Configure Azure OpenAI (deployment-based model ids) as a provider behind the LangWatch AI Gateway.
-- [AWS Bedrock](https://langwatch.ai/docs/ai-gateway/providers/bedrock.md): Configure AWS Bedrock (Anthropic, Titan, Llama, Mistral, Cohere) as a provider behind the LangWatch AI Gateway.
-- [Google Vertex AI](https://langwatch.ai/docs/ai-gateway/providers/vertex.md): Configure Google Vertex AI (Anthropic, Gemini) as a provider behind the LangWatch AI Gateway.
-- [Google Gemini](https://langwatch.ai/docs/ai-gateway/providers/gemini.md): Configure Google Gemini (AI Studio) as a provider behind the LangWatch AI Gateway.
-- [Custom OpenAI-compatible](https://langwatch.ai/docs/ai-gateway/providers/custom-openai-compatible.md): Point the gateway at any OpenAI-compatible endpoint (self-hosted vLLM, Ollama, Groq, Fireworks, Together, private fine-tunes).
+- [Providers](https://langwatch.ai/docs/ai-gateway/providers/overview.md): The LLM providers the LangWatch AI Gateway dispatches to, the credential each one needs and the endpoints each one serves.
+- [OpenAI](https://langwatch.ai/docs/ai-gateway/providers/openai.md): Add an OpenAI API key under Settings, Model Providers and call OpenAI models through the LangWatch AI Gateway.
+- [Anthropic](https://langwatch.ai/docs/ai-gateway/providers/anthropic.md): Add an Anthropic API key under Settings, Model Providers and call Claude models through the LangWatch AI Gateway with the Anthropic or the OpenAI SDK.
+- [Azure OpenAI](https://langwatch.ai/docs/ai-gateway/providers/azure-openai.md): Add an Azure OpenAI resource under Settings, Model Providers and call its deployments through the LangWatch AI Gateway.
+- [AWS Bedrock](https://langwatch.ai/docs/ai-gateway/providers/bedrock.md): Add AWS access keys and a region under Settings, Model Providers and call Bedrock models through the LangWatch AI Gateway.
+- [Google Vertex AI](https://langwatch.ai/docs/ai-gateway/providers/vertex.md): Add a service account, project and location under Settings, Model Providers and call Vertex AI models through the LangWatch AI Gateway.
+- [Google Gemini](https://langwatch.ai/docs/ai-gateway/providers/gemini.md): Add a Gemini API key under Settings, Model Providers and call Gemini models through the LangWatch AI Gateway with the OpenAI SDK or the Google GenAI SDKs.
+- [xAI](https://langwatch.ai/docs/ai-gateway/providers/xai.md): Add a xAI API key under Settings, Model Providers and call xAI models through the LangWatch AI Gateway.
+- [Groq](https://langwatch.ai/docs/ai-gateway/providers/groq.md): Add a Groq API key under Settings, Model Providers and call Groq models through the LangWatch AI Gateway.
+- [Cerebras](https://langwatch.ai/docs/ai-gateway/providers/cerebras.md): Add a Cerebras API key under Settings, Model Providers and call Cerebras models through the LangWatch AI Gateway.
+- [DeepSeek](https://langwatch.ai/docs/ai-gateway/providers/deepseek.md): Add a DeepSeek API key under Settings, Model Providers and call DeepSeek models through the LangWatch AI Gateway.
+- [Voyage AI](https://langwatch.ai/docs/ai-gateway/providers/voyage.md): Add a Voyage AI API key under Settings, Model Providers and call Voyage embedding models through the LangWatch AI Gateway.
+- [ElevenLabs](https://langwatch.ai/docs/ai-gateway/providers/elevenlabs.md): Add an ElevenLabs API key under Settings, Model Providers and call speech and transcription through the LangWatch AI Gateway with the OpenAI audio routes or the ElevenLabs SDKs.
+- [OpenAI account](https://langwatch.ai/docs/ai-gateway/providers/openai-account.md): Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.
+- [Custom OpenAI-compatible](https://langwatch.ai/docs/ai-gateway/providers/custom-openai-compatible.md): Add any OpenAI-compatible endpoint, for example vLLM, Ollama or an internal inference server, under Settings, Model Providers and call it through the LangWatch AI Gateway.
 - [Fallback Chains](https://langwatch.ai/docs/ai-gateway/providers/fallback-chains.md): Survive provider outages, rate limits, and timeouts transparently.
 
 ## Features
@@ -500,8 +507,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Cookbooks
 
 - [CI smoke test end-to-end gateway health check](https://langwatch.ai/docs/ai-gateway/cookbooks/ci-smoke-test.md): Provision a short-lived VK, make a real call, verify the response, then revoke. Runs in under 10 seconds.
-- [Migrating from direct provider calls](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-direct.md): Move from app → OpenAI/Anthropic to app → LangWatch Gateway → providers, without rewriting your integration.
-- [Migrating from Portkey](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-portkey.md): Move your Portkey gateway configuration to LangWatch, virtual keys, budgets, fallback, guardrails, with a side-by-side mapping of concepts and a concrete code migration.
+- [Migrate from direct provider calls](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-direct.md): Move an application that calls OpenAI, Anthropic or Google directly onto the LangWatch AI Gateway by changing the base URL and the key, then add budgets and routing without touching the code again.
+- [Migrate from Portkey](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-portkey.md): Map Portkey virtual keys, API keys, configs, caching, guardrails and metadata to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
+- [Migrate from LiteLLM](https://langwatch.ai/docs/ai-gateway/cookbooks/migrate-from-litellm.md): Map LiteLLM proxy keys, model lists, budgets, end-user ids and fallbacks to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
 - [Credential-leak incident response](https://langwatch.ai/docs/ai-gateway/cookbooks/credential-leak-incident.md): End-to-end playbook for when a virtual key (or the underlying provider credential) has leaked, containment, communication, rotation, and post-incident forensics.
 - [Multi-tenant SaaS reseller pattern](https://langwatch.ai/docs/ai-gateway/cookbooks/multi-tenant-reseller.md): Provision per-customer virtual keys and budgets from your application backend, audit everything, and bill accurately.
 - [Cache-control rollout](https://langwatch.ai/docs/ai-gateway/cookbooks/cache-control-rollout.md): Force, disable, or override cache behaviour for specific virtual keys, models, or traffic classes without changing any client code.

@@ -1,174 +1,74 @@
 ---
-title: Python SDK integration
-description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic Python SDKs, with proper trace propagation.
+title: Python
+description: Call the LangWatch AI Gateway from Python with the OpenAI SDK, the Anthropic SDK, the Google GenAI SDK, LangChain or LlamaIndex, and link the gateway span to your own trace.
 sidebarTitle: Python
 ---
 
-The gateway is designed to be a drop-in replacement for provider base URLs, every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
+## What changes in your code
 
-This page covers the standard setup and how to propagate trace ids through the gateway so you don't double-count cost.
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
 
-## OpenAI Python SDK
+| SDK | Base URL | Where the key goes |
+|---|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` | `api_key`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Api-Key` |
+| Google GenAI | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Goog-Api-Key` |
+| ElevenLabs | `https://gateway.langwatch.ai` | `api_key`, sent as `Xi-Api-Key` |
 
-### Minimal setup
+## OpenAI SDK
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-01HZX9K3M...",
-)
-
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-)
-```
-
-That's the whole integration. Everything else (streaming, tools, vision, embeddings, images, audio) works unchanged.
-
-### Trace propagation
-
-If your application is already traced with the LangWatch SDK, pass the current trace context so the gateway's span nests inside yours, otherwise you'll have two disconnected traces and double-counted cost in dashboards.
-
-```python
-import langwatch
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),   # injects traceparent + X-LangWatch-*
 )
 
-with langwatch.trace(name="my-agent-turn"):
-    resp = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": "Hi"}],
-    )
-```
-
-`langwatch.get_gateway_headers()` returns a dict with:
-
-- `traceparent` (W3C format), set from the active LangWatch trace.
-- `X-LangWatch-Trace-Id`, LangWatch-native trace id override.
-- `X-LangWatch-Parent-Span-Id`, parent span.
-- `X-LangWatch-Thread-Id`, if the active trace has a thread id.
-
-The gateway reads these on each request and attaches its own span as a child of your trace. The LangWatch UI shows the LLM call nested under your agent span with no cost duplication.
-
-<Note>`get_gateway_headers()` ships in LangWatch Python SDK ≥ `v0.22.0` alongside the gateway GA. Check your installed version with `pip show langwatch`.</Note>
-
-### Response headers for correlation
-
-Every gateway response carries these headers so clients can stitch the span back into their own trace without needing the LangWatch SDK:
-
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets |
-
-```python
-resp = client.chat.completions.with_raw_response.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
-headers = resp.http_response.headers
-print(f"trace_id = {headers['X-LangWatch-Trace-Id']}")
-print(f"span_id  = {headers['X-LangWatch-Span-Id']}")
-# Use the traceparent to stitch a downstream service:
-# requests.post(next_service, headers={"traceparent": headers["traceparent"]}, ...)
+print(response.choices[0].message.content)
 ```
 
-### Without the LangWatch SDK: raw traceparent
+The same client serves `client.responses`, `client.embeddings`, `client.audio.speech` and `client.audio.transcriptions`. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
 
-If you don't use the LangWatch Python SDK but still want trace continuity (e.g. you're traced via OpenTelemetry directly):
-
-```python
-from opentelemetry import trace
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-
-def _traceparent_headers() -> dict[str, str]:
-    carrier: dict[str, str] = {}
-    TraceContextTextMapPropagator().inject(carrier)
-    return carrier  # {"traceparent": "00-<tid>-<sid>-01"} when a span is active
-
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-...",
-    default_headers=_traceparent_headers(),
-)
-```
-
-The gateway honours the standard W3C `traceparent` contract, any OTel-instrumented app already emits this; no LangWatch-specific code needed.
-
-### Per-call overrides
-
-Every OpenAI SDK method accepts `extra_headers={}`:
-
-```python
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-    extra_headers={
-        "X-LangWatch-Cache": "disable",                # cold run, ignore cache
-        "X-LangWatch-Trace-Metadata": '{"tier":"free"}',  # attach metadata to the trace
-    },
-)
-```
-
-These layer on top of `default_headers` without replacing them.
-
-### Response inspection
-
-Grab the `X-LangWatch-Gateway-Request-Id` for support tickets or log correlation:
-
-```python
-resp = client.chat.completions.with_raw_response.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-)
-request_id = resp.http_response.headers["X-LangWatch-Gateway-Request-Id"]
-print(f"LangWatch request id: {request_id}")
-```
-
-## Anthropic Python SDK
-
-### Minimal setup
+## Anthropic SDK
 
 ```python
 import anthropic
 
 client = anthropic.Anthropic(
     base_url="https://gateway.langwatch.ai",
-    api_key="vk-lw-...",   # SDK accepts VK here; gateway also accepts via x-api-key
+    api_key="vk-lw-...",
 )
 
-resp = client.messages.create(
-    model="claude-haiku-4-5-20251001",
+message = client.messages.create(
+    model="anthropic/claude-haiku-4-5",
     max_tokens=64,
-    messages=[{"role": "user", "content": "Hi"}],
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
+print(message.content[0].text)
 ```
 
-### Trace propagation (Anthropic)
+## Google GenAI SDK
 
 ```python
-client = anthropic.Anthropic(
-    base_url="https://gateway.langwatch.ai",
+from google import genai
+
+client = genai.Client(
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
+    http_options={"base_url": "https://gateway.langwatch.ai"},
 )
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Say hi in one word",
+)
+print(response.text)
 ```
 
-Works identically to the OpenAI SDK.
-
-## LangChain, LangGraph
-
-LangChain's `ChatOpenAI` and `ChatAnthropic` accept a `base_url` or `openai_api_base`:
+## LangChain
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -176,12 +76,11 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     base_url="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
 )
 ```
 
-For LangGraph agents, set the headers on the LLM node, it propagates to every call the agent makes.
+`ChatAnthropic` takes `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`.
 
 ## LlamaIndex
 
@@ -191,32 +90,81 @@ from llama_index.llms.openai import OpenAI
 llm = OpenAI(
     api_base="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
 )
 ```
 
-## PydanticAI, OpenInference, other OTel-aware frameworks
+## Link the gateway span to your trace
 
-Frameworks that already emit OpenTelemetry spans will set `traceparent` automatically on outbound HTTP requests if the `opentelemetry-instrumentation-requests`, `httpx`, `aiohttp` packages are installed. No LangWatch SDK involvement needed.
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application already has the current context. Inject it into the request headers:
+
+```python
+from openai import OpenAI
+from opentelemetry.propagate import inject
+
+def trace_headers() -> dict[str, str]:
+    carrier: dict[str, str] = {}
+    inject(carrier)  # {"traceparent": "00-<trace id>-<span id>-01"} inside an active span
+    return carrier
+
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
+
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+    extra_headers=trace_headers(),
+)
+```
+
+Call `trace_headers()` per request, inside the span you want the gateway span under. `default_headers` on the client is read once and would pin the first span.
+
+The [LangWatch Python SDK](/integration/python/guide) uses OpenTelemetry, so the same code works inside `langwatch.trace()` or a `@langwatch.span()` function. Do not also autotrack the OpenAI client for calls that go through the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header | Purpose |
+|---|---|
+| `traceparent` | Nests the gateway span in your trace. |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+
+Pass them per request with `extra_headers={...}`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```python
+raw = client.chat.completions.with_raw_response.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+)
+headers = raw.http_response.headers
+print(headers["X-LangWatch-Gateway-Request-Id"])  # quote this to support
+print(headers.get("X-LangWatch-Budget-Warning"))   # "project:84" when a budget is at 80 percent or more
+print(headers.get("Traceparent"))                  # the gateway span in your project
+response = raw.parse()
+```
+
+## Manage keys and budgets from Python
+
+The LangWatch Python SDK wraps the management routes: `langwatch.virtual_keys`, `langwatch.gateway_budgets`, `langwatch.spend_events` and `langwatch.webhooks`. They take a LangWatch API key through `langwatch.setup(api_key=...)`. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#reconcile-with-the-sdks).
 
 ## Self-hosted gateway
 
-Replace the hostname:
+Replace the host with your gateway's URL. Everything else is the same.
 
 ```python
-client = OpenAI(
-    base_url="https://langwatch-gateway.your-corp.internal/v1",
-    api_key="vk-lw-...",
-)
+client = OpenAI(base_url="https://gateway.acme.internal/v1", api_key="vk-lw-...")
 ```
-
-Rest of the setup is identical.
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`**, wrong VK or VK revoked. Check the first 12 characters against the LangWatch UI.
-- **Cost double-counted**: trace propagation not working. Verify `default_headers` contains `traceparent` at request time (`client._custom_headers` on the OpenAI SDK).
-- **Anthropic auth header mismatch**: the Python Anthropic SDK sets `x-api-key` automatically from `api_key`. The gateway accepts all three (`Bearer`, `x-api-key`, `api-key`), so either works.
+| Symptom | Cause |
+|---|---|
+| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
+| Two spans per call in Trace Explorer | The OpenAI client is also autotracked by the LangWatch SDK. Remove the autotrack for gateway calls. |
+| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
 
-See [API: Errors](/ai-gateway/api/errors) for the full error-code list.
+See [Errors](/ai-gateway/api/errors) for every error code.

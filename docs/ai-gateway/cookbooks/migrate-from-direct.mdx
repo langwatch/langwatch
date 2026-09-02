@@ -1,200 +1,103 @@
 ---
-title: Migrating from direct provider calls
-description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway → providers, without rewriting your integration.
+title: Migrate from direct provider calls
+description: Move an application that calls OpenAI, Anthropic or Google directly onto the LangWatch AI Gateway by changing the base URL and the key, then add budgets and routing without touching the code again.
 sidebarTitle: Migrate from direct
 ---
 
-The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution. This cookbook shows the migration: each client gets the gateway's `baseURL` and reads one virtual key instead of the provider key, and the rest of your integration code stays as it is.
+## What changes
 
-## Before
+The code change is two settings per client: the base URL and the API key. The provider keys move out of your application and into LangWatch, and each application gets a virtual key.
 
-```ts
+<CodeGroup>
+
+```typescript Before
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 ```
 
-## After
-
-```ts
+```typescript After
 const openai = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LANGWATCH_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 const anthropic = new Anthropic({
   baseURL: "https://gateway.langwatch.ai",
-  apiKey: process.env.LANGWATCH_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 ```
 
-Two lines per client: the `baseURL` and the key it reads. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+</CodeGroup>
 
-## Pre-migration checklist
+## 1. Add the provider credentials
 
-- [ ] LangWatch project provisioned (you already have one for tracing, reuse it).
-- [ ] API token with `modelProviders:update` + `virtualKeys:create` at the same ORGANIZATION scope. Use the LangWatch UI → Settings → API Tokens.
-- [ ] Access to the upstream provider accounts (you'll rebind their existing keys inside LangWatch).
+Open **Settings > Model Providers** and add a row per provider your application calls, with the same key it uses today. See [Providers](/ai-gateway/providers/overview).
 
-## Step 1: Configure the providers you already use
+## 2. Create a virtual key
 
-For each provider (OpenAI, Anthropic, Bedrock, Azure, Vertex, Gemini) configure (or reuse) a **ModelProvider** at the organization scope. In the UI: **Settings → Model Providers → Add Model Provider**. Pick `Scope = Organization` so every project in the org inherits the credential.
+Open **AI Gateway > Virtual Keys**, click **New virtual key**, name it after the application, keep **Ownership** on the project you want the traces in, and set a budget if you want one now. Copy the secret into your secret manager.
 
-Then open each row and switch to the **Advanced (Gateway)** tab to set the gateway-only fields:
-
-- **Rate limit (RPM / TPM / RPD)**: caps the gateway applies before dispatch.
-- **Fallback priority**: used when the org's default RoutingPolicy resolves more than one eligible MP (lower wins; tiebreak by createdAt).
-- **Provider config (JSON)**: region/deployment overrides (e.g. `{"region": "us-east-1"}`).
-
-No separate "gateway provider" entity to mint. The credential itself is the only thing.
-
-<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators. The gateway reads from the same store.</Note>
-
-## Step 2: Mint your first virtual key
+From the CLI:
 
 ```bash
-export LANGWATCH_API_KEY="lwp_..."
-
-langwatch virtual-keys create \
-  --name "dev-migration" \
-  --env live \
-  --scope ORG:acme \
-  --format json | tee /tmp/vk.json
-
-export LANGWATCH_VK=$(jq -r '.secret' /tmp/vk.json)
+langwatch vk create \
+  --name acme-support-agent \
+  --scope project:<project_id> \
+  --budget-limit 200 --budget-window month --budget-breach block \
+  -f json | jq -r '.secret'
 ```
 
-Save the secret. It's shown exactly once. The VK lives at `ORG:acme` and inherits every ModelProvider visible from that scope. To pin a specific provider order, create a RoutingPolicy and pass `--routing-policy <id>`; otherwise the org's default ordering applies.
+See [Virtual keys](/ai-gateway/virtual-keys).
 
-## Step 3: Flip the env vars in your app
+## 3. Change the base URL and the key
 
-Dev/staging first:
+| SDK | Base URL |
+|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` |
+| Anthropic | `https://gateway.langwatch.ai` |
+| Google GenAI | `https://gateway.langwatch.ai` |
 
-```bash
-# Before
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-...
+Prefix the model with the provider: `gpt-5-mini` becomes `openai/gpt-5-mini`. A bare `gpt-5-mini`, `claude-*` or `gemini-*` name still resolves when the key reaches that provider, so this step can wait. See [Model naming](/ai-gateway/model-naming).
 
-# After
-OPENAI_API_KEY=$LANGWATCH_VK
-OPENAI_BASE_URL=https://gateway.langwatch.ai/v1
-ANTHROPIC_API_KEY=$LANGWATCH_VK
-ANTHROPIC_BASE_URL=https://gateway.langwatch.ai
-```
+Per SDK and framework: [Python](/ai-gateway/sdks/python), [TypeScript](/ai-gateway/sdks/typescript).
 
-Redeploy. Every request now flows through the gateway.
+## 4. Verify
 
-### Verify the migration is live
+Send one request and read the response headers. `X-LangWatch-Gateway-Request-Id` is present on every response that went through the gateway.
 
 ```bash
-curl -sD- -o/dev/null \
-  -H "Authorization: Bearer $LANGWATCH_VK" \
+curl -si https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -X POST https://gateway.langwatch.ai/v1/chat/completions \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
-  grep -i x-langwatch-
+  -d '{"model": "openai/gpt-5-mini", "messages": [{"role": "user", "content": "ping"}]}' \
+  | grep -i x-langwatch
 ```
 
-You should see `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar, the full trace is already there.
+Open **Trace Explorer** in the key's project: the request is there with its model, tokens and cost. Open **AI Gateway > Usage**: the spend is on the key.
 
-## Step 4: Add your first policy
+## 5. Add what the code could not do
 
-Pick the policy that maps to a real pain you have today:
+Each of these is a setting on the key or the project, with no change in application code.
 
-### Hard cap on engineering spend
+| Need | Where |
+|---|---|
+| A spend cap per application, team, project or end user | [Budgets](/ai-gateway/budgets) |
+| Requests per minute and per day on a key | [Rate limits](/ai-gateway/rate-limits) |
+| Fall over to a second provider when the first fails | [Routing policies](/ai-gateway/governance/routing-policies) and [Fallback chains](/ai-gateway/providers/fallback-chains) |
+| Run an evaluator on the request or the response | [Guardrails](/ai-gateway/guardrails) |
+| Bill your own customers per request | [Billing and spend events](/ai-gateway/billing-events) |
 
-```bash
-langwatch gateway-budgets create \
-  --name "engineering-monthly-cap" \
-  --scope team --team team_eng... \
-  --window month --limit 5000 --on-breach block
-```
+## 6. Remove the provider keys from the application
 
-Every VK attached to engineering principals now shares the $5K/month envelope.
+Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**: the gateway has no copy of the old key and starts returning `401 provider_credential_rejected` until the row is updated.
 
-### Automatic failover when OpenAI is flaky
+## What to expect in error handling
 
-Create a RoutingPolicy listing the ModelProvider ids in dispatch order (OpenAI primary, Anthropic backup), then point the VK at it:
+| Status and code | When |
+|---|---|
+| `402 budget_exceeded` | A `block` budget on the key, the project, the team, the organization, the person or the end user is at its limit. `error.meta.budget_scope` names which. |
+| `400 model_not_allowed` | The model is outside the key's **Provider access** selection or its routing policy. |
+| `429 rate_limited` | The key's RPM or RPD is exhausted. |
+| `403 virtual_key_disabled`, `virtual_key_expired`, `virtual_key_revoked` | The key was disabled, expired or revoked. |
+| `401 provider_credential_rejected` | The provider refused the stored credential. |
 
-```bash
-# Create a policy at org scope
-langwatch routing-policies create \
-  --scope ORG:acme \
-  --name "openai-then-anthropic" \
-  --strategy ordered \
-  --model-provider mp_openai_org \
-  --model-provider mp_anthropic_org \
-  --format json | jq -r '.id'
-# → rp_01HZX...
-
-# Re-bind the VK to it
-langwatch virtual-keys update vk_01HZX... \
-  --routing-policy rp_01HZX...
-```
-
-When OpenAI throws a 503, the gateway re-dispatches the same prompt to Anthropic transparently. Your application sees a normal 200 response. Tune the fallback conditions (5xx / timeout / rate_limit / network_error) via the VK `--config-json` field; the `model_aliases` map still lives there for client-side name redirects.
-
-### Block destructive tools on engineer VKs
-
-```json
-{
-  "policy_rules": {
-    "tools": { "deny": ["^shell\\.exec$", "^filesystem\\.write$"], "allow": null }
-  }
-}
-```
-
-Agent calls like `shell.exec("rm -rf ~")` get `403 tool_not_allowed` before they reach the model, the model never generates the destructive call path in the first place.
-
-## Step 5: Wire trace propagation
-
-If you were already using LangWatch SDKs for tracing, propagate the trace id into the gateway so requests nest under your existing trace (no double-cost-attribution):
-
-```python
-import langwatch
-
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
-    api_key=os.environ["LANGWATCH_VK"],
-    default_headers=langwatch.get_gateway_headers(),
-)
-```
-
-See [Python SDK → trace propagation](/ai-gateway/sdks/python#trace-propagation) and [TypeScript SDK](/ai-gateway/sdks/typescript#trace-propagation).
-
-## Step 6: Rotate the original upstream keys
-
-After a week of running through the gateway, the original upstream keys (`sk-proj-...`, `sk-ant-...`) should no longer be used by any application. Rotate them in the provider console, this is the only time you need to touch upstream again. The gateway still has access via its own encrypted copies of the old keys (fetched from the LangWatch control plane), and will continue to serve traffic uninterrupted.
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
-| `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
-| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules: TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
-| Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
-| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary |
-
-## What NOT to change
-
-- Request bodies: the gateway's whole point is byte-for-byte passthrough. Don't rewrite your payloads.
-- SDKs: the official OpenAI, Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
-- Streaming handlers: SSE passthrough is byte-identical post-first-chunk. Your streaming code should keep working.
-
-## Rollback plan
-
-If the gateway misbehaves, flip the env vars back:
-
-```bash
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=sk-proj-...    # original key
-```
-
-Redeploy. You're back to direct provider calls. Traces in LangWatch stop populating (the trace propagation + gateway spans go away), but your app works.
-
-Plan the first rollout behind a feature flag for this exact reason, 10% traffic through the gateway for a day before going 100%.
-
-## See also
-
-- [Quickstart](/ai-gateway/quickstart): green-field setup without migration.
-- [CI smoke test cookbook](/ai-gateway/cookbooks/ci-smoke-test): automate gateway health verification.
-- [SDK integration](/ai-gateway/sdks/python): trace propagation recipes.
+A provider error is forwarded with the provider's status, and `X-LangWatch-Provider` names the provider. When a routing policy tried more than one provider, `X-LangWatch-Fallback-Count` says how many. See [Errors](/ai-gateway/api/errors).

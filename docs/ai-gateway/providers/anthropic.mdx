@@ -1,57 +1,67 @@
 ---
 title: Anthropic
-description: Configure Anthropic (Claude) as a provider behind the LangWatch AI Gateway.
+description: Add an Anthropic API key under Settings, Model Providers and call Claude models through the LangWatch AI Gateway with the Anthropic or the OpenAI SDK.
 sidebarTitle: Anthropic
 ---
 
-Anthropic is one of the two core providers for the gateway (alongside OpenAI). The `/v1/messages` endpoint is Anthropic-native and designed to be Claude-Code-compatible.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Anthropic**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | Your Anthropic API key. Required unless you set a base URL. |
+| `ANTHROPIC_BASE_URL` | Optional. An Anthropic-compatible endpoint to call instead of `api.anthropic.com`. |
 
-1. Click **Add provider** → **Anthropic**.
-2. Paste your Anthropic API key (starts `sk-ant-...`).
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-The same credential serves the gateway, the evaluators' litellm path, and any other place in LangWatch that needs an Anthropic call.
+## Model names
 
-## Bind to a VK
+Write `anthropic/<model>`, for example `anthropic/claude-sonnet-4-5` or `anthropic/claude-haiku-4-5`. A bare name that starts with `claude-` resolves to Anthropic when the key reaches an Anthropic row.
 
-Pick Anthropic as a primary or fallback on any VK. When a VK uses Anthropic as its primary, its clients should ideally call `/v1/messages` (Anthropic-native shape). But `/v1/chat/completions` also works, the gateway uses bifrost/core to translate the request shape to Anthropic's Messages API and back.
+## Send a request
 
-## Supported endpoints
+The Anthropic SDK sends the virtual key in the `X-Api-Key` header. Set the base URL to `https://gateway.langwatch.ai` without `/v1`; the SDK adds `/v1/messages`.
 
-| Gateway route | Upstream | Notes |
-|---|---|---|
-| `POST /v1/messages` | `POST /v1/messages` | Native shape. Preferred for Claude Code, Anthropic SDK, any tool-using agent. |
-| `POST /v1/chat/completions` | `POST /v1/messages` (translated) | OpenAI SDKs work transparently via translation. |
-| `POST /v1/embeddings` | ❌ not supported | Anthropic has no embeddings endpoint. |
-| `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming | SSE pass-through byte-for-byte (tool-call deltas preserved). |
+<CodeGroup>
 
-## `cache_control` passthrough, the 90-percent discount
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
 
-Anthropic supports prompt caching via `cache_control` blocks on content. Ephemeral (5-min TTL) and persistent (1-hour TTL) caches are both honoured.
+```python Python
+import anthropic
 
-The gateway's hard invariant: **`cache_control` blocks are forwarded byte-for-byte in `cache.mode = respect`** (default). If you see cache-hit costs not matching expectations, first check `X-LangWatch-Cache` response header, `miss` means no cache was hit; `hit` with non-zero `cache_read_input_tokens` means the discount applied.
+client = anthropic.Anthropic(
+    base_url="https://gateway.langwatch.ai",
+    api_key="vk-lw-...",
+)
+message = client.messages.create(
+    model="anthropic/claude-haiku-4-5",
+    max_tokens=64,
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+)
+print(message.content[0].text)
+```
 
-Usage reporting (in the response body and trace) separates three counters:
+</CodeGroup>
 
-- `cache_read_input_tokens`, tokens served from cache (priced at ~10%).
-- `cache_creation_input_tokens`, tokens written to cache (priced at 125%).
-- `input_tokens`, regular cold input tokens.
+An OpenAI SDK call to `/v1/chat/completions` with an Anthropic model also works: the gateway translates the request to the Messages API and the answer back to a chat completion.
 
-The gateway sums these and computes per-request cost for the budget ledger.
+## Endpoints
 
-See [Caching Passthrough](/ai-gateway/caching-passthrough) for the full decision matrix and override headers.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/messages` | Yes, forwarded as is |
+| `POST /v1/chat/completions` | Yes, translated to Messages |
+| `POST /v1/embeddings` | No. Anthropic has no embeddings API; the gateway returns Anthropic's rejection |
+| `GET /v1/models` | Yes, from the Anthropic catalog |
 
-## Known quirks
-
-- **`max_tokens` required**, Anthropic requires `max_tokens` on every Messages request. The gateway does not default-insert a value; a client that omits it gets the upstream 400 back.
-- **System prompt structure**: Anthropic Messages uses a top-level `system` field (string or content blocks), not a message role. OpenAI-SDK clients that send a `system` role message get it rewritten into the top-level field by the translator.
-- **Tool-call streaming deltas**: Anthropic emits `content_block_delta` events with `input_json_delta` partial JSON. The gateway proxies these byte-for-byte post-first-chunk so Claude Code (and any other agent) can reconstruct the tool call incrementally.
-- **`thinking` (extended-reasoning) blocks**, available on Claude Opus, Sonnet extended-thinking models. Blocks appear in the response; pricing is separate. Thinking-token counts roll into `langwatch.usage.output_tokens` + debit the budget; a dedicated `langwatch.reasoning_tokens` span attribute is a v1.1 observability follow-up.
-
-## Using via Claude Code
-
-See [Claude Code](/ai-gateway/cli/claude-code): set `ANTHROPIC_BASE_URL=https://gateway.langwatch.ai` and `ANTHROPIC_AUTH_TOKEN=vk-lw-…` and it works.
+`cache_control` blocks pass through unchanged and the cache read and write token counts come back in `usage`. See [Caching passthrough](/ai-gateway/caching-passthrough).

@@ -76,7 +76,7 @@ The response is a normal OpenAI chat completion. The gateway adds these response
 | Header | Value |
 |---|---|
 | `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support. |
-| `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id` | The trace and span the gateway recorded for this request. |
+| `Traceparent` | The W3C trace context of the span the gateway recorded in your project. Send your own `traceparent` header on the request to nest that span in your trace. |
 | `X-LangWatch-Budget-Warning` | Present when a budget on this key is at 80 percent or more, as `scope:percent`. |
 
 For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. The SDK sends the key in the `X-Api-Key` header, which the gateway accepts. See [Python SDK](/ai-gateway/sdks/python) and [TypeScript SDK](/ai-gateway/sdks/typescript).

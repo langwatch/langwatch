@@ -1,63 +1,47 @@
 ---
 title: Custom OpenAI-compatible
-description: Point the gateway at any OpenAI-compatible endpoint (self-hosted vLLM, Ollama, Groq, Fireworks, Together, private fine-tunes).
+description: Add any OpenAI-compatible endpoint, for example vLLM, Ollama or an internal inference server, under Settings, Model Providers and call it through the LangWatch AI Gateway.
 sidebarTitle: Custom OpenAI-compatible
 ---
 
-The Custom OpenAI-compatible provider accepts any HTTP endpoint that implements the OpenAI Chat Completions shape, covering self-hosted servers (vLLM, SGLang, Ollama, LocalAI, TGI), hosted inference platforms (Groq, Together, Fireworks, Anyscale), and private fine-tunes exposed via an OpenAI-shape proxy.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Custom (OpenAI-compatible)**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `CUSTOM_BASE_URL` | The endpoint, for example `https://inference.acme.internal/v1`. A trailing `/v1` is accepted. |
+| `CUSTOM_API_KEY` | Optional. Sent as `Authorization: Bearer` when set. |
 
-1. **Add provider → Custom (OpenAI-compatible)**.
-2. Fill:
-    - **Name**: human label (e.g. `internal-vllm`, `groq`).
-    - **Base URL**: without the `/chat/completions` suffix (e.g. `https://api.groq.com/openai/v1`, `http://vllm.internal:8000/v1`).
-    - **Auth mode**: `Bearer` (default), `api-key` header, or `custom header` (for non-standard keys).
-    - **API key**: or leave blank for unauthenticated self-hosted endpoints.
-    - **Supported models**: optional allowlist to expose a curated subset via `/v1/models`.
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Supported endpoints (varies by upstream)
+Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
 
-The gateway forwards requests 1:1 to the upstream path (`/v1/chat/completions`, `/v1/embeddings`). If the upstream doesn't implement a path, the gateway returns the upstream's 404 or 405.
+The endpoint must be reachable from the gateway. The gateway always refuses link-local and cloud metadata addresses, and refuses private and loopback addresses when it runs with `BLOCK_LOCAL_HTTP_CALLS=true`.
 
-Common subsets:
+## Model names
 
-- **Groq, Together, Fireworks**: chat + embeddings (depends on the model).
-- **vLLM, SGLang**: chat + embeddings (depends on the model).
-- **Ollama**: chat (via the OpenAI-compat endpoint mode).
+Write `custom/<model>`, for example `custom/qwen3-14b`. Give the row a **Routing handle** when you have several custom endpoints: `acme-gpu/qwen3-14b` pins that row.
 
-## Model id format
+## Send a request
 
-Pass the upstream-native model id directly. Aliases still work:
-
-```json
-{
-  "model_aliases": {
-    "llama-70b":   "custom-groq/llama-3.3-70b-versatile",
-    "mixtral":     "custom-together/mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "fine-tuned":  "custom-internal/my-rag-model"
-  }
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "custom/qwen3-14b",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-The prefix before `/` is the ModelProvider's **Name** (e.g. `custom-groq`); everything after is the upstream model id.
+## Endpoints
 
-## Caching
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes, when the endpoint serves it |
+| `GET /v1/models` | Yes, the names under Custom Models |
 
-Gateway default `cache.mode = respect` forwards any cache-control headers or body fields the upstream understands. OpenAI-compatible servers rarely expose a prompt-caching API, so `X-LangWatch-Cache` reads as `miss` unless the upstream implements one.
-
-## Known quirks
-
-- **Streaming format drift.** Some OpenAI-compatible servers diverge on SSE chunk format (extra newlines, differing `[DONE]` casing, missing `data:` prefix on metadata frames). Test streaming early; bifrost/core normalises what it can but edge cases may require a client retry.
-- **Auth header unconventional.** Ollama historically uses no auth; vLLM uses Bearer; some self-hosted deployments use `X-Api-Key`. Pick the right mode at ModelProvider config time.
-- **`/v1/embeddings` response shape**, OpenAI-spec says each embedding is a list of floats. Some providers emit a single flat float array. Bifrost/core coerces to spec shape.
-- **Model allowlist enforcement.** If the upstream serves 100 models and you only want 3 exposed, set `models_allowed` on the VK rather than the ModelProvider, it's per-VK, so different VKs can curate different subsets.
-
-## Use cases
-
-- **Private fine-tunes.** Your ML team deploys a vLLM serving a fine-tuned model on internal infra. The gateway makes it accessible to every engineer's coding CLI with a VK, governed like any other model.
-- **Hosted inference platforms.** Groq, Together, Fireworks, DeepInfra ship OpenAI-compat APIs at competitive prices. Binding them behind the gateway lets you A/B against OpenAI without application changes.
-- **Local dev.** An engineer on the road can point the gateway at a local `ollama` server to work offline while preserving the same VK-based auth contract.
+Streaming, tools and other features depend on what the endpoint implements. A feature the endpoint does not support comes back as the endpoint's own error.

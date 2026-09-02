@@ -1,0 +1,39 @@
+---
+title: OpenAI account
+description: Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.
+sidebarTitle: OpenAI account
+---
+
+## What the OpenAI account provider is
+
+The OpenAI account provider is a credential backed by a ChatGPT subscription instead of an API key. Requests go to OpenAI's Codex backend and count against that subscription's plan.
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Codex (OpenAI account)**. The row has no key fields. Click the sign-in button, open the URL it shows and enter the code. The code is valid for 15 minutes. LangWatch stores the tokens and refreshes them.
+
+## Model names
+
+Write `openai_codex/<model>`, for example `openai_codex/gpt-5.6-terra`.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/responses \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai_codex/gpt-5.6-terra",
+    "input": "Say hi in one word"
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/responses` | Yes, streamed from OpenAI |
+| `POST /v1/messages` | Yes, translated to Responses |
+| `POST /v1/chat/completions`, `POST /v1/embeddings` | No, rejected with HTTP 400 |
+
+If OpenAI answers 401, the gateway refreshes the session once. If the refresh is rejected, the request fails with `codex_session_expired`. Sign in again on the row.

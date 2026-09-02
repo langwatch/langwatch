@@ -1,0 +1,39 @@
+---
+title: Cerebras
+description: Add a Cerebras API key under Settings, Model Providers and call Cerebras models through the LangWatch AI Gateway.
+sidebarTitle: Cerebras
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Cerebras**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `CEREBRAS_API_KEY` | Your Cerebras API key. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write `cerebras/<model>`, for example `cerebras/llama-3.3-70b`. The gateway does not infer Cerebras from a bare name.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "cerebras/llama-3.3-70b",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `GET /v1/models` | Yes, from the Cerebras catalog |

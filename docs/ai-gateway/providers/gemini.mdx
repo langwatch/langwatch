@@ -1,64 +1,61 @@
 ---
 title: Google Gemini
-description: Configure Google Gemini (AI Studio) as a provider behind the LangWatch AI Gateway.
-sidebarTitle: Google Gemini
+description: Add a Gemini API key under Settings, Model Providers and call Gemini models through the LangWatch AI Gateway with the OpenAI SDK or the Google GenAI SDKs.
+sidebarTitle: Gemini
 ---
 
-Google AI Studio serves Gemini through the "plain" Google API, distinct from Vertex. It uses API-key auth and needs no GCP project setup.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Gemini**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `GEMINI_API_KEY` | A Google AI Studio API key, or a Google Cloud API key when you set a project. |
+| `GEMINI_PROJECT` | Optional. A Google Cloud project id. Set it together with the location to call the Gemini API on Vertex AI instead of AI Studio. |
+| `GEMINI_LOCATION` | Optional. The location for the project, for example `us-central1`. Set both or neither. |
 
-1. **Add provider → Google Gemini**.
-2. Paste the AI Studio API key (starts with a long alphanumeric string).
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Supported models
+## Model names
 
-- `gemini-2.5-flash`, fast + cheap. Default recommendation for coding CLIs on a Gemini-first VK.
-- `gemini-2.5-pro`, bigger, more capable.
-- `gemini-2.0-flash`, prior generation.
-- `gemini-2.0-pro`, prior generation.
-- Embedding models: `text-embedding-004`, `gemini-embedding-001`.
+Write `gemini/<model>`, for example `gemini/gemini-2.5-flash`. A bare name that starts with `gemini-` resolves to Gemini when the key reaches a Gemini row.
 
-Expose via VK `model_aliases`:
+## Send a request
 
-```json
-{
-  "model_aliases": {
-    "gemini-flash": "gemini/gemini-2.5-flash",
-    "gemini-pro":   "gemini/gemini-2.5-pro"
-  }
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini/gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-## Supported endpoints
+## Google GenAI SDKs
 
-- `POST /v1/chat/completions`, OpenAI-shape dispatched to Gemini's `generateContent`, `streamGenerateContent` endpoint.
-- `POST /v1/embeddings`, for Gemini embedding models.
+The Google GenAI SDKs call `/v1beta/*`. Point them at the gateway host and send the virtual key as the API key. The SDK puts it in the `X-Goog-Api-Key` header, which the gateway accepts.
 
-Gemini has no `/v1/messages` equivalent; Anthropic-shape clients should use a VK that has Anthropic or Bedrock as primary.
+```python
+from google import genai
 
-## Context caching
+client = genai.Client(
+    api_key="vk-lw-...",
+    http_options={"base_url": "https://gateway.langwatch.ai"},
+)
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Say hi in one word",
+)
+print(response.text)
+```
 
-Gemini has an implicit context cache for prompts > 32k tokens. Support varies by model. The gateway forwards requests untouched; caching behaviour is entirely upstream-managed.
+## Endpoints
 
-For explicit caching, Gemini offers a separate `caches.create` API that the gateway does not orchestrate in v1, but clients can call Gemini directly to create a cache and reference it in subsequent gateway calls.
-
-## Known quirks
-
-- **Safety filters on by default.** Gemini applies `safetySettings` thresholds that return `finish_reason: SAFETY` when content crosses the threshold. Bifrost/core surfaces this as `provider_error` with the safety metadata in the OTel trace.
-- **Rate limits.** AI Studio's free tier has aggressive rate limits; the paid tier requires a Google account with billing attached. A 429 triggers fallback if configured.
-- **Tool/function calling.** Gemini has its own function-calling format that bifrost/core translates from OpenAI-shape tools. Tool-call streaming deltas are less mature on Gemini, expect byte-level differences vs OpenAI.
-- **Streaming chunks size.** Gemini's streaming emits larger chunks than OpenAI, fewer, bigger SSE frames. Gateway passes these through unchanged.
-- **No `system` role.** Gemini uses `systemInstruction` at the top level of the request. OpenAI-SDK clients that send a `system` role message get it rewritten by the translator.
-
-## AI Studio vs Vertex
-
-Google has two paths to Gemini:
-
-- **AI Studio** (this page), quickest, API-key auth, pay-as-you-go on a consumer-ish billing model.
-- **Vertex AI**: GCP-native, IAM-governed, data-residency, enterprise SLAs. See [Vertex](/ai-gateway/providers/vertex).
-
-Use AI Studio for dev, scoping, SaaS; use Vertex for production enterprise.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes |
+| `/v1beta/*` | Yes, forwarded to the Gemini API |
+| `GET /v1/models` | Yes, from the Gemini catalog |

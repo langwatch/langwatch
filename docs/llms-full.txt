@@ -3159,171 +3159,117 @@ Earlier v3.0 builds wrote gateway audit rows to a dedicated `GatewayAuditLog` ta
 # FILE: ./ai-gateway/billing-events.mdx
 
 ---
-title: Billing & Spend Events
-description: One spend event per gateway request, delivered by signed webhooks and reconcilable over REST. The money contract, settled requests, supersession, and the two-grain reconciliation workflow.
-sidebarTitle: Billing & Spend Events
+title: Billing and spend events
+description: One spend event per LangWatch AI Gateway request, with token counts, cost and attribution, delivered to your webhook endpoints and served over REST for reconciliation and rebilling.
+sidebarTitle: Billing and spend events
 keywords: spend events, billing events, rebilling, reconciliation, nano USD, settled, replay, usage metering
 ---
 
-Every request through the AI Gateway produces one **spend event**: token quantities by class, rated cost, and attribution (the virtual key, the end user, your echoed metadata). Spend events are pushed to your systems through [webhook endpoints](/features/webhooks) and pulled back for reconciliation over REST. Together they are the metering feed for platforms that rebill their own customers.
+## What a spend event is
 
-Three properties make the feed billing-grade:
+A spend event is the record of one gateway request: the tokens by class, the cost, the virtual key, the end user and the metadata the request carried. LangWatch delivers spend events to your [webhook endpoints](/features/webhooks) and serves the same events over REST.
 
-- **Nothing is silently missing.** A request whose confirmation never arrived still produces an event, typed `settled`, with its cost marked unknown rather than zero. The worst case is a recorded request with an unknown cost, never a missing request.
-- **Everything is idempotent.** Event ids are stable across retries and replays. Recorded spend is never mutated: budget resets move period boundaries, corrections arrive as new events, and the ledger is append-only.
-- **Push and pull agree.** The pull surface serves the same canonical envelopes the webhooks deliver, from the same ledger, so a checksum mismatch means something real.
+Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
 
-<Note>
-The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
-</Note>
+Spend events, spend summaries and the webhook endpoints are an Enterprise capability. The routes need an organization API key with `gatewaySpend:view`; replay needs `gatewaySpend:manage`. A project API key on these routes gets HTTP 401 `credential_class_mismatch`. See [RBAC](/ai-gateway/rbac).
 
-<Warning>
-**These endpoints take an organization API key, not a project one.** `spend-events`, `spend-summaries`, and `end-users/:id/spend` are organization-level, while [budgets and virtual keys](/ai-gateway/api/management) accept your project key. Using a project key here answers `401` with `error.code = "invalid_credentials"` and says so: create an admin key under **Settings > API Keys**.
-</Warning>
+## Event lifecycle
 
-## The spend event
+| Status | Event type | Meaning |
+|---|---|---|
+| `admitted` | `gateway.request.admitted` | The request entered the pipeline. Served over REST only, never delivered by webhook. |
+| `success` | `gateway.request.completed` | The provider answered. Usage and cost are final. |
+| `error` | `gateway.request.completed` | The request failed, at the provider or in the gateway. Usage may be zero. |
+| `settled` | `gateway.request.settled` | No outcome arrived within 30 minutes of admission. The request is recorded with an unknown cost, and `needs_reconciliation` is `true`. |
 
-Spend events ride the standard envelope (`{id, type, created, schema_version, data}`). The `data` payload:
+An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-```json
-{
-  "event_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T:completed",
-  "event_type": "gateway.request.completed",
-  "gateway_request_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T",
-  "occurred_at": "2026-07-27T14:03:11.482Z",
-  "organization_id": "org_01H...",
-  "project_id": "proj_01H...",
-  "virtual_key_id": "vk_01H...",
-  "principal_user_id": null,
-  "end_user_id": "d7dcef1e-0755-4ad1-b31a-c253fc27e8bf",
-  "trace_id": "cbabd1d8-4f...",
-  "model": "bedrock/global.anthropic.claude-sonnet-5",
-  "model_provider_id": "mp_01H...",
-  "request_type": "chat_completions",
-  "usage": {
-    "input_tokens": 869,
-    "output_tokens": 207,
-    "cache_read_input_tokens": 0,
-    "cache_creation_input_tokens": 0,
-    "reasoning_tokens": 0
-  },
-  "cost": {
-    "total_usd": "0.003808",
-    "nano_usd": 3808000,
-    "rate_version": "2026-07-15"
-  },
-  "status": "success",
-  "needs_reconciliation": null,
-  "settle_reason": null,
-  "error": null,
-  "duration_ms": 3878,
-  "labels": ["tier:pro"],
-  "metadata": { "tenant_org": "acme-172", "environment": "production" }
-}
-```
+Event ids are stable: `<gateway_request_id>:<completed|settled|admitted>`. A retried or replayed delivery carries the same id, so you can dedupe on it. Recorded spend never changes: a budget reset moves a period boundary and leaves every event as it was.
 
-Field notes:
+## The event payload
 
-- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same id your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
-- **`occurred_at`** is request time, never ingest or delivery time. Late events land in the right invoice period.
-- **`status`** is `success` or `error` on completed events. Failed provider calls are events too; `error` carries `{class, http_status}` so your billing decides whether to charge for them.
-- **`end_user_id`** is the attributed end user (see [attribution](#attribution-what-the-request-carries)). **`metadata`** is your caller echo, returned verbatim: this is how billing joins events to your own tenant and user records.
-- **`model_provider_id`** names the provider credential that actually served the request.
+Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type", "created", "schema_version": "1", "data" }`. The `data` object:
 
-### Money representation
+| Field | Meaning |
+|---|---|
+| `event_id`, `event_type` | The same values as the envelope `id` and `type`. |
+| `gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
+| `occurred_at` | The request time. Periods and windows are placed on this time. |
+| `organization_id`, `project_id` | The organization, and the trace project of the virtual key. |
+| `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`. |
+| `trace_id` | The trace in Trace Explorer. |
+| `model`, `model_provider_id`, `request_type` | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `realtime_session` or `passthrough`. |
+| `usage` | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`. `input_tokens` excludes the cached and audio tokens. `reasoning_tokens` is a subset of `output_tokens`. `null` on `settled` and `admitted`. |
+| `cost` | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`. |
+| `status` | `success`, `error`, `settled` or `admitted`. |
+| `needs_reconciliation`, `settle_reason` | `true` and `confirmation_deadline_expired` on `settled`. |
+| `error` | `{ "class", "http_status" }` on `error`, else `null`. `class` is the gateway error code, for example `budget_exceeded` or `provider_error`. |
+| `duration_ms` | The request duration, `null` when unknown. |
+| `labels` | The tags set on the virtual key. |
+| `metadata` | The JSON object your request sent in the `X-LangWatch-Metadata` header, or `{}`. |
 
-Get your ingest right once:
-
-- Quantities are exact integers per token class: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`.
-- Cost is **`cost.nano_usd`**, an int64 in billionths of a USD ($0.003808 arrives as `3808000`), together with **`rate_version`**, the pricing catalog version used to rate it. `total_usd` is a display-friendly decimal string of the same amount.
-- Never parse floats for money. Sum the integers; round exactly once, at invoice time. Currency is USD, single and stated.
-
-### Settled events and supersession
-
-A request is **admitted** when the gateway accepts it and **confirmed** when its outcome (tokens, cost, duration) arrives. If the confirmation never arrives inside the settlement window (30 minutes by default), the request is settled:
-
-```json
-{
-  "event_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T:settled",
-  "event_type": "gateway.request.settled",
-  "gateway_request_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T",
-  "usage": null,
-  "cost": null,
-  "duration_ms": null,
-  "status": "settled",
-  "needs_reconciliation": true,
-  "settle_reason": "confirmation_deadline_expired"
-}
-```
-
-The rules:
-
-- Quantities, cost, and duration are **`null`**: unknown is not zero. Never book a settled event as $0.
-- A settled request **never** appears in the completed stream, so your billing can trust `completed` for money and treat `settled` as a work queue.
-- If the confirmation later arrives, a real `gateway.request.completed` for the same `gateway_request_id` follows and **supersedes** the settled event. Your consumer replaces the settled figure with the completed one. **Replace, never sum.** The type-suffixed event ids exist precisely so your dedup layer does not swallow the second event.
+Cost is priced by LangWatch from the token counts and the model pricing, in the same way as the cost on a trace. Sum `nano_usd` for money; use `total_usd` for display.
 
 ## Attribution: what the request carries
 
-Attribution is captured on the request path; nothing is provisioned per end user.
+| Value | Source, in order |
+|---|---|
+| End user | The `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field on chat, messages, embeddings, responses and speech requests. |
+| Metadata | The `X-LangWatch-Metadata` header: a JSON object of at most 4096 bytes. An invalid value is dropped. |
+| Labels | The tags on the virtual key. |
+| Person | The principal of a personal key. |
 
-- **End-user id** resolution precedence: the `x-langwatch-end-user-id` header, then `x-litellm-end-user-id` (a migration alias, accepted so LiteLLM-shaped clients need no change), then the OpenAI `user` body field. Headers win over the body.
-- **Metadata echo**: send `x-langwatch-metadata` (a JSON object, 4 KB cap). It returns verbatim as `metadata` on every spend event for that request.
-- **Request id**: an authenticated gateway response carries `X-LangWatch-Gateway-Request-Id`, the same id that keys the spend event.
+The gateway removes the `X-LangWatch-*` headers before it forwards the request to the provider. The `user` body field is forwarded unchanged. Every value is stored as sent, so keep personal data out of end-user ids and metadata; events are retained for 13 months.
 
-One resolver feeds both metering and [per-end-user budget enforcement](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates), so billing and capping can never disagree about who a request was.
-
-<Note>
-**`end_user_id` is whatever you send.** The gateway stores and echoes it verbatim, so if your application passes a raw email address in the OpenAI `user` field, that address is what lands in webhook payloads, ledger rows, and the reconciliation pull, and it stays there for the 13-month retention window.
-
-Pass a **stable pseudonymous id** instead, such as a hash of the account id, whenever you would rather not have personal data in those places. It has to be stable, because it is the identity budgets and rollups group by; a value that changes per session bills the same person as many.
-</Note>
-
-## Reconciliation: two grains, one ledger
-
-The pull surface reads the spend **ledger**, not the webhook stream, so it includes settled rows and admitted (in-flight) rows the push deliberately types differently. Reconcile in two passes: checksums first, item diff only on divergence.
-
-### Fast path: aggregate checksums
-
-```
-GET /api/gateway/v1/spend-summaries?group_by=virtual_key&from=1751328000000&to=1753920000000
+```python
+client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Hi"}],
+    user="cust_8841",
+    extra_headers={"X-LangWatch-Metadata": '{"plan": "pro", "feature": "summarize"}'},
+)
 ```
 
-`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` and `virtual_key_id` optionally narrow, the latter to one key's traffic. Rows come back ordered by group key, with a `next_cursor` when the window held more than one page: follow it the same way the item walk does, because a full page does not mean the window is exhausted. Each row:
+## Receive events by webhook
 
-```json
-{
-  "key": "vk_01H...",
-  "event_count": 18412,
-  "settled_count": 3,
-  "usage": {
-    "input_tokens": 10233801,
-    "output_tokens": 2214410,
-    "cache_read_input_tokens": 3400122,
-    "cache_creation_input_tokens": 90212,
-    "reasoning_tokens": 0
-  },
-  "cost": { "total_usd": "184.402117", "nano_usd": 184402117000 }
-}
+Create an endpoint under **AI Gateway > Webhooks** and subscribe it to `gateway.request.completed` and `gateway.request.settled`, or to `gateway.*`. Deliveries are `POST` requests with a `{ "batch": [ ...envelopes ] }` body and these headers:
+
+| Header | Value |
+|---|---|
+| `X-LangWatch-Signature` | `t=<unix seconds>,v1=<hex>`: HMAC-SHA256 of `<t>.<raw body>` with the endpoint secret. During a secret rotation a second `v1=` is present for the previous secret, valid for 24 hours. Reject a timestamp older than 300 seconds. |
+| `X-LangWatch-Delivery-Id`, `X-LangWatch-Delivery-Attempt` | The delivery and the attempt number. |
+| `X-LangWatch-Test-Fire` | `true` on a test delivery sent from the endpoint page. |
+
+Answer with a 2xx. A failed delivery is retried after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours and 12 hours, then every 12 hours, up to 11 attempts. A `Retry-After` header on your response is honoured as a minimum. See [Webhooks](/features/webhooks) for endpoints, secrets and the delivery log.
+
+The same endpoints receive `gateway.budget.threshold_crossed`, `gateway.budget.breached` and the `gateway.virtual_key.*` lifecycle events. See [Budgets](/ai-gateway/budgets#block-and-warn) and [Virtual keys](/ai-gateway/virtual-keys#rotate-disable-expire-and-revoke).
+
+## Read events over REST
+
+Both routes take `from` and `to` as epoch milliseconds, required, and a `cursor` from the previous page.
+
+```bash
+# One row per virtual key over July, for a checksum against your ledger
+curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-summaries?group_by=virtual_key&from=1782864000000&to=1785542400000" \
+  -H "X-Auth-Token: $LANGWATCH_ORG_API_KEY"
+
+# The events of one key, for the item diff
+curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-events?virtual_key_id=vk_01HZX...&from=1782864000000&to=1785542400000" \
+  -H "X-Auth-Token: $LANGWATCH_ORG_API_KEY"
 ```
 
-`settled_count` counts unpriced requests separately; settled rows are **never** included in the cost sums. Compare a closed period's `event_count` and `nano_usd` against what your billing ingested. Matching checksums end the reconciliation; totals-only comparison is not enough on divergence, because one dropped and one duplicated request of similar cost can net to nearly zero.
+| Route | What it returns |
+|---|---|
+| `GET /api/gateway/v1/spend-summaries` | `{ "data": [{ "key", "group", "bucket_start", "event_count", "settled_count", "usage", "cost": { "total_usd", "nano_usd" } }], "next_cursor" }`. `group_by` takes one or two of `virtual_key`, `end_user`, `project`, `model`, `provider`, `principal`, `request_type`. `bucket` is `none`, `hour` or `day`, with `timezone` as an IANA name. `limit` defaults to 500, at most 1000. |
+| `GET /api/gateway/v1/spend-events` | `{ "data": [ ...envelopes ], "next_cursor" }`, oldest first. `limit` defaults to 50, at most 200. |
+| `GET /api/gateway/v1/end-users/:id/spend` | `{ "data": { "end_user_id", "window", "from", "to", "cost", "request_count", "usage", "caps": [...] } }`. `window` is `day`, `week` or `month` (24 hours, 7 days, 30 days back from now), or pass `from` and `to`. `caps` lists the per-end-user budgets that apply, each with `budget_id`, `window`, `on_breach`, `limit_usd`, `spent_usd` and `period_started_at`. |
+| `POST /api/gateway/v1/spend-events/replay` | Body `{ "from", "to", "endpoint_id" }`, at most 7 days and 10,000 events. Re-delivers the events in the window to that endpoint with their original ids. Needs `gatewaySpend:manage`. |
 
-### Item diff: the cursor walk
+Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
 
-```
-GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
-```
+A summary grouped by `model` or `provider`, or bucketed by time, is refused with `gateway_spend_group_by_unstable` when the window ends less than 30 minutes ago, because outcomes can still arrive. `meta.settles_at` says when the window is stable.
 
-- `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
-- Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
-- Filters: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). The same twelve narrow the summaries, with one exception: `status=admitted` is refused there, because a rollup sums the cost of requests past admission and an in-flight request has none to contribute. `limit` defaults to 50, max 200.
-- Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
-- A garbled `cursor` is refused with `400` rather than silently restarting the walk.
-- In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
-
-### From the SDKs
-
-Both SDKs walk these two grains for you, so the reconciliation job is a loop rather than cursor bookkeeping. Reads on this surface need an **organization** API key.
+## Reconcile with the SDKs
 
 <CodeGroup>
 
@@ -3364,134 +3310,15 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 
 </CodeGroup>
 
-`iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
+`iterSummaries` and `iterate` (`iter_summaries` and `iterate` in Python) fetch the pages for you. `summariesPage` and `listPage` (`summaries_page` and `list_page`) return one page with its cursor, for a reconciliation you checkpoint across runs. `replay` calls the replay route.
 
-Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow. The one filter the summaries take differently is `status`, which does not accept `admitted` there: list the events for in-flight requests.
+## See events in the UI
 
-The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
+**AI Gateway > Billing events** lists the events with filters on virtual key, end user, model, status and day range, and links each event to its trace.
 
-
-<CodeGroup>
-
-```typescript TypeScript
-for await (const row of langwatch.spendEvents.iterSummaries({
-  groupBy: ["model", "end_user"],
-  bucket: "day",
-  timezone: "Europe/Amsterdam",
-  from, to,
-  model: ["gpt-5-mini", "claude-opus-5"],
-  metadata: { customer_tier: "gold" },
-})) {
-  bill(row.group, row.bucket_start, row.cost.nano_usd);
-}
-```
-
-```python Python
-for row in langwatch.spend_events.iter_summaries(
-    group_by=["model", "end_user"],
-    bucket="day",
-    timezone="Europe/Amsterdam",
-    from_ms=from_ms,
-    to_ms=to_ms,
-    model=["gpt-5-mini", "claude-opus-5"],
-    metadata={"customer_tier": "gold"},
-):
-    bill(row["group"], row["bucket_start"], row["cost"]["nano_usd"])
-```
-
-</CodeGroup>
-
-The full vocabulary, and the groupings that are refused rather than served approximately (`model`, `provider`, and time buckets), are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
-
-### The settled work queue
-
-`GET /api/gateway/v1/spend-events?status=settled&from=...&to=...` lists requests recorded without a price. Each is bounded, visible, and resolvable; when a late confirmation supersedes one, it leaves this queue and the completed event carries the money.
-
-### Retention
-
-Spend records are retained for a **fixed 13 months**, independent of your organization's [trace retention settings](/platform/data-retention#billing-records-are-exempt). A tenant retention policy shrunk to weeks does not touch billing records. The 13 months bound your reconciliation and replay window by contract.
-
-## Per-end-user spend
-
-The read a rebilling platform polls at period close, or renders in its own UI next to the user's allowance:
-
-```
-GET /api/gateway/v1/end-users/:end_user_id/spend
-```
-
-One call answers both halves of the question: what this user consumed over a window, and which caps that counts against.
-
-```json
-{
-  "data": {
-    "end_user_id": "d7dcef1e-0755-4ad1-b31a-c253fc27e8bf",
-    "window": "month",
-    "from": "2026-06-27T14:03:11.482Z",
-    "to": "2026-07-27T14:03:11.482Z",
-    "cost": { "total_usd": "0.412209", "nano_usd": 412209000 },
-    "request_count": 218,
-    "usage": {
-      "input_tokens": 184220,
-      "output_tokens": 41022,
-      "cache_read_input_tokens": 0,
-      "cache_creation_input_tokens": 0,
-      "reasoning_tokens": 0
-    },
-    "caps": [
-      {
-        "budget_id": "bgt_01H...",
-        "anchor_id": "vk_01H...",
-        "window": "month",
-        "on_breach": "block",
-        "limit_usd": "25",
-        "spent_usd": "0.412209",
-        "period_started_at": "2026-07-01T00:00:00.000Z"
-      }
-    ]
-  }
-}
-```
-
-- **The rollup** (`cost`, `request_count`, `usage`) reads the spend ledger over a **rolling** window: `window` is `day`, `week`, or `month` (last 24 hours, 7 days, or 30 days, defaulting to `month`), and explicit `from`/`to` in unix milliseconds override it.
-- **`caps`** is every [attributed-user template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) in your organization that applies to this user, each carrying its **current budget period** spend, boundary-aware, which is the figure enforcement uses. That period is the budget's own, so it will not match the rolling rollup above unless the two happen to align; the rollup is for showing usage, `caps` is for showing headroom. An empty array means no template applies to that user.
-- `virtual_key_id` narrows both the rollup and the caps to one anchor key.
-
-Served on the billing surface: organization API key, `gatewaySpend:view`.
-
-## Replay
-
-```
-POST /api/gateway/v1/spend-events/replay
-{"from": 1753747200000, "to": 1753833600000, "endpoint_id": "whep_01H..."}
-```
-
-Re-delivers the window's spend envelopes to **one** endpoint through the normal delivery path: per-endpoint stream, retry ladder, delivery log, and the endpoint's own event subscriptions. Envelope ids are **unchanged**, so your consumer's event-id dedup decides what a redelivery means.
-
-Caps and caveats:
-
-- The window is capped at **7 days** per call, and a window holding more than **10,000** envelopes is refused with a request to narrow it.
-- The response reports `{endpoint_id, replay_id, replayed, window}`; `replay_id` identifies this replay in delivery bookkeeping without touching envelope ids.
-- **Downstream dedup windows are finite** (Metronome documents 34 days, Stripe meters 24 hours and up). Replaying a range older than your billing system's dedup window can double-bill on your side. For old ranges, prefer pull-and-diff over replay.
-
-Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your organization.
-
-## The ledger UI
-
-**Settings > Gateway > Billing events** (`/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
-
-## Operational notes
-
-- **Failed requests are events.** Decide explicitly whether your billing charges for provider errors; `status` and `error` give you the branch.
-- **Blocked requests are not.** A request rejected before dispatch (budget breach, missing end-user id, disabled key) produced no provider spend and no spend event. The rejection is visible on the [budget events](/features/webhooks#family-gateway) and in gateway metrics instead.
-- **Settlement window**: 30 minutes by default. Self-hosted deployments can tune it; see [self-hosting webhooks and billing](/self-hosting/webhooks).
-- **No content, ever.** Spend events carry ids, counts, classes, and your metadata echo. Prompts and responses never enter the billing pipe.
-
-## See also
-
-- [Webhooks](/features/webhooks): endpoints, signatures, retries, health, the events log.
-- [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling): the end-to-end cookbook, with the runnable demo repo.
-- [Budgets](/ai-gateway/budgets): caps on tenants and end users, thresholds, resets.
-- [Virtual keys](/ai-gateway/virtual-keys): the tenant credential, disable and revoke semantics.
+<Note>
+**Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.
+</Note>
 
 ---
 
@@ -6079,356 +5906,314 @@ The pair every tenant dashboard wants, current spend against the cap:
 # FILE: ./ai-gateway/cookbooks/migrate-from-direct.mdx
 
 ---
-title: Migrating from direct provider calls
-description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway → providers, without rewriting your integration.
+title: Migrate from direct provider calls
+description: Move an application that calls OpenAI, Anthropic or Google directly onto the LangWatch AI Gateway by changing the base URL and the key, then add budgets and routing without touching the code again.
 sidebarTitle: Migrate from direct
 ---
 
-The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution. This cookbook shows the migration: each client gets the gateway's `baseURL` and reads one virtual key instead of the provider key, and the rest of your integration code stays as it is.
+## What changes
 
-## Before
+The code change is two settings per client: the base URL and the API key. The provider keys move out of your application and into LangWatch, and each application gets a virtual key.
 
-```ts
+<CodeGroup>
+
+```typescript Before
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 ```
 
-## After
-
-```ts
+```typescript After
 const openai = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LANGWATCH_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 const anthropic = new Anthropic({
   baseURL: "https://gateway.langwatch.ai",
-  apiKey: process.env.LANGWATCH_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 ```
 
-Two lines per client: the `baseURL` and the key it reads. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+</CodeGroup>
 
-## Pre-migration checklist
+## 1. Add the provider credentials
 
-- [ ] LangWatch project provisioned (you already have one for tracing, reuse it).
-- [ ] API token with `modelProviders:update` + `virtualKeys:create` at the same ORGANIZATION scope. Use the LangWatch UI → Settings → API Tokens.
-- [ ] Access to the upstream provider accounts (you'll rebind their existing keys inside LangWatch).
+Open **Settings > Model Providers** and add a row per provider your application calls, with the same key it uses today. See [Providers](/ai-gateway/providers/overview).
 
-## Step 1: Configure the providers you already use
+## 2. Create a virtual key
 
-For each provider (OpenAI, Anthropic, Bedrock, Azure, Vertex, Gemini) configure (or reuse) a **ModelProvider** at the organization scope. In the UI: **Settings → Model Providers → Add Model Provider**. Pick `Scope = Organization` so every project in the org inherits the credential.
+Open **AI Gateway > Virtual Keys**, click **New virtual key**, name it after the application, keep **Ownership** on the project you want the traces in, and set a budget if you want one now. Copy the secret into your secret manager.
 
-Then open each row and switch to the **Advanced (Gateway)** tab to set the gateway-only fields:
-
-- **Rate limit (RPM / TPM / RPD)**: caps the gateway applies before dispatch.
-- **Fallback priority**: used when the org's default RoutingPolicy resolves more than one eligible MP (lower wins; tiebreak by createdAt).
-- **Provider config (JSON)**: region/deployment overrides (e.g. `{"region": "us-east-1"}`).
-
-No separate "gateway provider" entity to mint. The credential itself is the only thing.
-
-<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators. The gateway reads from the same store.</Note>
-
-## Step 2: Mint your first virtual key
+From the CLI:
 
 ```bash
-export LANGWATCH_API_KEY="lwp_..."
-
-langwatch virtual-keys create \
-  --name "dev-migration" \
-  --env live \
-  --scope ORG:acme \
-  --format json | tee /tmp/vk.json
-
-export LANGWATCH_VK=$(jq -r '.secret' /tmp/vk.json)
+langwatch vk create \
+  --name acme-support-agent \
+  --scope project:<project_id> \
+  --budget-limit 200 --budget-window month --budget-breach block \
+  -f json | jq -r '.secret'
 ```
 
-Save the secret. It's shown exactly once. The VK lives at `ORG:acme` and inherits every ModelProvider visible from that scope. To pin a specific provider order, create a RoutingPolicy and pass `--routing-policy <id>`; otherwise the org's default ordering applies.
+See [Virtual keys](/ai-gateway/virtual-keys).
 
-## Step 3: Flip the env vars in your app
+## 3. Change the base URL and the key
 
-Dev/staging first:
+| SDK | Base URL |
+|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` |
+| Anthropic | `https://gateway.langwatch.ai` |
+| Google GenAI | `https://gateway.langwatch.ai` |
 
-```bash
-# Before
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-...
+Prefix the model with the provider: `gpt-5-mini` becomes `openai/gpt-5-mini`. A bare `gpt-5-mini`, `claude-*` or `gemini-*` name still resolves when the key reaches that provider, so this step can wait. See [Model naming](/ai-gateway/model-naming).
 
-# After
-OPENAI_API_KEY=$LANGWATCH_VK
-OPENAI_BASE_URL=https://gateway.langwatch.ai/v1
-ANTHROPIC_API_KEY=$LANGWATCH_VK
-ANTHROPIC_BASE_URL=https://gateway.langwatch.ai
-```
+Per SDK and framework: [Python](/ai-gateway/sdks/python), [TypeScript](/ai-gateway/sdks/typescript).
 
-Redeploy. Every request now flows through the gateway.
+## 4. Verify
 
-### Verify the migration is live
+Send one request and read the response headers. `X-LangWatch-Gateway-Request-Id` is present on every response that went through the gateway.
 
 ```bash
-curl -sD- -o/dev/null \
-  -H "Authorization: Bearer $LANGWATCH_VK" \
+curl -si https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -X POST https://gateway.langwatch.ai/v1/chat/completions \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
-  grep -i x-langwatch-
+  -d '{"model": "openai/gpt-5-mini", "messages": [{"role": "user", "content": "ping"}]}' \
+  | grep -i x-langwatch
 ```
 
-You should see `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar, the full trace is already there.
+Open **Trace Explorer** in the key's project: the request is there with its model, tokens and cost. Open **AI Gateway > Usage**: the spend is on the key.
 
-## Step 4: Add your first policy
+## 5. Add what the code could not do
 
-Pick the policy that maps to a real pain you have today:
+Each of these is a setting on the key or the project, with no change in application code.
 
-### Hard cap on engineering spend
+| Need | Where |
+|---|---|
+| A spend cap per application, team, project or end user | [Budgets](/ai-gateway/budgets) |
+| Requests per minute and per day on a key | [Rate limits](/ai-gateway/rate-limits) |
+| Fall over to a second provider when the first fails | [Routing policies](/ai-gateway/governance/routing-policies) and [Fallback chains](/ai-gateway/providers/fallback-chains) |
+| Run an evaluator on the request or the response | [Guardrails](/ai-gateway/guardrails) |
+| Bill your own customers per request | [Billing and spend events](/ai-gateway/billing-events) |
+
+## 6. Remove the provider keys from the application
+
+Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**: the gateway has no copy of the old key and starts returning `401 provider_credential_rejected` until the row is updated.
+
+## What to expect in error handling
+
+| Status and code | When |
+|---|---|
+| `402 budget_exceeded` | A `block` budget on the key, the project, the team, the organization, the person or the end user is at its limit. `error.meta.budget_scope` names which. |
+| `400 model_not_allowed` | The model is outside the key's **Provider access** selection or its routing policy. |
+| `429 rate_limited` | The key's RPM or RPD is exhausted. |
+| `403 virtual_key_disabled`, `virtual_key_expired`, `virtual_key_revoked` | The key was disabled, expired or revoked. |
+| `401 provider_credential_rejected` | The provider refused the stored credential. |
+
+A provider error is forwarded with the provider's status, and `X-LangWatch-Provider` names the provider. When a routing policy tried more than one provider, `X-LangWatch-Fallback-Count` says how many. See [Errors](/ai-gateway/api/errors).
+
+---
+
+# FILE: ./ai-gateway/cookbooks/migrate-from-litellm.mdx
+
+---
+title: Migrate from LiteLLM
+description: Map LiteLLM proxy keys, model lists, budgets, end-user ids and fallbacks to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
+sidebarTitle: Migrate from LiteLLM
+---
+
+## What maps to what
+
+| LiteLLM proxy | LangWatch AI Gateway |
+|---|---|
+| Provider keys in `config.yaml` or the environment | A row per provider under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview). |
+| A virtual key from `/key/generate` (`sk-...`) | A [virtual key](/ai-gateway/virtual-keys) (`vk-lw-...`), sent as `Authorization: Bearer`. |
+| `max_budget` and `budget_duration` on a key | A budget on the key: a limit in USD per day, week or month, block or warn. See [Budgets](/ai-gateway/budgets). |
+| `team_id` and team budgets | A key with **Ownership** on the team, and a budget on the team. |
+| `models` on a key | **Provider access** on the key: the providers and models it may call. |
+| `rpm_limit`, `tpm_limit` on a key | [Rate limits](/ai-gateway/rate-limits) on the key: requests per minute and per day. Tokens per minute are not enforced. |
+| `model_list` entries: `model_name` to `litellm_params.model` | The `provider/model` name on the request, or a model alias on the routing policy when the public name differs. See [Model naming](/ai-gateway/model-naming) and [Model aliases](/ai-gateway/model-aliases). |
+| `fallbacks` in `router_settings` | A [routing policy](/ai-gateway/governance/routing-policies): the provider rows a key tries, in order. |
+| `x-litellm-end-user-id` header, `user` body field | Both accepted as is. `X-LangWatch-End-User-Id` is the native header. |
+| `metadata` body field | `X-LangWatch-Metadata`, a request header with a JSON object, copied onto the spend event. The gateway does not read a `metadata` body field. |
+| Spend logs, `/spend/logs` | A [spend event](/ai-gateway/billing-events) per request, by webhook or over REST, and a trace per request in Trace Explorer. |
+
+Several `model_list` entries under one `model_name`, which LiteLLM balances across, have no equivalent: the gateway tries the rows of a routing policy in order.
+
+## 1. Move the credentials
+
+Add a row under **Settings > Model Providers** for each provider in your LiteLLM config. The LiteLLM model spellings carry over: `azure/<deployment>` and `bedrock/<model id>` are the same, and `vertex_ai/gemini-2.5-flash` is accepted as an alias of `vertex/gemini-2.5-flash`.
+
+## 2. Create the keys and budgets
+
+For each LiteLLM key, create a virtual key with the same budget and model list. From the CLI:
 
 ```bash
-langwatch gateway-budgets create \
-  --name "engineering-monthly-cap" \
-  --scope team --team team_eng... \
-  --window month --limit 5000 --on-breach block
+langwatch vk create \
+  --name acme-support-agent \
+  --scope team:<team_id> --trace-project <project_id> \
+  --budget-limit 100 --budget-window month --budget-breach block
 ```
 
-Every VK attached to engineering principals now shares the $5K/month envelope.
+A LiteLLM budget on a team becomes a budget with **Target** set to the team, under **AI Gateway > Budgets**. A per-end-user cap becomes an `attributed_user` budget. See [Budgets](/ai-gateway/budgets#per-end-user).
 
-### Automatic failover when OpenAI is flaky
+## 3. Turn fallbacks into a routing policy
 
-Create a RoutingPolicy listing the ModelProvider ids in dispatch order (OpenAI primary, Anthropic backup), then point the VK at it:
-
-```bash
-# Create a policy at org scope
-langwatch routing-policies create \
-  --scope ORG:acme \
-  --name "openai-then-anthropic" \
-  --strategy ordered \
-  --model-provider mp_openai_org \
-  --model-provider mp_anthropic_org \
-  --format json | jq -r '.id'
-# → rp_01HZX...
-
-# Re-bind the VK to it
-langwatch virtual-keys update vk_01HZX... \
-  --routing-policy rp_01HZX...
+```yaml
+# LiteLLM
+router_settings:
+  fallbacks:
+    - gpt-5-mini: ["azure-mini-eu"]
 ```
 
-When OpenAI throws a 503, the gateway re-dispatches the same prompt to Anthropic transparently. Your application sees a normal 200 response. Tune the fallback conditions (5xx / timeout / rate_limit / network_error) via the VK `--config-json` field; the `model_aliases` map still lives there for client-side name redirects.
+Create a routing policy under **AI Gateway > Routing policies** with the OpenAI row first and the Azure row second, map `gpt-5-mini` to `azure/acme-mini-eu` in its model aliases, and pick the policy under **Routing** on the key.
 
-### Block destructive tools on engineer VKs
+## 4. Change the client
 
-```json
-{
-  "policy_rules": {
-    "tools": { "deny": ["^shell\\.exec$", "^filesystem\\.write$"], "allow": null }
-  }
-}
-```
+<CodeGroup>
 
-Agent calls like `shell.exec("rm -rf ~")` get `403 tool_not_allowed` before they reach the model, the model never generates the destructive call path in the first place.
-
-## Step 5: Wire trace propagation
-
-If you were already using LangWatch SDKs for tracing, propagate the trace id into the gateway so requests nest under your existing trace (no double-cost-attribution):
-
-```python
-import langwatch
-
+```python Before
 client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
-    api_key=os.environ["LANGWATCH_VK"],
-    default_headers=langwatch.get_gateway_headers(),
+    base_url="http://litellm.acme.internal:4000",
+    api_key="sk-...",
+)
+client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[...],
+    user="cust_8841",
+    extra_body={"metadata": {"plan": "pro"}},
 )
 ```
 
-See [Python SDK → trace propagation](/ai-gateway/sdks/python#trace-propagation) and [TypeScript SDK](/ai-gateway/sdks/typescript#trace-propagation).
-
-## Step 6: Rotate the original upstream keys
-
-After a week of running through the gateway, the original upstream keys (`sk-proj-...`, `sk-ant-...`) should no longer be used by any application. Rotate them in the provider console, this is the only time you need to touch upstream again. The gateway still has access via its own encrypted copies of the old keys (fetched from the LangWatch control plane), and will continue to serve traffic uninterrupted.
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
-| `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
-| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules: TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
-| Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
-| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary |
-
-## What NOT to change
-
-- Request bodies: the gateway's whole point is byte-for-byte passthrough. Don't rewrite your payloads.
-- SDKs: the official OpenAI, Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
-- Streaming handlers: SSE passthrough is byte-identical post-first-chunk. Your streaming code should keep working.
-
-## Rollback plan
-
-If the gateway misbehaves, flip the env vars back:
-
-```bash
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=sk-proj-...    # original key
+```python After
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="vk-lw-...",
+)
+client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[...],
+    user="cust_8841",
+    extra_headers={"X-LangWatch-Metadata": '{"plan": "pro"}'},
+)
 ```
 
-Redeploy. You're back to direct provider calls. Traces in LangWatch stop populating (the trace propagation + gateway spans go away), but your app works.
+</CodeGroup>
 
-Plan the first rollout behind a feature flag for this exact reason, 10% traffic through the gateway for a day before going 100%.
+An application that sends `x-litellm-end-user-id` keeps working without a change. See [Python](/ai-gateway/sdks/python) and [TypeScript](/ai-gateway/sdks/typescript).
 
-## See also
+## 5. Verify
 
-- [Quickstart](/ai-gateway/quickstart): green-field setup without migration.
-- [CI smoke test cookbook](/ai-gateway/cookbooks/ci-smoke-test): automate gateway health verification.
-- [SDK integration](/ai-gateway/sdks/python): trace propagation recipes.
+Send one request and check the response for `X-LangWatch-Gateway-Request-Id`. Open **Trace Explorer** in the key's project for the trace and **AI Gateway > Usage** for the spend.
+
+## Keep a LiteLLM proxy behind the gateway
+
+To move in stages, add the LiteLLM proxy as a [custom OpenAI-compatible provider](/ai-gateway/providers/custom-openai-compatible) with its URL as the base URL and a LiteLLM key as the API key. Keys created in LangWatch then reach it as `custom/<model_name>`, with LangWatch budgets, traces and spend events in front of it. Move providers to their own rows one at a time.
 
 ---
 
 # FILE: ./ai-gateway/cookbooks/migrate-from-portkey.mdx
 
 ---
-title: Migrating from Portkey
-description: Move your Portkey gateway configuration to LangWatch, virtual keys, budgets, fallback, guardrails, with a side-by-side mapping of concepts and a concrete code migration.
+title: Migrate from Portkey
+description: Map Portkey virtual keys, API keys, configs, caching, guardrails and metadata to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
 sidebarTitle: Migrate from Portkey
 ---
 
-Portkey and LangWatch both sit between your app and the upstream LLM providers, and both speak the OpenAI-compatible dialect. The feature surface overlaps heavily but the data-model and governance primitives differ in ways that shape your migration. This cookbook is the concrete end-to-end playbook for teams already on Portkey.
+## What maps to what
 
-<Note>**Terminology crosswalk.** Portkey and LangWatch use overlapping names for different concepts (e.g. "virtual key" means different things). The table below is the single source of truth, refer back to it whenever a section feels ambiguous.</Note>
+| Portkey | LangWatch AI Gateway |
+|---|---|
+| Virtual key (a stored provider credential) | A row under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview). |
+| API key sent as `x-portkey-api-key` | A [virtual key](/ai-gateway/virtual-keys), sent as `Authorization: Bearer vk-lw-...`. |
+| `x-portkey-virtual-key` or `x-portkey-provider` on the request | The `provider/` prefix on the model name, for example `openai/gpt-5-mini`. See [Model naming](/ai-gateway/model-naming). |
+| Config with `strategy.mode: "fallback"` and ordered `targets` | A [routing policy](/ai-gateway/governance/routing-policies): an ordered list of provider rows a key tries. |
+| `retry.attempts` in a config | `fallback.maxAttempts` in the key configuration, default 3. The gateway decides which failures move to the next provider; that list is not configurable. |
+| `cache.mode: "simple"` | Provider prompt caching passes through, and [cache rules](/ai-gateway/cache-control) force or disable it per model, key or tag. |
+| Guardrails | [Guardrails](/ai-gateway/guardrails): a LangWatch evaluator attached to the key, run on the request, the response or each stream chunk. |
+| `x-portkey-metadata` | `X-LangWatch-Metadata`, a JSON object copied onto the spend event, and `X-LangWatch-End-User-Id` for the end user. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
+| Budgets and rate limits on an API key | [Budgets](/ai-gateway/budgets) on the key, the project, the team, the organization, a person or an end user, and [rate limits](/ai-gateway/rate-limits) on the key. |
+| Logs | A trace per request in Trace Explorer and a [spend event](/ai-gateway/billing-events) per request. |
 
-## Concept mapping at a glance
+Two Portkey features have no equivalent: `strategy.mode: "loadbalance"` with weights across targets, and `cache.mode: "semantic"`. The gateway tries providers in order and caches only what the provider caches.
 
-| What you did in Portkey | What it becomes in LangWatch | Notes |
-|---|---|---|
-| **Virtual Key** (proxy credential for a single provider account) | **ModelProvider** (with Advanced/Gateway tab) | LangWatch keeps a single primitive for provider credentials: the **ModelProvider**, scoped to ORGANIZATION/TEAM/PROJECT. Gateway-only fields (rate limits, fallback priority, providerConfig overrides) live on the Advanced (Gateway) tab of the same record. |
-| **Key, API Key** (client-facing credential) | **Virtual Key** (`vk-lw-…`) | LangWatch's VK is what your client code presents. It references a routing policy whose `modelProviderIds[]` is the ordered fallback chain, attaches budgets, and carries per-caller policy. |
-| **Config** (JSON routing blob) | **VK `config.*` JSON** + **RoutingPolicy.modelProviderIds[]** + **ModelProvider Advanced tab fields** | LangWatch spreads a Portkey config across three places, client-side routing lives in the VK, provider ordering lives in the routing policy, provider-side defaults live on the ModelProvider Advanced tab. |
-| **Budget** (spend cap, key-scoped) | **GatewayBudget** (org, team, project, VK, principal scoped) | LangWatch budgets are hierarchical: a single request is checked against *every* applicable budget, from org down. Portkey scopes at the key level only. |
-| **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch uses the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail, no separate product surface. |
-| **Strategy: fallback** (provider retry ladder) | **RoutingPolicy.modelProviderIds[]** | Ordered list of ModelProvider ids that walk on 5xx/429/timeout per the standard precedence. The position in the array determines `primary`, `fallback-1`, … in the UI. |
-| **Strategy: loadbalance** (weight-spread across keys) | v1.1, see §Outstanding | LangWatch v1 doesn't ship multi-key sibling loadbalancing; the Portkey loadbalancer is the biggest v1 gap. v1.1 adds sibling-ModelProvider rotation driven by the routing policy. |
-| **Cache (Simple)** | **Anthropic `cache_control` passthrough + `X-LangWatch-Cache` override** | LangWatch v1 is pass-through by default (respect Anthropic's explicit cache hints) + rule-based enforcement for force/disable. Semantic caching is v1.1. |
-| **Cache (Semantic)** | v1.1, `specs/ai-gateway/semantic-caching.feature` drafted | Not in v1. |
-| **Prompt Library** | **LangWatch Prompt Management** (native product surface) | Already-existing LangWatch feature, separate from the gateway. |
-| **Traces, Logs** | **LangWatch Traces** + **GatewayBudgetLedger** + **Audit log** | Every gateway request already fans out to your LangWatch trace view; no extra integration. Budget ledger is the cost-accounting layer; audit log tracks governance mutations. |
+The gateway reads no `x-portkey-*` header. Remove them from the request.
 
-## Code migration: the minimum change
+## 1. Move the credentials
 
-If your current Portkey setup looks like:
+For each Portkey virtual key, add a row under **Settings > Model Providers** with the same provider key. Rows can belong to the organization, a team or a project.
 
-```ts
-import Portkey from "portkey-ai";
+## 2. Turn each config into a routing policy
 
-const portkey = new Portkey({
-  apiKey: process.env.PORTKEY_API_KEY,
-  virtualKey: "my-openai-vk",
-});
+A Portkey config with fallback targets becomes a routing policy that lists the same providers in the same order. Open **AI Gateway > Routing policies**, create the policy, and pick it under **Routing** when you create the virtual key.
 
-const response = await portkey.chat.completions.create({ ... });
-```
+<CodeGroup>
 
-Your LangWatch equivalent:
-
-```ts
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LANGWATCH_VK,       // e.g. vk-lw-01HZX9K3M...
-});
-
-const response = await openai.chat.completions.create({ ... });
-```
-
-Two things moved:
-
-1. **No Portkey SDK.** LangWatch speaks the OpenAI protocol natively, use any official OpenAI client (Node, Python, Go, Java). Same story for Anthropic: `new Anthropic({ baseURL: "https://gateway.langwatch.ai" })` with your VK as the `apiKey`.
-2. **`virtualKey` header → `apiKey` bearer.** Portkey carries the VK in a custom header; LangWatch just uses the standard bearer so you don't need provider-specific plumbing.
-
-## Config migration: Portkey Config JSON → LangWatch VK + ModelProviders
-
-A typical Portkey config:
-
-```json
+```json Portkey config
 {
   "strategy": { "mode": "fallback" },
   "targets": [
-    { "virtual_key": "openai-vk", "override_params": { "max_tokens": 500 } },
-    { "virtual_key": "anthropic-vk" }
+    { "virtual_key": "openai-prod" },
+    { "virtual_key": "azure-eu" }
   ],
-  "cache": { "mode": "simple", "max_age": 3600 },
   "retry": { "attempts": 3 }
 }
 ```
 
-Maps to:
+```text LangWatch routing policy
+Providers, in order: OpenAI (openai-prod), Azure OpenAI (azure-eu)
+Virtual key: Routing = that policy
+```
 
-**Step 1, configure ModelProviders in LangWatch Settings**
+</CodeGroup>
 
-Go to **Settings → Model Providers** and add entries for OpenAI + Anthropic with your provider-issued API keys. These are the LangWatch equivalent of Portkey's "Virtual Keys to actual providers" layer, and they're reusable across gateway AND prompt playground AND evaluators.
+Model aliases on the policy map a name your code sends to the model each provider serves, for example `gpt-5-mini` to `azure/acme-mini-eu`. See [Model aliases](/ai-gateway/model-aliases).
 
-**Step 2, fill the ModelProvider Advanced (Gateway) tab**
+## 3. Create the virtual keys
 
-Open each ModelProvider you created in Step 1 and switch to the **Advanced (Gateway)** tab:
+One virtual key per application, team or person, with its budget and routing policy. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-| ModelProvider | Rate limit | Fallback priority (global) |
-|---|---|---|
-| OpenAI | `rpm=60 rpd=10000` (or your caps) | 1 |
-| Anthropic | `rpm=30 rpd=5000` | 2 |
+## 4. Change the client
 
-**Step 3, create a Virtual Key with the routing policy**
+<CodeGroup>
 
-From **AI Gateway → Routing Policies → New routing policy** create a policy whose `modelProviderIds[]` is `[<openai-id>, <anthropic-id>]`. Then from **AI Gateway → Virtual Keys → New virtual key**:
+```python Before
+from openai import OpenAI
 
-- **Name**: whatever you called the Portkey config (e.g. `prod-chat`)
-- **Routing policy**: the one you just created (or leave unset to use the org default, which orders by `fallbackPriorityGlobal` then `createdAt`)
-- **Cache policy**: `respect` (default, honours Anthropic `cache_control` passthrough)
-- **Optional**: attach an existing LangWatch evaluator with `executionMode=AS_GUARDRAIL` as a `pre` or `post` hook if you had Portkey guardrails.
+client = OpenAI(
+    base_url="https://api.portkey.ai/v1",
+    api_key="dummy",
+    default_headers={
+        "x-portkey-api-key": PORTKEY_API_KEY,
+        "x-portkey-virtual-key": "openai-prod",
+        "x-portkey-metadata": '{"_user": "cust_8841"}',
+    },
+)
+```
 
-The `X-LangWatch-Cache: force`, `X-LangWatch-Cache: disable` header overrides the VK default per-request. Use `force` on idempotent eval harnesses to dedupe cost; use `disable` to bust caches during debugging (equivalent to Portkey's `x-portkey-cache-force-refresh: true`).
+```python After
+from openai import OpenAI
 
-**Step 4, attach a budget**
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key=LANGWATCH_VIRTUAL_KEY,
+)
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[...],
+    user="cust_8841",
+    extra_headers={"X-LangWatch-Metadata": '{"plan": "pro"}'},
+)
+```
 
-From **AI Gateway → Budgets → New budget**:
+</CodeGroup>
 
-- **Scope**: `project` (or `organization` for fleet-wide) + target the new project
-- **Window**: `month`
-- **Limit**: your Portkey spend cap
-- **on_breach**: `block` (hard-cap, returns 402) or `warn` (soft-cap, adds `X-LangWatch-Budget-Warning` header)
+The Anthropic SDK takes `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. See [Python](/ai-gateway/sdks/python) and [TypeScript](/ai-gateway/sdks/typescript).
 
-LangWatch budgets stack hierarchically, your org budget PLUS the project budget PLUS any per-VK budget all apply to the same request. This is a deliberate step-up from Portkey's key-scoped budgets.
+## 5. Verify
 
-## Rollout pattern: gradual migration without a big-bang
+Send one request and check that the response carries `X-LangWatch-Gateway-Request-Id`. Open **Trace Explorer** in the key's project for the trace, and **AI Gateway > Usage** for the spend. A response with `X-LangWatch-Fallback-Count` went through more than one provider.
 
-We recommend the following sequence over 2-4 weeks:
+## What the application sees on a breach
 
-1. **Week 1, shadow traffic.** Mint a LangWatch VK with `config.shadow_mode: true` (v1.1; for v1 just log both upstream responses). Route 1-5% of production traffic through LangWatch alongside Portkey. Compare latency, error rate, and response equality.
-2. **Week 2, canary by tenant.** Route low-risk tenants (internal users, dev environments) fully through LangWatch. Portkey still carries the majority.
-3. **Week 3, flip customer traffic.** Route 50% of customer traffic through LangWatch, with a feature flag that can instantly revert.
-4. **Week 4, decommission Portkey.** Once metrics show parity, null out the Portkey integration. Keep the Portkey org active for 30 days in case of rollback; delete after.
-
-Run `/gateway/usage` spend + `/settings/audit-log` (filter Target = `virtual_key`, `budget`, etc.) mutation history in parallel to your existing Portkey analytics during the rollout, the LangWatch audit log will show you every VK, budget, provider mutation alongside platform actions, which is especially useful in the cutover period when your ops team is still adjusting governance.
-
-## Feature-parity gaps (be explicit)
-
-Some Portkey features don't have LangWatch v1 equivalents. If your setup depends on any of these, weigh them carefully:
-
-- **Loadbalance strategy** (sibling-key rotation for rate-limit absorption), LangWatch v1 routes to one credential per provider slot. Sibling-key loadbalancing is on the v1.1 roadmap. Workaround: if you genuinely need it, keep Portkey for those routes, run LangWatch in parallel for governance.
-- **Semantic cache**: LangWatch v1 ships `respect`, `force`, `disable` modes for explicit Anthropic cache_control + a rule engine; semantic similarity lookups are v1.1.
-- **Prompt management embedded in the gateway**: LangWatch has a dedicated Prompt Management product surface, but it's a separate area rather than a subfolder of the gateway.
-- **Guardrails catalog**: Portkey ships a pre-built library of guardrails; LangWatch reuses the evaluator catalog you already have (and any custom evaluator you've built). If you want to own the guardrail logic this is a net win; if you want to start fast it is a cold start.
-
-## What to watch during + after migration
-
-- **Per-tenant spend**: compare your Portkey invoice amount to `sum(GatewayBudgetLedger.amountUsd)` on the same time window. First-week variance ≤ 3% is normal (different rounding, model-version timings); > 5% warrants investigation.
-- **p99 latency**: LangWatch's gateway hot path is ~700 ns of gateway-local overhead; upstream provider latency dominates. Compare p99 with + without the gateway (shadow mode is the cleanest A/B). Any regression > 10 ms is worth a ticket.
-- **401 rate**: during the VK rollout window, any client still hitting Portkey's endpoint will 404 post-decommission. Set an alert on `gateway_http_requests_total{status="401"}` rate spikes to catch stragglers before customer escalations.
-- **Audit log volume**: your team will mutate more governance-configuration post-migration (budgets, guardrails, rotation policies). Expect 10-50× more audit rows than Portkey's minimal audit surface, plan retention accordingly.
-
-## See also
-
-- [Virtual Keys](/ai-gateway/virtual-keys): the LangWatch VK reference.
-- [Budgets](/ai-gateway/budgets): hierarchical budget semantics.
-- [Gateway provider settings](/ai-gateway/provider-bindings): the Advanced (Gateway) tab on each ModelProvider.
-- [Credential-leak incident response](/ai-gateway/cookbooks/credential-leak-incident): the "oh no it's on GitHub" playbook.
-- [Cache-control rollout](/ai-gateway/cookbooks/cache-control-rollout): how to roll cache rules to production.
+A `block` budget at its limit answers `402 budget_exceeded`; a `warn` budget adds `X-LangWatch-Budget-Warning` and serves the request. See [Budgets](/ai-gateway/budgets#block-and-warn) and [Errors](/ai-gateway/api/errors).
 
 ---
 
@@ -7287,24 +7072,24 @@ A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitorin
 
 ---
 title: "Demo: a rebilling agent platform"
-description: The open-source agent-billing-demo repo, a tiny agent SaaS that meters and rebills its customers entirely through LangWatch, in TypeScript and Python.
+description: The open-source agent-billing-demo repository, a small agent SaaS that meters and rebills its customers through the LangWatch AI Gateway, in TypeScript and Python.
 sidebarTitle: "Demo: Rebilling Platform"
 keywords: demo, agent billing, rebilling example, webhook receiver example, reference implementation
 ---
 
-[`langwatch/agent-billing-demo`](https://github.com/langwatch/agent-billing-demo) is a deliberately small agent-platform SaaS: customers sign up, create agents, and chat with them. The platform meters every LLM call and rebills its customers, with **zero metering code of its own**. It exists so you can see the whole [metering and rebilling pattern](/ai-gateway/cookbooks/metering-and-rebilling) running, then copy it.
+[`langwatch/agent-billing-demo`](https://github.com/langwatch/agent-billing-demo) is a small agent-platform SaaS: customers sign up, create agents and chat with them. The platform meters every LLM call and rebills its customers through the LangWatch AI Gateway, with no metering code of its own. Run it to see the [metering and rebilling pattern](/ai-gateway/cookbooks/metering-and-rebilling) end to end, then copy the parts you need.
 
 <Tip>
-Point your coding agent at the repo as the canonical integration example for gateway provisioning, webhook ingestion, and budgets. Every file is written to be copied from, and the README carries the same contracts these docs document.
+Point your coding agent at the repo as the reference example for gateway provisioning, webhook ingestion and budgets. The README carries the same contracts these docs describe.
 </Tip>
 
 ## What it demonstrates
 
-- **Provisioning**: customer signup mints one virtual key (the tenant boundary) and attaches a hard cap, a soft cap, and an attributed-user template, four REST calls.
-- **The request path**: the chat calls the gateway on the OpenAI wire with the `user` field set. That one field is all the attribution the billing pipeline needs.
-- **Billing**: meters fed exclusively by LangWatch's signed webhooks, with signature verification, dedup by envelope id, and settled-row supersession (replace, never sum). If the numbers on screen are right, the pipeline works end to end.
+- **Provisioning**: customer sign-up creates one virtual key per tenant and attaches a hard cap, a soft cap and a per-end-user budget, in four REST calls.
+- **The request path**: the chat calls the gateway with the OpenAI SDK and the `user` field set. That field is the only attribution the billing pipeline needs.
+- **Billing**: meters fed only by the signed webhooks, with signature verification, dedup by envelope id, and replacement of a settled event by the completed one that follows it.
 - **Reconciliation**: checksum comparison against `spend-summaries`, cursor diff against `spend-events` on divergence.
-- **Breach UX**: the `402` meta's `budget_scope` drives two different messages, "your allowance ran out" versus "your workspace's budget ran out".
+- **Breach handling**: `error.meta.budget_scope` on the `402` selects one of two messages, for the end user's own allowance or for the workspace budget.
 - **Period close**: a reset button drives `POST /budgets/:id/reset` on the `manual` windows; recorded spend never changes.
 
 ## The app
@@ -7321,41 +7106,41 @@ One `POST` mints the virtual key and attaches three real budgets to it:
 | Soft cap | `virtual_key` | `manual` | $2.50 | `warn` |
 | Per-seat allowance | `attributed_user` anchored to the key | `month` | $1.00 | `block` |
 
-The form then redirects into the dashboard with a success toast naming the caps it just created, so the customer sees the outcome instead of a spinner. A workspace name that is already taken comes back as a structured `409` carrying `code: "customer_exists"` and an offer to open the existing workspace, never a database error.
+The form then opens the dashboard with a message that names the caps it created. A workspace name that is already taken comes back as a `409` with `code: "customer_exists"` and an offer to open the existing workspace.
 
-### The dashboard is the product
+### The dashboard
 
-Each signed-in customer creates agents (name, system prompt, model) and chats with them. Chat is streamed through the gateway over Server-Sent Events, on that customer's virtual key, with the seat's email in the OpenAI `user` field. A usage meter at the bottom of the page shows live spend against the real caps. Switching workspace swaps agents, transcripts, meter and event feed together, so nothing is shared between tenants but the code.
+Each signed-in customer creates agents (name, system prompt, model) and chats with them. The chat streams through the gateway over Server-Sent Events, on that customer's virtual key, with the seat's email in the OpenAI `user` field. A usage meter at the bottom of the page shows live spend against the caps. Switching workspace swaps agents, transcripts, meter and event feed together.
 
 ### The app receives its own billing events
 
-The app hosts its receiver in-process at `POST /webhooks/langwatch`. It verifies the `X-LangWatch-Signature` HMAC over the raw request bytes, dedups by envelope id, and answers `2xx` only once the batch is stored. Ingested events drive the meters and stream to the browser over Server-Sent Events, so a delivered event moves the meter without a page refresh.
+The app hosts its receiver at `POST /webhooks/langwatch`. It verifies the `X-LangWatch-Signature` HMAC over the raw request bytes, dedups by envelope id, and answers `2xx` once the batch is stored. Ingested events drive the meters and stream to the browser over Server-Sent Events, so a delivered event moves the meter without a page refresh.
 
 ### The owner console
 
 `/admin` is the SaaS owner's side of the same data: every customer with their virtual key, caps, spend and request counts, plus the actions a platform operator needs.
 
-- **Close billing period**, per customer, resets the `manual`-window caps only. The `month`-window seat allowance is left to roll over on its own, because closing the company's books does not hand every seat a fresh personal allowance, and recorded spend is never mutated.
+- **Close billing period**, per customer, resets the `manual`-window caps only. The `month`-window seat allowance rolls over on its own. Recorded spend never changes.
 - **Adjust caps**, per customer, calls the budgets update API. Raising a breached cap admits traffic again with the books intact.
 - **Webhook receiver health**: whether this app's endpoint is registered, and how many events it has ingested.
 - **A live feed of billing events**, signed deliveries as they arrive.
 
 ### The developer panel
 
-`/developer` keeps the raw signed envelopes one click away, expandable as JSON, next to the request-path and webhook-contract snippets that are the whole integration.
+`/developer` shows the raw signed envelopes as JSON, next to the request-path and webhook-contract snippets that make up the integration.
 
-### Breaches read as sentences
+### Breach messages
 
-A `402` from the gateway surfaces as a friendly UI state, branched on the `budget_scope` meta:
+A `402` from the gateway shows one of two messages, selected by `error.meta.budget_scope`:
 
 - `virtual_key`: "Your workspace has reached its AI budget for this period."
 - `attributed_user`: "You have used up your personal AI allowance for this period."
 
-The message you tried to send is handed back for a retry.
+The message you tried to send stays in the input for a retry.
 
-## The integration surfaces, twice
+## The integration files, in both languages
 
-Every surface you would copy exists in both languages, self-contained:
+Every file you would copy exists in TypeScript and in Python:
 
 | Surface | TypeScript | Python |
 |---|---|---|
@@ -7366,11 +7151,11 @@ Every surface you would copy exists in both languages, self-contained:
 | Provisioning | `ts/src/provision.ts` | `python/provision.py` |
 | App shell | `app/` (Express + React, `:4100`) | `python/app.py` (FastAPI, `:4200`) |
 
-The app's own receiver lives at `app/src/webhooks.ts` and implements the identical contract as the standalone one. Both standalone receivers run side by side against the same LangWatch instance, each registered as its own endpoint with its own secret; every request lands in both ledgers, signed and deduped, which doubles as a demonstration that delivery is consumer-agnostic.
+The app's own receiver is `app/src/webhooks.ts` and implements the same contract as the standalone ones. Both standalone receivers run side by side against the same LangWatch instance, each registered as its own endpoint with its own secret, so every request lands in both ledgers.
 
 ## Running it
 
-You need a LangWatch instance (local dev, self-hosted, or cloud) with an enterprise license for the webhook surface, and an organization API key carrying the gateway and webhook permissions.
+You need a LangWatch instance (self-hosted or Cloud) on an Enterprise plan for the webhook endpoints, and an organization API key with the gateway and webhook permissions. See [RBAC](/ai-gateway/rbac).
 
 ```bash
 cp .env.example .env       # LANGWATCH_API_KEY, LANGWATCH_PROJECT_ID,
@@ -7382,7 +7167,7 @@ pnpm build
 pnpm dev                   # the app on http://localhost:4100
 ```
 
-Create a workspace, add an agent, and chat: the usage meter fills from the billing events the gateway delivers to that same process. Optional extras:
+Create a workspace, add an agent and chat: the usage meter fills from the billing events the gateway delivers to that process. Optional:
 
 ```bash
 pnpm seed                  # two fictional tenants, already provisioned
@@ -7390,13 +7175,11 @@ pnpm receiver:ts           # the standalone TypeScript receiver on :4101
 python python/receiver.py  # the standalone Python receiver on :4102
 ```
 
-The full walkthrough, environment variables, and sequence diagrams live in the [repo README](https://github.com/langwatch/agent-billing-demo).
+The full walkthrough, environment variables and sequence diagrams are in the [repo README](https://github.com/langwatch/agent-billing-demo).
 
-## See also
-
-- [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling): the cookbook this demo implements.
-- [Billing & spend events](/ai-gateway/billing-events): the payload and money contract.
-- [Webhooks](/features/webhooks): endpoints, signatures, retries, health.
+<Note>
+**Also check:** [Metering and rebilling](/ai-gateway/cookbooks/metering-and-rebilling) for the cookbook this demo implements, [Billing and spend events](/ai-gateway/billing-events) for the event payload, and [Webhooks](/features/webhooks) for endpoints, signatures and retries.
+</Note>
 
 ---
 
@@ -10248,61 +10031,71 @@ Create a second ModelProvider row of the same family (e.g. two OpenAI rows for `
 
 ---
 title: Anthropic
-description: Configure Anthropic (Claude) as a provider behind the LangWatch AI Gateway.
+description: Add an Anthropic API key under Settings, Model Providers and call Claude models through the LangWatch AI Gateway with the Anthropic or the OpenAI SDK.
 sidebarTitle: Anthropic
 ---
 
-Anthropic is one of the two core providers for the gateway (alongside OpenAI). The `/v1/messages` endpoint is Anthropic-native and designed to be Claude-Code-compatible.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Anthropic**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | Your Anthropic API key. Required unless you set a base URL. |
+| `ANTHROPIC_BASE_URL` | Optional. An Anthropic-compatible endpoint to call instead of `api.anthropic.com`. |
 
-1. Click **Add provider** → **Anthropic**.
-2. Paste your Anthropic API key (starts `sk-ant-...`).
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-The same credential serves the gateway, the evaluators' litellm path, and any other place in LangWatch that needs an Anthropic call.
+## Model names
 
-## Bind to a VK
+Write `anthropic/<model>`, for example `anthropic/claude-sonnet-4-5` or `anthropic/claude-haiku-4-5`. A bare name that starts with `claude-` resolves to Anthropic when the key reaches an Anthropic row.
 
-Pick Anthropic as a primary or fallback on any VK. When a VK uses Anthropic as its primary, its clients should ideally call `/v1/messages` (Anthropic-native shape). But `/v1/chat/completions` also works, the gateway uses bifrost/core to translate the request shape to Anthropic's Messages API and back.
+## Send a request
 
-## Supported endpoints
+The Anthropic SDK sends the virtual key in the `X-Api-Key` header. Set the base URL to `https://gateway.langwatch.ai` without `/v1`; the SDK adds `/v1/messages`.
 
-| Gateway route | Upstream | Notes |
-|---|---|---|
-| `POST /v1/messages` | `POST /v1/messages` | Native shape. Preferred for Claude Code, Anthropic SDK, any tool-using agent. |
-| `POST /v1/chat/completions` | `POST /v1/messages` (translated) | OpenAI SDKs work transparently via translation. |
-| `POST /v1/embeddings` | ❌ not supported | Anthropic has no embeddings endpoint. |
-| `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming | SSE pass-through byte-for-byte (tool-call deltas preserved). |
+<CodeGroup>
 
-## `cache_control` passthrough, the 90-percent discount
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
 
-Anthropic supports prompt caching via `cache_control` blocks on content. Ephemeral (5-min TTL) and persistent (1-hour TTL) caches are both honoured.
+```python Python
+import anthropic
 
-The gateway's hard invariant: **`cache_control` blocks are forwarded byte-for-byte in `cache.mode = respect`** (default). If you see cache-hit costs not matching expectations, first check `X-LangWatch-Cache` response header, `miss` means no cache was hit; `hit` with non-zero `cache_read_input_tokens` means the discount applied.
+client = anthropic.Anthropic(
+    base_url="https://gateway.langwatch.ai",
+    api_key="vk-lw-...",
+)
+message = client.messages.create(
+    model="anthropic/claude-haiku-4-5",
+    max_tokens=64,
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+)
+print(message.content[0].text)
+```
 
-Usage reporting (in the response body and trace) separates three counters:
+</CodeGroup>
 
-- `cache_read_input_tokens`, tokens served from cache (priced at ~10%).
-- `cache_creation_input_tokens`, tokens written to cache (priced at 125%).
-- `input_tokens`, regular cold input tokens.
+An OpenAI SDK call to `/v1/chat/completions` with an Anthropic model also works: the gateway translates the request to the Messages API and the answer back to a chat completion.
 
-The gateway sums these and computes per-request cost for the budget ledger.
+## Endpoints
 
-See [Caching Passthrough](/ai-gateway/caching-passthrough) for the full decision matrix and override headers.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/messages` | Yes, forwarded as is |
+| `POST /v1/chat/completions` | Yes, translated to Messages |
+| `POST /v1/embeddings` | No. Anthropic has no embeddings API; the gateway returns Anthropic's rejection |
+| `GET /v1/models` | Yes, from the Anthropic catalog |
 
-## Known quirks
-
-- **`max_tokens` required**, Anthropic requires `max_tokens` on every Messages request. The gateway does not default-insert a value; a client that omits it gets the upstream 400 back.
-- **System prompt structure**: Anthropic Messages uses a top-level `system` field (string or content blocks), not a message role. OpenAI-SDK clients that send a `system` role message get it rewritten into the top-level field by the translator.
-- **Tool-call streaming deltas**: Anthropic emits `content_block_delta` events with `input_json_delta` partial JSON. The gateway proxies these byte-for-byte post-first-chunk so Claude Code (and any other agent) can reconstruct the tool call incrementally.
-- **`thinking` (extended-reasoning) blocks**, available on Claude Opus, Sonnet extended-thinking models. Blocks appear in the response; pricing is separate. Thinking-token counts roll into `langwatch.usage.output_tokens` + debit the budget; a dedicated `langwatch.reasoning_tokens` span attribute is a v1.1 observability follow-up.
-
-## Using via Claude Code
-
-See [Claude Code](/ai-gateway/cli/claude-code): set `ANTHROPIC_BASE_URL=https://gateway.langwatch.ai` and `ANTHROPIC_AUTH_TOKEN=vk-lw-…` and it works.
+`cache_control` blocks pass through unchanged and the cache read and write token counts come back in `usage`. See [Caching passthrough](/ai-gateway/caching-passthrough).
 
 ---
 
@@ -10310,74 +10103,59 @@ See [Claude Code](/ai-gateway/cli/claude-code): set `ANTHROPIC_BASE_URL=https://
 
 ---
 title: Azure OpenAI
-description: Configure Azure OpenAI (deployment-based model ids) as a provider behind the LangWatch AI Gateway.
+description: Add an Azure OpenAI resource under Settings, Model Providers and call its deployments through the LangWatch AI Gateway.
 sidebarTitle: Azure OpenAI
 ---
 
-Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees, but with a deployment-based model-id convention that the plain OpenAI client does not speak out of the box. The gateway handles Azure's quirks via bifrost/core, so an OpenAI-shaped client needs no change.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Azure OpenAI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `AZURE_OPENAI_API_KEY` | The key of your Azure OpenAI resource. |
+| `AZURE_OPENAI_ENDPOINT` | The resource endpoint, for example `https://acme-eu.openai.azure.com`. |
+| `AZURE_OPENAI_API_VERSION` | Optional. The `api-version` query parameter. The default is `2025-04-01-preview`. |
 
-1. **Add provider → Azure OpenAI**.
-2. Paste:
-    - **Endpoint**: e.g. `https://my-resource.openai.azure.com`.
-    - **API key**: Azure OpenAI key (hex string).
-    - **API version**: e.g. `2024-08-01-preview` (pin explicitly; don't rely on "latest").
-3. (Optional) **Default deployment name**: if clients send a bare model name, the gateway maps it to this deployment.
-4. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Deployment-based model routing
+Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure API Management. The form then asks for `AZURE_API_GATEWAY_BASE_URL` and an optional `AZURE_API_GATEWAY_VERSION` (default `2024-05-01-preview`) instead of the endpoint.
 
-Azure OpenAI binds models to **deployments**, which have customer-chosen names. `gpt-4o` in the OpenAI SDK needs to become `my-gpt-4o-deployment` at Azure, a mapping step. The gateway handles this via VK `model_aliases`:
+## Deployments and model names
 
-```json
-{
-  "model_aliases": {
-    "gpt-4o":       "azure/my-gpt-4o-deployment",
-    "gpt-5-mini":   "azure/my-mini-deployment",
-    "o3":           "azure/my-o3-deployment"
-  }
-}
+Azure serves models through deployments that you name yourself. The gateway uses the model id as the deployment name: `azure/gpt-5-mini` calls the deployment named `gpt-5-mini` on the resource.
+
+Add each deployment name under **Custom Models** on the row so that `GET /v1/models` lists it.
+
+To keep application code on generic names when your deployment names differ, map them on the key with `model_aliases`, for example `{"gpt-5-mini": "azure/acme-mini-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "azure/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure deployment without knowing Azure exists. The VK owner maps generic model names to their Azure infrastructure, and application code never changes.
+The gateway sends the request to `<endpoint>/openai/deployments/<deployment>/chat/completions?api-version=<version>` with the key in the `api-key` header.
 
-## Supported endpoints
+## Endpoints
 
-Identical to OpenAI direct:
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/responses` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes |
+| `GET /v1/models` | Yes, the names under Custom Models |
 
-- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/moderations`.
+## More than one resource
 
-The gateway translates the outgoing path + query string to Azure's format (`/openai/deployments/{deployment}/chat/completions?api-version=...`).
-
-## Auth headers
-
-OpenAI uses `Authorization: Bearer`, Azure uses `api-key: <hex>`. Bifrost/core swaps headers automatically based on the ModelProvider type. The client-facing VK auth is always `Authorization: Bearer vk-lw-…` (or one of the alternates, see [Virtual Keys](/ai-gateway/virtual-keys)).
-
-## AAD, Managed Identity
-
-For self-hosted gateway in Azure (AKS, App Service), you can omit the API key and use AAD auth:
-
-1. Assign the gateway's managed identity the "Cognitive Services OpenAI User" role on the Azure OpenAI resource.
-2. Set the ModelProvider's API key to `__use_aad__` (sentinel).
-3. The gateway uses `DefaultAzureCredential` to fetch tokens.
-
-Token caching + refresh are handled by bifrost/core.
-
-## Known quirks
-
-- **API version drift.** Azure changes API versions frequently; `2024-02-01` and `2024-08-01-preview` have different request/response shapes. Pin the version on the ModelProvider; don't rely on the newest.
-- **Content filtering.** Azure runs its own content filter before and after the model. A request blocked by Azure's filter returns 400 with a `content_filter_result` body; the gateway surfaces this as `provider_error` with the filter metadata in the OTel trace.
-- **Streaming SSE format.** Identical to OpenAI direct, `data: {...}\n\n` frames terminated by `data: [DONE]`. Byte-for-byte passthrough applies.
-- **Region naming.** Azure regions use dash-case (`eastus`, `westeurope`) vs AWS's dot-case. The gateway does not enforce a region, it's baked into the Endpoint URL.
-- **Rate limits.** Azure has per-deployment quota (PTU or TPM-based). A 429 shows `Retry-After` like OpenAI; treat it the same way (fallback trigger or client retry).
-- **Unsupported features.** Some OpenAI features (e.g. `/v1/audio/speech` TTS) are not yet available on Azure OpenAI depending on region.
-
-## Bifrost/core handles the ceremony
-
-The `bifrost/core` library hides the Azure idiosyncrasies (deployment URL construction, `api-key` vs `Bearer`, API-version query param, AAD vs key auth, regional endpoint detection). Users of the gateway see a plain OpenAI-shape API.
+Create one row per Azure resource and give each a **Routing handle**, for example `eu` and `us`. `eu/gpt-5-mini` pins the request to that resource. A routing policy sets the order a key tries them in. See [Routing policies](/ai-gateway/governance/routing-policies).
 
 ---
 
@@ -10385,73 +10163,98 @@ The `bifrost/core` library hides the Azure idiosyncrasies (deployment URL constr
 
 ---
 title: AWS Bedrock
-description: Configure AWS Bedrock (Anthropic, Titan, Llama, Mistral, Cohere) as a provider behind the LangWatch AI Gateway.
+description: Add AWS access keys and a region under Settings, Model Providers and call Bedrock models through the LangWatch AI Gateway.
 sidebarTitle: AWS Bedrock
 ---
 
-AWS Bedrock is an AWS-native path to Anthropic (and several other model families) with VPC-native security, data-residency guarantees, and AWS IAM governance. The gateway uses bifrost/core under the hood, which handles Bedrock's idiosyncratic authentication, cross-region inference profiles, and model-id quirks.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Bedrock**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user or role session. |
+| `AWS_SECRET_ACCESS_KEY` | The matching secret access key. |
+| `AWS_REGION_NAME` | The region the models are enabled in, for example `us-east-1`. |
 
-1. **Add provider → AWS Bedrock**.
-2. Choose authentication mode:
-    - **Access keys**: paste AWS Access Key ID + Secret Access Key + optional session token.
-    - **Instance profile, IRSA**: leave credentials empty; the gateway process uses its pod-level IAM role.
-    - **Bedrock API key**: new Bedrock-first auth mode (preview).
-3. Pick a default region (e.g. `us-east-1`). Requests can override per-call via the model id.
-4. (Optional) Provide a cross-region **inference profile ARN** for automatic regional failover on capacity issues.
-5. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Model id format
+All three fields are required.
 
-Bedrock model ids include the provider prefix and optionally a region tag:
+## Model names
 
-- `anthropic.claude-haiku-4-5-20251001`, Anthropic Claude Haiku 4.5.
-- `anthropic.claude-sonnet-4-6`, Anthropic Claude Sonnet 4.6.
-- `anthropic.claude-opus-4-7`, Anthropic Claude Opus 4.7.
-- `amazon.titan-text-express-v1`, Amazon Titan.
-- `meta.llama3-1-70b-instruct-v1:0`, Meta Llama.
-- `us.anthropic.claude-haiku-4-5-20251001`, region-prefixed (cross-region inference profile).
+Write `bedrock/<model id>` with the Bedrock model id or inference profile id, for example `bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0`. The gateway does not infer Bedrock from a bare name. Add the ids you use under **Custom Models** on the row so that `GET /v1/models` lists them.
 
-Configure VK `model_aliases` to expose friendly names to clients:
+Map friendly names on the key with `model_aliases`, for example `{"claude-haiku": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"}`. See [Model aliases](/ai-gateway/model-aliases).
 
-```json
-{
-  "model_aliases": {
-    "claude-haiku":  "bedrock/us.anthropic.claude-haiku-4-5-20251001",
-    "claude-sonnet": "bedrock/us.anthropic.claude-sonnet-4-6"
-  }
-}
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-## Supported endpoints
+## Endpoints
 
-- `POST /v1/messages`, Anthropic-shape dispatched to Bedrock's Converse API for Anthropic models.
-- `POST /v1/chat/completions`, translated to Bedrock Converse, InvokeModel depending on the model family.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes, for Bedrock embedding models |
+| `GET /v1/models` | Yes, the ids under Custom Models |
 
-Embeddings (`/v1/embeddings`) supports Titan-Embeddings via Bedrock as well.
+`cache_control` blocks on Anthropic models become Converse `cachePoint` markers, and the cache token counts come back in `usage`. See [Caching passthrough](/ai-gateway/caching-passthrough).
 
-## `cache_control` passthrough
+Model access is enabled per account and region in the AWS console. A 403 from Bedrock that says the account has no access to the model means that opt-in is missing.
 
-Anthropic-on-Bedrock supports prompt caching via the Converse API's `cachePoint` markers. The gateway forwards `cache_control` blocks and bifrost/core translates them into `cachePoint` objects. Cache-read and cache-write token counts flow back the same way as direct Anthropic.
+---
 
-## Cross-region inference profiles
+# FILE: ./ai-gateway/providers/cerebras.mdx
 
-Bedrock supports **inference profiles** that route to multiple regions automatically. Configure the ModelProvider's default region and the inference profile ARN; bifrost/core dispatches to the profile and Bedrock handles regional routing. Useful for high-availability setups without configuring an explicit fallback chain at the VK level.
+---
+title: Cerebras
+description: Add a Cerebras API key under Settings, Model Providers and call Cerebras models through the LangWatch AI Gateway.
+sidebarTitle: Cerebras
+---
 
-## Known quirks
+## Add the credential
 
-- **Region-coupled quotas**: Bedrock throughput is provisioned per-region per-model. A model that works in `us-east-1` may 429 or 403 in `eu-west-1`. Set the VK's default region to match where your quota lives.
-- **Model access enablement**: Bedrock requires manual model-access opt-in per account + region (console: *Bedrock → Model access*). A 403 with body "you don't have access to the model" means the AWS account needs to enable that model.
-- **IAM permissions**: at minimum `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`, and `bedrock:Converse` + `bedrock:ConverseStream`. Inference profiles also need `bedrock:InvokeModel` on the profile ARN.
-- **Streaming format**: Bedrock's event stream is AWS-specific (`application/vnd.amazon.eventstream`); bifrost/core normalises it to SSE for the client. The gateway's byte-for-byte invariant applies to the normalised SSE, not the upstream AWS format.
-- **Cold-start latency**: Bedrock frequently has higher cold latency than direct Anthropic. Use `/readyz` startup probes generously on self-hosted deployments if Bedrock is the primary.
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Cerebras**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-## Using IAM roles (no access keys)
+| Field | Value |
+|---|---|
+| `CEREBRAS_API_KEY` | Your Cerebras API key. |
 
-Recommended for self-hosted gateway in EKS/ECS. Leave the ModelProvider's access keys empty; attach an IAM role to the gateway's service account (IRSA for EKS, task role for ECS) with the permissions above. Bifrost/core detects IAM credentials via the AWS SDK default chain.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write `cerebras/<model>`, for example `cerebras/llama-3.3-70b`. The gateway does not infer Cerebras from a bare name.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "cerebras/llama-3.3-70b",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `GET /v1/models` | Yes, from the Cerebras catalog |
 
 ---
 
@@ -10459,67 +10262,151 @@ Recommended for self-hosted gateway in EKS/ECS. Leave the ModelProvider's access
 
 ---
 title: Custom OpenAI-compatible
-description: Point the gateway at any OpenAI-compatible endpoint (self-hosted vLLM, Ollama, Groq, Fireworks, Together, private fine-tunes).
+description: Add any OpenAI-compatible endpoint, for example vLLM, Ollama or an internal inference server, under Settings, Model Providers and call it through the LangWatch AI Gateway.
 sidebarTitle: Custom OpenAI-compatible
 ---
 
-The Custom OpenAI-compatible provider accepts any HTTP endpoint that implements the OpenAI Chat Completions shape, covering self-hosted servers (vLLM, SGLang, Ollama, LocalAI, TGI), hosted inference platforms (Groq, Together, Fireworks, Anyscale), and private fine-tunes exposed via an OpenAI-shape proxy.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Custom (OpenAI-compatible)**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `CUSTOM_BASE_URL` | The endpoint, for example `https://inference.acme.internal/v1`. A trailing `/v1` is accepted. |
+| `CUSTOM_API_KEY` | Optional. Sent as `Authorization: Bearer` when set. |
 
-1. **Add provider → Custom (OpenAI-compatible)**.
-2. Fill:
-    - **Name**: human label (e.g. `internal-vllm`, `groq`).
-    - **Base URL**: without the `/chat/completions` suffix (e.g. `https://api.groq.com/openai/v1`, `http://vllm.internal:8000/v1`).
-    - **Auth mode**: `Bearer` (default), `api-key` header, or `custom header` (for non-standard keys).
-    - **API key**: or leave blank for unauthenticated self-hosted endpoints.
-    - **Supported models**: optional allowlist to expose a curated subset via `/v1/models`.
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Supported endpoints (varies by upstream)
+Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
 
-The gateway forwards requests 1:1 to the upstream path (`/v1/chat/completions`, `/v1/embeddings`). If the upstream doesn't implement a path, the gateway returns the upstream's 404 or 405.
+The endpoint must be reachable from the gateway. The gateway always refuses link-local and cloud metadata addresses, and refuses private and loopback addresses when it runs with `BLOCK_LOCAL_HTTP_CALLS=true`.
 
-Common subsets:
+## Model names
 
-- **Groq, Together, Fireworks**: chat + embeddings (depends on the model).
-- **vLLM, SGLang**: chat + embeddings (depends on the model).
-- **Ollama**: chat (via the OpenAI-compat endpoint mode).
+Write `custom/<model>`, for example `custom/qwen3-14b`. Give the row a **Routing handle** when you have several custom endpoints: `acme-gpu/qwen3-14b` pins that row.
 
-## Model id format
+## Send a request
 
-Pass the upstream-native model id directly. Aliases still work:
-
-```json
-{
-  "model_aliases": {
-    "llama-70b":   "custom-groq/llama-3.3-70b-versatile",
-    "mixtral":     "custom-together/mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "fine-tuned":  "custom-internal/my-rag-model"
-  }
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "custom/qwen3-14b",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-The prefix before `/` is the ModelProvider's **Name** (e.g. `custom-groq`); everything after is the upstream model id.
+## Endpoints
 
-## Caching
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes, when the endpoint serves it |
+| `GET /v1/models` | Yes, the names under Custom Models |
 
-Gateway default `cache.mode = respect` forwards any cache-control headers or body fields the upstream understands. OpenAI-compatible servers rarely expose a prompt-caching API, so `X-LangWatch-Cache` reads as `miss` unless the upstream implements one.
+Streaming, tools and other features depend on what the endpoint implements. A feature the endpoint does not support comes back as the endpoint's own error.
 
-## Known quirks
+---
 
-- **Streaming format drift.** Some OpenAI-compatible servers diverge on SSE chunk format (extra newlines, differing `[DONE]` casing, missing `data:` prefix on metadata frames). Test streaming early; bifrost/core normalises what it can but edge cases may require a client retry.
-- **Auth header unconventional.** Ollama historically uses no auth; vLLM uses Bearer; some self-hosted deployments use `X-Api-Key`. Pick the right mode at ModelProvider config time.
-- **`/v1/embeddings` response shape**, OpenAI-spec says each embedding is a list of floats. Some providers emit a single flat float array. Bifrost/core coerces to spec shape.
-- **Model allowlist enforcement.** If the upstream serves 100 models and you only want 3 exposed, set `models_allowed` on the VK rather than the ModelProvider, it's per-VK, so different VKs can curate different subsets.
+# FILE: ./ai-gateway/providers/deepseek.mdx
 
-## Use cases
+---
+title: DeepSeek
+description: Add a DeepSeek API key under Settings, Model Providers and call DeepSeek models through the LangWatch AI Gateway.
+sidebarTitle: DeepSeek
+---
 
-- **Private fine-tunes.** Your ML team deploys a vLLM serving a fine-tuned model on internal infra. The gateway makes it accessible to every engineer's coding CLI with a VK, governed like any other model.
-- **Hosted inference platforms.** Groq, Together, Fireworks, DeepInfra ship OpenAI-compat APIs at competitive prices. Binding them behind the gateway lets you A/B against OpenAI without application changes.
-- **Local dev.** An engineer on the road can point the gateway at a local `ollama` server to work offline while preserving the same VK-based auth contract.
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **DeepSeek**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `DEEPSEEK_API_KEY` | Your DeepSeek API key. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+The gateway calls `https://api.deepseek.com` as an OpenAI-compatible endpoint.
+
+## Model names
+
+Write `deepseek/<model>`, for example `deepseek/deepseek-chat`. The gateway does not infer DeepSeek from a bare name.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek/deepseek-chat",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `GET /v1/models` | Yes, from the DeepSeek catalog |
+
+---
+
+# FILE: ./ai-gateway/providers/elevenlabs.mdx
+
+---
+title: ElevenLabs
+description: Add an ElevenLabs API key under Settings, Model Providers and call speech and transcription through the LangWatch AI Gateway with the OpenAI audio routes or the ElevenLabs SDKs.
+sidebarTitle: ElevenLabs
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **ElevenLabs**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `ELEVENLABS_API_KEY` | Your ElevenLabs API key. |
+| `ELEVENLABS_WEBHOOK_SECRET` | Optional. The secret ElevenLabs signs post-call webhooks with, for Conversational AI usage reporting. |
+| `ELEVENLABS_BASE_URL` | Optional. A residency host on `elevenlabs.io`, over HTTPS. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write `elevenlabs/<model_id>`, for example `elevenlabs/eleven_flash_v2_5` or `elevenlabs/eleven_multilingual_v2`. `eleven_multilingual_v2` is the default when a speech request names no model.
+
+## Send a request
+
+With the OpenAI audio routes:
+
+```bash
+curl https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "elevenlabs/eleven_flash_v2_5",
+    "voice": "<voice_id>",
+    "input": "Hello from ACME"
+  }'
+```
+
+With the ElevenLabs SDKs, set the base URL to `https://gateway.langwatch.ai` and the virtual key as the API key. The SDK sends it in the `Xi-Api-Key` header, which the gateway accepts.
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/audio/speech` | Yes. An OpenAI `response_format` of `pcm` is sent as `pcm_24000` |
+| `POST /v1/audio/transcriptions` | Yes |
+| `POST /v1/text-to-speech/{voice_id}` | Yes, the ElevenLabs native route |
+| `POST /v1/speech-to-text` | Yes, the ElevenLabs native route |
+| `GET /v1/convai/conversation/get-signed-url` | Yes, for Conversational AI sessions |
+| `POST /v1/chat/completions`, `POST /v1/embeddings` | No |
 
 ---
 
@@ -10639,68 +10526,153 @@ Returns decrease after 3 entries. Each extra attempt spends one more provider ro
 
 ---
 title: Google Gemini
-description: Configure Google Gemini (AI Studio) as a provider behind the LangWatch AI Gateway.
-sidebarTitle: Google Gemini
+description: Add a Gemini API key under Settings, Model Providers and call Gemini models through the LangWatch AI Gateway with the OpenAI SDK or the Google GenAI SDKs.
+sidebarTitle: Gemini
 ---
 
-Google AI Studio serves Gemini through the "plain" Google API, distinct from Vertex. It uses API-key auth and needs no GCP project setup.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Gemini**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `GEMINI_API_KEY` | A Google AI Studio API key, or a Google Cloud API key when you set a project. |
+| `GEMINI_PROJECT` | Optional. A Google Cloud project id. Set it together with the location to call the Gemini API on Vertex AI instead of AI Studio. |
+| `GEMINI_LOCATION` | Optional. The location for the project, for example `us-central1`. Set both or neither. |
 
-1. **Add provider → Google Gemini**.
-2. Paste the AI Studio API key (starts with a long alphanumeric string).
-3. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Supported models
+## Model names
 
-- `gemini-2.5-flash`, fast + cheap. Default recommendation for coding CLIs on a Gemini-first VK.
-- `gemini-2.5-pro`, bigger, more capable.
-- `gemini-2.0-flash`, prior generation.
-- `gemini-2.0-pro`, prior generation.
-- Embedding models: `text-embedding-004`, `gemini-embedding-001`.
+Write `gemini/<model>`, for example `gemini/gemini-2.5-flash`. A bare name that starts with `gemini-` resolves to Gemini when the key reaches a Gemini row.
 
-Expose via VK `model_aliases`:
+## Send a request
 
-```json
-{
-  "model_aliases": {
-    "gemini-flash": "gemini/gemini-2.5-flash",
-    "gemini-pro":   "gemini/gemini-2.5-pro"
-  }
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini/gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-## Supported endpoints
+## Google GenAI SDKs
 
-- `POST /v1/chat/completions`, OpenAI-shape dispatched to Gemini's `generateContent`, `streamGenerateContent` endpoint.
-- `POST /v1/embeddings`, for Gemini embedding models.
+The Google GenAI SDKs call `/v1beta/*`. Point them at the gateway host and send the virtual key as the API key. The SDK puts it in the `X-Goog-Api-Key` header, which the gateway accepts.
 
-Gemini has no `/v1/messages` equivalent; Anthropic-shape clients should use a VK that has Anthropic or Bedrock as primary.
+```python
+from google import genai
 
-## Context caching
+client = genai.Client(
+    api_key="vk-lw-...",
+    http_options={"base_url": "https://gateway.langwatch.ai"},
+)
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Say hi in one word",
+)
+print(response.text)
+```
 
-Gemini has an implicit context cache for prompts > 32k tokens. Support varies by model. The gateway forwards requests untouched; caching behaviour is entirely upstream-managed.
+## Endpoints
 
-For explicit caching, Gemini offers a separate `caches.create` API that the gateway does not orchestrate in v1, but clients can call Gemini directly to create a cache and reference it in subsequent gateway calls.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes |
+| `/v1beta/*` | Yes, forwarded to the Gemini API |
+| `GET /v1/models` | Yes, from the Gemini catalog |
 
-## Known quirks
+---
 
-- **Safety filters on by default.** Gemini applies `safetySettings` thresholds that return `finish_reason: SAFETY` when content crosses the threshold. Bifrost/core surfaces this as `provider_error` with the safety metadata in the OTel trace.
-- **Rate limits.** AI Studio's free tier has aggressive rate limits; the paid tier requires a Google account with billing attached. A 429 triggers fallback if configured.
-- **Tool/function calling.** Gemini has its own function-calling format that bifrost/core translates from OpenAI-shape tools. Tool-call streaming deltas are less mature on Gemini, expect byte-level differences vs OpenAI.
-- **Streaming chunks size.** Gemini's streaming emits larger chunks than OpenAI, fewer, bigger SSE frames. Gateway passes these through unchanged.
-- **No `system` role.** Gemini uses `systemInstruction` at the top level of the request. OpenAI-SDK clients that send a `system` role message get it rewritten by the translator.
+# FILE: ./ai-gateway/providers/groq.mdx
 
-## AI Studio vs Vertex
+---
+title: Groq
+description: Add a Groq API key under Settings, Model Providers and call Groq models through the LangWatch AI Gateway.
+sidebarTitle: Groq
+---
 
-Google has two paths to Gemini:
+## Add the credential
 
-- **AI Studio** (this page), quickest, API-key auth, pay-as-you-go on a consumer-ish billing model.
-- **Vertex AI**: GCP-native, IAM-governed, data-residency, enterprise SLAs. See [Vertex](/ai-gateway/providers/vertex).
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Groq**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Use AI Studio for dev, scoping, SaaS; use Vertex for production enterprise.
+| Field | Value |
+|---|---|
+| `GROQ_API_KEY` | Your Groq API key. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write `groq/<model>`, for example `groq/llama-3.3-70b-versatile`. The gateway does not infer Groq from a bare name.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "groq/llama-3.3-70b-versatile",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `GET /v1/models` | Yes, from the Groq catalog |
+
+---
+
+# FILE: ./ai-gateway/providers/openai-account.mdx
+
+---
+title: OpenAI account
+description: Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.
+sidebarTitle: OpenAI account
+---
+
+## What the OpenAI account provider is
+
+The OpenAI account provider is a credential backed by a ChatGPT subscription instead of an API key. Requests go to OpenAI's Codex backend and count against that subscription's plan.
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Codex (OpenAI account)**. The row has no key fields. Click the sign-in button, open the URL it shows and enter the code. The code is valid for 15 minutes. LangWatch stores the tokens and refreshes them.
+
+## Model names
+
+Write `openai_codex/<model>`, for example `openai_codex/gpt-5.6-terra`.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/responses \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai_codex/gpt-5.6-terra",
+    "input": "Say hi in one word"
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/responses` | Yes, streamed from OpenAI |
+| `POST /v1/messages` | Yes, translated to Responses |
+| `POST /v1/chat/completions`, `POST /v1/embeddings` | No, rejected with HTTP 400 |
+
+If OpenAI answers 401, the gateway refreshes the session once. If the refresh is rejected, the request fails with `codex_session_expired`. Sign in again on the row.
 
 ---
 
@@ -10708,61 +10680,52 @@ Use AI Studio for dev, scoping, SaaS; use Vertex for production enterprise.
 
 ---
 title: OpenAI
-description: Configure OpenAI as a provider behind the LangWatch AI Gateway.
+description: Add an OpenAI API key under Settings, Model Providers and call OpenAI models through the LangWatch AI Gateway.
 sidebarTitle: OpenAI
 ---
 
-OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **OpenAI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers** in the LangWatch app:
+| Field | Value |
+|---|---|
+| `OPENAI_API_KEY` | Your OpenAI API key. Required unless you set a base URL. |
+| `OPENAI_BASE_URL` | Optional. An OpenAI-compatible endpoint to call instead of `api.openai.com`. |
 
-1. Click **Add provider** → **OpenAI**.
-2. Paste your OpenAI API key (starts `sk-...`).
-3. Optionally set a custom organisation ID via the Organization field.
-4. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-This creates a `ModelProvider` row that any VK in the same project can bind to. The same credential also powers the existing litellm, playground, evaluators path, no duplication.
+With a base URL set, the gateway treats the row as an OpenAI-compatible endpoint and sends the key as `Authorization: Bearer`.
 
-## Bind the credential to a VK
+## Model names
 
-When creating or editing a VK, select the OpenAI credential from the Primary provider dropdown. Optionally add it again (or a second OpenAI key) as a fallback.
+Write `openai/<model>`, for example `openai/gpt-5-mini`, `openai/gpt-5` or `openai/text-embedding-3-small`. A bare `gpt-5-mini` also resolves to OpenAI when the key reaches an OpenAI row: the gateway infers OpenAI for names that start with `gpt-`, `o1-`, `o3-`, `o4-`, `chatgpt-`, `text-embedding-`, `whisper-` and `tts-`.
 
-Per-VK overrides available on the binding:
+## Send a request
 
-- **Rate limits**: per-VK `rpm`, `tpm`, `rpd` enforced at the gateway before the upstream call.
-- **Extra headers**: appended to every request (e.g. `OpenAI-Beta: assistants=v2`).
-- **Rotation policy**: when a credential has multiple API keys (comma-separated), the gateway can rotate them round-robin or on rate-limit.
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
 
-## Supported endpoints
+## Endpoints
 
-| Gateway route | Upstream | Notes |
-|---|---|---|
-| `POST /v1/chat/completions` | `POST /v1/chat/completions` | Streaming and non-streaming both supported. |
-| `POST /v1/responses` | `POST /v1/responses` | Reasoning models (o3, o4-mini) and tool use. |
-| `POST /v1/embeddings` | `POST /v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
-| `POST /v1/images/generations` | `POST /v1/images/generations` | DALL-E 3. |
-| `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper. |
-| `POST /v1/audio/speech` | `POST /v1/audio/speech` | TTS. |
-| `POST /v1/moderations` | `POST /v1/moderations` | Content moderation. |
-| `GET /v1/models` | `GET /v1/models` | Filtered by the VK's `models_allowed`. |
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/responses` | Yes |
+| `POST /v1/messages` | Yes, translated from the Anthropic format |
+| `POST /v1/embeddings` | Yes |
+| `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | Yes |
+| `POST /v1/realtime/client_secrets` | Yes. See [Realtime](/ai-gateway/api/realtime) |
+| `GET /v1/models` | Yes, from the OpenAI catalog |
 
-## Caching
-
-OpenAI automatically caches prompt prefixes ≥ 1024 tokens. Support varies by model within the GPT-4, GPT-5, and o-series families. There's no `cache_control` block to preserve, OpenAI handles it upstream. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
-
-The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `gen_ai.usage.cache_read.input_tokens` (OTel GenAI semconv). OpenAI has no write-to-cache dimension, so `gen_ai.usage.cache_creation.input_tokens` is unset.
-
-## Reasoning tokens (o-series)
-
-Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_details`. The gateway forwards this verbatim; it's also recorded in the LangWatch trace for cost analysis and included in budget debit.
-
-## Known quirks
-
-- **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
-- **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)**: a 429 moves to the next credential in the VK's [fallback chain](/ai-gateway/providers/fallback-chains). When the chain is used up, or the VK has no chain, the gateway sends OpenAI's `Retry-After` header to the client as is.
+Prompt caching happens on OpenAI's side. The cached token counts come back in `usage` and on the trace. See [Caching passthrough](/ai-gateway/caching-passthrough).
 
 ---
 
@@ -10770,53 +10733,62 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 ---
 title: Providers
-description: Every LLM provider the LangWatch AI Gateway can dispatch to.
+description: The LLM providers the LangWatch AI Gateway dispatches to, the credential each one needs and the endpoints each one serves.
 sidebarTitle: Overview
 ---
 
-The gateway delegates provider-specific dispatch to [`bifrost/core`](https://github.com/maximhq/bifrost), which LangWatch embeds as a Go library. This page lists the providers the gateway can talk to today and the path to configuring each.
+## Where credentials live
 
-## Configure a provider credential once, use from many VKs
+A provider credential is a row under **Settings > Model Providers**. The row belongs to an organization, a team or a project, and every virtual key whose scope can see the row can dispatch through it. The same rows serve evaluators, the playground and the rest of LangWatch.
 
-Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground, no separate "gateway providers" store.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON. See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
-Gateway-only settings (rate limits, fallback priority, providerConfig overrides) live directly on the **ModelProvider** itself, on the **Advanced (Gateway)** tab of the editor. There is no separate binding wrapper. VKs reference ModelProviders by id; the order in the bound routing policy drives primary + fallback selection.
+## Supported providers
 
-```
-ModelProvider (raw credential + Advanced/Gateway settings)
-  └── RoutingPolicy.modelProviderIds[] (ordered primary + fallback)
-       └── VirtualKey.routingPolicyId (or default policy from the org)
-```
+Model names are `provider/model`. The provider segment is the id in the first column. See [Model naming](/ai-gateway/model-naming).
 
-This means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit only affects gateway traffic (it's on the Advanced tab, not the basic credential); changing a VK's provider mix is one edit to the routing policy it references.
-
-## Supported providers (v1)
-
-| Provider | Routes supported | Auth methods | Caching passthrough |
+| Provider | Id | Credential | Endpoints served |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
-| [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | messages, chat | GCP ADC, SA JSON | implicit context cache |
-| [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
-| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream) | Bearer, custom header | opaque |
+| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, speech, transcription, realtime, models |
+| [Anthropic](/ai-gateway/providers/anthropic) | `anthropic` | API key, optional base URL | Messages, Chat, models |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, models |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, models |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, Gemini native, models |
+| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, Gemini native, models |
+| [xAI](/ai-gateway/providers/xai) | `xai` | API key | Chat, Messages, models |
+| [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
+| [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
+| [DeepSeek](/ai-gateway/providers/deepseek) | `deepseek` | API key | Chat, Messages, models |
+| [Voyage AI](/ai-gateway/providers/voyage) | `voyage` | API key | Embeddings only |
+| [ElevenLabs](/ai-gateway/providers/elevenlabs) | `elevenlabs` | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native |
+| [OpenAI account](/ai-gateway/providers/openai-account) | `openai_codex` | Sign in with a ChatGPT account | Responses, Messages |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | `custom` | Base URL, optional API key | Chat, Messages, embeddings |
 
-Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. Each appears in the UI once LangWatch ships its configuration form.
+The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and `google_gemini` are accepted as aliases of `azure`, `bedrock`, `vertex` and `gemini`.
 
-## Picking a primary + fallback
+## What each endpoint family means
 
-Pick one or two fallback providers. Guidelines:
+| Family | Route | Note |
+|---|---|---|
+| Chat | `POST /v1/chat/completions` | OpenAI wire format. The gateway translates for providers with another native format. |
+| Responses | `POST /v1/responses` | OpenAI Responses API. OpenAI, Azure OpenAI and the OpenAI account provider. |
+| Messages | `POST /v1/messages` | Anthropic wire format. Forwarded as is to Anthropic, translated for the others. |
+| Embeddings | `POST /v1/embeddings` | OpenAI wire format. |
+| Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | OpenAI and ElevenLabs. |
+| Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
+| Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
+| ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
+| Models | `GET /v1/models` | Lists the models the key can call. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
 
-- **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
-- **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
-- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency until a configured fallback trigger (by default `5xx`, `timeout`, `rate_limit`) moves it to OpenAI direct.
+A request to an endpoint the provider does not serve gets the provider's own error back. For example, `POST /v1/embeddings` with an Anthropic model returns Anthropic's rejection.
 
-See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
+## More than one row of the same provider
 
-## Multi-region, multi-account
+Create one row per account, region or endpoint, for example an Azure OpenAI row per Azure resource. Give each row a **Routing handle**, for example `eu`, and pin a request to that row with `eu/gpt-5-mini`. A routing policy orders the rows a key tries. See [Routing policies](/ai-gateway/governance/routing-policies).
 
-Each ModelProvider row pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create sibling ModelProvider rows of the same family with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right ModelProvider id.
+<Note>
+**Also check:** [Model naming](/ai-gateway/model-naming) for how a model name selects a provider, and [Fallback chains](/ai-gateway/providers/fallback-chains) for what happens when a provider fails.
+</Note>
 
 ---
 
@@ -10824,70 +10796,133 @@ Each ModelProvider row pins a region (Azure endpoint, Bedrock region, Vertex pro
 
 ---
 title: Google Vertex AI
-description: Configure Google Vertex AI (Anthropic, Gemini) as a provider behind the LangWatch AI Gateway.
-sidebarTitle: Google Vertex AI
+description: Add a service account, project and location under Settings, Model Providers and call Vertex AI models through the LangWatch AI Gateway.
+sidebarTitle: Vertex AI
 ---
 
-Vertex AI is Google Cloud's enterprise LLM surface, Anthropic's Claude family lives there alongside Gemini for customers who need GCP-native security and data-residency. The gateway uses bifrost/core which handles Vertex's OAuth, ADC flow, regional endpoints, and Anthropic-on-Vertex model-id quirks.
+## Add the credential
 
-## Configure the provider credential
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Vertex AI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-Under **Settings → Model Providers**:
+| Field | Value |
+|---|---|
+| `GOOGLE_APPLICATION_CREDENTIALS` | The service account key as JSON, pasted in full. |
+| `VERTEXAI_PROJECT` | The Google Cloud project id. |
+| `VERTEXAI_LOCATION` | The location, for example `us-central1` or `europe-west4`. |
 
-1. **Add provider → Google Vertex AI**.
-2. Choose authentication:
-    - **Service account JSON**: paste the JSON key (least-privilege role: `roles/aiplatform.user` or `roles/aiplatform.serviceAgent`).
-    - **Application Default Credentials**: leave JSON empty; gateway picks up workload identity on GKE, Cloud Run.
-3. Set **project ID** and **region** (`us-central1`, `us-east5`, `europe-west1`, Anthropic-on-Vertex has a limited region list).
-4. Save.
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-## Model id format
+## Model names
 
-Vertex model ids differ by model family:
+Write `vertex/<model>`, for example `vertex/gemini-2.5-pro`. The gateway does not infer Vertex AI from a bare name. Add the models you use under **Custom Models** on the row so that `GET /v1/models` lists them.
 
-- `publishers/anthropic/models/claude-haiku-4-5-20251001@20251001`, Anthropic Claude on Vertex.
-- `publishers/google/models/gemini-2.5-flash`, Gemini via Vertex.
+## Send a request
 
-Expose friendly names via VK `model_aliases`:
-
-```json
-{
-  "model_aliases": {
-    "claude-haiku":  "vertex/publishers/anthropic/models/claude-haiku-4-5-20251001@20251001",
-    "gemini-flash":  "vertex/publishers/google/models/gemini-2.5-flash"
-  }
-}
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "vertex/gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-## Supported endpoints
+## Endpoints
 
-- `POST /v1/messages`, Anthropic-shape dispatched to Vertex's `rawPredict` (or `streamRawPredict`) endpoint for Anthropic models.
-- `POST /v1/chat/completions`, translated shape for both Anthropic-on-Vertex and Gemini.
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `POST /v1/embeddings` | Yes |
+| `/v1beta/*` | Yes, the Google GenAI SDKs. See [Gemini](/ai-gateway/providers/gemini#google-genai-sdks) |
+| `GET /v1/models` | Yes, the names under Custom Models |
 
-## `cache_control` passthrough
+---
 
-Anthropic-on-Vertex supports prompt caching via the same `cache_control` blocks. Bifrost/core translates the shape for Vertex's raw-predict endpoint. Cache-read/write token counts flow back as with direct Anthropic.
+# FILE: ./ai-gateway/providers/voyage.mdx
 
-Gemini's implicit context caches are exposed via a separate API (`caches.create`); the gateway does not orchestrate these in v1 but forwards any cache-reference params the client includes.
+---
+title: Voyage AI
+description: Add a Voyage AI API key under Settings, Model Providers and call Voyage embedding models through the LangWatch AI Gateway.
+sidebarTitle: Voyage AI
+---
 
-## Known quirks
+## Add the credential
 
-- **Region availability.** Anthropic-on-Vertex is not in every GCP region, and the regions differ per model version; `us-central1`, `us-east5`, `europe-west1`, and `asia-southeast1` are the common ones. Check the model card for the version you pin. A 404 with "publisher not found" means wrong region.
-- **Token refresh.** Service-account tokens expire after ~1 hour. Bifrost/core caches and auto-refreshes, no configuration needed from the VK owner.
-- **Quota headers.** Vertex returns `x-vertex-ai-quota-remaining` and throttles with 429 when exhausted. Bifrost/core surfaces the 429 to the fallback engine.
-- **Provisioned throughput vs on-demand.** Provisioned throughput ("Committed Use Discounts") has separate regional ARNs. If you're using provisioned, pass the PT-specific URL on the ModelProvider.
-- **Model IDs include `@20251001` version suffix**, omitting it may route to a different model version silently. Always pin explicit versions in aliases.
-- **Streaming.** Vertex's streaming format is JSON-lines (`\n`-delimited) not SSE. Bifrost/core normalises to SSE for the client.
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Voyage AI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-## Using workload identity on GKE
+| Field | Value |
+|---|---|
+| `VOYAGE_API_KEY` | Your Voyage AI API key. |
 
-Recommended for self-hosted gateway in GKE:
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-1. Create a Google service account with `roles/aiplatform.user`.
-2. Bind it to the gateway pod's KSA via Workload Identity annotation.
-3. Leave the ModelProvider's JSON empty, ADC flows automatically.
+## Model names
 
-No JSON-key rotation chores; Google rotates tokens per-pod.
+Write the Voyage model id, for example `voyage-3.5` or `voyage/voyage-3.5`. The gateway strips the `voyage/` prefix before it calls Voyage.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/embeddings \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "voyage-3.5",
+    "input": ["The quick brown fox"]
+  }'
+```
+
+The gateway sends the request to `https://api.voyageai.com/v1/embeddings` and returns the OpenAI embeddings shape.
+
+## Endpoints
+
+Voyage AI serves `POST /v1/embeddings` only. Any other request to a Voyage row is rejected with the message `voyage credentials only accept embedding requests`.
+
+---
+
+# FILE: ./ai-gateway/providers/xai.mdx
+
+---
+title: xAI
+description: Add a xAI API key under Settings, Model Providers and call xAI models through the LangWatch AI Gateway.
+sidebarTitle: xAI
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **xAI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `XAI_API_KEY` | Your xAI API key. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write `xai/<model>`, for example `xai/grok-4`. The gateway does not infer xAI from a bare name.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "xai/grok-4",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
+```
+
+## Endpoints
+
+| Endpoint | Served |
+|---|---|
+| `POST /v1/chat/completions` | Yes |
+| `POST /v1/messages` | Yes, translated |
+| `GET /v1/models` | Yes, from the xAI catalog |
 
 ---
 
@@ -10971,7 +11006,7 @@ The response is a normal OpenAI chat completion. The gateway adds these response
 | Header | Value |
 |---|---|
 | `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support. |
-| `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id` | The trace and span the gateway recorded for this request. |
+| `Traceparent` | The W3C trace context of the span the gateway recorded in your project. Send your own `traceparent` header on the request to nest that span in your trace. |
 | `X-LangWatch-Budget-Warning` | Present when a budget on this key is at 80 percent or more, as `scope:percent`. |
 
 For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. The SDK sends the key in the `X-Api-Key` header, which the gateway accepts. See [Python SDK](/ai-gateway/sdks/python) and [TypeScript SDK](/ai-gateway/sdks/typescript).
@@ -11055,349 +11090,185 @@ A 429 that comes from the provider is forwarded as the provider sent it, with th
 
 ---
 title: RBAC
-description: Role-based access control for the LangWatch AI Gateway, resources, actions, and default role mappings.
+description: The permissions that gate the LangWatch AI Gateway, the resources they cover and what each built-in role holds.
 sidebarTitle: RBAC
 ---
 
-The AI Gateway is governed by LangWatch's existing RBAC system, the same resources-and-actions model you already use for traces, datasets, evaluations, and prompts. Gateway-specific resources cover the gateway surface; provider credentials reuse the platform-wide `modelProviders` resource (no separate `gatewayProviders` resource since the binding model was retired). Permissions are checked **scope-aware**: every guard names the scope (`ORGANIZATION`, `TEAM`, `PROJECT`) the action operates on, and a higher-scope grant cascades downward (org `manage` allows team and project actions).
+## How gateway permissions work
 
-<Note>The matrix below is the default. Custom roles can carry any combination of the permissions listed, see [Custom Roles](/platform/rbac#custom-roles) for how to define one.</Note>
+The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<resource>:<action>`, a role is a set of permissions, and a role binding gives a person a role on an organization, a team or a project. A grant at a higher scope covers the scopes below it: `virtualKeys:manage` on the organization covers every team and project in it.
+
+The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model, custom roles and role bindings.
 
 ## Resources
 
-Every gateway UI, tRPC call, and REST endpoint checks one of these nine resource keys:
+| Resource | Gates | Actions |
+|---|---|---|
+| `virtualKeys` | The Virtual Keys list, detail and drawers, and `/api/gateway/v1/virtual-keys*`. | `view`, `create`, `update`, `rotate`, `delete`, `manage`, `viewOtherPersonal` |
+| `gatewayBudgets` | The Budgets list, detail and drawers, and `/api/gateway/v1/budgets*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayProviders` | The Advanced (Gateway) section on a provider credential under Settings > Model Providers. | `view`, `update`, `manage` |
+| `routingPolicies` | Routing policies. | `view`, `manage` |
+| `gatewayGuardrails` | Attaching and detaching guardrails on a key. | `view`, `attach`, `detach`, `manage` |
+| `gatewayCacheRules` | Cache rules, and `/api/gateway/v1/cache-rules*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayUsage` | The Usage page and `GET /api/gateway/v1/virtual-keys/:id/spend`. | `view` |
+| `gatewaySpend` | Spend events and spend summaries under `/api/gateway/v1/spend-events*`, `/api/gateway/v1/spend-summaries` and `/api/gateway/v1/end-users/:id/spend`. Organization tier only. | `view`, `manage` |
+| `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
+| `auditLog` | The audit log under Settings. | `view` |
 
-| Resource | What it gates |
+`gatewaySpend` and `webhookEndpoints` come only from an organization role binding. A team or project binding never grants them, even through a custom role that lists them.
+
+`virtualKeys:viewOtherPersonal` lets an administrator see other people's personal keys. Everyone sees their own personal keys without it.
+
+## What the built-in roles hold
+
+Team roles apply on the teams and projects the binding names. Organization roles apply on the whole organization.
+
+| Permission | Team Viewer | Team Member | Team Admin | Organization Admin |
+|---|:-:|:-:|:-:|:-:|
+| `virtualKeys:view` | yes | yes | yes | |
+| `virtualKeys:create`, `update`, `rotate` | | yes | yes | |
+| `virtualKeys:delete` | | | yes | |
+| `virtualKeys:manage`, `viewOtherPersonal` | | | yes | yes |
+| `gatewayBudgets:view` | yes | yes | yes | |
+| `gatewayBudgets:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayProviders:view` | yes | yes | yes | |
+| `gatewayProviders:update`, `manage` | | | yes | |
+| `routingPolicies:view` | yes | yes | yes | |
+| `routingPolicies:manage` | | | yes | |
+| `gatewayGuardrails:view` | yes | yes | yes | |
+| `gatewayGuardrails:attach`, `detach`, `manage` | | | yes | |
+| `gatewayCacheRules:view` | yes | yes | yes | |
+| `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayUsage:view` | yes | yes | yes | |
+| `auditLog:view` | yes | yes | yes | |
+| `gatewaySpend:view`, `manage` | | | | yes |
+| `webhookEndpoints:view`, `manage` | | | | yes |
+
+The Organization Admin column lists what the organization role grants on its own. An organization admin gets the team permissions through the team role bindings they hold, like everyone else.
+
+Organization Member and External hold no gateway permission on their own. They get gateway access through a team role binding.
+
+A custom role starts with no permission. Add the ones you want from the table above.
+
+## Creating keys at a scope
+
+Creating a key with an organization, team or project scope needs `virtualKeys:manage` at every scope the key names. The same rule applies when you re-scope a key with `PATCH`. Naming a trace project on a team or organization key needs `virtualKeys:manage` on that project.
+
+A personal key needs only membership of the organization. See [Virtual keys](/ai-gateway/virtual-keys#ownership-and-scopes).
+
+## Permission per REST route
+
+| Route | Permission |
 |---|---|
-| `virtualKeys` | VK list, detail, drawer, create, update, disable, enable, rotate, revoke, archive. **Plus** `viewOtherPersonal` for org-admin off-boarding sweeps over other users' personal VKs. |
-| `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
-| `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
-| `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
-| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
-| `gatewayLogs` | Audit log list, filter, export. |
-| `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation, and the per-key REST spend read. |
-| `webhookEndpoints` | The [webhook endpoints platform](/features/webhooks): endpoint CRUD, secret roll, test fire, delivery log, health, the events log. **Organization-exclusive** (see below). Enterprise-gated at the plan layer on top of the permission. |
-| `gatewaySpend` | The [billing reconciliation surface](/ai-gateway/billing-events): spend-events pull, spend-summaries, and (`manage`) replay. **Organization-exclusive.** Separate from `webhookEndpoints` on purpose: reading the metered ledger is strictly weaker than managing outbound delivery, so billing consumers can hold keys that can only read. Same enterprise gate. |
-
-### Organization-exclusive resources
-
-`webhookEndpoints` and `gatewaySpend` can only be granted by an **ORGANIZATION-scoped** role binding. A team- or project-scoped binding never grants them, even through a custom role that lists them: endpoints carry signing secrets and stream org-wide events out of the platform, and the spend ledger spans every project, so granting either below the org tier would let a project-scoped role exfiltrate org-wide data.
-
-## Actions
-
-Each resource supports a subset of the standard CRUD action verbs:
-
-| Action | Semantics |
-|---|---|
-| `view` | Read, list + detail pages + REST `GET` endpoints. |
-| `create` | Mint a new record (VK, budget). |
-| `update` | Edit an existing record's fields (but not delete or rotate). |
-| `rotate` | VK-specific: issue a fresh secret and retire the old one with a 24 h grace window. |
-| `delete` | Soft-delete, archive. Budgets use `archived = true`; VKs use `revoked = true`. Hard-delete is not a gateway operation. |
-| `attach`, `detach` | Guardrail-specific: link, unlink an evaluator to a VK direction (pre, post, stream_chunk). |
-| `viewOtherPersonal` | VK-specific: view personal VKs whose `principalUserId` is **not** the calling user. Used by org admins for off-boarding sweeps. Without this perm, `api.personalVirtualKeys.list` always filters to the caller's own personal VKs. |
-| `manage` | Superset, implies all CRUD actions for the resource. |
-
-The full permission set uses the `<resource>:<action>` format, for example `virtualKeys:rotate`, `gatewayBudgets:manage`, `gatewayGuardrails:attach`, `virtualKeys:viewOtherPersonal`. Custom roles can pick any subset.
-
-### Multi-scope intersection
-
-When a VK is created with multiple scope rows (e.g. `TEAM:platform` AND `TEAM:data-sci`), the caller must hold `virtualKeys:manage` at **every** named scope. Holding it at only one does not pass; the error names the unauthorised scope. Holding `virtualKeys:manage` at `ORGANIZATION` cascades down to every TEAM and PROJECT in the org in a single grant.
-
-## Default role matrix
-
-| Permission | ADMIN | MEMBER | VIEWER |
-|---|:-:|:-:|:-:|
-| `virtualKeys:view` | ✓ | ✓ | ✓ |
-| `virtualKeys:create` | ✓ | ✓ | |
-| `virtualKeys:update` | ✓ | ✓ | |
-| `virtualKeys:rotate` | ✓ | ✓ | |
-| `virtualKeys:delete` | ✓ | | |
-| `virtualKeys:manage` | ✓ | | |
-| `virtualKeys:viewOtherPersonal` | ✓ | | |
-| `gatewayBudgets:view` | ✓ | ✓ | ✓ |
-| `gatewayBudgets:create` | ✓ | | |
-| `gatewayBudgets:update` | ✓ | | |
-| `gatewayBudgets:delete` | ✓ | | |
-| `gatewayBudgets:manage` | ✓ | | |
-| `modelProviders:view` | ✓ | ✓ | ✓ |
-| `modelProviders:update` | ✓ | | |
-| `modelProviders:manage` | ✓ | | |
-| `gatewayGuardrails:view` | ✓ | ✓ | ✓ |
-| `gatewayGuardrails:attach` | ✓ | | |
-| `gatewayGuardrails:detach` | ✓ | | |
-| `gatewayGuardrails:manage` | ✓ | | |
-| `gatewayLogs:view` | ✓ | ✓ | ✓ |
-| `gatewayUsage:view` | ✓ | ✓ | ✓ |
-| `webhookEndpoints:view` | ✓ (org admin) | | |
-| `webhookEndpoints:manage` | ✓ (org admin) | | |
-| `gatewaySpend:view` | ✓ (org admin) | | |
-| `gatewaySpend:manage` | ✓ (org admin) | | |
-
-### What each default role can actually do
-
-**ADMIN**: full gateway control. Can mint VKs at any scope, audit other users' personal VKs (`viewOtherPersonal`), set budgets (and delete them), edit ModelProvider Advanced (Gateway) settings, attach/detach guardrails, read audit logs, view usage. Org admins additionally hold the webhook platform and billing surface (`webhookEndpoints:*`, `gatewaySpend:*`); a custom org-scoped role can delegate `webhookEndpoints:view` for read-only delivery-log access or `gatewaySpend:view` for a read-only billing consumer.
-
-**MEMBER**: can mint + rotate their own VKs, view their own personal VKs, read budgets + providers + guardrails, read audit logs, view usage. **Cannot** create or delete budgets (finance-level control lives with admins), cannot edit ModelProvider Advanced settings, cannot attach/detach guardrails (policy change belongs to admins), and cannot view other users' personal VKs.
-
-**VIEWER**: read-only across every gateway surface. Can see VKs (but cannot see the secret, the secret is only ever shown at create-time, regardless of role), budgets, ModelProvider basic + Advanced fields (read-only), guardrail attachments, audit logs, usage. Cannot see other users' personal VKs.
-
-**CUSTOM**: inherits no gateway permissions by default. A custom role starts empty and must be granted the specific permissions you want.
-
-## Public REST API scoping
-
-Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalent UI action. The mapping is:
-
-| Endpoint | Permission |
-|---|---|
-| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` (plus `virtualKeys:manage` at every requested scope) |
-| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
-| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` (re-scoping needs `virtualKeys:manage` at every new scope) |
-| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
-| `POST /api/gateway/v1/virtual-keys/:id/disable` | `virtualKeys:update` |
-| `POST /api/gateway/v1/virtual-keys/:id/enable` | `virtualKeys:update` |
-| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
-| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
+| `GET /api/gateway/v1/virtual-keys`, `GET .../:id` | `virtualKeys:view` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope named |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `POST .../:id/rotate` | `virtualKeys:rotate` |
+| `POST .../:id/disable`, `POST .../:id/enable` | `virtualKeys:update` |
+| `POST .../:id/revoke` | `virtualKeys:delete` |
+| `GET .../:id/spend` | `gatewayUsage:view` |
+| `GET /api/gateway/v1/budgets`, `GET .../:id` | `gatewayBudgets:view` |
 | `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
-| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
-| `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
-| `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
+| `PATCH .../:id`, `POST .../:id/reset` | `gatewayBudgets:update` |
+| `DELETE .../:id` | `gatewayBudgets:delete` |
 | `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
 | `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
-| `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
-| `DELETE /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:delete` |
-
-The billing and webhook surfaces authenticate with an **organization API key** and the org-exclusive permissions:
-
-| Endpoint | Permission |
-|---|---|
-| `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
-| `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
-| `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
-| `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
+| `PATCH .../:id` | `gatewayCacheRules:update` |
+| `DELETE .../:id` | `gatewayCacheRules:delete` |
+| `GET /api/gateway/v1/spend-events`, `GET .../spend-summaries`, `GET .../end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
 
-Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
-
-Audit log retrieval is **not** exposed via the public REST API in v1, gateway audit rows live in the platform `AuditLog` table and are read via `/settings/audit-log` (CSV export) or via the tRPC `organization.getAuditLogs` procedure (gated on `auditLog:view`, with TeamUser ADMIN/MEMBER/VIEWER fallback for legacy admins). See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically). The `gatewayLogs:view` permission remains in the enum for backward compatibility but is no longer wired to any endpoint.
-
-A request with an API token that lacks the required permission returns `403 permission_denied` with the missing permission named in the `error.message`:
+A call with an API key that lacks the permission gets HTTP 403 `api_key_permission_denied`. The permission is in `error.meta.permission`:
 
 ```json
 {
   "error": {
-    "type":    "permission_denied",
-    "code":    "permission_denied",
-    "message": "permission_denied: virtualKeys:manage at ORGANIZATION:org_..."
+    "code": "api_key_permission_denied",
+    "message": "API Key does not grant required permission: virtualKeys:manage",
+    "meta": { "permission": "virtualKeys:manage" }
   }
 }
 ```
 
-## Personal VKs (principal-attributed)
-
-The default role matrix governs *who can mint a VK*: a VK can also be marked as **personal** by setting `principalUserId` on the record. The principal column is orthogonal to the VK's scope rows.
-
-- A VK with `principalUserId = user_abc` is treated as that user's personal credential. Spend cascades through the principal's PRINCIPAL-scope budget first, then through scope-driven budgets (TEAM, ORGANIZATION).
-- A VK with `principalUserId = null` is shared (service-account-style): spend cascades through scope-driven budgets only.
-- The CLI device-flow (`langwatch login --device`) lazy-mints a personal VK at `ORGANIZATION` scope with the caller as the principal. No explicit `virtualKeys:manage` grant is required for this self-mint path.
-- Visibility: a user always sees their own personal VKs without any explicit grant (principal-match short-circuit). Viewing **other** users' personal VKs requires `virtualKeys:viewOtherPersonal`.
-
-For full semantics see [vk-personal-scope.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-personal-scope.feature).
-
-## SCIM + SSO
-
-Default role matrix assignments flow through SCIM, when an IdP pushes a user with role `MEMBER`, they pick up the gateway permissions in the MEMBER column above. Custom roles must be assigned via LangWatch UI (SCIM doesn't carry custom-role identifiers); the SCIM integration only maps to ADMIN, MEMBER, VIEWER.
-
-## Changing the permission matrix
-
-Default roles are code-defined in `platform/app/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
-
-For the policy rationale (why MEMBER can mint VKs but not create budgets, etc.), see [spec contract §10, Permissions](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/_shared/contract.md#10-permissions).
-
-## See also
-
-- [Virtual Keys](/ai-gateway/virtual-keys): lifecycle, rotation, revoke semantics.
-- [Budgets](/ai-gateway/budgets): scope semantics + breach behaviours.
-- [API Reference: Management](/ai-gateway/api/management): all REST endpoints with their permission requirements.
-- [Security](/ai-gateway/security): threat model, secret handling, HMAC/JWT cryptography.
+<Note>
+**Also check:** [Roles and permissions](/platform/rbac) for role bindings and custom roles, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
+</Note>
 
 ---
 
 # FILE: ./ai-gateway/sdks/python.mdx
 
 ---
-title: Python SDK integration
-description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic Python SDKs, with proper trace propagation.
+title: Python
+description: Call the LangWatch AI Gateway from Python with the OpenAI SDK, the Anthropic SDK, the Google GenAI SDK, LangChain or LlamaIndex, and link the gateway span to your own trace.
 sidebarTitle: Python
 ---
 
-The gateway is designed to be a drop-in replacement for provider base URLs, every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
+## What changes in your code
 
-This page covers the standard setup and how to propagate trace ids through the gateway so you don't double-count cost.
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
 
-## OpenAI Python SDK
+| SDK | Base URL | Where the key goes |
+|---|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` | `api_key`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Api-Key` |
+| Google GenAI | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Goog-Api-Key` |
+| ElevenLabs | `https://gateway.langwatch.ai` | `api_key`, sent as `Xi-Api-Key` |
 
-### Minimal setup
+## OpenAI SDK
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-01HZX9K3M...",
-)
-
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-)
-```
-
-That's the whole integration. Everything else (streaming, tools, vision, embeddings, images, audio) works unchanged.
-
-### Trace propagation
-
-If your application is already traced with the LangWatch SDK, pass the current trace context so the gateway's span nests inside yours, otherwise you'll have two disconnected traces and double-counted cost in dashboards.
-
-```python
-import langwatch
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),   # injects traceparent + X-LangWatch-*
 )
 
-with langwatch.trace(name="my-agent-turn"):
-    resp = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": "Hi"}],
-    )
-```
-
-`langwatch.get_gateway_headers()` returns a dict with:
-
-- `traceparent` (W3C format), set from the active LangWatch trace.
-- `X-LangWatch-Trace-Id`, LangWatch-native trace id override.
-- `X-LangWatch-Parent-Span-Id`, parent span.
-- `X-LangWatch-Thread-Id`, if the active trace has a thread id.
-
-The gateway reads these on each request and attaches its own span as a child of your trace. The LangWatch UI shows the LLM call nested under your agent span with no cost duplication.
-
-<Note>`get_gateway_headers()` ships in LangWatch Python SDK ≥ `v0.22.0` alongside the gateway GA. Check your installed version with `pip show langwatch`.</Note>
-
-### Response headers for correlation
-
-Every gateway response carries these headers so clients can stitch the span back into their own trace without needing the LangWatch SDK:
-
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets |
-
-```python
-resp = client.chat.completions.with_raw_response.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
-headers = resp.http_response.headers
-print(f"trace_id = {headers['X-LangWatch-Trace-Id']}")
-print(f"span_id  = {headers['X-LangWatch-Span-Id']}")
-# Use the traceparent to stitch a downstream service:
-# requests.post(next_service, headers={"traceparent": headers["traceparent"]}, ...)
+print(response.choices[0].message.content)
 ```
 
-### Without the LangWatch SDK: raw traceparent
+The same client serves `client.responses`, `client.embeddings`, `client.audio.speech` and `client.audio.transcriptions`. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
 
-If you don't use the LangWatch Python SDK but still want trace continuity (e.g. you're traced via OpenTelemetry directly):
-
-```python
-from opentelemetry import trace
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-
-def _traceparent_headers() -> dict[str, str]:
-    carrier: dict[str, str] = {}
-    TraceContextTextMapPropagator().inject(carrier)
-    return carrier  # {"traceparent": "00-<tid>-<sid>-01"} when a span is active
-
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-...",
-    default_headers=_traceparent_headers(),
-)
-```
-
-The gateway honours the standard W3C `traceparent` contract, any OTel-instrumented app already emits this; no LangWatch-specific code needed.
-
-### Per-call overrides
-
-Every OpenAI SDK method accepts `extra_headers={}`:
-
-```python
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-    extra_headers={
-        "X-LangWatch-Cache": "disable",                # cold run, ignore cache
-        "X-LangWatch-Trace-Metadata": '{"tier":"free"}',  # attach metadata to the trace
-    },
-)
-```
-
-These layer on top of `default_headers` without replacing them.
-
-### Response inspection
-
-Grab the `X-LangWatch-Gateway-Request-Id` for support tickets or log correlation:
-
-```python
-resp = client.chat.completions.with_raw_response.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
-)
-request_id = resp.http_response.headers["X-LangWatch-Gateway-Request-Id"]
-print(f"LangWatch request id: {request_id}")
-```
-
-## Anthropic Python SDK
-
-### Minimal setup
+## Anthropic SDK
 
 ```python
 import anthropic
 
 client = anthropic.Anthropic(
     base_url="https://gateway.langwatch.ai",
-    api_key="vk-lw-...",   # SDK accepts VK here; gateway also accepts via x-api-key
+    api_key="vk-lw-...",
 )
 
-resp = client.messages.create(
-    model="claude-haiku-4-5-20251001",
+message = client.messages.create(
+    model="anthropic/claude-haiku-4-5",
     max_tokens=64,
-    messages=[{"role": "user", "content": "Hi"}],
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
+print(message.content[0].text)
 ```
 
-### Trace propagation (Anthropic)
+## Google GenAI SDK
 
 ```python
-client = anthropic.Anthropic(
-    base_url="https://gateway.langwatch.ai",
+from google import genai
+
+client = genai.Client(
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
+    http_options={"base_url": "https://gateway.langwatch.ai"},
 )
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Say hi in one word",
+)
+print(response.text)
 ```
 
-Works identically to the OpenAI SDK.
-
-## LangChain, LangGraph
-
-LangChain's `ChatOpenAI` and `ChatAnthropic` accept a `base_url` or `openai_api_base`:
+## LangChain
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -11405,12 +11276,11 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     base_url="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
 )
 ```
 
-For LangGraph agents, set the headers on the LLM node, it propagates to every call the agent makes.
+`ChatAnthropic` takes `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`.
 
 ## LlamaIndex
 
@@ -11420,235 +11290,255 @@ from llama_index.llms.openai import OpenAI
 llm = OpenAI(
     api_base="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    default_headers=langwatch.get_gateway_headers(),
-    model="gpt-5-mini",
+    model="openai/gpt-5-mini",
 )
 ```
 
-## PydanticAI, OpenInference, other OTel-aware frameworks
+## Link the gateway span to your trace
 
-Frameworks that already emit OpenTelemetry spans will set `traceparent` automatically on outbound HTTP requests if the `opentelemetry-instrumentation-requests`, `httpx`, `aiohttp` packages are installed. No LangWatch SDK involvement needed.
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application already has the current context. Inject it into the request headers:
+
+```python
+from openai import OpenAI
+from opentelemetry.propagate import inject
+
+def trace_headers() -> dict[str, str]:
+    carrier: dict[str, str] = {}
+    inject(carrier)  # {"traceparent": "00-<trace id>-<span id>-01"} inside an active span
+    return carrier
+
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
+
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+    extra_headers=trace_headers(),
+)
+```
+
+Call `trace_headers()` per request, inside the span you want the gateway span under. `default_headers` on the client is read once and would pin the first span.
+
+The [LangWatch Python SDK](/integration/python/guide) uses OpenTelemetry, so the same code works inside `langwatch.trace()` or a `@langwatch.span()` function. Do not also autotrack the OpenAI client for calls that go through the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header | Purpose |
+|---|---|
+| `traceparent` | Nests the gateway span in your trace. |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+
+Pass them per request with `extra_headers={...}`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```python
+raw = client.chat.completions.with_raw_response.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
+)
+headers = raw.http_response.headers
+print(headers["X-LangWatch-Gateway-Request-Id"])  # quote this to support
+print(headers.get("X-LangWatch-Budget-Warning"))   # "project:84" when a budget is at 80 percent or more
+print(headers.get("Traceparent"))                  # the gateway span in your project
+response = raw.parse()
+```
+
+## Manage keys and budgets from Python
+
+The LangWatch Python SDK wraps the management routes: `langwatch.virtual_keys`, `langwatch.gateway_budgets`, `langwatch.spend_events` and `langwatch.webhooks`. They take a LangWatch API key through `langwatch.setup(api_key=...)`. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#reconcile-with-the-sdks).
 
 ## Self-hosted gateway
 
-Replace the hostname:
+Replace the host with your gateway's URL. Everything else is the same.
 
 ```python
-client = OpenAI(
-    base_url="https://langwatch-gateway.your-corp.internal/v1",
-    api_key="vk-lw-...",
-)
+client = OpenAI(base_url="https://gateway.acme.internal/v1", api_key="vk-lw-...")
 ```
-
-Rest of the setup is identical.
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`**, wrong VK or VK revoked. Check the first 12 characters against the LangWatch UI.
-- **Cost double-counted**: trace propagation not working. Verify `default_headers` contains `traceparent` at request time (`client._custom_headers` on the OpenAI SDK).
-- **Anthropic auth header mismatch**: the Python Anthropic SDK sets `x-api-key` automatically from `api_key`. The gateway accepts all three (`Bearer`, `x-api-key`, `api-key`), so either works.
+| Symptom | Cause |
+|---|---|
+| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
+| Two spans per call in Trace Explorer | The OpenAI client is also autotracked by the LangWatch SDK. Remove the autotrack for gateway calls. |
+| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
 
-See [API: Errors](/ai-gateway/api/errors) for the full error-code list.
+See [Errors](/ai-gateway/api/errors) for every error code.
 
 ---
 
 # FILE: ./ai-gateway/sdks/typescript.mdx
 
 ---
-title: TypeScript SDK integration
-description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic TypeScript SDKs, with proper trace propagation.
+title: TypeScript
+description: Call the LangWatch AI Gateway from TypeScript with the OpenAI SDK, the Anthropic SDK, the Vercel AI SDK or LangChain.js, and link the gateway span to your own trace.
 sidebarTitle: TypeScript
 ---
 
-Every TypeScript LLM SDK works by overriding its base URL and using a LangWatch virtual key. The gateway handles the rest.
+## What changes in your code
 
-This page covers the standard setup and how to propagate trace ids so you don't double-count cost.
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
 
-## OpenAI TypeScript SDK
+| SDK | Base URL | Where the key goes |
+|---|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` | `apiKey`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Api-Key` |
+| Google GenAI | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Goog-Api-Key` |
 
-### Minimal setup
+## OpenAI SDK
 
-```ts
+```typescript
 import OpenAI from "openai";
 
-const openai = new OpenAI({
+const client = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
+const response = await client.chat.completions.create({
+  model: "openai/gpt-5-mini",
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
+console.log(response.choices[0].message.content);
 ```
 
-### Trace propagation
+The same client serves `client.responses`, `client.embeddings`, `client.audio.speech` and `client.audio.transcriptions`. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
 
-```ts
-import { getGatewayHeaders } from "langwatch";
-import OpenAI from "openai";
+## Anthropic SDK
 
-const openai = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: getGatewayHeaders(),
-});
-```
-
-`getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace, no duplicate cost.
-
-<Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
-
-### Response headers for correlation
-
-Every gateway response carries these headers so clients can stitch the gateway span into their own trace tooling without the LangWatch SDK:
-
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets |
-
-```ts
-const raw = await openai.chat.completions.withResponse().create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
-});
-const traceparent = raw.response.headers.get("traceparent");
-const traceId = raw.response.headers.get("X-LangWatch-Trace-Id");
-// Forward traceparent on the next outbound call to preserve the trace:
-// await fetch(nextService, { headers: { traceparent } });
-```
-
-### Without the LangWatch SDK: raw traceparent
-
-Using OpenTelemetry JS directly:
-
-```ts
-import { propagation, context } from "@opentelemetry/api";
-
-function traceparentHeaders(): Record<string, string> {
-  const carrier: Record<string, string> = {};
-  propagation.inject(context.active(), carrier);
-  return carrier; // { traceparent: "00-<tid>-<sid>-01" }
-}
-
-const openai = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: traceparentHeaders(),
-});
-```
-
-The gateway honours W3C `traceparent`, any OTel-instrumented Node.js app already emits this.
-
-### Per-call overrides
-
-```ts
-const resp = await openai.chat.completions.create(
-  {
-    model: "gpt-5-mini",
-    messages: [{ role: "user", content: "Hi" }],
-  },
-  {
-    headers: {
-      "X-LangWatch-Cache": "disable",
-      "X-LangWatch-Trace-Metadata": JSON.stringify({ tier: "free" }),
-    },
-  }
-);
-```
-
-### Response inspection
-
-```ts
-const resp = await openai.chat.completions.withResponse().create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
-});
-const requestId = resp.response.headers.get("X-LangWatch-Gateway-Request-Id");
-```
-
-## Anthropic TypeScript SDK
-
-```ts
+```typescript
 import Anthropic from "@anthropic-ai/sdk";
-import { getGatewayHeaders } from "langwatch";
 
-const anthropic = new Anthropic({
+const client = new Anthropic({
   baseURL: "https://gateway.langwatch.ai",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: getGatewayHeaders(),
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await anthropic.messages.create({
-  model: "claude-haiku-4-5-20251001",
+const message = await client.messages.create({
+  model: "anthropic/claude-haiku-4-5",
   max_tokens: 64,
-  messages: [{ role: "user", content: "Hi" }],
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
 ```
 
 ## Vercel AI SDK
 
-```ts
+```typescript
 import { createOpenAI } from "@ai-sdk/openai";
-import { getGatewayHeaders } from "langwatch";
+import { generateText } from "ai";
 
 const openai = createOpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  fetch: async (input, init) => {
-    const headers = new Headers(init?.headers);
-    for (const [k, v] of Object.entries(getGatewayHeaders())) headers.set(k, v as string);
-    return fetch(input, { ...init, headers });
-  },
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
 const { text } = await generateText({
-  model: openai("gpt-5-mini"),
-  prompt: "Hi",
+  model: openai("openai/gpt-5-mini"),
+  prompt: "Say hi in one word",
 });
 ```
 
-Custom `fetch` lets the AI SDK pass gateway-specific headers on every request without the SDK having a `defaultHeaders` option.
+`createOpenAI` also takes `headers: { ... }` for headers that are the same on every request.
 
 ## LangChain.js
 
-```ts
+```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { getGatewayHeaders } from "langwatch";
 
 const llm = new ChatOpenAI({
-  configuration: {
-    baseURL: "https://gateway.langwatch.ai/v1",
-  },
-  apiKey: process.env.LW_VK,
-  modelKwargs: {
-    default_headers: getGatewayHeaders(),
-  },
-  model: "gpt-5-mini",
+  model: "openai/gpt-5-mini",
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
+  configuration: { baseURL: "https://gateway.langwatch.ai/v1" },
 });
 ```
+
+## Link the gateway span to your trace
+
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application has the current context. Inject it into the request headers, per request, inside the span you want the gateway span under:
+
+```typescript
+import { context, propagation } from "@opentelemetry/api";
+import OpenAI from "openai";
+
+function traceHeaders(): Record<string, string> {
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier); // { traceparent: "00-<trace id>-<span id>-01" }
+  return carrier;
+}
+
+const client = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
+});
+
+const response = await client.chat.completions.create(
+  {
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "user", content: "Say hi in one word" }],
+  },
+  { headers: traceHeaders() },
+);
+```
+
+The [LangWatch TypeScript SDK](/integration/typescript/guide) uses OpenTelemetry, so the same code works inside a `langwatch` span. Do not also instrument the OpenAI client for calls that go through the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header | Purpose |
+|---|---|
+| `traceparent` | Nests the gateway span in your trace. |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+
+Pass them per request in the second argument of the OpenAI SDK methods, `{ headers: { ... } }`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```typescript
+const { data, response } = await client.chat.completions
+  .create({
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "user", content: "Say hi in one word" }],
+  })
+  .withResponse();
+
+console.log(response.headers.get("X-LangWatch-Gateway-Request-Id")); // quote this to support
+console.log(response.headers.get("X-LangWatch-Budget-Warning"));     // "project:84" when a budget is at 80 percent or more
+console.log(response.headers.get("Traceparent"));                    // the gateway span in your project
+```
+
+## Manage keys and budgets from TypeScript
+
+The `langwatch` package wraps the management routes: `VirtualKeysApiService`, `GatewayBudgetsApiService` and `langwatch.spendEvents` on a `LangWatch` client, with a LangWatch API key. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#reconcile-with-the-sdks).
 
 ## Self-hosted gateway
 
-Replace the hostname:
+Replace the host with your gateway's URL. Everything else is the same.
 
-```ts
-const openai = new OpenAI({
-  baseURL: "https://langwatch-gateway.your-corp.internal/v1",
-  apiKey: process.env.LW_VK,
-});
+```typescript
+const client = new OpenAI({ baseURL: "https://gateway.acme.internal/v1", apiKey: process.env.LANGWATCH_VIRTUAL_KEY });
 ```
+
+## In the browser
+
+The gateway sends no CORS headers on `/v1`, and a virtual key in browser code is visible to every visitor. Call the gateway from your server.
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`**, wrong VK or revoked. Verify the first 12 chars in the LangWatch UI.
-- **Cost double-counted**: trace propagation not working. Check that `getGatewayHeaders()` returned non-empty (log the dict). If the active trace is null, no headers are set.
-- **CORS errors in browser**: the gateway does not expose CORS for the `/v1` routes by default. Use a server-side proxy; don't call the gateway from a browser with a production VK (it would expose the VK to users).
+| Symptom | Cause |
+|---|---|
+| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
+| Two spans per call in Trace Explorer | The OpenAI client is also instrumented by the LangWatch SDK. Remove that instrumentation for gateway calls. |
+| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
 
-See [API: Errors](/ai-gateway/api/errors).
+See [Errors](/ai-gateway/api/errors) for every error code.
 
 ---
 

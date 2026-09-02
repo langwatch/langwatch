@@ -1,0 +1,37 @@
+---
+title: Voyage AI
+description: Add a Voyage AI API key under Settings, Model Providers and call Voyage embedding models through the LangWatch AI Gateway.
+sidebarTitle: Voyage AI
+---
+
+## Add the credential
+
+Open **Settings > Model Providers**, click **Add Model Provider** and select **Voyage AI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
+
+| Field | Value |
+|---|---|
+| `VOYAGE_API_KEY` | Your Voyage AI API key. |
+
+Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+## Model names
+
+Write the Voyage model id, for example `voyage-3.5` or `voyage/voyage-3.5`. The gateway strips the `voyage/` prefix before it calls Voyage.
+
+## Send a request
+
+```bash
+curl https://gateway.langwatch.ai/v1/embeddings \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "voyage-3.5",
+    "input": ["The quick brown fox"]
+  }'
+```
+
+The gateway sends the request to `https://api.voyageai.com/v1/embeddings` and returns the OpenAI embeddings shape.
+
+## Endpoints
+
+Voyage AI serves `POST /v1/embeddings` only. Any other request to a Voyage row is rejected with the message `voyage credentials only accept embedding requests`.

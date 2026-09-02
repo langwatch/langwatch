@@ -1,195 +1,166 @@
 ---
-title: TypeScript SDK integration
-description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic TypeScript SDKs, with proper trace propagation.
+title: TypeScript
+description: Call the LangWatch AI Gateway from TypeScript with the OpenAI SDK, the Anthropic SDK, the Vercel AI SDK or LangChain.js, and link the gateway span to your own trace.
 sidebarTitle: TypeScript
 ---
 
-Every TypeScript LLM SDK works by overriding its base URL and using a LangWatch virtual key. The gateway handles the rest.
+## What changes in your code
 
-This page covers the standard setup and how to propagate trace ids so you don't double-count cost.
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
 
-## OpenAI TypeScript SDK
+| SDK | Base URL | Where the key goes |
+|---|---|---|
+| OpenAI | `https://gateway.langwatch.ai/v1` | `apiKey`, sent as `Authorization: Bearer` |
+| Anthropic | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Api-Key` |
+| Google GenAI | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Goog-Api-Key` |
 
-### Minimal setup
+## OpenAI SDK
 
-```ts
+```typescript
 import OpenAI from "openai";
 
-const openai = new OpenAI({
+const client = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
+const response = await client.chat.completions.create({
+  model: "openai/gpt-5-mini",
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
+console.log(response.choices[0].message.content);
 ```
 
-### Trace propagation
+The same client serves `client.responses`, `client.embeddings`, `client.audio.speech` and `client.audio.transcriptions`. With an Anthropic or Gemini model name the gateway translates the chat request to the provider's format.
 
-```ts
-import { getGatewayHeaders } from "langwatch";
-import OpenAI from "openai";
+## Anthropic SDK
 
-const openai = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: getGatewayHeaders(),
-});
-```
-
-`getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace, no duplicate cost.
-
-<Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
-
-### Response headers for correlation
-
-Every gateway response carries these headers so clients can stitch the gateway span into their own trace tooling without the LangWatch SDK:
-
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, use in support tickets |
-
-```ts
-const raw = await openai.chat.completions.withResponse().create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
-});
-const traceparent = raw.response.headers.get("traceparent");
-const traceId = raw.response.headers.get("X-LangWatch-Trace-Id");
-// Forward traceparent on the next outbound call to preserve the trace:
-// await fetch(nextService, { headers: { traceparent } });
-```
-
-### Without the LangWatch SDK: raw traceparent
-
-Using OpenTelemetry JS directly:
-
-```ts
-import { propagation, context } from "@opentelemetry/api";
-
-function traceparentHeaders(): Record<string, string> {
-  const carrier: Record<string, string> = {};
-  propagation.inject(context.active(), carrier);
-  return carrier; // { traceparent: "00-<tid>-<sid>-01" }
-}
-
-const openai = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: traceparentHeaders(),
-});
-```
-
-The gateway honours W3C `traceparent`, any OTel-instrumented Node.js app already emits this.
-
-### Per-call overrides
-
-```ts
-const resp = await openai.chat.completions.create(
-  {
-    model: "gpt-5-mini",
-    messages: [{ role: "user", content: "Hi" }],
-  },
-  {
-    headers: {
-      "X-LangWatch-Cache": "disable",
-      "X-LangWatch-Trace-Metadata": JSON.stringify({ tier: "free" }),
-    },
-  }
-);
-```
-
-### Response inspection
-
-```ts
-const resp = await openai.chat.completions.withResponse().create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
-});
-const requestId = resp.response.headers.get("X-LangWatch-Gateway-Request-Id");
-```
-
-## Anthropic TypeScript SDK
-
-```ts
+```typescript
 import Anthropic from "@anthropic-ai/sdk";
-import { getGatewayHeaders } from "langwatch";
 
-const anthropic = new Anthropic({
+const client = new Anthropic({
   baseURL: "https://gateway.langwatch.ai",
-  apiKey: process.env.LW_VK,
-  defaultHeaders: getGatewayHeaders(),
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await anthropic.messages.create({
-  model: "claude-haiku-4-5-20251001",
+const message = await client.messages.create({
+  model: "anthropic/claude-haiku-4-5",
   max_tokens: 64,
-  messages: [{ role: "user", content: "Hi" }],
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
 ```
 
 ## Vercel AI SDK
 
-```ts
+```typescript
 import { createOpenAI } from "@ai-sdk/openai";
-import { getGatewayHeaders } from "langwatch";
+import { generateText } from "ai";
 
 const openai = createOpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
-  fetch: async (input, init) => {
-    const headers = new Headers(init?.headers);
-    for (const [k, v] of Object.entries(getGatewayHeaders())) headers.set(k, v as string);
-    return fetch(input, { ...init, headers });
-  },
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
 const { text } = await generateText({
-  model: openai("gpt-5-mini"),
-  prompt: "Hi",
+  model: openai("openai/gpt-5-mini"),
+  prompt: "Say hi in one word",
 });
 ```
 
-Custom `fetch` lets the AI SDK pass gateway-specific headers on every request without the SDK having a `defaultHeaders` option.
+`createOpenAI` also takes `headers: { ... }` for headers that are the same on every request.
 
 ## LangChain.js
 
-```ts
+```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { getGatewayHeaders } from "langwatch";
 
 const llm = new ChatOpenAI({
-  configuration: {
-    baseURL: "https://gateway.langwatch.ai/v1",
-  },
-  apiKey: process.env.LW_VK,
-  modelKwargs: {
-    default_headers: getGatewayHeaders(),
-  },
-  model: "gpt-5-mini",
+  model: "openai/gpt-5-mini",
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
+  configuration: { baseURL: "https://gateway.langwatch.ai/v1" },
 });
 ```
+
+## Link the gateway span to your trace
+
+The gateway records one `gen_ai.<request type>` span per request in the trace project of the virtual key. Send a W3C `traceparent` header and the gateway nests that span under your span. Without it, each request is its own trace.
+
+Any OpenTelemetry-instrumented application has the current context. Inject it into the request headers, per request, inside the span you want the gateway span under:
+
+```typescript
+import { context, propagation } from "@opentelemetry/api";
+import OpenAI from "openai";
+
+function traceHeaders(): Record<string, string> {
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier); // { traceparent: "00-<trace id>-<span id>-01" }
+  return carrier;
+}
+
+const client = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
+});
+
+const response = await client.chat.completions.create(
+  {
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "user", content: "Say hi in one word" }],
+  },
+  { headers: traceHeaders() },
+);
+```
+
+The [LangWatch TypeScript SDK](/integration/typescript/guide) uses OpenTelemetry, so the same code works inside a `langwatch` span. Do not also instrument the OpenAI client for calls that go through the gateway: the gateway already records the span with the model, the tokens and the cost.
+
+## Headers you can send
+
+| Header | Purpose |
+|---|---|
+| `traceparent` | Nests the gateway span in your trace. |
+| `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
+| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+
+Pass them per request in the second argument of the OpenAI SDK methods, `{ headers: { ... } }`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
+
+## Read the response headers
+
+```typescript
+const { data, response } = await client.chat.completions
+  .create({
+    model: "openai/gpt-5-mini",
+    messages: [{ role: "user", content: "Say hi in one word" }],
+  })
+  .withResponse();
+
+console.log(response.headers.get("X-LangWatch-Gateway-Request-Id")); // quote this to support
+console.log(response.headers.get("X-LangWatch-Budget-Warning"));     // "project:84" when a budget is at 80 percent or more
+console.log(response.headers.get("Traceparent"));                    // the gateway span in your project
+```
+
+## Manage keys and budgets from TypeScript
+
+The `langwatch` package wraps the management routes: `VirtualKeysApiService`, `GatewayBudgetsApiService` and `langwatch.spendEvents` on a `LangWatch` client, with a LangWatch API key. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) and [Billing and spend events](/ai-gateway/billing-events#reconcile-with-the-sdks).
 
 ## Self-hosted gateway
 
-Replace the hostname:
+Replace the host with your gateway's URL. Everything else is the same.
 
-```ts
-const openai = new OpenAI({
-  baseURL: "https://langwatch-gateway.your-corp.internal/v1",
-  apiKey: process.env.LW_VK,
-});
+```typescript
+const client = new OpenAI({ baseURL: "https://gateway.acme.internal/v1", apiKey: process.env.LANGWATCH_VIRTUAL_KEY });
 ```
+
+## In the browser
+
+The gateway sends no CORS headers on `/v1`, and a virtual key in browser code is visible to every visitor. Call the gateway from your server.
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`**, wrong VK or revoked. Verify the first 12 chars in the LangWatch UI.
-- **Cost double-counted**: trace propagation not working. Check that `getGatewayHeaders()` returned non-empty (log the dict). If the active trace is null, no headers are set.
-- **CORS errors in browser**: the gateway does not expose CORS for the `/v1` routes by default. Use a server-side proxy; don't call the gateway from a browser with a production VK (it would expose the VK to users).
+| Symptom | Cause |
+|---|---|
+| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
+| Two spans per call in Trace Explorer | The OpenAI client is also instrumented by the LangWatch SDK. Remove that instrumentation for gateway calls. |
+| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
 
-See [API: Errors](/ai-gateway/api/errors).
+See [Errors](/ai-gateway/api/errors) for every error code.
