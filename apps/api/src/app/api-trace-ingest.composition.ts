@@ -61,6 +61,9 @@ import {
   TraceIngestionService,
   TraceIngressCommandPort,
   TraceSpanDedupPort,
+  type CollectorCredential,
+  type CollectorCredentialPort,
+  type CollectorSpanIngestPort,
   type OtlpIngestCredential,
   type OtlpIngestRestPorts,
   type SpanDedupRef,
@@ -117,7 +120,30 @@ export type ApiTraceIngestOptions = Readonly<{
 }>;
 
 /**
- * The OTLP family's ports, or nothing.
+ * Both ingest doors' ports, composed over ONE ingestion service.
+ *
+ * The OTLP receiver and the SDK collector are two wires into one path: the
+ * same `trace_processing` producer registration, the same Redis dedup claim,
+ * the same coding-agent span filter. One composition rather than two, because
+ * a second `TraceIngestionService` would be a second dedup gate — and a span
+ * exported to one door and retried against the other would be recorded twice.
+ */
+export type ApiTraceIngestComposition = Readonly<{
+  /** `POST /api/otel/v1/*` and its path aliases. */
+  otlp: OtlpIngestRestPorts;
+  /** `POST /api/collector`: one already-normalized span at a time. */
+  ingestSpan: CollectorSpanIngestPort;
+  /**
+   * The collector's own credential resolution, over the SAME
+   * `ApiHandlerManagedCredentials` the OTLP door uses. It is mapped to the
+   * collector's discriminated refusal rather than passed through, because that
+   * family publishes its own unauthenticated sentence.
+   */
+  collectorCredential: CollectorCredentialPort;
+}>;
+
+/**
+ * Both ingest doors' ports, or nothing.
  *
  * Nothing when there is no command queue: a receiver that accepts a span and
  * has nowhere to send it answers 200 to data it then drops, which is the one
@@ -125,7 +151,7 @@ export type ApiTraceIngestOptions = Readonly<{
  */
 export function composeApiTraceIngest(
   options: ApiTraceIngestOptions,
-): OtlpIngestRestPorts | undefined {
+): ApiTraceIngestComposition | undefined {
   const { eventing, report } = options;
   if (!eventing) {
     report?.absent("command-queue");
@@ -147,19 +173,50 @@ export function composeApiTraceIngest(
 
   report?.absent("plan-allowance");
 
+  const authenticate = (request: Request) =>
+    options.credentials.authenticate({ request, permission: "traces:create" });
+
   return {
-    credential: async ({ request }) => {
-      const resolution = await options.credentials.authenticate({
-        request,
-        permission: "traces:create",
-      });
-      return toOtlpCredential(resolution);
+    otlp: {
+      credential: async ({ request }) => toOtlpCredential(await authenticate(request)),
+      // The allowance this process cannot read. Returning is the same outcome the
+      // receiver has always had when the lookup itself failed.
+      usageLimit: () => Promise.resolve(),
+      traces: ({ tenantId, traceRequest }) =>
+        ingestion.handleOtlpTraceRequest(tenantId, traceRequest, DEFAULT_PII_REDACTION_LEVEL),
     },
-    // The allowance this process cannot read. Returning is the same outcome the
-    // receiver has always had when the lookup itself failed.
-    usageLimit: () => Promise.resolve(),
-    traces: ({ tenantId, traceRequest }) =>
-      ingestion.handleOtlpTraceRequest(tenantId, traceRequest, DEFAULT_PII_REDACTION_LEVEL),
+    ingestSpan: (input) => ingestion.ingestNormalizedSpan(input as never),
+    collectorCredential: async ({ request }) =>
+      toCollectorCredential(await authenticate(request)),
+  };
+}
+
+/**
+ * Maps the process's one credential resolution onto the collector's own
+ * refusal vocabulary.
+ *
+ * A 401 from the shared resolution means the request carried no usable
+ * credential, and the collector answers that in its OWN words — the sentence
+ * every LangWatch SDK's error copy quotes. Anything else is a ceiling denial,
+ * whose full handled payload the family forwards untouched.
+ */
+function toCollectorCredential(
+  resolution: Awaited<ReturnType<ApiHandlerManagedCredentials["authenticate"]>>,
+): CollectorCredential {
+  if (!resolution.ok) {
+    return resolution.status === 401
+      ? { ok: false, kind: "credential" }
+      : { ok: false, kind: "ceiling", status: resolution.status, body: resolution.body };
+  }
+  const { project, markUsed } = resolution;
+  return {
+    ok: true,
+    project: {
+      id: project.id,
+      teamId: project.teamId,
+      organizationId: project.organizationId,
+    },
+    markUsed,
   };
 }
 

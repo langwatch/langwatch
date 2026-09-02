@@ -1,68 +1,202 @@
+/**
+ * The REST collector: `POST /api/collector`.
+ *
+ * Was `platform/app/src/server/routes/collector.ts`. This is the SDK's own
+ * ingest door — the one an SDK posts a whole trace to in one body, spans and
+ * custom evaluations together — and it sits beside the OTLP receiver on the
+ * same producer registration, the same Redis dedup gate and the same
+ * handler-managed credential, so a span that arrives here and a span that
+ * arrives on `/api/otel/v1/traces` are recorded by one path.
+ *
+ * Everything the platform route reached through its global application
+ * container is a port now: the credential, the plan allowance, the span
+ * ingestion, the evaluation report and the evaluator-id slug rule. The two
+ * ingest rules it used to import from a browser module — the RAG context
+ * id/normalisation pass and the chunk text extractor — are
+ * `@langwatch/trace-contract`'s, where both halves can name them.
+ *
+ * The nine distinct 400 sentences, the two 429s, the 402 and the 500 are
+ * transcribed rather than rewritten: every one of them is what a deployed SDK
+ * shows a customer.
+ */
 import crypto from "node:crypto";
+
+import { bodyLimit, type AppRestSecurity, type SecuredApp } from "@langwatch/api/rest";
+import { handlerManagedAuth } from "@langwatch/api";
 import { createLogger, validationMeta } from "@langwatch/observability";
+import type { Env } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { createServiceApp } from "~/server/api/security";
-import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
-import { DEFAULT_PII_REDACTION_LEVEL, SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
-import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
-import {
-  apiKeyCeilingDenialResponse,
-  enforceApiKeyCeiling,
-  extractCredentials,
-} from "../api-key/auth-middleware";
-import { PlanLimitExceededError } from "../app-layer/usage/errors";
-import type { UsageLimitResult } from "../app-layer/usage/usage.service";
-import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
-import { maybeAddIdsToContextList } from "../tracer/collector/rag";
-import type {
-  CollectorRESTParamsValidator,
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Span,
-} from "@langwatch/trace-contract";
+
 import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
+  DEFAULT_PII_REDACTION_LEVEL,
+  langWatchSpanSchema,
+  maybeAddIdsToContextList,
   reservedTraceMetadataSchema,
   spanMetricsSchema,
-  langWatchSpanSchema,
   spanValidatorSchema,
+  SPAN_MAX_PAST_MS,
+  type CollectorRESTParamsValidator,
+  type CustomMetadata,
+  type ReservedTraceMetadata,
+  type Span,
 } from "@langwatch/trace-contract";
-import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
-import { bodyLimit } from "./_lib/body-limit";
+
+import { CollectorSpanUtils } from "#services/trace-collector-span.service";
 
 const logger = createLogger("langwatch.collector");
-const secured = createServiceApp({ basePath: "/api" });
 
-// POST /api/collector
-secured
-  .access(
-    handlerManagedAuth({
-      reason: "ingestion API key resolved in-handler",
-      // Declared because this is the route it took a colleague "ages" to work
-      // out from the code: trace collection is gated by `traces:create`, which
-      // was previously discoverable only by reading the handler.
-      permissions: ["traces:create"],
-      credential: "apiKey",
-    }),
-  )
-  .post(
-    "/collector",
-    bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
-    async (c) => {
-      const credentials = extractCredentials((name) => c.req.header(name));
+/** The project a collector body is recorded against. */
+export type CollectorProject = Readonly<{
+  id: string;
+  teamId: string;
+  organizationId: string;
+}>;
 
-      if (!credentials) {
-        logger.warn("collector request is not authenticated, no auth token provided");
+/**
+ * A resolved credential, or why it was refused.
+ *
+ * The two refusals are told apart rather than passed through as one body,
+ * because their copy comes from two different places. `credential` is THIS
+ * family's own sentence — `{error:"Unauthorized", message:"Invalid
+ * credentials"}`, which every LangWatch SDK's error copy quotes — and it
+ * covers both a missing token and one that resolves to nothing. `ceiling` is
+ * the AuthZ layer's full handled payload (code, permission, tips), which the
+ * family forwards untouched because a caller acts on its fields.
+ */
+export type CollectorCredential =
+  | Readonly<{ ok: true; project: CollectorProject; markUsed: () => void }>
+  | Readonly<{ ok: false; kind: "credential" }>
+  | Readonly<{ ok: false; kind: "ceiling"; status: ContentfulStatusCode; body: object }>;
 
-        return c.json(
-          {
-            error: "Unauthorized",
-            message: "Invalid credentials",
-          },
-          401,
-        );
+/** How this process turns a request into a project credential. */
+export type CollectorCredentialPort = (input: {
+  request: Request;
+}) => Promise<CollectorCredential>;
+
+/**
+ * The plan allowance, enforced before the body is reshaped.
+ *
+ * It THROWS to refuse — the refusal is a `HandledError` the process's error
+ * boundary renders as a 402, deliberately not a 429: OTel SDKs and most HTTP
+ * clients retry a 429, and a plan limit is terminal for that payload, so a
+ * retryable status turns one rejection into an unbounded loop. It returns for
+ * every other outcome INCLUDING a lookup that failed, which is the behaviour
+ * this path has always had.
+ */
+export type CollectorUsageLimitPort = (input: {
+  project: CollectorProject;
+}) => Promise<void>;
+
+/** One already-normalized span, handed to the ingestion pipeline. */
+export type CollectorSpanIngestPort = (input: {
+  tenantId: string;
+  span: ReturnType<typeof CollectorSpanUtils.convertSpanToOtlp>;
+  resource: ReturnType<typeof CollectorSpanUtils.buildResource>;
+  instrumentationScope: Readonly<{ name: string }>;
+  piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
+}) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
+
+/** One custom SDK evaluation, reported to the evaluation pipeline. */
+export type CollectorEvaluationReportPort = (input: {
+  tenantId: string;
+  evaluationId: string;
+  evaluatorId: string;
+  evaluatorType: string;
+  evaluatorName: string;
+  traceId: string;
+  isGuardrail?: boolean | undefined;
+  status: string;
+  score: number | null;
+  passed: boolean | null;
+  label: string | null;
+  details: string | null;
+  error: string | null;
+  occurredAt: number;
+}) => Promise<unknown>;
+
+/** Reports a failure the collector answered but did not raise. */
+export type CollectorErrorReportPort = (
+  error: Error,
+  context: Readonly<{ projectId: string; traceId?: string | undefined }>,
+) => void;
+
+export type CollectorRestPorts = Readonly<{
+  credential: CollectorCredentialPort;
+  /**
+   * The plan allowance, or none.
+   *
+   * None where the process composed no usage meter, and then no monthly
+   * allowance is enforced. That is the same degradation this path has always
+   * had when the allowance LOOKUP failed — the batch is accepted — because
+   * telemetry a customer already paid to produce must not be dropped by a
+   * meter this process cannot read.
+   */
+  usageLimit?: CollectorUsageLimitPort | undefined;
+  /** Where a normalized span goes. Required: it is the whole of this door. */
+  ingestSpan: CollectorSpanIngestPort;
+  /**
+   * Where a custom SDK evaluation goes, or none.
+   *
+   * None where the process registered no evaluation pipeline. The spans still
+   * land; each evaluation is counted in `partialSuccess.rejectedEvaluations`
+   * with a sentence saying so, rather than dropped silently — a verdict a
+   * customer believes they recorded is worse than one they are told was not.
+   */
+  reportEvaluation?: CollectorEvaluationReportPort | undefined;
+  /**
+   * The evaluator-id slug rule, for an evaluation that names no evaluator.
+   *
+   * A port because the rule is EVALUATION's — the same one its own
+   * `custom-evaluation-sync` subscriber applies — and a feature server package
+   * may not reach into another feature's server package. Two copies would
+   * derive two ids for one evaluation name, and the id IS the key.
+   */
+  deriveEvaluatorId: (name: string) => string;
+  reportError?: CollectorErrorReportPort | undefined;
+}>;
+
+/** The largest body this door reads before refusing it unread. */
+const COLLECTOR_MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/**
+ * The REST collector, built against one process's security.
+ *
+ * `/api/collector` is a literal path nothing else claims, but it MUST be
+ * registered before the OTLP path-alias re-dispatcher, which claims
+ * `/api/collector/*` with a wildcard.
+ */
+export function createCollectorRestApp(options: {
+  security: AppRestSecurity;
+  ports: CollectorRestPorts;
+}): SecuredApp<Env> {
+  const { security, ports } = options;
+  const secured = security.createServiceApp({ basePath: "/api" });
+
+  secured
+    .access(
+      handlerManagedAuth({
+        reason: "ingestion API key resolved in-handler",
+        // Declared because this is the route it took a colleague "ages" to work
+        // out from the code: trace collection is gated by `traces:create`, which
+        // was previously discoverable only by reading the handler.
+        permissions: ["traces:create"],
+        credential: "apiKey",
+      }),
+    )
+    .post("/collector", bodyLimit({ maxSize: COLLECTOR_MAX_BODY_BYTES }), async (c) => {
+      const auth = await ports.credential({ request: c.req.raw });
+      if (!auth.ok) {
+        if (auth.kind === "ceiling") {
+          logger.warn("collector request denied by API key ceiling");
+          // The full handled body — code, permission, tips — not just a sentence.
+          return c.json(auth.body, auth.status);
+        }
+        logger.warn("collector request is not authenticated");
+        return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
       }
 
       // warn, not error: a malformed body is the caller's mistake and we answer
@@ -93,98 +227,13 @@ secured
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      const app = c.app;
-      const apiKeys = app.apiKeys.apiKeyService;
-      const resolved = await apiKeys.tryResolveToken({
-        token: credentials.token,
-        projectId: credentials.projectId,
-      });
-
-      if (!resolved) {
-        logger.warn("collector request is not authenticated, invalid auth token");
-
-        return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
-      }
-
-      // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
-      // access — ADMIN and MEMBER have it; VIEWER does not, preventing
-      // read-only API keys from ingesting traces.
-      try {
-        await enforceApiKeyCeiling({
-          resolved,
-          permission: "traces:create",
-        });
-      } catch (error) {
-        const denial = apiKeyCeilingDenialResponse(error);
-        logger.warn(
-          {
-            projectId: resolved.project.id,
-            apiKeyId: resolved.type === "apiKey" ? resolved.apiKeyId : undefined,
-          },
-          "collector request denied by API key ceiling",
-        );
-        // The full handled body — code, permission, tips — not just a sentence.
-        return c.json(denial.body, denial.status);
-      }
-
-      const project = resolved.project;
+      const project = auth.project;
 
       logger.info({ projectId: project.id }, "collector request being processed");
 
-      // The lookup is wrapped in try/catch on its own — on failure we log and
-      // let the request through (same behaviour as before). The thrown limit
-      // error below lives outside that try block so it is never mistaken for
-      // a lookup failure.
-      let limitResult: UsageLimitResult;
-      try {
-        limitResult = await app.usage.checkLimit({
-          teamId: project.teamId,
-        });
-      } catch (error) {
-        logger.error({ error, projectId: project.id }, "Error checking trace limit");
-        captureException(new Error("Error checking trace limit"), {
-          extra: { projectId: project.id, error },
-        });
-        limitResult = { exceeded: false };
-      }
-
-      if (limitResult.exceeded) {
-        try {
-          const activePlan = await app.planProvider.getActivePlan({
-            organizationId: project.organizationId,
-          });
-          await app.usageLimits.notifyPlanLimitReached({
-            organizationId: project.organizationId,
-            planName: activePlan.name ?? "free",
-            usageUnit: limitResult.usageUnit,
-            current: limitResult.count,
-            max: limitResult.maxMessagesPerMonth,
-          });
-        } catch (error) {
-          logger.error(
-            { error, projectId: project.id },
-            "Error sending plan limit notification",
-          );
-        }
-        logger.info(
-          {
-            projectId: project.id,
-            currentMonthMessagesCount: limitResult.count,
-            activePlanName: limitResult.planName,
-            maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-          },
-          "Project has reached plan limit",
-        );
-
-        // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
-        // plan limit is terminal for that payload, so a retryable status
-        // turns one rejection into an unbounded loop.
-        throw new PlanLimitExceededError(limitResult.message, {
-          currentMonthMessagesCount: limitResult.count,
-          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-          activePlanName: limitResult.planName,
-        });
-      }
+      // The allowance refuses by throwing; every other outcome — including a
+      // lookup that failed inside the port — lets the batch through.
+      await ports.usageLimit?.({ project });
 
       // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
       if (!("metadata" in body) || !body.metadata) {
@@ -268,8 +317,8 @@ secured
       } catch (error) {
         const validation = validationMeta(error);
 
-        captureException(new Error("ZodError on parsing body"), {
-          extra: { projectId: project.id, ...validation },
+        ports.reportError?.(new Error("ZodError on parsing body"), {
+          projectId: project.id,
         });
 
         const validationError = fromZodError(error as ZodError);
@@ -285,9 +334,7 @@ secured
 
       // Body successfully validated — mark the API key as used if this request was
       // authenticated via API key
-      if (resolved.type === "apiKey") {
-        apiKeys.markUsed({ id: resolved.apiKeyId });
-      }
+      auth.markUsed();
 
       const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
 
@@ -363,8 +410,8 @@ secured
         const validationError = fromZodError(error as ZodError);
         const validation = validationMeta(error);
 
-        captureException(new Error("ZodError on parsing metadata"), {
-          extra: { projectId: project.id, ...validation },
+        ports.reportError?.(new Error("ZodError on parsing metadata"), {
+          projectId: project.id,
         });
 
         // Metadata is customer-authored key/value content, so the values stay
@@ -456,12 +503,6 @@ secured
         return c.json({ message: "Trace ID not defined" }, 400);
       }
 
-      getCurrentScope()?.setPropagationContext?.({
-        traceId,
-        sampleRand: 1,
-        propagationSpanId: traceId,
-      });
-
       const traceIds = Array.from(
         new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
       );
@@ -494,8 +535,9 @@ secured
         } catch (error) {
           const validation = validationMeta(error);
 
-          captureException(new Error("ZodError on parsing spans"), {
-            extra: { projectId: project.id, index, ...validation },
+          ports.reportError?.(new Error("ZodError on parsing spans"), {
+            projectId: project.id,
+            traceId,
           });
 
           const validationError = fromZodError(error as ZodError);
@@ -573,11 +615,11 @@ secured
 
         const results = await Promise.allSettled(
           freshSpans.map((span) =>
-            // Route through ingestNormalizedSpan (not recordSpan directly) so the
-            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
-            // spool hook with the OTLP path — a retry storm here must not bypass
-            // dedup. occurredAt is stamped inside ingestNormalizedSpan.
-            app.traceIngestion.collection.ingestNormalizedSpan({
+            // Route through the ingestion pipeline (not the command sender
+            // directly) so the REST collector shares the (tenant, trace, span)
+            // dedup gate + ADR-022 spool hook with the OTLP path — a retry storm
+            // here must not bypass dedup. occurredAt is stamped inside it.
+            ports.ingestSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
@@ -652,57 +694,69 @@ secured
       let rejectedEvaluations = 0;
       const evaluationErrors: string[] = [];
       if (params.evaluations && params.evaluations.length > 0 && traceId) {
-        const occurredAt = Date.now();
+        const reportEvaluation = ports.reportEvaluation;
+        if (!reportEvaluation) {
+          rejectedEvaluations = params.evaluations.length;
+          evaluationErrors.push(
+            "This deployment records no evaluations, so the evaluations on this trace were not stored.",
+          );
+          logger.warn(
+            { projectId: project.id, traceId, count: params.evaluations.length },
+            "no evaluation pipeline on this process; collector evaluations rejected by name",
+          );
+        } else {
+          const occurredAt = Date.now();
 
-        for (const evaluation of params.evaluations) {
-          // try/catch per evaluation so one failing dispatch does not silently
-          // drop the remaining evaluations; failures are surfaced to the client
-          // via partialSuccess.rejectedEvaluations below.
-          try {
-            const evaluationMD5 = crypto
-              .createHash("md5")
-              .update(JSON.stringify({ traceId, evaluation }))
-              .digest("hex");
-            const evaluationId = evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
-            const evaluatorId =
-              evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
-            const status =
-              evaluation.status ?? (evaluation.error ? "error" : "processed");
-            // A verdict is only real when the evaluator ran to completion —
-            // an errored/skipped run's stray passed/score/label must not
-            // reach analytics or triggers as a real result (#6833). Same
-            // gate as the shared verdictGate helpers applied at the
-            // executeEvaluation command boundary.
-            const hasVerdict = status === "processed";
+          for (const evaluation of params.evaluations) {
+            // try/catch per evaluation so one failing dispatch does not silently
+            // drop the remaining evaluations; failures are surfaced to the client
+            // via partialSuccess.rejectedEvaluations below.
+            try {
+              const evaluationMD5 = crypto
+                .createHash("md5")
+                .update(JSON.stringify({ traceId, evaluation }))
+                .digest("hex");
+              const evaluationId = evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
+              const evaluatorId =
+                evaluation.evaluator_id ?? ports.deriveEvaluatorId(evaluation.name);
+              const status =
+                evaluation.status ?? (evaluation.error ? "error" : "processed");
+              // A verdict is only real when the evaluator ran to completion —
+              // an errored/skipped run's stray passed/score/label must not
+              // reach analytics or triggers as a real result (#6833). Same
+              // gate as the shared verdictGate helpers applied at the
+              // executeEvaluation command boundary.
+              const hasVerdict = status === "processed";
 
-            await app.evaluations.reportEvaluation({
-              tenantId: project.id,
-              evaluationId,
-              evaluatorId,
-              evaluatorType: "custom",
-              evaluatorName: evaluation.name,
-              traceId,
-              isGuardrail: evaluation.is_guardrail ?? undefined,
-              status,
-              score: hasVerdict ? (evaluation.score ?? null) : null,
-              passed: hasVerdict ? (evaluation.passed ?? null) : null,
-              label: hasVerdict ? (evaluation.label ?? null) : null,
-              details: evaluation.details ?? null,
-              error: evaluation.error?.message ?? null,
-              occurredAt,
-            });
-          } catch (error) {
-            rejectedEvaluations++;
-            evaluationErrors.push(error instanceof Error ? error.message : String(error));
-            logger.error(
-              {
-                error,
-                projectId: project.id,
+              await reportEvaluation({
+                tenantId: project.id,
+                evaluationId,
+                evaluatorId,
+                evaluatorType: "custom",
+                evaluatorName: evaluation.name,
                 traceId,
-                evaluationName: evaluation.name,
-              },
-              "Error dispatching REST evaluation to event sourcing",
-            );
+                isGuardrail: evaluation.is_guardrail ?? undefined,
+                status,
+                score: hasVerdict ? (evaluation.score ?? null) : null,
+                passed: hasVerdict ? (evaluation.passed ?? null) : null,
+                label: hasVerdict ? (evaluation.label ?? null) : null,
+                details: evaluation.details ?? null,
+                error: evaluation.error?.message ?? null,
+                occurredAt,
+              });
+            } catch (error) {
+              rejectedEvaluations++;
+              evaluationErrors.push(error instanceof Error ? error.message : String(error));
+              logger.error(
+                {
+                  error,
+                  projectId: project.id,
+                  traceId,
+                  evaluationName: evaluation.name,
+                },
+                "Error dispatching REST evaluation to event sourcing",
+              );
+            }
           }
         }
       }
@@ -715,7 +769,8 @@ secured
           errorMessage: [...rejectionErrors, ...evaluationErrors].join("; "),
         },
       });
-    },
-  );
+    });
 
-export const app = secured.hono;
+  return secured;
+}
+

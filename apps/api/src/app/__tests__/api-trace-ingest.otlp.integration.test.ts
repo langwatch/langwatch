@@ -244,13 +244,14 @@ function mount(overrides: MountOverrides = {}) {
     commands.push(data);
   });
 
-  const otlpIngest = composeApiTraceIngest({
+  const ingest = composeApiTraceIngest({
     eventing: recordingEventing(send),
     redis: null,
     credentials: credentialsStub(overrides.credential),
     processName: "langwatch-api-test",
   });
-  if (!otlpIngest) throw new Error("the OTLP ports must compose over a command queue");
+  if (!ingest) throw new Error("the OTLP ports must compose over a command queue");
+  const otlpIngest = ingest.otlp;
 
   const hono = new Hono();
   for (const app of createApiProcessRestFeatures({

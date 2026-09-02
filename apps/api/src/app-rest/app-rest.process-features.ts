@@ -43,6 +43,16 @@ import {
   createLangyUiActionsRestApp,
 } from "@langwatch/langy-server";
 import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
+import {
+  createAuthCliDeviceFlowRestApp,
+  type AuthCliDeviceFlowRestPorts,
+} from "@langwatch/auth-server";
+import {
+  createGovernanceCliRestApp,
+  createGovernanceIngestRestApp,
+  type GovernanceCliRestPorts,
+  type GovernanceIngestRestPorts,
+} from "@langwatch/enterprise-governance-server";
 
 import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount";
 
@@ -73,16 +83,49 @@ import {
 } from "../features/analytics/langwatch-ql-rest.mount";
 import { mountOrganizationRest } from "../features/organization/organization-rest.mount";
 import { mountPromptsRest } from "../features/prompt/prompt-rest.mount";
+import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition";
+import { mountDatasetGenerateRest } from "../features/dataset/dataset-generate-rest.mount";
+import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount";
+import { mountScenarioGenerateRest } from "../features/scenario/scenario-generate-rest.mount";
+import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount";
+import {
+  mountExperimentV3Rest,
+  type ApiExperimentV3RestCollaborators,
+} from "../features/experiment/experiment-v3-rest.mount";
+import {
+  mountExperimentInitRest,
+  type ApiExperimentInitRestCollaborators,
+} from "../features/experiment/experiment-init-rest.mount";
+import {
+  mountWorkflowRunRest,
+  type ApiWorkflowRunRestCollaborators,
+} from "../features/workflow/workflow-run-rest.mount";
 import { createApiDiscoveryRestApp } from "../features/discovery/api-discovery-rest";
 import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-openapi-rest";
 import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest";
+import {
+  createHealthProbeRestApp,
+  type HealthProbeRestPorts,
+} from "../features/health/health-probe-rest";
 import type { RumRateLimiter } from "../features/rum/rum-ingest.service";
 import { createRumRestApp } from "../features/rum/rum-rest";
 import {
   createOtlpIngestRestApp,
   createOtlpPathAliasRestApp,
+  type CollectorRestPorts,
   type OtlpIngestRestPorts,
 } from "@langwatch/trace-server";
+import {
+  mountEvaluationsLegacyRest,
+  type ApiEvaluationBatchRestCollaborators,
+} from "../features/evaluation/evaluations-legacy-rest.mount";
+import {
+  mountCollectorRest,
+  mountTraceLegacyRest,
+  mountTracesRest,
+  type ApiTraceLegacyRestCollaborators,
+  type ApiTracesRestCollaborators,
+} from "../features/trace/trace-rest.mount";
 
 /**
  * The project credential a handler-managed family resolves through.
@@ -169,6 +212,72 @@ export type ApiProcessRestServices = Readonly<{
         audit: AppRestManagementAuditPort;
       }>
     | undefined;
+  /**
+   * The v1 trace reads' collaborators, or none.
+   *
+   * None where this process composed no trace read stack: `/api/traces/search`
+   * and `/api/traces/:traceId` ARE that stack, and a family mounted over a
+   * refusing one would answer 500 to every reader rather than 404 to a door
+   * that is honestly not here.
+   */
+  traceReads?: ApiTracesRestCollaborators | undefined;
+  /**
+   * The deprecated `/api/trace/*` and `/api/thread/:id` family's
+   * collaborators, or none.
+   *
+   * All four travel together because two of the five routes MINT and REVOKE
+   * public links: a process holding the reads but not the share ledger could
+   * serve a trace it cannot unshare.
+   */
+  traceLegacy?: ApiTraceLegacyRestCollaborators | undefined;
+  /**
+   * The four AUTHORING doors a person reaches while editing something — the
+   * Studio's code completion and its run dispatch, the playground, the dataset
+   * row generator and the scenario author-assist — or none.
+   *
+   * One entry rather than four because a browser session is what every one of
+   * them resolves a person with, and a process holding no session transport
+   * can mount none of them. Which of the four are actually present beyond that
+   * is the composition's own answer — see `composeApiAuthoringRest`.
+   */
+  authoring?: ApiAuthoringRestComposition | undefined;
+  /**
+   * The experiment workbench's ten doors, or none.
+   *
+   * One entry because the family is one app plus the alias that forwards into
+   * it. Whether its four RUN doors answer is the run loop's own affair: they
+   * refuse `service_unavailable` by name on a process with no progress store,
+   * while the four setup doors keep answering — which is why an absent run
+   * loop does not take the family off.
+   */
+  experimentWorkbench?: ApiExperimentV3RestCollaborators | undefined;
+  /**
+   * The SDK's experiment create-or-take door, or none.
+   *
+   * Held apart from the workbench's ten even though both live under
+   * `/api/experiment*`: this one is an SDK's project key and the workbench's
+   * are a browser session and a richer credential. What it shares with the
+   * batch result log below is the find-or-create SERVICE, and that is the
+   * point — one construction, so one slug names one experiment on both doors.
+   */
+  experimentInit?: ApiExperimentInitRestCollaborators | undefined;
+  /**
+   * `POST /api/evaluations/batch/log_results`'s collaborators, or none.
+   *
+   * None where this process registered no experiment run writer: the rows are
+   * a run's history, and a door that accepted them with nowhere to write is
+   * one an SDK believes reported its results.
+   */
+  evaluationBatch?: ApiEvaluationBatchRestCollaborators | undefined;
+  /**
+   * The three URLs a synchronous studio run is started from, or none.
+   *
+   * Held apart from the Studio's editor doors even though two of the paths sit
+   * under `/api/workflows`: those two are a browser's session doors and these
+   * are an SDK's key doors, and a process can hold the graph service without
+   * holding a session transport.
+   */
+  workflowRun?: ApiWorkflowRunRestCollaborators | undefined;
 }>;
 
 export type ApiProcessRestPorts = Readonly<{
@@ -192,6 +301,15 @@ export type ApiProcessRestPorts = Readonly<{
    * signal whose collection is absent is not mounted at all.
    */
   otlpIngest?: OtlpIngestRestPorts | undefined;
+  /**
+   * The SDK collector's collaborators, or none.
+   *
+   * None for the same reason the OTLP receiver's are: `POST /api/collector` is
+   * the other wire into the same ingestion path, and a door that accepts a
+   * trace it cannot enqueue tells an SDK the trace landed. Composed from the
+   * SAME ingestion service the receiver uses — one dedup gate, not two.
+   */
+  collector?: CollectorRestPorts | undefined;
   /**
    * The public issue-report intake's collaborators, or none.
    *
@@ -229,6 +347,32 @@ export type ApiProcessRestPorts = Readonly<{
    */
   github?: GithubRestPorts | undefined;
   /**
+   * The RFC 8628 CLI device grant's collaborators, or none.
+   *
+   * None without Redis, a database or a browser session: a device code needs
+   * somewhere ephemeral to live, the membership re-derivation that stands
+   * between an offboarded person and a live credential needs rows, and the
+   * three approval routes cannot name who is approving without a session.
+   */
+  authCliDeviceFlow?: AuthCliDeviceFlowRestPorts | undefined;
+  /**
+   * The CLI governance plane's collaborators, or none.
+   *
+   * None where this process composed no Enterprise governance application:
+   * these routes ARE that application's CLI surface, and thirteen doors over a
+   * capability that is not there would answer 500 to every pre-flight.
+   */
+  governanceCli?: GovernanceCliRestPorts | undefined;
+  /**
+   * The Activity Monitor's receivers' collaborators, or none.
+   *
+   * None without both the governance application (which resolves a source's
+   * bearer secret) and a trace collection (which is where the spans go). Its
+   * own per-signal ports say which receivers are served — the log and metric
+   * routes are not registered at all where this process folds neither.
+   */
+  governanceIngest?: GovernanceIngestRestPorts | undefined;
+  /**
    * The deployment's public origin, where it declared one.
    *
    * Deep links on a REST response are built from it. Optional because a
@@ -237,6 +381,16 @@ export type ApiProcessRestPorts = Readonly<{
    * is what the builder this replaces did.
    */
   publicBaseUrl?: string | undefined;
+  /**
+   * The five subsystem health probes' collaborators, or none.
+   *
+   * None where this deployment declared no public origin: every probe sends a
+   * canary back through the boundary it is testing, so one with no origin to
+   * dial could only ever report on nothing. The probes are the one family here
+   * whose absence a MONITOR notices, which is why it is a 404 rather than five
+   * endpoints answering 500 to an alerting rule.
+   */
+  healthProbes?: HealthProbeRestPorts | undefined;
 }>;
 
 /**
@@ -280,6 +434,14 @@ export function createApiProcessRestFeatures(options: {
     createRootDiscoveryRestApp({ security }),
     createRumRestApp({ security, rateLimit: ports.rateLimit }),
   ];
+
+  // The subsystem probes. `/api/health` is claimed by the process's lifecycle
+  // surface at exactly that path and by nothing deeper, so the five
+  // sub-paths neither shadow it nor are shadowed by it.
+  const healthProbes = ports.healthProbes;
+  if (healthProbes) {
+    features.push(createHealthProbeRestApp({ security, ports: healthProbes }));
+  }
 
   // The charted reads' public door, over the SAME application the browser's
   // `analytics.getTimeseries` procedure resolves on, so a rule added on one
@@ -334,6 +496,57 @@ export function createApiProcessRestFeatures(options: {
     features.push(mountScenarioRunExportRest({ security, ...scenarioRunExport }));
   }
 
+  // The four AUTHORING doors. Each owns a literal path inside a namespace
+  // nothing above claims, and each is registered ahead of any parameterised
+  // sibling that could swallow it: `/api/dataset/generate` before a dataset
+  // family's `/:slugOrId`, and `/api/workflows/{code-completion,post_event}`
+  // before a workflow family's `/:workflowId/run`. This process composes
+  // neither of those packaged families today; the order keeps the rule true
+  // for when it does.
+  const authoring = services.authoring;
+  if (authoring?.datasetGenerate) {
+    features.push(mountDatasetGenerateRest({ security, ...authoring.datasetGenerate }));
+  }
+  if (authoring?.workflowStudio) {
+    features.push(
+      mountWorkflowStudioRest({ security, collaborators: authoring.workflowStudio }),
+    );
+  }
+  if (authoring?.scenarioGenerate) {
+    features.push(mountScenarioGenerateRest({ security, ...authoring.scenarioGenerate }));
+  }
+  if (authoring?.playground) {
+    features.push(mountPlaygroundRest({ security, ...authoring.playground }));
+  }
+
+  // The experiment workbench, and — LAST among the families sharing
+  // `/api/experiments` — its `/api/evaluations/v3` alias, which forwards into
+  // it. The mount returns both in registration order, and the workbench must
+  // come before any packaged experiment family so its literal `/runs`
+  // siblings are not swallowed by that family's `:slug`.
+  const experimentWorkbench = services.experimentWorkbench;
+  if (experimentWorkbench) {
+    features.push(
+      ...mountExperimentV3Rest({ security, collaborators: experimentWorkbench }),
+    );
+  }
+
+  // The SDK's create-or-take door. `/api/experiment/init` is a literal path in
+  // the SINGULAR namespace, which nothing above claims — the workbench owns
+  // `/api/experiments` — so it neither shadows nor is shadowed by them.
+  const experimentInit = services.experimentInit;
+  if (experimentInit) {
+    features.push(mountExperimentInitRest({ security, collaborators: experimentInit }));
+  }
+
+  // The synchronous run URLs. AFTER the Studio's two literal doors above,
+  // because `/api/workflows/:workflowId/run` would otherwise read
+  // `code-completion` as a workflow id.
+  const workflowRun = services.workflowRun;
+  if (workflowRun) {
+    features.push(mountWorkflowRunRest({ security, collaborators: workflowRun }));
+  }
+
   const annotations = services.annotations;
   if (annotations) {
     features.push(
@@ -376,6 +589,66 @@ export function createApiProcessRestFeatures(options: {
     if (langy.relay) {
       features.push(createLangyRelayRestApp({ security, ports: langy.relay }));
     }
+  }
+
+  // The two halves of `/api/auth/cli`, whose path sets are disjoint: the
+  // device grant owns the RFC 8628 lifecycle, the governance plane owns the
+  // reads and mints a device session authorizes. Both must be registered
+  // BEFORE any `/api/auth/*` catch-all, which swallows every `/auth/*` sibling
+  // after it — this process mounts none, and that is what keeps them reachable.
+  const authCliDeviceFlow = ports.authCliDeviceFlow;
+  if (authCliDeviceFlow) {
+    features.push(createAuthCliDeviceFlowRestApp({ security, ports: authCliDeviceFlow }));
+  }
+
+  const governanceCli = ports.governanceCli;
+  if (governanceCli) {
+    features.push(createGovernanceCliRestApp({ security, ports: governanceCli }));
+  }
+
+  // `/api/ingest` is a literal first segment nothing else claims, so it is
+  // order-free among the families above — and it is registered before the OTLP
+  // alias below for the same reason the governed-SQL family is: that alias
+  // claims broad wildcards and everything with its own routing goes first.
+  const governanceIngest = ports.governanceIngest;
+  if (governanceIngest) {
+    features.push(createGovernanceIngestRestApp({ security, ports: governanceIngest }));
+  }
+
+  // The v1 trace reads. `/api/traces` is a literal first segment nothing above
+  // claims, and it must be registered before the OTLP path alias below, whose
+  // `/api/v1/*` wildcard is broad on purpose.
+  const traceReads = services.traceReads;
+  if (traceReads) {
+    features.push(mountTracesRest({ security, collaborators: traceReads }));
+  }
+
+  // The deprecated trace family: `/api/trace/*` and `/api/thread/:id`. Literal
+  // first segments, and deliberately NOT under `/api/traces` — the two are
+  // different surfaces with different refusal bodies, and the deprecated one
+  // stamps `Deprecation` and a successor `Link` on every read.
+  const traceLegacy = services.traceLegacy;
+  if (traceLegacy) {
+    features.push(mountTraceLegacyRest({ security, collaborators: traceLegacy }));
+  }
+
+  // The legacy evaluation family. Its catalogue route needs nothing, so the
+  // family is mounted unconditionally; its batch and evaluate halves register
+  // only where their port groups are supplied — the batch log where this
+  // process registered the run writer, the four evaluate doors nowhere yet.
+  // See the mount.
+  features.push(
+    mountEvaluationsLegacyRest({
+      security,
+      credential: ports.handlerManagedCredential,
+      ...(services.evaluationBatch ? { batch: services.evaluationBatch } : {}),
+    }),
+  );
+
+  // The SDK collector, before the OTLP alias that claims `/api/collector/*`.
+  const collector = ports.collector;
+  if (collector) {
+    features.push(mountCollectorRest({ security, ports: collector }));
   }
 
   const otlpIngest = ports.otlpIngest;

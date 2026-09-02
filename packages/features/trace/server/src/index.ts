@@ -597,3 +597,45 @@ export {
   type ProjectionSource,
   type ResolvedField,
 } from "./services/trace-projection-catalog.service";
+
+// ---------------------------------------------------------------------------
+// The trace READ doors and the SDK collector
+//
+// `POST /api/traces/search` and its three siblings, the five deprecated
+// `/api/trace/*` and `/api/thread/*` endpoints, and `POST /api/collector` —
+// the door an SDK posts a whole trace to. Each takes what it cannot own as a
+// port, so a process mounts the ones its own graph can answer.
+// ---------------------------------------------------------------------------
+export {
+  createTracesRestApp,
+  traceSearchBodyExtensions,
+  type TraceSearchBody,
+  type TracesRestPorts,
+  type TracesRestReadPort,
+} from "./transport/api-rest/traces.api";
+export {
+  createTraceLegacyRestApp,
+  type TraceLegacyCredential,
+  type TraceLegacyCredentialPort,
+  type TraceLegacyReadsPort,
+  type TraceLegacyRestPorts,
+  type TraceLegacySearchFields,
+  type TraceLegacySharePort,
+} from "./transport/api-rest/trace-legacy.api";
+export {
+  createCollectorRestApp,
+  type CollectorCredential,
+  type CollectorCredentialPort,
+  type CollectorErrorReportPort,
+  type CollectorEvaluationReportPort,
+  type CollectorProject,
+  type CollectorRestPorts,
+  type CollectorSpanIngestPort,
+  type CollectorUsageLimitPort,
+} from "./transport/api-rest/collector.api";
+export {
+  projectionRequestSchema,
+  type CompiledProjection,
+  type CompileProjectionArgs,
+  type ProjectionRequest,
+} from "./services/trace-projection.types";

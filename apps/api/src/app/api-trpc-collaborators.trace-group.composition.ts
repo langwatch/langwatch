@@ -192,6 +192,17 @@ export abstract class ApiTraceReadStackPort {
     projectId: string;
     session: { user?: { id: string } } | null | undefined;
   }): Promise<Protections | null>;
+  /**
+   * The redactions an API KEY reads through, for the public REST doors.
+   *
+   * A key is not a person: the content categories resolve as they do for a
+   * caller with no session, so a project that hides captured content from the
+   * public hides it here too. Costs are the one difference and are always
+   * visible, because every project role grants `cost:view` and a project key
+   * carries full project access by design — which is exactly what
+   * `getProtectionsForProject` answered.
+   */
+  abstract getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections>;
   /** True when the read's trace no longer exists. */
   abstract isTraceNotFound(error: unknown): boolean;
 }
@@ -297,6 +308,16 @@ export type ApiTraceGroupCollaboratorsOptions = Readonly<{
 export type ApiTraceGroupCollaborators = Readonly<{
   /** For `ctx.app.traces` — the one application all five trace doors read. */
   traces: TraceApp;
+  /**
+   * The read stack itself, where this process composed one.
+   *
+   * Published alongside the application because the public REST trace doors
+   * need two things `TraceApp` does not expose: the legacy read's own
+   * `getAllTracesForProject` with its projection and date-axis options, and
+   * the API key's read-time redactions. Both are THIS stack's, so a REST
+   * caller and the browser see one trace redacted one way.
+   */
+  traceReads?: ApiTraceReadStackPort | undefined;
   /** For `ctx.app.share`. */
   share: ShareService;
   /** For `ctx.app.dataRetention`, which bounds a pin. */
@@ -433,6 +454,7 @@ export function composeApiTraceGroupCollaborators(
 
   return {
     traces,
+    ...(traceReads ? { traceReads } : {}),
     share,
     dataRetention,
     topics,

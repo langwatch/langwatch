@@ -15,6 +15,12 @@
  * These do not validate anything at runtime; the handler keeps its parsing.
  */
 
+import type {
+  EvaluationResult,
+  EvaluationResultError,
+  EvaluationResultSkipped,
+} from "@langwatch/evaluator-contract";
+import type { DescribeRouteOptions } from "hono-openapi";
 import { z } from "zod";
 
 export const evaluateRequestSchema = z.object({
@@ -195,4 +201,84 @@ export const datasetEvaluateRequestSchema = z.object({
     .optional()
     .nullable()
     .describe("Per-call overrides of the evaluator's settings"),
+});
+
+/**
+ * The body every evaluate door parses.
+ *
+ * Declared here rather than imported: the schema's other holder is the
+ * evaluator wizard's own form model in `@langwatch/evaluator-web`, and a
+ * server package may not value-import a browser one. This is the copy the
+ * PUBLIC door publishes, so it lives beside the door; collapsing the two
+ * belongs with whoever drains that browser package.
+ */
+export const evaluationInputSchema = z.object({
+  trace_id: z.string().optional().nullable(),
+  evaluation_id: z.string().optional().nullable(),
+  evaluator_id: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+  data: z.looseObject({}).optional().nullable(),
+  settings: z.looseObject({}).optional().nullable(),
+  as_guardrail: z.boolean().optional().nullable().default(false),
+});
+
+export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
+
+/**
+ * What an evaluate door answers with: the evaluator's own result minus the
+ * traceback, plus the guardrail verdict when the call asked for one.
+ */
+export type EvaluationRESTResult = (
+  | EvaluationResult
+  | EvaluationResultSkipped
+  | Omit<EvaluationResultError, "traceback">
+) & {
+  passed?: boolean;
+};
+
+/** The schema slot of a `describeRoute` request body, on hono-openapi's terms. */
+type RequestBodySchema = NonNullable<
+  Extract<
+    NonNullable<DescribeRouteOptions["requestBody"]>,
+    { content: unknown }
+  >["content"][string]["schema"]
+>;
+
+/**
+ * A zod schema as a `requestBody` schema object.
+ *
+ * `resolver()` is the normal way to put a zod schema into `describeRoute`, but
+ * it only types against `responses`; hono-openapi wants a plain schema object
+ * under `requestBody`. Every route in this family parses its body by hand, so
+ * there is no `zValidator` for the generator to read one off either.
+ */
+export const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
+  z.toJSONSchema(schema, {
+    target: "openapi-3.0",
+    reused: "inline",
+  }) as RequestBodySchema;
+
+/**
+ * A hand-rolled refusal from one of these handlers.
+ *
+ * They predate ADR-045 and answer a sentence rather than a stable code, in one
+ * of two fields depending on where the request failed: `message` when the body
+ * was not JSON at all or the route rejected it wholesale, `error` when it
+ * parsed and then failed validation. Documented as sent — there is no code to
+ * branch on here, so a caller has the status and the sentence.
+ */
+export const legacySentenceErrorSchema = z.object({
+  message: z
+    .string()
+    .optional()
+    .describe("Set when the request was rejected before validation"),
+  error: z
+    .string()
+    .optional()
+    .describe("Set when the body parsed and then failed validation"),
+});
+
+/** What an accepted write answers with when there is nothing to return. */
+export const acknowledgementSchema = z.object({
+  message: z.string().describe("Human-readable confirmation"),
 });

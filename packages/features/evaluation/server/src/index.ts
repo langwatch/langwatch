@@ -121,3 +121,23 @@ export {
   type LangevalsRuntimeConfig,
 } from "./adapters/http.langevals-evaluator.adapter";
 export { DirectEvaluationExecutionReceipt } from "./adapters/direct.evaluation-execution-receipt.adapter";
+
+// ---------------------------------------------------------------------------
+// The legacy evaluation REST doors
+//
+// The evaluator catalogue, the batch result log and the four evaluate paths.
+// The catalogue needs nothing; the other two halves take what they cannot own
+// as port groups, so a process mounts the ones its own graph can answer.
+// ---------------------------------------------------------------------------
+export {
+  createEvaluationsLegacyRestApp,
+  type DataForEvaluation,
+  type EvaluationBatchExperimentPort,
+  type EvaluationBatchRestPorts,
+  type EvaluationRunCustomEvaluator,
+  type EvaluationRunMonitor,
+  type EvaluationRunRestPorts,
+  type EvaluationsLegacyCredential,
+  type EvaluationsLegacyCredentialPort,
+  type EvaluationsLegacyRestPorts,
+} from "./transport/api-rest/evaluations-legacy.api";

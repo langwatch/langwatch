@@ -18,29 +18,10 @@ import {
   ForbiddenError,
   requestTraceIds,
 } from "@langwatch/platform-api/app-rest";
-import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as authCliApp } from "./routes/auth-cli";
-import { app as collectorApp } from "./routes/collector";
-import { app as cronApp } from "./routes/cron";
-import { app as datasetGenerateApp } from "./routes/dataset-generate";
-import { app as elevenLabsApp } from "./routes/elevenlabs";
-import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
-import {
-  app as experimentsV3App,
-  legacyAliasApp as experimentsV3LegacyAliasApp,
-} from "./routes/experiments-v3";
-import { app as gatewayInternalApp } from "./routes/gateway-internal";
-import { app as healthChecksApp } from "./routes/health-checks";
-import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
-import { app as playgroundApp } from "./routes/playground";
-import { app as scenarioGenerateApp } from "./routes/scenario-generate";
-import { app as sseApp } from "./routes/sse";
-import { app as tracesLegacyApp } from "./routes/traces-legacy";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import type { App } from "~/server/app-layer/app";
-import { app as workflowsApp } from "./routes/workflows";
 
 // --- capabilities the packaged REST families reach through, but do not own ---
 import { AgentCacheService } from "~/app/api/agent-cache/agent-cache.service";
@@ -154,22 +135,7 @@ export function createApiRouter(app: App) {
   // (ee/sso/providers.ts) — the URL is unchanged, only who answers it.
 
   // ORDERING: specific paths before catch-all siblings with same basePath
-  api.route("/", datasetGenerateApp); // /api/dataset/generate (before the dataset family's /:slugOrId)
-  api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
-  api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  // experimentsV3App owns the session-authenticated execute/abort endpoints and
-  // the API-key-authenticated run/runs endpoints; the packaged experiments
-  // family owns the project-API-key list endpoint (GET /api/experiments). Both
-  // live under /api/experiments. v3 mounts first so its specific handlers (e.g.
-  // POST /api/experiments/execute, a session-cookie request) match before any
-  // sibling route resolution, and so its literal `/runs` siblings are not
-  // swallowed by the packaged family's `:slug`. The packaged family
-  // authenticates per-route via the SecuredApp builder (no namespace-wide
-  // guard), so this ordering is belt-and-suspenders; the experiments-route-auth
-  // regression test pins both directions.
-  api.route("/", experimentsV3App);
-  api.route("/", experimentsV3LegacyAliasApp); // /api/evaluations/v3/... → /api/experiments/...
   // Most REST families now live in `@langwatch/platform-api` and are mounted by
   // factory rather than by import. `createAppRestFeatures` is their single
   // enumeration — the same one the route-registry audits build from — so a
@@ -276,22 +242,10 @@ export function createApiRouter(app: App) {
   })) {
     api.route("/", packagedRestApp);
   }
-  api.route("/", tracesApp);
 
-  api.route("/", gatewayInternalApp);
-  api.route("/", playgroundApp);
-  api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
-  api.route("/", scenarioGenerateApp);
 
-  api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
-  api.route("/", collectorApp);
-  api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
-  api.route("/", cronApp);
-  api.route("/", evaluationsLegacyApp);
   api.route("/", miscApp);
   api.route("/", opsApp);
-  api.route("/", sseApp);
-  api.route("/", tracesLegacyApp);
 
   return api;
 }
