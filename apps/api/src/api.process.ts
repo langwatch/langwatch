@@ -9,6 +9,7 @@ import {
   ApiApplication,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
+  type ApiTrpcFeaturesPort,
 } from "./api.application";
 import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener";
 import {
@@ -59,6 +60,11 @@ export class ApiProcess {
     featureDrain?: ApiFeatureDrainPort;
     readiness?: ApiReadinessPort;
     metrics?: ApiMetricsPort;
+    /**
+     * The packaged tRPC namespaces, when this process composed them. Absent
+     * leaves the root serving exactly the two routers it served before.
+     */
+    features?: ApiTrpcFeaturesPort;
   }): ApiProcess {
     if (options.http && options.requestPolicy) {
       throw new Error("API process composition accepts HTTP options or request policy, not both.");
@@ -72,6 +78,7 @@ export class ApiProcess {
     const application = ApiApplication.create({
       agents: options.agents,
       secrets: options.secrets,
+      ...(options.features ? { features: options.features } : {}),
       http: {
         ...http,
         ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),

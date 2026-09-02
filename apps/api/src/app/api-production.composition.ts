@@ -45,6 +45,11 @@ import {
   ApiEventingInfrastructure,
 } from "../platform/infrastructure/api-eventing.infrastructure";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
+import {
+  ApiTrpcFeaturesComposition,
+  LoggedApiTrpcFeaturesAbsence,
+} from "./api-trpc-features.composition";
+import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
 import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
 import {
@@ -170,6 +175,20 @@ export type ApiProductionCompositionOptions = {
   metrics?: ApiMetricsPort;
   featureDrain?: ApiFeatureDrainPort;
   queueStorage?: GroupQueueStoragePort;
+  /**
+   * The capabilities the packaged tRPC record reaches that no package owns
+   * yet — the analytics filter catalogue, the LangWatchQL workbench, the trace
+   * pipeline, the sign-in and sign-up ceremonies, the evaluator runtime, the
+   * model gateway and the Enterprise governance surfaces.
+   *
+   * Optional, and its absence is the reason this process serves no packaged
+   * namespaces rather than a reason it fails to boot. See
+   * {@link ApiTrpcCollaborators}: with them, all twenty-two mount on the same
+   * root the subscription lane resolves paths on; without them, the process
+   * serves its agent and secret routers exactly as before and says so once at
+   * boot.
+   */
+  trpcCollaborators?: AnyApiTrpcCollaborators;
 };
 
 /** The credential pair every product transport on this process is built from. */
@@ -256,8 +275,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.options.audit,
     });
     const agents = this.resolveAgents(options);
+    const features = ApiTrpcFeaturesComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      // The SAME AuthZ service the REST doors authorize through: a permission
+      // probe inside a resolver must answer what the declared check on the
+      // same procedure would have.
+      authz,
+      audit: this.options.audit,
+      collaborators: this.options.trpcCollaborators,
+      report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
+    });
     const process = ApiProcess.create({
       agents,
+      ...(features ? { features } : {}),
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
       ...this.composeDoors(authz, tenancy),
