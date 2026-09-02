@@ -116,18 +116,8 @@ export function combineProviderDay(
     // reported as itself.
     return {
       ...base,
-      total:
-        coveredGateway === null
-          ? null
-          : { ...coveredGateway, basis: "estimated" },
-      split:
-        coveredGateway === null
-          ? null
-          : {
-              attributedNano: coveredGateway.amountNano,
-              unallocatedNano: 0n,
-              overMeteredNano: 0n,
-            },
+      total: coveredGateway && { ...coveredGateway, basis: "estimated" },
+      split: coveredGateway && splitOf(coveredGateway.amountNano, null),
       metered: unmappedGateway,
       ineligibleReason: null,
     };
@@ -135,23 +125,7 @@ export function combineProviderDay(
 
   const total = { ...bill, basis: "billed" as const };
 
-  if (coveredGateway === null) {
-    // A bill nothing is mapped to. The whole of it is unexplained by metering,
-    // which is the honest reading of a bill whose keys nobody has named yet.
-    return {
-      ...base,
-      total,
-      split: {
-        attributedNano: 0n,
-        unallocatedNano: bill.amountNano,
-        overMeteredNano: 0n,
-      },
-      metered: unmappedGateway,
-      ineligibleReason: null,
-    };
-  }
-
-  if (coveredGateway.currencyCode !== bill.currencyCode) {
+  if (coveredGateway && coveredGateway.currencyCode !== bill.currencyCode) {
     // Splitting would mean converting, and nobody here has a rate that is not
     // invented. Both lanes render, each in its own currency, and the covered
     // metering joins the metered line rather than disappearing: its dollars are
@@ -165,24 +139,43 @@ export function combineProviderDay(
     };
   }
 
-  const billNano = bill.amountNano;
-  const meteredNano = coveredGateway.amountNano;
-  // Clamped at zero because metering cannot account for a refund: on a negative
-  // day the whole (negative) figure is unallocated, and the metering that ran
-  // anyway shows up as the variance below.
-  const attributedNano =
-    billNano <= 0n ? 0n : meteredNano < billNano ? meteredNano : billNano;
-
+  // A bill nothing is mapped to still gets a split: the whole of it is then
+  // unexplained by metering, which is the honest reading of a bill whose keys
+  // nobody has named yet.
   return {
     ...base,
     total,
-    split: {
-      attributedNano,
-      unallocatedNano: billNano - attributedNano,
-      overMeteredNano: meteredNano > billNano ? meteredNano - billNano : 0n,
-    },
+    split: splitOf(coveredGateway?.amountNano ?? 0n, bill.amountNano),
     metered: unmappedGateway,
     ineligibleReason: null,
+  };
+}
+
+/**
+ * How metering divides a total.
+ *
+ * `billNano` is null when metering IS the total — the estimated case, where
+ * every metered unit accounts for itself and there is nothing left over.
+ *
+ * The attributed part is clamped to `[0, max(bill, 0)]` because metering cannot
+ * account for a refund: on a negative day the whole negative figure is
+ * unallocated, and the metering that ran anyway shows up as the variance. That
+ * is what keeps `attributed + unallocated` equal to the total in every branch.
+ */
+function splitOf(meteredNano: bigint, billNano: bigint | null): BillSplit {
+  if (billNano === null) {
+    return {
+      attributedNano: meteredNano,
+      unallocatedNano: 0n,
+      overMeteredNano: 0n,
+    };
+  }
+  const attributedNano =
+    billNano <= 0n ? 0n : meteredNano < billNano ? meteredNano : billNano;
+  return {
+    attributedNano,
+    unallocatedNano: billNano - attributedNano,
+    overMeteredNano: meteredNano > billNano ? meteredNano - billNano : 0n,
   };
 }
 
