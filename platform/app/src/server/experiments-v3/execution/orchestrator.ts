@@ -28,12 +28,20 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
+import {
+  CONNECTED_OUTPUT_FIELD,
+  connectedParameterDefinitions,
+} from "~/experiments-v3/utils/connectedAgentTarget";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
+import type {
+  ConnectedComponentConfig,
+  ExecutionState,
+  Workflow,
+} from "~/optimization_studio/types/dsl";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -42,6 +50,18 @@ import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDom
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
+import type {
+  DispatchAgent,
+  DispatchCall,
+} from "~/server/connected-agents/call.dispatcher";
+import type { CallOutcome } from "~/server/connected-agents/call-envelope";
+import {
+  BUSY_RETRY_AFTER_MS,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "~/server/connected-agents/constants";
+import { AgentBusyError } from "~/server/connected-agents/errors";
+import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
 import { prisma } from "~/server/db";
 import type {
   EvaluatorTypes,
@@ -54,14 +74,23 @@ import type {
 } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { RunActor } from "~/server/scenarios/run-actor";
+import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
 import {
   estimateCost,
   getMatchingLLMModelCost,
 } from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { generateOtelTraceId } from "~/utils/trace";
+import { generateOtelSpanId, generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
+import {
+  buildConnectedCall,
+  CONNECTED_BUSY_RETRY_BUDGET_MS,
+  CONNECTED_REQUEST_SLACK_MS,
+  connectedCallFailure,
+  connectedOutputText,
+} from "./connectedTarget";
 import {
   type LoadedWorkflow,
   promptLoadKey,
@@ -133,6 +162,15 @@ export type OrchestratorInput = {
    * whole board and not only the column that was clicked.
    */
   carriedOverCells?: CarriedOverCell[];
+  /**
+   * Who started the run, when a person did.
+   *
+   * Read for one decision: a personal development agent belongs to the person
+   * whose key registered it, and only that person may send a turn to the
+   * process on their machine. A run that names no person is refused by the
+   * same rule, exactly as a simulation is.
+   */
+  actor?: RunActor;
 };
 
 /**
@@ -1942,6 +1980,222 @@ export async function* executeWorkflowCell({
   }
 }
 
+/** One turn to a connected agent, as the cell executor asks for it. */
+export type ConnectedDispatch = (params: {
+  projectId: string;
+  agent: DispatchAgent;
+  call: DispatchCall;
+  signal: AbortSignal;
+}) => Promise<CallOutcome>;
+
+/** The runtime's own dispatcher, which is what a real run uses. */
+const relayDispatch: ConnectedDispatch = (params) =>
+  getConnectedAgentRuntime().dispatcher.dispatch(params);
+
+/**
+ * The agent as the dispatcher reads it, with the per-call budget capped the
+ * same way the relay route caps it. One agent, one contract: a column may not
+ * ask for a longer call than a REST caller can.
+ */
+const dispatchAgentOf = (agent: TypedAgent): DispatchAgent => {
+  const config = agent.config as ConnectedComponentConfig;
+  return {
+    id: agent.id,
+    name: agent.name,
+    environment: agent.environment ?? null,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
+    // A workbench row is a conversation of one turn, so there is nothing to
+    // pin: every row picks whichever instance is free.
+    isSticky: false,
+  };
+};
+
+/**
+ * Executes a single cell whose target is a connected agent.
+ *
+ * The agent runs in the customer's own process, so the engine has no node for
+ * it: the row is one turn through the relay dispatcher (ADR-128), sent from
+ * here and answered in place. The evaluators attached to the column then run
+ * exactly as they do for a workflow target, over the text the agent answered.
+ *
+ * Each row is its own conversation. A workbench row has no history to carry,
+ * so it sends one user message under its own thread id and keeps no session:
+ * what one row said can never reach another.
+ */
+export async function* executeConnectedCell({
+  cell,
+  projectId,
+  agent,
+  datasetColumns = [],
+  loadedEvaluators,
+  resultMapperConfig,
+  isAborted,
+  dispatch = relayDispatch,
+  sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = () => Date.now(),
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  agent: TypedAgent;
+  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  resultMapperConfig?: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+  /** The dispatcher the turn goes through, replaceable in tests. */
+  dispatch?: ConnectedDispatch;
+  /** The wait between busy retries, replaceable in tests. */
+  sleep?: (ms: number) => Promise<void>;
+  /** The clock the retry budget reads, replaceable in tests. */
+  now?: () => number;
+}): AsyncGenerator<EvaluationV3Event> {
+  yield {
+    type: "cell_started",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+  };
+
+  const traceId = cell.traceId ?? generateOtelTraceId();
+  const dispatchAgent = dispatchAgentOf(agent);
+  const startedAt = now();
+
+  let outcome: CallOutcome;
+  try {
+    const { messages, params } = buildConnectedCall({
+      inputs: buildTargetInputs(cell),
+      definitions: connectedParameterDefinitions(agent.config),
+    });
+    outcome = await dispatchWithBusyRetry({
+      dispatch,
+      sleep,
+      now,
+      budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
+      params: {
+        projectId,
+        agent: dispatchAgent,
+        call: {
+          // One row, one conversation. The cell's own trace id keeps it
+          // unique and ties the conversation to the row that started it.
+          threadId: `eval_v3_${cell.rowIndex}_${traceId}`,
+          messages,
+          newMessages: messages.slice(-1),
+          params,
+          session: undefined,
+          // The agent adopts this context, so the spans it records land in
+          // the cell's own trace and the row links straight to them.
+          traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
+          run: {},
+        },
+        signal: AbortSignal.timeout(
+          dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
+        ),
+      },
+    });
+  } catch (error) {
+    logger.info(
+      {
+        error,
+        projectId,
+        agentId: agent.id,
+        rowIndex: cell.rowIndex,
+        targetId: cell.targetId,
+      },
+      "Connected agent cell failed",
+    );
+    const failure = connectedCallFailure(error);
+    yield {
+      type: "target_result",
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+      output: undefined,
+      duration: now() - startedAt,
+      traceId,
+      error: failure.message,
+      ...(failure.domainError ? { domainError: failure.domainError } : {}),
+    };
+    return;
+  }
+
+  const output = connectedOutputText(outcome.output);
+
+  yield {
+    type: "target_result",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+    output,
+    duration: outcome.durationMs,
+    traceId,
+  };
+
+  if (cell.evaluatorConfigs.length === 0) return;
+
+  const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
+    projectId,
+    cell,
+    datasetColumns,
+    loadedEvaluators,
+  });
+  yield* runCellEvaluators({
+    cell,
+    projectId,
+    workflow,
+    evaluatorNodeIds,
+    targetOutput: { [CONNECTED_OUTPUT_FIELD]: output },
+    traceId,
+    targetNodes: new Set([cell.targetId]),
+    config: resultMapperConfig ?? {},
+    isAborted,
+  });
+}
+
+/**
+ * One turn, waiting out a busy agent.
+ *
+ * Every instance being full is a queue, not a failure: the platform says when
+ * to try again and the row waits, the same way a simulation turn does. The
+ * budget bounds it so a permanently full agent still fails the row rather
+ * than holding a slot of the run forever.
+ */
+const dispatchWithBusyRetry = async ({
+  dispatch,
+  params,
+  sleep,
+  now,
+  budgetEndsAt,
+}: {
+  dispatch: ConnectedDispatch;
+  params: Parameters<ConnectedDispatch>[0];
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+  budgetEndsAt: number;
+}): Promise<CallOutcome> => {
+  for (;;) {
+    try {
+      return await dispatch(params);
+    } catch (error) {
+      const retryAfterMs = busyRetryAfterMs(error);
+      if (retryAfterMs === undefined || now() >= budgetEndsAt) throw error;
+      // Jitter spreads the retries of the rows that hit a full agent at once.
+      const waitMs = Math.min(
+        retryAfterMs + Math.floor(Math.random() * retryAfterMs),
+        budgetEndsAt - now(),
+      );
+      await sleep(Math.max(0, waitMs));
+    }
+  }
+};
+
+/** How long a busy agent asked to be left alone, or nothing if it is not busy. */
+const busyRetryAfterMs = (error: unknown): number | undefined => {
+  if (!(error instanceof AgentBusyError)) return undefined;
+  const declared = error.meta?.retryAfterMs;
+  return typeof declared === "number" && declared > 0
+    ? declared
+    : BUSY_RETRY_AFTER_MS;
+};
+
 // Shared by the pairwise (#5100) and select-best (#5101) branches:
 // resolve `inputs.input` from the variant's dataset mapping, or fall back
 // to the dataset's `input` column. Kept as a mutating helper (rather than
@@ -2827,7 +3081,17 @@ export async function* runOrchestrator(
     concurrency: requestedConcurrency,
     seedTargetOutputs,
     carriedOverCells,
+    actor,
   } = input;
+
+  // A personal development agent runs on one person's own machine, so only
+  // that person may send it a turn. Refused before any cell exists, the way a
+  // simulation refuses it when the run is scheduled.
+  await assertConnectedAgentsRunnable({
+    agents: [...loadedAgents.values()],
+    actor,
+    users: prisma,
+  });
 
   // Use requested concurrency, environment variable, or default
   const concurrency = requestedConcurrency ?? DEFAULT_CONCURRENCY;
@@ -3243,25 +3507,43 @@ export async function* runOrchestrator(
                   loadedData.agent?.type === "workflow")) &&
               !!loadedData.workflow;
 
-            const cellEvents = runsAsWorkflow
-              ? executeWorkflowCell({
+            // A connected agent has no node in the engine: it runs in the
+            // customer's own process and is reached through the relay.
+            const connectedAgent =
+              cell.targetConfig.type === "agent" &&
+              loadedData.agent?.type === "connected"
+                ? loadedData.agent
+                : undefined;
+
+            const cellEvents = connectedAgent
+              ? executeConnectedCell({
                   cell,
                   projectId,
-                  workflowDsl: loadedData.workflow!.dsl,
+                  agent: connectedAgent,
                   datasetColumns,
                   loadedEvaluators,
                   resultMapperConfig,
                   isAborted: checkAbort,
-                  sandboxApiKey,
                 })
-              : executeCell(
-                  cell,
-                  projectId,
-                  datasetColumns,
-                  loadedData,
-                  resultMapperConfig,
-                  checkAbort,
-                );
+              : runsAsWorkflow
+                ? executeWorkflowCell({
+                    cell,
+                    projectId,
+                    workflowDsl: loadedData.workflow!.dsl,
+                    datasetColumns,
+                    loadedEvaluators,
+                    resultMapperConfig,
+                    isAborted: checkAbort,
+                    sandboxApiKey,
+                  })
+                : executeCell(
+                    cell,
+                    projectId,
+                    datasetColumns,
+                    loadedData,
+                    resultMapperConfig,
+                    checkAbort,
+                  );
 
             // Execute cell and collect events
             let cellFailed = false;

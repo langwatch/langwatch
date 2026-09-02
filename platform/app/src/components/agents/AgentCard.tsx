@@ -10,6 +10,7 @@ import {
 import {
   ArrowUp,
   Bot,
+  Cable,
   Code,
   Copy,
   ExternalLink,
@@ -35,6 +36,7 @@ const agentTypeIcons: Record<string, LucideIcon> = {
   code: Code,
   http: Globe,
   workflow: Workflow,
+  connected: Cable,
 };
 
 const agentTypeLabels: Record<string, string> = {
@@ -42,6 +44,7 @@ const agentTypeLabels: Record<string, string> = {
   code: "Code",
   http: "HTTP",
   workflow: "Workflow",
+  connected: "Connected",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */

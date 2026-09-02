@@ -411,6 +411,11 @@ secured.access(sessionAuth).post(
           loadedWorkflows,
           concurrency: request.concurrency,
           seedTargetOutputs: request.seedTargetOutputs,
+          // Who is running it, which decides whether a personal development
+          // agent among the targets may be reached at all.
+          ...(session.user?.id
+            ? { actor: { id: session.user.id, label: "user" as const } }
+            : {}),
           // The board as the page had it, minus what this run produces. The
           // page sends it rather than the server reading the saved state,
           // because the page can be ahead of its own autosave and the run has
@@ -793,6 +798,12 @@ secured.access(apiKeyAuthRun).post(
       loadedEvaluators,
       loadedWorkflows,
       ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
+      // The person behind the key, when the key names one. A personal
+      // development agent is reachable only by its owner, and a key that
+      // names nobody is refused by that rule rather than passed through.
+      ...(resolved.type === "apiKey" && resolved.userId
+        ? { actor: { id: resolved.userId, label: "api" as const } }
+        : {}),
       // A run of the saved dataset fills the cells the workbench shows. The
       // app-layer service is the one that tells the tenant the experiment
       // moved, which is what makes an open page pick the cells up.

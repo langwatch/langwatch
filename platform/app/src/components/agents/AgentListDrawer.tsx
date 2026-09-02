@@ -10,6 +10,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import {
   Bot,
+  Cable,
   Code,
   Globe,
   MessageSquare,
@@ -306,6 +307,7 @@ const agentTypeIcons: Record<string, typeof MessageSquare> = {
   code: Code,
   workflow: Workflow,
   http: Globe,
+  connected: Cable,
 };
 
 const agentTypeLabels: Record<string, string> = {
@@ -313,6 +315,7 @@ const agentTypeLabels: Record<string, string> = {
   code: "Code",
   workflow: "Workflow",
   http: "HTTP",
+  connected: "Connected",
 };
 
 type AgentCardProps = {
