@@ -160,6 +160,24 @@ export class PlaygroundWidgetsApiService {
     return data as unknown as PlaygroundWidget;
   }
 
+  /** Adds a widget to a dashboard at the next free row, keeping its size. */
+  async assignDashboard(
+    id: string,
+    params: { dashboardId: string },
+  ): Promise<PlaygroundWidget> {
+    const projectId = this.projectId(`pin playground widget "${id}"`);
+    const { data, error, response } = await this.apiClient.POST(
+      "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}/dashboard" as any,
+      {
+        params: { path: { projectId, widgetId: id } },
+        body: { dashboardId: params.dashboardId },
+      } as any,
+    );
+    if (error)
+      this.handleApiError(`pin playground widget "${id}"`, error, response);
+    return data as unknown as PlaygroundWidget;
+  }
+
   /** Deletes a widget. The route answers `204` with no body. */
   async delete(id: string): Promise<void> {
     const projectId = this.projectId(`delete playground widget "${id}"`);

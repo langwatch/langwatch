@@ -3397,6 +3397,22 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    playgroundWidgetCmd
+      .command("pin <widget>")
+      .description("Add a playground widget to a dashboard (widget and dashboard by id or name)")
+      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      widget: string,
+      options: { dashboard?: string; project?: string },
+    ) => {
+      const { pinPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/pin.js");
+      return impl(widget, options);
+    },
+  );
+
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")

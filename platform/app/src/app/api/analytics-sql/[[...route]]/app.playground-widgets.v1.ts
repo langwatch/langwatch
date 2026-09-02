@@ -124,6 +124,11 @@ const widgetSchema = z.object({
 
 const widgetListSchema = z.object({ data: z.array(widgetSchema) });
 
+/** The `{ dashboardId }` an assign-to-dashboard request supplies. */
+const assignDashboardSchema = z.object({
+  dashboardId: z.string().min(1),
+});
+
 /** The tags every operation in this file carries in the published document. */
 const WIDGET_TAGS = ["Analytics / LangWatchQL"];
 
@@ -347,6 +352,42 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
   );
 }
 
+function registerAssignDashboard(
+  secured: ReturnType<typeof createProjectApp>,
+): void {
+  secured.access(requires("analytics:update")).post(
+    "/:projectId/analytics/playground-widgets/:widgetId/dashboard",
+    describeRoute({
+      summary: "Add a playground widget to a dashboard",
+      description:
+        "Assigns a playground widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.",
+      tags: WIDGET_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        ...widgetNotFoundResponse,
+        200: {
+          description: "The widget was added to the dashboard",
+          content: { "application/json": { schema: resolver(widgetSchema) } },
+        },
+      },
+    }),
+    zValidator("json", assignDashboardSchema),
+    async (c) => {
+      const project = await playgroundWidgetsProject({
+        project: c.get("project"),
+        requestedProjectId: c.req.param("projectId"),
+      });
+      const { dashboardId } = c.req.valid("json");
+      const widget = await widgetService().assignToDashboard({
+        id: widgetIdOf(c.req.param("widgetId")),
+        projectId: project.id,
+        dashboardId,
+      });
+      return c.json(widgetResource({ widget, project }));
+    },
+  );
+}
+
 function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:delete")).delete(
     "/:projectId/analytics/playground-widgets/:widgetId",
@@ -390,5 +431,6 @@ export function registerPlaygroundWidgetRoutes(
   registerCreate(secured);
   registerRead(secured);
   registerUpdate(secured);
+  registerAssignDashboard(secured);
   registerDelete(secured);
 }

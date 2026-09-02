@@ -241,6 +241,40 @@ export class PlaygroundWidgetService {
     if (result.count === 0) throw new PlaygroundWidgetNotFoundError();
   }
 
+  /**
+   * Adds a widget to a dashboard at the next free row, keeping its size.
+   *
+   * @throws {PlaygroundWidgetNotFoundError} when the update touches no row —
+   *   a missing id, or one in another project.
+   */
+  async assignToDashboard({
+    id,
+    projectId,
+    dashboardId,
+  }: {
+    id: string;
+    projectId: string;
+    dashboardId: string;
+  }): Promise<PlaygroundWidget> {
+    // Next free row on the TARGET dashboard across every kind (gridRow is shared
+    // between playground grid and dashboard grid — accepted prototype coupling).
+    const last = await this.prisma.customGraph.findFirst({
+      where: { projectId, dashboardId },
+      orderBy: { gridRow: "desc" },
+      select: { gridRow: true },
+    });
+    await this.prisma.customGraph.updateMany({
+      where: { id, projectId, kind: PLAYGROUND_SRCDOC_CHART_KIND },
+      data: {
+        dashboardId,
+        gridColumn: 0,
+        gridRow: last ? last.gridRow + 1 : 0,
+        // colSpan/rowSpan intentionally untouched — keep the widget's size.
+      },
+    });
+    return this.getById({ id, projectId });
+  }
+
   /** Parses a row's `graph` against the versioned schema, loud on a bad row. */
   private present(row: CustomGraph): PlaygroundWidget {
     const parsed = playgroundWidgetDefinitionSchema.safeParse(row.graph);
