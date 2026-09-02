@@ -5,6 +5,12 @@ import { HoverableBigText } from "../HoverableBigText";
 interface FilterDisplayProps {
   filters: string | Record<string, any>;
   hasBorder?: boolean;
+  /**
+   * Clamp each value to a single line, revealing the rest on hover. Turn this
+   * off where the chip is already inside a tooltip: there is no room for a
+   * second hover, so the value has to wrap instead.
+   */
+  clampValues?: boolean;
 }
 
 const FilterContainer = ({
@@ -22,7 +28,8 @@ const FilterContainer = ({
     gap={2}
     paddingX={2}
     paddingY={1}
-    border={hasBorder ? "1px solid lightgray" : "none"}
+    border={hasBorder ? "1px solid" : "none"}
+    borderColor={hasBorder ? "border.muted" : undefined}
     borderRadius="md"
   >
     <Box color="fg.subtle">
@@ -52,9 +59,28 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const FilterValue = ({ children }: { children: React.ReactNode }) => {
+const FilterValue = ({
+  children,
+  clamp = true,
+}: {
+  children: React.ReactNode;
+  clamp?: boolean;
+}) => {
+  if (!clamp) {
+    // Already inside a tooltip: wrap instead, and break mid-token so an
+    // unbreakable id cannot run past the tooltip edge.
+    return (
+      <Box padding={1} minWidth={0} overflowWrap="anywhere">
+        {children}
+      </Box>
+    );
+  }
+
   return (
-    <Box padding={1} borderRightRadius="md">
+    // minWidth 0 opts out of the flex child's min-width: auto, so a long
+    // unbreakable value (a monitor id) clamps inside the chip instead of
+    // widening it past its border.
+    <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
       <HoverableBigText lineClamp={1} expandable={false}>
         {children}
       </HoverableBigText>
@@ -65,6 +91,7 @@ const FilterValue = ({ children }: { children: React.ReactNode }) => {
 export const FilterDisplay = ({
   filters,
   hasBorder = false,
+  clampValues = true,
 }: FilterDisplayProps) => {
   const applyFilters = (filters: string | Record<string, any>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
@@ -75,7 +102,7 @@ export const FilterDisplay = ({
         result.push(
           <FilterContainer key={key} hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{value.join(", ")}</FilterValue>
+            <FilterValue clamp={clampValues}>{value.join(", ")}</FilterValue>
           </FilterContainer>,
         );
       } else if (typeof value === "object" && value !== null) {
@@ -99,14 +126,16 @@ export const FilterDisplay = ({
         result.push(
           <FilterContainer key={key} hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{nestedResult.join("; ")}</FilterValue>
+            <FilterValue clamp={clampValues}>
+              {nestedResult.join("; ")}
+            </FilterValue>
           </FilterContainer>,
         );
       } else {
         result.push(
           <FilterContainer key={key} fontSize="xs" hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{String(value)}</FilterValue>
+            <FilterValue clamp={clampValues}>{String(value)}</FilterValue>
           </FilterContainer>,
         );
       }
