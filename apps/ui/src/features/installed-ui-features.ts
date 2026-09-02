@@ -21,12 +21,13 @@ import { analyticsApiBinding, analyticsPageLoaders } from "./analytics";
 import { apiKeyApiBinding, apiKeyPageLoaders } from "./api-key";
 import { annotationApiBinding, annotationPageLoaders } from "./annotation";
 import { authzApiBinding, authzPageLoaders } from "./authz";
-import { automationsApiBinding, automationsPageLoaders } from "./automations";
+import { automationsAllPageLoaders, automationsApiBinding } from "./automations";
 import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
 import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
 import { datasetApiBinding, datasetPageLoaders } from "./dataset";
 import { evaluatorApiBinding, evaluatorPageLoaders } from "./evaluator";
 import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
+import { githubApiBinding, githubPageLoaders } from "./github";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
 import { monitorApiBinding, monitorPageLoaders } from "./monitor";
@@ -43,12 +44,13 @@ export const installedUiFeatures: UiFeatureInstall = {
     ...annotationPageLoaders,
     ...apiKeyPageLoaders,
     ...authzPageLoaders,
-    ...automationsPageLoaders,
+    ...automationsAllPageLoaders,
     ...dataPrivacyPageLoaders,
     ...dataRetentionPageLoaders,
     ...datasetPageLoaders,
     ...evaluatorPageLoaders,
     ...gatewayPageLoaders,
+    ...githubPageLoaders,
     ...governancePageLoaders,
     ...modelProviderPageLoaders,
     ...monitorPageLoaders,
@@ -70,6 +72,7 @@ export const installedUiFeatures: UiFeatureInstall = {
     datasetApiBinding,
     evaluatorApiBinding,
     gatewayApiBinding,
+    githubApiBinding,
     governanceApiBinding,
     modelProviderApiBinding,
     monitorApiBinding,

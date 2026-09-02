@@ -97,6 +97,7 @@ function settingsRouteSections(): Map<string, string> {
     "authz",
     "data-retention",
     "data-privacy",
+    "github",
     "model-provider",
     "organization",
     "personal-workspace",

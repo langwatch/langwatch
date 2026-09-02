@@ -11,6 +11,10 @@
     "./screens/automations": {
       "types": "./src/screens/automations/index.ts",
       "default": "./src/screens/automations/index.ts"
+    },
+    "./screens/unsubscribe": {
+      "types": "./src/screens/unsubscribe/index.ts",
+      "default": "./src/screens/unsubscribe/index.ts"
     }
   },
   "scripts": {

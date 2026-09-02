@@ -79,6 +79,7 @@
     "@langwatch/enterprise-governance-web": "workspace:*",
     "@langwatch/evaluator-web": "workspace:*",
     "@langwatch/gateway-web": "workspace:*",
+    "@langwatch/github-web": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/monitor-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",

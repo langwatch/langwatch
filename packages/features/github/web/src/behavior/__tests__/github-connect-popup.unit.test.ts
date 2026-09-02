@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useGitHubConnectPopup } from "../index";
+import { useGitHubConnectPopup } from "../github-connect-popup";
 
 afterEach(() => {
   vi.restoreAllMocks();

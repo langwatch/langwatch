@@ -92,6 +92,11 @@ const AUTOMATION_PAGE_KEYS = [
   "pages/[project]/automations/alerts",
   "pages/[project]/automations/schedules",
   "pages/[project]/automations/activity",
+  // The public unsubscribe landing rides on this family's transport and
+  // nothing else: a recipient opening it from a mail client holds no session,
+  // so it carries no guard and no host. It is registered here because
+  // `emailSuppression.*` is mounted out of `@langwatch/automation-server`.
+  "pages/unsubscribe",
 ];
 
 const DATA_GOVERNANCE_PAGE_KEYS = [
@@ -146,6 +151,13 @@ const GATEWAY_PAGE_KEYS = [
   "pages/gateway/guardrails",
   "pages/gateway/billing-events",
   "pages/gateway/webhooks",
+];
+
+const GITHUB_PAGE_KEYS = [
+  // ONE key, and the ranking row said two. The route table declares a single
+  // `/settings/integrations` row and nothing else in it names an integration,
+  // so the row's second key was a guess about a sibling that does not exist.
+  "pages/settings/integrations",
 ];
 
 const ORGANIZATION_PAGE_KEYS = [
@@ -258,6 +270,7 @@ describe("given what apps/ui serves itself", () => {
           ...DATASET_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
+          ...GITHUB_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
@@ -271,7 +284,7 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Twenty for nineteen features: the personal workspace mounts two,
+      // Twenty-one for twenty features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
@@ -286,6 +299,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/dataset-web",
         "@langwatch/evaluator-web",
         "@langwatch/gateway-web",
+        "@langwatch/github-web",
         "@langwatch/enterprise-governance-web",
         "@langwatch/model-provider-web",
         "@langwatch/monitor-web",
@@ -350,6 +364,7 @@ describe("given what apps/ui serves itself", () => {
           ...DATASET_PAGE_KEYS,
           ...EVALUATOR_PAGE_KEYS,
           ...GATEWAY_PAGE_KEYS,
+          ...GITHUB_PAGE_KEYS,
           ...GOVERNANCE_PAGE_KEYS,
           ...MODEL_PROVIDER_PAGE_KEYS,
           ...MONITOR_PAGE_KEYS,
@@ -360,7 +375,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(20);
+      expect(merged.apis).toHaveLength(21);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

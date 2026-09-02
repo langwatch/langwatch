@@ -290,6 +290,44 @@ export type AutomationApiMap = {
     };
   };
 
+  /**
+   * The two PUBLIC procedures behind `/unsubscribe`.
+   *
+   * They are the only calls in this map that run with no session at all: the
+   * `?token=` is the authorization (ADR-031), its HMAC binds it to one
+   * recipient, and both are mounted on the process's PUBLIC procedure. A
+   * recipient opening a link from a mail client holds nothing else.
+   *
+   * `emailSuppression` is the mount point on the root router — it is not
+   * `automation`, even though `@langwatch/automation-server` is what mounts it
+   * — and tRPC hashes that path into the React Query cache key, so the segment
+   * is load-bearing.
+   */
+  emailSuppression: {
+    /**
+     * Who the link was minted for and what it would silence.
+     *
+     * Answers null-shaped as a NOT_FOUND rather than as an empty result: an
+     * invalid or tampered token and a project that no longer exists are the
+     * same answer to a recipient, and the screen shows "Link not valid" for
+     * both.
+     */
+    resolveUnsubscribeToken: {
+      query: {
+        input: { token: string };
+        output: { projectName: string; triggerName: string | null; email: string };
+      };
+    };
+
+    /** Takes one of the two scopes the footer link promises. Idempotent. */
+    confirmUnsubscribe: {
+      mutation: {
+        input: { token: string; scope: "trigger" | "project" };
+        output: { ok: boolean };
+      };
+    };
+  };
+
   organization: {
     /**
      * The organization graph the scope is resolved out of.

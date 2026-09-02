@@ -13,6 +13,7 @@
     "@langwatch/enterprise-governance-web",
     "@langwatch/evaluator-web",
     "@langwatch/gateway-web",
+    "@langwatch/github-web",
     "@langwatch/model-provider-web",
     "@langwatch/monitor-web",
     "@langwatch/ops-web",
@@ -79,7 +80,8 @@
       "root": "automations",
       "uses": {
         "screens": [
-          "@langwatch/automation-web/screens/automations"
+          "@langwatch/automation-web/screens/automations",
+          "@langwatch/automation-web/screens/unsubscribe"
         ],
         "surfaces": []
       }
@@ -140,6 +142,16 @@
       "uses": {
         "screens": [
           "@langwatch/enterprise-governance-web/screens/governance"
+        ],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "integrations",
+      "root": "github",
+      "uses": {
+        "screens": [
+          "@langwatch/github-web/screens/integrations"
         ],
         "surfaces": []
       }
