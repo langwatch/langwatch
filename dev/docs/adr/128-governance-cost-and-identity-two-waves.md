@@ -583,13 +583,30 @@ email address), GDPR erasure:
 
 1. **records the erased identifiers on a suppression list** — a hash of
    each identifier the erasure covers, scoped to the organization
-   (`ErasedIdentifierSuppression`, Schema). Every puller consults it
-   before creating or updating a `DiscoveredPerson`, and skips a
-   suppressed identifier. Without this the erasure is undone by the
-   pipeline that produced it: the pullers look 30 days back, so the next
-   day's pull re-ingests the same email and re-creates the row we
-   erased. The list stores hashes, never the identifier, so it is not
-   itself a copy of the data it exists to keep out.
+   (`ErasedIdentifierSuppression`, Schema). Without this the erasure is
+   undone by the pipeline that produced it: the pullers look 30 days
+   back, so the next day's pull re-ingests the same email and re-writes
+   what we erased. The list stores hashes, never the identifier, so it
+   is not itself a copy of the data it exists to keep out.
+
+   **The check gates every write path that carries the identifier, not
+   just the identity tables.** Suppressing only `DiscoveredPerson`
+   creates and updates would leave the erased email flowing back in
+   through the paths that never touch that table:
+
+   - `DiscoveredPerson` creates and updates, and the `DiscoveredAgent` /
+     `IdentityMatch` writes that hang off them;
+   - **writes into `governance_ocsf_events`**, including the structured
+     `ActorEmail` column and the raw OCSF payload — a suppressed
+     identifier is dropped from the event rather than written and
+     erased again later;
+   - **seat-pull row writes** (§16), which carry `displayName`,
+     `userPrincipalName` and `mail` and would otherwise re-materialize an
+     erased person on the very next roster pull.
+
+   One check, consulted at each of those write points, is what makes the
+   erasure hold against a pipeline whose whole job is to re-fetch the
+   same 30 days tomorrow.
 2. blanks `IdentityMatch.userId` (§11) where a platform user was linked,
 3. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
    row (hash-replace, preserving the row for spend attribution),
@@ -599,10 +616,11 @@ email address), GDPR erasure:
    column — the key *is* the row's identity, so a changed key is a
    different row rather than an edited one, and the engine will not
    pretend otherwise. Erasure goes through the rebuild path the rollup
-   already has (§4: "a rebuild is a replay"): record the mapping (step
-   5), `ALTER TABLE … DELETE` this organization's rows carrying the
-   original value, then replay the affected days, which re-derives them
-   with the mapping applied. The pseudonym is deterministic (e.g.
+   already has (§4: "a rebuild is a replay"): record the identifier on
+   the suppression list (step 1), `ALTER TABLE … DELETE` this
+   organization's rows carrying the original value, then replay the
+   affected days, which re-derives them with the pseudonym in place of
+   the original. The pseudonym is deterministic (e.g.
    `SHA-256(secret ‖ original)`) so every replay lands on one stable key
    rather than minting a new one per run.
 
@@ -613,22 +631,38 @@ email address), GDPR erasure:
    those days drop by the erased amount. The alternative — leaving the
    row and its personal data in place — is not one, so the erasure job
    records which days it could not rebuild instead of failing silently.
-5. **Replay safety:** the fold / replay pipeline (§4) must apply the
-   erasure mapping — a lookup from original `RawActorId` to its
-   pseudonym — *before* writing the rollup row. Without this, a replay
-   re-derives the original value from the raw event log and inserts it
-   beside the pseudonymized row, duplicating the amount. The mapping is
-   a small table (`ErasedActorId(organizationId, provider, original,
-   pseudonym)`), joined during the fold's projection step. The key
-   includes `organizationId` and `provider` because the same raw actor
-   id string can appear under different providers or tenants — scoping
-   prevents cross-tenant collisions. Tests, against the ClickHouse
-   version we deploy rather than a mock: erase, replay, assert the
-   rollup contains only the pseudonymized key with the correct total; a
-   collision test with the same `original` under two providers; and one
-   that asserts the mutation route is closed — an `ALTER TABLE … UPDATE`
-   on `RawActorId` must be rejected, so nobody re-adds the step that
-   cannot work.
+5. **Replay safety, with no stored mapping from pseudonym back to the
+   original.** The fold / replay pipeline (§4) must pseudonymize an
+   erased `RawActorId` *before* writing the rollup row. Without that, a
+   replay re-derives the original value from the raw event log and
+   inserts it beside the pseudonymized row, duplicating the amount.
+
+   It does **not** need a table of original-to-pseudonym pairs to do it,
+   and must not have one: such a table would keep the erased identifier
+   in plaintext forever, which is the opposite of what the erasure was
+   for, and would contradict step 1's whole point that we store hashes
+   and not identifiers. The fold already holds the original value in
+   hand — it just read it off the raw event — so the two things it
+   needs are a **membership test** and a **recomputation**: hash the
+   value it is about to write, test that hash against
+   `ErasedIdentifierSuppression` for this `(organizationId, provider)`,
+   and on a hit write `SHA-256(secret ‖ original)` instead. Because the
+   pseudonym is deterministic in the original, every replay of every day
+   lands on the same key without anything ever having been stored.
+   `ErasedIdentifierSuppression` is therefore the only table erasure
+   adds. Scoping the lookup by `organizationId` and `provider` matters
+   for the same reason it does on the suppression list: the same raw
+   actor id string can be a different person under a different provider
+   or tenant.
+
+   Tests, against the ClickHouse version we deploy rather than a mock:
+   erase, replay, assert the rollup contains only the pseudonymized key
+   with the correct total; a replay-twice test asserting the pseudonym
+   is byte-identical across runs; a collision test with the same
+   original value under two providers, where only the erased side is
+   pseudonymized; and one that asserts the mutation route is closed — an
+   `ALTER TABLE … UPDATE` on `RawActorId` must be rejected, so nobody
+   re-adds the step that cannot work.
 
 Retention policy (§7) covers event expiry; the identity tables carry
 their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
@@ -657,10 +691,11 @@ exempting it from erasure.
   Agent-level **activity** works everywhere; the column says which it is
   showing. Discovering an agent grants nothing.
 
-### §11. The identity wave stands on three Postgres tables, defined here
+### §11. The identity wave stands on six Postgres tables, defined here
 
 Defined fresh in this document (the closed branch is design debris, mined
-for nothing), argued from scripts and scenarios:
+for nothing), argued from scripts and scenarios. Three carry the identity
+model itself:
 
 1. **`DiscoveredPerson`** — a name-text seen on provider rows ("the
    provider told us someone called m.silva exists"), one row per
@@ -675,6 +710,15 @@ for nothing), argued from scripts and scenarios:
    a correction closes the old row and opens a new one; nothing is
    silently rewritten.
 
+Three more support them, each argued where it is decided rather than
+here: **`GovernanceTenantHistory`** (every `TenantId` the org has written
+governance rows under — below in this section),
+**`ErasedIdentifierSuppression`** (hashes of erased identifiers, gating
+every write path that carries one — §9 step 1), and
+**`IdentityMatchSuggestion`** (background-computed match candidates —
+§12). All six are defined in the Schema block, alongside the two the cost
+wave adds (`SeatPrice`, §6; `IngestionSourceKeyCoverage`, §7).
+
 Postgres because the volume is small (hundreds–thousands of rows),
 relational (uniqueness on provider + raw id, foreign keys to
 Organization), and served to admin screens via Prisma like every other
@@ -683,7 +727,7 @@ the app layer — the pattern the whole codebase uses. Rejects: ClickHouse
 residence (admin-curated rows are what it is worst at); a Postgres → CH
 sync (infrastructure for a problem app-layer joins don't have yet).
 
-**All three are keyed by `organizationId`, never by the hidden governance
+**All six are keyed by `organizationId`, never by the hidden governance
 project.** The rollup's `TenantId` is that project's id (§8), and unlike the
 organization it is not durable: `resolveGovProjectId` resolves only
 un-archived projects (`archivedAt: null`,
@@ -888,9 +932,12 @@ Anthropic revises cost for up to 30 days (#6978), and FOCUS's
 closed, so nothing on the wire tells us a day is settled. The flag is
 therefore **derived** from a per-source settling window
 (`SETTLING_WINDOW_DAYS`, Constants — 30 days by default, overridable per
-source as providers differ), computed at read like every other overlap
-rule. The reason it earns a marker at all: a governance number that
-silently restates is worse than one that admitted up front it might.
+source as providers differ), computed **at read, from a stored
+observation timestamp** rather than persisted as a flag — like every
+other overlap rule, the answer changes with the clock, so storing it
+would only mean storing something that goes stale. The reason it earns a
+marker at all: a governance number that silently restates is worse than
+one that admitted up front it might.
 
 Three rules make the marker mean what it says.
 
@@ -904,7 +951,11 @@ Three rules make the marker mean what it says.
   days after the provider has stopped touching them, because the clock
   ran while nothing was watching. Anchoring on the last pull that
   covered the day means the marker tracks our own observation of the
-  provider, which is the only thing we can honestly claim to know.
+  provider, which is the only thing we can honestly claim to know. The
+  test reads that anchor from **`LastObservedAt`** on the rollup row
+  (Schema), which every fold write touching the day moves forward —
+  including a re-pull that confirms an unchanged figure, which is
+  precisely the case a correction-only timestamp would miss.
 - **Revised and provisional render together, because together is the
   normal case.** Anthropic restates within 30 days and the window is 30
   days, so essentially every revision we see lands on a day that is
@@ -957,16 +1008,22 @@ them. Four obligations ride inside wave 2, in the same change as the
 seat feature — not as follow-ups, because a follow-up would mean
 shipping the widening without the containment:
 
-- **A TTL on `governance_ocsf_events`, and enrolment in the retention
-  map.** The table declares no TTL at all and is absent from the
-  retention-policy table map, so today its rows are kept forever and a
-  customer's retention setting does not reach them. It gets a **13-month
-  TTL**, matching the precedent already set by the rollup in migration
-  00087 — a TTL that exists *because* the raw actor id is personal data,
-  which is exactly the argument here — and an entry in the retention
-  table map. This is a pre-existing defect (four shipped pullers already
-  write provider emails into this table); the seat feature does not get
-  to compound it.
+- **A fixed TTL on `governance_ocsf_events`, declared in the migration
+  and deliberately outside the retention map.** The table declares no
+  TTL at all, so today its rows are kept forever. It gets a **fixed
+  13-month `TTL … DELETE`** written into the migration, and stays
+  **absent from `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG`** —
+  which is the actual precedent migration 00087 set for the rollup, for
+  the same reason that applies here: the identifier is personal data, so
+  its holding period must be a fixed bound rather than a customer
+  setting. Enrolling the table in the retention map is ruled out, not
+  merely skipped: the reconciler's `MODIFY TTL` replaces the whole TTL
+  expression atomically (`ttlReconciler.ts:463`), so enrolment would
+  overwrite the fixed 13-month bound with the customer's own retention
+  value — and a customer who sets a longer one would then hold names and
+  email addresses past 13 months. The un-TTL'd table is a pre-existing
+  defect (four shipped pullers already write provider emails into it);
+  the seat feature does not get to compound it.
 - **Seat-assignment rows are excluded from the SIEM export.** The export
   filters on tenant and time and never on `ActionName`, so it ships
   whatever is in the table wholesale to a customer's SIEM. Seat rows are
@@ -979,8 +1036,14 @@ shipping the widening without the containment:
   one column cannot redact a JSON document, so §9's step-3
   pseudonymization does not reach seat rows. For wave 2 the erasure path
   for seat rows is therefore **delete the rows and suppress the
-  identifier** (§9 step 1), which is complete but coarse: the seat
-  history for that person disappears rather than becoming anonymous. A
+  identifier** (§9 step 1). Deleting alone would not be complete — the
+  next roster pull re-reads the same 30 days and re-writes
+  `displayName`, `userPrincipalName`, `mail` and the structured
+  `ActorEmail` column straight back in. It is the suppression check
+  sitting on the OCSF and seat-pull write paths, not only on
+  `DiscoveredPerson`, that makes the deletion stick. Complete, then, but
+  coarse: the seat history for that person disappears rather than
+  becoming anonymous. A
   payload-level redaction story — structured columns, or a redacting
   read path — is named here as owed work, not solved.
 - **The puller loop needs paging.** The per-user Graph seat endpoint
@@ -1064,7 +1127,7 @@ wave 2 are visibly scoped rather than quietly absorbed.
 
 | Defect | Status |
 |---|---|
-| `governance_ocsf_events` has no TTL and is absent from the retention-policy table map, while four already-shipped pullers write provider email addresses into it — and the SIEM export ships the table filtered only by tenant and time | **Fixed inside wave 2** (§16): 13-month TTL, retention-map enrolment, seat rows excluded from the export by action name |
+| `governance_ocsf_events` declares no TTL at all, so its rows are kept forever, while four already-shipped pullers write provider email addresses into it — and the SIEM export ships the table filtered only by tenant and time | **Fixed inside wave 2** (§16): a fixed 13-month `TTL … DELETE` declared in the migration, the table deliberately left out of the retention map (whole-clause `MODIFY TTL` would overwrite the fixed bound with a customer-settable one), seat rows excluded from the export by action name |
 | The hidden governance project is reachable through the generic project routes — `PATCH /api/projects/:id` and the archive path guard personal projects but not `kind`; the hiding invariant is enforced only on the list surface | **Fixed inside wave 2** (§11): `kind` guard on archive, update and GET-by-id, on top of the `GovernanceTenantHistory` table that makes an archive survivable rather than fatal |
 | The `event_log` plaintext erasure service designed in ADR-101 §5 was never written, so pre-erasure identifier values remain in the log (already documented in ADR-127) | Tracked separately; §9's erasure is complete for the rollup and the identity tables and does not claim to reach the event log |
 | The identity migration latch ships closed fleet-wide, so `lw.identity.user_erased` currently fires for no one | Tracked separately; §11 demotes that event to an optional trigger precisely so this does not block or fake governance erasure |
@@ -1295,7 +1358,7 @@ drift apart).
 |---|---|---|
 | Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
-| Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
+| Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNano` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
 | Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
 | Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
@@ -1373,6 +1436,15 @@ CREATE TABLE governance_cost_rollup_1d (
     RequestCount       UInt64 DEFAULT 0,
     RevisionCount      UInt32 DEFAULT 0,        -- §15 restatement history
     PreviousAmountNanoUsd Nullable(Int64) DEFAULT NULL,  -- §15 "was $X"
+    RevisedAt          Nullable(DateTime) DEFAULT NULL,  -- §15 marker, wave 2 ADDs it
+                                      -- (latest revision only)
+    LastObservedAt     DateTime DEFAULT 0,      -- §15: when a pull last TOUCHED this day.
+                                      -- Wave 2 ADDs it. Written on every fold write that
+                                      -- touches the row, not only on corrections — that is
+                                      -- RevisedAt's job. A re-pull that confirms an
+                                      -- unchanged figure still moves it, which is exactly
+                                      -- the fact the provisional test needs. Read with
+                                      -- argMax like every other payload column.
     PulledItemsJson    String DEFAULT '',       -- latest contribution per item
     Version            LowCardinality(String) DEFAULT '',  -- schema snapshot
     AppliedEventIds    Array(String) DEFAULT [],  -- redelivery dedup (00054)
@@ -1396,6 +1468,10 @@ TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE;
 -- `ExactOrEstimate` is deliberately OUTSIDE the key — a day moving from
 -- estimate to exact is a restatement that must REPLACE, and in the key
 -- both rows would survive and the day would read as double its cost.
+-- OrganizationId stays out for a different reason: it is not a dimension
+-- the row is distinguished BY, it is who owns the row TenantId already
+-- addresses. RevisedAt, PreviousAmountNanoUsd and LastObservedAt are
+-- markers about the row, not dimensions of it, and are likewise payload.
 -- Retention is a fixed 13-month TTL, exempt from tenant retention
 -- (following gateway_spend, 00067): cost records must not be governed by
 -- a policy a customer can shrink to weeks.
@@ -1521,9 +1597,15 @@ model ErasedIdentifierSuppression {
   provider       String            // scoped: the same string can be a different person elsewhere
   identifierHash String            // hash of the erased identifier — never the identifier
   erasedAt       DateTime
-  // §9 step 1: pullers consult this before creating or updating a
-  // DiscoveredPerson and skip a suppressed identifier. Without it the next
+  // §9 step 1: consulted by EVERY write path that carries the identifier —
+  // DiscoveredPerson creates/updates, governance_ocsf_events writes
+  // (ActorEmail and the raw payload) and seat-pull row writes — each of
+  // which skips a suppressed identifier. Without it the next
   // 30-day-lookback pull re-creates the row the erasure just removed.
+  // §9 step 5: the fold also membership-tests against it at replay and
+  // recomputes the deterministic pseudonym on a hit, which is why no
+  // original-to-pseudonym mapping table exists (one would hold the erased
+  // identifier in plaintext forever). This is the only table erasure adds.
   @@unique([organizationId, provider, identifierHash])
 }
 
@@ -1696,7 +1778,19 @@ money tables, only the identity tables and read paths.
     discovered-person record now drives every step;
     `ErasedIdentifierSuppression` stops the next 30-day-lookback pull from
     re-creating the erased row; the event is demoted to an optional
-    supplementary trigger.
+    supplementary trigger. The suppression check gates **every write path
+    that carries the identifier**, not only `DiscoveredPerson` — the OCSF
+    event writes (the structured `ActorEmail` column and the raw payload)
+    and the seat-pull row writes included, because deleting rows that a
+    nightly pull re-writes is not an erasure. And there is **no
+    `ErasedActorId` mapping table**: a stored table of
+    original-to-pseudonym pairs would keep the erased identifier in
+    plaintext forever, contradicting the hashes-only suppression list in
+    the same section. None is needed, because the pseudonym is
+    deterministic — at replay the fold already holds the original value,
+    tests its hash for membership, and on a hit recomputes
+    `SHA-256(secret ‖ original)`. `ErasedIdentifierSuppression` is the
+    only table erasure adds.
   - **Match suggestions are computed in the background and stored** (§12,
     Schema, Gates): this **reverses** v3.8's compute-at-read ruling.
     Measured at the ADR's own example size, 2,000 discovered people × 500
@@ -1713,6 +1807,11 @@ money tables, only the identity tables and read paths.
     revised** (§15, Constants): calendar age marked a 90-day backfill
     settled sight-unseen and kept weekly-pull sources provisional 23 extra
     days, so the window now counts days since a pull last touched the day.
+    That anchor needs a place to live, so the rollup gains a
+    `LastObservedAt` payload column (Schema), moved forward by every fold
+    write that touches the day — a re-pull confirming an unchanged figure
+    included, which is exactly what `RevisedAt` would miss; the flag stays
+    computed at read, now *from* that stored timestamp.
     revised ∧ provisional is the **normal** case, not a contradiction —
     Anthropic revises within 30 days and the window is 30 days — and the
     cell shows both: *"revised, was $X — may still change"*; the v3.8
@@ -1721,15 +1820,36 @@ money tables, only the identity tables and read paths.
     restated. Azure and Databricks windows are recorded as unmeasured.
     §15's restatement mechanics (`RevisedAt`, `PreviousAmountNano`) were
     not refuted and are unchanged.
-  - **Seat events carry PII obligations, inside the same PR** (§16):
-    `governance_ocsf_events` gets a 13-month TTL (the rollup's own
-    precedent, migration 00087) and retention-map enrolment, and
-    seat-assignment rows are excluded from the SIEM export — a pre-existing
-    defect the seat feature must not compound. The raw OCSF payload holds
-    names and email addresses that single-column pseudonymization cannot
-    reach: wave 2 answers with delete-and-suppress and records the
-    redaction story as owed. The per-user Graph endpoint paginates and the
-    current pull does not (~30k rows/day at 10k seats × 3 SKUs).
+  - **Seat events carry PII obligations, inside the same PR** (§16, §20a):
+    `governance_ocsf_events` gets a **fixed 13-month `TTL … DELETE`
+    declared in its migration** and stays **out** of
+    `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG` — which is what
+    migration 00087 actually did for the rollup, and the two halves are not
+    interchangeable: the reconciler's `MODIFY TTL` replaces the whole TTL
+    expression atomically (`ttlReconciler.ts:463`), so enrolling the table
+    would overwrite the fixed bound with a customer-settable one and let a
+    customer hold personal data past 13 months. Seat-assignment rows are
+    excluded from the SIEM export — a pre-existing defect the seat feature
+    must not compound. The raw OCSF payload holds names and email
+    addresses that single-column pseudonymization cannot reach: wave 2
+    answers with delete-and-suppress, complete only because the
+    suppression check also sits on the OCSF and seat-pull write paths, and
+    records the redaction story as owed. The per-user Graph endpoint
+    paginates and the current pull does not (~30k rows/day at 10k seats ×
+    3 SKUs).
+  - **The rollup sketch is corrected to the shipped table, and the table
+    counts to the schema** (Schema, Invariants, §11): the sketch had no
+    `TenantId` column and led its ORDER BY with `OrganizationId`, while
+    the shipped migration 00087 leads with `TenantId` and carries
+    `OrganizationId` as a payload column defaulting to `''` — ownership is
+    an attribute of the row, its address is the tenant. §11 and the new
+    `GovernanceTenantHistory` design already assumed the shipped shape, so
+    only the sketch and the "full-grain dedup key" invariant were wrong;
+    both now match, and the invariant states which columns are payload by
+    design rather than implying every column belongs in the key. §11's
+    "three Postgres tables" is likewise restated as six, the fold having
+    added `GovernanceTenantHistory`, `ErasedIdentifierSuppression` and
+    `IdentityMatchSuggestion` to the original three.
   - **Pre-existing defects written down** (§20a new, Open questions): four
     findings that predate this ADR — the un-TTL'd, unfiltered
     `governance_ocsf_events` already carrying provider emails from four
