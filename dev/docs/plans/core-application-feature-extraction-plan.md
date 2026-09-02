@@ -1,56 +1,35 @@
 # Platform application exit plan
 
-**Updated:** 2026-08-28
+**Updated:** 2026-09-02
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `367178c4be`
+**Working checkpoint:** `0fc9e4120d`
 
-**Current execution waves:** Wave 3 internal tRPC + strict-layout hygiene
+**Ruling in force (2026-09-01, Alex):** the migration is not gradual.
+`platform/app` does not need to compile, boot or serve during it. The only
+edit allowed there is a deletion (`git diff --numstat -- platform/app` shows
+zero insertions on every row). Since 2026-09-02 the recipe is lift-and-shift:
+move a module into the package that owns it keeping its shape, fix the moved
+code's imports, leave every other platform importer broken, delete what the
+move made unreachable. There are no "narrowed copies", no "priced" files, no
+per-slice whole-repo gate runs; the architecture-lint findings count is the
+cleanup backlog, not a gate.
 
-**State as of `367178c4be`.** Fifty-one package-owned tRPC APIs are written
-across `packages/**/server/src/api/app-trpc/`, in thirty-five feature packages.
-The transport surface now stands in three shapes, and the difference between
-them is the whole remaining job:
+**State at `0fc9e4120d`.**
 
-| Shape | Count | Where the mount lives | Imports from `platform/app` |
-| --- | --- | --- | --- |
-| Mounted from `apps/api` | 9 routers | `apps/api/src/features/*/…-trpc.mount.ts` | none |
-| Mounted from `platform/app` | 19 routers | `platform/app/src/runtime/app/internal-api/*.router.ts` | root, policy chain, some services |
-| Not yet moved | 44 routers | `platform/app/src/server/api/routers/*.ts` | everything |
+| Lane | Fact | Next |
+| --- | --- | --- |
+| API | `createAppTrpcFeatures` (22 namespaces) composes on `apps/api`'s own root behind its own policy chain, with ~40 ports lifted off platform; `/api/sse/*` serves subscriptions on that root. Production still serves agent+secret only: the record refuses to compose until `trpcCollaborators` is satisfied (LangWatchQL + filter service; the 14-member organization app service; sign-up/invite/provider-resolution; five NLP-bound workflow/evaluator ports; the evaluation_processing pipeline). Platform `root.ts` still holds the 947-line ports object as the reference until then. | Move the collaborator services into their owning server packages (analytics and identity halves in flight), satisfy `trpcCollaborators`, delete the `root.ts` block, cut haven's app lane to `apps/api`. |
+| Worker | Packaged registry is the one consumer since `4542cdc38c`. Trace conversion: g1 (projection collaborators) and g2 (project-metadata, model-cost-catalog, monitor-catalog, data-privacy-resolution seams) landed; worker suite 365. | g3–g7 and the 29-key trace conversion (in flight), then scenario, langy-conversation, gateway-spend, automation-half on the g2 seams. |
+| UI | 39 loader keys left of 149. Out: governance, gateway, me, automations, ops, analytics, evaluators, integrations, unsubscribe, workflows list+chat, auth front door (8 keys). | Studio, traces + share, chrome layout route (dashboard layout, project switcher, drawer mount; unblocks the authorize pages and every recorded drawer gap) in flight; then onboarding, org/members/teams, billing, experiments workbench, simulations, langy layout. |
+| Platform residue | ~471,700 non-test lines. A reachability census from the live roots (loader keys, `root.ts`, worker registry, REST mounts) is in flight to bulk-delete what nothing reaches. | Delete tiers as the census lands; refresh the inventory below from it. |
 
-Seventy-two router files remain under `server/api/routers/`. Nine of them are
-already thin compositions that import their behaviour from
-`@langwatch/platform-api/app-trpc` and hold no logic; the other sixty-three
-still own their procedures outright.
+The long rows under "Active and residual slices" and the worker blocker graph
+are the historical record of how each seam was found; read them for evidence,
+not for current state. The UI ledger is `ui-family-move-manifests.md`; the
+subscription lane is `ui-subscription-transport.md`.
 
-**The `apps/api` shape is the target, and it is already reachable.**
-`platform/app` declares `@langwatch/platform-api` as a workspace dependency and
-the `./app-trpc` subpath is exported, so a mount placed in `apps/api` can be
-consumed by `root.ts` today — nothing needs to be built or published first.
-`apps/api/src/app-trpc/app-trpc.policy.ts` imports only types from
-`@langwatch/authz-contract` and takes the process's concrete middlewares as a
-parameter, which is what keeps the dependency pointing the right way.
-
-**The nineteen `internal-api` mounts are not yet movable, and the reason is
-specific.** Each one reaches into `~/server/api/trpc.root`,
-`~/server/api/trpc.runtime-policy`, `~/server/api/trpc.scope-lineage-middleware`
-and `~/server/app-layer/authz/trpc-middleware` — roughly 1,900 lines of policy
-spine that still lives in `platform/app`. Several also reach feature services
-that have not been extracted yet (`~/server/modelProviders/*`,
-`~/server/app-layer/traces/*`, `~/utils/modelLimits`, `~/utils/safeRegex`).
-Moving the spine into `@langwatch/trpc` unblocks all nineteen at once; moving
-those services is a separate, smaller wave. Until then, a mount in
-`internal-api` is the correct intermediate rather than a regression: it holds a
-policy chain and a service handoff, and no feature behaviour.
-
-Waves 1 and 2 are closed. Wave 3's internal-tRPC column is now the active
-front, running beside the architecture-lint hygiene the strict layout needs in
-order to mean anything. Parallel work still requires independent file
-ownership: the concurrent transport verticals each own their own routers and
-their own package, and none of them edits `server/api/root.ts` — the mount
-point is applied once, centrally, because four agents editing one import block
-would clobber each other.
 
 **Goal:** delete `platform/app` after its UI, API, worker, configuration,
 backend, tests, assets and deployment responsibilities have canonical owners.
@@ -1544,7 +1523,9 @@ cannot hide a key that quietly stopped registering. It registers nothing the reg
 EE governance rollups stay unregistered when nobody supplies them, which is asserted rather than assumed. What
 it awaits is (g2): `recordSpanCommand` and the fifteen subscriber handlers are still parameters, because
 `command:recordSpan`'s service cascade needs `ProjectService` and, through it, `DataPrivacyService` and
-`ModelProviderService`, plus `MonitorService` and `AnalyticsService`.
+`ModelProviderService`, plus `MonitorService` and `AnalyticsService`. **CLOSED 2026-09-02 by (g3)–(g7): the
+sixteen parameters are composed, and the "the staged pipeline is not mounted" scenario this paragraph describes
+was inverted to the mounted form rather than deleted.**
 
 PINS, all literals in the packages' own tests rather than reads of the application's source. Media: both
 reserved attribute names, the exact serialised JSON for a two-reference list including key order and role, the
@@ -1802,6 +1783,95 @@ load-bearing. The leaves steps (a)–(f) and the two closed absences introduced 
 unchanged: `pnpm test:unit run src/runtime/worker` 8 files / 42 tests, `@langwatch/worker` 41 files / 337 tests,
 `@langwatch/trace-server` 94 files / 1576 tests, architecture-lint 21 files / 332 tests with 805 CLI findings,
 `apps/worker` clean under both `tsconfig.json` and `tsconfig.test.json`.
+
+**(g3)–(g7) AND THE TRACE CONVERSION ITSELF. LANDED 2026-09-02 (uncommitted at time of writing): `apps/worker`
+mounts all 29 byte-frozen `trace_processing` keys, with NO named absence. `recordSpanCommand` and the fifteen
+subscriber handlers stopped being parameters; `WorkerTraceProcessingPipeline.create(...)` composes them from the
+substrates this process already holds, and `worker-production.composition.ts` is the caller.**
+
+```
+ apps/worker/src/app/worker-production.composition.ts
+   └─ WorkerTraceProcessingPipeline.create({ config, services, stores, commands, … })
+        ├─ command:recordSpan          composed whole            (g2)
+        ├─ codingAgentSpanFactsDispatch ── CodingAgentTraceProcessingPort   (g3)
+        ├─ reactor:trackedEventSync    ── TrackedEventSpanService           (g4)
+        ├─ reactor:triggerMatch        ── TraceAlertTriggerPort trio        (g5)
+        ├─ reactor:governanceKpisSync  ── EE specs built at the root        (g6)
+        ├─ reactor:governanceOcsfEventsSync                                 (g6)
+        └─ job:datasetNormalize        ── DatasetNormalizationService       (g7)
+```
+
+WHAT EACH GROUP TURNED OUT TO BE.
+
+(g3) One query, as priced. `findNormalizedSpanById` joined `TraceSpanStorageClickHouseRepository` with its own
+`DERIVATION_SPAN_SELECT` and a single-span settings block; `ClickHouseTraceStoredSpanReaderAdapter` reads it
+through the existing windowed read (`fallback: "none"`, the default partition window), and
+`WorkerCodingAgentTraceProcessingAdapter` pairs it with the packaged normalization pipeline to satisfy
+`CodingAgentTraceProcessingPort`. Nine read tests were added beside the repository's existing ones — window
+bounds, the key triple, no nested columns, the lazy-materialization setting, a miss costing exactly one probe,
+and a tenantless read refused.
+
+(g4) The builder harvested, and the harvest FORCED A SPLIT that was better than the priced one.
+`TrackedEventSpanService` needs `ingestNormalizedSpan` and nothing else, but `TraceIngestionService.create`
+takes five collaborators — so composing it here would have meant handing it two arguments provably unreachable
+on this path. `TraceSpanCollectionService` was extracted instead (dedup + the one command handoff, moved
+verbatim), `TraceIngestionService` builds it internally and delegates, and the worker composes only the
+collection. The Redis span-dedup adapter is a frozen twin of the application's: same `span_dedup:` prefix, same
+60s/3600s TTLs, because while both graphs ingest either may claim the same span.
+
+(g5) Three narrow ports rather than one, because the two features disagree on shape.
+`AutomationTraceTriggerCataloguePort` (over `PrismaTriggerRepository` + `ActiveTriggerCacheService`) answers the
+catalogue read; a match recorder adapter carries the round trip back into Automation's enums; and the origin
+guard is the packaged `passesTraceOriginGuards` rather than a second copy. That guard is what stops a
+topic-clustering re-emit over historical traces re-firing every alert a customer ever configured, and it is
+pinned by a test.
+
+(g6) MOUNTED, NOT DECLARED ABSENT. The halt record said these two were the only keys that could honestly be
+absent and must not be, and that holds: `createWorkerGovernanceRollups` builds both subscriber specs — window,
+predicate and handler — at the composition root and hands them to the OSS pipeline as data, so the pipeline
+still imports no `@ee`. The throttle window is the governance package's own constant, not a number chosen here;
+spelled differently on either side it would double a customer's reported spend while both graphs ingest.
+
+(g7) `DatasetNormalizationService` composed over a stored-object runtime this process now builds for itself.
+The production graph supplies no `infrastructure`, so `WorkerProductionComposition` opens its own AWS and
+stored-object runtime — needed by the ADR-022 spool as well — and that surfaced a real BYOC gap: per-organization
+`DATAPLANE_S3__<label>__<orgId>` routing had no worker config leaf. `storage.dataplaneS3` is that leaf.
+
+HOW THE CONVERSION IS PROVEN. `worker-trace-processing-mount.composition.unit.test.ts` builds the real pipeline
+over substrate doubles and DRIVES REGISTERED SUBSCRIBERS the way the dispatcher does — `shouldDispatch` first,
+then `handle` — asserting the effect at the far end: a durable match through Automation's recorder, an
+evaluation through Evaluation's command with Evaluation's own slug rule, a minted tracked-event span back
+through `recordSpan`, a project's clustering through Topic's bootstrap with the milestone against the org admin,
+scenario and experiment metrics through their owning commands, and the frozen registry read back from
+`job-registry.json`. Seven sabotages were run and all seven went red: the tracked-event handler detached, the
+topic bootstrap dropped, the slug rule replaced, the governance registration skipped, the trigger-match handler
+detached, the tracked-event command never connected, and the origin guard removed. The staged slice's "no
+production caller reaches this composition" assertion was INVERTED rather than deleted — a test that kept
+asserting the staged shape would have gone red on the change it was written to guard.
+
+Specs: `specs/trace-processing/worker-trace-pipeline-conversion.feature` (new, eight `@unit` scenarios, each
+bound by a `@scenario` annotation), and `worker-trace-projection-runtime.feature`'s final scenario rewritten
+from "the staged pipeline is not mounted" to the mounted form.
+
+PLATFORM: one file touched, `runtime/worker/packaged-worker.capabilities.ts`, losing the trace installer import
+and its registration — `git diff --numstat` reports 0 insertions / 2 deletions, and 0 insertions across the whole
+of `platform/app`.
+
+Gates measured: `@langwatch/worker` 46 files / 373 tests, clean under `tsconfig.test.json`;
+`@langwatch/trace-server` 1598 tests across 95 files, clean under its tsconfig, with two `.integration.test.ts`
+files failing to LOAD on a `~/server/clickhouse/goose` platform alias — both untouched by this slice and failing
+the same way before it. `platform/app`'s `src/runtime/worker` parity suite was green at 8 files / 42 tests after
+the conversion (188/188 routing keys, which is the strongest oracle available for the mount) and is now blocked
+in the shared worktree by a concurrent lane's 1,080 in-flight `platform/app` deletions —
+`src/utils/constants.ts` and `src/server/filters/precondition-matchers.ts` among them. That red is that lane's,
+not this one's, and restoring 1,080 files to re-measure would have raced its work.
+
+DEPLOYMENT IMPACT: THIS IS THE MOUNT, so every leaf steps (a)–(g2) introduced becomes load-bearing for a
+worker process that runs the trace pipeline, plus one new leaf: `TRACE_SPAN_PROCESSING_SHARDS`
+(`processing.traceSpanShards`) and the `DATAPLANE_S3__<label>__<orgId>` group behind `storage.dataplaneS3`.
+A process with trace consumers enabled now REFUSES TO BOOT unless automation, evaluation and scenario producers
+are present — `requireTraceProducers` — because a mounted pipeline whose commands dispatch nowhere is the exact
+failure the absence discipline exists to prevent.
 
 
 ## How to execute the plan
@@ -2131,10 +2201,10 @@ Gate: every later API handler can rely only on `context.app`/`ctx.app`,
 
 #### Internal tRPC
 
-**In progress — 8 of 95 mounted routers moved.** Agent, Secret, Presence, Data
-Retention, Feature Flag, Role, role bindings and GitHub are package-owned and
-mounted from `runtime/app/internal-api/`; 87 modules remain under
-`server/api/routers/**`.
+**State 2026-09-02:** the 22-namespace record composes on `apps/api`'s own root
+(`0fc9e4120d`); what is left is the collaborator services it refuses to compose
+without, and the `root.ts` ports block that goes when they land. The paragraph
+below is the seam history.
 
 - [x] Establish the transport seam every vertical copies. GitHub
       (`172b31e456`) is the reference: `<Feature>TrpcApi.create(root, {
@@ -2219,7 +2289,7 @@ builds the pipeline):
 | ----- | ----- | ------------ |
 | Real (worker builds from raw deps) | 2 | eventing-maintenance, topic |
 | Extracted (this programme) | 14 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it); scenario deferred-metrics rider (`396a3d742e` — the job description lives beside its delay constant in `@langwatch/scenario-server`, the worker installer binds it through its own consumer-side interface, and a package test pins name/dedup-id/span literals against platform's frozen twin, which may only change together); github (`ec485ec46d` — the blocker was false coupling: sweep split from demand behind GithubBranchInstallationsPort, Prisma seams typed, worker builds the pipeline with no org/project service, credential absence declared by name; standalone deployments need the three GITHUB_LANGY_* env vars); langy-maintenance (`2cc56987f6` — session-key reap split from the wide service that demanded ApiKeyService/AuthzService it never called, narrow Pick<PrismaClient,"apiKey"> repository, package OTel metrics adapter pinning the identical series name); metric+log (`caee89b857` — append repositories split from reads whose demands only dead or narrow paths used; worker mounts both from the tenant-keyed substrate it already carries); suite (`3d6eba224f` — the coupling was a three-way assembly split across runtime/contract/registry; the package adapter owns it, redis required so a double-counting cacheless graph is inexpressible); identity+scim-sync (`54ba504b0d` — clean harvests: seven platform-only Prisma repositories landed at their honest homes, projection stores in identity-eventing beside the fold states that type them); authz+billing-reporting (`f397ac37ac` — the grants ledger split producer-from-consumer with connect deleted rather than stubbed; billing harvested its organization read, cache, Stripe twin and error reporter, mounting unconditionally with the SaaS shape in the sender); coding-agent+experiment (`e6a5d0fcda` — experiment was the suite assembly pattern; coding-agent dissolved ModelProviderService-for-one-pure-function and ProjectService-for-one-column-touch into three narrow ports, and composed the PR demand path its byte-frozen subscriber key requires); join-request (`baca75a26b` — the packaged mail capability in notification-server is the substrate, four provider gateways with the App's config spellings, templates in the application tier proven byte-identical to react-email's output; mounts unconditionally with absent mail declared by name, and a queue-claiming scoped graph refuses to compose without BASE_HOST) |
-| Hybrid (package installer, platform-built option bundle) | 2 | trace (**STAYS HYBRID; conversion attempted 2026-09-02 and halted, unreachable at zero platform insertions.** Steps (a)-(f) and the three named absences all landed and every staged composition is capability-tested, but `trace_processing`'s 29 byte-frozen routing keys are all-or-nothing and fourteen do not route from this process. Two groups are the halt: the PIPELINE DEFINITION was never in the census — `EventingTracePipelineAdapter` needs `ioExtraction`, `mediaReferences`, `modelCosts` and `prepareEventForProjection`, whose four implementations are 1,199 un-harvested platform lines, and the two modules that register the keys are platform's `AppTraceProjectionsAdapter` + `createTraceProcessingPipeline`; and `recordSpan`'s four staged ports each take a capability service by parameter, none of the six constructible here — `DataPrivacyService` and `ModelProviderService` both require `ProjectService`, which is shared prerequisite (1). THE WAVE ORDER INVERTS: ProjectService wave now precedes Trace. Three more keys have bounded gaps — `trackedEventSync`'s `getApp()`, the coding-agent normalized-span read step (c) handed forward, `datasetNormalize`'s unbuilt composition — and three belong to the automation and governance conversions. Full record, per-key disposition and clearing design at the end of the Worker blocker graph section), governance-ingestion |
+| Hybrid (package installer, platform-built option bundle) | 2 | trace (**CONVERTED 2026-09-02 after (g3)–(g7); `apps/worker` mounts all 29 byte-frozen `trace_processing` keys with no named absence, and `platform/app` lost the trace installer registration at 0 insertions. The record below is the HALT it replaces, kept because the wave-order correction it forced still governs the four gated conversions.** Steps (a)-(f) and the three named absences all landed and every staged composition is capability-tested, but `trace_processing`'s 29 byte-frozen routing keys are all-or-nothing and fourteen do not route from this process. Two groups are the halt: the PIPELINE DEFINITION was never in the census — `EventingTracePipelineAdapter` needs `ioExtraction`, `mediaReferences`, `modelCosts` and `prepareEventForProjection`, whose four implementations are 1,199 un-harvested platform lines, and the two modules that register the keys are platform's `AppTraceProjectionsAdapter` + `createTraceProcessingPipeline`; and `recordSpan`'s four staged ports each take a capability service by parameter, none of the six constructible here — `DataPrivacyService` and `ModelProviderService` both require `ProjectService`, which is shared prerequisite (1). THE WAVE ORDER INVERTS: ProjectService wave now precedes Trace. Three more keys have bounded gaps — `trackedEventSync`'s `getApp()`, the coding-agent normalized-span read step (c) handed forward, `datasetNormalize`'s unbuilt composition — and three belong to the automation and governance conversions. Full record, per-key disposition and clearing design at the end of the Worker blocker graph section), governance-ingestion |
 | Synthesized wrapper (platform builds, worker receives) | 7 | automation (blocked: subscriber:pm:triggerSettlement is in the byte-frozen registry and its notifyDigest intent IS outbound mail — the join-request wall, reached three ways: settlement digests, AutomationRunawayPort.sendLimitEmail, AutomationTestFirePort. Clearing: the packaged mail capability, then unsubscribe/no-reply + the four delivery transports + PrismaScheduledJobStore + triggerFilter.matcher behind the ports that already exist, OTel twins for four prom-client counters, eight WorkerConfig leaves — and persistMatch puts Annotation/Dataset/Trace services on the critical path, so it converts with the trace vertical, not before), evaluation (blocked twice: command:executeEvaluation reaches EvaluationExecutionService — 676 lines over ~2.4k more platform-only lines including tracesMapping (1,414) — a platform service graph, not the composable langevals HTTP client; and subscriber:graphTriggerActivity inherits automation's mail wall via evaluateGraphTrigger. The other three deps ARE reachable — EvaluationRunStore demands exactly three packaged methods, both analytics stores compose on AnalyticsAdapter. Clearing: automation's clearing, a worker-reachable TraceService, then the evaluator engine behind EvaluationExecutionPort), governance-events (blocked with gateway-spend), gateway-spend (blocked), scenario (blocked three ways, surveyed 2026-09-02: the execute intent reaches the in-process child-process pool whose runner only the App connects — clearing needs scenario-child-process.ts out of platform and the prefetcher's nine services worker-composable; traceSummaryStore comes from the unconverted Trace pipeline — dissolves when Trace converts, so TRACE PRECEDES SCENARIO in wave order; deriveScenarioRoleMetrics was recorded as the App's per-project span-cost matching; **(g1) surveyed it and that is wrong — it IS the static-catalog trick**, `computeSpanCost` reaches `getStaticModelCosts()` and no database, per-project overrides belong to record-time enrichment, and `deriveScenarioRoleMetricsFromSpans` was already trace-server's. No `ScenarioRoleMetricsPort` is needed and none was added; what remains of this blocker is the SPAN READER `getNormalizedSpansByTraceId`, which travels with (g3). Six of nine deps compose today; the unused simulations field should delete with the conversion), langy-conversation (blocked twice, nine of eleven deps compose: the title generator needs getVercelAIModel's model-resolution cascade worker-reachable — harvest it into model-provider-server with explicit params, platform copy stays frozen; the session-key mint needs ApiKeyService which needs ProjectService. Preparation pieces named: ClickHouse analytics sink twin, OTel dispatch metrics twin, and a shared RedisTenantBroadcastAdapter both scenario and langy need as one frozen twin), sso-connection (blocked: teardown drags ScimService whose composition needs the better-auth instance — clearing split: ScimTokenRevocationPort over the existing repository method + the lifecycle call, then harvest SsoConnectionLedgerWriter with injected store/sender), |
 | Riders (platform production code inside the mapper) | 0 | SaaS `globalProjections` EXTRACTED (`18c28be00e` — the wall was thinner than mapped: routing already packaged, the tenant directory answers an organization id as a tenant of itself, so the worker needed only the IS_SAAS deployment leaf; meter pair harvested to enterprise billing, gated on the worker's own leaf, refusing to compose SaaS without a reporting sender). Historical record follows: SaaS `globalProjections` (billing meter projection + dispatch subscriber). **Extraction attempted 2026-09-02 and reverted: unreachable at zero platform insertions.** The worker cannot build the pair — it has no `isSaas` leaf in `WorkerConfig`, and the meter's store writes through the organization-keyed ClickHouse client (`getClickHouseClientForOrganization`, billing routes private instances to their own cluster) plus the Redis-cached `resolveOrganizationId` directory, all platform-owned — so the mapper would have to gain port-passing lines. Sequencing instead: (1) package an organization-keyed ClickHouse/store seam and the org directory the worker can compose (the Redis cache is shared state, so both graphs read the same keys); (2) give `WorkerConfig` a deployment leaf; then the mapper's whole conditional spread deletes as a pure deletion. Until then the rider stays platform-built — it converts with the endgame either way. **gateway-spend + governance-events clearing order after 18c28be00e shrinks to three steps: (1) an all-instance ClickHouse directory (no organization id names the shared instance — needs a packaged managed-client factory or it stays with the endgame), (2) packaged plan source over the new deployment leaf, (3) webhook deliveryLog/destinations harvest + debit-path split. Original mapping: they hit the wall three ways (2026-09-02, survey in `3d6eba224f`): settlement needs an org-keyed ClickHouse instance directory, webhook delivery needs the isSaas leaf, the debit graph needs Project/Evaluator/Monitor or a false-coupling split of AppGatewayGovernancePort; both process managers are in the byte-frozen job registry so no half-mount exists. Clearing order: (1) package the org-keyed instance directory (also clears the billing rider), (2) WorkerConfig deployment leaf + packaged plan source, (3) harvest webhooks deliveryLog/destinations into enterprise-webhook-server, (4) split the debit path behind a narrow port.** |
 
