@@ -11,6 +11,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResultsTab } from "../results/ResultsTab";
@@ -102,11 +103,14 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
 }));
 
+/** The address the page writes, which is where the period is held. */
+const mockPush = vi.hoisted(() => vi.fn());
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     asPath: routerState.asPath,
-    push: vi.fn(),
+    push: mockPush,
     isReady: true,
   }),
 }));
@@ -302,7 +306,7 @@ describe("the Results tab loading gate", () => {
   describe("given a project with no run plan and no run inside the window", () => {
     describe("when the Results tab is opened", () => {
       /** @scenario "The empty state of the tab offers a wider period" */
-      it("offers the next wider period", () => {
+      it("widens the window to ninety days when the offer is taken", async () => {
         routerState.query = { project: "test-project", path: ["results"] };
         routerState.asPath = "/test-project/agent-testing/results";
         mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
@@ -310,8 +314,17 @@ describe("the Results tab loading gate", () => {
         render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
         expect(screen.getByText("No runs yet")).toBeInTheDocument();
-        expect(screen.getByTestId("widen-period-button")).toHaveTextContent(
-          "Show the last 90 days",
+        const widen = screen.getByTestId("widen-period-button");
+        expect(widen).toHaveTextContent("Show the last 90 days");
+
+        await userEvent.click(widen);
+
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({ period: "90d" }),
+          }),
+          undefined,
+          { shallow: true },
         );
       });
     });
