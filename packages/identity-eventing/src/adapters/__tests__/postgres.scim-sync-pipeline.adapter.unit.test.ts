@@ -41,7 +41,7 @@ function foldedState(): ScimSyncFoldState {
     scimSyncId: SYNC,
     connectionId: CONNECTION,
     organizationId: ORGANIZATION,
-    state: "ACTIVE",
+    state: "SYNCING",
     lastPushedAtMs: 1_700_000_000_000,
     lastFailure: null,
     deadLetters: [],
@@ -108,7 +108,7 @@ describe("PostgresScimSyncPipelineAdapter", () => {
         id: SYNC,
         connectionId: CONNECTION,
         organizationId: ORGANIZATION,
-        state: "ACTIVE",
+        state: "SYNCING",
         lastEventId: "evt_1",
         // Business time from the events, never `now()` — a replay has to
         // rebuild the identical row.
