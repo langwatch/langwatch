@@ -27,8 +27,12 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_session_events
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Plain String, never LowCardinality: branch names are high-cardinality (one
+-- per task, often per agent run), the same reasoning GitBranch carries in
+-- 00075. The three repository columns above stay LowCardinality, which is what
+-- coding_agent_sessions gives them.
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_session_events
-    ADD COLUMN IF NOT EXISTS Branch LowCardinality(String) DEFAULT '' CODEC(ZSTD(1));
+    ADD COLUMN IF NOT EXISTS Branch String DEFAULT '' CODEC(ZSTD(1));
 -- +goose StatementEnd
 
 -- +goose Down
