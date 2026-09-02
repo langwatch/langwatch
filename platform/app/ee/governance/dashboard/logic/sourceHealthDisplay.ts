@@ -62,34 +62,8 @@ export function sourceBadge({
 }
 
 /**
- * The line under a broken source: how far back the numbers can be trusted.
- *
- * Returns null while the source is healthy, and null when it has never
- * pulled successfully -- there is no "since" to name in either case, and the
- * awaiting-first-event badge already covers the second.
- *
- * Disabled is checked first, for the reason the badge checks it first: a
- * source nobody asked to run has not "stopped pulling". Retained failures
- * from before it was switched off would otherwise put an outage notice under
- * a source whose badge, correctly, reads Disabled.
+ * Re-exported from the health rule it belongs with. The badge and the cost
+ * screen ask the same question, and the cost service cannot import this
+ * module — it brings icons with it.
  */
-export function noDataSinceNotice({
-  status,
-  errorCount,
-  lastSuccessAt,
-}: {
-  status: string;
-  errorCount: number;
-  lastSuccessAt: Date | string | null;
-}): { lastSuccessIso: string } | null {
-  if (status === "disabled") return null;
-  if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "healthy") {
-    return null;
-  }
-  if (lastSuccessAt === null) return null;
-  const iso =
-    typeof lastSuccessAt === "string"
-      ? lastSuccessAt
-      : lastSuccessAt.toISOString();
-  return { lastSuccessIso: iso };
-}
+export { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";

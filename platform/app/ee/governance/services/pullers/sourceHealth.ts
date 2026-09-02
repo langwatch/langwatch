@@ -48,3 +48,40 @@ export function isDayCoveredByPull({
 }): boolean {
   return lastSuccessfulPullMs !== null && dayStartMs <= lastSuccessfulPullMs;
 }
+
+/**
+ * The line under a broken source: how far back the numbers can be trusted.
+ *
+ * Returns null while the source is healthy, and null when it has never
+ * pulled successfully -- there is no "since" to name in either case, and the
+ * awaiting-first-event badge already covers the second.
+ *
+ * Disabled is checked first, for the reason the badge checks it first: a
+ * source nobody asked to run has not "stopped pulling". Retained failures
+ * from before it was switched off would otherwise put an outage notice under
+ * a source whose badge, correctly, reads Disabled.
+ *
+ * This lives beside the health rule rather than with the badge that first
+ * needed it, because the cost screen asks the same question about the same
+ * sources (ADR-128 s4a) and must not import a module that pulls in icons.
+ */
+export function noDataSinceNotice({
+  status,
+  errorCount,
+  lastSuccessAt,
+}: {
+  status: string;
+  errorCount: number;
+  lastSuccessAt: Date | string | null;
+}): { lastSuccessIso: string } | null {
+  if (status === "disabled") return null;
+  if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "healthy") {
+    return null;
+  }
+  if (lastSuccessAt === null) return null;
+  const iso =
+    typeof lastSuccessAt === "string"
+      ? lastSuccessAt
+      : lastSuccessAt.toISOString();
+  return { lastSuccessIso: iso };
+}
