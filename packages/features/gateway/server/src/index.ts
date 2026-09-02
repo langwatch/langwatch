@@ -112,7 +112,10 @@ export {
   GatewayUsageTrpcApi,
   type GatewayUsageTrpcContext,
 } from "./transport/api-trpc/gateway-usage.api";
-export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./transport/api-trpc/virtual-key.api";
+export {
+  VirtualKeyTrpcApi,
+  type VirtualKeyTrpcContext,
+} from "./transport/api-trpc/virtual-key.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound REST
@@ -131,3 +134,84 @@ export {
   type GatewaySpendWebhookEvents,
 } from "./transport/api-rest/gateway-spend.api";
 export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api";
+
+/**
+ * The gateway control plane, moved out of the retired application.
+ *
+ * Virtual keys and their scope authorization, the budget overview and the
+ * budgets applicable to one target, guardrail evaluation, the realtime voice
+ * session record, the ElevenLabs credential read, and the configuration
+ * bundle the Go data plane long-polls for — plus the four ports those need
+ * that belong to other features or to the deployment.
+ */
+export {
+  VirtualKeyService,
+  type CreateVirtualKeyInput,
+  type CreatedVirtualKey,
+} from "./services/virtual-key.service";
+export {
+  assertActorCanManageAllScopes,
+  assertActorCanOperateOnAnyScope,
+  assertCanManageAllScopes,
+  assertCanOperateOnAnyScope,
+  loadMembershipSet,
+  type ActorContext,
+  type MembershipSet,
+  type RBACContext,
+  type Scope,
+  type VirtualKeyActor,
+  type VirtualKeyReader,
+  type VirtualKeySessionActor,
+} from "./services/virtual-key-authorization.service";
+export { BudgetOverviewService } from "./services/gateway-budget-overview.service";
+export {
+  resolveApplicableBudgetsForTarget,
+  type ApplicableBudget,
+} from "./services/gateway-applicable-budgets.service";
+export {
+  GatewayConfigMaterialiser,
+  buildCredentials,
+} from "./services/gateway-config-materialisation.service";
+export {
+  getElevenLabsApiCredential,
+  getElevenLabsWebhookSecret,
+  ELEVENLABS_DEFAULT_BASE_URL,
+  ELEVENLABS_WEBHOOK_SECRET_KEY,
+  type ElevenLabsApiCredential,
+  type ElevenLabsCredentialCollaborators,
+  type ElevenLabsWebhookSecret,
+} from "./services/gateway-elevenlabs-credential.service";
+export {
+  closeAndConfirmRealtimeSession,
+  correlateRealtimeSession,
+  expireStaleRealtimeSessions,
+  matchRealtimeSession,
+  releaseRealtimeSession,
+  reportRealtimeSessionUsage,
+  reserveRealtimeSession,
+  REALTIME_OPEN_SESSION_WINDOW_MS,
+  type GatewayRealtimeSessionCollaborators,
+  type ReserveInput,
+  type ReserveResult,
+} from "./services/gateway-realtime-session.service";
+export { GatewaySpendScopeAdapter } from "./adapters/gateway-spend-scope.adapter";
+export {
+  GatewayJwtAdapter,
+  type GatewayJwtClaims,
+  type GatewayJwtSubject,
+} from "./adapters/jwt.gateway-token.adapter";
+export { withTierFallthrough } from "./adapters/gateway-model-tier-fallthrough.adapter";
+export { declaredModelsForProvider } from "./adapters/gateway-provider-model-catalog.adapter";
+export { recordRealtimeSessionSpan } from "./adapters/gateway-realtime-session-span.adapter";
+export {
+  GatewayGovernanceSignalsPort,
+  type GatewayVirtualKeyLifecycleSignal,
+} from "./ports/gateway-governance-signals.port";
+export { GatewayModelProviderCredentialsPort } from "./ports/gateway-model-provider-credentials.port";
+export {
+  GatewayScopePermissionsPort,
+  type GatewayPermissionScope,
+} from "./ports/gateway-scope-permissions.port";
+export { GatewaySpanIngestionPort } from "./ports/gateway-span-ingestion.port";
+export { GatewaySpendConfirmationPort } from "./ports/gateway-spend-confirmation.port";
+export { GatewaySpendRatingPort } from "./ports/gateway-spend-rating.port";
