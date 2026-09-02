@@ -489,7 +489,11 @@ async function writePulledEvents({
       "skipped pulled events naming an erased identifier",
     );
   }
-  await routeConversationsToTraceDestination({ events, source });
+  // `kept`, not `events`. This is the export that leaves our storage entirely
+  // — it writes the conversation into the customer's own trace project, with
+  // the provider's user id on it and the question and answer in the spans. A
+  // suppressed person is suppressed here most of all.
+  await routeConversationsToTraceDestination({ events: kept, source });
 }
 
 /**
