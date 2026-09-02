@@ -29,7 +29,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 ## Control plane routes
 
-The gateway signs every call to the control plane with HMAC-SHA256 over the shared secret `LW_GATEWAY_INTERNAL_SECRET`. An unsigned or missigned call is refused.
+The gateway signs every call to the control plane with HMAC-SHA256 over the shared secret `LW_GATEWAY_INTERNAL_SECRET`. An unsigned or incorrectly signed call is refused.
 
 | Route | Method | Purpose |
 |---|---|---|

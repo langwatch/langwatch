@@ -43,7 +43,7 @@ Entries are sorted by `id` and deduplicated. `data` is always an array, empty ra
 Three sources, filtered to what the key can actually call:
 
 1. **Model aliases** on the key, under the alias name. An alias whose target the key cannot dispatch to is left out.
-2. **Allowlist entries**, when the key sets `models_allowed`. The allowlist is authoritative, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out and the concrete ids come from discovery instead.
+2. **Allowlist entries**, when the key sets `models_allowed`. An allowlist of literal model ids is authoritative on its own, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out of the list, and an allowlist that holds one runs discovery to get the concrete ids behind the pattern.
 3. **Discovered models** from every credential the key can reach, read from each provider's own catalog.
 
 Every candidate is then dropped when the key's allowlist or its policy rules refuse it, and when the key holds no credential for the provider that would serve it. A listed model is one a request for it can reach.

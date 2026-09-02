@@ -98,7 +98,7 @@ dig +short gateway.acme.com
 openssl s_client -connect gateway.acme.com:443 -servername gateway.acme.com </dev/null 2>&1 \
   | grep -E 'subject=|issuer='
 curl -sS https://gateway.acme.com/health
-curl -sS https://gateway.acme.com/v1/models -H "Authorization: Bearer vk-lw-YOUR_VIRTUAL_KEY"
+curl -sS https://gateway.acme.com/v1/models -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
 ```
 
 The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}`. The `/v1/models` call returns `200` with the models your key can route to. Continue with the [post-install checklist](/ai-gateway/self-hosting/post-install-checklist).
@@ -135,6 +135,8 @@ gateway:
       service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
       service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 ```
+
+<Warning>`aws-load-balancer-backend-protocol: tcp` terminates TLS on the load balancer and forwards plain TCP to gateway port 5563, so the `Authorization` header that carries the virtual key crosses that hop without encryption. Use this only when the network between the load balancer and the pods already encrypts traffic, for example under a service mesh with mutual TLS. Otherwise keep the ingress path above, which terminates TLS inside the cluster.</Warning>
 
 Request the certificate first and publish the validation CNAME records ACM prints:
 

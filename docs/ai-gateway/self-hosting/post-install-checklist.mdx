@@ -31,6 +31,8 @@ Expected:
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Either add a selector for the probe pod to `ingressFrom`, or run this check through the ingress host instead of the in-cluster service name.
+
 ## 3. The gateway reaches the control plane
 
 ```bash

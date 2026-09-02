@@ -12,7 +12,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 |---|---|---|
 | `/healthz` | `livenessProbe` | The process answers |
 | `/readyz` | `readinessProbe` | The pod is not draining |
-| `/startupz` | `startupProbe` | Startup is complete. This is true before the listener opens, so the endpoint is 200 from the first request |
+| `/startupz` | `startupProbe` | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health` | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds |
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |

@@ -47,7 +47,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -d '{"model": "fast", "messages": [{"role": "user", "content": "Summarize this ticket."}]}'
 ```
 
-The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier as a model of its own, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. Model ids in that list carry no provider prefix.
+The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier that resolves to a model, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. A tier with no target and no default model is not listed. Model ids in that list carry no provider prefix.
 
 Tiers and name mappings are the same mechanism on the wire: an alias the gateway looks up by exact name. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -83,7 +83,7 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
 </Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `403` and `"code": "policy_violation"`.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `403` and `"code": "policy_violation"`. A model the key cannot reach at all answers `400 model_not_allowed` instead, which tests the key rather than the policy.
   </Step>
 </Steps>
 

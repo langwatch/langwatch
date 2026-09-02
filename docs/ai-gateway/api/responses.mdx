@@ -61,7 +61,8 @@ A codex credential serves `/v1/responses` and, translated, `/v1/messages`. It do
 | `stream` | Read to choose the streaming path. On the codex lane, pinned on towards the backend; a non-streaming call still gets one JSON body. |
 | `store` | Forwarded on OpenAI and Azure. Pinned off on the codex lane. |
 | `previous_response_id`, `background`, `top_logprobs`, `max_tool_calls` | Refused on the codex lane with `400 unsupported_parameter`: the backend cannot honor them and dropping them would change what the call returns. |
-| `max_output_tokens`, `temperature`, `top_p`, `truncation`, `metadata`, `service_tier`, `user`, `safety_identifier`, `prompt_cache_options`, `prompt_cache_retention`, and any field outside the table | Dropped on the codex lane and reported on `X-LangWatch-Params-Dropped`. |
+| `input`, `instructions`, `stream_options`, `include`, `tools`, `tool_choice`, `parallel_tool_calls`, `reasoning`, `text`, `prompt_cache_key` | Forwarded to the codex backend as written. |
+| `max_output_tokens`, `temperature`, `top_p`, `truncation`, `metadata`, `service_tier`, `user`, `safety_identifier`, `prompt_cache_options`, `prompt_cache_retention`, and any other field | Dropped on the codex lane and reported on `X-LangWatch-Params-Dropped`. |
 | `drop_tuning_params` | Consumed by the gateway. `false` turns every codex-lane drop into `400 unsupported_parameter`. |
 
 The full codex table is on [Parameter mapping](/ai-gateway/parameter-mapping#the-codex-lane). On OpenAI and Azure the body is not read beyond `model` and `stream`.

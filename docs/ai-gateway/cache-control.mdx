@@ -124,7 +124,7 @@ Archive the rule from the row menu on the Cache Rules page. The next change-feed
 
 - A cache mode set on a virtual key's own configuration is not applied. The gateway reads cache rules and the provider default only.
 - Rules change the request body only. The gateway has no cache of its own; the provider decides whether a cached prefix is served.
-- OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; the response header and span attributes still record which rule fired.
+- OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; `X-LangWatch-Cache-Mode` still reports the action that fired.
 - The provider default (`auto`) never overrides a client that manages its own breakpoints. On `/v1/messages` any `cache_control` in the body disables it; on `/v1/chat/completions` only a top-level `cache_control` does, because message-level markers do not survive the translation to the Anthropic shape.
 
 **Also check:** [Virtual Keys](/ai-gateway/virtual-keys) for tags and the display prefix, [Observability](/ai-gateway/observability) for the span attributes, [Audit](/ai-gateway/audit) for the rule change events.

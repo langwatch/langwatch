@@ -72,18 +72,21 @@ curl -sS $LW/api/gateway/v1/virtual-keys \
 # Hard cap: blocks at the limit
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-hard-cap" \
   -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme hard cap", "window": "manual", "limit_usd": "500", "on_breach": "block"}'
 
 # Soft cap: warns without blocking (a second, lower budget)
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-soft-cap" \
   -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
 # Per-end-user allowance: one template covers every end user, current and new
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-per-user-cap" \
   -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme per-user cap", "window": "month", "limit_usd": "25", "on_breach": "block"}'
 ```

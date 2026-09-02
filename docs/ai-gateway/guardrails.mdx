@@ -79,7 +79,7 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
 </Frame>
   </Step>
   <Step title="Attach it to a virtual key">
-    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request** or **Post-response** and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request**, **Post-response** or **Stream chunk**, and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
 
     <Frame caption="The Guardrails section of a key's detail page, with the request guardrail ticked.">
   <img src="/images/ai-gateway/vk-guardrails-attach.png" alt="The Guardrails section of a virtual key detail page with Pre-request and Post-response groups and the Save guardrails button" />
@@ -87,6 +87,8 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
   </Step>
   <Step title="Verify">
     Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.
+
+    A stream chunk guardrail has no error response to read. Send a streaming request whose output the evaluator rejects: the stream ends early at the rejected chunk, with the usual `data: [DONE]` frame and no error frame.
   </Step>
 </Steps>
 

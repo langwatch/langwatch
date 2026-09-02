@@ -6,7 +6,7 @@ sidebarTitle: Observability
 
 ## Where each signal lands
 
-Every request through `/v1` produces three things you can read.
+Every request through `/v1` produces three things you can read. The one exception is on the trace span: a successful chat or messages call that returns no output, no cost and no completion tokens is dropped before export.
 
 | Signal | Where you read it |
 |---|---|

@@ -69,7 +69,7 @@ OpenAI-compatible providers (OpenAI, Azure OpenAI, custom OpenAI-compatible endp
 
 | Header | When present | Value |
 |---|---|---|
-| `X-LangWatch-Gateway-Request-Id` | Every dispatched request | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets. |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets. |
 | `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
 | `X-LangWatch-Fallback-Count` | A credential failed before another answered | The number of failed attempts. |
 | `X-LangWatch-Budget-Warning` | A budget is past its warning threshold | `<scope>:<percent used>`, or `<scope>/<provider id>:<percent>` for a provider-filtered budget. Comma separated. |

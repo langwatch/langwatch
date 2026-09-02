@@ -84,7 +84,7 @@ CONTENT=$(jq -r '.choices[0].message.content' "$BODY")
 echo "OK: request_id=$REQUEST_ID"
 ```
 
-Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/model`, for example `anthropic/claude-sonnet-4-5` or `azure/<your deployment name>`. See [Model naming](/ai-gateway/providers/overview).
+Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/model`, for example `anthropic/claude-sonnet-4-5` or `azure/<your deployment name>`. See [Model naming](/ai-gateway/model-naming).
 
 ## GitHub Actions
 

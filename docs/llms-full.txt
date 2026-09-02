@@ -1612,7 +1612,7 @@ The response is JSON with `text`, plus the duration or token usage the provider 
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
 
 ## Streaming
 
@@ -1706,7 +1706,7 @@ OpenAI-compatible providers (OpenAI, Azure OpenAI, custom OpenAI-compatible endp
 
 | Header | When present | Value |
 |---|---|---|
-| `X-LangWatch-Gateway-Request-Id` | Every dispatched request | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets. |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id. It is the `gateway_request_id` on spend events and the id to quote in support tickets. |
 | `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
 | `X-LangWatch-Fallback-Count` | A credential failed before another answered | The number of failed attempts. |
 | `X-LangWatch-Budget-Warning` | A budget is past its warning threshold | `<scope>:<percent used>`, or `<scope>/<provider id>:<percent>` for a provider-filtered budget. Comma separated. |
@@ -1929,7 +1929,7 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
 
 ## Streaming
 
@@ -2081,7 +2081,7 @@ ALL /v1beta/*
 x-goog-api-key: vk-lw-<ULID>
 ```
 
-Every path under `/v1beta` is forwarded to Google as written: method, path, query string, headers and body. The gateway does not translate the body and returns Google's answer, headers included, unchanged. `Authorization: Bearer <key>` works in place of `x-goog-api-key`.
+Every path under `/v1beta` is forwarded to Google as written: method, path, query string and body. The gateway does not translate the body and returns Google's answer, headers included. It removes your client credential and the hop-by-hop headers, sends Google's own credential in their place, and adds its own response headers. `Authorization: Bearer <key>` works in place of `x-goog-api-key`.
 
 This is the route for gemini-cli and the `@google/genai` SDK. Set `GOOGLE_GEMINI_BASE_URL=https://gateway.langwatch.ai` and use the virtual key as the Gemini API key; see [Gemini CLI](/coding-agents/gemini-cli).
 
@@ -2113,7 +2113,7 @@ Only a Gemini or a Vertex credential. The body and the path are Google's own, so
 
 | Part of the request | What the gateway does |
 |---|---|
-| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside the routing policy or its restrictions: `403 policy_violation` with the message `model "<model>" is not in allowlist`. Outside the key's provider access: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
+| The model in the path (`/models/{model}:{action}`) | Read as the model. Resolved through the key's allowlist, policy rules and routing policy. Outside the routing policy: `403 policy_violation` with the message `model "<model>" is not in allowlist`. Refused by a restriction on the policy: `403 policy_violation` with the message `model "<model>" is blocked by policy`. Outside the key's provider access: `400 model_not_allowed`. A path with no `/models/{model}` segment answers `400 missing_model`. |
 | Body | Forwarded as written. No parameter policy applies, and `drop_tuning_params` is not read. |
 | Query string | Forwarded as written. |
 | `Authorization`, `x-api-key`, `x-goog-api-key` | Removed. The gateway adds the provider's own key. |
@@ -2124,11 +2124,11 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
 
 ## Streaming
 
-A path ending in `:streamGenerateContent` or `:streamGenerateAnswer` streams. Google's SSE bytes reach the client exactly as Google framed them, with no `data: [DONE]` trailer and no re-wrapping. Pass the query string Google expects for SSE, for example `?alt=sse`, as you would against Google directly.
+A path ending in `:streamGenerateContent` or `:streamGenerateAnswer` streams. Google's own SSE frames reach the client exactly as Google framed them, with no `data: [DONE]` trailer and no re-wrapping. A failure after the stream opens adds one terminal `event: error` frame that the gateway writes itself. Pass the query string Google expects for SSE, for example `?alt=sse`, as you would against Google directly.
 
 ```bash
 curl "https://gateway.langwatch.ai/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse" \
@@ -2145,7 +2145,7 @@ A failure after the stream opened ends it with an `event: error` frame; see [Err
 |---|---|---|
 | `model_provider_not_bound` | 400 | The key has no Gemini and no Vertex credential. |
 | `missing_model` | 400 | The path carries no `/models/{model}` segment. |
-| `policy_violation` | 403 | The model is outside the routing policy or one of its restrictions. Same shape as on every other route. |
+| `policy_violation` | 403 | The model is outside the routing policy (`is not in allowlist`) or refused by one of its restrictions (`is blocked by policy`). Same shape as on every other route. See [Policy rules](/ai-gateway/policy-rules). |
 | `model_not_allowed` | 400 | The model is outside the key's allowlist or provider access. |
 
 Google's own errors are forwarded with Google's status, body and headers, under `X-LangWatch-Provider`. The full table is on [Errors](/ai-gateway/api/errors).
@@ -2293,11 +2293,11 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
 
 ## Streaming
 
-Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing. The frames reach the client as the provider wrote them, and there is no `data: [DONE]` trailer:
+Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing, and there is no `data: [DONE]` trailer. On an Anthropic-compatible provider the frames reach the client as the provider wrote them. On a translated lane the gateway builds the Anthropic events itself from the provider's own stream. A failure after the stream opens adds one terminal `event: error` frame:
 
 ```
 event: message_start
@@ -2378,7 +2378,7 @@ Entries are sorted by `id` and deduplicated. `data` is always an array, empty ra
 Three sources, filtered to what the key can actually call:
 
 1. **Model aliases** on the key, under the alias name. An alias whose target the key cannot dispatch to is left out.
-2. **Allowlist entries**, when the key sets `models_allowed`. The allowlist is authoritative, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out and the concrete ids come from discovery instead.
+2. **Allowlist entries**, when the key sets `models_allowed`. An allowlist of literal model ids is authoritative on its own, so no provider catalog is queried. A wildcard entry such as `claude-haiku-*` is a pattern rather than a model name, so it is left out of the list, and an allowlist that holds one runs discovery to get the concrete ids behind the pattern.
 3. **Discovered models** from every credential the key can reach, read from each provider's own catalog.
 
 Every candidate is then dropped when the key's allowlist or its policy rules refuse it, and when the key holds no credential for the provider that would serve it. A listed model is one a request for it can reach.
@@ -2630,7 +2630,8 @@ A codex credential serves `/v1/responses` and, translated, `/v1/messages`. It do
 | `stream` | Read to choose the streaming path. On the codex lane, pinned on towards the backend; a non-streaming call still gets one JSON body. |
 | `store` | Forwarded on OpenAI and Azure. Pinned off on the codex lane. |
 | `previous_response_id`, `background`, `top_logprobs`, `max_tool_calls` | Refused on the codex lane with `400 unsupported_parameter`: the backend cannot honor them and dropping them would change what the call returns. |
-| `max_output_tokens`, `temperature`, `top_p`, `truncation`, `metadata`, `service_tier`, `user`, `safety_identifier`, `prompt_cache_options`, `prompt_cache_retention`, and any field outside the table | Dropped on the codex lane and reported on `X-LangWatch-Params-Dropped`. |
+| `input`, `instructions`, `stream_options`, `include`, `tools`, `tool_choice`, `parallel_tool_calls`, `reasoning`, `text`, `prompt_cache_key` | Forwarded to the codex backend as written. |
+| `max_output_tokens`, `temperature`, `top_p`, `truncation`, `metadata`, `service_tier`, `user`, `safety_identifier`, `prompt_cache_options`, `prompt_cache_retention`, and any other field | Dropped on the codex lane and reported on `X-LangWatch-Params-Dropped`. |
 | `drop_tuning_params` | Consumed by the gateway. `false` turns every codex-lane drop into `400 unsupported_parameter`. |
 
 The full codex table is on [Parameter mapping](/ai-gateway/parameter-mapping#the-codex-lane). On OpenAI and Azure the body is not read beyond `model` and `stream`.
@@ -2747,7 +2748,7 @@ Every virtual key and every budget detail page has an **Audit history** button. 
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
-For a scheduled export into a SIEM, read the `AuditLog` table in the application Postgres database directly. Filter on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` to select gateway rows, and join `User` on `userId` for the actor. There is no REST endpoint for reading audit rows.
+For a scheduled export into a SIEM, read the `AuditLog` table in the application Postgres database directly. Filter on `organizationId` first, because that column is what keeps one organization's rows out of another's, then on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` to select gateway rows, and join `User` on `userId` for the actor. There is no REST endpoint for reading audit rows. For a governance event feed with its own permission check, see [OCSF export](/ai-gateway/governance/ocsf-export), which carries trace and anomaly events rather than these audit rows.
 
 ## Retention and integrity
 
@@ -3461,7 +3462,7 @@ Archive the rule from the row menu on the Cache Rules page. The next change-feed
 
 - A cache mode set on a virtual key's own configuration is not applied. The gateway reads cache rules and the provider default only.
 - Rules change the request body only. The gateway has no cache of its own; the provider decides whether a cached prefix is served.
-- OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; the response header and span attributes still record which rule fired.
+- OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; `X-LangWatch-Cache-Mode` still reports the action that fired.
 - The provider default (`auto`) never overrides a client that manages its own breakpoints. On `/v1/messages` any `cache_control` in the body disables it; on `/v1/chat/completions` only a top-level `cache_control` does, because message-level markers do not survive the translation to the Anthropic shape.
 
 **Also check:** [Virtual Keys](/ai-gateway/virtual-keys) for tags and the display prefix, [Observability](/ai-gateway/observability) for the span attributes, [Audit](/ai-gateway/audit) for the rule change events.
@@ -3739,7 +3740,7 @@ CONTENT=$(jq -r '.choices[0].message.content' "$BODY")
 echo "OK: request_id=$REQUEST_ID"
 ```
 
-Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/model`, for example `anthropic/claude-sonnet-4-5` or `azure/<your deployment name>`. See [Model naming](/ai-gateway/providers/overview).
+Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/model`, for example `anthropic/claude-sonnet-4-5` or `azure/<your deployment name>`. See [Model naming](/ai-gateway/model-naming).
 
 ## GitHub Actions
 
@@ -3833,7 +3834,9 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back | The secret is publicly exposed |
 | Rotate | Keeps working for 24 hours, then fails | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak at once. Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
+Disable and revoke contain the leak as soon as the change reaches the gateway. The control plane writes a change event, and the gateway stops serving the key on the next request after it picks the event up on its change feed. A gateway that cannot reach the control plane keeps serving the cached key configuration until its 60 second configuration lifetime runs out, so plan for that window when you report containment.
+
+Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
 All three keep the key's id, so its traces, its audit rows and its spend stay attributable.
 
@@ -4430,18 +4433,21 @@ curl -sS $LW/api/gateway/v1/virtual-keys \
 # Hard cap: blocks at the limit
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-hard-cap" \
   -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme hard cap", "window": "manual", "limit_usd": "500", "on_breach": "block"}'
 
 # Soft cap: warns without blocking (a second, lower budget)
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-soft-cap" \
   -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
 # Per-end-user allowance: one template covers every end user, current and new
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: signup-acme-4171-per-user-cap" \
   -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."}, "external_id": "acme-4171",
        "name": "acme per-user cap", "window": "month", "limit_usd": "25", "on_breach": "block"}'
 ```
@@ -5454,7 +5460,7 @@ Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create 
 
 Open **AI Gateway > Budgets** (`/gateway/budgets`) and create a budget. A budget caps spend on a scope: the organization, a team, a project, one virtual key, one member, or a group. Every request is checked against every budget that applies to it.
 
-Set at least one budget before you tell members to sign in. A key with no budget still serves traffic, and the gateway has no limit to refuse it at.
+Set at least one budget before you tell members to sign in. A key with no budget still serves traffic, and no limit stops it.
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the scopes, the windows and the breach behavior.
 
@@ -5522,7 +5528,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 ## Control plane routes
 
-The gateway signs every call to the control plane with HMAC-SHA256 over the shared secret `LW_GATEWAY_INTERNAL_SECRET`. An unsigned or missigned call is refused.
+The gateway signs every call to the control plane with HMAC-SHA256 over the shared secret `LW_GATEWAY_INTERNAL_SECRET`. An unsigned or incorrectly signed call is refused.
 
 | Route | Method | Purpose |
 |---|---|---|
@@ -5675,6 +5681,8 @@ curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
 ```
 
 Replace `YOUR_SESSION_COOKIE` with the cookie of a browser session signed in as a user who holds `complianceExport:view`. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+
+<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. A cookie written on a command line lands in the shell history and in the process list of the host that runs the job. Read it from a secrets store into the environment of a scheduled job, never from a literal in a script, and rotate the session when the job host changes.</Warning>
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for what sets `anomalyAlertId`, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
@@ -5895,7 +5903,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
   -d '{"model": "fast", "messages": [{"role": "user", "content": "Summarize this ticket."}]}'
 ```
 
-The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier as a model of its own, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. Model ids in that list carry no provider prefix.
+The response reports the model that served the request in `model`, and `extra_fields.model_requested` holds the model the tier resolved to. `GET /v1/models` on the key lists each tier that resolves to a model, with `owned_by` set to the provider the tier points at, next to the models of the policy's providers. A tier with no target and no default model is not listed. Model ids in that list carry no provider prefix.
 
 Tiers and name mappings are the same mechanism on the wire: an alias the gateway looks up by exact name. See [Model aliases](/ai-gateway/model-aliases).
 
@@ -5931,7 +5939,7 @@ See [Fallback chains](/ai-gateway/providers/fallback-chains) for what triggers t
 </Frame>
   </Step>
   <Step title="Verify">
-    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider the policy does not list and check for `403` and `"code": "policy_violation"`.
+    Send a request for `fast` through the key and read `model` in the response. Then request a model on a provider that the key's **Provider access** still lists but that the policy does not, and check for `403` and `"code": "policy_violation"`. A model the key cannot reach at all answers `400 model_not_allowed` instead, which tests the key rather than the policy.
   </Step>
 </Steps>
 
@@ -6028,7 +6036,7 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
 </Frame>
   </Step>
   <Step title="Attach it to a virtual key">
-    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request** or **Post-response** and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
+    Open the key's detail page under **AI Gateway, Virtual Keys** (`/gateway/virtual-keys/<id>`). In the **Guardrails** section, tick the guardrail under **Pre-request**, **Post-response** or **Stream chunk**, and click **Save guardrails**. The edit drawer has no guardrail field. Guardrails are project-scoped: the key must be scoped to that single project to attach them.
 
     <Frame caption="The Guardrails section of a key's detail page, with the request guardrail ticked.">
   <img src="/images/ai-gateway/vk-guardrails-attach.png" alt="The Guardrails section of a virtual key detail page with Pre-request and Post-response groups and the Save guardrails button" />
@@ -6036,6 +6044,8 @@ A realtime session mint (`POST /v1/realtime/client_secrets`, `GET /v1/convai/con
   </Step>
   <Step title="Verify">
     Send a request the evaluator rejects and check the response for `403` and `"code": "guardrail_blocked"`. Open the trace in Trace Explorer: the span records `error.type` as `guardrail_blocked`.
+
+    A stream chunk guardrail has no error response to read. Send a streaming request whose output the evaluator rejects: the stream ends early at the rejected chunk, with the usual `data: [DONE]` frame and no error frame.
   </Step>
 </Steps>
 
@@ -6293,7 +6303,7 @@ sidebarTitle: Observability
 
 ## Where each signal lands
 
-Every request through `/v1` produces three things you can read.
+Every request through `/v1` produces three things you can read. The one exception is on the trace span: a successful chat or messages call that returns no output, no cost and no completion tokens is dropped before export.
 
 | Signal | Where you read it |
 |---|---|
@@ -7254,8 +7264,9 @@ The window, the threshold and the open duration are gateway settings: `LW_GATEWA
 
 | Code | Status | Cause |
 |---|---|---|
-| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list, or a restriction on the policy refuses it. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
-| `model_not_allowed` | 400 | The model resolves to a provider the key's provider access excludes. |
+| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
+| `policy_violation` | 403 | A restriction on the policy refuses the model. The message names the model: `model "gemini-2.5-flash" is blocked by policy`. See [Policy rules](/ai-gateway/policy-rules). |
+| `model_not_allowed` | 400 | The model is outside the key's own model allowlist, or resolves to a provider the key's provider access excludes. |
 | `no_provider_configured` | 400 | The key reaches no provider at all. |
 | `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
 
@@ -8438,7 +8449,7 @@ The spend record is what budgets debit from. It holds the organization, project,
 
 The gateway does not write request or response bodies to its logs. The access log records the fields in the table above and no headers.
 
-Your client's auth headers never reach the provider. The gateway builds the upstream request itself and injects the real provider credential, and on the passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
+The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `Xi-Api-Key` is also accepted as a virtual-key header, and the passthrough lane forwards it, so send the virtual key on `Authorization` or `X-Goog-Api-Key` when you call `/v1beta`. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
 
 <Warning>One self-hosted debug switch overrides this. `LW_LOG_MESSAGE_BODY=1` writes the full request body of `/v1/messages` and `/v1/responses` to the gateway log at info level, including prompts. Use it to reproduce a provider rejection, then turn it off.</Warning>
 
@@ -8648,12 +8659,12 @@ Every gateway span carries the `langwatch.project_id` of the virtual key, so an 
 
 ## Debug
 
-Never set these on a production pod. Both write request content to the log.
+Never set these on a production pod. Each one puts request content somewhere a production deployment should not have it.
 
 | Var | Purpose |
 |---|---|
-| `LW_LOG_MESSAGE_BODY=1` | Logs every inbound `/v1/messages` and `/v1/responses` body at `info` level |
-| `LW_GATEWAY_OUTBOUND_PROXY` | `http://host:port` proxy for outbound provider traffic on OpenAI, Anthropic, Gemini and Azure. Bedrock uses the AWS SDK and ignores it |
+| `LW_LOG_MESSAGE_BODY=1` | Logs every inbound `/v1/messages` and `/v1/responses` body at `info` level, prompts included |
+| `LW_GATEWAY_OUTBOUND_PROXY` | `http://host:port` proxy for outbound provider traffic on OpenAI, Anthropic, Gemini and Azure. This does not add anything to the gateway log, but the proxy sees every request and records what its own configuration tells it to. Bedrock uses the AWS SDK and ignores it |
 
 ## Legacy aliases
 
@@ -8664,7 +8675,7 @@ Deployments that predate the canonical names can keep these. The canonical name 
 | `GATEWAY_LISTEN_ADDR` | `SERVER_ADDR` |
 | `GATEWAY_CONTROL_PLANE_URL` | `LW_GATEWAY_BASE_URL` |
 | `GATEWAY_LOG_LEVEL` | `LOG_LEVEL` |
-| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_OTLP_ENDPOINT` |
+| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
 
 ---
 
@@ -8770,7 +8781,7 @@ dig +short gateway.acme.com
 openssl s_client -connect gateway.acme.com:443 -servername gateway.acme.com </dev/null 2>&1 \
   | grep -E 'subject=|issuer='
 curl -sS https://gateway.acme.com/health
-curl -sS https://gateway.acme.com/v1/models -H "Authorization: Bearer vk-lw-YOUR_VIRTUAL_KEY"
+curl -sS https://gateway.acme.com/v1/models -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
 ```
 
 The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}`. The `/v1/models` call returns `200` with the models your key can route to. Continue with the [post-install checklist](/ai-gateway/self-hosting/post-install-checklist).
@@ -8807,6 +8818,8 @@ gateway:
       service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
       service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 ```
+
+<Warning>`aws-load-balancer-backend-protocol: tcp` terminates TLS on the load balancer and forwards plain TCP to gateway port 5563, so the `Authorization` header that carries the virtual key crosses that hop without encryption. Use this only when the network between the load balancer and the pods already encrypts traffic, for example under a service mesh with mutual TLS. Otherwise keep the ingress path above, which terminates TLS inside the cluster.</Warning>
 
 Request the certificate first and publish the validation CNAME records ACM prints:
 
@@ -8885,7 +8898,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 |---|---|---|
 | `/healthz` | `livenessProbe` | The process answers |
 | `/readyz` | `readinessProbe` | The pod is not draining |
-| `/startupz` | `startupProbe` | Startup is complete. This is true before the listener opens, so the endpoint is 200 from the first request |
+| `/startupz` | `startupProbe` | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health` | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds |
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |
@@ -9302,6 +9315,8 @@ Expected:
 ```
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
+
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Either add a selector for the probe pod to `ingressFrom`, or run this check through the ingress host instead of the in-cluster service name.
 
 ## 3. The gateway reaches the control plane
 
@@ -15422,6 +15437,7 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
 The wrapper starts Claude Code with `ANTHROPIC_BASE_URL` set to the gateway URL and `ANTHROPIC_AUTH_TOKEN` set to your virtual key, and removes `ANTHROPIC_API_KEY` from the environment, because Claude Code warns when both are set. Claude Code appends `/v1/messages` to the base URL itself, so set the base URL with no path. To route a plain `claude` run with a service virtual key, set the same two variables:
 
 ```bash
+unset ANTHROPIC_API_KEY
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
 export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 claude
@@ -16186,6 +16202,7 @@ The wrapper starts Gemini CLI with `GOOGLE_GEMINI_BASE_URL` set to the gateway U
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gateway.langwatch.ai"
 export GEMINI_API_KEY="vk-lw-..."
+export GOOGLE_API_KEY="vk-lw-..."
 gemini
 ```
 
@@ -17080,7 +17097,7 @@ keywords:
 
 
 
-This will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more.
+Each `npx langwatch` command will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more. Cursor has no wrapper command: point it at the LangWatch AI Gateway as above, and its telemetry comes from the gateway.
 
 Check out the [quickstart](/coding-agents/quickstart) for next steps.
 
@@ -38045,7 +38062,7 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/gateway-virtual-keys/create-virtual-key) and a retry that lost its response returns the original secret instead of stranding it.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/webhooks/create-a-webhook-endpoint) and a retry that lost its response returns the original secret instead of stranding it.
 
 To create the same endpoint from the UI, click **New endpoint** on the Webhooks page and pick the destination, the URL and the events.
 

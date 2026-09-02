@@ -114,6 +114,7 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
 The wrapper starts Claude Code with `ANTHROPIC_BASE_URL` set to the gateway URL and `ANTHROPIC_AUTH_TOKEN` set to your virtual key, and removes `ANTHROPIC_API_KEY` from the environment, because Claude Code warns when both are set. Claude Code appends `/v1/messages` to the base URL itself, so set the base URL with no path. To route a plain `claude` run with a service virtual key, set the same two variables:
 
 ```bash
+unset ANTHROPIC_API_KEY
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
 export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 claude

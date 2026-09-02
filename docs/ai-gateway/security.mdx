@@ -22,7 +22,7 @@ The spend record is what budgets debit from. It holds the organization, project,
 
 The gateway does not write request or response bodies to its logs. The access log records the fields in the table above and no headers.
 
-Your client's auth headers never reach the provider. The gateway builds the upstream request itself and injects the real provider credential, and on the passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
+The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `Xi-Api-Key` is also accepted as a virtual-key header, and the passthrough lane forwards it, so send the virtual key on `Authorization` or `X-Goog-Api-Key` when you call `/v1beta`. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
 
 <Warning>One self-hosted debug switch overrides this. `LW_LOG_MESSAGE_BODY=1` writes the full request body of `/v1/messages` and `/v1/responses` to the gateway log at info level, including prompts. Use it to reproduce a provider rejection, then turn it off.</Warning>
 

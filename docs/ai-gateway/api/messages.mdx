@@ -71,11 +71,11 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
 
 ## Streaming
 
-Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing. The frames reach the client as the provider wrote them, and there is no `data: [DONE]` trailer:
+Set `"stream": true`. The response is `text/event-stream` in Anthropic's own event framing, and there is no `data: [DONE]` trailer. On an Anthropic-compatible provider the frames reach the client as the provider wrote them. On a translated lane the gateway builds the Anthropic events itself from the provider's own stream. A failure after the stream opens adds one terminal `event: error` frame:
 
 ```
 event: message_start

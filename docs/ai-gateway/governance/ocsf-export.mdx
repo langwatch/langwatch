@@ -83,4 +83,6 @@ curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
 
 Replace `YOUR_SESSION_COOKIE` with the cookie of a browser session signed in as a user who holds `complianceExport:view`. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
 
+<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. A cookie written on a command line lands in the shell history and in the process list of the host that runs the job. Read it from a secrets store into the environment of a scheduled job, never from a literal in a script, and rotate the session when the job host changes.</Warning>
+
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for what sets `anomalyAlertId`, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.

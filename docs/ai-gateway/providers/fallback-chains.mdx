@@ -72,8 +72,9 @@ The window, the threshold and the open duration are gateway settings: `LW_GATEWA
 
 | Code | Status | Cause |
 |---|---|---|
-| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list, or a restriction on the policy refuses it. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
-| `model_not_allowed` | 400 | The model resolves to a provider the key's provider access excludes. |
+| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
+| `policy_violation` | 403 | A restriction on the policy refuses the model. The message names the model: `model "gemini-2.5-flash" is blocked by policy`. See [Policy rules](/ai-gateway/policy-rules). |
+| `model_not_allowed` | 400 | The model is outside the key's own model allowlist, or resolves to a provider the key's provider access excludes. |
 | `no_provider_configured` | 400 | The key reaches no provider at all. |
 | `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
 

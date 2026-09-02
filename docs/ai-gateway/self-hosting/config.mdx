@@ -125,12 +125,12 @@ Every gateway span carries the `langwatch.project_id` of the virtual key, so an 
 
 ## Debug
 
-Never set these on a production pod. Both write request content to the log.
+Never set these on a production pod. Each one puts request content somewhere a production deployment should not have it.
 
 | Var | Purpose |
 |---|---|
-| `LW_LOG_MESSAGE_BODY=1` | Logs every inbound `/v1/messages` and `/v1/responses` body at `info` level |
-| `LW_GATEWAY_OUTBOUND_PROXY` | `http://host:port` proxy for outbound provider traffic on OpenAI, Anthropic, Gemini and Azure. Bedrock uses the AWS SDK and ignores it |
+| `LW_LOG_MESSAGE_BODY=1` | Logs every inbound `/v1/messages` and `/v1/responses` body at `info` level, prompts included |
+| `LW_GATEWAY_OUTBOUND_PROXY` | `http://host:port` proxy for outbound provider traffic on OpenAI, Anthropic, Gemini and Azure. This does not add anything to the gateway log, but the proxy sees every request and records what its own configuration tells it to. Bedrock uses the AWS SDK and ignores it |
 
 ## Legacy aliases
 
@@ -141,4 +141,4 @@ Deployments that predate the canonical names can keep these. The canonical name 
 | `GATEWAY_LISTEN_ADDR` | `SERVER_ADDR` |
 | `GATEWAY_CONTROL_PLANE_URL` | `LW_GATEWAY_BASE_URL` |
 | `GATEWAY_LOG_LEVEL` | `LOG_LEVEL` |
-| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_OTLP_ENDPOINT` |
+| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
