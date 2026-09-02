@@ -105,6 +105,19 @@ export function readPrepaidDeclared(
  * not "caught by a louder failure". That path is the only way the state this
  * guard exists to refuse could still be reached, which is precisely why it
  * cannot be the one path left open.
+ *
+ * An edit SWAPPING one subscription for another behind a sealed envelope is
+ * deliberately allowed, and the distinction is worth stating because it looks
+ * like a hole. What is checked here is that a claim never lands without a pair
+ * PRESENT, never that the pair can read the subscription named — §21.6 proposed
+ * verifying the grant at save time and v3.4 withdrew it. The swapped-in claim
+ * still rides the envelope validated for the previous one, so the pair is
+ * there; if it turns out not to cover the new subscription the read fails and
+ * the window is held, which the panel says out loud as `billing_read_failed`.
+ * That is the honest path. Refusing the swap would instead force an admin to
+ * retype both secrets whenever one registered app holds Cost Management Reader
+ * across several subscriptions — the ordinary Azure setup — and prove nothing
+ * about the new one.
  */
 export function assertAzureBillHasItsOwnCredential(params: {
   parserConfig: Record<string, unknown> | null | undefined;
