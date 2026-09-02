@@ -181,7 +181,7 @@ function buildErasure(prisma: PrismaClient) {
         replayObserved = actorTheFoldWouldWrite(ERASED);
       },
     },
-    replayHorizon: () => null,
+    replayHorizon: async () => new Map(),
   });
 }
 

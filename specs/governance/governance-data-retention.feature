@@ -18,3 +18,28 @@ Feature: How long governance data lives, and what that costs when it goes
     # longer window would then be holding names and email addresses past the
     # fixed bound. A holding period for personal data is not a customer
     # setting.
+
+  @unit @integration
+  Scenario: Each area is judged against how far its own log reaches
+    Given an organization whose spend was recorded in two areas
+    And one area's history reaches further back than the other's
+    When somebody is erased from both
+    Then a day is only reported as unrebuildable when its own area's history
+      has aged past it
+    # How far back the history reaches is read from the history itself, not
+    # worked out from the retention setting. The setting describes what will
+    # happen to rows written from now on; it says nothing reliable about the
+    # rows already there, which were written under whatever setting was in
+    # force then and are removed lazily rather than on the stroke of the
+    # deadline.
+
+  @unit @integration
+  Scenario: An area whose log cannot be read is retried, not written off
+    Given an area whose history cannot be read
+    When somebody is erased
+    Then every affected day is attempted
+    And no day is reported as unrebuildable
+    # The two ways of being wrong here are not equal. Attempting a day that
+    # cannot be rebuilt costs a wider replay that changes nothing. Writing off
+    # a day that could have been rebuilt permanently lowers that day's total
+    # and tells the customer it was unavoidable.
