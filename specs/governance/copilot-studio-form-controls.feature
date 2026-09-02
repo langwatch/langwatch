@@ -23,14 +23,20 @@ Feature: The Copilot Studio create form reads by purpose, and one app registrati
     Given an organization with the ingestionSources:manage permission
     And the source composer is open on the copilot_studio_dataverse adapter
 
-  Rule: The form is three purposes, not one list
+  Rule: The form reads by purpose, not as one list
 
     @unit
-    Scenario: The fields stand in three labelled groups
+    Scenario: The fields stand in labelled groups, choices last
       When the admin looks at the form
       Then the connection fields stand first under their own heading
-      And the cost fields stand second under their own heading
+      And the subscription claim stands second under the cost heading
       And the conversation credential stands third under its own heading
+      And the billing choice stands last under its own heading
+      And the prepaid declaration sits in the Advanced group
+      # Required paste-work first, choices whose default already answers
+      # last: the billing switch refers back to the conversation credential
+      # above it, and the prepaid declaration is a disagreement with the
+      # pay-as-you-go default, which is what Advanced is for.
 
   Rule: One app registration is the default, a second one is a choice
 

@@ -281,14 +281,32 @@ describe("given the Copilot Studio licence switch", () => {
 
 describe("given the Copilot Studio create form", () => {
   describe("when the form first renders", () => {
-    /** @scenario "The fields stand in three labelled groups" */
-    it("stands in three labelled groups, connection then cost then conversation", () => {
+    /** @scenario "The fields stand in labelled groups, choices last" */
+    it("stands in labelled groups with the billing choice last", () => {
       renderFields("copilot_studio_dataverse");
 
       const headings = screen
-        .getAllByText(/^(Connection|Cost|Conversation access)$/)
+        .getAllByText(/^(Connection|Cost|Conversation access|Billing)$/)
         .map((el) => el.textContent);
-      expect(headings).toEqual(["Connection", "Cost", "Conversation access"]);
+      expect(headings).toEqual([
+        "Connection",
+        "Cost",
+        "Conversation access",
+        "Billing",
+      ]);
+    });
+
+    /** @scenario "The fields stand in labelled groups, choices last" */
+    it("keeps the prepaid declaration folded away under Advanced", async () => {
+      renderFields("copilot_studio_dataverse");
+
+      expect(
+        screen.queryByText("This Copilot runs on prepaid message packs"),
+      ).toBeNull();
+      await expandAdvanced();
+      expect(
+        screen.getByText("This Copilot runs on prepaid message packs"),
+      ).toBeTruthy();
     });
 
     /** @scenario "A new source starts with one app registration for everything" */

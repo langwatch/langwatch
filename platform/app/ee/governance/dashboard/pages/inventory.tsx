@@ -1082,6 +1082,10 @@ function ComposerDestinationHint({
   destinationCtx: DestinationContext;
 }) {
   if (!routesConversations(composer.sourceType)) return null;
+  // Silent until a destination is picked: the field tooltips already say
+  // what the silent default means, so the drawer only speaks when it has a
+  // choice to confirm.
+  if (!composer.traceProjectId) return null;
   // Named from the same list the picker offers, so the line and the control
   // cannot disagree about which project was chosen.
   const chosen = destinationCtx.availableProjects.find(
@@ -1093,9 +1097,7 @@ function ComposerDestinationHint({
       color="fg.muted"
       data-testid="composer-destination-hint"
     >
-      {composer.traceProjectId
-        ? `Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`
-        : "Conversations will not land anywhere until you pick a destination project under Advanced. Audit events are recorded either way."}
+      {`Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`}
     </Text>
   );
 }
@@ -2107,57 +2109,6 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       group: "Cost",
     },
     {
-      // One app for both reads is what most admins actually set up; the
-      // split-credential arrangement (ADR-128 §21.1) stays one flip away for
-      // tenants whose finance approval is separate. The choice itself is
-      // persisted by the builder (`azureBillingUsesSameApp`), because it
-      // cannot be reconstructed from the stored credentials once they are
-      // sealed.
-      key: "azureBillingUsesSameApp",
-      label: "Use one app registration for everything",
-      placeholder: "",
-      hint: "On, the app registration under Conversation access also reads the subscription's bill — grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
-      control: "switch",
-      defaultOn: AZURE_ONE_APP_DEFAULT_ON,
-      group: "Cost",
-    },
-    {
-      // The bill's OWN app registration: it holds Cost Management Reader on
-      // the subscription and nothing else, so the person who approves the
-      // finance grant hands out a permission that reads money and cannot read
-      // a conversation. Only offered once the admin has turned the one-app
-      // switch off — hidden, the copy in `copilotAzureBillingFrom` answers
-      // instead.
-      key: "credentialsBillingClientId",
-      label: "Billing app registration client ID",
-      placeholder: "00000000-0000-0000-0000-000000000000",
-      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
-      secret: true,
-      group: "Cost",
-      visibleWhen: (values) => !azureOneAppChosen(values),
-    },
-    {
-      key: "credentialsBillingClientSecret",
-      label: "Billing app registration client secret",
-      placeholder: "(value pasted from the Azure portal)",
-      secret: true,
-      group: "Cost",
-      visibleWhen: (values) => !azureOneAppChosen(values),
-    },
-    {
-      // Declared by the customer, never inferred (ADR-128 §21.4): prepaid
-      // credit packs create no Azure resource, so the cost feed returns
-      // nothing — byte-for-byte what a quiet pay-as-you-go month returns.
-      // Only this declaration licenses the panel's prepaid sentence.
-      key: "azureBillingIsPrepaid",
-      label: "This Copilot runs on prepaid message packs",
-      placeholder: "",
-      hint: "Prepaid message packs never appear on the Azure bill. Turn this on and the spend panel will say so instead of showing an empty bill as if nothing ran.",
-      control: "switch",
-      defaultOn: false,
-      group: "Cost",
-    },
-    {
       key: "credentialsClientId",
       label: "App registration client ID",
       placeholder: "00000000-0000-0000-0000-000000000000",
@@ -2173,6 +2124,60 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
       secret: true,
       group: "Conversation access",
+    },
+    {
+      // One app for both reads is what most admins actually set up; the
+      // split-credential arrangement (ADR-128 §21.1) stays one flip away for
+      // tenants whose finance approval is separate. The choice itself is
+      // persisted by the builder (`azureBillingUsesSameApp`), because it
+      // cannot be reconstructed from the stored credentials once they are
+      // sealed. Last on the form: it refers back to the credential above it,
+      // and most admins never touch it.
+      key: "azureBillingUsesSameApp",
+      label: "Use one app registration for everything",
+      placeholder: "",
+      hint: "On, the app registration under Conversation access also reads the subscription's bill — grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
+      control: "switch",
+      defaultOn: AZURE_ONE_APP_DEFAULT_ON,
+      group: "Billing",
+    },
+    {
+      // The bill's OWN app registration: it holds Cost Management Reader on
+      // the subscription and nothing else, so the person who approves the
+      // finance grant hands out a permission that reads money and cannot read
+      // a conversation. Only offered once the admin has turned the one-app
+      // switch off — hidden, the copy in `copilotAzureBillingFrom` answers
+      // instead.
+      key: "credentialsBillingClientId",
+      label: "Billing app registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
+      secret: true,
+      group: "Billing",
+      visibleWhen: (values) => !azureOneAppChosen(values),
+    },
+    {
+      key: "credentialsBillingClientSecret",
+      label: "Billing app registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      secret: true,
+      group: "Billing",
+      visibleWhen: (values) => !azureOneAppChosen(values),
+    },
+    {
+      // Declared by the customer, never inferred (ADR-128 §21.4): prepaid
+      // credit packs create no Azure resource, so the cost feed returns
+      // nothing — byte-for-byte what a quiet pay-as-you-go month returns.
+      // Only this declaration licenses the panel's prepaid sentence.
+      // Advanced because almost nobody runs on packs: the declaration is
+      // where an admin goes to disagree with the pay-as-you-go default.
+      key: "azureBillingIsPrepaid",
+      label: "This Copilot runs on prepaid message packs",
+      placeholder: "",
+      hint: "Prepaid message packs never appear on the Azure bill. Turn this on and the spend panel will say so instead of showing an empty bill as if nothing ran.",
+      control: "switch",
+      defaultOn: false,
+      advanced: true,
     },
     {
       key: "readSeats",
