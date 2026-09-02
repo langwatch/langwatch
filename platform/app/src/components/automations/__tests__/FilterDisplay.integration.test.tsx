@@ -6,10 +6,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { FilterDisplay } from "../FilterDisplay";
 
-const renderFilters = (filters: Record<string, unknown>) =>
+const renderFilters = (
+  filters: Record<string, unknown>,
+  props: { clampValues?: boolean } = {},
+) =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <FilterDisplay filters={filters} hasBorder={true} />
+      <FilterDisplay filters={filters} hasBorder={true} {...props} />
     </ChakraProvider>,
   );
 
@@ -42,6 +45,32 @@ describe("FilterDisplay", () => {
       const text = screen.getByText(LONG_VALUE);
       const clamped = getComputedStyle(text.closest("div")!);
       expect(clamped.webkitLineClamp).toBe("1");
+    });
+  });
+
+  // The graph filter indicator renders this inside a tooltip, where clamping
+  // hides the rest of the value behind a hover the user cannot perform.
+  describe("when clamping is turned off", () => {
+    it("wraps the value instead of clamping it to one line", () => {
+      renderFilters(
+        { "trace_checks.check_id": [LONG_VALUE] },
+        { clampValues: false },
+      );
+
+      const style = getComputedStyle(screen.getByText(LONG_VALUE));
+      expect(style.webkitLineClamp).not.toBe("1");
+      expect(style.overflow).not.toBe("hidden");
+    });
+
+    it("breaks mid-token so an unbreakable id cannot run past its container", () => {
+      renderFilters(
+        { "trace_checks.check_id": [LONG_VALUE] },
+        { clampValues: false },
+      );
+
+      const style = getComputedStyle(screen.getByText(LONG_VALUE));
+      expect(style.overflowWrap).toBe("anywhere");
+      expect(style.minWidth).toBe("0px");
     });
   });
 });
