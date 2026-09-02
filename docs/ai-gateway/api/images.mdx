@@ -18,7 +18,7 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
 ```
 
-Body matches OpenAI's [image generation schema](https://platform.openai.com/docs/api-reference/images/create).
+Body matches OpenAI's [image generation schema](https://developers.openai.com/api/reference/resources/images/methods/generate/).
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/generations \
@@ -56,7 +56,7 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://platform.openai.com/docs/api-reference/images/createEdit): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`, which the gateway reads only when the form has no `image[]` part. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`; anything else is dropped rather than sent to the provider. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`, which the gateway reads only when the form has no `image[]` part. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`; anything else is dropped rather than sent to the provider. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \

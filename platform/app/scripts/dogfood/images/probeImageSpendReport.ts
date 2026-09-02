@@ -29,6 +29,12 @@ import {
  */
 export const MAX_SPAN_OUTPUT_BYTES = 1024;
 
+/**
+ * Images per call the probe asks for. Both calls send n=1, so a record that
+ * counts fewer means the count was dropped between the gateway and the row.
+ */
+const EXPECTED_IMAGES_PER_CALL = 1;
+
 /** One call the probe made, as the gateway identified it on the response. */
 export interface Call {
   label: string;
@@ -76,7 +82,6 @@ function check({
   process.stdout.write(`${isOk ? "PASS" : "FAIL"}  ${name}  ${detail}\n`);
 }
 
-/** Poll until the predicate holds or the deadline passes. */
 async function until<T>({
   what,
   deadlineMs,
@@ -180,6 +185,11 @@ function checkSpendRows({
       name: `output image tokens reached the record (${call.label})`,
       isOk: row.outputImageTokens > 0,
       detail: `TokensOutputImage=${row.outputImageTokens}`,
+    });
+    check({
+      name: `image count reached the record (${call.label})`,
+      isOk: row.imageCount >= EXPECTED_IMAGES_PER_CALL,
+      detail: `ImageCount=${row.imageCount}, want at least ${EXPECTED_IMAGES_PER_CALL}`,
     });
     if (call.hasSourceImage) {
       check({

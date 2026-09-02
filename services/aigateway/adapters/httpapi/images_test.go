@@ -239,6 +239,28 @@ func TestImageEdits_SingularImageFieldWithoutMask(t *testing.T) {
 	assert.Nil(t, captured.ImageEdit.Mask)
 }
 
+// @scenario "A form using both image field names is refused"
+func TestImageEdits_BothImageFieldNamesIs400BeforeDispatch(t *testing.T) {
+	dispatched := false
+	router := blockedImageRouter(&dispatched)
+
+	buf, contentType := imageMultipartBody(t,
+		map[string]string{"model": "openai/gpt-image-2", "prompt": "make it blue"},
+		[]imageFile{
+			{field: "image", filename: "one.png", content: []byte("singular-png")},
+			{field: "image[]", filename: "two.png", content: []byte("plural-png")},
+		})
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", buf)
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "image[]")
+	assert.False(t, dispatched, "an ambiguous source order must not reach the provider")
+}
+
 // @scenario "A multipart edit with no image part fails informatively"
 func TestImageEdits_MissingImageIs400BeforeDispatch(t *testing.T) {
 	dispatched := false

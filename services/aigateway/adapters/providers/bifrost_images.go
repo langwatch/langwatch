@@ -104,6 +104,19 @@ func imageEndpointSupported(ctx context.Context, provider bfschemas.ModelProvide
 	})
 }
 
+// imageEndpointOnCodex refuses an image request carrying a Codex credential.
+// The codex backend serves the Responses dialect only: it has no image route,
+// and the image models live on a direct OpenAI credential instead.
+func imageEndpointOnCodex(ctx context.Context, reqType domain.RequestType) error {
+	if reqType != domain.RequestTypeImageGeneration && reqType != domain.RequestTypeImageEdit {
+		return nil
+	}
+	return herr.New(ctx, domain.ErrBadRequest, herr.M{
+		"message": "image endpoints need a direct OpenAI, Azure OpenAI, Gemini, Vertex or Bedrock " +
+			"credential; a Codex credential serves the Responses API only",
+	})
+}
+
 // imageDispatchContext carries the credential plus the raw-response flag, so a
 // provider refusal reaches the caller in the vendor's own error envelope
 // instead of a rewritten one. Image SDKs read that envelope for the moderation

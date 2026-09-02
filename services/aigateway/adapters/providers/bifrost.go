@@ -249,6 +249,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// translated first (anthropic_codex.go): raw-forwarding an Anthropic body
 	// would be rejected before it ever left the gateway.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		// The codex backend serves the Responses dialect only, so an image
+		// request has no route on this lane and must not reach dispatchCodex,
+		// which would send it as a Responses call.
+		if err := imageEndpointOnCodex(ctx, req.Type); err != nil {
+			return nil, err
+		}
 		if req.Type == domain.RequestTypeMessages {
 			return r.dispatchMessagesTranslatedCodex(ctx, req, model, cred)
 		}

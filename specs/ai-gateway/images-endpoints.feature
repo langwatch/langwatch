@@ -66,6 +66,13 @@ Feature: Gateway image endpoints, OpenAI-compatible generation and editing
     # OpenAI Node SDK always sends the plural one.
 
   @unit
+  Scenario: A form using both image field names is refused
+    When the form carries files under "image[]" and under "image"
+    Then the gateway responds 400 naming both fields
+    # The parsed form states an order inside each field and none across them,
+    # so there is no source order left to send the provider.
+
+  @unit
   Scenario: A multipart edit with no image part fails informatively
     When the form has a model and a prompt but no image part
     Then the gateway responds 400 naming the missing "image" field
@@ -105,6 +112,14 @@ Feature: Gateway image endpoints, OpenAI-compatible generation and editing
   # ============================================================
   # Group: Credentials
   # ============================================================
+
+  @unit
+  Scenario: A Codex credential is refused on both image routes
+    When an image generation or edit request carries a Codex credential
+    Then the gateway responds 400 saying that credential serves the Responses API only
+    And nothing reaches the codex backend
+    # The codex backend has no image route, so an unrefused request would go
+    # out as a Responses call.
 
   @unit
   Scenario: An OpenAI credential with a custom base URL is refused with a readable message

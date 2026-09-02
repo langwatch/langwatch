@@ -9,21 +9,30 @@
 
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { z } from "zod";
 import { prisma } from "~/server/db";
 import type { ProbeScope } from "./probeImageSpendReads";
 import { log } from "./probeImageSpendReport";
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
-export interface Args {
-  email: string;
-  org: string;
-  gateway: string;
-  model: string;
-  quality: string;
-  deadlineMs: number;
-  shouldAllowRemoteDb: boolean;
-}
+const argsSchema = z.object({
+  email: z.string().min(1, "--email is required"),
+  org: z.string(),
+  gateway: z.string().transform((url) => url.replace(/\/$/, "")),
+  model: z.string(),
+  quality: z.string(),
+  // A non-numeric or missing value parses to NaN, and every deadline
+  // comparison against NaN is false, so the poll loop would run forever
+  // instead of failing.
+  deadlineMs: z
+    .number()
+    .finite()
+    .positive("--deadline-ms must be a positive number of milliseconds"),
+  shouldAllowRemoteDb: z.boolean(),
+});
+
+export type Args = z.infer<typeof argsSchema>;
 
 export function parseArgs(argv: string[]): Args {
   let email = "";
@@ -43,22 +52,19 @@ export function parseArgs(argv: string[]): Args {
     if (argv[i] === "--deadline-ms") deadlineMs = Number(argv[++i] ?? 60_000);
     if (argv[i] === "--allow-remote-db") shouldAllowRemoteDb = true;
   }
-  if (!email) throw new Error("--email is required");
-  // A non-numeric or missing value parses to NaN, and every deadline
-  // comparison against NaN is false, so the poll loop would run forever
-  // instead of failing.
-  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
-    throw new Error("--deadline-ms must be a positive number of milliseconds");
-  }
-  return {
+  const parsed = argsSchema.safeParse({
     email,
     org,
-    gateway: gateway.replace(/\/$/, ""),
+    gateway,
     model,
     quality,
     deadlineMs,
     shouldAllowRemoteDb,
-  };
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues.map((i) => i.message).join("; "));
+  }
+  return parsed.data;
 }
 
 /**

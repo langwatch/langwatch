@@ -571,11 +571,11 @@ var imageEditFormFields = []string{
 	"output_format", "output_compression", "response_format", "user",
 }
 
-// imageEditFileFields are the form fields a source image arrives under, in
-// precedence order. The OpenAI Node SDK posts an array of files as "image[]";
-// a caller sending a single file, and curl, use "image". A form that carries
-// both is read from the first field that has files, so the images keep the
-// order the caller wrote them in rather than an order this list invents.
+// imageEditFileFields are the form fields a source image arrives under. The
+// OpenAI Node SDK posts an array of files as "image[]"; a caller sending a
+// single file, and curl, use "image". Only one of the two may carry files:
+// the parsed form states no order across fields, so a request using both has
+// no order the gateway can honour, and it is refused rather than guessed.
 var imageEditFileFields = []string{"image[]", "image"}
 
 // imageEditsHandler terminates POST /v1/images/edits (OpenAI-wire multipart
@@ -691,22 +691,28 @@ func readImageEditFiles(r *http.Request) ([][]byte, error) {
 	if r.MultipartForm == nil {
 		return nil, nil
 	}
+	var used string
+	var headers []*multipart.FileHeader
 	for _, field := range imageEditFileFields {
-		headers := r.MultipartForm.File[field]
-		if len(headers) == 0 {
+		found := r.MultipartForm.File[field]
+		if len(found) == 0 {
 			continue
 		}
-		images := make([][]byte, 0, len(headers))
-		for _, header := range headers {
-			data, err := readMultipartHeader(header)
-			if err != nil {
-				return nil, err
-			}
-			images = append(images, data)
+		if used != "" {
+			return nil, fmt.Errorf(
+				"send the source images under %q or under %q, not both", used, field)
 		}
-		return images, nil
+		used, headers = field, found
 	}
-	return nil, nil
+	images := make([][]byte, 0, len(headers))
+	for _, header := range headers {
+		data, err := readMultipartHeader(header)
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, data)
+	}
+	return images, nil
 }
 
 // readMultipartHeader reads one file part into memory.

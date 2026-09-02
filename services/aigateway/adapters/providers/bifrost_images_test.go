@@ -280,6 +280,28 @@ func TestDispatchImageEdit_SendsEverySourceImageAndTheMask(t *testing.T) {
 	assert.Equal(t, 196, resp.Usage.OutputImageTokens)
 }
 
+// @scenario "A Codex credential is refused on both image routes"
+func TestDispatch_RefusesTheImageRequestTypesOnACodexCredential(t *testing.T) {
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop()})
+	require.NoError(t, err)
+	defer router.Close()
+
+	codex := domain.Credential{
+		ID: "cred-codex", ProviderID: domain.ProviderOpenAICodex, APIKey: "sk-codex",
+	}
+	for _, reqType := range []domain.RequestType{
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+	} {
+		_, err := router.Dispatch(context.Background(), &domain.Request{
+			Type:  reqType,
+			Model: "gpt-image-2",
+			Body:  []byte(`{"model":"gpt-image-2","prompt":"a red bicycle"}`),
+		}, codex)
+		require.Error(t, err, "%s must not reach the codex Responses lane", reqType)
+		assert.Contains(t, err.Error(), "Responses API only")
+	}
+}
+
 // @scenario "A streamed image request is refused before dispatch"
 func TestDispatchStream_RefusesTheImageRequestTypes(t *testing.T) {
 	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop()})
