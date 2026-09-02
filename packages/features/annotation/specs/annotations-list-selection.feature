@@ -3,6 +3,9 @@ Feature: Annotations list
   Reviewers select queue items, act on the selected traces, and export the
   rows currently in scope.
 
+  The four addresses are four VIEWS of one screen: the route decides which list
+  a page is, and the screen is told rather than reading the address back.
+
   Background:
     Given the user is authenticated with annotation view permission
     And the annotations list has rows
@@ -104,3 +107,49 @@ Feature: Annotations list
       When the sidebar lists a queue
       Then its own actions menu can open that queue's edit drawer
       But the queue page header has no duplicate queue menu
+
+  Rule: An address names which list it is, and whose work is on it
+
+    @integration
+    Scenario: Each annotations address opens its own list
+      When the reader opens one of the four annotations addresses
+      Then the inbox, the reviewer's own queue, all annotations and a named
+        queue each open their own view of the one list
+
+    @integration
+    Scenario: The inbox spans every queue the reviewer is on
+      When the reader opens the inbox
+      Then the read covers the queues they are a member of as well as their own
+        items
+      But their own queue and a named queue each read only their own work
+
+    @integration
+    Scenario: Moving a selection starts from the list it is already on
+      When the reader opens the send picker from a list that is itself a queue
+      Then the picker opens on that queue, named "queue-<id>" for a named queue
+        and "user-<id>" for the reviewer's own
+      And a list that is nobody's queue opens the picker on nothing
+
+    @integration
+    Scenario: A reader who may not change resources is offered no queue actions
+      Given the reader holds the lite membership role
+      When the sidebar lists their queues
+      Then neither creating a queue nor editing one is offered
+
+  Rule: The queue editor opens from an address rather than from a registry
+
+    @integration
+    Scenario: Creating or editing a queue is a link, not a drawer call
+      When the reader creates a queue from the sidebar, edits one from its entry,
+        or adds a new queue from inside the send picker
+      Then the address names the editor and the screen mounts it
+      And closing it takes only the editor's own parameter off the address
+
+  Rule: Every annotation in range reaches the all-annotations list
+
+    @integration
+    Scenario: All annotations reads the whole project inside its range
+      When the reader opens all annotations
+      Then every annotation the project holds inside the range is grouped onto
+        its trace
+      And no saved trace view narrows the list

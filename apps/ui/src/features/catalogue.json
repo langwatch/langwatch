@@ -2,6 +2,7 @@
   "version": 0,
   "governedWebPackages": [
     "@langwatch/agent-web",
+    "@langwatch/annotation-web",
     "@langwatch/authz-web",
     "@langwatch/automation-web",
     "@langwatch/data-privacy-web",
@@ -19,15 +20,31 @@
       "id": "agent-management",
       "root": "agent",
       "uses": {
-        "screens": ["@langwatch/agent-web/screens/agent-management"],
-        "surfaces": ["@langwatch/agent-web/surfaces/browser-port"]
+        "screens": [
+          "@langwatch/agent-web/screens/agent-management"
+        ],
+        "surfaces": [
+          "@langwatch/agent-web/surfaces/browser-port"
+        ]
+      }
+    },
+    {
+      "id": "annotations",
+      "root": "annotation",
+      "uses": {
+        "screens": [
+          "@langwatch/annotation-web/screens/annotations"
+        ],
+        "surfaces": []
       }
     },
     {
       "id": "authz",
       "root": "authz",
       "uses": {
-        "screens": ["@langwatch/authz-web/screens/authz"],
+        "screens": [
+          "@langwatch/authz-web/screens/authz"
+        ],
         "surfaces": []
       }
     },
@@ -35,7 +52,9 @@
       "id": "automations",
       "root": "automations",
       "uses": {
-        "screens": ["@langwatch/automation-web/screens/automations"],
+        "screens": [
+          "@langwatch/automation-web/screens/automations"
+        ],
         "surfaces": []
       }
     },
@@ -43,7 +62,9 @@
       "id": "data-privacy",
       "root": "data-privacy",
       "uses": {
-        "screens": ["@langwatch/data-privacy-web/screens/data-privacy"],
+        "screens": [
+          "@langwatch/data-privacy-web/screens/data-privacy"
+        ],
         "surfaces": []
       }
     },
@@ -51,7 +72,9 @@
       "id": "data-retention",
       "root": "data-retention",
       "uses": {
-        "screens": ["@langwatch/data-retention-web/screens/data-retention"],
+        "screens": [
+          "@langwatch/data-retention-web/screens/data-retention"
+        ],
         "surfaces": []
       }
     },
@@ -59,7 +82,9 @@
       "id": "datasets",
       "root": "dataset",
       "uses": {
-        "screens": ["@langwatch/dataset-web/screens/datasets"],
+        "screens": [
+          "@langwatch/dataset-web/screens/datasets"
+        ],
         "surfaces": []
       }
     },
@@ -67,7 +92,9 @@
       "id": "gateway",
       "root": "gateway",
       "uses": {
-        "screens": ["@langwatch/gateway-web/screens/gateway"],
+        "screens": [
+          "@langwatch/gateway-web/screens/gateway"
+        ],
         "surfaces": []
       }
     },
@@ -75,7 +102,9 @@
       "id": "governance",
       "root": "governance",
       "uses": {
-        "screens": ["@langwatch/enterprise-governance-web/screens/governance"],
+        "screens": [
+          "@langwatch/enterprise-governance-web/screens/governance"
+        ],
         "surfaces": []
       }
     },
@@ -83,7 +112,9 @@
       "id": "model-provider",
       "root": "model-provider",
       "uses": {
-        "screens": ["@langwatch/model-provider-web/screens/model-provider"],
+        "screens": [
+          "@langwatch/model-provider-web/screens/model-provider"
+        ],
         "surfaces": []
       }
     },
@@ -91,7 +122,9 @@
       "id": "ops",
       "root": "ops",
       "uses": {
-        "screens": ["@langwatch/ops-web/screens/ops"],
+        "screens": [
+          "@langwatch/ops-web/screens/ops"
+        ],
         "surfaces": []
       }
     },
@@ -99,7 +132,9 @@
       "id": "personal-workspace",
       "root": "personal-workspace",
       "uses": {
-        "screens": ["@langwatch/user-web/screens/personal-workspace"],
+        "screens": [
+          "@langwatch/user-web/screens/personal-workspace"
+        ],
         "surfaces": []
       }
     },
@@ -107,7 +142,9 @@
       "id": "prompt-studio",
       "root": "prompt",
       "uses": {
-        "screens": ["@langwatch/prompt-web/screens/prompt-studio"],
+        "screens": [
+          "@langwatch/prompt-web/screens/prompt-studio"
+        ],
         "surfaces": []
       }
     }

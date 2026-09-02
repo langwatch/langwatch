@@ -20,6 +20,21 @@ const AGENT_PAGE_KEYS = [
   "runtime/ui/features/agent-ui-host.adapter",
 ];
 
+const ANNOTATION_PAGE_KEYS = [
+  // FOUR keys for ONE screen, the automations shape applied to a list: the
+  // four addresses were four page files that differed only in the props they
+  // handed one table, so the feature maps each key to the VIEW it shows and the
+  // screen is told rather than reading the address.
+  //
+  // The fifth annotations address, `/annotations/my-queue`, is deliberately
+  // absent: the queue walker mounts the trace family's conversation view, which
+  // no package publishes, so `platform/app` still serves that key.
+  "pages/[project]/annotations",
+  "pages/[project]/annotations/me",
+  "pages/[project]/annotations/all",
+  "pages/[project]/annotations/[slug]",
+];
+
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
   // page-level grant — `organization:manage` — because both pages read
@@ -168,6 +183,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...ANNOTATION_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -183,11 +199,12 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Thirteen for twelve features: the personal workspace mounts two,
+      // Fourteen for thirteen features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
+        "@langwatch/annotation-web",
         "@langwatch/authz-web",
         "@langwatch/automation-web",
         "@langwatch/data-privacy-web",
@@ -246,6 +263,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...ANNOTATION_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
           ...AUTOMATION_PAGE_KEYS,
           ...DATA_GOVERNANCE_PAGE_KEYS,
@@ -258,7 +276,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(13);
+      expect(merged.apis).toHaveLength(14);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

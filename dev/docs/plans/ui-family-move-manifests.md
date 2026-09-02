@@ -561,7 +561,7 @@ Known costs, all reported rather than suppressed:
 | `ui/{ListTable,Pagination}`                     | me+governance      | design-system (`./list-table`, `./pagination`) — LANDED for both                                                                                               |
 | `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)                                              |
 | `settings/ScopeFilter` + `useUrlScopeFilter`      | data-retention+data-privacy | the SAME surface (`@langwatch/authz-web/surfaces/scope-picker`), component and pure address half both. Free, because every consumer of one already imports the other and `ui-screen-closure` counts import LINES. The platform copies stay for model-providers, api-keys and default-models |
-| traces-v2 deep imports                          | me+automations     | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided                                   |
+| traces-v2 deep imports                          | me+automations+annotations | me shipped a PLACEHOLDER and recorded the gap; `@langwatch/trace-web` has no table surface to consume. automations undecided. ANNOTATIONS DREW THE LINE: a placeholder is right for a widget and wrong for a page whose whole subject is the thing being placeheld — the queue walker stayed in `platform/app` rather than lose its conversation view, and moves with traces |
 
 ## Single-owner files (serialize)
 
@@ -1767,6 +1767,198 @@ the line, which is the only kind of edit the deletes-only ruling admits.
   can only shrink the offer, never widen it. Look for the narrowing before
   accepting the copy.
 
+### annotations — MOVED. 4 keys of 5, 8 platform files, 0 insertions, 2,497 deletions
+
+Moved twelfth, and the first family whose ranking row was wrong about the KEYS
+rather than about the effort. Five keys were listed; four moved. Everything else
+follows the shape by now: one host port (`model/annotation-host.ts`), one
+hand-written procedure map (`behavior/annotation-api.ts`), the
+router/session/feedback re-bindings, `withUiPageGuard` in front of the loader
+registry, a `testing.tsx` harness and a package-owned `vitest.setup.ts`.
+
+Destination `@langwatch/annotation-web`, relaid out from flat-by-topic to the
+two-scope layout: 3 modules to `model`, 5 to `ui/elements`, 7 to `ui/blocks`,
+the tests colocated beside them, and the new `behavior`, `screens` and
+`ui/sections` on top. The suite was 36 tests before the relayout and 36 after,
+which is what made it safe to do in one step. The root `.` export STAYS —
+twelve `platform/app` modules import it (the trace drawer's annotation rail, the
+trace table's annotations column, the comment editor, the score editor) and
+deletes-only forbids repointing any of them.
+
+#### THE FIFTH KEY DID NOT MOVE, and that is the finding
+
+`pages/[project]/annotations/my-queue` is the annotation queue WALKER, and it
+does not merely open the trace drawer — it MOUNTS the drawer's conversation
+view inline. `features/traces-v2/components/TraceDrawer/conversationView` is
+4,347 lines that reach the transcript, the turn ledger, the annotation rail, the
+waterfall's anchored comments, `FormatSelect` and `useTraceDrawerNavigation`.
+`@langwatch/trace-web` publishes the annotation-queue SESSION STORE and the
+Shiki adapter and no conversation surface at all.
+
+So the two honest options were a placeholder or leaving the key. A placeholder
+is what the me family shipped for recent-traces and what automations shipped for
+the query autocomplete — but those are a widget and a completion popup, and this
+is the entire surface the queue exists for: the reviewer reads the thread, marks
+turns into the sitting's set, and annotates in the rail. Deleting it and calling
+it a recorded gap would have been deleting the feature. **A key belongs to the
+family that can carry its content, not to the family whose name is in its URL.**
+
+What that costs, and it is not free: four platform modules stay alive for the
+one key — `components/AnnotationsLayout.tsx` (the sidebar), `hooks/useAnnotationQueues.tsx`,
+`features/traces-v2/components/AddToAnnotationQueueDialog.tsx` and
+`components/AddAnnotationQueueDrawer.tsx` — and the family now renders TWO
+sidebars, the platform one on the walker and the package copy on the other four
+addresses. They die together when traces moves. The moved screens still link to
+the walker as a plain address, and the loader merge leaves a key the package
+registry does not name to the host's, so the seam is invisible to a reader.
+
+#### The move introduced a live render loop, and the suite is what found it
+
+`model/annotation-period.ts` is the reading half of the platform's
+`usePeriodSelector`, made pure so the "a queue does not narrow until a range is
+picked" rule could be a unit test. Pure means it takes `now` — and calling it
+straight out of a render body gives a RELATIVE window a new end timestamp every
+render, to the millisecond. The list's "the picks belong to these rows" effect is
+keyed on that window, so it fired, set state, rendered, and moved the window
+again. In a browser that is a render loop AND a tRPC round trip per frame,
+because the queue read's input carries the two dates.
+
+It surfaced as a test worker that stalled inside an ordinary synchronous render
+and walked to its four-gigabyte ceiling with NO failing assertion — raising the
+ceiling to eight gigabytes only made it take longer, and the apparent culprit
+moved every time anything else in the file changed, which is how three hours went
+into splitting files that were never the problem. **A jsdom worker that dies of
+memory with every test green is an infinite render, not a heavy suite. Look for
+a value recomputed per render that something is keyed on, before you touch the
+runner.** The platform hook held the same line with the same `useMemo` and said
+why in a comment; `behavior/use-annotation-period.ts` says it again, with a
+referential regression pin beside it.
+
+#### Four keys, one screen, and the view as a prop
+
+The automations tab-as-prop shape, applied to a list. Four page files whose
+bodies differed only in the props they handed one table become one screen and a
+`view` prop; `apps/ui`'s routes section maps a key to a view. That is why the
+host port has NO `pathname` — the only thing still read off the address is the
+queue `:slug`, which the router captured as a parameter.
+
+Two things a later family should copy from how it was pinned:
+`annotation-page-policy.integration.test.tsx` asserts each key resolves ITS view
+by name, so a swapped pair cannot pass; and the guard asymmetry is asserted in
+both directions, because only ONE of the four platform pages carried a
+`withPermissionGuard` and inventing three more is a change to who can reach a
+page that a move does not own. It is not a hole — every procedure behind all four
+carries `annotations:view` — and it is recorded so somebody can decide.
+
+#### The one feature loss, and it is the same wall automations hit
+
+**The All Annotations page's FILTERED MODE did not travel.** The platform page
+asked `useFilterParams` whether the address carried any trace filter and, if it
+did, queried the matching traces first and the annotations on them second. That
+hook reaches `~/server/filters/registry`, `~/server/filters/types` and
+`~/server/analytics/utils`; a browser package may name none of them, and
+`availableFilters` is a vocabulary with NOTHING to narrow a copy of it — the
+RBAC family's test for when a vocabulary copy is safe, failed. Nothing in the
+product links to `/annotations/all` with a filter: the annotations pages render
+no filter control, so the mode was reachable only by a hand-made URL or by the
+saved-view fallback the hook reads out of the browser's key-value store. That
+fallback is the visible half — a reviewer with a saved trace view selected used
+to see this page silently narrowed to it and now sees every annotation in the
+range.
+
+#### Chrome gaps, recorded
+
+- `traceV2Details` and `addDatasetRecord`. Every row opens one of them, and both
+  are `platform/app` registry entries mounted by `DashboardPageBody`. The screens
+  write the address (`model/annotation-overlay-address.ts`, clearing every stale
+  `drawer.` key first, which is what the registry did) and nothing opens until the
+  chrome layout route lands. The same gap coding-agent, me and automations
+  recorded; the addresses are asserted on the host's recorded query rather than on
+  a rendered overlay, which is the only assertion available and is the right one.
+- **The queue editor does NOT carry that gap**, and that is the gateway family's
+  shape paying off: creating and editing a queue is `?queue-editor=<id|new>`,
+  this family's own key, and the screen mounts its own narrowed copy of the
+  drawer. A link that opens a queue for editing still works.
+
+#### What the closure cost
+
+- **`AnnotationsTable` was EXCLUSIVE and moved** (631 lines, four callers, all of
+  them the four moved pages) along with both of its suites.
+- **Seven family-local copies, every one with platform callers that stay**:
+  `NoDataInfoBlock`, `SelectionActionBar` (the datasets family took the same two),
+  `RandomColorAvatar`/`UserAvatar` (→ `reviewer-avatar`), `MenuLink` (→ a narrowed
+  `sidebar-menu-link` that no longer resolves selection from the pathname),
+  `PeriodSelector` (split into a pure model and a picker), `RedactedField`
+  (narrowed to its query-driven half) and `downloadCsv` (papaparse did not travel
+  — eleven lines do the same RFC 4180 job).
+- **Two more the walker keeps**: `AddToAnnotationQueueDialog` and
+  `AddParticipants`. The dialog is opened by the trace table's bulk bar and the
+  trace drawer's overflow menu as well, so both stay and both travelled as copies.
+- **Three things the queue editor dropped**, all recorded in its docblock: the
+  nested "Add New" score-type sub-drawer (score types are defined in Settings, and
+  the picker now says so — the automations dataset-sub-flow precedent), the slug
+  preview under the name field (the server mints the slug; a preview that can
+  disagree is worse than none), and `react-hook-form` (two text fields are plain
+  state; the server's field rejections still land on the field, read through the
+  same nine-line `readHandledError` copy gateway and automations carry).
+
+#### Known costs, all reported rather than suppressed
+
+- **2 new architecture-lint findings, 5 retired** (823 measured before, 819
+  after; the extra movement belongs to the identity worker lane running
+  concurrently, which came and went during this move). Mine:
+  `ui-screen-closure` for `@langwatch/platform-api-client` in the procedure map —
+  the line every family carries — and `ui-web-public-entry` for the root `.`
+  export, un-repointable. Retired: five `legacy-feature-fragment` rows, the four
+  page shells and `AnnotationsTable`, and their baseline entries went with them.
+- Two findings were FIXED rather than carried, and both are worth knowing about.
+  `ui-web-layer-direction` fired because a `ui/blocks` dialog imported its state
+  TYPE from `behavior`; the type moved to `model`, where a portable value belongs.
+  And `ui-screen-closure` fired on the SCREEN for "browser session or storage
+  state" — because its docblock contained the word `localStorage` while
+  explaining the filtered mode that did not travel. **The closure rule reads
+  source text, comments included.**
+- ZERO new `platform/app` typecheck errors: 18 in 13 files, the attributed
+  baseline, none of them annotations. Nothing outside the family imported any of
+  the eight deleted files.
+- **TWO INHERITED RED SUITES, not caused and not fixed.** Both of the queue
+  walker's test files —
+  `pages/[project]/annotations/__tests__/my-queue-{conversation,bar}.integration.test.tsx`
+  — fail on an incomplete `@langwatch/trace-web` module mock: the page imports
+  `useAnnotationQueueSessionStore`, `sessionTraceIds` and (transitively)
+  `useDrawerStore`, and the factories declare only `useShikiAdapter`. Proved
+  pre-existing by restoring the eight deleted platform files and the four loader
+  keys and running both again: identically red. They belong to the key that did
+  not move, and they are the trace family's to fix with it.
+- `annotations-list-selection.feature` went from **0/14 bound to 20/20**. It was
+  already 0 before this move — the tests carried fine-grained `@scenario` titles
+  the spec's coarse scenarios never matched, so the file reported unbound and
+  nobody noticed. Both halves are bound now (stacked `/** @scenario */`
+  docblocks bind more than one title to one test), and six scenarios were added
+  for what the move changed.
+
+#### The twelfth family's own additions, for whoever moves the thirteenth
+
+- **A TENTH HOST PORT OF THE SAME SHAPE.** What this one asks that none before it
+  did is `isOwnPersonalWorkspace()` — a column on the TEAM crossed with who is
+  signed in, which `hasPermission` cannot answer and which cannot be discovered
+  by asking the procedure, because `personalWorkspaceFeatures.get` answers
+  NOT_FOUND for anybody else's workspace. A refusal is not an answer.
+- **RE-SURVEY THE KEYS, NOT JUST THE FILE COUNT.** The ranking row's "12+7" was
+  almost exactly right about the files and wrong about which of them could
+  travel. Before costing a family, open every page and ask what each one MOUNTS,
+  not what it links to.
+- **A pure function that takes `now` must be memoised at the render seam.**
+  Making a hook pure is right; calling it per render is not. The rule generalises
+  to anything a reading is keyed on.
+- **Check the spec's binding count BEFORE you move it.** `0/14 bound` on a file
+  full of `@integration` tags is the feature-parity trap in its quietest form,
+  and a page move is the moment somebody is actually reading both halves.
+- **A DELIBERATE ADDITION IS STILL AN ADDITION.** Three unguarded keys were left
+  unguarded. Writing the reason down in the routes section and asserting the
+  refusal in both directions is what turns "we did not get round to it" into a
+  question somebody can answer.
+
 ## Post-five-families re-ranking (2026-09-01 survey of the remaining keys)
 
 82 keys → 80 distinct modules at survey time; the evaluations redirect
@@ -1786,7 +1978,7 @@ closures are computed net of that.
 | 5 | prompts | 1 | 44+14 | **MOVED** — see the section above. ONE key, and the nine model copies landed as surveyed. What the estimate missed is that fourteen of the sixty-three closure files have callers outside the family, so they stay in `platform/app` with their tests and travel as narrowed copies: 56 files delete, not 44. The `~70 prompt fragment lines` were 39. |
 | 6 | settings S7 identity | 3 | 8+3 | needs a web package decision; EnrichedAuditLog contract type |
 | 7 | settings S2 RBAC | 2 | 8+4 | **MOVED** — see the section above. Two keys, and the effort estimate held exactly (8 platform files, 4 tests touched). What it got wrong is the gate: governing `@langwatch/authz-web` clears NOTHING that governance or gateway carry, because `governedWebPackages` selects what the lint walks and changes no rule's verdict about an import. The `~/server/api/rbac` fix was real and cheap — a bare type alias and one deprecated function, both already published by the authz contract. |
-| 8 | annotations | 5 | 12+7 | traceV2Details chrome gap; relayout annotation-web; tab-as-prop |
+| 8 | annotations | 5 | 12+7 | **MOVED** — see the section above. FOUR keys, not five: `/annotations/my-queue` mounts 4,347 lines of the trace family's conversation view, which no package publishes, so it stays with traces and takes four platform modules with it. The chrome gap and the tab-as-prop shape were both as forecast; what the row missed is that making the period reading pure introduced a render loop that read as a four-gigabyte test worker, and that the family's spec was already 0/14 bound. |
 | 9 | settings S6 credentials + /cli/auth | 3 | 14+12 | MUST ship together (cli imports api-keys files); create api-key-web; rbac fix |
 | 10 | analytics | 9 | 49+17 | six ~/server modules; retires 4 of automations' 7 platform breaks; custom/[id] is tab-as-prop |
 | 11 | evaluations/evaluators | 7 | 16+8 | WORST drawer sharing (evaluatorEditor 20 callers); entangled with experiments at module level |
