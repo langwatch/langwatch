@@ -40,6 +40,7 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { navigationApi } from "../../behavior/navigation-api";
 import { useNavigationHost } from "../../model/navigation-host";
+import { planManagementHref } from "../../model/plan-management-href";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner";
 import { NavigationLink } from "../elements/navigation-link";
 import { PageErrorFallback } from "../elements/page-error-fallback";
@@ -50,13 +51,11 @@ export type ShellPageBodyProps = {
 } & StackProps;
 
 /**
- * Where a reader goes to change what they are paying for.
- *
- * SaaS manages a subscription; every other deployment manages a license.
+ * Where a reader goes to change what they are paying for, re-published from
+ * `model` so this banner and the command bar's "View Plans" entry resolve the
+ * one address.
  */
-export function planManagementHref(isSaaS: boolean): string {
-  return isSaaS ? "/settings/subscription" : "/settings/license";
-}
+export { planManagementHref };
 
 /**
  * The organization role that carries administrative reach across every team.

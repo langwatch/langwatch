@@ -186,6 +186,53 @@ export type NavigationApiMap = {
       query: { input: Record<string, never>; output: { pendingSsoSetup?: boolean } };
     };
   };
+
+  /**
+   * THE FIVE LISTS QUICK SEARCH READS, and the reason the command bar is not a
+   * feature of its own.
+   *
+   * Every one of them is another family's list query, asked at the family's own
+   * path and input so the answer is the same React Query entry that family's own
+   * page fills — the way `limits.getUsage` above is one entry shared with the
+   * sidebar meter. The palette owns no procedure at all; it owns a catalogue and
+   * a ranking. That is what put it here, in the package whose shell renders it,
+   * rather than in a package of its own.
+   *
+   * Each is asked only while the palette is open and a project is resolved,
+   * which is what keeps a Cmd+K on a settings page from firing five requests.
+   */
+  prompts: {
+    getAllPromptsForProject: {
+      query: {
+        input: { projectId: string };
+        output: Array<{ id: string; handle?: string | null; version?: number }>;
+      };
+    };
+  };
+
+  agents: {
+    getAll: {
+      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+    };
+  };
+
+  dataset: {
+    getAll: {
+      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+    };
+  };
+
+  workflow: {
+    getAll: {
+      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+    };
+  };
+
+  evaluators: {
+    getAll: {
+      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+    };
+  };
 };
 
 export const navigationApi = createFeatureApi<NavigationApiMap>();

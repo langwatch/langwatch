@@ -67,7 +67,11 @@ export {
   type SettingsMenuGroup,
   type SettingsMenuItem,
 } from "../model/settings-menu";
-export { featureIcons, type FeatureKey } from "../model/feature-icons";
+export {
+  featureIcons,
+  recentItemTypeToFeature,
+  type FeatureKey,
+} from "../model/feature-icons";
 export { APP_HEADER_HEIGHT } from "../model/menu-widths";
 export {
   projectNavItems,

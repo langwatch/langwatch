@@ -20,6 +20,7 @@ import {
   type NavigationCommandBar,
   type NavigationDeployment,
   type NavigationFlagReading,
+  type NavigationLangy,
   type NavigationOpsAccess,
   type NavigationOrganization,
   type NavigationPlanReading,
@@ -56,6 +57,7 @@ export type StubNavigationReadings = {
   plan?: Partial<NavigationPlanReading>;
   opsAccess?: Partial<NavigationOpsAccess>;
   commandBar?: NavigationCommandBar | null;
+  langy?: NavigationLangy | null;
   supportChat?: NavigationSupportChat | null;
   accountMenu?: NavigationAccountMenu | null;
 };
@@ -67,6 +69,7 @@ export type StubNavigationActions = {
   rememberScope?: (write: NavigationScopeWrite) => void;
   signOut?: () => void;
   setDocumentTitle?: (title: string) => void;
+  openDrawer?: (drawer: string, params?: Record<string, string>) => void;
 };
 
 const SELF_HOSTED_PRODUCTION: NavigationDeployment = {
@@ -192,6 +195,14 @@ export class StubNavigationHost extends NavigationHostPort {
 
   commandBar(): NavigationCommandBar | null {
     return this.readings.commandBar ?? null;
+  }
+
+  openDrawer(drawer: string, params?: Record<string, string>): void {
+    this.actions.openDrawer?.(drawer, params);
+  }
+
+  langy(): NavigationLangy | null {
+    return this.readings.langy ?? null;
   }
 
   supportChat(): NavigationSupportChat | null {

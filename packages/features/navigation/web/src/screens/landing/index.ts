@@ -42,6 +42,7 @@ export {
   useOptionalNavigationHost,
   type NavigationAccountMenu,
   type NavigationCommandBar,
+  type NavigationLangy,
   type NavigationDeployment,
   type NavigationFlagReading,
   type NavigationOpsAccess,

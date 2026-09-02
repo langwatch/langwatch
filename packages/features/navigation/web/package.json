@@ -8,13 +8,17 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/landing": {
-      "types": "./src/screens/landing/index.ts",
-      "default": "./src/screens/landing/index.ts"
-    },
     "./chrome": {
       "types": "./src/ui/index.ts",
       "default": "./src/ui/index.ts"
+    },
+    "./command-bar": {
+      "types": "./src/command-bar.ts",
+      "default": "./src/command-bar.ts"
+    },
+    "./screens/landing": {
+      "types": "./src/screens/landing/index.ts",
+      "default": "./src/screens/landing/index.ts"
     },
     "./testing": {
       "types": "./src/testing.tsx",
@@ -31,11 +35,14 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",
-    "zustand": "^5.0.2",
     "next-themes": "^0.4.6",
+    "react-error-boundary": "^6.1.2",
     "react-icons": "^5.7.0",
-    "react-error-boundary": "^6.1.2"
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",

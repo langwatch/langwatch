@@ -154,6 +154,34 @@ export type NavigationCommandBar = {
 };
 
 /**
+ * The assistant, when this application composes one and this reader may start
+ * a turn with it.
+ *
+ * THE COMMAND BAR'S ONE DOOR INTO LANGY, and it is a host answer rather than
+ * an import for the reason every other cross-family reach in this package is:
+ * `@langwatch/langy-web` is a feature-web package and this one may not name it.
+ * What the palette actually needs is small — may this reader ask, a way to
+ * hand a question over, a way to tell a minimised panel to stand down while
+ * the home's field is in use, and the mark to draw in the composer — so the
+ * port carries those four and nothing of the assistant itself.
+ *
+ * `null` is a real answer: a reader holding only `langy:view` is not offered
+ * the hand-off at all, because the hand-off queues a prompt that auto-sends
+ * and offering it would be an invitation into a 403.
+ */
+export type NavigationLangy = {
+  /** Hand a typed question to the assistant. It opens and sends. */
+  ask: (prompt: string) => void;
+  /**
+   * Tell a minimised assistant that an inline palette has the reader's
+   * attention, so the two do not talk over each other on the home page.
+   */
+  setHomeAskOpen: (open: boolean) => void;
+  /** The assistant's own mark, drawn in the palette's composer. */
+  mark: ReactNode;
+};
+
+/**
  * The live-chat bubble, when this deployment carries one.
  *
  * `null` is a real answer and the Support menu reads it as one: a deployment
@@ -342,6 +370,20 @@ export abstract class NavigationHostPort {
 
   /** The search palette, or nothing when this application has none. */
   abstract commandBar(): NavigationCommandBar | null;
+
+  /**
+   * Opens a drawer BY NAME, against whatever registry the application composed.
+   *
+   * The command catalogue names drawers eight other families own. None of them
+   * is this package's to import, and none of them has to be: `?drawer.open=`
+   * is an address, so the catalogue carries the name and the host resolves it.
+   * A host whose registry has no such drawer opens nothing, which is the same
+   * answer a mistyped address has always given.
+   */
+  abstract openDrawer(drawer: string, params?: Record<string, string>): void;
+
+  /** The assistant, or nothing when this reader may not start a turn. */
+  abstract langy(): NavigationLangy | null;
 
   /** The live-chat bubble, or nothing when this deployment carries none. */
   abstract supportChat(): NavigationSupportChat | null;

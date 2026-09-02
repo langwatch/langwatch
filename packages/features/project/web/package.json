@@ -1,0 +1,73 @@
+{
+  "name": "@langwatch/project-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe project screens: the project home a member lands on, and the organization and project settings they configure.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./screens/home": {
+      "types": "./src/screens/home/index.ts",
+      "default": "./src/screens/home/index.ts"
+    },
+    "./screens/project": {
+      "types": "./src/screens/project/index.ts",
+      "default": "./src/screens/project/index.ts"
+    },
+    "./ui/blocks/tech-stack": {
+      "types": "./src/ui/blocks/tech-stack.tsx",
+      "default": "./src/ui/blocks/tech-stack.tsx"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/navigation-web": "workspace:*",
+    "@langwatch/organization-web": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@paper-design/shaders-react": "^0.0.76",
+    "@tanstack/react-query": "5.101.4",
+    "date-fns": "^4.1.0",
+    "lodash-es": "^4.17.21",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
+    "numeral": "^2.0.6",
+    "posthog-js": "^1.396.9",
+    "react-contextual-analytics": "^1.1.2",
+    "react-hook-form": "^7.65.0",
+    "react-icons": "^5.7.0"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/numeral": "^2.0.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}
