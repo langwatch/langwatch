@@ -7,6 +7,7 @@ import {
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
+import type { UserService } from "@langwatch/user-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import type {
@@ -71,6 +72,23 @@ class TestAuthorization extends ApiAuthorizationPort {
   }
 }
 
+/**
+ * The user directory the Auth graph publishes, as a double.
+ *
+ * Every call refuses: this file describes how a verified browser session
+ * becomes an actor, and that path reads no user through this seam — the
+ * identity half does.
+ */
+function testUserService(): UserService {
+  return new Proxy({} as UserService, {
+    get(_target, property) {
+      return () => {
+        throw new Error(`the auth composition test reached users.${String(property)}`);
+      };
+    },
+  });
+}
+
 class TestAuthComposition extends ApiAuthSessionCompositionPort {
   readonly compose = vi.fn(() => this.dependencies);
 
@@ -86,7 +104,7 @@ describe("API Auth/session composition", () => {
     const sessions = BetterAuthBrowserSessionTransportAdapter.create({
       api: { getSession },
     });
-    const composition = new TestAuthComposition({ auth, sessions });
+    const composition = new TestAuthComposition({ auth, sessions, users: testUserService() });
     const authentication = AuthSessionApiAuthenticationAdapter.create(composition.compose());
     const request = new Request("https://api.example.test/api/trpc", {
       headers: { cookie: "better-auth.session_token=token-1" },

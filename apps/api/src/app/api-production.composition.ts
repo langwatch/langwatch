@@ -1,6 +1,7 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   createProcessObservability,
@@ -8,6 +9,7 @@ import {
 } from "@langwatch/observability/node";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
@@ -54,6 +56,19 @@ import {
   withApiAnalyticsCollaborators,
   type ApiAnalyticsCollaborators,
 } from "./api-trpc-collaborators.analytics.composition";
+import {
+  composeApiIdentityCollaborators,
+  withApiIdentityCollaborators,
+  type ApiIdentityCollaborators,
+  type ApiIdentityDeploymentFacts,
+  type ApiIdentityMailPort,
+} from "./api-trpc-collaborators.identity.composition";
+import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter";
+import {
+  composeApiExecutionCollaborators,
+  withApiExecutionCollaborators,
+  type ApiExecutionCollaborators,
+} from "./api-trpc-collaborators.execution.composition";
 import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
@@ -198,6 +213,41 @@ export type ApiProductionCompositionOptions = {
    * boot.
    */
   trpcCollaborators?: AnyApiTrpcCollaborators;
+  /**
+   * A host's already-composed model gateway.
+   *
+   * The one collaborator the EXECUTION half cannot do without and this process
+   * cannot yet build for itself: `PostgresModelProviderAdapter` takes six
+   * ports — its catalogue, its credential codec, its Codex refresher, its
+   * connection limiter, its translation port and its id service — whose only
+   * implementations are still `platform/app` classes. A Studio node's model is
+   * resolved per run, so the workflow service cannot be composed without one.
+   *
+   * Absent means this process composes no workflow, experiment or evaluation
+   * surfaces at all, rather than mounting four namespaces over a gateway that
+   * does not exist and answering every run with an unattributable failure.
+   */
+  modelProviders?: ModelProviderService;
+  /**
+   * The four facts a person-shaped surface needs that are the DEPLOYMENT's:
+   * its public host, the sign-in provider it mounted, whether it registered
+   * passkeys, and who its operators are.
+   *
+   * Optional, and every absence has a stated consequence rather than a
+   * default — see {@link ApiIdentityDeploymentFacts}. They arrive as options
+   * rather than as configuration leaves because they are the same class of
+   * thing `browserSessions` is: the deployment's, not this package's.
+   */
+  identity?: ApiIdentityDeploymentFacts;
+  /**
+   * The messages the identity surfaces send, where the deployment composed a
+   * mail gateway.
+   *
+   * A port rather than the gateway, and for a structural reason: rendering a
+   * LangWatch message is react-email, and this process must not pull a React
+   * renderer onto its import graph. See {@link ApiIdentityMailPort}.
+   */
+  mail?: ApiIdentityMailPort;
 };
 
 /** The credential pair every product transport on this process is built from. */
@@ -230,6 +280,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAuth: ApiAuthComposition | undefined;
   private composedClickHouse: ApiClickHouseInfrastructure | undefined;
   private composedAnalytics: ApiAnalyticsCollaborators | undefined;
+  private composedIdentity: ApiIdentityCollaborators | undefined;
+  private composedExecution: ApiExecutionCollaborators | undefined;
+  /**
+   * The one shared counter. Built at construction rather than inside
+   * {@link composeFeaturePorts} because two callers meter through it — the
+   * public REST surface and the identity half's throttles — and two limiter
+   * instances would give a caller two budgets for one rule.
+   */
+  private readonly rateLimiter = ApiRateLimitInfrastructure.create({
+    connection: () => this.composedQueueRedis,
+  });
+
+  private composedQueueRedis: RedisConnection | undefined;
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -291,6 +354,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // submitted SQL runs as. Both are this composition's to open, so the record
     // below can be satisfied without a host handing them in.
     this.composedAnalytics = this.composeAnalytics(options, authz);
+    // The person half of the same record: the two signed-out doors, the
+    // signed-in person's account and credentials, their organization's
+    // membership and groups, join requests, sign-up and presence. Composed
+    // over the SAME user directory the browser-session boundary resolves
+    // through and the SAME organization service the REST doors serve from —
+    // a second of either would be a second answer to who somebody is.
+    this.composedIdentity = this.composeIdentity(options, auth, tenancy, queueInfrastructure);
+    // The execution half: the studio's own lifecycle, the optimization panel,
+    // the experiment wizard and workbench, and the evaluator surfaces. One
+    // workflow service serves all four plus the evaluator service built over
+    // it, and the evaluation re-score reports through a PRODUCER-only
+    // registration of the same pipeline the worker drains.
+    this.composedExecution = this.composeExecution(options, agents, encryption);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: this.composedDatabase?.connection,
       // The SAME AuthZ service the REST doors authorize through: a permission
@@ -298,9 +374,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // same procedure would have.
       authz,
       audit: this.options.audit,
-      collaborators: withApiAnalyticsCollaborators(
-        this.options.trpcCollaborators,
-        this.composedAnalytics,
+      collaborators: withApiExecutionCollaborators(
+        withApiIdentityCollaborators(
+          withApiAnalyticsCollaborators(this.options.trpcCollaborators, this.composedAnalytics),
+          this.composedIdentity,
+        ),
+        this.composedExecution,
       ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
     });
@@ -742,12 +821,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     queueInfrastructure: ApiQueueInfrastructure | undefined,
   ): ApiOwnedRestFeaturePorts {
     const instanceAdminKey = ApiInstanceAdminKeyAdapter.create({ config: options.config });
-    const rateLimit = ApiRateLimitInfrastructure.create({
-      connection: () => queueInfrastructure?.redis,
-    });
+    this.composedQueueRedis = queueInfrastructure?.redis;
     return {
       instanceAdminKey: () => instanceAdminKey.read(),
-      rateLimit: (request) => rateLimit.consume(request),
+      rateLimit: (request) => this.rateLimiter.consume(request),
     };
   }
 
@@ -796,6 +873,106 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
       resources: options.resources,
+    });
+  }
+
+  /**
+   * Composes the identity half of the collaborator set.
+   *
+   * Everything it needs this process already holds: the guarded client, the
+   * organization / project / API-key graph, the grant ledger, and the user
+   * directory and Auth service the browser-session boundary composed. What it
+   * cannot hold — the deployment's public host, its sign-in provider, its
+   * operators and its mail gateway — arrives on the options, and each absence
+   * is a named refusal on the one surface that needs it rather than a reason
+   * the whole record goes missing.
+   */
+  private composeIdentity(
+    options: ApiRuntimeCompositionOptions,
+    auth: ApiAuthSessionCompositionPort,
+    tenancy: ApiResolvedTenancy,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ApiIdentityCollaborators | undefined {
+    const database = this.composedDatabase?.connection;
+    const projects = this.composedTenancy?.projects;
+    const authz = this.composedAuthz;
+    // A host that injected its own api-key and organization pair composed no
+    // tenancy here, so it holds the collaborator set whole and hands it in
+    // rather than having this half built for it.
+    if (!database || !projects || !authz) return undefined;
+
+    const session = auth.compose();
+    return composeApiIdentityCollaborators({
+      prisma: database.client,
+      organizations: tenancy.organizations,
+      projects,
+      apiKeys: tenancy.apiKeys,
+      grants: authz.grants,
+      users: session.users,
+      auth: session.auth,
+      // The SAME Redis the queue owns: presence and the broadcast fan-out ride
+      // the process's one connection rather than opening a second.
+      redis: queueInfrastructure?.redis ?? null,
+      // The SAME counter the public REST surface meters through, so a budget
+      // cannot be spent twice by asking on two paths.
+      rateLimit: (request) => this.rateLimiter.consume(request),
+      eventing: ApiEventingIdentityAdapter.create(this.composedEventing),
+      resources: options.resources,
+      deployment: this.options.identity ?? {},
+      mail: this.options.mail,
+      processName: options.config.serviceName,
+    });
+  }
+
+  /**
+   * Composes the execution half of the collaborator set over this process's
+   * own graph.
+   *
+   * Three things gate it, and each absence is a different fact:
+   *
+   *  - the DATABASE, because every service below is a row reader;
+   *  - the AGENT service, because a wizard experiment resolves the agents its
+   *    targets name and the reference set takes one;
+   *  - the MODEL GATEWAY, which this process cannot build for itself — see
+   *    {@link ApiProductionCompositionOptions.modelProviders}.
+   *
+   * Everything else is optional and degrades where it is used rather than
+   * here: no ClickHouse means a run history refuses at the call, no NLP
+   * address means nothing executes, no queue means a re-score cannot be
+   * reported, and no cipher means a project's run secrets cannot be decrypted.
+   * None of them makes the four namespaces unmountable, because each is a
+   * capability of one operation rather than of the surface.
+   */
+  private composeExecution(
+    options: ApiRuntimeCompositionOptions,
+    agents: AgentService | undefined,
+    encryption: SecretEncryptionPort | undefined,
+  ): ApiExecutionCollaborators | undefined {
+    const database = this.composedDatabase?.connection;
+    const modelProviders = this.options.modelProviders;
+    if (!database || !agents || !modelProviders) {
+      LoggedApiExecutionAbsence.create(createLogger(options.config.serviceName)).absent({
+        database: Boolean(database),
+        agents: Boolean(agents),
+        modelProviders: Boolean(modelProviders),
+      });
+      return undefined;
+    }
+
+    return composeApiExecutionCollaborators({
+      prisma: database.client,
+      processName: options.config.serviceName,
+      modelProviders,
+      agents,
+      // The SAME ClickHouse the charted reads run on, opened once by
+      // {@link composeAnalytics}: an experiment's run history and an
+      // evaluation's analytics are rows in that same routed instance, and a
+      // second connection would be a second pool against one server.
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
+      publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
+      secretDecryptor: encryption,
+      eventing: this.composedEventing?.eventSourcing,
     });
   }
 
@@ -950,6 +1127,36 @@ export class LoggedApiClickHouseAbsence extends ApiClickHouseAbsenceReportPort {
     this.logger.info(
       { reason: "unconfigured" },
       "API composed without ClickHouse: the charted analytics reads and the filter pickers refuse at the call. The LangWatchQL workbench is unaffected — it runs on its own restricted identity.",
+    );
+  }
+}
+
+/**
+ * Names which of the execution half's three preconditions this process is
+ * missing, once, at boot.
+ *
+ * Named individually rather than as one "not composed": a deployment with no
+ * database has a different problem from one that simply has not handed in a
+ * model gateway yet, and an operator reading "no packaged tRPC namespaces"
+ * without this line has no way to tell them apart.
+ */
+export class LoggedApiExecutionAbsence {
+  static create(logger: Pick<Logger, "info">): LoggedApiExecutionAbsence {
+    return new LoggedApiExecutionAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {}
+
+  absent(present: { database: boolean; agents: boolean; modelProviders: boolean }): void {
+    const missing = [
+      present.database ? undefined : "a database",
+      present.agents ? undefined : "an agent service",
+      present.modelProviders ? undefined : "a model gateway",
+    ].filter((entry): entry is string => entry !== undefined);
+    if (missing.length === 0) return;
+    this.logger.info(
+      { missing },
+      `API composed without ${missing.join(" and ")}: it serves no workflow, optimization, experiment or evaluation surfaces.`,
     );
   }
 }

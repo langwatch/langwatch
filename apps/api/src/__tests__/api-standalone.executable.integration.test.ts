@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { AgentService } from "@langwatch/agent-contract";
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
+import type { UserService } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { OrganizationService } from "@langwatch/organization-contract";
@@ -277,7 +278,11 @@ function hostProducts(): ApiProductionCompositionOptions {
 
 class HostAuthComposition extends ApiAuthSessionCompositionPort {
   compose() {
-    return { auth: new HostAuthService(), sessions: new HostSessionTransport() };
+    return {
+      auth: new HostAuthService(),
+      sessions: new HostSessionTransport(),
+      users: testUserService(),
+    };
   }
 }
 
@@ -332,4 +337,22 @@ class RecordingHost implements ApiExecutableHost {
   subscribers(event: ApiExecutableHostEvent): number {
     return this.listeners.get(event)?.size ?? 0;
   }
+}
+
+/**
+ * The user directory the Auth graph publishes, as a double.
+ *
+ * The identity half reads a person's account off THIS instance rather than
+ * composing a second one, so a test standing in for the Auth graph carries one
+ * too. It refuses on every call: nothing here exercises it, and a call would be
+ * a test reaching past what it is describing.
+ */
+function testUserService(): UserService {
+  return new Proxy({} as UserService, {
+    get(_target, property) {
+      return () => {
+        throw new Error(`the composition test reached users.${String(property)}`);
+      };
+    },
+  });
 }

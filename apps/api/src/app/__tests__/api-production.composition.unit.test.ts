@@ -10,6 +10,7 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { LANGY_VK_SECRET_NAME, SecretService, type Secret } from "@langwatch/secret-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { OrganizationService } from "@langwatch/organization-contract";
+import type { UserService } from "@langwatch/user-contract";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,6 +55,16 @@ const queueMocks = vi.hoisted(() => {
     // Registering a Group Queue producer stages the queue's own key set. It
     // enqueues nothing here; no test in this file sends a job.
     sadd: vi.fn(async () => 1),
+    // The presence broadcast fabric takes a SECOND connection for its
+    // subscriber, because one ioredis client in subscriber mode cannot serve
+    // ordinary commands. The double answers itself: nothing in this file
+    // publishes, and a subscriber that never subscribes is what a process
+    // with no live tenants has anyway.
+    duplicate: vi.fn(() => redis),
+    subscribe: vi.fn(async () => 1),
+    unsubscribe: vi.fn(async () => 1),
+    on: vi.fn(),
+    quit: vi.fn(async () => "OK"),
   };
   // `dependencies` is what the process's producer-only Eventing runtime is
   // built from; `redis` is what the rate limiter counts in. One mock carries
@@ -1034,8 +1045,30 @@ class TestGraph extends ApiProcessGraphPort {
 
 class TestAuthComposition extends ApiAuthSessionCompositionPort {
   compose() {
-    return { auth: new TestAuthService(), sessions: new TestSessionTransport() };
+    return {
+      auth: new TestAuthService(),
+      sessions: new TestSessionTransport(),
+      users: testUserService(),
+    };
   }
+}
+
+/**
+ * The user directory the Auth graph publishes, as a double.
+ *
+ * The identity half reads a person's account off THIS instance rather than
+ * composing a second one, so a test standing in for the Auth graph has to
+ * carry one too. Nothing in this file calls it: the doubles exist to satisfy
+ * the shape, and a call would be a test reaching past what it is describing.
+ */
+function testUserService(): UserService {
+  return new Proxy({} as UserService, {
+    get(_target, property) {
+      return () => {
+        throw new Error(`the composition test reached users.${String(property)}`);
+      };
+    },
+  });
 }
 
 class TestAuthService extends AuthService {

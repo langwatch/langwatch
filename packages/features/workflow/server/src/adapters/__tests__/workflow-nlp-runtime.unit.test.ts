@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatTraceparent } from "../nlpgoFetch";
+import { formatTraceparent } from "../workflow-nlp-runtime.adapter";
 
 /**
  * Unit tests for the W3C traceparent header formatting in nlpgoFetch.
  *
- * Why this matters: nlpgoFetch is the dispatch boundary between TS
+ * Why this matters: the NLP runtime adapter is the dispatch boundary between TS
  * (eval-execution.service) and the nlpgo subprocess. Without a valid
  * `traceparent` header on the request, nlpgo's `startStudioSpan` cannot
  * extract a parent SpanContext and the eval workflow emits spans on a
@@ -17,7 +17,7 @@ import { formatTraceparent } from "../nlpgoFetch";
  * These tests pin the wire-format contract so a future refactor can't
  * silently regress it.
  */
-describe("nlpgoFetch.formatTraceparent", () => {
+describe("formatTraceparent", () => {
   /** @scenario formatTraceparent builds a valid W3C traceparent header */
   it("formats a valid W3C traceparent header", () => {
     const header = formatTraceparent({

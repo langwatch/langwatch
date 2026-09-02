@@ -2,6 +2,31 @@ export {
   PostgresWorkflowAdapter,
   type PostgresWorkflowAdapterOptions,
 } from "./adapters/postgres.workflow.adapter";
+export {
+  PrismaWorkflowAgentMappingAdapter,
+  type WorkflowAgentMappingDatabase,
+} from "./adapters/prisma.workflow-agent-mapping.adapter";
+export {
+  PrismaWorkflowProjectEnvironmentAdapter,
+  UnavailableWorkflowEnvironmentDecryptor,
+  type WorkflowEnvironmentDecryptor,
+  type WorkflowProjectEnvironmentDatabase,
+} from "./adapters/prisma.workflow-project-environment.adapter";
+export {
+  PrismaWorkflowRowAdapter,
+  type WorkflowRowDatabase,
+} from "./adapters/prisma.workflow-row.adapter";
+export { ContractWorkflowDslMigrationAdapter } from "./adapters/workflow-dsl-migration.adapter";
+export {
+  HttpWorkflowNlpRuntimeAdapter,
+  UnconfiguredWorkflowNlpRuntimeAdapter,
+  formatTraceparent,
+  nlpProxyBaseUrl,
+  NLP_KEEP_ALIVE_EVENT,
+  type NlpDispatchRequest,
+  type NlpOrigin,
+} from "./adapters/workflow-nlp-runtime.adapter";
+export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter";
 export { WorkflowApp, type WorkflowAppDependencies, type WorkflowCaller } from "./app/workflow.app";
 export {
   WorkflowAgentMappingPort,

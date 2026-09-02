@@ -3,8 +3,27 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { autoComputeAgentMappings } from "../auto-compute-agent-mappings";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import {
+  PrismaWorkflowAgentMappingAdapter,
+  type WorkflowAgentMappingDatabase,
+} from "../prisma.workflow-agent-mapping.adapter";
+
+/** The adapter under test, over the fake rows one case supplies. */
+const recompute = (input: {
+  database: WorkflowAgentMappingDatabase;
+  workflowId: string;
+  projectId: string;
+  dsl: unknown;
+}): Promise<void> =>
+  PrismaWorkflowAgentMappingAdapter.create({
+    database: input.database,
+    logger: { error: () => undefined },
+  }).recompute({
+    workflowId: input.workflowId,
+    projectId: input.projectId,
+    dsl: input.dsl as StudioWorkflow,
+  });
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,7 +90,7 @@ function buildPrismaMock({
           },
         ),
     },
-  } as unknown as PrismaClient;
+  } as unknown as WorkflowAgentMappingDatabase;
 
   return { prisma, updatedConfigs };
 }
@@ -139,7 +158,7 @@ function buildUnwiredDSL({
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("autoComputeAgentMappings", () => {
+describe("PrismaWorkflowAgentMappingAdapter", () => {
   describe("when a workflow agent has no scenarioMappings and conventional inputs", () => {
     /** @scenario Auto-computes mappings when workflow with conventional inputs is saved */
     it("maps query to scenario input field", async () => {
@@ -151,8 +170,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -180,8 +199,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -209,8 +228,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -227,8 +246,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: {} }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -261,8 +280,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -281,8 +300,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -312,8 +331,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -346,8 +365,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -382,8 +401,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -448,8 +467,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -484,8 +503,8 @@ describe("autoComputeAgentMappings", () => {
         ],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -509,8 +528,8 @@ describe("autoComputeAgentMappings", () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
       const { prisma } = buildPrismaMock({ agents: [] });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -529,11 +548,11 @@ describe("autoComputeAgentMappings", () => {
           findMany: vi.fn().mockRejectedValue(new Error("DB connection lost")),
           update: vi.fn(),
         },
-      } as unknown as PrismaClient;
+      } as unknown as WorkflowAgentMappingDatabase;
 
       await expect(
-        autoComputeAgentMappings({
-          prisma,
+        recompute({
+          database: prisma,
           workflowId: "wf-1",
           projectId: "proj-1",
           dsl,
@@ -555,8 +574,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -584,8 +603,8 @@ describe("autoComputeAgentMappings", () => {
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
-      await autoComputeAgentMappings({
-        prisma,
+      await recompute({
+        database: prisma,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,

@@ -49,6 +49,14 @@ export {
   createEvaluationProcessingPipeline,
   type EvaluationProcessingPipelineDeps,
 } from "./adapters/evaluation-processing.adapter";
+export { createEvaluationProcessingProducerPipeline } from "./adapters/evaluation-processing-producer.adapter";
+export {
+  evaluatorUnavailability,
+  unavailableEvaluatorMessage,
+  LINGUA_ENABLE_ENV_VAR,
+  PRESIDIO_ENABLE_ENV_VAR,
+  type EvaluatorInstallEnvironment,
+} from "./services/evaluator-availability.service";
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
 export {
   EvaluationTrpcApi,

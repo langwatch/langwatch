@@ -234,6 +234,33 @@ export const apiConfigDefinition = RuntimeConfig.define({
         tenantSetting: Config.value(optionalEnvironmentString, { env: "LWQL_TENANT_SETTING" }),
       },
     },
+    /**
+     * The two addresses the EXECUTION half needs: where the NLP engine
+     * answers, and where this deployment answers its own public API.
+     *
+     * `nlpServiceUrl` is the engine every Studio run, every code evaluator and
+     * the evaluator keep-alive dial. Absent means this process executes no
+     * workflow and no code evaluator, and says so at the call rather than
+     * failing to boot — a deployment that serves only reads is a supported
+     * shape.
+     *
+     * `publicBaseUrl` is the origin the studio's chat panel calls back into
+     * when it runs a project's PUBLISHED workflow: that path deliberately goes
+     * over the same public run endpoint an external caller uses, authenticated
+     * as the project, so the panel exercises what a customer's integration
+     * exercises. It is the deployment's public origin rather than this
+     * listener's bind address, because behind a proxy those are different and
+     * only the first is reachable.
+     *
+     * Read here rather than where they are used, because this module is the
+     * process's only environment reader.
+     */
+    execution: {
+      nlpServiceUrl: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_NLP_SERVICE",
+      }),
+      publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
+    },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
       clusterEndpoints: Config.value(optionalEnvironmentString, {
@@ -302,9 +329,25 @@ export type ApiClickHouseConfigResolution = Readonly<{
   poolSizing: PoolSizingInput;
 }>;
 
+/**
+ * The two addresses the execution half runs on, each absent when the
+ * deployment named none.
+ *
+ * Blank is not an address: an operator who exported either variable empty has
+ * NOT configured it, and a `fetch` at `"/go/studio/execute_sync"` reports a
+ * URL parse failure rather than the configuration gap that caused it.
+ */
+export type ApiExecutionConfigResolution = Readonly<{
+  /** Where the NLP engine answers; absent means no workflow or code evaluator runs. */
+  nlpServiceUrl: string | undefined;
+  /** This deployment's public origin; absent means the studio cannot run a published workflow. */
+  publicBaseUrl: string | undefined;
+}>;
+
 export type ApiInfrastructureConfig = Readonly<{
   database: ApiDatabaseConfigResolution;
   clickhouse: ApiClickHouseConfigResolution;
+  execution: ApiExecutionConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
 }>;
@@ -371,6 +414,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         langwatchQl: resolveLangWatchQLConnection(value.infrastructure.clickhouse.langwatchQl),
         privateRoutes: resolvePrivateClickHouseRoutes(source),
         poolSizing: poolSizingFromEnv(environmentStrings(source)),
+      },
+      execution: {
+        nlpServiceUrl: value.infrastructure.execution.nlpServiceUrl?.trim() || undefined,
+        publicBaseUrl: value.infrastructure.execution.publicBaseUrl?.trim() || undefined,
       },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),

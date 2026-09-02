@@ -56,6 +56,7 @@ describe("API process configuration", () => {
             clientsPerProcess: undefined,
           },
         },
+        execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
           globalConcurrency: undefined,
@@ -65,6 +66,32 @@ describe("API process configuration", () => {
           payloadCodec: "json",
         },
       },
+    });
+  });
+
+  describe("when the execution addresses are configured", () => {
+    it("reads the NLP engine and the deployment's public origin", () => {
+      const config = resolveApiConfig({
+        LANGWATCH_NLP_SERVICE: "http://nlp.example.test:5561",
+        BASE_HOST: "https://app.example.test",
+      });
+
+      expect(config.infrastructure.execution).toEqual({
+        nlpServiceUrl: "http://nlp.example.test:5561",
+        publicBaseUrl: "https://app.example.test",
+      });
+    });
+
+    it("treats a blank export as unconfigured rather than as an empty address", () => {
+      const config = resolveApiConfig({ LANGWATCH_NLP_SERVICE: "  ", BASE_HOST: "" });
+
+      // A blank value is not an address: composed as one it would produce a URL
+      // parse failure at the first run instead of the configuration gap that
+      // caused it.
+      expect(config.infrastructure.execution).toEqual({
+        nlpServiceUrl: undefined,
+        publicBaseUrl: undefined,
+      });
     });
   });
 
@@ -266,6 +293,7 @@ describe("API process configuration", () => {
           clientsPerProcess: undefined,
         },
       },
+      execution: { nlpServiceUrl: undefined, publicBaseUrl: undefined },
       redis: {
         configured: true,
         mode: "standalone",

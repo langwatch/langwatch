@@ -3,6 +3,14 @@ export {
   type PostgresEvaluatorAdapterOptions,
 } from "./adapters/postgres.evaluator.adapter";
 export { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "./ports/evaluator.port";
+export {
+  NlpEvaluatorCodeExecutionAdapter,
+  type EvaluatorNlpDispatcher,
+} from "./adapters/evaluator-code-execution.adapter";
+export {
+  PrismaEvaluatorAuditLogAdapter,
+  type EvaluatorAuditLogDatabase,
+} from "./adapters/prisma.evaluator-audit-log.adapter";
 
 /**
  * The feature's application: the one typed thing its transports are given.

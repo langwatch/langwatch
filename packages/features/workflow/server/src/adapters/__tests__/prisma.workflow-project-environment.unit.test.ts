@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AppWorkflowProjectEnvironmentPort } from "../workflow-studio-enrichment.adapter";
+import { PrismaWorkflowProjectEnvironmentAdapter } from "../prisma.workflow-project-environment.adapter";
 
 type ProjectQuery = {
   where: { id: string };
@@ -19,7 +19,7 @@ function projectEnvironmentAdapter(input: {
   const projectSecretQueries: ProjectSecretQuery[] = [];
   const decryptedValues: string[] = [];
 
-  const port = AppWorkflowProjectEnvironmentPort.create({
+  const port = PrismaWorkflowProjectEnvironmentAdapter.create({
     database: {
       project: {
         async findUniqueOrThrow(query: ProjectQuery) {
@@ -45,7 +45,7 @@ function projectEnvironmentAdapter(input: {
   return { port, projectQueries, projectSecretQueries, decryptedValues };
 }
 
-describe("AppWorkflowProjectEnvironmentPort", () => {
+describe("PrismaWorkflowProjectEnvironmentAdapter", () => {
   it("selects a project's API key and decrypts each project-scoped secret", async () => {
     const adapter = projectEnvironmentAdapter({
       apiKey: "project-api-key",
