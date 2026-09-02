@@ -65,6 +65,7 @@
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
     "@langwatch/annotation-web": "workspace:*",
     "@langwatch/api-key-web": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

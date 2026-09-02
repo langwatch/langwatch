@@ -34,7 +34,7 @@ We will run the whole LangWatchQL chart path without `eval`, and prove it.
    `scripts/generate-vega-lite-validator.ts` compiles the bundled official
    Vega-Lite v6 schema with Ajv's standalone code generation and writes a
    checked-in module,
-   `packages/features/analytics/web/src/visualization/vega-lite-schema-validator.generated.js`.
+   `packages/features/analytics/web/src/model/visualization/vega-lite-schema-validator.generated.js`.
    The browser loads a function that already exists. The schema is used
    verbatim — nothing is pruned or rewritten, so "the bundled official schema
    decides schema validity" stays literally true.

@@ -132,17 +132,6 @@
         "~/server/filters/registry",
         "~/server/filters/types"
       ],
-      "platform/app/src/components/analytics/LLMSummary.tsx": ["../../server/analytics/registry"],
-      "platform/app/src/components/analytics/reports/DraggableGraphCard.tsx": [
-        "~/server/filters/types"
-      ],
-      "platform/app/src/components/analytics/reports/GraphCardHeader.tsx": [
-        "~/server/filters/types"
-      ],
-      "platform/app/src/components/analytics/reports/GraphFilterIndicator.tsx": [
-        "~/server/filters/types"
-      ],
-      "platform/app/src/components/analytics/UserMetrics.tsx": ["../../server/analytics/registry"],
       "platform/app/src/components/AnnotationExpectedOutputs.tsx": [
         "~/server/annotations/annotationSuggestedOutput"
       ],
@@ -270,7 +259,6 @@
       ],
       "platform/app/src/components/home/RecentItemsSection.tsx": ["~/server/home/types"],
       "platform/app/src/components/home/TracesOverview.tsx": ["~/server/analytics/registry"],
-      "platform/app/src/components/LLMMetrics.tsx": ["../server/analytics/registry"],
       "platform/app/src/components/ModelSelector.tsx": [
         "../server/modelProviders/customModelDisplayNames"
       ],
@@ -329,7 +317,6 @@
       "platform/app/src/components/scenarios/SimulationModelSelect.tsx": [
         "../../server/modelProviders/customModelDisplayNames"
       ],
-      "platform/app/src/components/SeriesFilterDrawer.tsx": ["~/server/filters/types"],
       "platform/app/src/components/settings/AddCustomEmbeddingsModelDialog.tsx": [
         "../../server/modelProviders/customModel.schema"
       ],
@@ -745,15 +732,6 @@
       "platform/app/src/optimization_studio/hooks/useGetDatasetData.ts": [
         "../../server/api/root",
         "../../server/datasets/types"
-      ],
-      "platform/app/src/pages/[project]/analytics/custom/index.tsx": [
-        "../../../../server/analytics/registry",
-        "../../../../server/analytics/types",
-        "../../../../server/analytics/utils",
-        "../../../../server/filters/types"
-      ],
-      "platform/app/src/pages/[project]/analytics/evaluations.tsx": [
-        "../../../server/evaluations/getEvaluator"
       ],
       "platform/app/src/pages/[project]/evaluations.tsx": [
         "../../server/experiments/workbenchState"

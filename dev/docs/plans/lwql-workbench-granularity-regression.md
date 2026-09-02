@@ -81,7 +81,7 @@ widgets still set it. Only the authoring surface lost the ability.
    package's duplicate `LangWatchQLGranularityStep` in the first place, so the
    move deleted the second copy rather than adding a third.
 1. Port `LangWatchQLGranularityPicker` into
-   `packages/features/analytics/web/src/components/`, reading the steps from
+   `packages/features/analytics/web/src/ui/`, reading the steps from
    the one definition.
 2. Restore the `splitMissing` behaviour in `failureView`, so a reserved name
    reveals the control instead of being offered as a value to type. On its own

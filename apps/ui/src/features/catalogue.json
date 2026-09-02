@@ -2,6 +2,7 @@
   "version": 0,
   "governedWebPackages": [
     "@langwatch/agent-web",
+    "@langwatch/analytics-web",
     "@langwatch/annotation-web",
     "@langwatch/api-key-web",
     "@langwatch/authz-web",
@@ -29,6 +30,16 @@
         "surfaces": [
           "@langwatch/agent-web/surfaces/browser-port"
         ]
+      }
+    },
+    {
+      "id": "analytics",
+      "root": "analytics",
+      "uses": {
+        "screens": [
+          "@langwatch/analytics-web/screens/analytics"
+        ],
+        "surfaces": []
       }
     },
     {

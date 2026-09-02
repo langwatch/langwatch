@@ -20,6 +20,25 @@ const AGENT_PAGE_KEYS = [
   "runtime/ui/features/agent-ui-host.adapter",
 ];
 
+const ANALYTICS_PAGE_KEYS = [
+  // NINE keys for EIGHT screens. Seven addresses are their own screen; the
+  // chart builder serves two and is told which by a `mode` prop, the
+  // automations tab-as-prop shape applied to a form. All nine carry the same
+  // grant — every one of the platform page files was
+  // `withPermissionGuard("analytics:view")` — and
+  // `analytics-page-policy.integration.test.tsx` asserts that in both
+  // directions, key by key.
+  "pages/[project]/analytics/index",
+  "pages/[project]/analytics/users",
+  "pages/[project]/analytics/topics",
+  "pages/[project]/analytics/metrics",
+  "pages/[project]/analytics/evaluations",
+  "pages/[project]/analytics/reports",
+  "pages/[project]/analytics/query",
+  "pages/[project]/analytics/custom/index",
+  "pages/[project]/analytics/custom/[id]",
+];
+
 const ANNOTATION_PAGE_KEYS = [
   // FOUR keys for ONE screen, the automations shape applied to a list: the
   // four addresses were four page files that differed only in the props they
@@ -215,6 +234,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
@@ -234,11 +254,12 @@ describe("given what apps/ui serves itself", () => {
     });
 
     it("mounts each feature's own transport Provider", () => {
-      // Seventeen for sixteen features: the personal workspace mounts two,
+      // Eighteen for seventeen features: the personal workspace mounts two,
       // because the coding-agent tables its screens render call procedures of
       // their own and `apps/ui` may not import the package they live in.
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
         "@langwatch/agent-web",
+        "@langwatch/analytics-web",
         "@langwatch/annotation-web",
         "@langwatch/api-key-web",
         "@langwatch/authz-web",
@@ -301,6 +322,7 @@ describe("given what apps/ui serves itself", () => {
       expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
+          ...ANALYTICS_PAGE_KEYS,
           ...ANNOTATION_PAGE_KEYS,
           ...API_KEY_PAGE_KEYS,
           ...AUTHZ_PAGE_KEYS,
@@ -317,7 +339,7 @@ describe("given what apps/ui serves itself", () => {
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
         ].sort(),
       );
-      expect(merged.apis).toHaveLength(17);
+      expect(merged.apis).toHaveLength(18);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

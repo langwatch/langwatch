@@ -16,40 +16,63 @@
       "default": "./src/index.ts"
     },
     "./visualization": {
-      "types": "./src/visualization/index.ts",
-      "default": "./src/visualization/index.ts"
+      "types": "./src/model/visualization/index.ts",
+      "default": "./src/model/visualization/index.ts"
     },
     "./validation": {
-      "types": "./src/visualization/validation.ts",
-      "default": "./src/visualization/validation.ts"
+      "types": "./src/model/visualization/validation.ts",
+      "default": "./src/model/visualization/validation.ts"
     },
     "./chart": {
-      "types": "./src/chart.ts",
-      "default": "./src/chart.ts"
+      "types": "./src/ui/sections/chart.ts",
+      "default": "./src/ui/sections/chart.ts"
     },
     "./testing": {
-      "types": "./src/components/__tests__/lwql-fixtures.ts",
-      "default": "./src/components/__tests__/lwql-fixtures.ts"
+      "types": "./src/__tests__/lwql-fixtures.ts",
+      "default": "./src/__tests__/lwql-fixtures.ts"
+    },
+    "./screens/analytics": {
+      "types": "./src/screens/analytics/index.ts",
+      "default": "./src/screens/analytics/index.ts"
     }
   },
   "scripts": {
     "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:browser": "vitest run -c vitest.browser.config.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.5",
     "ajv": "^8.20.0",
+    "chakra-react-select": "^6.1.3",
+    "date-fns": "^4.1.0",
+    "lodash-es": "^4.18.1",
     "lucide-react": "^1.22.0",
     "monaco-editor": "^0.55.1",
+    "numeral": "^2.0.6",
+    "qs": "^6.15.3",
     "react": "^19.2.7",
     "react-error-boundary": "^6.1.2",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.7.0",
+    "recharts": "^3.9.1",
+    "shiki": "^4.3.0",
+    "usehooks-ts": "^3.1.1",
     "vega": "6.3.1",
     "vega-embed": "7.1.0",
     "vega-lite": "6.4.3",
@@ -59,10 +82,15 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/lodash-es": "^4.17.12",
     "@types/node": "^26.0.1",
+    "@types/numeral": "^2.0.5",
+    "@types/qs": "^6.15.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitest/browser-playwright": "^4.1.9",
     "jsdom": "^30.0.1",
+    "playwright": "1.61.1",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

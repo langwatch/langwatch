@@ -71,16 +71,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/chat/[workflow]": () => import("~/pages/[project]/chat/[workflow]"),
   "pages/[project]/studio/[workflow]": () => import("~/pages/[project]/studio/[workflow]"),
   "pages/[project]/annotations/my-queue": () => import("~/pages/[project]/annotations/my-queue"),
-  "pages/[project]/analytics/index": () => import("~/pages/[project]/analytics/index"),
-  "pages/[project]/analytics/evaluations": () => import("~/pages/[project]/analytics/evaluations"),
-  "pages/[project]/analytics/metrics": () => import("~/pages/[project]/analytics/metrics"),
-  "pages/[project]/analytics/reports": () => import("~/pages/[project]/analytics/reports"),
-  "pages/[project]/analytics/topics": () => import("~/pages/[project]/analytics/topics"),
-  "pages/[project]/analytics/users": () => import("~/pages/[project]/analytics/users"),
-  "pages/[project]/analytics/query": () => import("~/pages/[project]/analytics/query"),
-  "pages/[project]/analytics/custom/index": () =>
-    import("~/pages/[project]/analytics/custom/index"),
-  "pages/[project]/analytics/custom/[id]": () => import("~/pages/[project]/analytics/custom/[id]"),
   // /experiments and /evaluations are one module: the experiments address
   // serves its guarded named export, the evaluations address its default.
   // The alias file that re-exported the one as the other is gone, so the key

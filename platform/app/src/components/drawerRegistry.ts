@@ -79,10 +79,6 @@ const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "WorkflowSelectorDrawerFromUrl",
 });
-const DashboardNameDrawer = lazyDefault({
-  factory: () => import("./analytics/DashboardNameDrawer"),
-  key: "DashboardNameDrawer",
-});
 const SelectDatasetDrawer = lazyDefault({
   factory: () => import("./datasets/SelectDatasetDrawer"),
   key: "SelectDatasetDrawer",
@@ -150,10 +146,6 @@ const PromptListDrawer = lazyDefault({
 const ScenarioFormDrawerFromUrl = lazyDefault({
   factory: () => import("./scenarios/ScenarioFormDrawer"),
   key: "ScenarioFormDrawerFromUrl",
-});
-const SeriesFiltersDrawer = lazyDefault({
-  factory: () => import("./SeriesFilterDrawer"),
-  key: "SeriesFiltersDrawer",
 });
 const CreateTeamDrawer = lazyDefault({
   factory: () => import("./settings/CreateTeamDrawer"),
@@ -226,9 +218,7 @@ export const drawers = {
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVDrawer,
   addOrEditDataset: AddOrEditDatasetDrawer,
-  seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
-  dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
   promptList: PromptListDrawer,
