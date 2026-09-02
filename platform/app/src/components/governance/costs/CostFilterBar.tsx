@@ -66,7 +66,7 @@ function FilterChip({
 }
 
 export function CostFilterBar({
-  department,
+  departmentName,
   departments,
   onDepartmentChange,
   windowDays,
@@ -76,9 +76,10 @@ export function CostFilterBar({
   groupBy,
   onGroupByChange,
 }: {
-  department: string;
+  /** `null` when no single department is selected. */
+  departmentName: string | null;
   departments: Array<{ id: string; name: string }>;
-  onDepartmentChange: (value: string) => void;
+  onDepartmentChange: (value: string, name: string | null) => void;
   windowDays: number;
   onWindowDaysChange: (value: number) => void;
   interval: TimeInterval;
@@ -86,11 +87,11 @@ export function CostFilterBar({
   groupBy: GroupBy;
   onGroupByChange: (value: GroupBy) => void;
 }) {
-  const departmentLabel =
-    department === ALL_DEPARTMENTS
-      ? "All departments"
-      : (departments.find((d) => d.id === department)?.name ??
-        "All departments");
+  // The selected name, not a lookup against the current window's options. A
+  // department the reader picked can drop out of those options, and falling
+  // back to "All departments" there would label a filtered panel as the whole
+  // organisation's spend.
+  const departmentLabel = departmentName ?? "All departments";
   const timeFrameLabel =
     TIME_FRAMES.find((f) => f.value === windowDays)?.label ??
     `Last ${windowDays} days`;
@@ -108,7 +109,7 @@ export function CostFilterBar({
       >
         <MenuItem
           value={ALL_DEPARTMENTS}
-          onClick={() => onDepartmentChange(ALL_DEPARTMENTS)}
+          onClick={() => onDepartmentChange(ALL_DEPARTMENTS, null)}
         >
           All departments
         </MenuItem>
@@ -116,7 +117,7 @@ export function CostFilterBar({
           <MenuItem
             key={d.id}
             value={d.id}
-            onClick={() => onDepartmentChange(d.id)}
+            onClick={() => onDepartmentChange(d.id, d.name)}
           >
             {d.name}
           </MenuItem>
