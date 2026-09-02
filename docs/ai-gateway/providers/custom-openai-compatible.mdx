@@ -15,6 +15,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **C
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Custom (OpenAI-compatible) row: the optional CUSTOM_API_KEY, the required CUSTOM_BASE_URL, Add Header and the routing handle custom.">
+  <img src="/images/ai-gateway/model-provider-custom-form.png" alt="The Custom OpenAI-compatible model provider drawer with CUSTOM_API_KEY, CUSTOM_BASE_URL, an Add Header button and the routing handle custom" />
+</Frame>
+
 Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
 
 The endpoint must be reachable from the gateway. The gateway always refuses link-local and cloud metadata addresses, and refuses private and loopback addresses when it runs with `BLOCK_LOCAL_HTTP_CALLS=true`.

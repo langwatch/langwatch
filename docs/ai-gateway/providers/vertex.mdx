@@ -16,6 +16,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **V
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Vertex AI row: the service account JSON, VERTEXAI_PROJECT and VERTEXAI_LOCATION, all three required. The routing handle defaults to vertex_ai.">
+  <img src="/images/ai-gateway/model-provider-vertex-form.png" alt="The Vertex AI model provider drawer with GOOGLE_APPLICATION_CREDENTIALS filled in, VERTEXAI_PROJECT acme-ai, VERTEXAI_LOCATION us-central1 and the routing handle vertex_ai" />
+</Frame>
+
 ## Model names
 
 Write `vertex/<model>`, for example `vertex/gemini-2.5-flash`. `vertex_ai/` is accepted as an alias. The gateway does not infer Vertex AI from a bare name. Add the models you use under **Custom Models** on the row.

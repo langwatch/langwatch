@@ -8,7 +8,7 @@ sidebarTitle: RBAC
 
 The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<resource>:<action>`, a role is a set of permissions, and a role binding gives a person a role on an organization, a team or a project. A grant at a higher scope covers the scopes below it: `virtualKeys:manage` on the organization covers every team and project in it.
 
-The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model, custom roles and role bindings.
+The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model and role bindings.
 
 ## Resources
 
@@ -25,7 +25,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
 | `auditLog` | The audit log under Settings. | `view` |
 
-`gatewaySpend` and `webhookEndpoints` come only from an organization role binding. A team or project binding never grants them, even through a custom role that lists them.
+`gatewaySpend` and `webhookEndpoints` come only from an organization role binding. A team or project binding never grants them.
 
 `virtualKeys:viewOtherPersonal` lets an administrator see other people's personal keys. Everyone sees their own personal keys without it.
 
@@ -57,8 +57,6 @@ Team roles apply on the teams and projects the binding names. Organization roles
 The Organization Admin column lists what the organization role grants on its own. An organization admin gets the team permissions through the team role bindings they hold, like everyone else.
 
 Organization Member and External hold no gateway permission on their own. They get gateway access through a team role binding.
-
-A custom role that lists no permission has the Team Viewer set. Add the permissions you want from the table above.
 
 ## Creating keys at a scope
 
@@ -101,5 +99,5 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 ```
 
 <Note>
-**Also check:** [Roles and permissions](/platform/rbac) for role bindings and custom roles, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
+**Also check:** [Roles and permissions](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
 </Note>

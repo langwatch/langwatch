@@ -16,6 +16,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **E
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The ElevenLabs row: ELEVENLABS_API_KEY, the optional webhook secret and base URL, and the routing handle elevenlabs.">
+  <img src="/images/ai-gateway/model-provider-elevenlabs-form.png" alt="The ElevenLabs model provider drawer with ELEVENLABS_API_KEY, ELEVENLABS_WEBHOOK_SECRET, ELEVENLABS_BASE_URL and the routing handle elevenlabs" />
+</Frame>
+
 ## Model names
 
 Write `elevenlabs/<model_id>`, for example `elevenlabs/eleven_flash_v2_5` or `elevenlabs/eleven_multilingual_v2`. `eleven_multilingual_v2` is the default when a speech request names no model.

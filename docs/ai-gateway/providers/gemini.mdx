@@ -11,10 +11,14 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **G
 | Field | Value |
 |---|---|
 | `GEMINI_API_KEY` | A Google AI Studio API key, or a Google Cloud API key when you set a project. |
-| `GEMINI_PROJECT` | Optional. A Google Cloud project id. Set it together with the location to call the Gemini API on Vertex AI instead of AI Studio. |
+| `GEMINI_PROJECT` | Optional. The Google Cloud project of a Gemini Enterprise Agent Platform key. With the location set, the row calls `aiplatform.googleapis.com` instead of AI Studio. |
 | `GEMINI_LOCATION` | Optional. The location for the project, for example `us-central1`. Set both or neither. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+<Frame caption="The Gemini row: GEMINI_API_KEY, the optional GEMINI_PROJECT and GEMINI_LOCATION pair for a Gemini Enterprise Agent Platform key, and the routing handle gemini.">
+  <img src="/images/ai-gateway/model-provider-gemini-form.png" alt="The Gemini model provider drawer with GEMINI_API_KEY filled in, GEMINI_PROJECT and GEMINI_LOCATION empty and the routing handle gemini" />
+</Frame>
 
 ## Model names
 

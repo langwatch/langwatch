@@ -3452,10 +3452,16 @@ A reset moves the period boundary to now. Recorded spend and emitted spend event
 
 ## See the spend
 
-**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
+**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset.
 
 <Frame caption="AI Gateway > Budgets: spent against limit per budget, the window, the breach mode and the next reset. The block budget is at 100 percent, the warn budget at 85.">
   <img src="/images/ai-gateway/budgets-page.png" alt="The Budgets list with an organization budget at 0 percent, a block budget at 100 percent and a warn budget at 85 percent" />
+</Frame>
+
+Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
+
+<Frame caption="A breached block budget opened: $0.05822 spent of a $0.05 daily limit, 100 percent used, the next reset, and under Recent activity the requests that spent it.">
+  <img src="/images/ai-gateway/budget-breached-detail.png" alt="The budget detail page for acme-block-budget with the utilization bar full and red, Window day, On breach block, the Identity block and the Recent activity table" />
 </Frame>
 
 **AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
@@ -10264,6 +10270,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **C
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Cerebras row: name, scope, CEREBRAS_API_KEY and the routing handle cerebras.">
+  <img src="/images/ai-gateway/model-provider-cerebras-form.png" alt="The Cerebras model provider drawer with the CEREBRAS_API_KEY field and the routing handle cerebras" />
+</Frame>
+
 ## Model names
 
 Write `cerebras/<model>`, for example `cerebras/llama-3.3-70b`. The gateway does not infer Cerebras from a bare name.
@@ -10308,6 +10318,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **C
 | `CUSTOM_API_KEY` | Optional. Sent as `Authorization: Bearer` when set. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+<Frame caption="The Custom (OpenAI-compatible) row: the optional CUSTOM_API_KEY, the required CUSTOM_BASE_URL, Add Header and the routing handle custom.">
+  <img src="/images/ai-gateway/model-provider-custom-form.png" alt="The Custom OpenAI-compatible model provider drawer with CUSTOM_API_KEY, CUSTOM_BASE_URL, an Add Header button and the routing handle custom" />
+</Frame>
 
 Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
 
@@ -10360,6 +10374,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **D
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The DeepSeek row: name, scope, DEEPSEEK_API_KEY and the routing handle deepseek.">
+  <img src="/images/ai-gateway/model-provider-deepseek-form.png" alt="The DeepSeek model provider drawer with the DEEPSEEK_API_KEY field and the routing handle deepseek" />
+</Frame>
+
 The gateway calls `https://api.deepseek.com` as an OpenAI-compatible endpoint.
 
 ## Model names
@@ -10407,6 +10425,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **E
 | `ELEVENLABS_BASE_URL` | Optional. A residency host on `elevenlabs.io`, over HTTPS. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+<Frame caption="The ElevenLabs row: ELEVENLABS_API_KEY, the optional webhook secret and base URL, and the routing handle elevenlabs.">
+  <img src="/images/ai-gateway/model-provider-elevenlabs-form.png" alt="The ElevenLabs model provider drawer with ELEVENLABS_API_KEY, ELEVENLABS_WEBHOOK_SECRET, ELEVENLABS_BASE_URL and the routing handle elevenlabs" />
+</Frame>
 
 ## Model names
 
@@ -10569,10 +10591,14 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **G
 | Field | Value |
 |---|---|
 | `GEMINI_API_KEY` | A Google AI Studio API key, or a Google Cloud API key when you set a project. |
-| `GEMINI_PROJECT` | Optional. A Google Cloud project id. Set it together with the location to call the Gemini API on Vertex AI instead of AI Studio. |
+| `GEMINI_PROJECT` | Optional. The Google Cloud project of a Gemini Enterprise Agent Platform key. With the location set, the row calls `aiplatform.googleapis.com` instead of AI Studio. |
 | `GEMINI_LOCATION` | Optional. The location for the project, for example `us-central1`. Set both or neither. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+<Frame caption="The Gemini row: GEMINI_API_KEY, the optional GEMINI_PROJECT and GEMINI_LOCATION pair for a Gemini Enterprise Agent Platform key, and the routing handle gemini.">
+  <img src="/images/ai-gateway/model-provider-gemini-form.png" alt="The Gemini model provider drawer with GEMINI_API_KEY filled in, GEMINI_PROJECT and GEMINI_LOCATION empty and the routing handle gemini" />
+</Frame>
 
 ## Model names
 
@@ -10638,6 +10664,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **G
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Groq row: name, scope, GROQ_API_KEY and the routing handle groq.">
+  <img src="/images/ai-gateway/model-provider-groq-form.png" alt="The Groq model provider drawer with the GROQ_API_KEY field and the routing handle groq" />
+</Frame>
+
 ## Model names
 
 Write `groq/<model>`, for example `groq/llama-3.3-70b-versatile`. The gateway does not infer Groq from a bare name.
@@ -10679,6 +10709,10 @@ The OpenAI account provider is a credential backed by a ChatGPT subscription ins
 ## Add the credential
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **Codex (OpenAI account)**. The row has no key fields. Click the sign-in button, open the URL it shows and enter the code. The code is valid for 15 minutes. LangWatch stores the tokens and refreshes them.
+
+<Frame caption="The Codex (OpenAI account) row: no key field, a Sign in with OpenAI button and the routing handle openai_codex.">
+  <img src="/images/ai-gateway/model-provider-openai-account-form.png" alt="The Codex OpenAI account model provider drawer with the Sign in with OpenAI button and the routing handle openai_codex" />
+</Frame>
 
 ## Model names
 
@@ -10781,9 +10815,9 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority, a provider config JSON and a read-only health block.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON.
 
-<Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority, provider config and health.">
+<Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority and provider config.">
   <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
 </Frame> See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
@@ -10856,6 +10890,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **V
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Vertex AI row: the service account JSON, VERTEXAI_PROJECT and VERTEXAI_LOCATION, all three required. The routing handle defaults to vertex_ai.">
+  <img src="/images/ai-gateway/model-provider-vertex-form.png" alt="The Vertex AI model provider drawer with GOOGLE_APPLICATION_CREDENTIALS filled in, VERTEXAI_PROJECT acme-ai, VERTEXAI_LOCATION us-central1 and the routing handle vertex_ai" />
+</Frame>
+
 ## Model names
 
 Write `vertex/<model>`, for example `vertex/gemini-2.5-flash`. `vertex_ai/` is accepted as an alias. The gateway does not infer Vertex AI from a bare name. Add the models you use under **Custom Models** on the row.
@@ -10902,6 +10940,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **V
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Voyage AI row: name, scope, VOYAGE_API_KEY and the routing handle voyage.">
+  <img src="/images/ai-gateway/model-provider-voyage-form.png" alt="The Voyage AI model provider drawer with the VOYAGE_API_KEY field and the routing handle voyage" />
+</Frame>
+
 ## Model names
 
 Write the Voyage model id, for example `voyage-3.5` or `voyage/voyage-3.5`. The gateway strips the `voyage/` prefix before it calls Voyage.
@@ -10943,6 +10985,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **x
 | `XAI_API_KEY` | Your xAI API key. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
+
+<Frame caption="The xAI row: name, scope, XAI_API_KEY and the routing handle xai.">
+  <img src="/images/ai-gateway/model-provider-xai-form.png" alt="The xAI model provider drawer with the XAI_API_KEY field and the routing handle xai" />
+</Frame>
 
 ## Model names
 
@@ -11165,7 +11211,7 @@ sidebarTitle: RBAC
 
 The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<resource>:<action>`, a role is a set of permissions, and a role binding gives a person a role on an organization, a team or a project. A grant at a higher scope covers the scopes below it: `virtualKeys:manage` on the organization covers every team and project in it.
 
-The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model, custom roles and role bindings.
+The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model and role bindings.
 
 ## Resources
 
@@ -11182,7 +11228,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
 | `auditLog` | The audit log under Settings. | `view` |
 
-`gatewaySpend` and `webhookEndpoints` come only from an organization role binding. A team or project binding never grants them, even through a custom role that lists them.
+`gatewaySpend` and `webhookEndpoints` come only from an organization role binding. A team or project binding never grants them.
 
 `virtualKeys:viewOtherPersonal` lets an administrator see other people's personal keys. Everyone sees their own personal keys without it.
 
@@ -11214,8 +11260,6 @@ Team roles apply on the teams and projects the binding names. Organization roles
 The Organization Admin column lists what the organization role grants on its own. An organization admin gets the team permissions through the team role bindings they hold, like everyone else.
 
 Organization Member and External hold no gateway permission on their own. They get gateway access through a team role binding.
-
-A custom role that lists no permission has the Team Viewer set. Add the permissions you want from the table above.
 
 ## Creating keys at a scope
 
@@ -11258,7 +11302,7 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 ```
 
 <Note>
-**Also check:** [Roles and permissions](/platform/rbac) for role bindings and custom roles, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
+**Also check:** [Roles and permissions](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
 </Note>
 
 ---

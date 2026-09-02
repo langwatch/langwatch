@@ -14,6 +14,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **G
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Groq row: name, scope, GROQ_API_KEY and the routing handle groq.">
+  <img src="/images/ai-gateway/model-provider-groq-form.png" alt="The Groq model provider drawer with the GROQ_API_KEY field and the routing handle groq" />
+</Frame>
+
 ## Model names
 
 Write `groq/<model>`, for example `groq/llama-3.3-70b-versatile`. The gateway does not infer Groq from a bare name.

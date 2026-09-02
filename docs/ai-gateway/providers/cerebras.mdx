@@ -14,6 +14,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **C
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Cerebras row: name, scope, CEREBRAS_API_KEY and the routing handle cerebras.">
+  <img src="/images/ai-gateway/model-provider-cerebras-form.png" alt="The Cerebras model provider drawer with the CEREBRAS_API_KEY field and the routing handle cerebras" />
+</Frame>
+
 ## Model names
 
 Write `cerebras/<model>`, for example `cerebras/llama-3.3-70b`. The gateway does not infer Cerebras from a bare name.

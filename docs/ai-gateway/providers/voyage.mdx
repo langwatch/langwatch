@@ -14,6 +14,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **V
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The Voyage AI row: name, scope, VOYAGE_API_KEY and the routing handle voyage.">
+  <img src="/images/ai-gateway/model-provider-voyage-form.png" alt="The Voyage AI model provider drawer with the VOYAGE_API_KEY field and the routing handle voyage" />
+</Frame>
+
 ## Model names
 
 Write the Voyage model id, for example `voyage-3.5` or `voyage/voyage-3.5`. The gateway strips the `voyage/` prefix before it calls Voyage.
