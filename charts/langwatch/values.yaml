@@ -614,6 +614,31 @@ app:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # Governance: the key that turns an erased person's identifier into the
+  # stand-in that replaces it in the cost tables.
+  #
+  # Optional until somebody is erased. A deployment that has erased nobody has
+  # nothing to substitute, so leaving this empty is the normal state and costs
+  # nothing.
+  #
+  # Once anybody has been erased it is required, and it must be the SAME value
+  # in the app and the workers — which is why it is emitted into sharedEnv. The
+  # workers rebuild the daily cost rows, and a worker without the key cannot
+  # compute the stand-in, so it refuses to write those rows rather than putting
+  # the erased address back into the money table.
+  #
+  # Changing it after an erasure orphans the stand-ins already written: nothing
+  # maps one back to the identifier it replaced. Treat it as permanent.
+  #
+  # Minimum 32 characters: generate with `openssl rand -hex 32`.
+  ## @extra app.governance Governance configuration.
+  ## @param app.governance.erasurePseudonymSecret.value [string] Key deriving the stand-in that replaces an erased identifier. Required once anyone has been erased.
+  ## @param app.governance.erasurePseudonymSecret.secretKeyRef [object] Secret ref holding the erasure pseudonym secret.
+  governance:
+    erasurePseudonymSecret:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -1786,6 +1811,12 @@ postgresql:
   chartManaged: true
 
   # Connection string to use for PostgreSQL when running in `chartManaged: false` mode
+  #
+  # The instance must allow `CREATE EXTENSION btree_gist` and the migration user
+  # must be allowed to run it. It comes with postgresql-contrib, so the
+  # chart-managed instance above already has it; on a managed provider, check the
+  # extension allow-list before pointing this at it. Migrations fail with an
+  # explicit message rather than half-applying when it is missing.
   external:
     connectionString:
       ## @param postgresql.external.connectionString.value [string] External PostgreSQL connection string.
