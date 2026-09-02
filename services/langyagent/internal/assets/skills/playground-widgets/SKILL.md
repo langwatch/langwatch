@@ -36,7 +36,7 @@ Read the datasets, their grain, their time column, and which columns are `availa
 `--queries-file` is a JSON array of named queries: `{ name, sql, parameters? }`. A widget's code calls a query by `name` — the two files are one unit.
 
 - `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
-- The reserved bound names `{period_start:DateTime}`, `{period_end:DateTime}`, `{period_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `playground_query_reserved_param` / a schema validation error.
+- The reserved bound names `{period_start:DateTime}`, `{period_end:DateTime}`, `{period_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `playground_query_reserved_param` / a schema validation error. On the playground page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
 - Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
 
 ```json
@@ -51,7 +51,7 @@ Read the datasets, their grain, their time column, and which columns are `availa
 
 ## Step 3: Write the widget file
 
-One React/TSX file, default-exporting a component. **React and Recharts are available as globals** in the render iframe (`window.React`, `window.Recharts`) — no import needed, no build step (in-browser Babel compiles the file on load). You may also `import` from `"react"`, `"react-dom"`, `"react-dom/client"`, or `"recharts"` if you prefer that style; both resolve to the same globals, and importing anything else is refused at compile time.
+One React/TSX file, default-exporting a component. **React and Recharts are available as globals** in the render iframe (`window.React`, `window.Recharts`) — no import needed, no build step (in-browser Babel compiles the file on load). You may also `import` from `"react"`, `"react-dom"`, `"react-dom/client"`, `"recharts"`, or `"@langwatch/charts"` if you prefer that style; these resolve to the same globals, and importing anything else is refused at compile time.
 
 Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches an entry in the queries file. It returns the same shape as TanStack Query's `useQuery` — same field names, on purpose:
 
@@ -69,6 +69,31 @@ Always render all three branches (loading / error / data) — a widget that only
 Params are validated against the query's declared `parameters` before anything is forwarded to LangWatchQL — an undeclared key, or a required parameter with no default that is omitted, comes back through `error` rather than firing the request.
 
 For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
+
+### Prebuilt charts: `@langwatch/charts`
+
+Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
+
+Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+
+```jsx
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+
+  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+
+  return <LwqlChart data={data} />;
+}
+```
+
+More worked examples: `platform/app/scripts/north-star-widgets/`.
+
+### Drill-down: `LW.navigate`
+
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+
+`Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
 ## Step 4: Save the widget, then prove it renders
 
@@ -89,7 +114,10 @@ langwatch playground-widget list -f json
 langwatch playground-widget get <id> -f json      # code, queries, platformUrl
 langwatch playground-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch playground-widget delete <id>
+langwatch playground-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
+
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the playground. See `langwatch dashboard list` for ids.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
