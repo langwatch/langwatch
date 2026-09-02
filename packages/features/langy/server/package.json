@@ -97,21 +97,25 @@
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
-    "nanoid": "^5.1.5",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "langwatch": "workspace:*",
+    "nanoid": "^5.1.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/feature-flag-server": "workspace:*",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
     "@types/node": "^26.0.1",

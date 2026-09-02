@@ -23,3 +23,12 @@ export {
 } from "./processes/github-branch-recheck.process";
 export { GithubTrpcApi, type GithubTrpcContext } from "./transport/api-trpc/github.api";
 export { GithubConnectionService } from "./services/github-connection.service";
+
+// The GitHub App installation flow's REST family: the session-gated start, the
+// protocol-mandated Setup URL and the HMAC-verified webhook, plus the two
+// `github-langy` aliases held by App registrations we do not own.
+export {
+  createGithubRestApp,
+  type GithubRestPorts,
+  type GithubRestSessionPort,
+} from "./transport/api-rest/github.api";

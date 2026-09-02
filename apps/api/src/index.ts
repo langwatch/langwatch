@@ -38,6 +38,24 @@ export {
   type ApiTraceGroupCollaboratorsOptions,
   type ApiTraceGroupPorts,
 } from "./app/api-trpc-collaborators.trace-group.composition";
+/**
+ * The AI Gateway and governance half: the gateway application every one of its
+ * doors is given, and the collaborator fold the record's twenty-one gateway and
+ * governance namespaces arrive through.
+ */
+export {
+  composeApiGatewayGroupCollaborators,
+  withApiGatewayGroupCollaborators,
+  type ApiGatewayGroupCollaborators,
+  type ApiGatewayGroupCollaboratorsOptions,
+} from "./app/api-trpc-collaborators.gateway-group.composition";
+export {
+  ApiGatewayIdempotencyPort,
+  composeApiGateway,
+  type ApiGatewayClickHousePort,
+  type ApiGatewayComposition,
+  type ApiGatewayCompositionOptions,
+} from "./app/api-gateway.composition";
 export {
   ApiAgentsAbsenceReportPort,
   ApiAgentsComposition,

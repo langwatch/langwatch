@@ -319,6 +319,18 @@ function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborat
      * The six agent surfaces, stubbed with only what the record reads while it
      * is being BUILT. Their own suite is what proves they answer.
      */
+    /**
+     * The twenty-one gateway and governance surfaces, stubbed with only what
+     * the record reads while it is BUILT: the virtual-key budget parser and
+     * the SaaS-billing decision, which chooses which router the two billing
+     * namespaces ARE. Their own suite is what proves they answer.
+     */
+    gatewayGroup: {
+      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+      governanceHome: stub("gatewayGroup.governanceHome"),
+      saasBilling: false,
+    },
+    github: stub("github"),
     agentGroup: {
       scenarios: stub("agentGroup.scenarios"),
       langy: stub("agentGroup.langy"),

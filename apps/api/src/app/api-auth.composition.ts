@@ -1,5 +1,6 @@
 import type { AuthService, VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { PostgresAuthAdapter } from "@langwatch/auth-server";
+import { PostgresAuthAdapter, type SignUpVerificationPort } from "@langwatch/auth-server";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { issuerForProviderId, PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -7,7 +8,13 @@ import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { PostgresUserAdapter } from "@langwatch/user-server";
 import type { UserService } from "@langwatch/user-contract";
+import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
 import { ApiAuthenticationPort } from "../api-request.policy";
+import {
+  announceApiBetterAuthAbsences,
+  composeApiBetterAuth,
+  type ApiPasswordResetMailPort,
+} from "./api-better-auth.composition";
 import { UnavailableApiUserAvatarStorageAdapter } from "./api-user-avatar-storage.adapter";
 
 const logger = createLogger("langwatch:api:auth");
@@ -136,12 +143,32 @@ export type ApiAuthCompositionOptions = {
    */
   organizations: OrganizationService;
   /**
-   * The deployment's Better Auth request boundary.
+   * A host's own Better Auth request boundary, where it has one.
    *
-   * The one collaborator on this graph a package cannot build; see
-   * {@link ApiAuthComposition} for why.
+   * An injected transport WINS, and that ordering is the point: a deployment
+   * that already runs an instance has one cookie namespace, and a second
+   * instance composed here would verify nothing and answer `null` — which
+   * reads to every caller as "signed out". Absent, this process composes the
+   * deployment's instance itself from {@link browserSession}.
    */
-  browserSessions: ApiBrowserSessionTransportPort;
+  browserSessions?: ApiBrowserSessionTransportPort | undefined;
+  /**
+   * The deployment's browser-session identity, read from its environment.
+   *
+   * Without it — and without an injected transport — there is no way to
+   * verify a browser caller, and the Auth graph is not composed.
+   */
+  browserSession?: ApiBrowserSessionConfig | undefined;
+  /** `"email"`, or the federated provider id this deployment mounted. */
+  authProvider?: string | undefined;
+  /** Whether this is the hosted product rather than a self-hosted install. */
+  isSaas?: boolean | undefined;
+  /** The grant ledger an SSO domain auto-join writes its membership through. */
+  authzGrants?: AuthzGrantsService | undefined;
+  /** The gateway a password-reset link leaves through. */
+  mail?: ApiPasswordResetMailPort | undefined;
+  /** Sign-up's address confirmation, for the passkey ceremony. */
+  signUpVerification?: SignUpVerificationPort | undefined;
   /**
    * The process's Redis, where it has one.
    *
@@ -202,10 +229,9 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
    * than a door that is not there.
    */
   static tryCompose(
-    options: Omit<ApiAuthCompositionOptions, "database" | "organizations" | "browserSessions"> & {
+    options: Omit<ApiAuthCompositionOptions, "database" | "organizations"> & {
       database: PrismaConnection | undefined;
       organizations: OrganizationService | undefined;
-      browserSessions: ApiBrowserSessionTransportPort | undefined;
       report?: ApiAuthAbsenceReportPort;
     },
   ): ApiAuthComposition | undefined {
@@ -217,7 +243,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       options.report?.absent("no-tenancy");
       return undefined;
     }
-    if (!options.browserSessions) {
+    if (!options.browserSessions && !options.browserSession) {
       options.report?.absent("no-browser-session-transport");
       return undefined;
     }
@@ -225,7 +251,6 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       ...options,
       database: options.database,
       organizations: options.organizations,
-      browserSessions: options.browserSessions,
     });
   }
 
@@ -247,16 +272,67 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       }),
     }).build();
 
+    const auth = PostgresAuthAdapter.create({
+      database,
+      redis: options.redis ?? null,
+      identityEmails: PostgresIdentityEmailAdapter.create({ database }).build(),
+      users,
+    }).build();
+
     return new ApiAuthComposition({
-      auth: PostgresAuthAdapter.create({
-        database,
-        redis: options.redis ?? null,
-        identityEmails: PostgresIdentityEmailAdapter.create({ database }).build(),
-        users,
-      }).build(),
-      sessions: options.browserSessions,
+      auth,
+      sessions:
+        options.browserSessions ??
+        ApiAuthComposition.composeBrowserSessions({ options, database, auth, users }),
       users,
     });
+  }
+
+  /**
+   * Composes the deployment's Better Auth instance over this process's own
+   * graph.
+   *
+   * Reached only when no host supplied a transport AND the deployment named a
+   * browser-session identity, which `tryCompose` has already established; a
+   * caller reaching `compose` directly with neither is asking for a graph that
+   * cannot authenticate anybody, and the refusal says so rather than composing
+   * an instance over a guessed secret.
+   */
+  private static composeBrowserSessions({
+    options,
+    database,
+    auth,
+    users,
+  }: {
+    options: ApiAuthCompositionOptions;
+    database: PrismaConnection["client"];
+    auth: AuthService;
+    users: UserService;
+  }): ApiBrowserSessionTransportPort {
+    const configuration = options.browserSession;
+    if (!configuration) {
+      throw new Error(
+        "No Better Auth transport was supplied and this deployment named no browser-session identity",
+      );
+    }
+
+    announceApiBetterAuthAbsences(logger);
+
+    return BetterAuthBrowserSessionTransportAdapter.create(
+      composeApiBetterAuth({
+        configuration,
+        database,
+        auth,
+        users,
+        redis: options.redis ?? null,
+        authProvider: options.authProvider,
+        isSaas: options.isSaas === true,
+        authzGrants: options.authzGrants,
+        mail: options.mail,
+        signUpVerification: options.signUpVerification,
+        logger,
+      }) as unknown as BetterAuthSessionLookup,
+    );
   }
 
   private constructor(private readonly dependencies: ApiAuthSessionDependencies) {

@@ -86,9 +86,12 @@ const TEAM_ID = "team-1";
 
 /** Every namespace `createAppTrpcFeatures` mounts, as the wire names them. */
 const RECORD_NAMESPACES = [
+  "activityMonitor",
+  "aiTools",
   "analytics",
   "annotation",
   "annotationScore",
+  "anomalyRules",
   "apiKey",
   "authz",
   "automation",
@@ -96,11 +99,13 @@ const RECORD_NAMESPACES = [
   "bugReports",
   "codingAgents",
   "costs",
+  "currency",
   "dashboards",
   "dataPrivacy",
   "dataRetention",
   "dataset",
   "datasetRecord",
+  "departments",
   "emailSuppression",
   "evaluations",
   "evaluators",
@@ -108,11 +113,21 @@ const RECORD_NAMESPACES = [
   "export",
   "featureFlag",
   "frontDoor",
+  "gatewayBudgets",
+  "gatewayCacheRules",
+  "gatewayGuardrails",
+  "gatewaySpendEvents",
+  "gatewayUsage",
+  "github",
+  "governance",
   "graphs",
   "group",
   "home",
   "httpProxy",
   "identity",
+  "ingestionKey",
+  "ingestionSources",
+  "ingestionTemplates",
   "integrationsChecks",
   "joinRequests",
   "langy",
@@ -127,6 +142,8 @@ const RECORD_NAMESPACES = [
   "ops",
   "optimization",
   "organization",
+  "personalSessions",
+  "personalVirtualKeys",
   "personalWorkspaceFeatures",
   "pinnedTrace",
   "plan",
@@ -137,15 +154,18 @@ const RECORD_NAMESPACES = [
   "publicEnv",
   "role",
   "roleBinding",
+  "routingPolicy",
   "savedViews",
   "scenarios",
   "scimToken",
+  "sessionPolicy",
   "setupSkills",
   "share",
   "sharedTrace",
   "spans",
   "ssoConnections",
   "storedObjects",
+  "subscription",
   "suites",
   "team",
   "topics",
@@ -154,6 +174,8 @@ const RECORD_NAMESPACES = [
   "tracesV2",
   "translate",
   "user",
+  "virtualKeys",
+  "webhookEndpoints",
   "workflow",
 ] as const;
 
@@ -372,6 +394,15 @@ function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
       scimApp: stub("app.scimApp"),
       usageLimits: stub("app.usageLimits"),
       workflows: stub("app.workflows"),
+      // The six slices the gateway-group half writes, present for the same
+      // reason: the seal refuses a set any fold left unfilled, and the group's
+      // own suite is what proves they answer.
+      gateway: stub("app.gateway"),
+      github: stub("app.github"),
+      governance: stub("app.governance"),
+      governanceApp: stub("app.governanceApp"),
+      sessionPolicy: stub("app.sessionPolicy"),
+      webhooks: stub("app.webhooks"),
     } as unknown as ApiTrpcFeatureApplication,
     analytics: {
       reads: stub("analytics.reads", {
@@ -485,6 +516,18 @@ function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
       ops: stub("agentGroup.ops"),
       opsCheck: () => passThroughMiddleware,
     },
+    /**
+     * The twenty-one gateway and governance surfaces, stubbed with only what
+     * the record reads while it is being BUILT: the virtual-key budget parser
+     * and the SaaS-billing decision, which chooses which router the two
+     * billing namespaces ARE. Their own suite is what proves they answer.
+     */
+    gatewayGroup: {
+      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+      governanceHome: stub("gatewayGroup.governanceHome"),
+      saasBilling: false,
+    },
+    github: stub("github"),
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
@@ -815,7 +858,7 @@ describe("given an API process composed with the product half of the record", ()
       const record = features.build(stubMount());
 
       expect(Object.keys(record).sort()).toEqual([...RECORD_NAMESPACES].sort());
-      expect(RECORD_NAMESPACES).toHaveLength(69);
+      expect(RECORD_NAMESPACES).toHaveLength(91);
     });
   });
 

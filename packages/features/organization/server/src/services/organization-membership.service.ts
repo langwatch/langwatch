@@ -71,7 +71,7 @@ const TEAM_KSUID_RESOURCE = "team";
  *
  * This is intentionally a standalone function — NOT a method on
  * `OrganizationService` — because the service instance is wrapped with the
- * `traced()` proxy (see `app-layer/tracing.ts`) which turns every method call
+ * `traced()` proxy (see `@langwatch/observability/node`) which turns every method call
  * into an async call that returns a Promise. Callers expecting a synchronous
  * return value would silently get a Promise with `members === undefined`,
  * causing team membership enrichment to fail invisibly.

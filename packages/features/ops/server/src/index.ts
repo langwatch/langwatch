@@ -181,3 +181,12 @@ export {
   type AdminRestPorts,
   type AdminRestSessionPorts,
 } from "./transport/api-rest/admin.api";
+
+// The public issue-report intake, `POST /api/bug-reports`. Its optional
+// project credential is a port: reading one off a request is the deployment's
+// published precedence, and a second reading here is how the two would drift.
+export {
+  createBugReportsRestApp,
+  type BugReportRestCredentialReader,
+  type BugReportRestPorts,
+} from "./transport/api-rest/bug-report.api";

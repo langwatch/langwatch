@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
@@ -30,6 +31,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.1.5",
     "zod": "^4.4.3"

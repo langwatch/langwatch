@@ -74,6 +74,7 @@ import {
 } from "@langwatch/dashboard-server";
 import {
   isContentVisible,
+  isContentVisibleToPublic,
   type ContentCategory,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
@@ -151,6 +152,19 @@ export type ApiAnalyticsCollaborators = Readonly<{
   analytics: AnalyticsApp;
   /** For `ctx.app.dashboard`. */
   dashboard: DashboardApp;
+  /**
+   * The governed-SQL runner, the rollout switch it is behind, and the content
+   * protections an API KEY resolves to — the three the public governed-SQL
+   * REST family needs and the tRPC ports do not expose.
+   *
+   * Published rather than rebuilt at the REST mount: the workbench's door and
+   * the API key's door must run one validator against one catalogue, or a
+   * statement the browser refuses is a statement a key can still run.
+   */
+  langWatchQL: LangWatchQLService;
+  featureFlags: FeatureFlagService;
+  /** See {@link ApiAnalyticsProtections.resolveForApiKey}. */
+  apiKeyProtections: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
   /** The `analytics` entry of {@link ApiTrpcCollaborators}. */
   analyticsPorts: Readonly<{
     reads: ApiAnalyticsReadPorts;
@@ -304,6 +318,9 @@ export function composeApiAnalyticsCollaborators(
   return {
     analytics,
     dashboard,
+    langWatchQL,
+    featureFlags,
+    apiKeyProtections: (input) => protections.resolveForApiKey(input),
     analyticsPorts: {
       reads: {
         // The two schemas are this process's because the same shapes are the
@@ -460,6 +477,37 @@ class ApiAnalyticsProtections {
       canSeeCosts,
       canSeeCapturedInput: visible("input"),
       canSeeCapturedOutput: visible("output"),
+    };
+  }
+
+  /**
+   * What an API KEY may see, which is a different question from what a person
+   * may see.
+   *
+   * A project key carries full project access by design — it predates RBAC and
+   * every role that can hold one grants `cost:view` — so costs are visible.
+   * Captured content is NOT: it follows the project's own data-privacy policy
+   * read for a caller with no session, which is exactly what a `restrict` rule
+   * is for. Fail-closed on a resolution failure, for the same reason the
+   * member's resolution is.
+   */
+  async resolveForApiKey(input: { projectId: string }): Promise<LangWatchQLProtections> {
+    let policy: ResolvedDataPrivacy;
+    try {
+      policy = await this.dependencies.dataPrivacy.getResolvedForProject({
+        projectId: input.projectId,
+      });
+    } catch (error) {
+      this.logger.error(
+        { error, projectId: input.projectId },
+        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+      );
+      return { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: false };
+    }
+    return {
+      canSeeCosts: true,
+      canSeeCapturedInput: isContentVisibleToPublic(policy.categories.input),
+      canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
     };
   }
 

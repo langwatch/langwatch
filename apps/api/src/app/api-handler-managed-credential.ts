@@ -89,15 +89,8 @@ export class ApiHandlerManagedCredentials {
     }
 
     if (resolved.type === "apiKey") {
-      const allowed = await this.authz.hasApiKeyPermission({
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId ?? null,
-        organizationId: resolved.organizationId,
-        scope: {
-          type: "project",
-          id: resolved.project.id,
-          teamId: resolved.project.teamId,
-        },
+      const allowed = await this.isWithinCeiling({
+        resolved,
         permission: input.permission,
       });
       if (!allowed) {
@@ -120,6 +113,54 @@ export class ApiHandlerManagedCredentials {
         }
       },
     };
+  }
+
+  /**
+   * Enforces one permission as an ALREADY-RESOLVED key's ceiling, THROWING the
+   * same refusal {@link authenticate} would have answered with.
+   *
+   * Separate from `authenticate` because two families cannot use the combined
+   * form: the Langy doors have to read the resolved key's PROJECT before they
+   * know whether the surface is even open for it, and the UI-action door only
+   * learns which permission to check once the dispatched action names one. Both
+   * would otherwise have to check a ceiling ahead of a rollout gate, which is
+   * how a dark surface reveals itself by answering 403.
+   *
+   * It throws rather than returning a refusal because the callers are inside a
+   * canonical-envelope family, whose error boundary is what renders a handled
+   * error — the same decision, in that family's own sentence.
+   */
+  async enforceCeiling(input: {
+    resolved: ResolvedApiKeyToken;
+    permission: AuthzPermission;
+  }): Promise<void> {
+    // A legacy project key has no per-permission ceiling: project keys predate
+    // RBAC and carry full project access by design, so a route's declared
+    // permission is decorative for that credential class.
+    if (input.resolved.type !== "apiKey") return;
+    const allowed = await this.isWithinCeiling({
+      resolved: input.resolved,
+      permission: input.permission,
+    });
+    if (!allowed) throw ceilingRefusal(input.resolved, input.permission);
+  }
+
+  private isWithinCeiling(input: {
+    resolved: Extract<ResolvedApiKeyToken, { type: "apiKey" }>;
+    permission: AuthzPermission;
+  }): Promise<boolean> {
+    const { resolved, permission } = input;
+    return this.authz.hasApiKeyPermission({
+      apiKeyId: resolved.apiKeyId,
+      userId: resolved.userId ?? null,
+      organizationId: resolved.organizationId,
+      scope: {
+        type: "project",
+        id: resolved.project.id,
+        teamId: resolved.project.teamId,
+      },
+      permission,
+    });
   }
 }
 

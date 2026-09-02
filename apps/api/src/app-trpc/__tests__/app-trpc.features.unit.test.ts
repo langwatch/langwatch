@@ -72,6 +72,10 @@ import { z } from "zod";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 import type { AppAgentGroupTrpcContext } from "../app-trpc.agent-group";
 import type {
+  AnyAppGatewayGroupTrpcPorts,
+  AppGatewayGroupTrpcContext,
+} from "../app-trpc.gateway-group";
+import type {
   AnyAppProductInfraTrpcPorts,
   AppProductInfraTrpcContext,
 } from "../app-trpc.product-infra";
@@ -90,6 +94,7 @@ import type {
  * in this suite rather than a surprise in the app.
  */
 type TestContext = AnalyticsTrpcContext &
+  AppGatewayGroupTrpcContext &
   AuthzTrpcContext &
   AnnotationTrpcContext &
   AnnotationScoreTrpcContext &
@@ -384,6 +389,21 @@ function refusingPorts(): AppTrpcFeaturePorts<
         preconditionsSchema: z.array(z.object({ field: z.string() })),
       },
     } as unknown as AnyAppProductInfraTrpcPorts,
+    // The gateway and governance group. Two build-time members: the
+    // virtual-key budget parser, which is fixed when the router is BUILT
+    // because a tRPC input parser is, and the billing switch, which decides
+    // which router the two billing namespaces ARE. Everything else refuses.
+    gatewayGroup: {
+      gateway: { virtualKeys: { virtualKeyBudgetInput: z.object({}) } },
+      governanceHome: refuseEvery("gatewayGroup.governanceHome"),
+      // The SaaS shape, because this suite's last assertion is that no
+      // namespace mounts without procedures: `false` is the self-hosted
+      // answer, and it deliberately serves `subscription` and `currency` as
+      // empty routers of the same type. Which shape a deployment gets is the
+      // gateway group's own suite to pin.
+      saasBilling: true,
+    } as unknown as AnyAppGatewayGroupTrpcPorts,
+    github: refuseEvery("github"),
     user: refuseEvery("user"),
     workflows: {
       lifecycle: refuseEvery("workflows.lifecycle"),
@@ -437,9 +457,12 @@ describe("the app tRPC feature list", () => {
   describe("given one process mount", () => {
     it("builds every namespace the app process serves from this package", () => {
       expect(Object.keys(buildFeatures()).sort()).toEqual([
+        "activityMonitor",
+        "aiTools",
         "analytics",
         "annotation",
         "annotationScore",
+        "anomalyRules",
         "apiKey",
         "authz",
         "automation",
@@ -447,11 +470,13 @@ describe("the app tRPC feature list", () => {
         "bugReports",
         "codingAgents",
         "costs",
+        "currency",
         "dashboards",
         "dataPrivacy",
         "dataRetention",
         "dataset",
         "datasetRecord",
+        "departments",
         "emailSuppression",
         "evaluations",
         "evaluators",
@@ -459,11 +484,21 @@ describe("the app tRPC feature list", () => {
         "export",
         "featureFlag",
         "frontDoor",
+        "gatewayBudgets",
+        "gatewayCacheRules",
+        "gatewayGuardrails",
+        "gatewaySpendEvents",
+        "gatewayUsage",
+        "github",
+        "governance",
         "graphs",
         "group",
         "home",
         "httpProxy",
         "identity",
+        "ingestionKey",
+        "ingestionSources",
+        "ingestionTemplates",
         "integrationsChecks",
         "joinRequests",
         "langy",
@@ -478,6 +513,8 @@ describe("the app tRPC feature list", () => {
         "ops",
         "optimization",
         "organization",
+        "personalSessions",
+        "personalVirtualKeys",
         "personalWorkspaceFeatures",
         "pinnedTrace",
         "plan",
@@ -488,15 +525,18 @@ describe("the app tRPC feature list", () => {
         "publicEnv",
         "role",
         "roleBinding",
+        "routingPolicy",
         "savedViews",
         "scenarios",
         "scimToken",
+        "sessionPolicy",
         "setupSkills",
         "share",
         "sharedTrace",
         "spans",
         "ssoConnections",
         "storedObjects",
+        "subscription",
         "suites",
         "team",
         "topics",
@@ -505,6 +545,8 @@ describe("the app tRPC feature list", () => {
         "tracesV2",
         "translate",
         "user",
+        "virtualKeys",
+        "webhookEndpoints",
         "workflow",
       ]);
     });

@@ -95,3 +95,10 @@ export {
   QueryTimeoutError,
 } from "./clickhouse/query-errors";
 export { generateClickHouseFilterConditions } from "./filters/clickhouse/filter-conditions";
+
+/** The governed-SQL REST family: LangWatchQL query + schema, and saved charts. */
+export {
+  createLangWatchQLRestApp,
+  type LangWatchQLRestPorts,
+} from "./transport/api-rest/langwatch-ql.api";
+export type { SavedWorkbenchChartRestService } from "./transport/api-rest/langwatch-ql-route-guards";

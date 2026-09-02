@@ -3,8 +3,6 @@
  * Each sub-app sets its own basePath (e.g. "/api/traces").
  */
 
-import { app as scimApp } from "~/server/enterprise/scim/routes";
-import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
 import { appRestSecurity } from "~/server/api/security";
@@ -20,16 +18,8 @@ import {
   ForbiddenError,
   requestTraceIds,
 } from "@langwatch/platform-api/app-rest";
-import { buildAnalyticsRestApp } from "./analytics/analytics-rest";
-import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
-import { createScenarioRunExportApp } from "./export/scenario-runs/scenario-run-export-rest";
-import { organizationRestApp } from "./api/management/organization-rest";
-import { buildPromptsRestApp } from "./api/prompts-rest";
-import { secretPublicRestApp } from "../runtime/app/features/secret";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
-import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
@@ -40,24 +30,16 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
-import { app as githubApp } from "./routes/github";
-import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
-import { app as langyApiApp } from "./routes/langy-api";
-import { app as langyInternalApp } from "./routes/langy-internal";
-import { app as langyRelayApp } from "./routes/langy-relay";
-import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as playgroundApp } from "./routes/playground";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
-import { createTRPCApp } from "./routes/trpc";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import type { App } from "~/server/app-layer/app";
-import { app as unsubscribeApp } from "./routes/unsubscribe";
 import { app as workflowsApp } from "./routes/workflows";
 
 // --- capabilities the packaged REST families reach through, but do not own ---
@@ -151,7 +133,6 @@ const agentCacheStore = new AgentCacheService();
 
 export function createApiRouter(app: App) {
   const api = new Hono();
-  const processTrpcApp = createTRPCApp(app);
 
   api.use("*", appContextMiddlewareFor(app));
 
@@ -177,8 +158,6 @@ export function createApiRouter(app: App) {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  api.route("/", buildAnalyticsRestApp(() => app.analytics));
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   // experimentsV3App owns the session-authenticated execute/abort endpoints and
   // the API-key-authenticated run/runs endpoints; the packaged experiments
   // family owns the project-API-key list endpoint (GET /api/experiments). Both
@@ -191,7 +170,6 @@ export function createApiRouter(app: App) {
   // regression test pins both directions.
   api.route("/", experimentsV3App);
   api.route("/", experimentsV3LegacyAliasApp); // /api/evaluations/v3/... → /api/experiments/...
-  api.route("/", createScenarioRunExportApp(app));
   // Most REST families now live in `@langwatch/platform-api` and are mounted by
   // factory rather than by import. `createAppRestFeatures` is their single
   // enumeration — the same one the route-registry audits build from — so a
@@ -298,45 +276,22 @@ export function createApiRouter(app: App) {
   })) {
     api.route("/", packagedRestApp);
   }
-  // /api/organization is the credential-implied management family. Its plural
-  // sibling — the self-hosted instance-admin provisioning family, absent unless
-  // the instance key is configured on a non-SaaS deployment — is a disjoint
-  // surface and is now mounted from the factory loop above.
-  api.route("/", organizationRestApp);
-  api.route("/", buildPromptsRestApp(() => app.prompts.promptService));
-  api.route("/", secretPublicRestApp);
   api.route("/", tracesApp);
 
   api.route("/", gatewayInternalApp);
   api.route("/", playgroundApp);
-  api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
-  api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
-  api.route("/", langyInternalApp);
-  api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
-  api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
-  api.route("/", scimApp);
-  api.route("/", webhooksApp);
 
-  api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  // ORDERING: authCliApp MUST be registered BEFORE authApp.
-  // authApp owns the BetterAuth catch-all (`/auth/*`), which would
-  // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.
-  // Register the more-specific basePath first so Hono routes match it.
   api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
-  api.route("/", authApp);
   api.route("/", collectorApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);
-  api.route("/", healthApp);
   api.route("/", miscApp);
   api.route("/", opsApp);
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
-  api.route("/", processTrpcApp);
-  api.route("/", unsubscribeApp); // /api/unsubscribe — RFC 8058 one-click POST
 
   return api;
 }

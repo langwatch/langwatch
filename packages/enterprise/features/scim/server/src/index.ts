@@ -15,6 +15,16 @@ export {
   type ScimTokenTrpcPorts,
 } from "./transport/api-trpc/scim-token.api";
 export { createScimTokensRestApp } from "./transport/api-rest/scim.api";
+// The SCIM 2.0 protocol family itself, and the Auth0 webhook intake beside it.
+// Both take the application as a provider rather than a request context, so a
+// process that composed no Enterprise SCIM cannot mount either by accident.
+export {
+  createScimProtocolRestApp,
+} from "./transport/api-rest/scim-protocol.api";
+export {
+  createScimWebhookRestApp,
+  type ScimWebhookRestPorts,
+} from "./transport/api-rest/scim-webhook-intake.api";
 export * from "./api/scim/scim.api";
 export { ScimWebhookApi } from "./api/scim-webhook/scim-webhook.api";
 export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter";

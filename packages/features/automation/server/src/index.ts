@@ -224,6 +224,13 @@ export {
  * delegation are the feature's.
  */
 export { createTriggerRestApp } from "./transport/api-rest/automation.api";
+// The RFC 8058 one-click unsubscribe door. Its own family rather than part of
+// the trigger surface: the HMAC token IS the authorization, so it authenticates
+// nobody and shares no policy with the credentialed routes beside it.
+export {
+  createUnsubscribeRestApp,
+  type UnsubscribeRestPorts,
+} from "./transport/api-rest/unsubscribe.api";
 
 /** The scheduled-report handler and the two readers it renders from. */
 export {

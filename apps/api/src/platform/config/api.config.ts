@@ -198,6 +198,21 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "METRICS_API_KEY",
   }),
   /**
+   * The shared bearer the Langy agent presents on its callbacks into this
+   * process — the durable turn-result ingest, the session-key revoke and the
+   * relay's frame stream.
+   *
+   * An unvalidated optional string for the reason every credential above is:
+   * an operator who exports it blank has not configured a secret, and
+   * `Config.secret` would refuse the whole boot over it. What blank means is
+   * the gate's own rule and lives with it — the internal Langy family answers
+   * 503 `Not configured` rather than falling open, so a deployment running no
+   * Langy agent needs no secret at all.
+   */
+  langyInternalSecret: Config.value(optionalEnvironmentString, {
+    env: "LANGY_INTERNAL_SECRET",
+  }),
+  /**
    * The two AuthZ switches, read raw and interpreted below.
    *
    * `AUTHZ_EPOCH_CACHE` is a legacy opt-in the platform app reads as "1 or
@@ -222,6 +237,54 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * shape the organization surface already answers for.
      */
     demoProjectUserId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_USER_ID" }),
+  },
+  /**
+   * The deployment's ONE browser-session identity, as Better Auth is
+   * configured with it.
+   *
+   * Read all-or-nothing on the secret, because a second Better Auth instance
+   * built from a different option set does not fail — it verifies nothing and
+   * answers `null`, which every caller reads as "signed out". A process that
+   * cannot be certain it holds the SAME signing identity as the tier that
+   * minted a cookie must compose no transport at all rather than one that
+   * silently rejects every session.
+   *
+   * `secret` is `NEXTAUTH_SECRET`, the same variable the whole deployment
+   * signs sessions with. It is read here as its own value rather than reused
+   * from the stored-secret key or the API-key pepper: those two are named
+   * apart precisely so a deployment can rotate one without the others, and a
+   * session secret derived from either would tie a rotation nobody intended
+   * to every live login.
+   *
+   * `url` is where this instance believes it is served and what it trusts as
+   * an origin. The externally reachable origin, where a proxy makes the two
+   * differ, is `BASE_HOST` — already read once as
+   * `infrastructure.execution.publicBaseUrl` and taken from there rather than
+   * bound a second time, so one variable cannot resolve to two values. Both
+   * are trusted origins so sign-in does not fail with "Invalid origin" behind
+   * a proxy.
+   *
+   * The two plugin switches are read the platform app's way — the literal
+   * string `"on"` — because they are the same variables that tier reads, and
+   * a plugin mounted in one process and not another is a route that exists
+   * for half the fleet.
+   *
+   * `passkeyHandleSecret` salts the provisional handle a passkey sign-up
+   * ceremony is minted with. It falls back to the session secret, which is
+   * what the platform app does: the handle is not an authorization and a
+   * deployment that set only one secret still gets a stable, unguessable
+   * handle.
+   */
+  browserSession: {
+    secret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
+    url: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_URL" }),
+    mfaEnrollmentOpen: Config.value(optionalEnvironmentString, {
+      env: "MFA_ENROLLMENT_OPEN",
+    }),
+    passkeysEnabled: Config.value(optionalEnvironmentString, { env: "PASSKEYS_ENABLED" }),
+    passkeyHandleSecret: Config.value(optionalEnvironmentString, {
+      env: "PASSKEY_HANDLE_SECRET",
+    }),
   },
   infrastructure: {
     /**
@@ -564,14 +627,34 @@ export type ApiAuthzConfig = Readonly<{
   demoProjectUserId: string | undefined;
 }>;
 
+/**
+ * The browser-session identity, present only when this deployment named a
+ * signing secret and a base URL.
+ *
+ * Absent means this process composes no Better Auth transport and mounts no
+ * transports that authenticate a browser caller — the stated consequence,
+ * rather than an instance built over a guessed secret that would answer
+ * "signed out" to everybody.
+ */
+export type ApiBrowserSessionConfig = Readonly<{
+  secret: string;
+  baseUrl: string;
+  publicBaseUrl: string | undefined;
+  mfaEnrollmentOpen: boolean;
+  passkeysEnabled: boolean;
+  passkeyHandleSecret: string;
+}>;
+
 export type ApiShutdownConfig = Readonly<{
   /** The whole shutdown sequence's budget, listener drain included. */
   processDeadlineMs: number;
 }>;
 
 export type ApiConfig = Readonly<
-  Omit<ApiConfigProjection, "authz" | "infrastructure" | "shutdown"> & {
+  Omit<ApiConfigProjection, "authz" | "browserSession" | "infrastructure" | "shutdown"> & {
     authz: ApiAuthzConfig;
+    /** The deployment's one browser-session identity, or nothing. */
+    browserSession: ApiBrowserSessionConfig | undefined;
     /**
      * This deployment's rollout switches, as every LangWatch tier reads them.
      *
@@ -622,6 +705,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       demoProjectId: value.authz.demoProjectId?.trim() || undefined,
       demoProjectUserId: value.authz.demoProjectUserId?.trim() || undefined,
     },
+    browserSession: resolveBrowserSessionConfig({
+      ...value.browserSession,
+      publicUrl: value.infrastructure.execution.publicBaseUrl,
+    }),
     shutdown: {
       processDeadlineMs:
         value.shutdown.deadlineMs ?? value.httpDrainGraceMs + PROCESS_CLOSE_SLACK_MS,
@@ -667,6 +754,41 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
+  };
+}
+
+/**
+ * The browser-session identity, or nothing at all.
+ *
+ * Both halves are required together and neither is defaulted. A secret with no
+ * base URL cannot state a trusted origin, and a base URL with no secret cannot
+ * verify a cookie; either alone would compose an instance that rejects every
+ * session while looking configured.
+ */
+function resolveBrowserSessionConfig(
+  value: Readonly<{
+    secret: string | undefined;
+    url: string | undefined;
+    publicUrl: string | undefined;
+    mfaEnrollmentOpen: string | undefined;
+    passkeysEnabled: string | undefined;
+    passkeyHandleSecret: string | undefined;
+  }>,
+): ApiBrowserSessionConfig | undefined {
+  const secret = value.secret?.trim() || undefined;
+  const baseUrl = value.url?.trim() || undefined;
+  if (!secret || !baseUrl) return undefined;
+
+  return {
+    secret,
+    baseUrl,
+    publicBaseUrl: value.publicUrl?.trim() || undefined,
+    // The platform app reads both as the literal string "on", so this one
+    // does too: a plugin mounted in one process and not another is a route
+    // that exists for half the fleet.
+    mfaEnrollmentOpen: value.mfaEnrollmentOpen?.trim() === "on",
+    passkeysEnabled: value.passkeysEnabled?.trim() === "on",
+    passkeyHandleSecret: value.passkeyHandleSecret?.trim() || secret,
   };
 }
 

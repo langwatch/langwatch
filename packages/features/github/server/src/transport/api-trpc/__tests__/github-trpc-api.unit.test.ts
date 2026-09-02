@@ -80,6 +80,45 @@ describe("GithubTrpcApi", () => {
         "pullRequestLiveStatus",
       ]);
     });
+
+    /**
+     * Which permission each procedure DEMANDS, not just that one is demanded.
+     *
+     * Reading the connection asks for `organization:view`, which every member
+     * holds, so a surface that needs GitHub can name who to ask; listing
+     * repositories and disconnecting ask for `organization:manage`, because an
+     * installation grants repository access to the whole organization; and the
+     * pull-request status asks for `traces:view`, because what it reveals is
+     * what a coding-agent session did rather than anything about the
+     * connection. This travelled here from the retired application's own mount
+     * when the router moved onto the API process, because the permission is
+     * declared by this transport rather than by whoever mounts it.
+     */
+    it("demands the permission each procedure is declared with", () => {
+      const asked: string[] = [];
+      const trpc = initTRPC.context<TestContext>().create();
+      GithubTrpcApi.create(
+        trpc,
+        {
+          protected: trpc.procedure,
+          policy: (permission) => {
+            asked.push(permission);
+            return (procedure) => procedure;
+          },
+        },
+        {
+          tryResolveOrganizationForProject: async () => undefined,
+          recordAudit: async () => {},
+        },
+      );
+
+      expect(asked.sort()).toEqual([
+        "organization:manage",
+        "organization:manage",
+        "organization:view",
+        "traces:view",
+      ]);
+    });
   });
 
   describe("when a permitted caller is not a member of the organization", () => {

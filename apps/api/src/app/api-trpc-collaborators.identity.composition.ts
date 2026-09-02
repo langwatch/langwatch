@@ -108,6 +108,7 @@ import {
   type JoinRequestTrpcPorts,
   type OnboardingTrpcPorts,
   type OrganizationPlanUser,
+  type OrganizationRestService,
   type OrganizationSeatDecision,
 } from "@langwatch/organization-server";
 import type { PresenceService } from "@langwatch/presence-contract";
@@ -254,6 +255,21 @@ export type ApiIdentityCollaboratorsOptions = Readonly<{
  * replacing it.
  */
 export type ApiIdentityCollaborators = Readonly<{
+  /**
+   * The organization object the MANAGEMENT REST family serves from: the
+   * canonical contract's settings reads and writes, plus the membership
+   * operations the contract does not declare, routed onto one object.
+   */
+  organizationRest: OrganizationRestService;
+  /**
+   * The tenant fan-out this half composed, published so a REST family can
+   * broadcast on it too.
+   *
+   * The SAME fabric `ctx.app.broadcast` publishes on and the subscription lane
+   * reads: a second one would put a download's progress on a channel no
+   * browser is listening to.
+   */
+  broadcast: BroadcastService;
   /** The six `ctx.app` slices this half owns. */
   application: Pick<
     ApiTrpcFeatureApplication,
@@ -541,6 +557,13 @@ export function composeApiIdentityCollaborators(
     "updateTeamMemberRole",
     "changeMemberRole",
     "getAuditLogs",
+    // The paged listing and the single-member read the MANAGEMENT REST family
+    // asks for. On this list for the same reason as the twelve above: the
+    // canonical contract declares neither, so routing them here is what makes
+    // one object answer both halves rather than two objects answering one
+    // question each.
+    "listMembers",
+    "getMember",
   ]);
 
   const organizationsForApp = new Proxy(organizations, {
@@ -778,6 +801,13 @@ export function composeApiIdentityCollaborators(
   };
 
   return {
+    // The SAME merged object `OrganizationApp` reads, published so the
+    // management REST family serves from it too. A second service over the
+    // same rows would let `/api/organization/members` and the members screen
+    // disagree about who is in an organization.
+    organizationRest: organizationsForApp as unknown as OrganizationRestService,
+    broadcast,
+
     application: {
       apiKeys: ApiKeyApp.create({ apiKeys }),
       broadcast: broadcast as unknown as PresenceEmitterPort,
