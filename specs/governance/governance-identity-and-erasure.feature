@@ -132,6 +132,23 @@ Feature: Erasing a person from the governance data, and making it stick
     Then those rows are stored as usual
 
   @unit
+  Scenario: An erased person's conversations stop being exported
+    Given an erased person whose provider still reports their conversations
+    And the source sends conversations on to a project of the customer's own
+    When the next pull reads the same thirty days
+    Then nothing is sent to that project
+    # This export leaves our storage entirely, carrying the provider's user id
+    # and the question and the answer. It is the write an erasure most has to
+    # reach, and the daily pull would otherwise repeat it forever.
+
+  @unit
+  Scenario: Suppression removes only the erased person from the export
+    Given a pull carrying one erased person and one who was not
+    When the conversations are sent on to the customer's project
+    Then the other person's conversation arrives
+    And the erased person's identifier appears nowhere in it
+
+  @unit
   Scenario: A pull still runs when the erasure list cannot be read
     Given the erasure list is unreadable
     When a pull runs
