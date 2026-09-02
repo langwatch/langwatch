@@ -336,6 +336,15 @@ Rule: The inbox can be narrowed to the queues being worked on
     When the reviewer picks one queue
     Then the list goes back to the first page
 
+  # The filter lists the queues the reviewer can reach, and a non-member
+  # reaches one only through items assigned to them. Removing the last of those
+  # takes the queue out of their reach, so a cached list would keep offering a
+  # queue whose rows have all gone.
+  @integration
+  Scenario: The queue filter is refreshed when items leave a queue
+    When items are removed from a queue
+    Then the queue filter's list is read again
+
   @unit
   Scenario: A picked queue cannot widen what the reviewer may read
     Given the reviewer may read only their own items

@@ -7,6 +7,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -38,6 +39,12 @@ const mocks = vi.hoisted(() => ({
   downloadCsv: vi.fn(),
   periodIsDefault: true,
   queueReadArgs: null as Record<string, unknown> | null,
+  // Stable across renders, unlike the invalidators built inside useUtils, so a
+  // test can say whether the picker's list was refreshed.
+  invalidateQueues: vi.fn(),
+  // What the component wants done once a removal lands. Held so a test can run
+  // it, which is the only way the refresh is reachable from here.
+  deleteOnSuccess: null as ((result: { deleted: number }) => void) | null,
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
@@ -73,6 +80,7 @@ vi.mock("~/utils/api", () => ({
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
+        getQueues: { invalidate: mocks.invalidateQueues },
       },
     }),
     annotationScore: {
@@ -80,7 +88,12 @@ vi.mock("~/utils/api", () => ({
     },
     annotation: {
       deleteQueueItems: {
-        useMutation: () => ({ mutate: mocks.deleteMutate, isLoading: false }),
+        useMutation: (options?: {
+          onSuccess?: (result: { deleted: number }) => void;
+        }) => {
+          mocks.deleteOnSuccess = options?.onSuccess ?? null;
+          return { mutate: mocks.deleteMutate, isLoading: false };
+        },
       },
       getQueues: { useQuery: () => ({ data: mocks.queues }) },
     },
@@ -242,6 +255,8 @@ beforeEach(() => {
   mocks.queues = [];
   mocks.periodIsDefault = true;
   mocks.queueReadArgs = null;
+  mocks.invalidateQueues.mockClear();
+  mocks.deleteOnSuccess = null;
   // Column choices live in the browser, so one test's picks must not decide
   // what the next one starts from.
   window.localStorage.clear();
@@ -783,6 +798,23 @@ describe("AnnotationsTable columns and row actions", () => {
           { pathname: "/[project]/annotations", query: {} },
           undefined,
           { shallow: true },
+        );
+      });
+    });
+
+    describe("when items are removed from a queue", () => {
+      /** @scenario "The queue filter is refreshed when items leave a queue" */
+      it("reads the filter's list again", async () => {
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
+        expect(mocks.invalidateQueues).not.toHaveBeenCalled();
+
+        // A non-member reaches a queue only through items assigned to them, so
+        // the removal that empties that set is the one that changes the list.
+        mocks.deleteOnSuccess?.({ deleted: 1 });
+
+        await waitFor(() =>
+          expect(mocks.invalidateQueues).toHaveBeenCalledTimes(1),
         );
       });
     });

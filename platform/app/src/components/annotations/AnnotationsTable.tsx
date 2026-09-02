@@ -526,6 +526,11 @@ export const AnnotationsTable = ({
       utils.annotation.getPendingItemsCount.invalidate(),
       utils.annotation.getAssignedItemsCount.invalidate(),
       utils.annotation.getQueueItemsCounts.invalidate(),
+      // The picker's list is a reach, not a name list: a reviewer who is not a
+      // member reaches a queue only through items assigned to them, so removing
+      // their last one takes the queue out of it. Left cached, the picker keeps
+      // offering a queue whose rows have all gone.
+      utils.annotation.getQueues.invalidate(),
     ]);
   }, [utils]);
 
