@@ -25,6 +25,7 @@ import {
   SeatLanePanel,
 } from "~/components/governance/CostLanePanel";
 import { CostLanesChart } from "~/components/governance/CostLanesChart";
+import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
   CostForecastArea,
@@ -306,6 +307,11 @@ function CostsBody({
           amountUsd={data.billed.amountUsd}
           cellsWithoutAmount={data.billed.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.billed.currenciesWithoutUsdAmount}
+          laneNote={
+            data.azureBilling
+              ? azureBillingNoteSentence(data.azureBilling)
+              : null
+          }
         />
         <CostLanePanel
           testId="cost-lane-gateway"

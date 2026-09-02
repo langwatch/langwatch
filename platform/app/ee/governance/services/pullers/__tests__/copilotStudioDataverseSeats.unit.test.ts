@@ -32,6 +32,11 @@ const CREDENTIALS = {
   tenantId: "aaaaaaaa-0000-4000-8000-000000000001",
   clientId: "app-client-id",
   clientSecret: "app-client-secret",
+  // The bill's own identity (ADR-128 §21.1): the cost read is skipped without
+  // it, and the seat tests that expect the bill delivered would silently test
+  // less than they say.
+  billingClientId: "billing-client-id",
+  billingClientSecret: "billing-client-secret",
 };
 const BOT_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 const TRANSCRIPT_ID = "11111111-1111-4111-8111-111111111111";
