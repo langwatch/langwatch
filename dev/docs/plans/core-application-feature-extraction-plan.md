@@ -896,7 +896,7 @@ answers will be needed before the named later boundary can close:
 
 ### Worker blocker graph (2026-09-02, all 8 remaining wrappers blocked)
 
-Shared prerequisites, by leverage: (1) **ProjectService worker-composable** — gates langy-conversation (via ApiKeyService), scenario (prefetcher), gateway-spend (debit graph) and part of automation; it needs organizations, the LWQL ClickHouse key-map and S3 stored-objects. (2) **Packaged mail capability** — LANDED in baca75a26b; join-request converted on it, automation and evaluation can consume the same EmailDeliveryPort once their template placement is decided. (3) **Trace conversion** — surveyed 2026-09-02 (in the a3147dbb slice report): all-or-nothing, 28 byte-frozen keys, 21-field bundle census recorded; the binding wall is field 9, subscriber:graphTriggerActivity needing AutomationService.evaluateGraphTrigger. TWO CORRECTIONS: scenario's traceSummaryStore blocker clears WITHOUT trace converting (createAppTraceSummaryStore is 60 lines of purely packaged imports over substrates the worker holds), and the evaluator-engine path does not gate trace (its reactors close over command dispatchers the evaluation installer already defers). The trace↔automation cycle breaks at automation's GRAPH half: an AutomationGraphActivityPort backed by the packaged AutomationGraphService/GraphAlertDispatchService over the now-packaged EmailDeliveryPort + harvested encrypt/decrypt, Slack/webhook delivery, PrismaScheduledJobStore, unsubscribe-token verifier. Landing order: (a) the graph vertical, (b) a shared RedisTenantBroadcastAdapter frozen twin (trace/scenario/langy all need it), (c) the 1,970-line span-storage write repository, (d) the trace-privacy vertical (~2,700 lines + tiktoken), (e) blob store onto StoredObjectStorageRuntime, (f) four narrow ports + three OTel twins + the 13-line evaluationNameAutoslug move, (g) the conversion itself. (4) Model-provider resolution (getVercelAIModel) harvested with explicit params. (5) The all-instance ClickHouse directory (gateway-spend settlement) — endgame. Wave order: mail+join-request → Trace → scenario/evaluation → ProjectService wave → automation/langy-conversation/gateway-spend.
+Shared prerequisites, by leverage: (1) **ProjectService worker-composable** — gates langy-conversation (via ApiKeyService), scenario (prefetcher), gateway-spend (debit graph) and part of automation; it needs organizations, the LWQL ClickHouse key-map and S3 stored-objects. (2) **Packaged mail capability** — LANDED in baca75a26b; join-request converted on it, automation and evaluation can consume the same EmailDeliveryPort once their template placement is decided. (3) **Trace conversion** — surveyed 2026-09-02 (in the a3147dbb slice report): all-or-nothing, 28 byte-frozen keys, 21-field bundle census recorded; the binding wall is field 9, subscriber:graphTriggerActivity needing AutomationService.evaluateGraphTrigger. TWO CORRECTIONS: scenario's traceSummaryStore blocker clears WITHOUT trace converting (createAppTraceSummaryStore is 60 lines of purely packaged imports over substrates the worker holds), and the evaluator-engine path does not gate trace (its reactors close over command dispatchers the evaluation installer already defers). The trace↔automation cycle breaks at automation's GRAPH half: an AutomationGraphActivityPort backed by the packaged AutomationGraphService/GraphAlertDispatchService over the now-packaged EmailDeliveryPort + harvested encrypt/decrypt, Slack/webhook delivery, PrismaScheduledJobStore, unsubscribe-token verifier. Landing order: (a) the graph vertical, (b) a shared RedisTenantBroadcastAdapter frozen twin (trace/scenario/langy all need it), (c) the 1,970-line span-storage write repository, (d) the trace-privacy vertical (~2,700 lines + tiktoken), (e) blob store onto StoredObjectStorageRuntime, (f) four narrow ports + three OTel twins + the 13-line evaluationNameAutoslug move, (g) the conversion itself. (4) Model-provider resolution (getVercelAIModel) harvested with explicit params. (5) The all-instance ClickHouse directory (gateway-spend settlement) — endgame. Wave order: mail+join-request → Trace → scenario/evaluation → ProjectService wave → automation/langy-conversation/gateway-spend. **CORRECTED 2026-09-02 by the step-(g) attempt: the wave order inverts to mail+join-request → ProjectService wave → Trace.** Trace needs `ProjectService` three ways directly (`projectMetadata`, `graphTriggerActivity`, the narrow-ports bundle) and two more transitively — `PrismaDataPrivacyAdapter` and `PostgresModelProviderAdapter` both require it, and both are on `recordSpan`'s path — so ProjectService gates five conversions rather than four, and Trace is one of them. Step (g)'s halt record at the end of this section carries the evidence.
 
 **Steps (a) and (b) landed (uncommitted at time of writing).** (a) `AutomationGraphActivityPort` is the two methods
 `subscriber:graphTriggerActivity` actually calls, and `createGraphTriggerActivityHandler` now names it instead of the whole
@@ -1154,10 +1154,15 @@ still owns `RecordSpanCommand`'s adapters and still registers `evaluationTrigger
 a production caller. Zero platform edits. `apps/worker` gained `@langwatch/evaluation-contract` and
 `@langwatch/evaluation-server` (filtered install). Deployment impact: none until the conversion.
 
-**What remains in the step-(g) census:** the conversion itself — the 21-field trace bundle, the 28 byte-frozen
+**What remains in the step-(g) census:** the conversion itself — the 21-field trace bundle, the 29 byte-frozen
 keys, and mounting the staged compositions. ALL THREE named absences are now CLOSED: the customer-supplied
 webhook transport for automation's graph half (below), the product-analytics sink and trace's half of the
-tenant-broadcast producers (both below). The collector edge
+tenant-broadcast producers (both below). **CORRECTED 2026-09-02 BY THE ATTEMPT ITSELF (below): this paragraph
+undercounted twice.** `trace_processing` names 29 routing keys, not 28; and the census enumerated what the
+subscribers DO without enumerating the pipeline definition they are registered into or the capability services
+`recordSpan` asks, so "the conversion itself" turned out to be fourteen unrouted keys rather than a mounting
+exercise. The halt record at the end of this section carries the per-key disposition, the clearing design and a
+wave-order inversion. The collector edge
 (`langwatch_edge_spool_fail_open_total`, `langwatch_edge_media_extract_fail_open_total`,
 `edge-media-extraction`'s use of the drop catalog) stays excluded by name: it is apps/api's conversion, not
 the worker's.
@@ -1355,6 +1360,138 @@ DEPLOYMENT IMPACT: none until the conversion. At that point `POSTHOG_KEY` and `P
 load-bearing for a standalone worker and must match the application's while both graphs ingest — two graphs
 pointed at different PostHog projects split one funnel in two, and a worker holding no key on a deployment that
 configured one undercounts it.
+
+**Step (g) ATTEMPTED 2026-09-02 AND HALTED: the trace conversion is unmountable at zero platform insertions.**
+Every staged composition is real and each one still does what its capability test proves. The conversion itself
+cannot be made, and the reason is that the step-(g) census counted the RECORD-SPAN bodies and the SUBSCRIBER
+effects and never counted two things the subscribers hang on: the PIPELINE DEFINITION they are registered into,
+and the capability SERVICES the record command asks. Recorded here with the same standing as the reverted SaaS
+`globalProjections` rider, because the failure shape is identical — the mapper would have to gain port-passing
+lines, and a port-passing line is an insertion.
+
+WHAT THE CONVERSION IS, stated exactly. `packagedWorkerCapabilities` maps one line —
+`trace: { installer: TraceProcessingServerInstaller.create(capabilities.trace) }`
+(`platform/app/src/runtime/worker/packaged-worker.capabilities.ts:170`) — and `capabilities.trace` is the
+21-field bundle `PipelineRegistry` assembles at
+`platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts:1345`. `trace` is a REQUIRED option on
+`WorkerProductionCompositionBaseOptions` and `PackagedWorkerExecutableComposition` is its one production caller,
+so deleting that line is a pure deletion only if `apps/worker` builds the whole installer itself. It is
+all-or-nothing: `trace_processing` names 29 routing keys in the byte-frozen `job-registry.json`, and the queue
+rejects an unroutable job for redelivery rather than dropping it.
+
+FIFTEEN OF THE 29 KEYS ROUTE FROM THIS PROCESS TODAY. Eight commands (`addAnnotation`, `assignTopic`,
+`bulkSyncAnnotations`, `changeTraceName`, `recordLogContribution`, `recordMetricCorrelation`, `removeAnnotation`,
+`resolveOrigin`) come off `EventingTraceProcessingAdapter` and the packaged builder; `job:deferredOriginResolution`
+and `reactor:originGate` are the installer's own; `reactor:traceUpdateBroadcast` and `reactor:spanStorageBroadcast`
+are `tryCreateWorkerTraceBroadcast`; `reactor:experimentMetricsSync` is the `computeExperimentRunMetrics` proxy
+`ExperimentWorkerFeatureInstaller` already publishes plus the packaged `ExperimentRunEventingIdLookup`;
+`reactor:simulationMetricsSync` and `reactor:customEvaluationSync` are the `computeRunMetrics` and
+`reportEvaluation` proxies Scenario's and Evaluation's installers publish. The three stores are reachable too —
+`createAppTraceSummaryStore` is 60 lines of packaged imports over `TraceSummaryClickHouseRepository`, and
+`TraceAnalyticsClickHouseRepository` and `TraceAnalyticsRollupClickHouseRepository` both take the
+`TraceClickHouseWriteResolver` this graph already holds — as is `projectMetadata`'s `bootstrapTopicClustering`,
+which is `claimAndBootstrap` on the packaged `TopicServerInstaller`'s own install result.
+
+FOURTEEN DO NOT, IN FOUR GROUPS, AND THE FIRST TWO ARE THE HALT.
+
+(1) THE PIPELINE DEFINITION ITSELF — four keys, and by construction all 29. `EventingTracePipelineAdapter.create`
+takes `ioExtraction`, `mediaReferences`, `modelCosts` and `prepareEventForProjection`, and every implementation is
+platform-only and was never in the census: `TraceIOExtractionService` (619 lines,
+`~/server/app-layer/traces/trace-io-extraction.service`), `~/shared/traces/media-refs` (201),
+`computeSpanCost` over `~/server/app-layer/traces/model-cost-matching` (36) and
+`~/server/app-layer/traces/lean-for-projection` (343). On top of them sit the two composition modules that
+actually register the 29 keys — `AppTraceProjectionsAdapter` (168) and `createTraceProcessingPipeline` (278),
+both in `platform/app/src/runtime/app/`. Without those four collaborators `projection:traceSummary`,
+`projection:traceAnalytics`, `handler:spanStorage` and `handler:traceAnalyticsRollup` cannot be built, and
+without the two modules there is no definition to install at all. Steps (c)–(f) harvested what the projections
+STORE; nothing harvested what they COMPUTE.
+
+(2) `command:recordSpan`'s SERVICE CASCADE. The four staged record-time compositions each take a capability
+service as a parameter, and not one of the six is constructed anywhere in `apps/worker` — `ProjectService`,
+`MonitorService`, `ModelProviderService`, `FeatureFlagService`, `DataPrivacyService` and `AnalyticsService` are
+`import type` in every file that names them. Composing them is not a wiring detail: `PrismaDataPrivacyAdapter`
+requires `ProjectService` AND `OrganizationService`; `PostgresModelProviderAdapter` requires both of those plus
+`AuthzService`, a catalog, a translation port, an id service, a credential codec, a token refresher and a
+connection rate limiter; `PostgresMonitorAdapter` requires `EvaluatorService`; `PostgresProjectAdapter` requires
+`OrganizationService` and a `ProjectCredentialsPort`. Only `FeatureFlagService` (a database, a cache, a config,
+a clock) and `AnalyticsService` (`AnalyticsAdapter` over a ClickHouse resolver) compose from substrates this
+process holds. THE NARROW PORTS DID NOT REMOVE THIS WALL, and it is worth saying plainly because step (f) reads
+as if they did: `TraceProjectMetadataPort` narrows the TYPE to three methods, but
+`createWorkerTraceNarrowPorts` still renames off a whole `ProjectService` instance, and nothing in this process
+can produce one. So `command:recordSpan`, `reactor:evaluationTrigger` (`MonitorService`),
+`reactor:projectMetadata` (`ProjectService`) and `subscriber:graphTriggerActivity` (`ProjectService` +
+`AnalyticsService`) are all blocked on shared prerequisite (1) of the worker blocker graph. Field 9 is cleared as
+a PORT and is not cleared as a COMPOSITION; `worker-automation-graph.composition.ts` says so in its own header.
+
+(3) THREE KEYS WITH NAMED, BOUNDED GAPS. `reactor:trackedEventSync` calls `recordTrackedEventSpan`
+(`~/server/app-layer/events/track-event.service`, 102 lines), which builds the span and then dispatches it
+through `getApp()` (line 69) — the universal App singleton, the one import a package may not have.
+`subscriber:codingAgentSpanFactsDispatch` needs
+`CodingAgentTraceProcessingPort.tryGetNormalizedSpan`, which is `findNormalizedSpanById` at line 983 of
+`span-storage.clickhouse.repository.ts` — the READ half step (c) deliberately left behind and handed forward to
+"whoever composes `CodingAgentTraceProcessingPort` at conversion time", which is this slice. `job:datasetNormalize`
+needs `DatasetNormalizationService` from `@langwatch/dataset-server` over a `DatasetContentRepository` and a
+per-project `DatasetStorageResolver`; that one is reachable and merely unbuilt.
+
+(4) THREE KEYS THAT BELONG TO CONVERSIONS THAT HAVE NOT HAPPENED. `reactor:triggerMatch` is blocked three ways —
+`AutomationService.getActiveTraceTriggersForProject` behind `TraceAlertTriggerPort`, the automation pipeline's
+`recordTriggerMatch` command (`AutomationWorkerFeatureInstaller` publishes no command proxies at all), and
+`AppGovernanceSubscriberAdapter`'s runtime. `reactor:governanceKpisSync` and `reactor:governanceOcsfEventsSync`
+are composed from `AppGovernanceSubscriberRuntime`, a private class at `pipelineRegistry.ts:279` fed by two
+`PipelineRegistryDeps` repositories.
+
+THE CLEARING DESIGN, in the order the evidence puts it.
+(g1) HARVEST THE PROJECTION RUNTIME'S FOUR COLLABORATORS, homes surveyed rather than assumed.
+`TraceIOExtractionService` goes to `@langwatch/trace-server` behind the `TraceIoExtractionPort` it already
+answers. `media-refs` goes to `@langwatch/trace-contract`, not the server, on step (g) item 2's own catalog
+reasoning: the serialised column is read by the trace read path and by `trace-list.service` as well as by the
+projection, and a format two readers disagree about is a media reference that resolves to nothing.
+`computeSpanCost`/`model-cost-matching` goes to `@langwatch/trace-server` behind the fold-time
+`TraceModelCostPort` — and this is ONE move that clears TWO recorded blockers, because Scenario's
+`deriveScenarioRoleMetrics` is the same per-project matching and the ledger already schedules it as "move
+span-cost matching into trace-server behind a ScenarioRoleMetricsPort". `leanForProjection` is projection-payload
+policy shared by two graphs (`eventing`'s `replayExecutor` re-runs it at materialization and
+`resolve-offloaded-traces` reverses it), so it belongs beside the offload contract rather than inside Trace.
+Then `AppTraceProjectionsAdapter` and `createTraceProcessingPipeline` become one
+`WorkerTraceProcessingPipeline` in `apps/worker` with no platform import left, staged and capability-tested like
+everything else in this wave.
+(g2) THE ProjectService WAVE, WHICH NOW PRECEDES TRACE RATHER THAN FOLLOWING IT. This is the correction that
+matters most and it inverts a recorded order. The blocker graph's wave order reads
+`mail+join-request → Trace → scenario/evaluation → ProjectService wave`; the evidence above says Trace needs
+`ProjectService` three ways directly and two more transitively (`DataPrivacyService` and `ModelProviderService`
+both require it), so the wave order is `mail+join-request → ProjectService wave → Trace`. Nothing about
+`ProjectService` changes — it still needs organizations, the LWQL ClickHouse key-map and S3 stored-objects — but
+it stops being a prerequisite of four conversions and becomes a prerequisite of five.
+(g3) Harvest the ONE normalized-span read (`findNormalizedSpanById`, its windowed read and the stored-span
+codec, which is already packaged) so `CodingAgentTraceProcessingPort` composes; it is ONE query out of the
+1,970-line repository, not its whole read half.
+(g4) Harvest `recordTrackedEventSpan` into `@langwatch/trace-server`. Its one reason for reaching `getApp()` is
+`traceIngestion.collection.ingestNormalizedSpan`, and `TraceIngestionService` is already the package's own
+(`services/trace-ingestion.service.ts:210`) — so the harvest is the 102-line span builder, not a new seam.
+(g5) Give `AutomationWorkerFeatureInstaller` its `recordTriggerMatch` command proxy and declare Trace's
+`TraceAlertTriggerPort` catalogue read as a narrow port over `AutomationService` — the same shape step (a) used
+for `AutomationGraphActivityPort`, and it converts with automation's remaining half.
+(g6) The EE governance subscriber runtime moves with the governance conversion; `reactor:governanceKpisSync` and
+`reactor:governanceOcsfEventsSync` are optional in the definition today, so they are the only two of the fourteen
+that could be honestly mounted as absent — and they must not be, because both keys are in the byte-frozen
+registry and a definition that omits them stalls their work.
+(g7) Compose `DatasetNormalizationService` in `apps/worker` over the stored-object runtime it already holds.
+
+WHAT WAS DELIBERATELY NOT DONE. No platform line was added, deleted or moved; no `apps/worker` line was written
+against a service this process cannot build; `job-registry.json` and every `catalogue.json` are byte-identical.
+Mounting the fifteen reachable keys and leaving fourteen unrouted was rejected outright: it is precisely the
+failure every refusal in `worker-production.composition.ts` exists to prevent — the pods stay up, the liveness
+probe answers, and fourteen kinds of trace work redeliver forever.
+
+DEPLOYMENT IMPACT: NONE. Nothing mounted, so nothing changed for either graph, and no configuration leaf became
+load-bearing. The leaves steps (a)–(f) and the two closed absences introduced —
+`AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`, `TIKTOKENS_PATH`, `TIKTOKEN_FETCH_TIMEOUT_MS`, `POSTHOG_KEY`,
+`POSTHOG_HOST`, `GOOGLE_APPLICATION_CREDENTIALS`, `LANGWATCH_DISABLE_GOOGLE_DLP`, `LANGEVALS_ENDPOINT`,
+`LANGWATCH_DATA_PRIVACY_ENFORCEMENT`, the mail block behind `BASE_HOST`, `NEXTAUTH_SECRET` and
+`CREDENTIALS_SECRET` — stay inert and become load-bearing at the conversion, not before. Gates measured
+unchanged: `pnpm test:unit run src/runtime/worker` 8 files / 42 tests, `@langwatch/worker` 41 files / 337 tests,
+`@langwatch/trace-server` 94 files / 1576 tests, architecture-lint 21 files / 332 tests with 805 CLI findings,
+`apps/worker` clean under both `tsconfig.json` and `tsconfig.test.json`.
 
 
 ## How to execute the plan
@@ -1772,7 +1909,7 @@ builds the pipeline):
 | ----- | ----- | ------------ |
 | Real (worker builds from raw deps) | 2 | eventing-maintenance, topic |
 | Extracted (this programme) | 14 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it); scenario deferred-metrics rider (`396a3d742e` — the job description lives beside its delay constant in `@langwatch/scenario-server`, the worker installer binds it through its own consumer-side interface, and a package test pins name/dedup-id/span literals against platform's frozen twin, which may only change together); github (`ec485ec46d` — the blocker was false coupling: sweep split from demand behind GithubBranchInstallationsPort, Prisma seams typed, worker builds the pipeline with no org/project service, credential absence declared by name; standalone deployments need the three GITHUB_LANGY_* env vars); langy-maintenance (`2cc56987f6` — session-key reap split from the wide service that demanded ApiKeyService/AuthzService it never called, narrow Pick<PrismaClient,"apiKey"> repository, package OTel metrics adapter pinning the identical series name); metric+log (`caee89b857` — append repositories split from reads whose demands only dead or narrow paths used; worker mounts both from the tenant-keyed substrate it already carries); suite (`3d6eba224f` — the coupling was a three-way assembly split across runtime/contract/registry; the package adapter owns it, redis required so a double-counting cacheless graph is inexpressible); identity+scim-sync (`54ba504b0d` — clean harvests: seven platform-only Prisma repositories landed at their honest homes, projection stores in identity-eventing beside the fold states that type them); authz+billing-reporting (`f397ac37ac` — the grants ledger split producer-from-consumer with connect deleted rather than stubbed; billing harvested its organization read, cache, Stripe twin and error reporter, mounting unconditionally with the SaaS shape in the sender); coding-agent+experiment (`e6a5d0fcda` — experiment was the suite assembly pattern; coding-agent dissolved ModelProviderService-for-one-pure-function and ProjectService-for-one-column-touch into three narrow ports, and composed the PR demand path its byte-frozen subscriber key requires); join-request (`baca75a26b` — the packaged mail capability in notification-server is the substrate, four provider gateways with the App's config spellings, templates in the application tier proven byte-identical to react-email's output; mounts unconditionally with absent mail declared by name, and a queue-claiming scoped graph refuses to compose without BASE_HOST) |
-| Hybrid (package installer, platform-built option bundle) | 2 | trace, governance-ingestion |
+| Hybrid (package installer, platform-built option bundle) | 2 | trace (**STAYS HYBRID; conversion attempted 2026-09-02 and halted, unreachable at zero platform insertions.** Steps (a)-(f) and the three named absences all landed and every staged composition is capability-tested, but `trace_processing`'s 29 byte-frozen routing keys are all-or-nothing and fourteen do not route from this process. Two groups are the halt: the PIPELINE DEFINITION was never in the census — `EventingTracePipelineAdapter` needs `ioExtraction`, `mediaReferences`, `modelCosts` and `prepareEventForProjection`, whose four implementations are 1,199 un-harvested platform lines, and the two modules that register the keys are platform's `AppTraceProjectionsAdapter` + `createTraceProcessingPipeline`; and `recordSpan`'s four staged ports each take a capability service by parameter, none of the six constructible here — `DataPrivacyService` and `ModelProviderService` both require `ProjectService`, which is shared prerequisite (1). THE WAVE ORDER INVERTS: ProjectService wave now precedes Trace. Three more keys have bounded gaps — `trackedEventSync`'s `getApp()`, the coding-agent normalized-span read step (c) handed forward, `datasetNormalize`'s unbuilt composition — and three belong to the automation and governance conversions. Full record, per-key disposition and clearing design at the end of the Worker blocker graph section), governance-ingestion |
 | Synthesized wrapper (platform builds, worker receives) | 7 | automation (blocked: subscriber:pm:triggerSettlement is in the byte-frozen registry and its notifyDigest intent IS outbound mail — the join-request wall, reached three ways: settlement digests, AutomationRunawayPort.sendLimitEmail, AutomationTestFirePort. Clearing: the packaged mail capability, then unsubscribe/no-reply + the four delivery transports + PrismaScheduledJobStore + triggerFilter.matcher behind the ports that already exist, OTel twins for four prom-client counters, eight WorkerConfig leaves — and persistMatch puts Annotation/Dataset/Trace services on the critical path, so it converts with the trace vertical, not before), evaluation (blocked twice: command:executeEvaluation reaches EvaluationExecutionService — 676 lines over ~2.4k more platform-only lines including tracesMapping (1,414) — a platform service graph, not the composable langevals HTTP client; and subscriber:graphTriggerActivity inherits automation's mail wall via evaluateGraphTrigger. The other three deps ARE reachable — EvaluationRunStore demands exactly three packaged methods, both analytics stores compose on AnalyticsAdapter. Clearing: automation's clearing, a worker-reachable TraceService, then the evaluator engine behind EvaluationExecutionPort), governance-events (blocked with gateway-spend), gateway-spend (blocked), scenario (blocked three ways, surveyed 2026-09-02: the execute intent reaches the in-process child-process pool whose runner only the App connects — clearing needs scenario-child-process.ts out of platform and the prefetcher's nine services worker-composable; traceSummaryStore comes from the unconverted Trace pipeline — dissolves when Trace converts, so TRACE PRECEDES SCENARIO in wave order; deriveScenarioRoleMetrics is the App's per-project span-cost matching, not the static-catalog trick — clearing: move span-cost matching into trace-server behind a ScenarioRoleMetricsPort. Six of nine deps compose today; the unused simulations field should delete with the conversion), langy-conversation (blocked twice, nine of eleven deps compose: the title generator needs getVercelAIModel's model-resolution cascade worker-reachable — harvest it into model-provider-server with explicit params, platform copy stays frozen; the session-key mint needs ApiKeyService which needs ProjectService. Preparation pieces named: ClickHouse analytics sink twin, OTel dispatch metrics twin, and a shared RedisTenantBroadcastAdapter both scenario and langy need as one frozen twin), sso-connection (blocked: teardown drags ScimService whose composition needs the better-auth instance — clearing split: ScimTokenRevocationPort over the existing repository method + the lifecycle call, then harvest SsoConnectionLedgerWriter with injected store/sender), |
 | Riders (platform production code inside the mapper) | 0 | SaaS `globalProjections` EXTRACTED (`18c28be00e` — the wall was thinner than mapped: routing already packaged, the tenant directory answers an organization id as a tenant of itself, so the worker needed only the IS_SAAS deployment leaf; meter pair harvested to enterprise billing, gated on the worker's own leaf, refusing to compose SaaS without a reporting sender). Historical record follows: SaaS `globalProjections` (billing meter projection + dispatch subscriber). **Extraction attempted 2026-09-02 and reverted: unreachable at zero platform insertions.** The worker cannot build the pair — it has no `isSaas` leaf in `WorkerConfig`, and the meter's store writes through the organization-keyed ClickHouse client (`getClickHouseClientForOrganization`, billing routes private instances to their own cluster) plus the Redis-cached `resolveOrganizationId` directory, all platform-owned — so the mapper would have to gain port-passing lines. Sequencing instead: (1) package an organization-keyed ClickHouse/store seam and the org directory the worker can compose (the Redis cache is shared state, so both graphs read the same keys); (2) give `WorkerConfig` a deployment leaf; then the mapper's whole conditional spread deletes as a pure deletion. Until then the rider stays platform-built — it converts with the endgame either way. **gateway-spend + governance-events clearing order after 18c28be00e shrinks to three steps: (1) an all-instance ClickHouse directory (no organization id names the shared instance — needs a packaged managed-client factory or it stays with the endgame), (2) packaged plan source over the new deployment leaf, (3) webhook deliveryLog/destinations harvest + debit-path split. Original mapping: they hit the wall three ways (2026-09-02, survey in `3d6eba224f`): settlement needs an org-keyed ClickHouse instance directory, webhook delivery needs the isSaas leaf, the debit graph needs Project/Evaluator/Monitor or a false-coupling split of AppGatewayGovernancePort; both process managers are in the byte-frozen job registry so no half-mount exists. Clearing order: (1) package the org-keyed instance directory (also clears the billing rider), (2) WorkerConfig deployment leaf + packaged plan source, (3) harvest webhooks deliveryLog/destinations into enterprise-webhook-server, (4) split the debit path behind a narrow port.** |
 
