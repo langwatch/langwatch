@@ -83,24 +83,35 @@ function colorAt(colors: string[], index: number): string {
 
 type MetricFormat = "number" | "currency" | "percent" | "duration";
 
-function formatNumber(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+/** True when a value is missing or not a usable number (null/undefined/NaN). */
+function isMissingNumber(value: unknown): boolean {
+  return value === null || value === undefined || (typeof value === "number" && isNaN(value));
 }
 
-function formatDuration(ms: number): string {
-  if (!isFinite(ms)) return String(ms);
-  if (Math.abs(ms) < 1000) return `${Math.round(ms)}ms`;
-  if (Math.abs(ms) < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+function formatNumber(value: number | null | undefined): string {
+  if (isMissingNumber(value)) return "–";
+  return (value as number).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function formatValue(value: number | string, format?: MetricFormat): string {
+function formatDuration(ms: number | null | undefined): string {
+  if (isMissingNumber(ms)) return "–";
+  if (!isFinite(ms as number)) return String(ms);
+  if (Math.abs(ms as number) < 1000) return `${Math.round(ms as number)}ms`;
+  if (Math.abs(ms as number) < 60000) return `${((ms as number) / 1000).toFixed(1)}s`;
+  return `${((ms as number) / 60000).toFixed(1)}m`;
+}
+
+function formatValue(
+  value: number | string | null | undefined,
+  format?: MetricFormat,
+): string {
   if (typeof value === "string") return value;
+  if (isMissingNumber(value)) return "–";
   switch (format) {
     case "currency":
       return `$${formatNumber(value)}`;
     case "percent":
-      return `${formatNumber(value * 100)}%`;
+      return `${formatNumber((value as number) * 100)}%`;
     case "duration":
       return formatDuration(value);
     case "number":
@@ -226,7 +237,7 @@ export function Sparkline({ data, y, color, height = 40 }: SparklineProps) {
 // ---------------------------------------------------------------------------
 
 export interface MetricStatProps {
-  value: number | string;
+  value: number | string | null | undefined;
   label: string;
   delta?: number;
   deltaDirection?: "up" | "down";
@@ -252,6 +263,7 @@ export function MetricStat({
   const palette = paletteFor(colors);
   const deltaColor = deltaDirection === "down" ? "#ef4444" : "#22c55e";
   const deltaArrow = deltaDirection === "down" ? "▼" : "▲";
+  const hasValue = typeof value === "string" || !isMissingNumber(value);
 
   return h(
     "div",
@@ -259,8 +271,15 @@ export function MetricStat({
     h("div", { style: { fontSize: 12, color: c.axis } }, label),
     h(
       "div",
-      { style: { fontSize: 24, fontWeight: 600, color: c.text, lineHeight: 1.2 } },
-      formatValue(value, format),
+      {
+        style: {
+          fontSize: 24,
+          fontWeight: 600,
+          color: hasValue ? c.text : c.axis,
+          lineHeight: 1.2,
+        },
+      },
+      hasValue ? formatValue(value, format) : "No data",
     ),
     delta !== undefined &&
       h(
@@ -534,7 +553,16 @@ export function ProjectionBars({
       { data, margin: { top: 8, right: 12, bottom: 0, left: 0 } },
       h(R.CartesianGrid, { stroke: c.grid, strokeDasharray: "3 3" }),
       h(R.XAxis, { dataKey: x, stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
-      h(R.YAxis, { stroke: c.axis, tick: { fill: c.axis, fontSize: 11 } }),
+      h(R.YAxis, {
+        stroke: c.axis,
+        tick: { fill: c.axis, fontSize: 11 },
+        // Auto-scaled domain can clip the budget's ReferenceLine when budget
+        // exceeds the data's own max; pad the domain to always include it.
+        domain:
+          budget !== undefined
+            ? [0, (dataMax: number) => Math.max(dataMax, budget * 1.1)]
+            : undefined,
+      }),
       h(R.Tooltip, {
         contentStyle: { background: c.tooltipBg, border: `1px solid ${c.tooltipBorder}` },
         labelStyle: { color: c.text },
