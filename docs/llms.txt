@@ -136,23 +136,16 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [GitHub Integration](https://langwatch.ai/docs/prompt-management/features/essential/github-integration.md): Sync prompts with GitHub using LangWatch to maintain version history, enable review workflows, and support agent evaluations.
 - [Tags](https://langwatch.ai/docs/prompt-management/features/essential/tags.md): Use tags to manage prompt deployment stages like production, staging, and custom environments in LangWatch.
 - [Link to Traces](https://langwatch.ai/docs/prompt-management/features/advanced/link-to-traces.md): Link prompts to execution traces in LangWatch to analyze performance, measure regressions, and support informed AI agent evaluations.
-- [Using Prompts in the Optimization Studio](https://langwatch.ai/docs/prompt-management/features/advanced/optimization-studio.md): Learn how to version, test, and optimize prompts directly inside the Optimization Studio.
+- [Use Prompts in Workflows](https://langwatch.ai/docs/prompt-management/features/advanced/workflows.md): Pick a prompt from the prompt library in an LLM node of a workflow, edit it in the same drawer, and save the result as a new prompt version.
 - [Guaranteed Availability](https://langwatch.ai/docs/prompt-management/features/advanced/guaranteed-availability.md): Ensure prompt availability with LangWatch’s Guaranteed Availability feature, even in offline or air-gapped agent testing setups.
 - [A/B Testing](https://langwatch.ai/docs/prompt-management/features/advanced/a-b-testing.md): Implement A/B testing for prompts in LangWatch to compare performance, measure regressions, and improve AI agent evaluations.
 
-### Optimization Studio
+### Workflows
 
-- [Optimization Studio](https://langwatch.ai/docs/optimization-studio/overview.md): Use LangWatch Optimization Studio to create, evaluate, and optimize LLM workflows and agent testing pipelines.
-- [LLM Nodes](https://langwatch.ai/docs/optimization-studio/llm-nodes.md): Use LLM Nodes in Optimization Studio to invoke LLMs from workflows and run controlled evaluations for agent testing.
-- [Datasets](https://langwatch.ai/docs/optimization-studio/datasets.md): Define datasets in Optimization Studio to structure test inputs and support automated agent evaluations.
-- [Evaluating](https://langwatch.ai/docs/optimization-studio/evaluating.md): Measure workflow quality using LangWatch’s evaluation tools to ensure reliable LLM pipeline and agent test performance.
-- [Optimizing](https://langwatch.ai/docs/optimization-studio/optimizing.md): Optimize prompts using DSPy in LangWatch to find the best-performing variants for AI agent evaluation workflows.
-
-### DSPy Optimization
-
-- [DSPy Visualization Quickstart](https://langwatch.ai/docs/dspy-visualization/quickstart.md): Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
-- [Tracking Custom DSPy Optimizer](https://langwatch.ai/docs/dspy-visualization/custom-optimizer.md): Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
-- [RAG Visualization](https://langwatch.ai/docs/dspy-visualization/rag-visualization.md): Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
+- [Workflows](https://langwatch.ai/docs/workflows/overview.md): Build LLM pipelines from prompts, Python code, HTTP calls and evaluators in a visual editor, run them on a dataset, and publish them as evaluators, agents or API endpoints.
+- [Building a Workflow](https://langwatch.ai/docs/workflows/building-a-workflow.md): Create a workflow from the Workflows page, configure the Entry point, LLM, Code, Evaluator and End nodes, run it on one input or on a dataset, and read the results.
+- [Workflow as Evaluator](https://langwatch.ai/docs/workflows/workflow-as-evaluator.md): Publish a workflow as a custom evaluator, so online evaluations, experiments and other workflows score outputs with your own multi-step logic.
+- [Workflow as Agent](https://langwatch.ai/docs/workflows/workflow-as-agent.md): Register a workflow as a Workflow Agent, so Agent Testing runs its scenarios against the workflow and judges the answers.
 
 ## Platform
 
@@ -303,6 +296,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [PydanticAI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/pydantic-ai.md): Connect PydanticAI applications to LangWatch using the Python SDK to trace calls, debug structured outputs, and improve AI agent evaluations.
 - [Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra.md): LangWatch traces agents built with Mastra, the TypeScript agent framework.
 - [DSPy Instrumentation](https://langwatch.ai/docs/integration/python/integrations/dspy.md): Instrument DSPy programs with the LangWatch Python SDK to trace RAG pipelines, optimize prompts, and improve AI agent evaluations.
+
+### DSPy Optimization
+
+- [DSPy Visualization Quickstart](https://langwatch.ai/docs/dspy-visualization/quickstart.md): Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
+- [Tracking Custom DSPy Optimizer](https://langwatch.ai/docs/dspy-visualization/custom-optimizer.md): Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
+- [RAG Visualization](https://langwatch.ai/docs/dspy-visualization/rag-visualization.md): Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
+
 - [LlamaIndex Instrumentation](https://langwatch.ai/docs/integration/python/integrations/llamaindex.md): Instrument LlamaIndex applications with LangWatch to trace retrieval, generation, and RAG behavior for AI agent evaluations.
 - [Haystack Instrumentation](https://langwatch.ai/docs/integration/python/integrations/haystack.md): Instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
 - [Strands Agents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/strand-agents.md): Instrument Strands Agents with LangWatch to capture decision flows and support repeatable AI agent testing.

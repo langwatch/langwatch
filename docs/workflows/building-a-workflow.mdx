@@ -1,0 +1,181 @@
+---
+title: Building a Workflow
+sidebarTitle: Building a workflow
+keywords: langwatch, workflow editor, llm node, code node, evaluator node, entry point, end node, run workflow, evaluate dataset, workflow versions
+description: Create a workflow from the Workflows page, configure the Entry point, LLM, Code, Evaluator and End nodes, run it on one input or on a dataset, and read the results.
+---
+
+## Create a workflow
+
+Open **Workflows** under **Build** and click **New Workflow**. Pick a starting point:
+
+| Option | What you get |
+|---|---|
+| **Blank Template** | An Entry point, one LLM Call and an End node, already connected. |
+| **Custom Evaluator** | An Entry point with a `question` input, one LLM judge node and an End node with the fixed evaluator results. See [Workflow as evaluator](/workflows/workflow-as-evaluator). |
+| **From Export** | A workflow imported from a JSON file that **Export Workflow** produced on another project. |
+
+Give the workflow a name, an icon and a description, then click **Create Workflow**. The editor opens.
+
+<Frame>
+<img className="block" src="/images/workflows/create-workflow.png" alt="The Create new workflow dialog with Blank Template, Custom Evaluator and From Export" />
+</Frame>
+
+## The editor
+
+The **Components** panel on the left lists the node types you can drag onto the canvas. The canvas holds the nodes and the edges between them. Click a node to open its settings in a drawer on the right.
+
+| Component | What it does |
+|---|---|
+| **Prompt** | Calls a model with a prompt. The node is named LLM Call on the canvas. |
+| **Code** | Runs a Python class you write. |
+| **HTTP Call** | Sends an HTTP request to an external API and reads the response. |
+| **If/Else** | Routes execution to a `true` or a `false` branch from a condition over its inputs. Nodes on the branch that is not taken are skipped. |
+| **Agent** | Calls one of the agents of the project (HTTP, code or workflow agent). |
+| **Evaluator** | Runs one of the evaluators of the project and outputs `passed`, `score` or `label`. |
+| **Custom Components** | Workflows of the project that were published as components. They appear below the built-in components. |
+
+Every node lists its inputs and outputs with a type: `str`, `float`, `bool`, `image`, `list[str]`, `dict`, `json_schema` or `chat_messages`. Drag from an output handle on the right side of a node to an input handle on the left side of another node to connect them. In a node drawer, the mapping field next to an input does the same thing: pick the node and the output the input reads from.
+
+The top bar shows the workflow name, undo and redo, the version history, **Evaluate** and **Publish**. The **Results** button at the bottom opens the evaluation runs of the workflow.
+
+## Entry point
+
+The Entry point declares the inputs of the workflow. Every other node reads from these inputs or from the outputs of an earlier node.
+
+<Frame>
+<img className="block" src="/images/workflows/entry-node.png" alt="The Entry point drawer with a question input and an attached draft dataset" />
+</Frame>
+
+- **Inputs**: add one field per value the workflow receives. Each field has a type and an optional default value.
+- **Attached Dataset**: a new workflow starts with a draft dataset. **Open** edits its rows and columns, **Replace** attaches another dataset of the project, and the cross detaches it. Attaching a dataset adds its columns to the inputs. **Save as dataset** in the dataset editor stores the draft under **Datasets**.
+- **Workflow Outputs**: **Go to end node** opens the End node, which declares what the workflow returns.
+
+An input that no dataset column provides is a parameter of the workflow. Runs from the API and from Agent Testing set it per run.
+
+## LLM node
+
+The LLM node calls a model with a prompt and returns the fields you declare as outputs.
+
+<Frame>
+<img className="block" src="/images/workflows/llm-node.png" alt="The LLM Call drawer with the model, the system prompt, the user message and the variable mapping" />
+</Frame>
+
+- **Model**: the picker at the top selects the model. The list holds the model providers configured for the project.
+- **Prompt**: the view switch next to the section title shows either the system prompt alone (**Prompt**) or the full message list (**Messages**). Write `{{name}}` in a message to insert a variable. A variable used in a message but not declared shows an **Undefined variables** notice with a **Create** action.
+- **Variables**: one row per input of the node, each with a type and a mapping to the source it reads from, for example `Entry.question`.
+- **Outputs**: one row per field the model returns. With one output of type Text the node returns the model answer as is. With several outputs, or an output of another type, the node asks the model for structured output with those fields.
+
+**Apply** keeps the changes on this node. **Save** stores the prompt in the prompt library as a new version, so other workflows and your code can use it. An orange dot on the node marks prompt changes that are applied but not saved. See [Prompts in workflows](/prompt-management/features/advanced/workflows).
+
+## Code node
+
+The Code node runs a Python class. The `__call__` method receives one keyword argument per input and returns a dictionary with one key per output.
+
+<Frame>
+<img className="block" src="/images/workflows/code-node.png" alt="The Code drawer with the Python source, one input mapped to the LLM answer and two outputs" />
+</Frame>
+
+```python
+class Code:
+    def __call__(self, answer: str = None):
+        length = len(answer or "")
+        return {"within_limit": length <= 300, "length": length}
+```
+
+- **Inputs** and **Outputs** work as on the LLM node. Adding an input also adds the parameter to the `__call__` signature. Every parameter defaults to `None`, so an input that is not connected does not raise an error.
+- Click the source to open the code editor. **Save** keeps the editor open, **Save & Close** returns to the drawer.
+- **Secrets**: the editor lists the secrets of the project and inserts `secrets.NAME` at the cursor. The value reaches the code at run time only; the editor and the saved workflow hold the name. Manage the values under **Settings**, **Secrets**. See [Secrets](/platform/secrets).
+
+<Frame>
+<img className="block" src="/images/workflows/code-editor.png" alt="The Python code editor with the Secrets button and Save and Close" />
+</Frame>
+
+## Evaluator node
+
+The Evaluator node runs an evaluator of the project on the values you map to it and outputs `passed`, `score` or `label`, depending on the evaluator type.
+
+Dragging **Evaluator** onto the canvas opens the evaluator picker. Pick an existing evaluator, or click **New Evaluator** and choose a type from the categories (Expected Answer, LLM as Judge, RAG Quality, Quality Aspects, Safety, Custom). The evaluator is saved to the project and the node references it.
+
+<Frame>
+<img className="block" src="/images/workflows/evaluator-node.png" alt="The evaluator drawer with the name, the model, the judge prompt and the variable mappings" />
+</Frame>
+
+- The drawer shows the settings of the evaluator type, for example the model and the prompt of an LLM judge.
+- **Variables**: map `input`, `output`, `expected_output` or `contexts` to the entry inputs or to the outputs of earlier nodes. Only the fields the evaluator uses are required.
+- **Apply** keeps the changes on this node only. **Save** updates the saved evaluator for every place that uses it.
+
+**Also check:** [Built-in evaluators](/evaluations/evaluators/built-in-evaluators) for the list of evaluator types and their fields.
+
+## End node
+
+The End node declares the results of the workflow. Add one result per value the workflow returns, with its type, and connect an output of an earlier node to each one.
+
+<Frame>
+<img className="block" src="/images/workflows/end-node.png" alt="The End drawer with four results: answer, within_limit, length and passed" />
+</Frame>
+
+In a workflow published as an evaluator, the results are fixed to `details`, `passed`, `score` and `label`. See [Workflow as evaluator](/workflows/workflow-as-evaluator).
+
+## Run one input
+
+The play button on a node opens two options:
+
+- **Run with manual input** runs this node alone. A form asks for a value per input of the node.
+- **Run workflow until here** runs this node and everything it depends on. The **Run until here** dialog shows one field per Entry point input, prefilled with the first dataset row or with the values of your last run. **Select dataset value** picks a row of the attached dataset instead.
+
+<Frame>
+<img className="block" src="/images/workflows/run-until-here.png" alt="The Run until here dialog with the question field prefilled from the dataset" />
+</Frame>
+
+Use it on the End node to run the whole workflow. Each node shows a check mark when it finishes or an error mark when it fails.
+
+## Read the result of a node
+
+Click a node after a run to see what it received and what it produced. The expanded view shows the inputs on the left, the settings in the middle and the outputs on the right, with the duration of the run. **Full Trace** opens the trace of the run in the Trace Explorer, with every model call, its cost and its messages.
+
+<Frame>
+<img className="block" src="/images/workflows/run-results.png" alt="The End node after a run, with the answer, length, passed and within_limit outputs" />
+</Frame>
+
+## Evaluate on a dataset
+
+**Evaluate** runs the workflow on every row of the attached dataset and records the outputs of the evaluator nodes. The dialog asks for a description of the version it saves, and for the rows to evaluate: **Full dataset**, **Test entries**, **Train entries** or **Specific entry**.
+
+<Frame>
+<img className="block" src="/images/workflows/evaluate-dialog.png" alt="The Evaluate Workflow dialog with the version description and the Full dataset option" />
+</Frame>
+
+The **Results** panel at the bottom lists the runs of the workflow. Select a run to see the pass rate of each evaluator, the total cost and the runtime. **Open full results** opens the run under **Experiments**, with the row by row results. **Run via API** shows the code that starts the same evaluation from a script or a CI job, in Python, TypeScript or shell.
+
+<Frame>
+<img className="block" src="/images/workflows/evaluate-results.png" alt="The Results panel with one run, its pass rate, total cost and runtime" />
+</Frame>
+
+**Also check:** [Experiments](/evaluations/experiments/overview) for the results page and comparisons between runs.
+
+## Versions
+
+The editor autosaves every change. The history button in the top bar opens **Workflow Versions**: type what changed and click **Save new version** to store a numbered version, or restore an earlier one from **Previous Versions**. **Evaluate** and **Publish** save a version when the workflow changed since the last one.
+
+<Frame>
+<img className="block" src="/images/workflows/versions.png" alt="The Workflow Versions popover with the autosaved current state and version 1" />
+</Frame>
+
+## Publish
+
+**Publish** opens a menu with three actions:
+
+| Action | What it does |
+|---|---|
+| **Publish Workflow** | Saves a version and marks it as the published one. This is the version the API, the evaluator lists and the Components panel of other workflows use. A workflow created as a custom evaluator becomes an evaluator of the project when you publish it. |
+| **View API Reference** | Shows how to run the published version through the [Workflows API](/api-reference/workflows/overview). Available after the first publish. |
+| **Export Workflow** | Downloads the workflow as JSON, with the attached dataset. Import it on another project with **From Export**. |
+
+<Frame>
+<img className="block" src="/images/workflows/publish-menu.png" alt="The Publish menu with Publish Workflow, View API Reference and Export Workflow" />
+</Frame>
+
+## Copy a workflow to another project
+
+On the Workflows page, the menu of a workflow card offers **Replicate to another project**. Pick the target project and choose whether the attached dataset is copied with it.

@@ -1,0 +1,42 @@
+---
+title: Workflows
+sidebarTitle: Overview
+keywords: langwatch, workflows, workflow editor, llm pipeline, custom evaluator, agent testing target
+description: Build LLM pipelines from prompts, Python code, HTTP calls and evaluators in a visual editor, run them on a dataset, and publish them as evaluators, agents or API endpoints.
+---
+
+## What a workflow is
+
+A workflow is a graph of nodes that LangWatch runs from an Entry point to an End node. Each node takes named inputs, produces named outputs, and an edge connects an output of one node to an input of the next. Workflows live under **Build**, **Workflows** in the sidebar.
+
+For example, the workflow below answers a support question with a prompt, checks the answer length in a Python node, and asks an LLM judge whether the answer addresses the question. The End node collects the answer, the length check and the verdict.
+
+<Frame>
+<img className="block" src="/images/workflows/editor-overview.png" alt="The workflow editor with an Entry point, an LLM Call, a Code node, an evaluator and an End node" />
+</Frame>
+
+The editor autosaves every change. You save a numbered version when you evaluate or publish, and you can restore any earlier version.
+
+## When to use a workflow
+
+| Goal | How |
+|---|---|
+| Run a prompt against a dataset and read the per-row results | Attach the dataset to the Entry point and click **Evaluate**. See [Building a workflow](/workflows/building-a-workflow). |
+| Score your agent with logic a single evaluator does not cover | Publish the workflow as an evaluator and pick it in online evaluations or experiments. See [Workflow as evaluator](/workflows/workflow-as-evaluator). |
+| Test a multi-step pipeline with simulated conversations | Register the workflow as a Workflow Agent in Agent Testing. See [Workflow as agent](/workflows/workflow-as-agent). |
+| Call the pipeline from your own code | Publish the workflow and call the [Workflows API](/api-reference/workflows/overview) with the entry inputs. |
+
+<CardGroup cols={2}>
+  <Card title="Building a workflow" icon="diagram-project" href="/workflows/building-a-workflow">
+    Create a workflow, configure each node, run it and read the results.
+  </Card>
+  <Card title="Workflow as evaluator" icon="check-double" href="/workflows/workflow-as-evaluator">
+    Publish a workflow so it scores outputs like a built-in evaluator.
+  </Card>
+  <Card title="Workflow as agent" icon="robot" href="/workflows/workflow-as-agent">
+    Use a workflow as the target of your agent tests.
+  </Card>
+  <Card title="Prompts in workflows" icon="file-lines" href="/prompt-management/features/advanced/workflows">
+    Use a prompt from the prompt library in an LLM node.
+  </Card>
+</CardGroup>

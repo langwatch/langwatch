@@ -40858,46 +40858,45 @@ For more detailed information about setting up tracing in your application, see 
 
 ---
 
-# FILE: ./prompt-management/features/advanced/optimization-studio.mdx
+# FILE: ./prompt-management/features/advanced/workflows.mdx
 
 ---
-title: "Using Prompts in the Optimization Studio"
-description: "Learn how to version, test, and optimize prompts directly inside the Optimization Studio."
+title: "Use Prompts in Workflows"
+sidebarTitle: "Prompts in workflows"
+keywords: langwatch, prompts, workflows, llm node, prompt library, prompt versions
+description: "Pick a prompt from the prompt library in an LLM node of a workflow, edit it in the same drawer, and save the result as a new prompt version."
 ---
 
-### Watch: Prompt Management Tutorial
+## Pick a prompt for an LLM node
 
-The video below shows how to use the prompt management features in LangWatch:
-
-<Frame>
-  <iframe
-    width="100%"
-    height="400"
-    src="https://www.youtube.com/embed/F64y61v72CA"
-    title="Prompt Management on LangWatch Optimization Studio"
-    frameBorder="0"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowFullScreen
-  ></iframe>
-</Frame>
-
-### Using Prompts in the Optimization Studio
+Drag **Prompt** from the **Components** panel onto the canvas. The **Choose Prompt** drawer lists the prompts of the project. Pick one, or click **New Prompt** to start from an empty prompt. The node on the canvas is named after the prompt.
 
 <Frame>
-  <img
-    className="block"
-    src="/images/prompts/prompt-versions-in-studio.png"
-    alt="LangWatch Prompt Versions in Studio"
-  />
+<img className="block" src="/images/workflows/prompt-picker.png" alt="The Choose Prompt drawer listing the prompts of the project" />
 </Frame>
 
-To get started with prompt versioning in the Optimization Studio:
+Click the node to open the prompt in the drawer. It is the same editor as the prompt page: the model, the system prompt, the messages, the variables and the outputs.
 
-1. Create a new workflow or open an existing one
-2. Drag a signature node onto the workspace
-3. Click on the node to access configuration options in the right side panel
-4. Make your desired changes to the prompt configuration
-5. Save your changes as a new version
+## Apply or save
+
+The drawer has two ways to keep a change:
+
+| Button | Effect |
+|---|---|
+| **Apply** | Keeps the change on this node only. The prompt in the library does not change. An orange dot on the node marks a node whose prompt differs from the saved version. |
+| **Save** | Creates a new version of the prompt in the library, with the model, the messages and the variables the drawer holds. Every place that uses the prompt can move to the new version. |
+
+The first **Save** on a node that started from **New Prompt** opens **Save Prompt**, which asks for the prompt identifier, for example `support-answer` or `marketing/tone-of-voice`, and the scope of the prompt.
+
+<Frame>
+<img className="block" src="/images/workflows/prompt-save.png" alt="The Save Prompt dialog asking for the prompt identifier and the scope" />
+</Frame>
+
+## Run the workflow with the prompt
+
+The workflow runs the node with the prompt the drawer shows: the applied changes when there are any, otherwise the saved version. Evaluate the workflow on a dataset to compare prompt versions on the same rows, see [Building a workflow](/workflows/building-a-workflow).
+
+**Also check:** [Version control](/prompt-management/features/essential/version-control) for how prompt versions work, and [Workflows](/workflows/overview).
 
 ---
 
@@ -41796,22 +41795,20 @@ Beyond basic prompt creation, LangWatch provides these features for optimizing a
 - **Model Selection**: Choose the best model for your specific use case
 
 <Tip>
-Combine these advanced features with LangWatch's optimization studio,
-where you can A/B test different configurations and measure their impact on performance metrics.
+Combine these settings with [Workflows](/workflows/overview),
+where you can evaluate different configurations on the same dataset and compare the results.
 </Tip>
 
-### Optimization Studio Integration
+### Workflows Integration
 
-The optimization studio uses these advanced prompt capabilities to help you:
+A workflow uses these prompt settings in its LLM nodes, so you can:
 
-- **A/B Testing**: Compare different prompt versions, models, and configurations
-- **Performance Metrics**: Measure response quality, latency, and cost across variations
-- **Automated Optimization**: Let the system find the best combination of settings
-- **Version Management**: Track which configurations perform best over time
-- **Team Collaboration**: Share optimized prompts across your organization
+- **Compare versions**: Evaluate different prompt versions, models, and configurations on one dataset
+- **Measure results**: Read the pass rate, cost and duration of each run
+- **Save what works**: Save the prompt from the workflow as a new version
 
-<Card title="Explore Optimization Studio" icon="rocket" href="/optimization-studio/overview">
-Learn how to use advanced prompt features to improve your AI application performance.
+<Card title="Use prompts in workflows" icon="diagram-project" href="/prompt-management/features/advanced/workflows">
+Pick a prompt in an LLM node, evaluate it on a dataset and save the result as a version.
 </Card>
 
 ## Version History
@@ -50817,7 +50814,7 @@ By implementing this evaluation-driven approach with LangWatch, you can systemat
 
 ### **7. Optimizing Your Extraction**
 
-Now that you've set up evaluation for your structured data extraction, you can use the [Optimization Studio](/optimization-studio/optimizing) to fine-tune and improve your extraction pipeline. The Optimization Studio provides tools to analyze patterns in model failures, test different prompt variations, and track improvements over time.
+Now that you've set up evaluation for your structured data extraction, you can use [Workflows](/workflows/overview) to improve your extraction pipeline. Put the extraction prompt in an LLM node, attach the dataset, evaluate each prompt variation on the same rows and compare the results run by run.
 ---
 
 # FILE: ./use-cases/technical-rag.mdx
@@ -51242,405 +51239,6 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
 
 ---
 
-# FILE: ./optimization-studio/datasets.mdx
-
----
-title: Datasets
-description: Define datasets in Optimization Studio to structure test inputs and support automated agent evaluations.
----
-
-<iframe
-  width="720"
-  height="405"
-  src="https://www.youtube.com/embed/BnHQkZlCJLw"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
-
-## Understanding the Role of Datasets
-
-Datasets are at the core of the Optimization Studio's functionality. When working with non-deterministic systems like LLMs, running your tests across multiple examples is crucial for confidence in your results. While you might get lucky with a single successful test, running your LLM against hundreds of examples provides much more reliable validation of your solution.
-
-You don't need an enormous dataset to get started. As little as 20 examples can already provide meaningful results with the DSPy optimizers.
-
-## Creating and Managing Datasets [(0:50)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=50s)
-
-If you already use LangWatch for monitoring, you can import the production data generated by your LLMs as a dataset, otherwise, you can also create or import a new dataset on optimization studio directly.
-
-### Creating and Editing Datasets
-
-Access the dataset editor by double-clicking on the dataset in the node or sidebar, this provides a spreadsheet-like interface where you can:
-- Add new records manually or modify existing entries
-- Add or remove columns
-- Make real-time changes to experiment on your workflow
-- Collaborate with team members and domain experts
-
-
-### Importing Existing Data [(1:45)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=105s)
-If you already have data in CSV format, you can import it:
-1. Use the upload CSV option
-2. Configure column types and formats
-3. Add additional columns as needed
-4. Save and immediately use in your workflows
-
-## Dataset Configuration [(2:23)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=143s)
-
-### Manual Test Entry Settings
-The "manual test entry" setting controls which data point is used during manual execution:
-- "Random" (default): Picks a different entry each time you run
-- "First Entry": Always uses the same entry for consistent testing
-- This setting only affects manual testing, not full evaluations
-
-### Dataset Splitting [(2:52)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=172s)
-
-One of the most important aspects of working with datasets is how they're split for optimization and testing:
-
-#### Default 80-20 Split
-- Optimization Set (80%): Used for training and improving your LLM pipeline
-- Test Set (20%): Reserved for validation to ensure your optimizations generalize well
-
-You can adjust this split based on your needs:
-- Use fixed numbers instead of percentages
-- Modify the split ratio for different use cases
-- Balance between optimization data and test data
-
-### Shuffle Seed Configuration [(3:51)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=231s)
-
-The shuffle seed is crucial for maintaining consistent, unbiased testing:
-- Prevents dataset ordering bias
-- Ensures consistent splitting across runs
-- Can be modified to test resilience to different data arrangements
-- The default 42 seed can be changed to any number for randomization
-
-## Evaluation Basics [(4:56)](https://www.youtube.com/watch?v=BnHQkZlCJLw&t=296s)
-
-While detailed evaluation is covered in later tutorials, the basic workflow involves:
-1. Clicking the Evaluate button
-2. Documenting changes made to your pipeline
-3. Selecting which dataset partition to evaluate against
-4. Adding necessary LLM API keys
-
-The evaluation panel provides:
-- Total entries processed
-- Average cost per entry
-- Total runtime
-- Overall experiment costs
-
-This foundation in dataset management sets you up for evaluating the quality and running automated optimizations, which are covered in subsequent tutorials.
----
-
-# FILE: ./optimization-studio/evaluating.mdx
-
----
-title: Evaluating
-description: Measure workflow quality using LangWatch’s evaluation tools to ensure reliable LLM pipeline and agent test performance.
----
-
-<iframe
-  width="720"
-  height="405"
-  src="https://www.youtube.com/embed/-sQikz38yBI"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
-
-## The Importance of Evaluation
-
-Evaluators are essential tools for measuring LLM output quality. When you have a reliable way to measure quality, it becomes much easier to:
-- Compare different LLM models
-- Test prompt variations
-- Validate feature additions
-- Ensure quality remains consistent during upgrades
-
-## Types of Evaluators
-
-On the video, a few evaluators are introduced:
-
-### Exact Match Evaluator [(0:56)](https://www.youtube.com/watch?v=-sQikz38yBI&t=56s)
-The simplest form of evaluation, perfect for classification tasks:
-- Compares LLM output directly with expected output
-- Uses straightforward string matching
-- Ideal for categorical outputs where precision is crucial
-- Works well when you need strict matching
-
-### Answer Correctness Evaluator [(4:44)](https://www.youtube.com/watch?v=-sQikz38yBI&t=264s)
-Comparison with golden answers for factual accuracy:
-- Uses another LLM to assess if answers are factually equivalent
-- Looks beyond exact wording to evaluate semantic meaning
-- Particularly useful for QA systems and knowledge-based tasks
-- Can handle variations in phrasing while maintaining accuracy checking
-
-### LLM as Judge Evaluator [(7:01)](https://www.youtube.com/watch?v=-sQikz38yBI&t=421s)
-Flexible evaluation for custom criteria:
-- Allows custom prompts to define evaluation criteria
-- Useful when you don't have expected outputs
-- Can evaluate subjective qualities (conciseness, tone, style)
-- Returns boolean (true/false) or scored (0-1) results
-
-## Working with Evaluators
-
-### Setting Up Evaluators [(1:32)](https://www.youtube.com/watch?v=-sQikz38yBI&t=92s)
-To implement an evaluator:
-1. Drag and drop the desired evaluator onto your workflow
-2. Connect appropriate inputs (output from LLM, expected output from dataset)
-3. Configure any additional parameters or criteria
-4. Run evaluation on individual examples or full test sets
-
-### Running Evaluations [(2:28)](https://www.youtube.com/watch?v=-sQikz38yBI&t=148s)
-The evaluation process:
-1. Select your test dataset
-2. Choose appropriate evaluator
-3. Run evaluation across all test examples
-4. Review accuracy scores and individual results
-
-### Improving Results [(9:14)](https://www.youtube.com/watch?v=-sQikz38yBI&t=554s)
-After setting up evaluation:
-- Make incremental changes to your workflow
-- Test impact immediately through re-evaluation
-- Track improvements in accuracy scores
-- Iterate on prompts and parameters based on results
-
-## Summary
-
-- Choose evaluators that match your quality criteria
-- Use multiple evaluators for different aspects of quality
-- Start with simple evaluators before moving to complex ones
-- Consider both strict and semantic matching depending on your use case
-- Use evaluation results to guide optimization efforts
-
-The ability to properly evaluate LLM outputs sets the foundation for automated optimization, which is covered in the next tutorial.
----
-
-# FILE: ./optimization-studio/llm-nodes.mdx
-
----
-title: LLM Nodes
-description: Use LLM Nodes in Optimization Studio to invoke LLMs from workflows and run controlled evaluations for agent testing.
----
-
-<iframe
-  width="720"
-  height="405"
-  src="https://www.youtube.com/embed/fbNmm6qoZFw"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
-
-## Getting Started
-
-To begin working with LLM nodes, first create a new workflow by navigating to the workflows page and clicking "Create New Workflow." You can choose from available templates, but for learning purposes, the blank template is a good starting point. After naming your workflow, the system automatically creates three basic blocks: an entry node, an LLM call node, and an end node.
-
-## Understanding the LLM Node [(0:34)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=34s)
-
-The LLM node is where the actual language model interaction happens. Each node has configurable properties accessible through the right sidebar, including:
-- LLM provider selection
-- LLM Instructions
-- Input and output fields
-- Few-shot demonstrations
-
-You can quickly test an LLM node by using the "Run with manual input" option, which allows you to input test queries and see immediate results. The system shows you both the cost and duration of each execution.
-
-## Configuring Input and Output Fields [(1:31)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=91s)
-
-One of the most important aspects of the LLM node is how you configure its inputs and outputs. The field names are meaningful as they're passed directly to the LLM. You can:
-- Add multiple input fields (such as 'purchase' and 'amount')
-- Create custom output fields for different types of responses
-- Rename fields to better represent their purpose
-
-## Working with Datasets [(2:10)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=130s)
-
-You can connect LLM nodes to datasets. Through the entry node, you can:
-- Select and load your datasets
-- Map dataset fields to LLM input fields
-- Test your workflow using random samples from your dataset
-- Connect multiple dataset fields to provide richer context to your LLM
-
-## Improving Results with Instructions [(2:58)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=178s)
-
-To get better responses from your LLM, you can add specific instructions in the node properties. These instructions help guide the LLM's behavior and can include:
-- Expected output categories
-- Format specifications
-- Processing guidelines
-- Context information
-
-## Creating Complex Workflows [(4:25)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=265s)
-
-A workflow can contain several LLM nodes. You can build one by:
-- Connecting multiple LLM nodes in sequence
-- Passing outputs from one node as inputs to another
-- Using different LLM models for different tasks
-- Adjusting temperature and other parameters independently for each node
-
-## Monitoring and Tracking [(5:54)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=354s)
-
-Every LLM node execution is tracked in detail. You can:
-- View the full execution trace in LangWatch trace monitoring
-- Examine system prompts and user requests
-- Track costs and performance metrics
-- Analyze the complete message flow
-
-## Using Demonstrations [(6:58)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=418s)
-
-To improve your LLM's performance, you can provide example cases through demonstrations. In the node properties, you can:
-- Add input-output pairs as examples
-- Save demonstrations for reuse
-- Test how different examples affect results
-
-## Custom LLM Providers [(7:27)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=447s)
-
-You can also set up custom LLM providers, on top of the default ones, by:
-1. Accessing the "Configure available model" settings
-2. Enabling custom settings
-3. Adding your API keys
-4. Configuring custom or fine-tuned models
-
-Apart from the main providers (OpenAI, Anthropic, Google, Groq, etc) the system also supports any OpenAI-compatible APIs, for example on your own self-hosted Llama.
-
-
-The LLM Node serves as the foundation for more advanced features like image processing, evaluation, and automatic optimization, which are covered in the next tutorials.
-
----
-
-# FILE: ./optimization-studio/optimizing.mdx
-
----
-title: Optimizing
-description: Optimize prompts using DSPy in LangWatch to find the best-performing variants for AI agent evaluation workflows.
----
-
-<iframe
-  width="720"
-  height="405"
-  src="https://www.youtube.com/embed/QGUTiAX64aE"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
-
-## Optimizing LLM Workflows in LangWatch
-
-The Optimization Studio runs DSPy optimizers to improve your LLM workflow performance. Starting from a basic setup with baseline performance, you improve the results through automated optimization techniques.
-
-## Getting Started with Optimization
-
-To begin optimization:
-1. Set up your basic workflow with an LLM node
-2. Connect your dataset
-3. Add appropriate evaluators
-4. Click the "Optimize" button
-
-## Optimization Options [(0:47)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=47s)
-
-The platform offers different optimization strategies such as:
-- Improving prompts and demonstrations with MIPROv2
-- Prompt-only optimization with MIPROv2
-- Demonstrations optimization with BootstrapFewShotWithRandomSearch
-
-## Configuration Settings [(1:07)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=67s)
-
-Key optimization parameters include:
-- Number of prompts to generate
-- Number of demonstrations to bootstrap
-- Teacher LLM selection (can use a more capable LLM to teach a cheaper one)
-- Optimization budget and constraints
-
-## Monitoring Optimization Progress [(1:55)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=115s)
-
-During optimization:
-- View real-time progress in the optimization window
-- Monitor score improvements
-- Access detailed logs of the optimization process
-- Track cost and performance metrics
-
-## Understanding Results [(2:14)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=134s)
-
-The optimization process typically shows:
-- Initial baseline performance
-- Progressive improvements
-- Final optimized results
-- Detailed breakdown of changes made
-
-## Applying and Managing Optimizations [(2:29)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=149s)
-
-After optimization:
-- Apply optimized settings with one click
-- Review new instructions and demonstrations
-- Test individual examples
-- Run evaluation on test set to validate improvements
-
-## Advanced Optimization Strategies [(4:11)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=251s)
-
-To further improve results:
-- Try different LLM models
-- Add prompting techniques (like chain of thought)
-- Combine multiple optimization approaches
-- Experiment with different demonstration sets
-
-## Cost Considerations [(7:37)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=457s)
-
-Important factors to consider:
-- Optimization costs vs. inference costs
-- Trade-offs between model performance and expense
-- Tracking costs per call
-- Balancing quality and budget requirements
-
-## Best Practices [(8:08)](https://www.youtube.com/watch?v=QGUTiAX64aE&t=488s)
-
-For optimal results:
-1. Start with smaller datasets and lighter models
-2. Gradually increase complexity
-3. Monitor costs and performance metrics
-4. Test different model combinations
-5. Use optimization results to make informed decisions about model selection
-
-## Tips for Success
-
-- Begin with a clear baseline measurement
-- Use appropriate evaluators for your use case
-- Consider both quality and cost metrics
-- Iterate and experiment with different approaches
-- Keep track of optimization history for comparison
-
-The Optimization Studio provides a systematic way to improve your LLM workflows, allowing you to find the optimal balance between performance and cost for your specific use case.
----
-
-# FILE: ./optimization-studio/overview.mdx
-
----
-title: Optimization Studio
-description: Use LangWatch Optimization Studio to create, evaluate, and optimize LLM workflows and agent testing pipelines.
----
-
-The Optimization Studio is where you create, evaluate, and optimize your LLM workflows. Watch the introduction video below and the video tutorials on the next page to learn how to measure the quality of your LLMs and optimize their performance.
-
-<iframe
-  width="720"
-  height="460"
-  src="https://www.youtube.com/embed/dZG44oRTz84?si=fYYztAsJLEnZidfk"
-  title="YouTube video player"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
-
-<br />
-
-<CardGroup cols={2}>
-  <Card title="LLM Nodes" icon="link" href="./llm-nodes" />
-  <Card title="Datasets" icon="link" href="./datasets" />
-  <Card title="Evaluating" icon="link" href="./evaluating" />
-  <Card title="Optimizing" icon="link" href="./optimizing" />
-</CardGroup>
-
----
-
 # FILE: ./better-agents/overview.mdx
 
 ---
@@ -52000,7 +51598,7 @@ The variables available depend on how you invoke the prompt:
 |---------|-----------|
 | **SDK `compile()`** | Any key-value pairs you pass in |
 | **Prompt Playground** | Values set in the Variables tab |
-| **Optimization Studio** | Node inputs defined in the workflow |
+| **Workflows** | Node inputs defined in the workflow |
 | **Scenario adapters** | `input`, `messages`, and adapter-specific fields |
 
 ## Conditionals
@@ -63955,7 +63553,7 @@ Python service for natural language processing tasks.
 | **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
 
 **What it does:**
-- Runs Optimization Studio workflows
+- Runs workflows
 - Executes topic clustering algorithms
 - Handles custom evaluator execution
 - Processes NLP tasks (embeddings, text analysis)
@@ -64815,7 +64413,7 @@ Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jo
 
 Python service for:
 
-- Optimization Studio workflow execution
+- Workflow execution
 - Topic clustering algorithms
 - Custom evaluator execution
 
@@ -65870,7 +65468,7 @@ No visibility window on the data in your own ClickHouse. Retention is yours to c
 </Card>
 
 <Card title="The whole product surface" icon="grid-2">
-Observability, evaluations, prompt management, agent simulations, the Optimization Studio, and the AI Gateway.
+Observability, evaluations, prompt management, agent simulations, Workflows, and the LangWatch AI Gateway.
 </Card>
 </CardGroup>
 
@@ -65915,7 +65513,7 @@ Once a license is present **and the configured identity provider actually starts
 <Warning>
 **Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it. Those accounts have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure an email gateway (see [Email](/self-hosting/configuration/email)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
 
-If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs nothing but the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
+If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
 ## Activating a license
@@ -65955,7 +65553,7 @@ The SSO decision is made once at startup. Plan entitlements apply immediately, b
 
 ## Expiry
 
-Nothing is switched off on the day a license reaches its end date. No user is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
+No capability is switched off on the day a license reaches its end date. No user is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
 
 The seat count keeps binding. A license we issued is a record of what was bought, so an expired one still covers the seats it sold: an organization holding more members than that is asked to disable the ones who no longer need access, and adding a new member is refused until the license is renewed. Everyone who already has a seat is unaffected.
 

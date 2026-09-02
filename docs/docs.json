@@ -239,27 +239,18 @@
                   "prompt-management/features/essential/github-integration",
                   "prompt-management/features/essential/tags",
                   "prompt-management/features/advanced/link-to-traces",
-                  "prompt-management/features/advanced/optimization-studio",
+                  "prompt-management/features/advanced/workflows",
                   "prompt-management/features/advanced/guaranteed-availability",
                   "prompt-management/features/advanced/a-b-testing"
                 ]
               },
               {
-                "group": "Optimization Studio",
+                "group": "Workflows",
                 "pages": [
-                  "optimization-studio/overview",
-                  "optimization-studio/llm-nodes",
-                  "optimization-studio/datasets",
-                  "optimization-studio/evaluating",
-                  "optimization-studio/optimizing"
-                ]
-              },
-              {
-                "group": "DSPy Optimization",
-                "pages": [
-                  "dspy-visualization/quickstart",
-                  "dspy-visualization/custom-optimizer",
-                  "dspy-visualization/rag-visualization"
+                  "workflows/overview",
+                  "workflows/building-a-workflow",
+                  "workflows/workflow-as-evaluator",
+                  "workflows/workflow-as-agent"
                 ]
               }
             ]
@@ -472,6 +463,14 @@
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
               "integration/python/integrations/dspy",
+              {
+                "group": "DSPy Optimization",
+                "pages": [
+                  "dspy-visualization/quickstart",
+                  "dspy-visualization/custom-optimizer",
+                  "dspy-visualization/rag-visualization"
+                ]
+              },
               "integration/python/integrations/llamaindex",
               "integration/python/integrations/haystack",
               "integration/python/integrations/strand-agents",
@@ -2029,6 +2028,30 @@
     {
       "source": "/agent-simulations/red-teaming",
       "destination": "/agent-testing/red-teaming"
+    },
+    {
+      "source": "/optimization-studio/overview",
+      "destination": "/workflows/overview"
+    },
+    {
+      "source": "/optimization-studio/llm-nodes",
+      "destination": "/workflows/building-a-workflow"
+    },
+    {
+      "source": "/optimization-studio/datasets",
+      "destination": "/workflows/building-a-workflow"
+    },
+    {
+      "source": "/optimization-studio/evaluating",
+      "destination": "/workflows/workflow-as-evaluator"
+    },
+    {
+      "source": "/optimization-studio/optimizing",
+      "destination": "/workflows/overview"
+    },
+    {
+      "source": "/prompt-management/features/advanced/optimization-studio",
+      "destination": "/prompt-management/features/advanced/workflows"
     }
   ]
 }
