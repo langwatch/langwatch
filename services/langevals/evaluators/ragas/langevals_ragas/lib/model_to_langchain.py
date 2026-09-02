@@ -10,6 +10,34 @@ from langchain_core.language_models.chat_models import (
 import litellm
 
 
+class _ParsedRawResponse:
+    """What `with_raw_response.create()` hands back to langchain-openai.
+
+    langchain-openai only requires `.parse()`; it reads `.headers` and
+    `.http_response` behind hasattr guards, so a litellm ModelResponse that
+    never saw an HTTP layer can simply not have them.
+    """
+
+    def __init__(self, response):
+        self._response = response
+
+    def parse(self):
+        return self._response
+
+
+class _WithRawResponse:
+    def __init__(self, client: "LitellmCompletion"):
+        self._client = client
+
+    def create(self, *args, **kwargs):
+        return _ParsedRawResponse(self._client.create(*args, **kwargs))
+
+
+class _AsyncWithRawResponse(_WithRawResponse):
+    async def create(self, *args, **kwargs):
+        return _ParsedRawResponse(await self._client.create(*args, **kwargs))
+
+
 class LitellmCompletion:
     exception: Optional[Exception] = None
     temperature: float = 0
@@ -36,10 +64,21 @@ class LitellmCompletion:
             self.exception = e
             raise e
 
+    # langchain-openai >= 0.3 calls the chat completions endpoint through
+    # `client.with_raw_response.create(...)` unconditionally, no longer plain
+    # `client.create(...)`.
+    @property
+    def with_raw_response(self):
+        return _WithRawResponse(self)
+
 
 class AsyncLitellmCompletion(LitellmCompletion):
     async def create(self, *args, **kwargs):
         return super().create(*args, **kwargs)
+
+    @property
+    def with_raw_response(self):
+        return _AsyncWithRawResponse(self)
 
 
 def model_to_langchain(
