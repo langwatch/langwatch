@@ -411,8 +411,8 @@ export class GovernanceCostService {
     > | null;
     const cursor = readStoredCostCursor(claiming.pollerCursor);
     return azureBillingNoteFrom({
-      claimsSubscription: true,
-      prepaidDeclared: readPrepaidDeclared(parserConfig),
+      hasSubscriptionClaim: true,
+      isPrepaidDeclared: readPrepaidDeclared(parserConfig),
       hasAzureSpendRows: await costRollup.hasRowsForSource({
         tenantId,
         fromDay,

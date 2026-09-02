@@ -16,8 +16,8 @@ import { azureBillingNoteFrom } from "../azureBillingNote";
 
 /** A source that reads a bill and has read it clean: no rows, no hold. */
 const READ_CLEAN = {
-  claimsSubscription: true,
-  prepaidDeclared: false,
+  hasSubscriptionClaim: true,
+  isPrepaidDeclared: false,
   hasAzureSpendRows: false,
   costPricedThroughDay: "2026-08-30",
   costHeldSinceMs: null,
@@ -28,7 +28,7 @@ describe("azureBillingNoteFrom", () => {
     /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
     it("answers with the prepaid explanation", () => {
       expect(
-        azureBillingNoteFrom({ ...READ_CLEAN, prepaidDeclared: true }),
+        azureBillingNoteFrom({ ...READ_CLEAN, isPrepaidDeclared: true }),
       ).toBe("prepaid_declared");
     });
   });
@@ -46,7 +46,7 @@ describe("azureBillingNoteFrom", () => {
       expect(
         azureBillingNoteFrom({
           ...READ_CLEAN,
-          prepaidDeclared: true,
+          isPrepaidDeclared: true,
           hasAzureSpendRows: true,
         }),
       ).toBeNull();
@@ -62,7 +62,7 @@ describe("azureBillingNoteFrom", () => {
       expect(
         azureBillingNoteFrom({
           ...READ_CLEAN,
-          prepaidDeclared: true,
+          isPrepaidDeclared: true,
           costHeldSinceMs: 1_700_000_000_000,
         }),
       ).toBe("billing_read_failed");
@@ -85,8 +85,8 @@ describe("azureBillingNoteFrom", () => {
       expect(
         azureBillingNoteFrom({
           ...READ_CLEAN,
-          claimsSubscription: false,
-          prepaidDeclared: true,
+          hasSubscriptionClaim: false,
+          isPrepaidDeclared: true,
         }),
       ).toBeNull();
     });

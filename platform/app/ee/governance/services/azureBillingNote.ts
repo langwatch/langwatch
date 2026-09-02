@@ -43,9 +43,9 @@ export type GovernanceAzureBillingNote =
  */
 export function azureBillingNoteFrom(params: {
   /** Whether any live source names an Azure subscription. */
-  claimsSubscription: boolean;
+  hasSubscriptionClaim: boolean;
   /** The customer's own declaration — never inferred (ADR-128 §21.4). */
-  prepaidDeclared: boolean;
+  isPrepaidDeclared: boolean;
   /**
    * Whether the window holds rollup rows from the CLAIMING SOURCE's bill
    * read. Scoped to that one source, never to the whole pulled lane: the
@@ -59,16 +59,16 @@ export function azureBillingNoteFrom(params: {
   costHeldSinceMs: number | null;
 }): GovernanceAzureBillingNote | null {
   const {
-    claimsSubscription,
-    prepaidDeclared,
+    hasSubscriptionClaim,
+    isPrepaidDeclared,
     hasAzureSpendRows,
     costPricedThroughDay,
     costHeldSinceMs,
   } = params;
 
-  if (!claimsSubscription) return null;
+  if (!hasSubscriptionClaim) return null;
   if (hasAzureSpendRows) return null;
   if (costHeldSinceMs !== null) return "billing_read_failed";
   if (costPricedThroughDay === null) return null;
-  return prepaidDeclared ? "prepaid_declared" : "no_spend_recorded";
+  return isPrepaidDeclared ? "prepaid_declared" : "no_spend_recorded";
 }

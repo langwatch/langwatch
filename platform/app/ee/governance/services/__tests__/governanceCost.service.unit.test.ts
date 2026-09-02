@@ -99,17 +99,20 @@ function createService(deps: {
 }
 
 /**
- * `sourceHasRows` answers the SOURCE-scoped existence read the billing note
+ * `hasSourceRows` answers the SOURCE-scoped existence read the billing note
  * makes, independently of the lane rows: the whole point of that read is that
  * another provider's lane rows say nothing about the Azure bill.
  */
-function rollupReturning(
-  rows: LaneRow[],
-  opts: { sourceHasRows?: boolean } = {},
-) {
+function rollupReturning({
+  rows = [],
+  hasSourceRows = false,
+}: {
+  rows?: LaneRow[];
+  hasSourceRows?: boolean;
+} = {}) {
   return {
     sumDaysByLane: vi.fn().mockResolvedValue(rows),
-    hasRowsForSource: vi.fn().mockResolvedValue(opts.sourceHasRows ?? false),
+    hasRowsForSource: vi.fn().mockResolvedValue(hasSourceRows),
   } as unknown as GovernanceCostRollupClickHouseRepository;
 }
 
@@ -160,7 +163,7 @@ describe("GovernanceCostService.summary", () => {
       it("reports unavailable with null amounts rather than zeros", async () => {
         const service = createService({
           prisma: prismaWithGovProject(null),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -178,10 +181,12 @@ describe("GovernanceCostService.summary", () => {
   describe("given both lanes reporting different totals", () => {
     describe("when requesting the summary", () => {
       it("keeps each lane's figure in its own lane", async () => {
-        const rollup = rollupReturning([
-          laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO }),
-          laneRow({ costSource: "gateway", amountNanoUsd: 7 * NANO }),
-        ]);
+        const rollup = rollupReturning({
+          rows: [
+            laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO }),
+            laneRow({ costSource: "gateway", amountNanoUsd: 7 * NANO }),
+          ],
+        });
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollup,
@@ -211,7 +216,7 @@ describe("GovernanceCostService.summary", () => {
 
     describe("when requesting a seven-day summary", () => {
       it("reads the window ending today, inclusive of both ends", async () => {
-        const rollup = rollupReturning([]);
+        const rollup = rollupReturning({ rows: [] });
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollup,
@@ -237,13 +242,15 @@ describe("GovernanceCostService.summary", () => {
       it("reports null for that lane and counts the unpriced cells", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({
-              costSource: "pulled",
-              amountNanoUsd: null,
-              cellsWithoutAmount: 3,
-            }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                costSource: "pulled",
+                amountNanoUsd: null,
+                cellsWithoutAmount: 3,
+              }),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -267,20 +274,22 @@ describe("GovernanceCostService.summary", () => {
       it("withholds the total rather than offering the dollar part of it", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({
-              day: "2026-08-01",
-              costSource: "pulled",
-              amountNanoUsd: 100 * NANO,
-            }),
-            laneRow({
-              day: "2026-08-02",
-              costSource: "pulled",
-              amountNanoUsd: null,
-              cellsWithoutAmount: 1,
-              currenciesWithoutUsdAmount: ["EUR"],
-            }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                day: "2026-08-01",
+                costSource: "pulled",
+                amountNanoUsd: 100 * NANO,
+              }),
+              laneRow({
+                day: "2026-08-02",
+                costSource: "pulled",
+                amountNanoUsd: null,
+                cellsWithoutAmount: 1,
+                currenciesWithoutUsdAmount: ["EUR"],
+              }),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -301,22 +310,24 @@ describe("GovernanceCostService.summary", () => {
       it("gaps the mixed day for that lane and leaves the other lane alone", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            // A day the lane DID price part of: the partial figure exists and
-            // is exactly what must not be plotted.
-            laneRow({
-              day: "2026-08-01",
-              costSource: "pulled",
-              amountNanoUsd: 60 * NANO,
-              cellsWithoutAmount: 2,
-              currenciesWithoutUsdAmount: ["EUR"],
-            }),
-            laneRow({
-              day: "2026-08-01",
-              costSource: "gateway",
-              amountNanoUsd: 7 * NANO,
-            }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              // A day the lane DID price part of: the partial figure exists and
+              // is exactly what must not be plotted.
+              laneRow({
+                day: "2026-08-01",
+                costSource: "pulled",
+                amountNanoUsd: 60 * NANO,
+                cellsWithoutAmount: 2,
+                currenciesWithoutUsdAmount: ["EUR"],
+              }),
+              laneRow({
+                day: "2026-08-01",
+                costSource: "gateway",
+                amountNanoUsd: 7 * NANO,
+              }),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -343,12 +354,14 @@ describe("GovernanceCostService.summary", () => {
       it("passes the negative total through without interpretation", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({
-              costSource: "pulled",
-              amountNanoUsd: -42.5 * NANO,
-            }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                costSource: "pulled",
+                amountNanoUsd: -42.5 * NANO,
+              }),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -363,18 +376,20 @@ describe("GovernanceCostService.summary", () => {
       it("nets charges against refunds and still reports the negative", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({
-              costSource: "pulled",
-              day: "2026-08-01",
-              amountNanoUsd: 12.25 * NANO,
-            }),
-            laneRow({
-              costSource: "pulled",
-              day: "2026-08-02",
-              amountNanoUsd: -30.75 * NANO,
-            }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                costSource: "pulled",
+                day: "2026-08-01",
+                amountNanoUsd: 12.25 * NANO,
+              }),
+              laneRow({
+                costSource: "pulled",
+                day: "2026-08-02",
+                amountNanoUsd: -30.75 * NANO,
+              }),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -398,16 +413,19 @@ describe("GovernanceCostService.summary", () => {
         // real organization can spend in a thirty-day window.
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({
-              costSource: "pulled",
-              day: "2026-08-01",
-              amountNanoUsd: 9_007_199_254_740_992,
-            }),
-            ...["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"].map(
-              (day) => laneRow({ costSource: "pulled", day, amountNanoUsd: 1 }),
-            ),
-          ]),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                costSource: "pulled",
+                day: "2026-08-01",
+                amountNanoUsd: 9_007_199_254_740_992,
+              }),
+              ...["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"].map(
+                (day) =>
+                  laneRow({ costSource: "pulled", day, amountNanoUsd: 1 }),
+              ),
+            ],
+          }),
         });
 
         const result = await service.summary({
@@ -426,7 +444,7 @@ describe("GovernanceCostService.summary", () => {
       it("reports each pool's bought and assigned counts and no money", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents: ocsfReturning([
             seatPool({ skuPartNumber: "AGENT_SEAT_USL" }),
             seatPool({
@@ -474,7 +492,7 @@ describe("GovernanceCostService.summary", () => {
         const ocsfEvents = ocsfReturning([seatPool()]);
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents,
         });
 
@@ -497,7 +515,7 @@ describe("GovernanceCostService.summary", () => {
         // bought.
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents: ocsfReturning([
             seatPool({ skuPartNumber: "COUNTED_AGENT_USL" }),
             seatPool({ skuPartNumber: "COMPANY_WIDE", perPerson: false }),
@@ -523,7 +541,7 @@ describe("GovernanceCostService.summary", () => {
       it("stays awaiting when no pool survives the count", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents: ocsfReturning([
             seatPool({ skuPartNumber: "FLOW_FREE", free: true }),
           ]),
@@ -544,7 +562,7 @@ describe("GovernanceCostService.summary", () => {
       it("says the seat lane is awaiting data", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents: ocsfReturning([]),
         });
 
@@ -564,9 +582,9 @@ describe("GovernanceCostService.summary", () => {
       it("says the seat read failed and still returns the cost lanes", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([
-            laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO }),
-          ]),
+          costRollup: rollupReturning({
+            rows: [laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO })],
+          }),
           ocsfEvents: {
             findLatestSeatReports: vi
               .fn()
@@ -613,7 +631,7 @@ describe("GovernanceCostService.summary", () => {
       it("says the seat lane is awaiting data rather than reporting none", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
           ocsfEvents: undefined,
         });
 
@@ -644,7 +662,7 @@ describe("GovernanceCostService.summary", () => {
           prisma: prismaWithGovProject("gov-1", [
             brokenSince("2026-08-20T09:00:00.000Z", "Azure Billing"),
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -665,7 +683,7 @@ describe("GovernanceCostService.summary", () => {
             brokenSince("2026-08-25T09:00:00.000Z", "OpenAI Compliance"),
             brokenSince("2026-08-20T09:00:00.000Z", "Azure Billing"),
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -708,7 +726,7 @@ describe("GovernanceCostService.summary", () => {
               lastSuccessAt: new Date("2026-01-01T09:00:00.000Z"),
             },
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -732,7 +750,7 @@ describe("GovernanceCostService.summary", () => {
               lastSuccessAt: null,
             },
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -774,7 +792,7 @@ describe("GovernanceCostService.summary", () => {
           prisma: prismaWithGovProject("gov-1", [
             azureSource({ azureBillingIsPrepaid: true }),
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -792,7 +810,7 @@ describe("GovernanceCostService.summary", () => {
       it("says no spend was recorded, never prepaid", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1", [azureSource({})]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -811,10 +829,10 @@ describe("GovernanceCostService.summary", () => {
           prisma: prismaWithGovProject("gov-1", [
             azureSource({ azureBillingIsPrepaid: true }),
           ]),
-          costRollup: rollupReturning(
-            [laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO })],
-            { sourceHasRows: true },
-          ),
+          costRollup: rollupReturning({
+            rows: [laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO })],
+            hasSourceRows: true,
+          }),
         });
 
         const result = await service.summary({
@@ -834,10 +852,10 @@ describe("GovernanceCostService.summary", () => {
         // off the whole pulled lane. An org running Copilot beside any other
         // pulled source always has lane rows, and the note would fall
         // permanently silent for exactly the tenants it was built for.
-        const rollup = rollupReturning(
-          [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
-          { sourceHasRows: false },
-        );
+        const rollup = rollupReturning({
+          rows: [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
+          hasSourceRows: false,
+        });
         const service = createService({
           prisma: prismaWithGovProject("gov-1", [
             azureSource({ azureBillingIsPrepaid: true }),
@@ -873,10 +891,10 @@ describe("GovernanceCostService.summary", () => {
               }),
             }),
           ]),
-          costRollup: rollupReturning(
-            [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
-            { sourceHasRows: false },
-          ),
+          costRollup: rollupReturning({
+            rows: [laneRow({ costSource: "pulled", amountNanoUsd: 40 * NANO })],
+            hasSourceRows: false,
+          }),
         });
 
         const result = await service.summary({
@@ -904,7 +922,7 @@ describe("GovernanceCostService.summary", () => {
               }),
             }),
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -928,7 +946,7 @@ describe("GovernanceCostService.summary", () => {
               }),
             }),
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({
@@ -949,7 +967,7 @@ describe("GovernanceCostService.summary", () => {
               pollerCursor: null,
             },
           ]),
-          costRollup: rollupReturning([]),
+          costRollup: rollupReturning({ rows: [] }),
         });
 
         const result = await service.summary({

@@ -37,7 +37,7 @@ describe("given the ingestion-sources field definitions", () => {
     });
   });
 
-  describe("the Azure billing identity's pair", () => {
+  describe("when a key names the Azure billing identity's pair", () => {
     /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
     it("treats both billing fields as secrets, by name, as a merge blocker", () => {
       // Named explicitly rather than left to the walk above (ADR-128 §21.2
