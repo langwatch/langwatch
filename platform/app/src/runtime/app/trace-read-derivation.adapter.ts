@@ -1,11 +1,5 @@
-import {
-  deriveScenarioRoleMetricsFromSpans,
-  type ScenarioRoleMetrics,
-} from "@langwatch/trace-server";
-import { SpanCostService } from "@langwatch/trace-server";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {
@@ -74,37 +68,9 @@ interface MemoEntry<T> {
  * events it dispatches, while a fold that has advanced (new spans) re-reads.
  */
 export class TraceReadDerivationService {
-  // The cost estimate is the app's own model-price matching; the packaged
-  // service owns only the token extraction that feeds it.
-  private readonly spanCostService = SpanCostService.create({
-    modelCosts: {
-      estimate: ({ attributes, model, promptTokens, completionTokens }) =>
-        computeSpanCost({
-          attrs: attributes,
-          model,
-          promptTokens,
-          completionTokens,
-        }),
-    },
-  });
-  private readonly scenarioRoleMetricsMemo = new Map<string, MemoEntry<ScenarioRoleMetrics>>();
   private readonly eventsMemo = new Map<string, MemoEntry<DerivedTraceEvent[]>>();
 
   constructor(private readonly spans: NormalizedSpanReader) {}
-
-  async deriveScenarioRoleMetrics(params: DeriveParams): Promise<ScenarioRoleMetrics> {
-    return this.memoize(this.scenarioRoleMetricsMemo, params, async () => {
-      const spans = await this.spans.getNormalizedSpansByTraceId({
-        tenantId: params.tenantId,
-        traceId: params.traceId,
-        occurredAtMs: params.occurredAtMs,
-      });
-      return deriveScenarioRoleMetricsFromSpans({
-        spans,
-        spanCostService: this.spanCostService,
-      });
-    });
-  }
 
   async deriveEvents(params: DeriveParams): Promise<DerivedTraceEvent[]> {
     return this.memoize(this.eventsMemo, params, () =>

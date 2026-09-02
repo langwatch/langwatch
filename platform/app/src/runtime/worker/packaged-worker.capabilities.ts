@@ -156,28 +156,8 @@ export function packagedWorkerCapabilities(options: {
   const definition = (name: string) => capabilities.definition(name);
 
   return {
-    automation: { installer: { buildPipeline: () => definition("automations") } },
     eventingMaintenance: capabilities.eventingMaintenance,
     evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
-    gatewaySpend: {
-      governance: { buildProcessing: () => definition("governance_events_processing") },
-      spend: {
-        buildProcessing: () => definition("gateway_spend_processing"),
-        connectSettlement: workerCapabilityAlreadyConnected,
-      },
-    },
-    scenario: {
-      installer: {
-        buildProcessing: () => definition("simulation_processing"),
-        connect: workerCapabilityAlreadyConnected,
-      },
-    },
-    langyConversation: {
-      installer: {
-        buildProcessing: () => definition("langy_conversation_processing"),
-        connectCommands: workerCapabilityAlreadyConnected,
-      },
-    },
     topic,
     governanceIngestion: {
       installer: {
