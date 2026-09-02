@@ -132,7 +132,7 @@ Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on th
 
 ## reasoning_effort budgets
 
-Anthropic and Bedrock take a thinking budget in tokens, not an effort level, so the gateway derives the budget from your output cap:
+Claude models take a thinking budget in tokens. On the anthropic lane and on the bedrock lane, the gateway derives that budget from your output cap:
 
 ```
 budget = 1024 + ratio x (max_tokens - 1024)

@@ -74,7 +74,7 @@ Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v
 
 ## When a stream fails after it opened
 
-The HTTP status is committed to `200` the moment the first frame is written, so a failure after that point cannot change it. The gateway ends the stream with an `event: error` frame instead.
+The gateway writes `200 OK` and the `text/event-stream` headers before the first frame, so a failure after that point cannot change the status. The gateway ends the stream with an `event: error` frame instead.
 
 ```
 event: error
@@ -112,7 +112,7 @@ Providers report usage at the end of a stream, in their own shape.
 | Endpoint and provider | Where the usage arrives |
 |---|---|
 | `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}` |
-| `/v1/messages` on Anthropic or Bedrock | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
+| `/v1/messages`, any provider | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
 | `/v1beta` on Gemini or Vertex | `usageMetadata` on the chunks that carry it |
 
 The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.

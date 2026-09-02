@@ -2682,7 +2682,7 @@ sidebarTitle: Audit log
 
 Gateway mutations write to the same `AuditLog` table as the rest of the platform. Open **Settings, Audit Log** to read them. Gateway rows carry a purple **Gateway** badge; platform rows, such as a member change or a project edit, carry a grey **Platform** badge.
 
-A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. Virtual-key rows leave the hashed secret out of both halves.
+A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. On a virtual-key row, both halves leave the hashed secret out.
 
 The actor is the user who made the change. A write that arrives on a legacy project API key, which carries no user, records the machine actor `svc_<projectId>`.
 
@@ -2725,7 +2725,7 @@ The Audit Log page is at **Settings, Audit Log**. It needs the `auditLog:view` p
 
 Filter by user name or email, by action code, by project, and by date range. All gateway codes start with `gateway.`, so typing `gateway.` in the action filter narrows the page to gateway rows.
 
-Every virtual key and every budget detail page carries an **Audit history** button. It opens the Audit Log page filtered to that resource, and the filter shows as a chip you can clear. The button stays available on a revoked key and on an archived budget, so a forensic review starts from the resource itself.
+Every virtual key and every budget detail page has an **Audit history** button. It opens the Audit Log page filtered to that resource, and the filter shows as a chip you can clear. The button stays available on a revoked key and on an archived budget, so a forensic review starts from the resource itself.
 
 ## Querying programmatically
 
@@ -2742,7 +2742,7 @@ Every virtual key and every budget detail page carries an **Audit history** butt
 | `IP Address`, `User Agent` | Request origin, on platform rows |
 | `Error` | Error text, on platform rows |
 | `Args` | Call arguments, on platform rows |
-| `Before`, `After` | The gateway row's state either side of the change |
+| `Before`, `After` | The gateway row's state on each side of the change |
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
@@ -2754,11 +2754,7 @@ Rows live in the application Postgres database, indexed on `(organizationId, cre
 
 The application only ever inserts into this table. It exposes no update and no delete path, so a row that lands stays as written.
 
-## Also check
-
-- [Virtual keys](/ai-gateway/virtual-keys) for the rotation and revocation operations behind those action codes.
-- [RBAC](/ai-gateway/rbac) for who can read the log.
-- [Security](/ai-gateway/security) for the rest of the gateway's security boundary.
+**Also check:** [Virtual Keys](/ai-gateway/virtual-keys) for the rotation and revocation operations behind those action codes, [RBAC](/ai-gateway/rbac) for who can read the log, [Security](/ai-gateway/security) for the rest of the security boundary.
 
 ---
 
@@ -4174,7 +4170,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     {
       "type": "timeseries",
       "title": "Budget blocks by scope",
-      "description": "The gateway does not debit budgets: cost rides the spend commands and the control plane writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
+      "description": "The gateway records spend and the control plane writes the ledger. This counter is the only gateway-side signal that a hard cap rejected traffic.",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
       "targets": [{
@@ -4184,14 +4180,14 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "Bundle refresh round-trips",
-      "description": "Budget precheck is local against the cached bundle snapshot, so spend only moves as the bundle refreshes. A flat line here with a climbing ledger means the gateway is prechecking against stale spend.",
+      "title": "Spend records written and dropped",
+      "description": "Budget debits come from these records. A drop is spend that is never billed and never enforced against.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 31, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (status) (rate(gateway_control_plane_requests_total{namespace=\"$namespace\", endpoint=\"changes\"}[$__rate_interval]))",
-        "legendFormat": "{{status}}"
-      }],
+      "targets": [
+        { "expr": "sum(rate(gateway_spend_spool_appended_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "written" },
+        { "expr": "sum by (reason) (rate(gateway_spend_spool_dropped_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "dropped / {{reason}}" }
+      ],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
 
@@ -5336,13 +5332,13 @@ When you find something worth filing:
 
 ---
 title: Prometheus alert rules
-description: Production-ready PromQL alert rules for the LangWatch AI Gateway.
+description: A PromQL ruleset for the LangWatch AI Gateway, covering reliability, provider health, budget enforcement and the auth cache.
 sidebarTitle: Prometheus alerts
 ---
 
-The gateway exposes a `/metrics` endpoint scrapable by any standard Prometheus setup. This cookbook is a drop-in set of alert rules that cover what you actually need to page on: provider outages, budget bypass, auth cache degradation, streaming bugs, and cost anomalies.
+The gateway serves `/metrics` on its own port for any Prometheus setup to scrape. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
 
-Copy this into `alerts/langwatch-gateway.yml` and `prometheus reload` or `kubectl rollout restart` your Prometheus Operator-managed `PrometheusRule` CR.
+Every metric name and label here comes from the gateway's registry. See [Observability](/ai-gateway/observability#metrics-prometheus) for the full list.
 
 ## The ruleset
 
@@ -5352,7 +5348,7 @@ groups:
     interval: 30s
     rules:
 
-      # ─── Reliability ─────────────────────────────────────────────────────
+      # --- Reliability ---
 
       - alert: GatewayHighErrorRate
         expr: |
@@ -5361,10 +5357,9 @@ groups:
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
-          summary: "Gateway 5xx rate > 5% over 5m"
+          summary: "Gateway 5xx rate above 5% over 5m"
           description: |
-            End-user requests to the gateway are returning 5xx at {{ $value | humanizePercentage }}.
-            Check /readyz on pods, then upstream provider status.
+            Read /readyz on the pods, then the provider status pages.
 
       - alert: GatewayReadinessFlapping
         expr: |
@@ -5376,21 +5371,23 @@ groups:
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "Gateway pod {{ $labels.pod }} readiness flapped > 4 times in 10m"
-          description: "Pod is flipping ready/not-ready. Investigate /readyz output."
+          summary: "Gateway pod {{ $labels.pod }} readiness flapped more than 4 times in 10m"
+          description: |
+            /readyz only reports draining, so a flap means pods are
+            restarting. Read kubectl describe pod for the reason.
 
-      # ─── Provider health ─────────────────────────────────────────────────
+      # --- Provider health ---
 
       - alert: CircuitOpenTooLong
         expr: gateway_circuit_state == 1
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
-          summary: "Circuit open for credential {{ $labels.credential_id }} > 5m"
+          summary: "Circuit open for credential {{ $labels.credential_id }} for more than 5m"
           description: |
-            Gateway has tripped the breaker and is skipping this provider.
-            Verify the provider is actually having issues (check X-LangWatch-
-            Provider headers on recent failures + provider status page).
+            The gateway is skipping this credential and letting one probe
+            through per cooldown. Check the provider status page and the
+            credential itself.
 
       - alert: ExcessiveFallback
         expr: |
@@ -5399,13 +5396,12 @@ groups:
         for: 10m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "> 10% of requests falling back over 10m"
+          summary: "More than 10% of dispatch attempts fall back over 10m"
           description: |
-            Primary provider is degraded enough that > 10% of requests are
-            walking the fallback chain. Not paging because fallback is
-            working as designed, but the primary needs investigation.
+            Fallback is working, so this does not page. The primary
+            credential still needs attention.
 
-      # ─── Budget governance ───────────────────────────────────────────────
+      # --- Budget enforcement ---
 
       - alert: StreamingUsageMissing
         expr: |
@@ -5413,13 +5409,12 @@ groups:
         for: 10m
         labels: { severity: page, team: ai-platform }
         annotations:
-          summary: "Streaming requests without usage reported"
+          summary: "Streams are closing without token usage"
           description: |
-            A streaming request completing without token counts records $0 of
-            cost on the span, so the ledger never accumulates it and budgets
-            are silently bypassed. OpenAI requires stream_options.include_usage
-            =true on the client.
-            See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
+            A stream that reports no usage debits nothing, so it never
+            reaches a budget. OpenAI-style clients must send
+            stream_options.include_usage = true.
+            See /ai-gateway/streaming.
 
       - alert: SpendSpoolDrops
         expr: |
@@ -5429,13 +5424,12 @@ groups:
         annotations:
           summary: "Gateway spend records dropped (reason={{ $labels.reason }})"
           description: |
-            Budget debits are written from the spend records this pod spools,
-            so a dropped record is spend that is neither billed nor counted
-            against a budget. reason=intake means the pod produced faster than the
-            spool could write; reason=overflow means the drainer is not
-            shipping fast enough and the oldest segments were deleted to stay
-            inside the size bound. Check the control plane's spend-command
-            ingest is reachable and returning 2xx
+            Budget debits are written from these records, so a dropped
+            record is spend that is neither billed nor counted.
+            reason=intake means the pod produced faster than the spool
+            could write. reason=overflow means the drainer is behind and
+            the oldest segments were deleted to stay inside the size
+            bound. Check that the control plane answers the spend ingest
             (gateway_control_plane_requests_total).
 
       - alert: BudgetBlockSpike
@@ -5444,39 +5438,41 @@ groups:
         for: 10m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "Budget scope {{ $labels.scope }} is blocking > 1 req/s over 10m"
+          summary: "Budget scope {{ $labels.scope }} is blocking more than 1 req/s over 10m"
           description: |
-            A hard-cap scope is rejecting sustained traffic. Either the limit
-            needs raising or a caller is looping. Precheck is local against the
-            cached bundle snapshot, so a scope that should be blocking but is
-            not means the bundle has not refreshed; check
-            gateway_control_plane_requests_total{endpoint="changes"}.
+            A hard cap is rejecting sustained traffic. Either raise the
+            limit or find the caller that is looping.
 
-      # ─── Auth cache ──────────────────────────────────────────────────────
+      # --- Auth cache ---
 
       - alert: AuthCacheHitRateDropped
         expr: |
           sum(rate(gateway_auth_cache_hits_total{tier="l1"}[5m]))
-            / ( sum(rate(gateway_auth_cache_hits_total{tier="l1"}[5m]))
-              + sum(rate(gateway_auth_cache_misses_total{tier="l1"}[5m])) ) < 0.9
+            / sum(rate(gateway_auth_cache_lookups_total[5m])) < 0.9
         for: 15m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "L1 auth cache hit rate < 90% for 15m"
+          summary: "Auth cache hit rate below 90% for 15m"
           description: |
-            Sustained cache-miss rate means every miss costs a /resolve-key
-            round-trip to the control plane. Investigate: recent deploy churn,
-            /changes feed reliability, or LRU eviction under load.
+            Every miss costs a round trip to the control plane. The
+            causes are deploy churn and more active keys than the
+            10,000-entry per-pod cache holds.
 
-      # ─── Cost & anomaly ──────────────────────────────────────────────────
+      - alert: ControlPlaneCallsFailing
+        expr: |
+          sum by (endpoint) (
+            rate(gateway_control_plane_requests_total{status="error"}[5m])
+          ) > 0
+        for: 5m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Gateway calls to the control plane are failing on {{ $labels.endpoint }}"
+          description: |
+            status=error means no response arrived at all. Cached keys
+            keep serving inside the grace window; keys this pod has
+            never seen answer 503 auth_upstream_unavailable.
 
-      # Note: the registry carries no per-request cost metric, by design.
-      # Cost anomalies are easier to derive from the ledger table in the
-      # control-plane warehouse than from Prometheus, since attribution
-      # happens control-plane side when the spend commands are folded into
-      # debits. See /gateway/usage UI for the visual equivalent.
-
-      # ─── Blocked-by-policy noise ────────────────────────────────────────
+      # --- Policy ---
 
       - alert: GuardrailBlockSpike
         expr: |
@@ -5486,31 +5482,25 @@ groups:
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "> 10 req/s blocked by policy on direction={{ $labels.direction }}"
+          summary: "More than 10 req/s blocked by policy on direction={{ $labels.direction }}"
           description: |
-            Legit block storm (a customer's runtime is trying a banned tool
-            repeatedly) or a regression in the policy_rules config.
-            Check LangWatch traces filtered on
-            attr.langwatch.policy.blocked != "".
+            Either a caller is repeating a banned request or a policy
+            change went too wide. Open the traces for the affected key.
 ```
 
-## Why these and not others
+## Why these rules
 
-The temptation with Prometheus rules is to alert on everything. Don't. Each rule above either:
+Each rule reports one of three things: customer impact that is happening now (5xx rate, an open circuit), a leading indicator (fallback rate, cache hit rate, failing control-plane calls), or spend that is escaping enforcement (missing stream usage, dropped spend records).
 
-- **Represents real impact** (5xx rate, circuit open, usage missing), customers or budgets are actively affected.
-- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, stale bundle), things get worse soon if ignored.
-- **Is a cost guardrail** (streaming usage missing, cost anomaly), silent over-spend is a real failure mode for AI infra.
+Rules that are deliberately absent:
 
-Rules we explicitly **do NOT** have:
+- **Provider 429s.** Fallback and the circuit breaker handle them without a person.
+- **Request latency.** The provider round trip dominates, so an alert on it is an alert on the provider. Use `gateway_provider_duration_seconds` next to `gateway_http_request_duration_seconds` to see the gateway's own share.
+- **Cost.** The registry holds no per-request cost metric. Spend is priced by the control plane and read from the usage screens.
 
-- **Individual provider 429s**: these are normal operating state; fallback + circuit handle them without a human.
-- **High latency**: the gateway's added latency is bounded; if a provider is slow, alerting on it is alerting on the provider.
-- **Cache miss rate on upstream**: cache is passthrough; if Anthropic doesn't hit cache that's not the gateway's problem.
+## Routing
 
-## Slack, PagerDuty routing
-
-Route `severity: page` to PagerDuty, `severity: warn` to Slack. Example Alertmanager config:
+Send `severity: page` to your pager and `severity: warn` to chat:
 
 ```yaml
 route:
@@ -5526,7 +5516,7 @@ route:
 receivers:
   - name: pagerduty-ai-platform
     pagerduty_configs:
-      - routing_key: "<pager-duty-service-key>"
+      - routing_key: "YOUR_PAGERDUTY_SERVICE_KEY"
   - name: slack-gateway
     slack_configs:
       - channel: "#ai-gateway-alerts"
@@ -5534,14 +5524,12 @@ receivers:
         text: "{{ range .Alerts }}{{ .Annotations.description }}{{ end }}"
 ```
 
-## Verifying rules before deploy
+## Test the rules before you deploy them
 
 ```bash
 promtool check rules alerts/langwatch-gateway.yml
 promtool test rules alerts/langwatch-gateway.test.yml
 ```
-
-Example unit test:
 
 ```yaml
 rule_files:
@@ -5550,12 +5538,12 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  # 5xx rate: every request errors, so the ratio pins at 1.0
+  # Every request errors, so the 5xx ratio pins at 1.0.
   - interval: 1m
     input_series:
-      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-4o"}'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-5-mini"}'
         values: '0+1x15'
-      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-4o"}'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-5-mini"}'
         values: '0+0x15'
     alert_rule_test:
       - eval_time: 10m
@@ -5563,8 +5551,8 @@ tests:
         exp_alerts:
           - exp_labels: { severity: page, team: ai-platform }
 
-  # gateway_circuit_state encodes the state in the value: 0 closed, 1 open,
-  # 2 half-open. Only value 1 means "open and short-circuiting".
+  # gateway_circuit_state carries the state in the value: 0 closed,
+  # 1 open, 2 half-open. Only 1 means the credential is being skipped.
   - interval: 1m
     input_series:
       - series: 'gateway_circuit_state{credential_id="cred_openai_primary"}'
@@ -5575,7 +5563,7 @@ tests:
         exp_alerts:
           - exp_labels: { credential_id: cred_openai_primary, severity: page, team: ai-platform }
 
-  # Half the attempts land on a fallback slot, well past the 10% threshold.
+  # Half the attempts land on a fallback credential, past the 10% threshold.
   - interval: 1m
     input_series:
       - series: 'gateway_provider_attempts_total{credential_id="cred_openai_primary", outcome="success"}'
@@ -5588,7 +5576,7 @@ tests:
         exp_alerts:
           - exp_labels: { severity: warn, team: ai-platform }
 
-  # Budget precheck rejecting sustained traffic on one scope.
+  # One budget scope rejecting sustained traffic.
   - interval: 1m
     input_series:
       - series: 'gateway_budget_blocks_total{scope="project:proj_acme"}'
@@ -5600,16 +5588,12 @@ tests:
           - exp_labels: { scope: "project:proj_acme", severity: warn, team: ai-platform }
 ```
 
-## Grafana dashboard
-
-A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitoring](/ai-gateway/self-hosting/helm#monitoring). Panels mirror the alert rules so you can visually see what's about to fire.
-
 ## See also
 
-- [Troubleshooting](/ai-gateway/troubleshooting): paged-at-3am runbook for each symptom.
-- [Observability](/ai-gateway/observability): span attributes + metric names surface.
-- [Streaming](/ai-gateway/streaming): the include_usage gotcha these alerts catch.
-- [Budgets](/ai-gateway/budgets): how spend reaches the ledger and what the precheck can see.
+- [Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard): the panels behind these rules.
+- [Troubleshooting](/ai-gateway/troubleshooting): what to do when one of them fires.
+- [Observability](/ai-gateway/observability): every metric, label and span attribute.
+- [Budgets](/ai-gateway/budgets): how spend reaches the ledger and what the precheck reads.
 
 ---
 
@@ -5734,314 +5718,100 @@ The full walkthrough, environment variables, and sequence diagrams live in the [
 
 ---
 title: Admin setup
-description: One-time SSO, provider, routing-policy, and budget configuration for an organization rolling out LangWatch Governance.
+description: Add model providers, set the routing handle and the fallback order, create a routing policy, set budgets, then verify the LangWatch AI Gateway with one request.
 sidebarTitle: Admin setup
 ---
 
-This is the **admin** side of [Personal IDE keys](/ai-gateway/governance/personal-keys).
-Once configured, every developer in your organization can run
-`langwatch login --device` and immediately get a working CLI.
-No per-user setup, no IT tickets.
+## Before you start
 
-## Time budget
+An organization owner or admin does this once. After it, every member signs in from the LangWatch CLI and gets a personal virtual key that routes through your providers, under your routing policy and your budgets.
 
-The numbers below are hands-on time at the LangWatch admin console, not net of organisational approvals.
+You need:
 
-| Path | Hands-on time | Net of approvals |
-|------|---------------|--------------------|
-| **Self-serve** (existing email signup, no SSO yet) | ~5 minutes | ~5 minutes |
-| **With Okta / Azure AD / Google Workspace SSO** | ~30 minutes | Days, depending on IT / security review of a new SAML or OIDC app |
+- The owner or admin role on the LangWatch organization.
+- One API key or credential set per provider you want to make available. The credential fields per provider are on [Providers](/ai-gateway/providers/overview).
 
-If your IT team is the bottleneck, you can start on the self-serve path today (skip §1 below) and add SSO later. The providers, routing policies, and budgets you set up keep working unchanged when SSO drops in.
-
-## Before you start: brand-new to LangWatch?
-
-If this is your first LangWatch session, sign up at `/auth/signup`. The
-post-signup flow routes you to `/onboarding/welcome` to create your
-organization (name + ToS) and pick a flavor (Platform / Coding Agent /
-MCP / Manual). Once that completes, you land at your first project, and
-this guide picks up from there. The bootstrap creates: your
-Organization, a Personal Team membership, an Owner RoleBinding on the
-org, and your first Project. The subsequent steps assume all of this is
-already in place.
-
-If you already have a LangWatch account on the org you're configuring,
-skip to §1 below.
-
-## Prerequisites
-
-- Organization owner or admin role at LangWatch.
-- Workspace API keys for the providers you want to make available
-  (one each from the providers your team needs: Anthropic, OpenAI,
-  Gemini, Azure, Bedrock, Vertex).
-- Your IdP's SAML metadata or OIDC discovery URL (Okta, Azure AD,
-  Google Workspace, Auth0).
-
-<Note>
-  On SaaS, governance rollout is managed per organization: if you don't see the **Govern** menu, or AI-tools device login is refused with a governance error, contact your LangWatch account rep.
-
-  You can reach `/governance` with no project created yet: governance is org-scoped, not project-scoped.
-</Note>
-
-## 1. Connect SSO
-
-In **Settings → SSO**, click **Connect identity provider**.
-
-
-  ### Okta (SAML)
-
-    1. In Okta admin, create a new SAML 2.0 application.
-    2. **Single sign-on URL**:
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. **Audience URI**: `https://app.langwatch.ai`
-    4. Map the **NameID** to email and add the standard claims
-       (`email`, `firstName`, `lastName`).
-    5. Download the IdP metadata XML.
-    6. Paste it into LangWatch's **Connect identity provider** form.
-    7. (Optional) Enable **SCIM provisioning** so users are
-       auto-created the first time they sign in.
-
-  ### Azure AD (OIDC)
-
-    1. In Azure portal, register a new application.
-    2. Set redirect URI to
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. Generate a client secret.
-    4. Note the tenant ID, client ID, client secret.
-    5. Paste into LangWatch's **Connect identity provider** form.
-
-  ### Google Workspace (OIDC)
-
-    1. In Google Cloud Console, create OAuth 2.0 credentials.
-    2. Set authorized redirect URI to
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. Restrict to your Workspace domain.
-    4. Paste client ID + secret into LangWatch.
-
-
-
-Once SSO is live, anyone with an `@yourdomain.com` email is
-auto-routed to your IdP at login. You can disable password
-authentication entirely from this page if you want SSO-only.
-
-## 2. Connect providers
-
-In **Settings → Model Providers**, add an entry per upstream:
-
-1. Click **Add provider** and pick from the list (Anthropic, OpenAI,
-   Azure OpenAI, Bedrock, Vertex, Gemini, custom OpenAI-compatible).
-2. Paste the workspace API key (or AWS / GCP credentials).
-3. Set the **scope**: `Organization` (everyone), `Team` (only members
-   of one team), or `Project` (only one project).
-
-When you start out, scope at `Organization` so the credential
-is available everywhere. You can tighten later by creating
-team-scoped overrides.
-
-<Note>The provider entries here are the same ones the AI Gateway
-already uses for service virtual keys. Personal keys reuse them. There is
-no parallel pool.</Note>
-
-## 3. Define routing policies
-
-Open **AI Gateway → Routing Policies** and click **New policy**.
-
-A policy is the answer to "when one of my users wants to call a
-model, what providers can serve it, in what order?" See the
-full reference at [Routing policies](/ai-gateway/governance/routing-policies).
-
-Two policies to create on day one:
+## Add a model provider
 
 <Steps>
-  <Step title="developer-default">
-    - Scope: Organization
-    - Strategy: `priority`
-    - Providers (in order): Anthropic, OpenAI, Gemini
-    - Allowed models: `claude-3-5-*`, `claude-3-opus-*`,
-      `gpt-4o*`, `gpt-5*`, `o1-*`, `o3-*`, `o4-*`, `gemini-2.5-*`
-    - Mark as **default for ORG scope**
+  <Step title="Open Settings > Model Providers">
+    Go to **Settings > Model Providers** (`/settings/model-providers`), also listed as **Model Providers** in the **AI Gateway** sidebar. Click **Add Model Provider** and pick the provider from the menu.
 
-    This is what every user's personal key references unless a
-    team-level override exists.
+    {/* screenshot: admin-setup-model-providers.png, the Model Providers table with the Add Model Provider button and one connected provider row */}
   </Step>
-  <Step title="evaluator-default">
-    - Scope: Organization
-    - Strategy: `cost`
-    - Providers: OpenAI, Gemini, Anthropic
-    - Allowed models: `gpt-4o-mini`, `gpt-5-mini`,
-      `gemini-2.5-flash`, `claude-3-5-haiku-*`
-    - Mark as **default for the evaluator system VK** (your
-      LangWatch-internal evaluators use this, which keeps eval
-      costs predictable).
+
+  <Step title="Paste the credentials and pick the scope">
+    Fill the credential fields for that provider, then pick the scopes the credential serves. A provider is attached to the organization, to a team, to a project, or to several of these at once. A virtual key reaches every provider attached to its own scope and to the scopes above it, so a key on a project reaches that project's providers, its team's and the organization's. Which of them serves a request is the routing policy's order, and the fallback priority below when the key has no policy.
+
+    Scope is fixed after you save. To move a credential to another scope, delete it and create it again.
+
+    Click **Save**, then open the row menu and click **Test Connection** to confirm the credential works.
+  </Step>
+
+  <Step title="Set the routing handle and the gateway options">
+    Open the row menu again and click **Edit Provider**.
+
+    **Routing handle** names this one provider row in a model string. With a handle of `eu`, a request reaches this row as `eu/<model>`. Without one, the provider family name is the prefix, and a key with two rows of the same family routes by the chain order instead. A handle is lowercase, up to 32 characters, and unique in the organization.
+
+    Expand **Advanced (Gateway)** for the rest:
+
+    | Field | What it does |
+    |---|---|
+    | Fallback priority | The order used when a virtual key has no routing policy. The lower number is tried first. Rows with the same number are tried in creation order. |
+    | Provider config (JSON) | Provider-specific routing hints, such as a Bedrock region or an Azure deployment override. It must be a JSON object. |
+
+    The same section shows the health status, the last health check and the circuit-breaker state for this row, read only.
+
+    {/* screenshot: admin-setup-provider-advanced.png, the provider drawer with the Routing handle field filled and the Advanced (Gateway) section expanded on Fallback priority and Provider config */}
   </Step>
 </Steps>
 
-Policies cascade: a `TEAM`-scoped policy with `isDefault=true`
-overrides the `ORG`-scoped default for members of that team.
+## Create a routing policy
 
-<Note>
-**Smoke-test before you publish the portal**: the org-default routing
-policy MUST have at least one provider in its chain before personal
-keys can serve traffic. If you publish `/me` to teammates with an
-empty `developer-default` policy, every issued VK provisions
-successfully but the first call returns `504 provider_timeout` (the
-gateway has nothing to forward to). After §2 (Connect providers) +
-this section, mint a test key against your own user, fire one
-completion, and confirm a 200 before announcing the portal.
-</Note>
+Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name. Virtual keys then point at the policy.
 
-## 4. Set per-user budgets
+{/* screenshot: admin-setup-routing-policy.png, the routing policy drawer with the provider chain in order and the model tiers set */}
 
-In **AI Gateway → Budgets**:
+**Also check:** [Routing policies](/ai-gateway/governance/routing-policies) for the sections of a policy and the permissions to manage one.
 
-1. Click **New budget** and pick scope `User (default)`.
-2. Set the monthly cap (e.g. `$500/mo`).
-3. Click save.
+## Set budgets
 
-Every personal VK auto-issued by `langwatch login` inherits this
-budget. To exempt a power user, override at scope `User` with a
-specific user ID and a higher limit.
+Open **AI Gateway > Budgets** (`/gateway/budgets`) and create a budget. A budget caps spend on a scope: the organization, a team, a project, one virtual key, one member, or a group. Every request is checked against every budget that applies to it.
 
-You can also set:
-- **Team budgets**: cap an entire team's total spend.
-- **Project budgets**: cap a production agent's spend.
-- **Org budgets**: a hard ceiling for the whole organization.
+Set at least one budget before you tell members to sign in. A key with no budget still serves traffic, and the gateway has no limit to refuse it at.
 
-The gateway enforces the **strictest binding**: if any scope is
-exceeded, the gateway rejects the request with a structured error
-that identifies the blocking scope.
+{/* screenshot: admin-setup-budget.png, the New budget drawer with the scope, the window and the limit filled */}
 
-## 5. Roll out to your team
+**Also check:** [Budgets](/ai-gateway/budgets) for the scopes, the windows and the breach behavior.
 
-Send your team this snippet:
+## Give members their keys
 
-```text
-Welcome to LangWatch! To use AI tools at <YourCompany>:
+There is no switch to turn personal keys on. A member runs `langwatch login --device`, approves the device in the browser, and gets a personal virtual key as soon as the organization has one model provider the member can reach. Until then, the first tool run stops with `No personal virtual key on this account` and points at **Settings > Model Providers**.
 
-1. Install: npm install -g langwatch     (or run via npx -y langwatch ...)
-2. Sign in: langwatch login
-3. Use it:  langwatch claude  (or codex / cursor / gemini)
+To choose which coding tools and which providers members see on their portal, open **Governance > Inventory** (`/governance/inventory`) and edit the **Catalog** tab.
 
-Dashboard: https://app.langwatch.ai/me
-Questions: <#langwatch slack channel>
+**Also check:** [Personal keys](/ai-gateway/governance/personal-keys) for what the member sees.
+
+## Verify with one request
+
+Mint a key for yourself and send one completion through it.
+
+1. Open **Configure** in your personal workspace (`/me/configure`), click **Add a new key**, and copy the secret. It is shown once.
+2. Send the request:
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "openai/gpt-5-mini",
+        "messages": [{"role": "user", "content": "Say hi in one word"}]
+      }'
 ```
 
-The CLI ships as an npm package (the only canonical install path); see
-the [LangWatch CLI guide](/integration/cli) for full prerequisites and
-self-hosted endpoint configuration.
+3. Open **AI Gateway > Usage** (`/gateway/usage`) for the request and its cost.
 
-The first time each user runs `langwatch login`, the
-backend auto-provisions their personal team + project, mints a
-personal VK against the `developer-default` routing policy, and
-returns it in the same round-trip. They have a working CLI in
-under a minute.
-
-## What you'll see as users come online
-
-In **AI Gateway → Activity**:
-
-- Per-user request counts and spend, in real time.
-- A **By tool** breakdown (Claude Code vs Codex vs Cursor).
-- A **By model** breakdown.
-- The full audit trail of `vk-lw-…` issuance, `langwatch login`
-  events, budget violations, and policy denials.
-
-In **Settings → Members**:
-
-- A list of every user with their personal team auto-created.
-- Per-user budget ceiling and current spend.
-- A **Revoke all credentials** button per user, for off-boarding.
-
-## Off-boarding flow
-
-When someone leaves:
-
-1. Disable them in your IdP (this is what your IT process already
-   does).
-2. The next time the LangWatch SCIM sync runs (or when their access
-   token expires, ~1h), their credentials are dead.
-3. (Optional, for immediate revocation) In **Settings → Members**,
-   click **Revoke all credentials** for the user. This invalidates
-   their refresh token and any active access tokens within 60s.
-
-Their personal team and traces stay in the audit log for
-compliance, but no new gateway calls succeed.
-
-## CLI device-flow REST API (for custom clients)
-
-The `langwatch` CLI uses a standard
-[RFC 8628 device-code](https://www.rfc-editor.org/rfc/rfc8628) flow
-against the control plane. Self-hosters who need to integrate
-custom CLI clients, or audit the wire surface, can hit these
-endpoints directly. The format is **snake_case JSON** (matches
-RFC 8628 + every other OAuth library). Origin enforcement applies
-to all endpoints. Pass `Origin: <your-base-url>` from any client
-outside a browser.
-
-| Endpoint | Purpose | Success | Notable error states |
-|---|---|---|---|
-| `POST /api/auth/cli/device-code` | Mint a device-code + user-code pair | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }` | `400 invalid_request` |
-| `POST /api/auth/cli/exchange` | Long-poll for approval | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }` | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast, back off) |
-| `POST /api/auth/cli/refresh` | Rotate access token | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation, the old token is invalidated) | `401 invalid_grant` (CLI must wipe local state) |
-| `POST /api/auth/cli/logout` | Revoke a refresh-token server-side | `200 { ok: true }` (idempotent) | None |
-| `GET /api/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }` | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired` |
-| `POST /api/auth/cli/approve` | Browser-side: user clicks "Approve" | `200 { ok, personal_vk_label, organization_id }` | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved` |
-| `POST /api/auth/cli/deny` | Browser-side: user clicks "Deny" | `200 { ok }` (idempotent) | `401 unauthorized` |
-
-The browser approval surface is
-`https://<your-base-url>/cli/auth?user_code=XXXX-YYYY` (the
-`verification_uri_complete` field). Unauthenticated visitors are
-bounced through SSO and return to the page automatically.
-
-### Verified behavior
-
-The reference server passes all of:
-
-- Each `device-code` mint returns a unique `user_code` and `device_code`
-- `user_code` is 8 chars, base32 alphabet (no I/O/0/1/L/U), dashed `XXXX-YYYY`
-- `verification_uri` ends with `/cli/auth`
-- `expires_in` defaults to 600s (configurable), `interval` defaults to 5s
-- Polling `/exchange` faster than the per-device rate-limit (4s) returns `429 slow_down`
-- Polling with an unknown / TTL-expired `device_code` returns `408 expired_token`
-- `/refresh` with an unknown / expired token returns `401 invalid_grant`
-- All browser-side endpoints (`/lookup`, `/approve`, `/deny`) require an
-  active session cookie; unauthenticated requests get `401 unauthorized`
-  with a body the CLI surfaces verbatim
-- `/logout` is idempotent: passing an unknown / already-revoked refresh
-  token still returns `200 { ok: true }`
-
-## Verify it yourself
-
-Mint a personal virtual key for your own account and send one request
-through it. The spend then lands in the same surfaces your users and
-admins read.
-
-1. Open `/me`, pick a provider you connected in step 2, and mint a
-   personal virtual key. The secret is shown once.
-2. Send one completion through the gateway with that key, from the
-   `langwatch` CLI or any OpenAI-compatible client.
-3. Wait a few seconds for the trace pipeline, then open `/me/usage`
-   for your own spend and `/governance` for the org-wide activity.
-
-<Note>
-  **Why `/me/usage` can read `$0.00`**: spend is computed from the
-  `gateway_budget_ledger_events` fold, which writes ledger rows only
-  when a Budget applies to the request. A personal virtual key with no
-  Budget bound produces real spans in the trace store and no ledger
-  rows, so `/me/usage` stays at `$0.00`.
-
-  Bind a Budget to the user, to the personal team, or to the personal
-  virtual key ([step 4](#4-set-per-user-budgets)) before you send the
-  request, and the spend appears.
-</Note>
-
-## What's next
-
-- [Routing policies](/ai-gateway/governance/routing-policies) for
-  provider order, model tiers, model name mapping, and restrictions.
-- [`langwatch` CLI](/integration/cli). The unified CLI lives in the
-  TypeScript SDK. Its device-flow login sends every coding CLI
-  through your governance plane.
+A `200` with an OpenAI-shaped body means the credential, the routing policy and the key all resolve. If the request is refused, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
 
 ---
 
@@ -6139,7 +5909,7 @@ The check is permissive on error: when the spend figure cannot be read, the requ
 
 ## Deployment
 
-The Helm chart in `charts/gateway` deploys the gateway as a Deployment with a Service, an optional Ingress, an HPA, a PodDisruptionBudget and a NetworkPolicy. The spool lives on the pod's writable emptyDir, so a pod that is killed loses at most the records not yet shipped, about a second of drain lag.
+The gateway sub-chart of the `langwatch` Helm chart deploys the gateway as a Deployment with a Service, an optional Ingress, an HPA, a PodDisruptionBudget and a NetworkPolicy. The spool lives on the pod's writable emptyDir, so a pod that is killed loses at most the records still in the spool, about a second of drain lag.
 
 **Also check:** [Helm deployment](/ai-gateway/self-hosting/helm) for the chart values, and [Budgets](/ai-gateway/budgets) for the budget scopes and periods.
 
@@ -6155,7 +5925,7 @@ sidebarTitle: OCSF / SIEM export
 
 ## What the export contains
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
 
 Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
 
@@ -6244,9 +6014,9 @@ description: Set up the LangWatch AI Gateway for an organization, give every mem
 sidebarTitle: Overview
 ---
 
-## Pages in this section
-
 Governance covers the admin side of the LangWatch AI Gateway: who can call which model, on which budget, and what record is kept of it. Members get a personal key without seeing a provider secret. Admins set the providers, the routing policies and the budgets once for the whole organization.
+
+## Pages in this section
 
 <CardGroup cols={2}>
   <Card title="Personal keys" icon="user" href="/ai-gateway/governance/personal-keys">
@@ -6341,7 +6111,7 @@ The first run issues your personal key, prints `issued your personal virtual key
 | `langwatch cursor` | Cursor | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
 | `langwatch gemini` | Gemini CLI | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 | `langwatch copilot` | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY` |
-| `langwatch opencode` | OpenCode | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+| `langwatch opencode` | OpenCode | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` |
 
 **Also check:** [Coding Agents](/coding-agents/overview) for the setup pages per tool.
 
@@ -6517,7 +6287,7 @@ A virtual key attaches guardrails per direction. The gateway evaluates them on e
 
 **Response.** Runs on the full completion before it returns to the caller. The evaluator receives the assistant text of the first choice. A blocked response is replaced by the error below; the provider call has already been billed.
 
-**Stream chunk.** Runs on each streamed chunk as it passes through. On a fail verdict the gateway closes the stream at that chunk. The caller sees the stream end without a `[DONE]` frame and without an error frame. Chunks already sent stay with the caller.
+**Stream chunk.** Runs on each streamed chunk as it passes through. On a fail verdict the gateway closes the stream at that chunk. The caller sees the stream end with the usual `data: [DONE]` frame and no error frame. Chunks already sent stay with the caller.
 
 The gateway waits up to 5 seconds for a request or response evaluation and 50 milliseconds for a stream chunk evaluation.
 
@@ -6864,8 +6634,8 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 | `langwatch.project_id` | Project the span is filed under |
 | `langwatch.virtual_key_id` | Virtual key that authenticated the request |
 | `langwatch.gateway_request_id` | Same value as the `X-LangWatch-Gateway-Request-Id` response header |
-| `langwatch.model_provider_id` | Model provider row the request was dispatched to. Provider-filtered budgets match on it |
-| `langwatch.labels` | The virtual key's tags. Trace Explorer filters these as **Label** |
+| `langwatch.model_provider_id` | Model provider row the request was dispatched to. Provider-filtered budgets match on this id |
+| `langwatch.labels` | The virtual key's tags. Trace Explorer filters on them as **Label** |
 | `langwatch.end_user_id` | End-user id from `X-LangWatch-End-User-Id`, its LiteLLM alias, or the `user` body field |
 | `langwatch.reserved.request_metadata` | The `X-LangWatch-Metadata` JSON object, echoed back verbatim |
 | `http.response.status_code` | Upstream status, set when the provider answered 400 or above |
@@ -6893,7 +6663,7 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 
 ## Debugging a single request
 
-Read `X-LangWatch-Gateway-Request-Id` off the response or the client's error, then search that value in Trace Explorer. The span it opens carries the model, the provider, the token counts, the cost and the upstream status.
+Read `X-LangWatch-Gateway-Request-Id` off the response or the client's error, then search that value in Trace Explorer. That span shows the model, the provider, the token counts, the cost and the upstream status.
 
 ```bash
 curl -sD- -o /dev/null \
@@ -6982,7 +6752,7 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted, which is a session count and not a bill |
+| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted at mint time; the vendor's later report decides what a session cost |
 | `gateway_realtime_session_limit_blocks_total` | counter | none | Mints refused because a key already held its maximum open sessions. A rise means the cap is too low for the key's traffic, or its sessions stay open. The key is in the trace and the log line |
 | `gateway_realtime_registry_errors_total` | counter | `operation` | Failed calls to the voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint; a `correlate` failure costs the session its exact join to the vendor's report |
 
@@ -7010,17 +6780,13 @@ Every request writes a spend record to a bounded on-disk spool, and a background
 sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
 ```
 
-Both counters read `0` on a pod whose spool failed to open. That pod serves traffic and emits no spend at all. It logs the failure at startup, and a flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
+Both counters read `0` on a pod whose spool failed to open. That pod serves traffic and emits no spend at all. It logs the failure at startup, and you can spot it from a scrape by reading these two counters against a live `gateway_http_requests_total`.
 
 The spool is pod-local and stays off a volume. A pod deleted with records still unshipped loses them, bounded by the drain lag of about a second of traffic.
 
 The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
-## Also check
-
-- [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the environment variables that point the gateway at your collector.
-- [Troubleshooting](/ai-gateway/troubleshooting) for reading a failed request end to end.
-- [Security](/ai-gateway/security) for what the gateway records and what it never logs.
+**Also check:** [Troubleshooting](/ai-gateway/troubleshooting) for reading a failed request end to end, [Security](/ai-gateway/security) for what the gateway records and what it never logs, [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the environment variables.
 
 ---
 
@@ -7307,7 +7073,7 @@ Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on th
 
 ## reasoning_effort budgets
 
-Anthropic and Bedrock take a thinking budget in tokens, not an effort level, so the gateway derives the budget from your output cap:
+Claude models take a thinking budget in tokens. On the anthropic lane and on the bedrock lane, the gateway derives that budget from your output cap:
 
 ```
 budget = 1024 + ratio x (max_tokens - 1024)
@@ -8947,150 +8713,106 @@ See [API: Errors](/ai-gateway/api/errors).
 
 ---
 title: Security & Trust
-description: How the LangWatch AI Gateway protects secrets, isolates tenants, and audits privileged actions.
+description: What the LangWatch AI Gateway records, what it never logs, where provider credentials live, and how each hop is authenticated.
 sidebarTitle: Security & Trust
 ---
 
-The gateway sits on the hot path between your applications and upstream LLM providers.
+## What the gateway records
 
-## Threat model
+Each request produces three records, and each one holds a different amount of your data.
 
-In scope:
+| Record | Where it goes | What it holds |
+|---|---|---|
+| Trace span | Your LangWatch project | Model, provider, token counts, cost, duration, ids, plus the request and response messages |
+| Spend record | The control plane's billing ingest | Ids, model, token counts, cost, duration and the error class. No message content |
+| Access log line | The gateway's own logs | Method, path, remote address, request id, status, response size, duration, and the error code on a failure |
 
-- A compromised customer application attempting to exfiltrate other tenants' data.
-- A compromised virtual key leaking upstream.
-- An insider at LangWatch attempting to read VK secrets or upstream provider credentials.
-- A network-level attacker between gateway and control plane.
+The span is the only record that holds message content. The gateway writes it under `gen_ai.input.messages` and `gen_ai.output.messages`, and exports it to the project the virtual key names, using the per-project OTLP token the control plane returns in the key's bundle. A key whose bundle names no trace project, or returns no token, gets no span export at all.
 
-Out of scope:
+The spend record is what budgets debit from. It holds the organization, project, virtual key, end-user id, trace id, gateway request id, model, request type, the virtual key's labels, your `X-LangWatch-Metadata` echo, token usage, cost, duration and, on a failure, the error type and HTTP status.
 
-- Compromise of the underlying upstream provider (Anthropic, OpenAI, etc.). Your trust in them is independent of LangWatch.
-- Compromise of the customer's OS, build pipeline supplying the VK to their app.
+## What the gateway never logs
 
-## Secrets at rest
+The gateway does not write request or response bodies to its logs. The access log records the fields in the table above and no headers.
 
-### Virtual keys
+Your client's auth headers never reach the provider. The gateway builds the upstream request itself and injects the real provider credential, and on the passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
 
-VK secrets are **hashed before persistence** and the plaintext is shown exactly once at creation. The hash scheme is peppered HMAC-SHA256 rather than argon2id, chosen deliberately:
+<Warning>One self-hosted debug switch overrides this. `LW_LOG_MESSAGE_BODY=1` writes the full request body of `/v1/messages` and `/v1/responses` to the gateway log at info level, including prompts. Use it to reproduce a provider rejection, then turn it off.</Warning>
 
-- Each VK has 130 bits of Crockford-ULID entropy. Stretching a 130-bit random with argon2 costs 50–100 ms per validation for essentially no attack surface reduction.
-- HMAC with a server-side pepper (`LW_VIRTUAL_KEY_PEPPER`, rotated via dual-pepper overlap window) makes offline cracking infeasible without the pepper.
-- HMAC is constant-time and enables an O(1) lookup-by-hash, critical for the hot-path `/resolve-key` endpoint.
+## Where provider credentials live
 
-See [Virtual Keys → hashing](/ai-gateway/virtual-keys#how-secrets-are-stored).
+Your provider credentials are stored in the control plane's Postgres database, encrypted with AES-256-GCM under the `CREDENTIALS_SECRET` key. Each stored value includes its own initialization vector and authentication tag.
 
-### Upstream provider credentials
+The gateway needs the decrypted credential to call the provider, so the control plane sends it inside the key bundle over the signed internal channel. The gateway holds the bundle in a per-pod in-memory cache and writes it to no disk. Restarting the pod discards it.
 
-Provider credentials (OpenAI keys, Azure deployments, Bedrock IAM, Vertex service accounts) are stored encrypted at rest in the control plane. The gateway never sees the plaintext, it receives a redacted bundle and the actual upstream call is made from a short-lived subprocess with the decrypted value in memory only, zeroed after the call.
+The cached bundle refreshes on three triggers: the JWT's 15 minute lifetime, the control plane's change feed when you edit a key or a provider, and a configuration time-to-live of 60 seconds that catches edits the change feed does not announce.
 
-- Encryption key: per-organization KMS key (AWS KMS in LangWatch Cloud; customer-supplied KMS in BYOK deployments).
-- Rotation: rotate the KMS key, re-encrypt all credentials in place. Zero-downtime, decrypt-then-re-encrypt happens in the background, old-key references resolve for 24 h during migration.
+If the control plane cannot be reached, a cached entry keeps serving past its expiry, extended 5 minutes at a time up to 6 hours. A rejection with 401, 403 or 404 evicts the entry at once, so a revoked or disabled key gets no grace. Set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` to a negative value to remove the grace window entirely.
 
-### Gateway-to-control-plane auth (HMAC)
+## How a virtual key is verified
 
-Every internal call (`/api/internal/gateway/*`) is signed with HMAC-SHA256. The signature covers `METHOD\nPATH\nTIMESTAMP\nhex(sha256(body))`, with a ±300s replay window. Rotation uses a dual-secret overlap (`LW_GATEWAY_INTERNAL_SECRET` + `_PREVIOUS`) so rolling restart doesn't reject in-flight calls.
+A virtual key secret reads `vk-lw-` plus a 26 character Crockford base32 ULID. The full secret is shown once, at creation, and is never stored.
 
-Signature verification happens **before** the timestamp check to avoid a secret-length timing oracle.
+| Step | What happens |
+|---|---|
+| Storage | The control plane stores `HMAC-SHA256(LW_VIRTUAL_KEY_PEPPER, secret)` as hex, plus the first 13 characters of the secret as a display prefix |
+| Presentation | Your client sends the secret as `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` or `Xi-Api-Key` |
+| Resolution | The gateway forwards the presented secret to the control plane's `/resolve-key` over the signed internal channel |
+| Lookup | The control plane hashes the presented secret with the same pepper and reads the row by that hash. A wrong secret produces a different hash and matches no row |
+| Answer | The control plane returns a signed JWT carrying `vk_id`, `project_id`, `team_id`, `org_id`, `principal_id`, `revision` and the key's own expiration date, valid 15 minutes or until the key expires, whichever comes first |
 
-### JWTs on the hot path
+The pepper never leaves the control plane, so a copy of the database alone does not let anyone recover a key or mint a matching hash.
 
-Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
+Rotation writes a new secret and keeps the previous hash valid for 24 hours, so a deploy that still carries the old secret keeps working. Revocation is terminal, and the key can never be re-enabled.
 
-**Never** persisted to disk, and never shared: the cache is in memory, private to each replica.
+## Gateway and control plane
 
-## Tenant isolation
+Every call between the gateway and the control plane, in both directions, is signed with HMAC-SHA256 over `METHOD\nPATH\nTIMESTAMP\nhex(sha256(body))`.
 
-### Traces
+| Header | Content |
+|---|---|
+| `X-LangWatch-Gateway-Signature` | The hex HMAC of the canonical string |
+| `X-LangWatch-Gateway-Timestamp` | Unix seconds. A drift above 300 seconds is refused |
+| `X-LangWatch-Gateway-Node` | Advisory node id, outside the signature |
 
-Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The gateway ships all spans to a single OTel endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`); LangWatch ingest reads `langwatch.project_id` off each span and files the trace under the owning project (or the org's `internal_governance` project for TEAM/ORG-scoped VKs without a single project). Tenant isolation is enforced at the ingest layer: a span's `project_id` must resolve from the VK's scope cascade at bundle-resolve time, and ClickHouse storage partitions on `TenantId` with middleware-enforced predicates on every query.
+The receiver compares the signature in constant time before it checks the timestamp, so the rejection reason does not leak through timing.
 
-Implication: a bug or data leak in one project's span payload cannot land in another project's LangWatch UI. Cross-project queries are impossible from the gateway side.
+| Variable | Purpose |
+|---|---|
+| `LW_GATEWAY_INTERNAL_SECRET` | The HMAC secret both sides share. When it is unset, the gateway refuses every `/internal/*` request |
+| `LW_GATEWAY_JWT_SECRET` | Signs and verifies the resolve-key JWT. The gateway requires the issuer `langwatch-control-plane` and the audience `langwatch-gateway` |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | The previous JWT secret. A token that fails against the current secret is retried against this one, so a rotation does not reject tokens already in flight |
+| `LW_VIRTUAL_KEY_PEPPER` | The pepper for the virtual-key hash. Control plane only |
 
-### Upstream providers
+## Egress controls
 
-Each request's upstream call uses one of the ModelProviders visible from the VK's scope cascade. The eligible set is the union of every ModelProvider whose scope (ORG/TEAM/PROJECT) is at or above one of the VK's scope rows. A VK scoped to PROJECT A cannot reach a TEAM-scoped ModelProvider on a sibling team, or a PROJECT-scoped credential on a different project.
+A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Turn them on for any deployment that reaches the public internet.
 
-This is enforced at two layers:
+| Variable | Effect |
+|---|---|
+| `BLOCK_LOCAL_HTTP_CALLS` | Refuses a customer-configured provider endpoint that resolves to a private or link-local address |
+| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP |
+| `ALLOWED_PROXY_HOSTS` | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
 
-1. Control-plane RBAC, VK create/update validates the caller has `virtualKeys:manage` on each scope row AND `modelProviders:view` is satisfied by the scope cascade for every `model_provider_id` referenced in the bound routing policy.
-2. Gateway data-plane, the bundle returned by `/config/:vk_id` contains only the ModelProviders eligible for that VK's scope cascade. The gateway has no way to reach an out-of-scope provider even if a request is maliciously crafted.
+## Network policy on Kubernetes
 
-### Budgets & debits
+The gateway Helm chart ships a deny-by-default `NetworkPolicy`. Turn it on with `networkPolicy.enabled: true`.
 
-Debits carry the VK's `organization_id` as a filter predicate on every Postgres write. A misrouted debit cannot land on another org's ledger, the foreign-key constraint would reject it.
+| Direction | Allowed by default | Value to change it |
+|---|---|---|
+| Ingress | TCP 5563 from the `ingress-nginx` namespace and from Prometheus in the `monitoring` namespace | `networkPolicy.ingressFrom` |
+| Egress, DNS | TCP and UDP 53 to `kube-system` | Fixed |
+| Egress, control plane | The port set by `networkPolicy.controlPlanePort` (5560 by default) to the `langwatch-app` pods | `networkPolicy.egressToControlPlane` |
+| Egress, OTLP collector | TCP 4318, and only when you name a target. Empty by default | `networkPolicy.egressToOTLP` |
+| Egress, providers | TCP 443 to any public address. Every private and link-local range is excluded | `networkPolicy.egressToProviders`, `networkPolicy.providerPorts` |
 
-## Privileged actions are audited
-
-Every write through the REST API or the UI emits a row in the platform-wide `AuditLog` (gateway shape):
-
-- `userId`, the resolved actor user (session, PAT, or API token mapped to a user).
-- `action`, dotted-lowercase string code: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.budget.deleted`, `gateway.provider_binding.updated`, etc. (See [Audit log → What's logged](/ai-gateway/audit#whats-logged) for the full mapping.)
-- `targetKind`, `targetId`, resource kind + id the action affected.
-- `before`, `after`, JSON diff on update actions.
-
-Audit logs are visible to organization admins under **/settings/audit-log** with a Source = "Gateway" badge for gateway rows. Retention: 7 years default, extendable on request.
-
-Rotations and revocations are considered security-sensitive and generate an organization-wide notification (configurable).
-
-## RBAC on gateway resources
-
-Six resources, each with standard CRUD + specialized actions:
-
-| Resource | Read | Create, Attach | Update | Delete, Rotate, Detach |
-|---|---|---|---|---|
-| `virtualKeys` | `virtualKeys:view` | `:create` | `:update` | `:delete`, `:rotate` |
-| `gatewayBudgets` | `:view` | `:create` | `:update` | `:delete` |
-| `gatewayProviders` | `:view` | n/a | `:update` | n/a |
-| `gatewayGuardrails` | `:view` | `:attach` | n/a | `:detach` |
-| `gatewayLogs` | `:view` | n/a | n/a | n/a |
-| `gatewayUsage` | `:view` | n/a | n/a | n/a |
-
-Each resource also supports a `:manage` permission that acts as a superset of all actions for that resource, useful for custom roles that should get full control over one surface without opening every individual verb.
-
-Permissions bind to principals via the existing LangWatch role system, same roles/groups used elsewhere in the platform. A "VK owner" role (for engineers who create their own dev VKs but can't touch team VKs) is the common pattern; it grants `virtualKeys:{view,create,update,rotate,delete}` on their personally-owned VKs via the `principal_user_id` scope.
-
-See [RBAC](/ai-gateway/rbac) for the full resource matrix.
-
-## What the gateway can't see
-
-The gateway sits in the request path but is a passthrough for payload bytes:
-
-- It does NOT log request or response bodies by default. Body bytes are forwarded into bifrost's upstream call and returned to the client; neither the gateway process nor its structured logs retain them.
-- OTel spans record metadata (model, token counts, latencies, cost, fallback attempts) but NOT message content. Message content is written into LangWatch's trace ingestion at the SDK layer, which is a separate pipeline the customer opted into. Some gateway spans mirror the first 200 chars of user messages when customers enable the LangWatch "Message preview" setting, that toggle is off by default and project-scoped.
-- It does NOT decrypt cached `X-LangWatch-Cache: force` headers. Caching is handled entirely upstream at the provider (Anthropic `cache_control`); the gateway is transparent to which bytes are actually cached.
-
-## Data-at-rest in the LangWatch control plane
-
-Postgres:
-
-- All VK-adjacent tables live in the primary app database.
-- TLS-encrypted connections between gateway ↔ control plane (no cleartext network traffic).
-- Field-level encryption on provider credential secrets using per-org KMS keys (AWS KMS default; customer-managed KMS available for BYOK).
-
-ClickHouse:
-
-- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Every query the application builds carries that predicate, which is what keeps a read inside one organization.
-
-## Self-hosted deployments
-
-In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
-
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, OTLP (if configured), and provider upstream IPs. There is no operator debug surface to lock down: the gateway binary exposes no admin or pprof listener, and the chart's `gateway.admin.*` keys are forward-compat surface that nothing reads. The planned listener is loopback-bound by default, with a required bearer token and a startup refusal for the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
-
-See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
+Replace `networkPolicy.egressToProviders` with explicit CIDR blocks to pin the gateway to a known provider set.
 
 ## Reporting a security issue
 
-Email `security@langwatch.ai` with reproduction steps. Do not file GitHub issues for security reports. The security team replies within 1 business day; known-exploitable issues trigger a 24-hour SLA for acknowledgement.
+Email `security@langwatch.ai` with reproduction steps. Do not open a GitHub issue for a security report.
 
-Public acknowledgements are listed in the [security.txt](https://langwatch.ai/.well-known/security.txt) endpoint.
-
-## See also
-
-- [Virtual Keys](/ai-gateway/virtual-keys): show-once secret, rotation, revocation mechanics.
-- [RBAC](/ai-gateway/rbac): the full permission matrix.
-- [Observability](/ai-gateway/observability): how per-tenant trace routing works.
-- [Self-Hosting → Config](/ai-gateway/self-hosting/config): secrets + rotation env vars.
+**Also check:** [Virtual Keys](/ai-gateway/virtual-keys) for creating, rotating and revoking keys, [Audit log](/ai-gateway/audit) for the record of every change to a gateway resource, [RBAC](/ai-gateway/rbac) for who can read and change what, [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the full environment variable reference.
 
 ---
 
@@ -9981,53 +9703,65 @@ Members can then sign in from the CLI and get a [personal key](/ai-gateway/gover
 
 ---
 title: Scaling
-description: Horizontal scaling, autoscaling, capacity, and benchmarks for the LangWatch AI Gateway.
+description: Replicas, autoscaling, resource sizing and per-pod caches for the LangWatch AI Gateway.
 sidebarTitle: Scaling
 ---
 
-The gateway is a stateless proxy, scale it horizontally. JWTs are self-contained and every replica can serve every virtual key, so there is no sticky-session requirement. The auth cache is in-process LRU; replicas are independent. Capacity is dominated by **upstream provider latency** and **concurrent in-flight connections**, not gateway-side CPU.
+The gateway holds no shared state, so you scale it by adding replicas. Every pod can serve every virtual key, and there is no sticky-session requirement. Request time is dominated by the provider round trip; the gateway's own work before dispatch takes microseconds.
 
-## Horizontal Pod Autoscaler
+Each pod caches the virtual keys it has resolved in its own memory. Pods never share that cache, and none of them warms it on boot.
 
-The chart ships an HPA with CPU-based scaling plus an opt-in Prometheus custom metric (`charts/gateway/values.yaml: autoscaling.*`):
+## Replicas
 
-```yaml
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-  customMetrics:
-    - type: Pods
-      pods:
-        metric:
-          name: lw_gateway_rps
-        target:
-          type: AverageValue
-          averageValue: "150"
-```
-
-- **Use CPU first.** It's free (no Prometheus dependency) and avoids feedback loops between the metric pipeline and the autoscaler.
-- **Add `lw_gateway_rps` only if you run prometheus-adapter** and the gateway's `/metrics` endpoint is scraped. Without the adapter the HPA will silently ignore the custom metric line. Verify with `kubectl describe hpa langwatch-gateway`, `External metric ... not active` means the adapter isn't wired.
-- **3 replicas is a sane minimum** for production: the chart's PDB requires `minAvailable: 1`, so 3 replicas tolerates one rolling-deploy pod going down plus one ad-hoc node drain.
-
-If you scale beyond ~30 replicas, watch your control plane: every gateway replica polls the auth cache change feed independently, so QPS to the control plane scales linearly with replica count. Below 30 replicas the load is negligible.
-
-## Pod Disruption Budget
-
-Chart default (`charts/gateway/values.yaml: podDisruptionBudget`):
+The chart runs two replicas by default and keeps one available during a voluntary disruption:
 
 ```yaml
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
+gateway:
+  replicaCount: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
 ```
 
-This is conservative, `kubectl drain` for AZ rotation, node upgrades, or eviction always leaves at least one replica serving. Bump to `minAvailable: 2` for higher-availability tiers (paired with `minReplicas: 3+`).
+Run three replicas in production. Three tolerates one pod leaving in a rolling deploy plus one node drain, and still serves. Raise `minAvailable` to 2 alongside it if you want the same margin during a node pool rotation.
+
+The Deployment rolls with `maxSurge: 1` and `maxUnavailable: 0`, so a rollout adds a pod before it takes one away.
+
+## Autoscaling
+
+The chart ships a Horizontal Pod Autoscaler on CPU, plus an optional custom metric:
+
+```yaml
+gateway:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    customMetrics:
+      - type: Pods
+        pods:
+          metric:
+            name: lw_gateway_rps
+          target:
+            type: AverageValue
+            averageValue: "150"
+    behavior: {}
+```
+
+Start with CPU alone. It needs no Prometheus and it cannot create a loop between the metrics pipeline and the autoscaler.
+
+Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's `/metrics`. Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
+
+Use `behavior` for scale-up and scale-down stabilization when the traffic shape needs it. It is passed to the HPA as written.
+
+<Note>
+Every replica polls the control plane's change feed on its own, so the poll rate against the control plane grows with the replica count. Watch the control plane once you pass a few dozen replicas.
+</Note>
 
 ## Topology spread
 
-Pair the HPA with a topology-spread constraint so replicas spread across zones:
+Spread the replicas across zones through the chart's `affinity` value, or by setting `topologySpreadConstraints` on the Deployment with a values override:
 
 ```yaml
 topologySpreadConstraints:
@@ -10039,124 +9773,78 @@ topologySpreadConstraints:
         app.kubernetes.io/name: langwatch-gateway
 ```
 
-Add this to the chart via the `affinity` value (you can lift it directly into `affinity.podAntiAffinity` semantics, or set `topologySpreadConstraints` on the deployment via a values override). With 3 replicas across 3 AZs you survive an AZ outage; at 6+ replicas you maintain ≥2 per AZ.
+Three replicas across three zones survive a zone outage. Six replicas keep two per zone.
 
 ## Resource sizing
 
-Chart defaults (`charts/gateway/values.yaml: resources`):
+Chart defaults:
 
 ```yaml
-resources:
-  requests:
-    cpu: 200m
-    memory: 256Mi
-  limits:
-    cpu: 1
-    memory: 512Mi
+gateway:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
 ```
 
-The 256Mi request/512Mi limit fits the in-process auth-cache LRU (default 50,000 entries × ~1 KB ≈ 50 MB) plus Go runtime overhead. For tenants with > 100,000 active virtual keys, raise the LRU size in `values.yaml` (`cache.lruSize`, currently a forward-compat knob, see "Future tunables" below) and bump memory accordingly.
+The key cache holds up to 10,000 resolved keys per pod, which is a small share of that memory. The rest is the Go runtime plus the request bodies in flight, so raise the memory limit when your callers send large payloads rather than when your key count grows.
 
-CPU limits matter more than they look: streaming responses pin one goroutine per connection, so tight CPU limits stretch tail latency under SSE load. Keep the limit at least 5× the request, the chart's 200m → 1000m default is the right ratio.
+Keep the CPU limit well above the request. Each open stream holds a goroutine, so a tight limit stretches tail latency under streaming load. The default ratio of `200m` to `1` is a good starting point.
 
-## Connection pooling
+The spend spool writes to the pod's `/tmp` emptyDir, sized by `scratchSizeLimit` (default `1Gi`) and capped at 64 MiB by the gateway itself.
 
-The gateway uses Go's default `net/http.Transport` (unbounded `MaxIdleConnsPerHost`, 90s `IdleConnTimeout`). At ~5K req/s sustained per replica, expect ~1.5K live keepalive connections to your primary upstream. Under provider failover, the live count multiplies by the fallback chain length, budget headroom.
+## Cache sizes
 
-If you observe ephemeral-port exhaustion on a replica handling > 10K req/s, scale out (cheaper, stateless replication is the design point) or bump the host's `net.ipv4.ip_local_port_range` via a privileged init container.
+The key cache is fixed at 10,000 entries per pod and is not configurable. Past that the least recently used key is evicted and its next request costs one round trip to the control plane.
 
-There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport directly; bound concurrency upstream by adding replicas, not by tightening per-pod connection caps.
+What you can tune is how long a cached key survives without the control plane, and how often its configuration is re-read:
 
-## Cold-start cost
+| Variable | Default | Effect |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Age at which a cached key's configuration is re-fetched in the background |
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension granted per failed refresh while the control plane is unreachable |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry |
 
-There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
+Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 
-The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica cache, by design. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
+Watch the hit rate to tell whether the cache is doing its job:
 
-## Blue-green, canary
+```promql
+sum(rate(gateway_auth_cache_hits_total{tier="l1"}[5m]))
+  / sum(rate(gateway_auth_cache_lookups_total[5m]))
+```
 
-Because JWTs use symmetric-secret signing (`LW_GATEWAY_JWT_SECRET`) and the secret is shared across all gateway pods, JWTs minted by one replica validate on every other. That makes blue-green, canary trivial:
+A sustained drop means every miss is paying for a control-plane round trip. Deploy churn and key counts above the cache size are the two causes.
 
-1. Deploy the new release as `langwatch-gateway-canary` with its own Service + targets a fraction of LB traffic.
-2. Verify `/readyz` and `/v1/chat/completions` against a synthetic VK.
-3. Shift traffic by adjusting LB weights; existing JWTs continue to verify.
-4. Drain blue once green is stable.
+## Cold pods
 
-Two operational invariants:
-- Roll **the same** `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) onto both colors.
-- For HMAC-secret rotation specifically, use the dual-secret rotation path (chart value `secrets.jwtSecretPreviousKey`), see [Config](/ai-gateway/self-hosting/config) for the rotation procedure.
+A new pod resolves each virtual key from the control plane the first time it sees that key. Expect one extra round trip per key after a scale-up and after every rolling deploy. There is no boot-time warm-up to wait for, which is why `/startupz` reports ready before the first request arrives.
+
+## Blue-green and canary
+
+Every pod signs and verifies with the same `LW_GATEWAY_JWT_SECRET`, so a token minted for one pod verifies on all of them. That makes a second colour straightforward:
+
+1. Deploy the new release with its own Service, behind a fraction of the load balancer's traffic.
+2. Check `/readyz` and send one completion with a test virtual key.
+3. Shift the load balancer weights.
+4. Drain the old colour.
+
+Roll the same `LW_GATEWAY_JWT_SECRET` and `LW_GATEWAY_INTERNAL_SECRET` onto both colours. To change the JWT secret itself, use the dual-secret procedure on [Helm chart](/ai-gateway/self-hosting/helm#rotate-the-jwt-secret-without-downtime).
 
 ## Regional placement
 
-For latency-sensitive deployments place the gateway in the same region as:
+Put the gateway in the region that holds your control plane, so a cache miss pays a short round trip, and close to the provider endpoints you call most.
 
-1. Your LangWatch control plane (saves ~50–100 ms on auth-resolver round-trips when the cache misses).
-2. Your primary upstream provider's regional endpoint (single-digit milliseconds to OpenAI us-east-1, Anthropic us-west-2, etc.).
+For several regions, run an independent fleet per region with its own autoscaler. The gateway keeps no cross-region state, and the control plane is the source of truth for all of them.
 
-Multi-region: run independent gateway fleets per region with their own HPA. There is no cross-region state in the gateway today; each region's auth cache is local to that fleet. The control plane is the source of truth and is reachable from every region.
+## See also
 
-## Hot-path overhead: microbenchmarks
-
-The hot-path primitives are benchmarked under `services/aigateway/.../*_test.go` and tracked in [`services/aigateway/BENCHMARKS.md`](https://github.com/langwatch/langwatch/blob/main/services/aigateway/BENCHMARKS.md). Reproduce locally with:
-
-```bash
-go test -bench=. -benchmem -run=^$ \
-  ./services/aigateway/adapters/controlplane/ \
-  ./services/aigateway/adapters/authresolver/ \
-  ./services/aigateway/adapters/budget/ \
-  ./services/aigateway/adapters/httpapi/ \
-  ./pkg/retry/
-```
-
-Indicative happy-path-per-request budget (Apple M3 Pro, Go 1.26.1):
-
-| Operation                  | ns/op | allocs | Fires on                                       |
-|----------------------------|------:|-------:|------------------------------------------------|
-| `HashKey`                  |  83.8 |      1 | Every request (VK → L1 lookup key)             |
-| `Precheck` (cached, 3 scopes)|  4.6 |      0 | Every request (budget evaluation)              |
-| `Walk_PrimarySuccess`      |  71.7 |      0 | Every request (retry engine, primary succeeds) |
-| `NewULID`                  |  76.0 |      2 | Every request (`gateway_request_id`)           |
-
-Total pre-dispatch overhead: **~0.24 μs**. A full router benchmark (chi routing + middleware + JSON serialization) lands at ~4.8 μs in `httptest`; production with connection reuse and kernel zero-copy is in the 3–4 μs range. Bifrost + upstream RTT dominate wall time; the gateway's own tax is negligible.
-
-`BENCHMARKS.md` is the source of truth, these numbers re-run on every `pull_request` against `services/aigateway/**` and regressions > 2× any baseline block merges. Refer to it for current values; the table above is illustrative.
-
-## End-to-end load tests
-
-Microbenchmarks validate per-primitive correctness, not end-to-end throughput. For full request testing, point a load generator at a running gateway:
-
-```bash
-# k6, non-streaming, 30s, ramping to 500 VUs
-k6 run --vus 500 --duration 30s ./hack/bench/chat.js
-
-# vegeta, sustained 1000 req/s on /v1/chat/completions
-echo 'POST https://gateway.your-corp.com/v1/chat/completions
-Authorization: Bearer '"$LW_BENCH_VK"'
-Content-Type: application/json
-@body.json' | vegeta attack -duration=30s -rate=1000/s | vegeta report
-```
-
-Targets to validate against (gateway-added latency, excluding upstream provider time):
-
-- p50 < 5 ms, well under the microbenchmark sum even with realistic OS scheduling
-- p99 < 25 ms, tail captured by L1 cache miss → control-plane round-trip
-- Cold-start time-to-ready (50K VKs) < 5 s
-
-If you're outside these ranges, check [Health Checks](/ai-gateway/self-hosting/health-checks) for probe state and [Config](/ai-gateway/self-hosting/config) for tuning knobs before escalating.
-
-## Future tunables (forward-compat in `values.yaml`)
-
-Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway code does not yet read, they exist as a forward-compat surface for v1.1. Setting them today has no effect; setting them once they're wired will be a no-op deploy (env vars already present in the chart configmap). They are documented here so operators can stage their own runbooks ahead of time.
-
-- `cache.lruSize`, explicit auth-cache LRU bound (default 50,000)
-- `cache.refreshInterval`, `cache.jwtRefreshThreshold`, proactive auth-cache refresh cadence
-- `cache.bootstrapAllKeys`, full prefetch on boot (enterprise tier; control plane must support the bulk endpoint)
-- `bifrost.poolSize`, `bifrost.streamBufferSize`, Bifrost-side connection sizing
-- `admin.addr`, `admin.existingAuthSecretName`, operator pprof, debug listener
-- `guardrails.preTimeout`, `guardrails.postTimeout`, `guardrails.streamChunkWindow`, guardrail evaluation budgets
-- `startup.netcheckHosts`, `startup.netcheckTimeout`, boot-time DNS + TCP probe of upstream providers
-
-When these features land in the gateway code, the chart's `templates/configmap.yaml` will be updated to inject the corresponding env vars (matching the canonical `Hydrate`-resolved names, the same pattern the existing `SERVER_ADDR`, `LW_GATEWAY_BASE_URL`, `LOG_LEVEL`, `OTEL_OTLP_ENDPOINT` follow). Until then, setting these `values.yaml` entries is a no-op.
+- [Health checks](/ai-gateway/self-hosting/health-checks): probe behaviour and the drain sequence.
+- [Config](/ai-gateway/self-hosting/config): every environment variable and its default.
+- [Troubleshooting](/ai-gateway/troubleshooting): 502s during a rollout, cold-pod latency, cache staleness.
 
 ---
 
@@ -10240,7 +9928,7 @@ Tool-call deltas arrive in the endpoint's own shape and keep their order. On `/v
 
 ## When a stream fails after it opened
 
-The HTTP status is committed to `200` the moment the first frame is written, so a failure after that point cannot change it. The gateway ends the stream with an `event: error` frame instead.
+The gateway writes `200 OK` and the `text/event-stream` headers before the first frame, so a failure after that point cannot change the status. The gateway ends the stream with an `event: error` frame instead.
 
 ```
 event: error
@@ -10278,7 +9966,7 @@ Providers report usage at the end of a stream, in their own shape.
 | Endpoint and provider | Where the usage arrives |
 |---|---|
 | `/v1/chat/completions` on OpenAI, Azure OpenAI, an OpenAI-compatible custom endpoint | The final data-only chunk, and only when the body carries `stream_options: {"include_usage": true}` |
-| `/v1/messages` on Anthropic or Bedrock | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
+| `/v1/messages`, any provider | `message_start` carries the input and cache counters, `message_delta` carries the running `output_tokens` |
 | `/v1beta` on Gemini or Vertex | `usageMetadata` on the chunks that carry it |
 
 The gateway keeps the last non-zero counter it sees for each bucket, so an empty usage block late in the stream does not overwrite a real number.
@@ -10322,508 +10010,247 @@ A proxy in front of a self-hosted gateway must not buffer responses. With buffer
 
 ---
 title: Troubleshooting
-description: Diagnostic paths for the most common LangWatch AI Gateway failure modes.
+description: Symptoms you can search for on the LangWatch AI Gateway, with the check that confirms each cause and the fix.
 sidebarTitle: Troubleshooting
 ---
 
-Each symptom below names the diagnostic to run first and, where possible, the single log line or metric that identifies the root cause.
+Every section below names a symptom, the cause behind it, the one check that confirms the cause, and the fix.
 
-Gateway responses carry `X-LangWatch-Gateway-Request-Id` once the request is authenticated. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
+## Start with the request id
 
-## `401 invalid_api_key`
+Every gateway response carries `X-LangWatch-Gateway-Request-Id`. Read it from your client's output and search for it in [Trace Explorer](/ai-gateway/observability). The trace holds the resolved provider, the dispatch attempts, the upstream latency and the guardrail verdicts for that one request.
 
-**Symptoms:**
-- Every request from one client returns 401.
-- A VK that worked yesterday suddenly doesn't.
+Error responses share one body shape:
 
-**Diagnose:**
-
-```bash
-# 1. Is the VK format right?
-echo "$LANGWATCH_VK" | grep -E '^vk-lw-(live|test)_[0-9A-HJKMNP-TV-Z]{26}$' || echo "malformed"
-
-# 2. Is it actually getting through?
-curl -sD- -o/dev/null -H "Authorization: Bearer $LANGWATCH_VK" \
-  https://gateway.langwatch.ai/v1/models
+```json
+{"error":{"type":"rate_limited","code":"rate_limited","message":"rate_limited","fault":"customer"}}
 ```
 
-**Root causes, most to least common:**
-1. Env var expansion failed, `$LANGWATCH_VK` is empty at runtime. Check your deploy config.
-2. VK was rotated; client still holds the old secret. Update to the new one.
-3. VK was revoked. Status in UI → Gateway → Virtual Keys.
-4. You pasted the prefix (`vk-lw-01HZX...`) instead of the full secret. The secret is always 40 chars total.
-5. Rare: the gateway's auth cache is stale. Should resolve within 30 s via `/changes`. If persistent, check control-plane `/api/internal/gateway/changes` is reachable.
+The `code` field is the stable identifier. Match on it, never on the message.
 
-## `403 model_not_allowed`
+## 401 on every request
 
-**Symptoms:**
-- Specific models return 403, others work.
-- New model you just added to the provider account is rejected.
+The gateway answers `401 invalid_api_key` when it cannot resolve the bearer token to a virtual key.
 
-**Diagnose:**
+**Confirm it:**
 
 ```bash
-curl -s -H "Authorization: Bearer $LANGWATCH_VK" \
-  https://gateway.langwatch.ai/v1/models | jq -r '.data[].id' | sort
+curl -si https://gateway.acme.com/v1/models \
+  -H "Authorization: Bearer $LW_VK" | head -20
 ```
 
-If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, (b) blocked by `policy_rules.models` (regex policy, different from the static allowlist), or (c) not exposed by any ModelProvider visible from the VK's scope cascade.
+A `401` with an empty `Authorization` value in your own shell means the variable never expanded in the running process. That is the most common cause.
 
-**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. For the regex policy, edit `policy_rules.models.deny`, `.allow`, see [Policy Rules → Models dimension vs models_allowed](/ai-gateway/policy-rules#models-dimension-vs-models_allowed) for when to use which. Or attach a provider credential that actually serves the model.
+**Causes and fixes:**
 
-## `402 budget_exceeded`
+| Cause | Fix |
+|---|---|
+| The environment variable is empty in the client process | Print it inside the running container, not in your shell |
+| The client holds a secret that was rotated more than 24 hours ago | Copy the new secret from the rotate response into your secret store |
+| The value is the display prefix, not the secret | A secret is `vk-lw-` plus 26 characters, 32 in total. The 13-character prefix shown in the UI is not a key |
+| The virtual key was deleted or belongs to another organization | Create a key in the organization you are calling |
 
-**Symptoms:**
-- Requests start failing mid-day after working all morning.
-- Only specific users see it; others don't.
+A revoked or disabled key answers `403`, not `401`. See the next section.
 
-**Diagnose:**
+## 403 `virtual_key_revoked` or `virtual_key_disabled`
+
+Both are deliberate stops on the key, and they are different states.
+
+| Code | Status | Meaning |
+|---|---|---|
+| `virtual_key_revoked` | 403 | The key is dead. Revocation is terminal |
+| `virtual_key_disabled` | 403 | The key is stopped and an administrator can turn it back on |
+| `virtual_key_expired` | 403 | The key passed its expiration date |
+
+**Fix:** re-enable a disabled key in **AI Gateway → Virtual Keys**, or with `langwatch virtual-keys enable <id>`. A revoked key cannot come back. Create a new key and move the callers to it.
+
+## 429 with `rate_limited`
+
+The virtual key hit its own requests-per-minute or requests-per-day ceiling. The gateway checks the ceiling before it calls any provider, so a rejected request burns no upstream tokens.
+
+**Confirm it:** the response body carries `"code":"rate_limited"` and no `X-LangWatch-Provider` header. A `429` from the provider instead carries `X-LangWatch-Provider` and forwards the provider's own `Retry-After`.
+
+The response does not say which dimension fired. The metric does:
+
+```promql
+sum by (dimension) (rate(gateway_rate_limit_denied_total[5m]))
+```
+
+`dimension` is `rpm` or `rpd`.
+
+**Fix:** raise or clear the ceiling on the key.
 
 ```bash
-langwatch gateway-budgets list --format json | \
-  jq '.[] | select((.spent_usd | tonumber) >= (.limit_usd | tonumber) * 0.9)'
+langwatch virtual-keys update <id> --config-json '{"rate_limits":{"rpm":600,"rpd":100000}}'
 ```
 
-The response payload's `error.message` names the scope that breached, `project:month` or `principal:day` etc. That's your target budget.
+The limiter runs in each pod against the key's cached configuration, so the ceiling applies per pod. Size it against one pod's share of your traffic. See [Rate limits](/ai-gateway/rate-limits).
 
-**Fix options:**
-- Raise the cap: `langwatch gateway-budgets update <id> --limit 1000`.
-- Switch the VK to a bigger-headroom scope.
-- Change `on_breach` from `block` to `warn` if you just want visibility, not enforcement (but then spend is uncapped, be sure).
+For a provider 429, add a fallback credential to the key's chain, or ask the provider for more quota. See [Fallback chains](/ai-gateway/providers/fallback-chains).
 
-## `429 rate_limit_exceeded`
+## 400 `model_not_recognized`
 
-**Symptoms:**
-- Bursty traffic 429s; steady traffic succeeds.
-- Rate-limit headers in the response body mention `tpm`/`rpm`.
+The gateway resolved the virtual key but could not turn the `model` string into a provider and a model id.
 
-**Diagnose:**
-
-Check whether the 429 came from your VK's rate-limit config OR from the upstream provider. The response headers tell you:
-
-- `error.type = rate_limit_exceeded` + `X-LangWatch-RateLimit-Dimension: rpm|rpd` + `Retry-After: <seconds>`, gateway-level VK cap. The dimension header names which ceiling fired so dashboards can filter.
-- `type: rate_limit_exceeded` WITH `X-LangWatch-Provider: openai` and no `X-LangWatch-RateLimit-Dimension`, upstream quota hit.
-
-Gateway-level enforcement runs **before** guardrails, budget, bifrost so rejected requests don't count upstream tokens. Cross-dimension accounting: if RPM denies, RPD isn't burned (and vice versa), raising one ceiling doesn't blow through the other.
-
-Upstream 429s will trigger fallback if the VK has a chain configured. Check `X-LangWatch-Fallback-Count` on the next success to see if fallback is working.
-
-**Fix:**
-- If gateway-level: `langwatch virtual-keys update <id> --config-json '{"rate_limits": {"rpm": 60, "rpd": 100000}}'` to raise the cap, or `{"rpm": null, "rpd": null}` to disable. Ceiling changes take effect on the next request (limiter invalidates on every bundle refresh).
-- If upstream: add a fallback provider to the VK chain, or request quota from the upstream.
-
-<Warning>
-**Rate-limit changes look broken when the `/changes` long-poll is
-unreachable.** The gateway's cached VK bundle only refreshes when the
-control-plane's `/api/internal/gateway/changes` endpoint is reachable
-and responding within the gateway's `GATEWAY_LONG_POLL_TIMEOUT + 5s`
-deadline. If long-polls are timing out (look for `changes long-poll
-error` in the gateway log), bundles stay stale indefinitely, a fresh
-`langwatch virtual-keys update` that tightens `rpm` will appear to
-have no effect. Verify connectivity and client timeout headroom before
-concluding the limiter itself is broken.
-</Warning>
-
-<Note>**TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the provider replies, so pre-estimation can't be a hard cap. TPM will ship with Redis-coordinated cluster-wide counters in v1.1.</Note>
-
-## `403 tool_not_allowed`
-
-**Symptoms:**
-- Agent suddenly can't run `shell.exec`, `filesystem.write`, specific tools.
-- Was working; now isn't.
-
-**Diagnose:** check `error.message`, it names the blocked pattern and which list (`tools`/`mcp`/`urls`) it matched.
-
-**Fix:**
-- Intended policy, agent must not have this tool. Stop using it.
-- Policy added in error, edit `policy_rules.tools.deny` on the VK.
-
-See [Policy Rules](/ai-gateway/policy-rules) for the regex syntax reference.
-
-## `503 service_unavailable`, `504 upstream_timeout`
-
-**Symptoms:**
-- Intermittent 503/504 but NOT from upstream (no `X-LangWatch-Provider` header).
-- Gateway `/readyz` starts flapping.
-
-**Diagnose:**
+**Confirm it:** list what the key can actually route to.
 
 ```bash
-curl -s https://gateway.langwatch.ai/readyz | jq
+curl -sS https://gateway.acme.com/v1/models \
+  -H "Authorization: Bearer $LW_VK" | jq -r '.data[].id' | sort
 ```
 
-Non-`ok` checks pinpoint the layer:
-- `control_plane: error: timeout ...` → control-plane degraded; gateway is refusing traffic correctly.
-- `auth_cache_bootstrap: error: ...` → startup failed; pod will be restarted.
-- `bundle_refresh: stale ...` → the bundle snapshot is not refreshing, so budget prechecks run against stale spend.
+**Causes and fixes:**
 
-**Fix:**
-- If control plane is down, wait, investigate control plane.
-- If single pod, rolling-restart that pod, scheduler will replace.
-- If fleet-wide, check LB + DNS before assuming gateway fault.
+| Cause | Fix |
+|---|---|
+| The model has no provider prefix and no prefix rule matches it | Write `provider/model`, for example `openai/gpt-5-mini` or `anthropic/claude-sonnet-4-5` |
+| The first segment is not a provider the key can reach | Use a provider id from the list above, or a routing handle defined on the key's provider row |
+| An Azure deployment name is not in the deployment map | Add the deployment name on the provider credential, or send `azure/<deployment name>` |
 
-## `502 provider_error` after fallback exhaustion
+Two neighbouring codes mean something else. `400 model_not_allowed` means the model is real but the key's allowlist refuses it. `400 model_provider_not_bound` means no credential in the key's scope serves that provider. See [Model naming](/ai-gateway/providers/overview).
 
-**Symptoms:**
-- `X-LangWatch-Fallback-Count` ≥ chain length.
-- Multiple providers all failing at once.
+## 402 `budget_exceeded`
 
-**Diagnose:** expand the LangWatch trace, each attempt is a child span with `langwatch.fallback.reason`. If every attempt shows `5xx:503` on a different provider, your chain providers are all down (real multi-cloud incident) or your credentials are all wrong (e.g. expired IAM role).
+A budget scope on the key breached its limit. The message names the scope.
 
-**Fix:**
-- Real multi-provider incident: wait it out, post status page, shed traffic to queues.
-- Credential issue: rotate the failing provider credentials (Gateway → Providers).
+**Fix:** raise the limit, move the key to a scope with headroom, or change the scope's breach action from block to warn. See [Budgets](/ai-gateway/budgets).
 
-## Cache-discount not applying (Anthropic)
+Spend reaches the budget through the spend records the gateway ships. If the ledger is not moving at all, read [Spend does not appear on the key](#spend-does-not-appear-on-the-key) instead.
 
-**Symptoms:**
-- `cache_read_input_tokens` is always `0` on `/v1/messages` responses.
-- Anthropic bill doesn't show 90% cache discount.
+## 502 or 503 during a rollout
 
-**Diagnose:**
+A pod stopped serving before the load balancer removed it, or the drain window cut requests that were still running.
 
-```bash
-# Is VK cache.mode set to 'respect'?
-langwatch virtual-keys get <id> --format json | jq '.config.cache'
+**Confirm it:** during a healthy drain, `gateway_draining` goes to 1 on the leaving pod and `gateway_in_flight_requests` falls to 0 before the pod exits. A flat in-flight count past the drain window is a handler that never returned.
+
+```promql
+sum by (pod) (gateway_draining)
+sum by (pod) (gateway_in_flight_requests)
 ```
 
-If `mode: disable`, that's the problem, `disable` strips `cache_control` blocks before upstream.
+**How the drain works.** On `SIGTERM` the gateway flips `/readyz` to `503 {"status":"draining"}`, waits `shutdown.preDrainWaitSeconds` (default 5) so the endpoint controller removes the pod, then closes the listener and gives in-flight requests `shutdown.timeoutSeconds` (default 60).
 
-**Fix:** `langwatch virtual-keys update <id> --config-json '{"cache":{"mode":"respect"}}'`.
+**Fix, 502 from the load balancer:** raise `shutdown.preDrainWaitSeconds` so the removal has time to propagate, and raise `terminationGracePeriodSeconds` by the same amount. The chart requires `terminationGracePeriodSeconds` to be at least `preDrainWaitSeconds + timeoutSeconds + 10`, and refuses to render otherwise.
 
-Also check your client is actually sending `cache_control: {type: "ephemeral"}` blocks in the system prompt. Many SDKs don't emit these by default; you often have to pass the system field as a content-blocks array, not a string. See [Caching Passthrough](/ai-gateway/caching-passthrough).
+**Fix, cut streams:** a provider call can run up to 14 minutes, so the default 60 second window cuts long streams on every rollout. The gateway says so at boot with `graceful_shutdown_shorter_than_max_stream_duration`. To finish long streams:
 
-## Request succeeded but no trace in my inbox
-
-**Symptoms:**
-- `/v1/chat/completions` returned `200` with a real model response.
-- Response carried `X-LangWatch-Gateway-Request-Id`.
-- But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
-
-**Diagnose:**
-
-```bash
-# 1. Is the gateway configured to export spans at all?
-# In the gateway pod:
-echo "$GATEWAY_OTEL_DEFAULT_ENDPOINT"   # must be non-empty
-echo "$GATEWAY_OTEL_DEFAULT_AUTH_TOKEN" # must be non-empty when endpoint is LangWatch's /api/otel
-
-# 2. Is the exporter reaching the ingest?
-kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
-# Look for:
-#   - "exporter: export succeeded"                 -> spans left the gateway
-#   - "status=401"                                 -> auth-token rejected at ingest
-#   - "status=404"                                 -> endpoint URL is wrong (missing /v1/traces suffix, recent fix)
-#   - "no endpoint configured"                     -> env var wasn't picked up
+```yaml
+gateway:
+  shutdown:
+    preDrainWaitSeconds: 5
+    timeoutSeconds: 840
+  terminationGracePeriodSeconds: 855
 ```
 
-**Root causes, most to least common:**
+A `preStop` sleep does not help. It delays the `SIGTERM`, so the pod is not yet reporting 503 while the sleep runs and the load balancer has no signal to act on.
 
-1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh, each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
+## A stream stops mid-way
 
-   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` need no env override. Override the endpoint only for prod/self-hosted.</Info>
+The client received part of a response and then nothing.
 
-2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel`, if you've overridden to empty, you've disabled trace export.
+**Confirm it:** the gateway never switches providers mid-stream. When an upstream stream fails after the first chunk, the gateway writes one terminal SSE frame and closes:
 
-3. **Auth token 401s at the ingest.** `/api/otel` rejects unauthenticated or expired tokens with 401; the gateway exporter logs the rejection but the hot path is already done. Rotate the token, update the Secret, roll the gateway pod.
-
-   <Note>**OTLP 401/403 noise during the first 30s of startup is suppressed by design.** The gateway's OTel startup-error handler swallows transient transport errors (401, 403, connection-refused, no-such-host) for a 30-second grace window OR until the first successful export, whichever comes first. This avoids logspam during cold-boot races where the gateway is up before the control plane has minted the OTLP token. **If you see OTLP 401 floods AFTER that grace window, the control-plane auth pipeline isn't minting tokens**: first-line check is `LW_GATEWAY_INTERNAL_SECRET` parity between the gateway and control plane (mismatched HMAC secret silently breaks the `/resolve-key` handshake that mints the OTLP token).</Note>
-
-4. **Endpoint URL 404s.** Before the auto-suffix fix, an endpoint like `http://langwatch-app:5560/api/otel` was treated as the full URL; the Go OTLP exporter hit `/api/otel` and got 404 (the receiver is at `/api/otel/v1/traces`). Recent gateway builds append `/v1/traces` automatically when missing. Bump to the latest image.
-
-5. **Sampler dropped the span.** Gateway spans are sampled at 1.0 by default, if you've tuned `GATEWAY_OTEL_SAMPLER_ARG` below 1.0 for cost, spot-checks will miss by design.
-
-6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active, and vice-versa).
-
-**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Gateway-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
-
-## `auth_cache_refresh_transport_failure` WARN spew in logs
-
-**Symptoms:**
-- Sustained WARN-level lines reading `auth_cache_refresh_transport_failure vk_id=... error=... error_class=transport new_soft_expires_at=...`.
-- Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
-- Customers report no rejection, traffic flows normally.
-
-This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default `21600`, 6 hours). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
-
-**What to do:**
-
-1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
-2. If it is, no operator action on the gateway side, wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
-3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected**: see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
-4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
-
-**What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
-
-## Trace-id propagation not working
-
-**Symptoms:**
-- `X-LangWatch-Trace-Id` on response doesn't match the `traceparent` you sent.
-- Gateway spans show up as new root traces instead of children of your app trace.
-
-**Diagnose:**
-
-```bash
-curl -sD- -o/dev/null \
-  -H "Authorization: Bearer $LANGWATCH_VK" \
-  -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1111111111111111-01" \
-  -H "Content-Type: application/json" \
-  -X POST https://gateway.langwatch.ai/v1/chat/completions \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
-  grep -i x-langwatch-trace-id
+```
+data: {"type":"error","error":{"type":"provider_error","message":"..."}}
 ```
 
-Expected: `x-langwatch-trace-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`.
+If your client shows silence instead of an error, it is not reading that frame. Log the raw SSE bytes and check.
 
-**Root causes:**
-- SDK isn't forwarding the `traceparent` header. Check `default_headers`, `defaultHeaders` in your client.
-- Your trace propagator isn't active. Use `langwatch.get_gateway_headers()`, `getGatewayHeaders()`.
-- Proxy, LB between client and gateway is stripping the header. Curl directly to the gateway DNS to bypass.
+**Streams that end with no error** are usually the provider closing early. Open the request's trace and compare the token counts against the response you got.
 
-See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake).
+**A stream that reports no usage** debits nothing, so it bypasses budget enforcement:
 
-## Streaming hangs, drops mid-response
-
-**Symptoms:**
-- Chat assistant produces half a response then nothing.
-- No error, just silence; client eventually times out.
-
-**Diagnose:** check the LangWatch trace for the request. Look at:
-- `langwatch.stream.chunk_count`, how many chunks reached the gateway.
-- `langwatch.stream.terminated_at_chunk`, present when gateway observed mid-stream failure.
-
-If the gateway saw a terminal `event: error`, your client isn't parsing SSE correctly (should have surfaced the error). If `chunk_count` abruptly stops at 20-ish, the upstream connection dropped, gateway won't silent-switch mid-stream, so the client receives the partial response plus a terminal error event.
-
-See [Streaming](/ai-gateway/streaming).
-
-## "My config override isn't taking effect"
-
-**Symptoms:**
-- You set an env var via Helm or `values.yaml`, deployed, but the gateway behaves as if the default were still in effect.
-- `kubectl exec` + `env` shows the var is set, but the behaviour doesn't match.
-
-**Diagnose:** the gateway validates its configuration on boot. Required env vars missing → the process exits with a clear error naming the unset field (struct-tag `validate:"required"`). If the pod reached `Running` state, every required field was set.
-
-Inspect the running pod's effective env:
-
-```bash
-POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
-
-# Dump the env the pod sees, anything set via Helm, ConfigMap, or Secret refs
-kubectl exec -n langwatch "$POD" -- env | grep -E '^(LW_GATEWAY|CUSTOMER_TRACE_BRIDGE|OTEL|SERVER|LOG)_' | sort
+```promql
+sum(rate(gateway_streaming_usage_missing_total[10m]))
 ```
 
-The config struct has six groups, each rooted at an env prefix: `LW_GATEWAY_*` (control plane + secrets), `CUSTOMER_TRACE_BRIDGE_*` (per-tenant OTLP export), `OTEL_*` (gateway-side OTel), `SERVER_*` (bind addr + graceful shutdown), `LOG_*`, plus `ENVIRONMENT`.
+Send `stream_options: {"include_usage": true}` on OpenAI-style requests. See [Streaming](/ai-gateway/streaming).
 
-**Common causes when the env shows the expected value but behaviour differs:**
+## A key change is not applied
 
-1. Stale pods, you bumped values.yaml but haven't restarted. `kubectl rollout restart deploy/langwatch-gateway`.
-2. The VK's bundled config overrides the pod-level default (e.g. VK has its own `cache.mode`). Check the VK config via `langwatch vk get <id>`.
-3. The control plane hasn't propagated the bundle change. Wait 30 s for the `/changes` long-poll cycle, or restart gateway pods.
+You changed a limit, an allowlist or a credential, and requests still behave the old way.
 
-**Common causes when the env shows the DEFAULT despite an override:**
+**How a change reaches a pod.** Each pod holds the resolved key in memory and refreshes it three ways:
 
-1. The env var is set on the wrong container in the deployment (e.g. on an init container).
-2. Helm value was set on the wrong key (`gateway.env.X` vs `gateway.X`).
-3. ConfigMap rendered the value as a YAML scientific-notation number (a known gotcha for int64 fields), check `kubectl describe configmap`.
+| Path | Timing |
+|---|---|
+| The change feed, a long poll against the control plane | About 10 seconds |
+| The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
+| The key's own token expiring | 15 minutes |
+
+Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
+
+**Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
+
+**Fix:** restore the route to the control plane. `curl http://langwatch-gateway/debug/control-plane` inside the cluster prints the URL the pod resolved. A rolling restart clears every cache at once when you need the change now.
+
+## Spend does not appear on the key
+
+Traffic is flowing, and the key's spend and its budgets stay flat.
+
+**How spend travels.** The gateway writes one record per request to a spool on disk. A background drainer ships the spool to the control plane, which prices the records and writes the ledger. Budget enforcement in the gateway is a local check against the budget snapshot in the cached key, so spend only moves when the whole chain runs.
+
+**Confirm it, in order:**
+
+| Check | Query | If it fails |
+|---|---|---|
+| Records are written | `gateway_spend_spool_appended_total` is climbing | Spend emission is off. Set `spend.enabled: true` |
+| No records are lost | `gateway_spend_spool_dropped_total` is flat | `reason="intake"` means the pod outran the spool; `reason="overflow"` means the drainer is behind and the oldest segments were deleted |
+| The control plane is answering | `gateway_control_plane_requests_total{status="error"}` is flat | The drainer cannot reach the control plane |
+
+Every dropped record is spend that is never billed and never enforced against, so alert on the drop counter.
+
+**A budget that should block but does not** is the same chain seen from the other end. The precheck is local and permissive, so a stale snapshot lets requests through rather than rejecting them. It reconciles once the ledger catches up.
+
+## `503 auth_upstream_unavailable`
+
+The gateway cannot reach the control plane and has no cached bundle for the key.
+
+**What still works.** A key a pod has already resolved keeps serving. When its token expires while the control plane is unreachable, the pod extends the entry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default 300) on each failed refresh, up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry (default 21600, six hours). Past that cap the entry is evicted and the key answers 503.
+
+A key the pod has never seen has nothing to serve from and fails at once. There is no cache warm-up on boot, so a pod added during an outage starts cold, and so does every pod after a rolling deploy.
+
+A `401`, `403` or `404` from the control plane about the key itself is not an outage. It evicts the entry immediately, with no grace.
+
+**Read the ladder in the pod log:**
+
+| Line | Level | Meaning |
+|---|---|---|
+| `auth_cache_serve_stale` | info | The grace window is active and keys are still being served |
+| `auth_cache_refresh_transport_failure` | warn | Each refresh is failing. This is the outage signal, and customers are not affected yet |
+| `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused |
+
+**Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
+
+## First request to a new pod is slow
+
+A pod resolves each virtual key from the control plane the first time it sees it, which adds one round trip. Every request after that reads the in-process cache. The cache is per pod and holds 10,000 keys.
+
+Expect the extra round trip after a scale-up and after every rolling deploy.
 
 ## `413 payload_too_large`
 
-**Symptoms:**
-- A request with a large prompt, large base64 image, long tool-call argument list returns 413.
-- Response body: `{"error":{"type":"payload_too_large","message":"request body exceeds 33554432 bytes"}}`.
+The request body passed the cap, which the gateway applies at the edge before authentication.
 
-**Root cause:** the request body exceeded the gateway's request-body cap (default **32 MiB**). The cap is enforced at the edge, before auth, before upstream dispatch, so this is always a client-side payload-size issue, not an auth or provider issue.
+**Fix:** shrink the body first. A 4K image is about 6 MB once base64 encoded, so a few full-resolution images plus a long system prompt reach the 32 MiB default. Raise `security.maxRequestBodyBytes` in the chart only when your traffic genuinely needs it, and write it as an integer literal. Never remove the cap on a public endpoint.
 
-32 MiB covers the 1M-context + multi-image-vision worst case with headroom; truly-huge workloads can raise it, edge-public deployments can lower it.
+The audio upload routes have their own fixed cap of 26 MB.
 
-**Tuning:** set `SERVER_MAX_REQUEST_BODY_BYTES` (bytes) on the gateway container, or the corresponding Helm value. Set to 0 to fall back to the 32 MiB default. Never disable the cap entirely on a public endpoint, a body-cap-less endpoint is drive-by-scan-able.
+## The gateway refuses to start
 
-**Fix, in increasing order of effort:**
-
-1. Compress, resize large base64 images on the client before including them in the payload. A 4K image base64-encoded is ~6 MB on its own; multiple full-res images plus a big system prompt can push past 32 MiB.
-2. Trim long tool-call argument lists or chunk the request across multiple completions.
-3. If your traffic legitimately exceeds 32 MiB (multi-image vision with 1M-context models), raise `SERVER_MAX_REQUEST_BODY_BYTES` on the gateway deployment. Coordinate with ops, raising the cap reduces attack-surface cheapness, so the higher value should be deliberate and scoped to the impacted deployment.
-
-**What NOT to do:** disabling the cap at the LB, ingress layer. A public endpoint with no body cap is drive-by-scan-able; an attacker discovers your endpoint and sends a few GB to see if the pod crashes.
-
-## Pod never becomes ready after a deploy
-
-**Symptoms:**
-- `kubectl rollout status` hangs, pod cycles through `CrashLoopBackOff` or stays in `Running` with `/startupz` returning 503.
-- First customer request would have failed, but you're catching it at deploy.
-
-**Diagnose:**
-
-```bash
-POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
-kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial failed'
-```
-
-**Root causes (the startup netcheck distinguishes these explicitly):**
-
-- `dns resolution failed: lookup api.openai.com: no such host`, the `NetworkPolicy` is blocking kube-system :53 egress. Check the DNS rule is FIRST in `spec.egress` (order matters in some CNIs) and the `kube-system` selector matches your cluster's DNS namespace (some clusters use `kube-dns`, others a custom namespace).
-- `tcp dial failed: dial tcp <ip>:443: connect: connection refused`, DNS works but provider egress is blocked. Your `egressToProviders` override is too narrow; check the resolved IP is in an allowed CIDR, or widen back to the default (any-IP except RFC1918).
-- `tcp dial failed: i/o timeout`, firewall (VPC security group, on-prem) is dropping the packet silently. DNS worked, `NetworkPolicy` allowed it, but an upstream network layer did not. Check your cloud provider's security groups, NAT gateway rules.
-
-**Fix:** correct the policy or firewall rule, `helm upgrade`, rollout. If you need to deploy immediately without fixing the root cause, temporarily set `gateway.startup.netcheckHosts: []` to disable the probe (but then the first customer request will fail instead, prefer fixing the root cause).
-
-## First-request latency spike
-
-**Symptoms:**
-- First request after pod scale-up takes 3-5 s; subsequent requests take 200 ms.
-- Autoscaler adds replicas during traffic bursts.
-
-**Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
-
-**Fix:**
-- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
-- Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
-- `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
-
-## Debug checklist: common patterns
-
-When you don't know where to start:
-
-1. Take the `X-LangWatch-Gateway-Request-Id` from the failing request → LangWatch search.
-2. Compare `X-LangWatch-Provider` to the VK's configured primary, if different, fallback fired.
-3. Check `X-LangWatch-Cache` response header: `hit`, `miss`, `bypass`, `force` (the last is v1.1, deferred in v1).
-4. Gateway pod logs filtered on `request_id=req_...` for structured entries.
-5. Control-plane logs filtered on `vk_id` for authorization decisions.
-
-If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
-
-## `503 service_unavailable`, guardrail upstream
-
-**Symptoms:**
-- Requests that previously worked return 503 with `type=service_unavailable` when a guardrail evaluator fails and the VK is fail-closed (the default).
-- The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
-- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request, response), or `{verdict="fail_open"}` if the VK opts in. The same evaluator outage also shows as `{direction="stream_chunk", verdict="fail_open"}`, which climbs whether or not the VK opted in, because that direction always fails open rather than stall a stream.
-
-**Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed**: if policy can't be evaluated, the request is refused rather than passed through ungoverned.
-
-**Diagnose:**
-
-```bash
-# Which guardrails are attached to the VK?
-langwatch virtual-keys get <vk_id> --format json | jq '.config.guardrails'
-
-# Is the fail-open toggle set (per direction)?
-langwatch virtual-keys get <vk_id> --format json | \
-  jq '{req: .config.guardrails.request_fail_open, resp: .config.guardrails.response_fail_open}'
-```
-
-**Fix, in order of preference:**
-1. Restore the evaluator service. Check LangEvals pod, webhook endpoint health. The most common causes are (a) evaluator service OOM-killed by a long-running evaluator, (b) evaluator secret (LLM API key) expired.
-2. If the evaluator is optional (best-effort redaction, nice-to-have), flip fail-open for that direction:
-   ```bash
-   langwatch virtual-keys update <vk_id> --config-json \
-     '{"guardrails": {"response_fail_open": true}}'
-   ```
-   Warning: fail-open means requests pass through ungoverned when evaluators are down. Only do this for low-stakes traffic.
-3. For `stream_chunk` guardrails, the 50 ms per-chunk budget is **fail-open by contract** (no opt-in needed), blocking the user's stream on a slow policy service is worse than pass-through. Check `langwatch.guardrail.stream_chunk_fail_open=<reason>` trace attributes for why chunks are being passed through.
-
-See [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed).
-
-## `503 service_unavailable`, policy_rules compile failure
-
-**Symptoms:**
-- All requests through one VK return 503 with `type=service_unavailable`.
-- Gateway WARN log line `policy_rules_compile_failed` (dispatcher.go:253), names the dimension (`tools`, `mcp`, `urls`, `models`) and the broken pattern.
-- Follow-up WARN line `policy_rules_broken` on every subsequent request until the policy is fixed.
-
-**Root cause:** one of the RE2 patterns on the VK's `policy_rules` failed to compile. The gateway fails **closed** on invalid regex, silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
-
-**Diagnose:**
-
-```bash
-langwatch virtual-keys get <vk_id> --format json | jq '.config.policy_rules'
-```
-
-Look for patterns with common regex mistakes:
-- Unescaped parentheses, use `\\(` `\\)`
-- Unterminated character classes, `[abc` missing `]`
-- Backrefs `\1`, RE2 doesn't support backreferences (by design, for O(n) guarantees). Use alternation `(a|b)` instead.
-
-**Fix:** update the offending list with a valid pattern. Test the regex with Go's `regexp` package (same RE2 flavour) before saving:
-
-```bash
-# Quick RE2 syntax check
-echo 'test' | docker run -i --rm golang:1.22 go run -e 'package main
-import ("fmt"; "os"; "regexp")
-func main() { _, err := regexp.Compile(os.Args[1]); if err != nil { fmt.Println(err); os.Exit(1) }; fmt.Println("ok") }' '<your_pattern>'
-```
-
-See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
-
-## `504 provider is required`
-
-**Symptoms:**
-- Requests intermittently return `504 provider is required` for a VK that worked fine seconds before.
-- Direct curl with a known-good model name fails the same way.
-
-**Root cause:** the gateway's bundle cache went stale and resolved the VK with an empty provider type. Bifrost's `validateRequest` rejects when `req.Provider == ""`. Most often hits after rapid pnpm-dev, control-plane restarts or after long-running gateway processes.
-
-**Fix:**
-- Restart the gateway pod (`kubectl rollout restart deploy/langwatch-gateway` in prod, `pkill -f "service aigateway" && make service svc=aigateway` in dev). A fresh bundle fetch resolves it.
-- If recurring under steady load, file the gateway log line + repro shape, it points at a Bundle resolver TTL/refresh bug.
-
-**How to disambiguate from a model-name issue**: this same error fires when the model name in the request body isn't recognized by Bifrost's registry. `gpt-5-mini` (alias) and `claude-haiku-4-5` (alias) currently return "provider is required" because Bifrost only resolves concrete dated names like `gpt-4o-mini` or `claude-haiku-4-5-20251001`. Pin to a dated name (or set up a VK alias) and the error goes away. If both the model name is concrete AND the gateway was just restarted, it's a real bundle bug, escalate.
-
-## `504 HTML response received from provider`
-
-**Symptoms:**
-- 504 with the body containing `event: response.created\ndata: {…}` or just plain HTML fragments.
-- Affects coding-agent CLIs (codex, claude-code) more than direct API clients.
-
-**Root causes:**
-
-1. **Body too large for the upstream's edge.** Some providers return HTML 4xx pages instead of JSON when the request body exceeds their per-request tolerance. Coding agents can balloon request bodies past 50 KiB with rich tool schemas + system prompts. **Fix**: reduce body, use `claude --bare --disable-slash-commands` to strip parent skills + plugins; for codex, lower `model_reasoning_effort` and avoid stuffing large `instructions` blocks.
-2. **Upstream auth failure.** Provider returned an HTML 401/403 page rather than JSON. Verify the gateway VK's underlying provider credential is valid (see Settings → Model Providers).
-3. **Upstream API rate limit, outage.** Provider is degraded; falls back via the VK chain if configured.
-4. **The streaming response was misclassified as non-streaming.** Was historically the cause for codex 0.122+ on `/v1/responses`, `stream:true` lived past the gateway's 32 KiB peek window and `PeekStream(peek)` returned false. Fixed by widening the peek window for `/v1/responses` to 256 KiB.
-
-## `504 failed to unmarshal response from provider API`
-
-**Symptoms:**
-- Gateway returns generic 504 with "failed to unmarshal response from provider API".
-- The actual upstream error from the provider is hidden behind the generic message.
-
-**Root cause (largely fixed):** an older version of the gateway's raw-forward error-passthrough helper used a `case []byte:` type switch that didn't match `json.RawMessage` (distinct named type in Go), so the upstream response bytes that Bifrost stashed on `ExtraFields.RawResponse` got dropped and the 504 fell through with the generic message. Fixed in `df37575c4`. If you still see this on a current build, the upstream may be sending an unanticipated response shape, capture with `LW_LOG_MESSAGE_BODY=1` + `LW_GATEWAY_OUTBOUND_PROXY` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) to surface the bytes.
-
-## Boot fails with `AI Gateway secrets partial config`
-
-**Symptoms:**
-- Any LangWatch entry point (`pnpm dev`, `pnpm start`, workers, `prisma:*`, CLI scripts) refuses to start.
-- Loud banner in the boot log naming a subset of `LW_VIRTUAL_KEY_PEPPER`, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` as missing.
-
-**Root cause:** the three AI-Gateway secrets are an all-or-none group. Setting one or two without the third is always a misconfig, the missing secret will fail at first request rather than at boot, often with cryptic errors like `/resolve-key` HMAC mismatches or VK secrets that can't be hashed. The boot validator (`assertGatewaySecretsAllOrNone`) catches this at import time so every entry point fails the same way at the same place. Added in `3941b5239`, hardened in a follow-up to skip the client bundle entirely.
-
-<Note>**Browser blank-page on a partial-secret config (legacy)**: between `3941b5239` and the client-skip follow-up, the validator ran inside `createEnvConfig()` and touched the secret keys off the t3-env proxy. The Vite client bundle includes that module, so any browser nav to `/` triggered `@t3-oss/env-core`'s server-leak guard and the page never hydrated (blank screen + a single `Attempted to access a server-side environment variable on the client` console error). Pull to current `feat/ai-gateway` if you see that, the validator now `typeof window === 'undefined'`-gates and reads `process.env` directly, so the client bundle doesn't trip the guard.</Note>
-
-**Fix, generate the missing one(s):**
-
-```bash
-# Whichever the banner names as missing
-echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> platform/app/.env
-echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
-echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
-```
-
-Restart the entry point (the validator runs at import time, so no incremental refresh).
-
-**If you don't run the AI Gateway at all**, leave all three unset, the validator only fires when at least one is set. The control plane runs cleanly without them; the AI Gateway routes return `503` until the secrets are populated and the gateway pod boots.
-
-**Related dev hint** (warning, not failure): if `FEATURE_FLAG_FORCE_ENABLE` lists `release_ui_ai_gateway_menu_enabled` AND all three secrets are missing, the dev server logs a one-time WARN that the AI Gateway menu will be visible but non-functional until the secrets are populated. This is intentional, it lets you preview the UI without wiring the gateway yet.
+| Message | Cause | Fix |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_... is no longer read` | A retired duration-string variable is still set | Set the `_SECONDS` variable the message names, as a plain number of seconds |
+| `hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true` | `ENVIRONMENT` is set to anything but `local` | Set `BLOCK_LOCAL_HTTP_CALLS` and `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` to `true` |
+| A validation error naming `LW_GATEWAY_BASE_URL`, `LW_GATEWAY_INTERNAL_SECRET` or `LW_GATEWAY_JWT_SECRET` | One of the three required variables is empty | Set all three. See [Config](/ai-gateway/self-hosting/config) |
+| `... is outside the supported range` | A seconds field holds a millisecond or nanosecond count | Write the value in seconds |
 
 ## See also
 
-- [API: Errors](/ai-gateway/api/errors): full error-type enum and HTTP status mapping.
-- [Observability](/ai-gateway/observability): what every span attribute means.
-- [Health Checks](/ai-gateway/self-hosting/health-checks): interpreting `/readyz` output.
-- [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test): automate validation.
-- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, budget spend accumulation, pprof diagnostics).
-- [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard): importable JSON to visualise every metric referenced on this page.
+- [Errors](/ai-gateway/api/errors): every error code and its HTTP status.
+- [Observability](/ai-gateway/observability): metric names, labels and span attributes.
+- [Health checks](/ai-gateway/self-hosting/health-checks): what each probe reports.
+- [CI smoke test](/ai-gateway/cookbooks/ci-smoke-test): catch these failures before your callers do.
 
 ---
 

@@ -24,7 +24,7 @@ A virtual key attaches guardrails per direction. The gateway evaluates them on e
 
 **Response.** Runs on the full completion before it returns to the caller. The evaluator receives the assistant text of the first choice. A blocked response is replaced by the error below; the provider call has already been billed.
 
-**Stream chunk.** Runs on each streamed chunk as it passes through. On a fail verdict the gateway closes the stream at that chunk. The caller sees the stream end without a `[DONE]` frame and without an error frame. Chunks already sent stay with the caller.
+**Stream chunk.** Runs on each streamed chunk as it passes through. On a fail verdict the gateway closes the stream at that chunk. The caller sees the stream end with the usual `data: [DONE]` frame and no error frame. Chunks already sent stay with the caller.
 
 The gateway waits up to 5 seconds for a request or response evaluation and 50 milliseconds for a stream chunk evaluation.
 
