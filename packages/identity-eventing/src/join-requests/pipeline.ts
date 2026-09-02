@@ -66,6 +66,8 @@ export interface JoinRequestPipelineDeps {
   lifecycle: JoinRequestLifecyclePort;
 }
 
+export type JoinRequestPipeline = ReturnType<typeof createJoinRequestPipeline>;
+
 /**
  * The join-request pipeline (D12, ADR-117). One aggregate per request; the
  * organization is the tenant. Commands append (waited) and the operational

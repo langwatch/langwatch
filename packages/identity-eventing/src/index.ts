@@ -107,7 +107,27 @@ export {
 } from "./sso-connections/schemas/events";
 
 export { joinRequestEventsFor } from "./join-requests/envelope";
-export { createJoinRequestPipeline, type JoinRequestPipelineDeps } from "./join-requests/pipeline";
+export {
+  createJoinRequestPipeline,
+  type JoinRequestPipeline,
+  type JoinRequestPipelineDeps,
+} from "./join-requests/pipeline";
+export {
+  EventingJoinRequestLedgerAdapter,
+  JOIN_REQUEST_CONVERGENCE_POLL_MS,
+  JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
+  type EventingJoinRequestLedgerOptions,
+  type JoinRequestStagedSender,
+} from "./adapters/eventing.join-request-ledger.adapter";
+export {
+  EventingJoinRequestLifecycleAdapter,
+  type EventingJoinRequestLifecycleOptions,
+} from "./adapters/eventing.join-request-lifecycle.adapter";
+export {
+  PostgresJoinRequestPipelineAdapter,
+  type JoinRequestPipelineDatabase,
+  type PostgresJoinRequestPipelineOptions,
+} from "./adapters/postgres.join-request-pipeline.adapter";
 export {
   JOIN_REQUEST_EXPIRY_MS,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,

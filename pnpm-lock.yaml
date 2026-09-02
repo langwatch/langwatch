@@ -617,6 +617,9 @@ importers:
       '@langwatch/identity-eventing':
         specifier: workspace:*
         version: link:../../packages/identity-eventing
+      '@langwatch/identity-server':
+        specifier: workspace:*
+        version: link:../../packages/features/identity/server
       '@langwatch/langy-server':
         specifier: workspace:*
         version: link:../../packages/features/langy/server
@@ -632,6 +635,9 @@ importers:
       '@langwatch/metric-server':
         specifier: workspace:*
         version: link:../../packages/features/metric/server
+      '@langwatch/notification-server':
+        specifier: workspace:*
+        version: link:../../packages/features/notification/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -668,10 +674,22 @@ importers:
       '@langwatch/trace-server':
         specifier: workspace:*
         version: link:../../packages/features/trace/server
+      '@react-email/components':
+        specifier: ^1.0.12
+        version: 1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@react-email/render':
+        specifier: ^2.0.9
+        version: 2.0.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
       zod:
         specifier: ^4.3.6
         version: 4.4.3
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.18
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -4679,13 +4697,31 @@ importers:
 
   packages/features/notification/server:
     dependencies:
+      '@aws-sdk/client-ses':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@sendgrid/mail':
+        specifier: ^8.1.6
+        version: 8.1.6
+      nodemailer:
+        specifier: ^9.0.3
+        version: 9.0.3
+      undici:
+        specifier: '>=8.9.0 <9'
+        version: 8.10.0
     devDependencies:
+      '@types/nodemailer':
+        specifier: ^8.0.1
+        version: 8.0.1
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -6617,6 +6653,9 @@ importers:
 
   packages/identity-eventing:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../actor
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../eventing
@@ -17728,11 +17767,6 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier@3.9.4:
-    resolution: {integrity: sha512-yWG/o/4oJfo036EKAfK6ACAoDOfHeRHx4tuxkfBZiauURiaSmYwlpOr5LQqKtIkRD2z1PLteme2WoxEnj4tHTg==}
-    engines: {node: '>=14'}
-    hasBin: true
-
   prettier@3.9.6:
     resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
     engines: {node: '>=14'}
@@ -20106,9 +20140,9 @@ snapshots:
 
   '@aws-sdk/client-ses@3.1108.0':
     dependencies:
-      '@aws-sdk/core': 3.977.7
+      '@aws-sdk/core': 3.977.8
       '@aws-sdk/credential-provider-node': 3.972.79
-      '@aws-sdk/types': 3.974.3
+      '@aws-sdk/types': 3.974.4
       '@smithy/core': 3.32.0
       '@smithy/fetch-http-handler': 5.7.0
       '@smithy/node-http-handler': 4.10.0
@@ -24410,7 +24444,7 @@ snapshots:
   '@react-email/render@2.0.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       html-to-text: 9.0.5
-      prettier: 3.9.4
+      prettier: 3.9.6
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
@@ -31526,8 +31560,6 @@ snapshots:
   preact@10.29.8: {}
 
   prelude-ls@1.2.1: {}
-
-  prettier@3.9.4: {}
 
   prettier@3.9.6: {}
 

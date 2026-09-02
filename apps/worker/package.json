@@ -49,11 +49,13 @@
     "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/identity-eventing": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
     "@langwatch/langy-server": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/log-server": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/metric-server": "workspace:*",
+    "@langwatch/notification-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/project-server": "workspace:*",
@@ -66,9 +68,13 @@
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.9",
+    "react": "^19.2.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

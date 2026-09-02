@@ -20,6 +20,7 @@ import {
 } from "@langwatch/eventing/server";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { point } from "@langwatch/metric-server/testing";
+import { EmailDeliveryAdapter } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { ProjectService } from "@langwatch/project-contract";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
@@ -33,6 +34,7 @@ import {
   TopicWorkerFeatureInstaller,
   type TopicWorkerCapability,
 } from "../../features/topic/topic-worker-feature.installer";
+import { AbsentJoinRequestMail } from "../../features/identity/join-request-mail.adapter";
 import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer";
 import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 import {
@@ -1226,30 +1228,28 @@ describe("WorkerProductionComposition", () => {
     });
 
     /**
-     * A graph that mounted the package-built pair while the application still
-     * owned the other two would be the failure this suite exists to catch, so
-     * both readings are asserted: with the option, four; without it, exactly
-     * the two this process can build.
+     * A graph that mounted the package-built ledgers while the application
+     * still owned the connection one would be the failure this suite exists to
+     * catch, so both readings are asserted: with the option, all four; without
+     * it, exactly the ones this process can build for itself.
+     *
+     * `join-request` is absent from BOTH readings here because this
+     * composition names no `BASE_HOST`, so it composed no mail capability —
+     * which is the whole subject of the block below.
      */
     /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
-    it("still mounts the other two only when the application hands them over", () => {
+    it("still mounts the connection ledger only when the application hands it over", () => {
       const withoutOption = compositionWith().featureInstallers.map((installer) => installer.name);
       expect(withoutOption).toContain("identity");
       expect(withoutOption).toContain("scim-sync");
       expect(withoutOption).not.toContain("sso-connection");
-      expect(withoutOption).not.toContain("join-request");
 
       const withOption = compositionWith({
-        identity: {
-          ssoConnection: { pipeline: {} },
-          joinRequest: { pipeline: {} },
-        },
+        identity: { ssoConnection: { pipeline: {} } },
       }).featureInstallers.map((installer) => installer.name);
       expect(
-        withOption.filter((name) =>
-          ["identity", "sso-connection", "scim-sync", "join-request"].includes(name),
-        ),
-      ).toEqual(["identity", "sso-connection", "scim-sync", "join-request"]);
+        withOption.filter((name) => ["identity", "sso-connection", "scim-sync"].includes(name)),
+      ).toEqual(["identity", "sso-connection", "scim-sync"]);
     });
 
     /** @scenario "The worker builds the identity ledger from its own client" */
@@ -1851,9 +1851,7 @@ describe("WorkerProductionComposition", () => {
       } as never;
     }
 
-    async function storeFoldedSession(
-      composition: WorkerProductionComposition,
-    ): Promise<void> {
+    async function storeFoldedSession(composition: WorkerProductionComposition): Promise<void> {
       const stores: FoldProjectionStore<Record<string, unknown>>[] = [];
       const eventSourcing = composition.eventing.eventSourcing;
       vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
@@ -2158,6 +2156,200 @@ describe("WorkerProductionComposition", () => {
       // different TTLs expire each other's entries early, and a fold-cache miss
       // is treated as authoritative.
       expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
+    });
+  });
+});
+
+/**
+ * The join-request ledger, and the mail capability that finally lets this
+ * process build it.
+ *
+ * What kept this graph in the application was never persistence: the
+ * `JoinRequest` head is Postgres like the other three ledgers'. It was the
+ * lifecycle port — the day-7 reminder and the lapse notice are outbound mail,
+ * and no process but the App had a gateway to send it through.
+ *
+ * The failure this block exists to catch is the quiet one. `join-requests`
+ * names five commands, a state projection and the lifecycle subscriber in the
+ * checked-in job registry, and the queue rejects an unroutable job for
+ * redelivery rather than dropping it — so a consumer that mounted everything
+ * else would stall exactly those seven forever with the pods up, the liveness
+ * probe answering and the queue depth simply growing.
+ */
+describe("given a worker that composes the join-request ledger", () => {
+  /** The routing keys the checked-in job registry says this pipeline carries.
+   *  Read rather than restated: a literal here would only ever assert this
+   *  file against itself. */
+  function expectedJoinRequestRoutingKeys(): string[] {
+    const registry = JSON.parse(
+      readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), "../../features/job-registry.json"),
+        "utf8",
+      ),
+    ) as { pipelines: { name: string; jobs: string[] }[] };
+    const entry = registry.pipelines.find((pipeline) => pipeline.name === "join-requests");
+    expect(entry, "the job registry names no join-requests pipeline").toBeDefined();
+    return entry!.jobs.map((job) => `${entry!.name}:${job}`).sort();
+  }
+
+  function compositionFor(
+    input: {
+      source?: Record<string, unknown>;
+      resources?: ResourceScope;
+      consumers?: boolean;
+    } = {},
+  ): WorkerProductionComposition {
+    return WorkerProductionComposition.create({
+      config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+      eventing: {
+        database: createProcessPersistenceDatabase(),
+        resolveClickHouseClient: async () => ({
+          insert: async () => undefined,
+          query: async () => ({ json: async () => [] }),
+        }),
+        groupQueue: { redis: {} as never },
+        retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        ...(input.consumers ? { consumers: { enabled: true as const } } : {}),
+      },
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      trace: { installer: new TraceInstaller(new TraceAssignments()) },
+      topic: {
+        database: {} as never,
+        redis: null,
+        execution: {} as never,
+        metrics: {} as never,
+      },
+      ...(input.resources ? { resources: input.resources } : {}),
+    });
+  }
+
+  const mailSource = {
+    BASE_HOST: "https://langwatch.acme.example",
+    EMAIL_PROVIDER: "smtp",
+    SMTP_URL: "smtp://relay.acme.example:587",
+  };
+
+  async function routingKeysFor(composition: WorkerProductionComposition): Promise<string[]> {
+    const installer = composition.featureInstallers.find(
+      (candidate) => candidate.name === "join-request",
+    );
+    expect(installer, "the composition mounted no join-request feature").toBeDefined();
+    await installer!.install();
+    return [...composition.eventing.eventSourcing.globalJobRegistry.keys()]
+      .filter((key) => key.startsWith("join-requests:"))
+      .sort();
+  }
+
+  describe("when the deployment named a host and the graph owns a resource scope", () => {
+    /** @scenario "A worker with a mail gateway mounts the join-request ledger itself" */
+    it("mounts it and routes exactly the keys the job registry names", async () => {
+      const composition = compositionFor({
+        source: mailSource,
+        resources: new ResourceScope(),
+      });
+
+      expect(await routingKeysFor(composition)).toEqual(expectedJoinRequestRoutingKeys());
+    });
+
+    /** @scenario "A worker with a mail gateway mounts the join-request ledger itself" */
+    it("no longer takes the pipeline from the application", () => {
+      const composition = compositionFor({
+        source: mailSource,
+        resources: new ResourceScope(),
+      });
+
+      // The option that used to carry it now carries the connection ledger
+      // alone. A graph that still received a join-request definition would
+      // register the application's stores rather than its own, and register
+      // the identical routing keys while doing it.
+      expect(composition.featureInstallers.map((installer) => installer.name)).toContain(
+        "join-request",
+      );
+      expect(composition.featureInstallers.map((installer) => installer.name)).not.toContain(
+        "sso-connection",
+      );
+    });
+
+    /** @scenario "The mail capability is closed with the graph that composed it" */
+    it("hands the transport to the scope that closes it", async () => {
+      // A gateway holds a transport — an SMTP connection pool, an SES client,
+      // a proxy dispatcher. A graph that composed one it could not close would
+      // leak it for the life of the process.
+      const close = vi.spyOn(EmailDeliveryAdapter.prototype, "close").mockResolvedValue(undefined);
+      try {
+        const resources = new ResourceScope();
+        compositionFor({ source: mailSource, resources });
+        expect(close).not.toHaveBeenCalled();
+
+        await resources.close();
+
+        expect(close).toHaveBeenCalledOnce();
+      } finally {
+        close.mockRestore();
+      }
+    });
+  });
+
+  describe("when the deployment named no host", () => {
+    /**
+     * The pipeline still mounts, and that is the point. Its routing keys are in
+     * the byte-frozen registry and its expiry is a fold this graph performs, so
+     * a request lapses on time whether or not anybody can be told. What is
+     * absent is the mail, by name.
+     */
+    /** @scenario "A producer-only worker without mail still routes every key" */
+    it("still mounts the ledger and routes every key the registry names", async () => {
+      const composition = compositionFor({ resources: new ResourceScope() });
+
+      expect(await routingKeysFor(composition)).toEqual(expectedJoinRequestRoutingKeys());
+    });
+
+    /** @scenario "A producer-only worker without mail still routes every key" */
+    it("refuses a send by name rather than reporting one that never happened", async () => {
+      await expect(
+        AbsentJoinRequestMail.create().sendStillWaiting({
+          adminEmail: "admin@acme.example",
+          organizationName: "Acme",
+          requesterName: "Ada Lovelace",
+        }),
+      ).rejects.toThrow(/composed no outbound mail gateway/);
+      await expect(
+        AbsentJoinRequestMail.create().sendExpired({
+          requesterEmail: "ada@acme.example",
+          organizationName: "Acme",
+        }),
+      ).rejects.toThrow(/composed no outbound mail gateway/);
+    });
+
+    /** @scenario "A consuming worker without mail refuses to compose" */
+    it("refuses to compose a graph that would claim the shared queue", () => {
+      expect(() => compositionFor({ resources: new ResourceScope(), consumers: true })).toThrow(
+        /will not claim event-sourcing\/jobs without outbound mail/,
+      );
+    });
+
+    /**
+     * The one graph the refusal deliberately lets through: a composition with
+     * no resource scope owns nothing closable, so it could not hold a mail
+     * transport even where the deployment is fully configured. Every root that
+     * runs as a process supplies a scope, so this shape is a partially-composed
+     * graph rather than a misconfigured deployment.
+     */
+    /** @scenario "A consuming worker without mail refuses to compose" */
+    it("lets a scope-less composition through rather than refusing a fixture", () => {
+      expect(() => compositionFor({ consumers: true })).not.toThrow();
+    });
+
+    /** @scenario "A consuming worker without mail refuses to compose" */
+    it("composes the same graph once the host is named", () => {
+      expect(() =>
+        compositionFor({
+          source: mailSource,
+          resources: new ResourceScope(),
+          consumers: true,
+        }),
+      ).not.toThrow();
     });
   });
 });

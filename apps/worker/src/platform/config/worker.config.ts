@@ -6,6 +6,7 @@ import {
   type ConfigValue,
 } from "@langwatch/config";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
+import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
@@ -104,6 +105,56 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   stripe: {
     secretKey: Config.secret({ optional: true, env: "STRIPE_SECRET_KEY" }),
+  },
+  /**
+   * The one outbound mail gateway this process sends through.
+   *
+   * Every variable below is the application's own spelling
+   * (`platform/app/src/runtime/app/mailer.private-config.ts`), because both
+   * graphs still send while the pipelines are twinned: a reminder that left
+   * this process from a different sender domain than the same reminder leaving
+   * the App would fail one deployment's SPF and pass the other's, and the half
+   * that failed is the half nobody is watching.
+   *
+   * `BASE_HOST` is what makes the whole leaf resolvable or not. Every mail this
+   * process sends carries a link back to the deployment, and the sender address
+   * a deployment did not name is derived from the same host — so a worker
+   * without it cannot compose a delivery capability at all, rather than
+   * composing one that sends mail nobody can act on. What that absence costs is
+   * decided by the graph, not here: see `resolveWorkerMailConfig`.
+   *
+   * The gateway settings themselves stay optional. A deployment with no email
+   * provider configured is an ordinary self-hosted install: it composes, mounts
+   * every pipeline, and fails at the moment of a send, which the notification
+   * fan-outs survive because the durable fact is the request and never the
+   * courtesy.
+   */
+  mail: {
+    baseHost: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
+    defaultFrom: Config.value(optionalEnvironmentString, { env: "EMAIL_DEFAULT_FROM" }),
+    provider: Config.value(optionalEnvironmentString, { env: "EMAIL_PROVIDER" }),
+    ses: {
+      // Presence-based, exactly as the App reads it: existing deployments treat
+      // USE_AWS_SES=false as enabled, and changing that would select a
+      // different gateway at send time in one process and not the other.
+      enabled: Config.value(optionalEnvironmentString, { env: "USE_AWS_SES" }),
+      region: Config.value(optionalEnvironmentString, { env: "AWS_REGION" }),
+      endpoint: Config.value(optionalEnvironmentString, { env: "AWS_SES_ENDPOINT" }),
+    },
+    sendgrid: {
+      apiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
+    },
+    smtp: {
+      url: Config.secret({ optional: true, env: "SMTP_URL" }),
+      host: Config.value(optionalEnvironmentString, { env: "SMTP_HOST" }),
+      port: Config.value(optionalEnvironmentString, { env: "SMTP_PORT" }),
+      user: Config.value(optionalEnvironmentString, { env: "SMTP_USER" }),
+      password: Config.secret({ optional: true, env: "SMTP_PASSWORD" }),
+      secure: Config.value(optionalEnvironmentString, { env: "SMTP_SECURE" }),
+    },
+    resend: {
+      apiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
+    },
   },
   /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
@@ -259,6 +310,19 @@ export type WorkerStripeConfig = Readonly<{
   secretKey?: string;
 }>;
 
+/**
+ * Everything one process needs to send mail, or nothing at all.
+ *
+ * `baseHost` rides alongside the gateway configuration rather than inside it
+ * because the two answer different questions: the gateway decides how a message
+ * leaves, the host decides what the message can link to. A notifier needs both,
+ * and neither is derivable from the other.
+ */
+export type WorkerMailConfig = Readonly<{
+  baseHost: string;
+  mailer: MailerConfiguration;
+}>;
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -281,6 +345,8 @@ export type WorkerConfig = Readonly<{
   observability: WorkerConfigProjection["observability"];
   shutdown: WorkerShutdownConfig;
   deployment: WorkerDeploymentConfig;
+  /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
+  mail?: WorkerMailConfig;
   stripe: WorkerStripeConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
@@ -295,6 +361,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     definition: workerConfigDefinition,
     source: normalizeWorkerConfigSource(source),
   }).value;
+  const mail = resolveWorkerMailConfig(value.mail);
 
   return {
     processRole: value.processRole,
@@ -310,6 +377,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
     deployment: value.deployment,
+    ...(mail ? { mail } : {}),
     stripe: value.stripe,
     gateway: value.gateway,
     github: value.github,
@@ -328,6 +396,49 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         },
       },
       outboundProxy: value.infrastructure.outboundProxy,
+    },
+  };
+}
+
+/**
+ * The mail configuration, or nothing.
+ *
+ * Nothing exactly when `BASE_HOST` is absent or blank. It is the one variable
+ * the whole capability rests on — the sender address is derived from it and
+ * every mail links back through it — so a half-filled value would produce mail
+ * addressed from a host that is not the deployment's and pointing at links
+ * that are not either. What an absent capability costs is a decision for the
+ * graph that would have consumed it, not for this projection.
+ */
+function resolveWorkerMailConfig(
+  mail: WorkerConfigProjection["mail"],
+): WorkerMailConfig | undefined {
+  const baseHost = mail.baseHost?.trim();
+  if (!baseHost) return undefined;
+
+  return {
+    baseHost,
+    mailer: {
+      defaultFrom: EmailProviderService.resolveDefaultFrom({
+        emailDefaultFrom: mail.defaultFrom,
+        baseHost,
+      }),
+      provider: mail.provider,
+      ses: {
+        enabled: Boolean(mail.ses.enabled),
+        region: mail.ses.region,
+        endpoint: mail.ses.endpoint,
+      },
+      sendgrid: { apiKey: mail.sendgrid.apiKey },
+      smtp: {
+        url: mail.smtp.url,
+        host: mail.smtp.host,
+        port: mail.smtp.port,
+        user: mail.smtp.user,
+        password: mail.smtp.password,
+        secure: mail.smtp.secure,
+      },
+      resend: { apiKey: mail.resend.apiKey },
     },
   };
 }

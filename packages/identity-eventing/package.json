@@ -26,6 +26,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/actor": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",

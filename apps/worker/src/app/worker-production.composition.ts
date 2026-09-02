@@ -25,7 +25,9 @@ import {
 } from "@langwatch/github-server";
 import {
   type IdentityPipelineDatabase,
+  type JoinRequestPipelineDatabase,
   PostgresIdentityPipelineAdapter,
+  PostgresJoinRequestPipelineAdapter,
   PostgresScimSyncPipelineAdapter,
   type ScimSyncPipelineDatabase,
 } from "@langwatch/identity-eventing";
@@ -120,9 +122,10 @@ import {
 import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
 import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer";
 import {
-  JoinRequestWorkerFeatureInstaller,
-  type JoinRequestWorkerCapability,
-} from "../features/identity/join-request-worker-feature.installer";
+  AbsentJoinRequestMail,
+  JoinRequestMailAdapter,
+} from "../features/identity/join-request-mail.adapter";
+import { JoinRequestWorkerFeatureInstaller } from "../features/identity/join-request-worker-feature.installer";
 import { ScimSyncWorkerFeatureInstaller } from "../features/identity/scim-sync-worker-feature.installer";
 import {
   SsoConnectionWorkerFeatureInstaller,
@@ -147,6 +150,10 @@ import {
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
 import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer";
 import { WorkerApplication } from "./worker.application";
+import {
+  tryCreateWorkerMailComposition,
+  type WorkerMailComposition,
+} from "./worker-mail.composition";
 
 /** The worker-owned runtime dependencies for the Topic feature. */
 export type WorkerTopicCompositionOptions = {
@@ -195,36 +202,29 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   GithubBranchDemandDatabase &
   GithubBranchMaintenanceDatabase &
   IdentityPipelineDatabase &
+  JoinRequestPipelineDatabase &
   LangySessionKeyReapDatabase &
   ScimSyncPipelineDatabase;
 
 /**
- * The two identity ledgers this graph still RECEIVES (ADR-101).
+ * The ONE identity ledger this graph still RECEIVES (ADR-101).
  *
- * The other two — `identity` and `scim-sync` — are composed below from
- * `@langwatch/identity-eventing`'s Postgres seams, because every dependency
- * they take is a Postgres binding. These two are not: the connection ledger's
- * teardown port revokes a torn-down connection's directory tokens through the
- * SCIM service, and the join ledger's lifecycle port sends the reminder and
- * the expiry notice. Neither the directory service nor an outbound mail
- * gateway exists as something this process can compose, so their definitions
- * still come from the application that has both.
- *
- * One option rather than two because they are one feature's ledger and the
- * app's writers resolve a sender by pipeline NAME on first use, so a graph
- * carrying one of them would stage commands for the other against a pipeline
- * nothing had registered. They have no ordering requirement among themselves —
- * none subscribes to another's events.
+ * The other three — `identity`, `scim-sync` and `join-requests` — are composed
+ * below from `@langwatch/identity-eventing`'s Postgres seams, because every
+ * dependency they take is either a Postgres binding or the mail gateway this
+ * process now owns. The connection ledger is not: its teardown port revokes a
+ * torn-down connection's directory tokens through the SCIM service, and no
+ * directory service exists as something this process can compose, so its
+ * definition still comes from the application that has one.
  *
  * Optional, like every group the legacy registry still owns. A graph without
- * it routes two of the four identity ledgers and must not claim
+ * it routes three of the four identity ledgers and must not claim
  * `event-sourcing/jobs`; that rule is the composition root's
  * (`createWorkerDurableComposition` asks for no consumers), and the parity
  * guard is what proves the packaged consumer routes all four.
  */
 export type WorkerIdentityCompositionOptions = {
   ssoConnection: SsoConnectionWorkerCapability;
-  joinRequest: JoinRequestWorkerCapability;
 };
 
 /**
@@ -350,6 +350,16 @@ export class WorkerProductionComposition {
         })
       : undefined;
     const eventingOptions = createEventingPersistence(options, infrastructure);
+    const mail = tryCreateWorkerMailComposition({
+      config: options.config,
+      ...(infrastructure ? { aws: infrastructure.aws } : {}),
+      ...(options.resources ? { resources: options.resources } : {}),
+    });
+    WorkerProductionComposition.requireMailForConsumers({
+      mail,
+      consumers: options.eventing.consumers,
+      resources: options.resources,
+    });
 
     // The SaaS billable-events meter and the dispatch subscriber that follows
     // it, built HERE rather than received. They are configured on the runtime
@@ -746,12 +756,41 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const joinRequest = options.identity
-      ? JoinRequestWorkerFeatureInstaller.create({
-          installer: options.identity.joinRequest,
-          eventing,
-        })
-      : undefined;
+    // Composed here, on the mail capability this process now owns. Everything
+    // else the join ledger takes is Postgres: the `JoinRequest` head serving
+    // both the fold and its guards, and the audience its two notices are
+    // addressed to.
+    //
+    // UNCONDITIONAL, unlike the connection ledger above. `join-requests` names
+    // five commands, a state projection and the lifecycle subscriber in the
+    // checked-in `job-registry.json`, and the queue rejects an unroutable job
+    // for redelivery rather than dropping it — so a graph that mounted this
+    // only where mail happened to be configured would stall those seven
+    // forever while the pods stayed up and the queue depth simply grew.
+    // Expiry is also a FOLD this graph performs: a request lapses on time
+    // whether or not anybody can be told about it.
+    //
+    // Which leaves the mail itself as the thing that can be absent, and it is
+    // absent by NAME: `AbsentJoinRequestMail` throws on every send, the
+    // notification fan-out logs it, and the request stands — the behaviour a
+    // deployment with no email provider already has. A process that claims
+    // `event-sourcing/jobs` never reaches that state, because
+    // `requireMailForConsumers` above refuses to compose it.
+    const joinRequest = JoinRequestWorkerFeatureInstaller.create({
+      installer: {
+        pipeline: PostgresJoinRequestPipelineAdapter.create({
+          database: options.database ?? options.topic.database,
+          eventSourcing: eventing.eventSourcing,
+          mail: mail
+            ? JoinRequestMailAdapter.create({
+                mailer: mail.delivery,
+                baseHost: mail.baseHost,
+              })
+            : AbsentJoinRequestMail.create(),
+        }).build(),
+      },
+      eventing,
+    });
     const enterprise = options.enterprise
       ? EnterpriseWorkerComposition.create(options.enterprise)
       : undefined;
@@ -790,6 +829,45 @@ export class WorkerProductionComposition {
       resources: options.resources,
       infrastructure,
     });
+  }
+
+  /**
+   * Refuses a consuming graph that cannot send mail.
+   *
+   * `join-requests` names five commands, a state projection and the lifecycle
+   * subscriber in the checked-in `job-registry.json`, and the queue rejects an
+   * unroutable job for redelivery rather than dropping it. So a consumer that
+   * mounted everything else would stall exactly those seven forever while the
+   * pods stayed up, the liveness probe answered and the queue depth simply
+   * grew — the failure shape every refusal in this file exists to convert into
+   * a boot error.
+   *
+   * Mounting the pipeline WITHOUT mail is not the alternative. Its two wakes
+   * are the only nudge an admin ever gets about a pending request and the only
+   * notice a requester gets that theirs lapsed; a graph that folded the
+   * expiry and told nobody would look identical to a working one from every
+   * angle the fleet watches.
+   *
+   * A producer-only graph is unaffected, deliberately: it claims nothing, so
+   * nothing goes unrouted, and every existing composition that never asked for
+   * consumers keeps composing without a mail gateway.
+   *
+   * So is a graph with no resource scope, and for a narrower reason: a mail
+   * gateway holds a transport, and a composition that owns no scope can close
+   * nothing — so it could not hold one even where the deployment is fully
+   * configured. Every root that runs as a process supplies a scope; a
+   * composition without one is a partially-composed graph, and refusing it
+   * would be refusing the fixture rather than the deployment.
+   */
+  private static requireMailForConsumers(input: {
+    mail: WorkerMailComposition | undefined;
+    consumers: WorkerEventingConsumerOptions | undefined;
+    resources: ResourceScope | undefined;
+  }): void {
+    if (input.mail || !input.consumers?.enabled || !input.resources) return;
+    throw new Error(
+      "The worker composition will not claim event-sourcing/jobs without outbound mail: the join-request pipeline's routing keys are in the job registry and its two wakes are notifications. Set BASE_HOST so the mail capability composes.",
+    );
   }
 
   /** The boot logger, as the one place a composition absence is declared. */
@@ -1166,4 +1244,3 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
     );
   }
 }
-

@@ -149,7 +149,15 @@ export {
   SignInCallbackLinkingService,
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
+export {
+  PostgresJoinRequestNotificationAdapter,
+  type JoinRequestNotificationDatabase,
+  type PostgresJoinRequestNotificationOptions,
+} from "./adapters/postgres.join-request-notification.adapter";
 export { JoinRequestGuards, type JoinRequestGuardsDeps } from "./join-request-guards";
+export { JoinRequestAudiencePort } from "./ports/join-request-audience.port";
+export { JoinRequestMailPort } from "./ports/join-request-mail.port";
+export { JoinRequestNotificationService } from "./services/join-request-notification.service";
 export {
   approveJoinCommandId,
   expireJoinCommandId,

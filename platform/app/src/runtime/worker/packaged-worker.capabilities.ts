@@ -192,7 +192,6 @@ export function packagedWorkerCapabilities(options: {
     },
     identity: {
       ssoConnection: { pipeline: definition("sso-connections") },
-      joinRequest: { pipeline: definition("join-requests") },
     },
   };
 }
