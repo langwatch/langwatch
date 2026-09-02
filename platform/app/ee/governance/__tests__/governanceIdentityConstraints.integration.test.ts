@@ -22,7 +22,7 @@ import {
   resolveGovOrganizationId,
   resolveGovTenantIds,
 } from "../services/governanceTenantHistory.service";
-import { isOpenLinkViolation } from "../services/identityMatch.errors";
+import { isOpenLinkViolation } from "../services/logic/postgresConstraintErrors";
 
 const ns = `gov-identity-${nanoid(8)}`;
 const organizationId = `org_${ns}`;

@@ -15,7 +15,7 @@
  */
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
-import { isUniqueViolation } from "../services/identityMatch.errors";
+import { isUniqueViolation } from "../services/logic/postgresConstraintErrors";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
