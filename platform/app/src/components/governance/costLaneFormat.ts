@@ -1,3 +1,5 @@
+import type { GovernanceAzureBillingNote } from "@ee/governance/services/azureBillingNote";
+
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 
 /**
@@ -50,4 +52,28 @@ export function laneWithheldTotalNote({
   return `Some usage in this lane is billed in ${joinCurrencies(
     currenciesWithoutUsdAmount,
   )} rather than US dollars. ${withheld}`;
+}
+
+/**
+ * The sentence the billed lane shows for each Azure billing note.
+ *
+ * The note itself — which of the closed list of reasons applies — is the read
+ * side's decision (`azureBillingNoteFrom`, `@ee`); the words are panel copy
+ * and live here with the rest of it. Digit-free on purpose, like the seat
+ * lane's absence copy: these sentences explain why there is NO figure, and a
+ * digit in one is a figure waiting to be misread. Each is honest about what
+ * happened — a failed read says the data is missing, never that the bill was
+ * empty, because those ask the reader for opposite things.
+ */
+export function azureBillingNoteSentence(
+  note: GovernanceAzureBillingNote,
+): string {
+  switch (note) {
+    case "prepaid_declared":
+      return "This Copilot is declared as running on prepaid message packs, which never appear on the Azure bill — an empty bill here is expected.";
+    case "no_spend_recorded":
+      return "The Azure bill was read and holds no Copilot charges for this period.";
+    case "billing_read_failed":
+      return "The Azure bill could not be read, so its charges are missing here rather than empty. They appear as soon as a read succeeds.";
+  }
 }

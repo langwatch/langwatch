@@ -42,6 +42,15 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
+import {
+  readClaimedSubscription,
+  readPrepaidDeclared,
+} from "./activity-monitor/azureBillOwnership";
+import {
+  azureBillingNoteFrom,
+  type GovernanceAzureBillingNote,
+} from "./azureBillingNote";
+import { readStoredCostCursor } from "./pullers/copilotStudioDataverse.puller";
 
 const logger = createLogger("langwatch:governance:cost");
 
@@ -168,6 +177,13 @@ export interface GovernanceCostSummaryDto {
   billed: GovernanceCostLaneDto;
   /** What the gateway metered as it served the traffic. */
   gateway: GovernanceCostLaneDto;
+  /**
+   * Why the Azure bill shows nothing, when a source claims one. Null when no
+   * bill is claimed, when the figures already speak for themselves, or when
+   * the first read has not completed yet. See `azureBillingNote.ts` for the
+   * closed list and its sentences.
+   */
+  azureBilling: GovernanceAzureBillingNote | null;
   seats: GovernanceSeatLaneDto;
   /** Oldest day first. Empty while unavailable. */
   series: GovernanceCostDayDto[];
@@ -196,6 +212,7 @@ function unavailable({
     unavailableReason: reason,
     billed: laneWithoutFigure(),
     gateway: laneWithoutFigure(),
+    azureBilling: null,
     seats: { status: "awaiting_data" },
     series: [],
     windowDays,
@@ -281,16 +298,18 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources] = await Promise.all([
+    const [rows, seats, staleSources, azureBilling] = await Promise.all([
       costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
       this.readSeats({ tenantId }),
       this.readStaleSources({ organizationId }),
+      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
     ]);
 
     return {
       unavailableReason: null,
       billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
+      azureBilling,
       seats,
       series: seriesFrom(rows),
       windowDays,
@@ -343,6 +362,67 @@ export class GovernanceCostService {
       oldestLastSuccessIso: oldest.lastSuccessIso,
       sourceNames: stopped.map((source) => source.name).sort(),
     };
+  }
+
+  /**
+   * The Azure billing note, from the source that claims the bill.
+   *
+   * The spend check is scoped to the CLAIMING SOURCE's rows, not to the
+   * pulled lane: the lane is fed by every pulled provider on the picker, so
+   * an org running Copilot beside another pulled source would otherwise have
+   * that provider's rows silence every sentence about the Azure bill —
+   * including the warning that its read failed.
+   *
+   * At most one live source can claim a given SUBSCRIPTION (the ownership
+   * guard refuses a second), but nothing stops two sources claiming two
+   * different ones. `createdAt` order makes which claim speaks deterministic
+   * — the oldest — rather than Postgres row order; one note for two bills is
+   * recorded as an open question in ADR-128 §21.
+   */
+  private async readAzureBillingNote({
+    organizationId,
+    tenantId,
+    fromDay,
+    toDay,
+  }: {
+    organizationId: string;
+    tenantId: string;
+    fromDay: string;
+    toDay: string;
+  }): Promise<GovernanceAzureBillingNote | null> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) return null;
+    const sources = await prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, parserConfig: true, pollerCursor: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const claiming = sources.find(
+      (source) =>
+        readClaimedSubscription(
+          source.parserConfig as Record<string, unknown> | null,
+        ) !== null,
+    );
+    if (!claiming) return null;
+
+    const parserConfig = claiming.parserConfig as Record<
+      string,
+      unknown
+    > | null;
+    const cursor = readStoredCostCursor(claiming.pollerCursor);
+    return azureBillingNoteFrom({
+      hasSubscriptionClaim: true,
+      isPrepaidDeclared: readPrepaidDeclared(parserConfig),
+      hasAzureSpendRows: await costRollup.hasRowsForSource({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+        ingestionSourceId: claiming.id,
+      }),
+      costPricedThroughDay: cursor.costPricedThroughDay,
+      costHeldSinceMs: cursor.costHeldSinceMs,
+    });
   }
 
   /**

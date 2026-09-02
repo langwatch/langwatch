@@ -2073,7 +2073,37 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "azureSubscriptionId",
       label: "Azure subscription ID (optional)",
       placeholder: "00000000-0000-0000-0000-000000000000",
-      hint: "Add this to also record what the environment costs each day. The same app registration needs the Cost Management Reader role on the subscription. Leave it empty to record conversations only.",
+      hint: "Add this to also record what the environment costs each day, and fill in the billing app registration below. Leave it empty to record conversations only.",
+    },
+    {
+      // The bill's OWN app registration (ADR-128 §21.1): it holds Cost
+      // Management Reader on the subscription and nothing else, so the person
+      // who approves the finance grant hands out a permission that reads money
+      // and cannot read a conversation. The conversation credential above is
+      // never used for the bill — there is no fallback.
+      key: "credentialsBillingClientId",
+      label: "Billing app registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
+      secret: true,
+    },
+    {
+      key: "credentialsBillingClientSecret",
+      label: "Billing app registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      secret: true,
+    },
+    {
+      // Declared by the customer, never inferred (ADR-128 §21.4): prepaid
+      // credit packs create no Azure resource, so the cost feed returns
+      // nothing — byte-for-byte what a quiet pay-as-you-go month returns.
+      // Only this declaration licenses the panel's prepaid sentence.
+      key: "azureBillingIsPrepaid",
+      label: "This Copilot runs on prepaid message packs",
+      placeholder: "",
+      hint: "Prepaid message packs never appear on the Azure bill. Turn this on and the spend panel will say so instead of showing an empty bill as if nothing ran.",
+      control: "switch",
+      defaultOn: false,
     },
     {
       key: "readSeats",
@@ -2611,12 +2641,12 @@ export function buildCopilotStudioDataversePullConfig(
   const tenantId = (p.credentialsTenantId ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
-  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
 
   // All three or none: two thirds of an app registration is not a sign-in,
   // and accepting it would save a source that cannot run.
   if (!environmentUrl || !tenantId || !clientId || !clientSecret) return null;
 
+  const billing = copilotAzureBillingFrom(p);
   return {
     adapter: "copilot_studio_dataverse",
     environmentUrl,
@@ -2630,12 +2660,7 @@ export function buildCopilotStudioDataversePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
       "*/15 * * * *",
-    // Omitted rather than sent empty, the same way Genie omits an unset
-    // warehouse: the adapter reads "no subscription named" as "do not read
-    // cost", and an empty string is a subscription id it would then ask Azure
-    // about — and the schema would refuse it as not a uuid, failing the save
-    // for a field the customer deliberately left blank.
-    ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
+    ...billing.config,
     // A real boolean, because the adapter's schema is `z.boolean()` and would
     // refuse the form's string on every run. The default comes from the field
     // definition the switch renders from, so a form nobody touched saves the
@@ -2644,8 +2669,53 @@ export function buildCopilotStudioDataversePullConfig(
       value: p.readSeats,
       defaultOn: READ_SEATS_DEFAULT_ON,
     }),
-    credentials: { tenantId, clientId, clientSecret },
+    credentials: { tenantId, clientId, clientSecret, ...billing.credentials },
   };
+}
+
+/**
+ * The Azure billing part of a Copilot Studio pullConfig: the subscription and
+ * prepaid declaration for the config itself, and the billing identity's pair
+ * for the encrypted credentials subtree.
+ *
+ * The subscription is omitted rather than sent empty, the same way Genie
+ * omits an unset warehouse: the adapter reads "no subscription named" as "do
+ * not read cost", and an empty string is a subscription id it would then ask
+ * Azure about — and the schema would refuse it as not a uuid, failing the
+ * save for a field the customer deliberately left blank. The prepaid flag
+ * rides only beside a subscription: without a bill to read the declaration
+ * has nothing to explain, and a stored `true` would spring back the day a
+ * subscription is added — declared by nobody.
+ *
+ * The billing keys are present or absent, never empty strings, which
+ * everything downstream would read as credentials. Whether the pair is
+ * COMPLETE is judged server-side (`assertAzureBillHasItsOwnCredential`),
+ * whose refusal names what is missing; the builder's job is only to not
+ * manufacture values.
+ */
+function copilotAzureBillingFrom(p: Record<string, string>): {
+  config: Record<string, unknown>;
+  credentials: Record<string, string>;
+} {
+  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
+  const billingClientId = (p.credentialsBillingClientId ?? "").trim();
+  const billingClientSecret = (p.credentialsBillingClientSecret ?? "").trim();
+
+  const config: Record<string, unknown> = {};
+  if (azureSubscriptionId) {
+    config.azureSubscriptionId = azureSubscriptionId;
+    config.azureBillingIsPrepaid = switchFieldIsOn({
+      value: p.azureBillingIsPrepaid,
+      defaultOn: false,
+    });
+  }
+
+  const credentials: Record<string, string> = {};
+  if (billingClientId) credentials.billingClientId = billingClientId;
+  if (billingClientSecret) {
+    credentials.billingClientSecret = billingClientSecret;
+  }
+  return { config, credentials };
 }
 
 /**
@@ -3142,10 +3212,15 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would reach the adapter as a string where its schema
     // demands a boolean — a source that saved cleanly and fails to parse on
     // every run.
+    // `azureBillingIsPrepaid` is owned for the same reason as `readSeats`:
+    // the builder converts the switch's string to the boolean the adapter's
+    // schema demands, and it also OMITS the field when no subscription is
+    // named — the raw form string winning the merge would undo both.
     copilot_studio_dataverse: [
       "environmentUrl",
       "botIds",
       "azureSubscriptionId",
+      "azureBillingIsPrepaid",
       "readSeats",
     ],
   };
