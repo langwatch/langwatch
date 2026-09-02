@@ -4,7 +4,11 @@ sidebarTitle: Overview
 description: Run a dataset through your prompts and agents in the workbench, score every row with evaluators, and compare runs before you ship a change.
 ---
 
-{/* video */}
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/experiments-workbench.webm" type="video/webm" />
+</video>
+
+The clip above builds an experiment on a customer support dataset: a prompt column runs the ten rows, an LLM Answer Match evaluator scores each answer against the expected output, and the column header reads the pass rate, 70 percent on this run.
 
 <Tip>
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.

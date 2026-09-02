@@ -16,7 +16,13 @@ A dataset is a table of rows your experiments run on. Each column has a name and
 
 ## Create a dataset
 
-Open [Datasets](https://app.langwatch.ai/@project/datasets) and click **Upload or create dataset**. The menu has two entries:
+Open [Datasets](https://app.langwatch.ai/@project/datasets) and click **Upload or create dataset**.
+
+<Frame>
+<img src="/images/datasets/datasets-list.png" alt="The Datasets list with the Upload or create dataset menu open" />
+</Frame>
+
+The menu has two entries:
 
 | Entry | What it does |
 |-------|--------------|
@@ -25,10 +31,10 @@ Open [Datasets](https://app.langwatch.ai/@project/datasets) and click **Upload o
 
 ### Create an empty dataset
 
-In the **New Dataset** drawer, type a **Name** and define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**.
+In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**.
 
 <Frame>
-<img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name filled and the column type select open" />
+<img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name, its slug, and the default columns with their types" />
 </Frame>
 
 Column names must be unique and cannot be `id` or `selected`. Each column has one of these types:
