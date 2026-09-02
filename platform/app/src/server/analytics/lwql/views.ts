@@ -764,7 +764,7 @@ export function lwqlViewSetupStatements({
     ),
     ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
     ...lwqlSourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable }),
+      lwqlRowPolicyStatement({ names, lwqlTable, sourceDatabase }),
     ),
   ];
 }
