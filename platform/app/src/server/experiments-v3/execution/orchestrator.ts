@@ -2014,6 +2014,110 @@ const dispatchAgentOf = (agent: TypedAgent): DispatchAgent => {
 };
 
 /**
+ * The one turn a row sends: the mapped row as a single user message, in its
+ * own conversation and inside the trace of the cell.
+ */
+const connectedTurnParams = ({
+  cell,
+  projectId,
+  agent,
+  dispatchAgent,
+  traceId,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  agent: TypedAgent;
+  dispatchAgent: ReturnType<typeof dispatchAgentOf>;
+  traceId: string;
+}): Parameters<ConnectedDispatch>[0] => {
+  const { messages, params } = buildConnectedCall({
+    inputs: buildTargetInputs(cell),
+    definitions: connectedParameterDefinitions(agent.config),
+  });
+  return {
+    projectId,
+    agent: dispatchAgent,
+    call: {
+      // One row, one conversation. The cell's own trace id keeps it unique
+      // and ties the conversation to the row that started it.
+      threadId: `eval_v3_${cell.rowIndex}_${traceId}`,
+      messages,
+      newMessages: messages.slice(-1),
+      params,
+      session: undefined,
+      // The agent adopts this context, so the spans it records land in the
+      // cell's own trace and the row links straight to them.
+      traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
+      run: {},
+    },
+    signal: AbortSignal.timeout(
+      dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
+    ),
+  };
+};
+
+/**
+ * What the cell shows when the turn did not answer.
+ *
+ * A named failure keeps its code, so the cell renders the copy of that code
+ * instead of a generic unknown error.
+ */
+const connectedFailureEvent = ({
+  cell,
+  projectId,
+  agentId,
+  error,
+  traceId,
+  duration,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  agentId: string;
+  error: unknown;
+  traceId: string;
+  duration: number;
+}): EvaluationV3Event => {
+  logger.info(
+    {
+      error,
+      projectId,
+      agentId,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    },
+    "Connected agent cell failed",
+  );
+  const failure = connectedCallFailure(error);
+  return {
+    type: "target_result",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+    output: undefined,
+    duration,
+    traceId,
+    error: failure.message,
+    ...(failure.domainError ? { domainError: failure.domainError } : {}),
+  };
+};
+
+/** What one connected agent cell needs to run. */
+interface ConnectedCellInput {
+  cell: ExecutionCell;
+  projectId: string;
+  agent: TypedAgent;
+  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  resultMapperConfig?: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+  /** The dispatcher the turn goes through, replaceable in tests. */
+  dispatch?: ConnectedDispatch;
+  /** The wait between busy retries, replaceable in tests. */
+  sleep?: (ms: number) => Promise<void>;
+  /** The clock the retry budget reads, replaceable in tests. */
+  now?: () => number;
+}
+
+/**
  * Executes a single cell whose target is a connected agent.
  *
  * The agent runs in the customer's own process, so the engine has no node for
@@ -2036,21 +2140,7 @@ export async function* executeConnectedCell({
   dispatch = relayDispatch,
   sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = () => Date.now(),
-}: {
-  cell: ExecutionCell;
-  projectId: string;
-  agent: TypedAgent;
-  datasetColumns?: Array<{ id: string; name: string; type: string }>;
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
-  resultMapperConfig?: ResultMapperConfig;
-  isAborted?: () => Promise<boolean>;
-  /** The dispatcher the turn goes through, replaceable in tests. */
-  dispatch?: ConnectedDispatch;
-  /** The wait between busy retries, replaceable in tests. */
-  sleep?: (ms: number) => Promise<void>;
-  /** The clock the retry budget reads, replaceable in tests. */
-  now?: () => number;
-}): AsyncGenerator<EvaluationV3Event> {
+}: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
     rowIndex: cell.rowIndex,
@@ -2063,58 +2153,28 @@ export async function* executeConnectedCell({
 
   let outcome: CallOutcome;
   try {
-    const { messages, params } = buildConnectedCall({
-      inputs: buildTargetInputs(cell),
-      definitions: connectedParameterDefinitions(agent.config),
-    });
     outcome = await dispatchWithBusyRetry({
       dispatch,
       sleep,
       now,
       budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
-      params: {
+      params: connectedTurnParams({
+        cell,
         projectId,
-        agent: dispatchAgent,
-        call: {
-          // One row, one conversation. The cell's own trace id keeps it
-          // unique and ties the conversation to the row that started it.
-          threadId: `eval_v3_${cell.rowIndex}_${traceId}`,
-          messages,
-          newMessages: messages.slice(-1),
-          params,
-          session: undefined,
-          // The agent adopts this context, so the spans it records land in
-          // the cell's own trace and the row links straight to them.
-          traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
-          run: {},
-        },
-        signal: AbortSignal.timeout(
-          dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-        ),
-      },
+        agent,
+        dispatchAgent,
+        traceId,
+      }),
     });
   } catch (error) {
-    logger.info(
-      {
-        error,
-        projectId,
-        agentId: agent.id,
-        rowIndex: cell.rowIndex,
-        targetId: cell.targetId,
-      },
-      "Connected agent cell failed",
-    );
-    const failure = connectedCallFailure(error);
-    yield {
-      type: "target_result",
-      rowIndex: cell.rowIndex,
-      targetId: cell.targetId,
-      output: undefined,
-      duration: now() - startedAt,
+    yield connectedFailureEvent({
+      cell,
+      projectId,
+      agentId: agent.id,
+      error,
       traceId,
-      error: failure.message,
-      ...(failure.domainError ? { domainError: failure.domainError } : {}),
-    };
+      duration: now() - startedAt,
+    });
     return;
   }
 

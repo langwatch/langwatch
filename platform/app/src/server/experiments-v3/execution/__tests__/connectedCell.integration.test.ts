@@ -38,7 +38,6 @@ vi.mock("~/optimization_studio/server/loadDatasets", () => ({
   loadDatasets: vi.fn(async (event: unknown) => event),
 }));
 
-import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationsV3State, TargetConfig } from "~/experiments-v3/types";
 import {
   createInitialResults,
@@ -46,7 +45,10 @@ import {
 } from "~/experiments-v3/types";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { CallOutcome } from "~/server/connected-agents/call-envelope";
-import { AgentBusyError } from "~/server/connected-agents/errors";
+import {
+  AgentBusyError,
+  AgentOfflineError,
+} from "~/server/connected-agents/errors";
 import {
   type ConnectedDispatch,
   executeConnectedCell,
@@ -94,7 +96,12 @@ const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
       "dataset-1": {
-        input: { type: "source", source: "dataset", sourceField: "question" },
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
         model: { type: "value", value: "gpt-5" },
       },
     },
@@ -157,12 +164,13 @@ describe("given a connected agent column", () => {
   describe("when the row runs", () => {
     /** @scenario "The column reads the dataset row and answers" */
     it("sends the mapped row and writes the answer in the cell", async () => {
-      const dispatch = vi.fn(async () => answered("Open a return request."));
+      const dispatch = vi.fn<ConnectedDispatch>(async () =>
+        answered("Open a return request."),
+      );
 
       const events = await run({ cell: makeCell(), dispatch });
 
-      const call = dispatch.mock
-        .calls[0]![0] as Parameters<ConnectedDispatch>[0];
+      const call = dispatch.mock.calls[0]![0];
       expect(call.call.messages).toEqual([
         { role: "user", content: "How do I return a broken item?" },
       ]);
@@ -184,15 +192,14 @@ describe("given a connected agent column", () => {
 
     /** @scenario "The agent's own spans join the cell's trace" */
     it("carries the cell's trace context", async () => {
-      const dispatch = vi.fn(async () => answered("ok"));
+      const dispatch = vi.fn<ConnectedDispatch>(async () => answered("ok"));
 
       const events = await run({
         cell: makeCell({ traceId: "a".repeat(32) }),
         dispatch,
       });
 
-      const call = dispatch.mock
-        .calls[0]![0] as Parameters<ConnectedDispatch>[0];
+      const call = dispatch.mock.calls[0]![0];
       expect(call.call.traceparent).toMatch(/^00-a{32}-[0-9a-f]{16}-01$/);
       const result = events[1] as Extract<
         EvaluationV3Event,
@@ -203,19 +210,15 @@ describe("given a connected agent column", () => {
 
     /** @scenario "Every row is a separate conversation" */
     it("gives every row its own conversation and no session", async () => {
-      const dispatch = vi.fn(async () => answered("ok"));
+      const dispatch = vi.fn<ConnectedDispatch>(async () => answered("ok"));
 
       await run({ cell: makeCell({ rowIndex: 0 }), dispatch });
       await run({ cell: makeCell({ rowIndex: 1 }), dispatch });
 
-      const threads = dispatch.mock.calls.map(
-        (call) => (call[0] as Parameters<ConnectedDispatch>[0]).call.threadId,
-      );
+      const threads = dispatch.mock.calls.map((call) => call[0].call.threadId);
       expect(threads[0]).not.toBe(threads[1]);
       for (const call of dispatch.mock.calls) {
-        expect(
-          (call[0] as Parameters<ConnectedDispatch>[0]).call.session,
-        ).toBeUndefined();
+        expect(call[0].call.session).toBeUndefined();
       }
     });
   });
@@ -238,7 +241,9 @@ describe("given a connected agent column", () => {
 
       const events = await run({
         cell: makeCell({ evaluatorConfigs: [gradingEvaluator] }),
-        dispatch: vi.fn(async () => answered("Open a return request.")),
+        dispatch: vi.fn<ConnectedDispatch>(async () =>
+          answered("Open a return request."),
+        ),
       });
 
       const evaluatorInputs = scripted.dispatched[0]?.payload?.inputs as
@@ -259,10 +264,10 @@ describe("given a connected agent column", () => {
     it("does not grade a row the agent never answered", async () => {
       const events = await run({
         cell: makeCell({ evaluatorConfigs: [gradingEvaluator] }),
-        dispatch: vi.fn(async () => {
-          throw new HandledError("agent_offline", "No instance is connected", {
-            httpStatus: 503,
-            fault: "customer",
+        dispatch: vi.fn<ConnectedDispatch>(async () => {
+          throw new AgentOfflineError({
+            agentName: "Support agent",
+            environment: "production",
           });
         }),
       });
@@ -279,10 +284,10 @@ describe("given a connected agent column", () => {
     it("fails the cell with the offline code, not an unknown error", async () => {
       const events = await run({
         cell: makeCell(),
-        dispatch: vi.fn(async () => {
-          throw new HandledError("agent_offline", "No instance is connected", {
-            httpStatus: 503,
-            fault: "customer",
+        dispatch: vi.fn<ConnectedDispatch>(async () => {
+          throw new AgentOfflineError({
+            agentName: "Support agent",
+            environment: "production",
           });
         }),
       });
@@ -300,7 +305,7 @@ describe("given a connected agent column", () => {
     /** @scenario "A busy agent is retried before the row fails" */
     it("tries again inside the budget", async () => {
       let attempts = 0;
-      const dispatch = vi.fn(async () => {
+      const dispatch = vi.fn<ConnectedDispatch>(async () => {
         attempts += 1;
         if (attempts < 3) throw new AgentBusyError({ retryAfterMs: 10 });
         return answered("Open a return request.");
@@ -349,7 +354,7 @@ describe("given two columns of the same agent", () => {
   describe("when each column sets its own parameter value", () => {
     /** @scenario "Two parameter values compare side by side" */
     it("sends each column's own value", async () => {
-      const dispatch = vi.fn(async () => answered("ok"));
+      const dispatch = vi.fn<ConnectedDispatch>(async () => answered("ok"));
 
       const columnWith = (model: string): ExecutionCell => {
         const cell = makeCell();
@@ -364,6 +369,7 @@ describe("given two columns of the same agent", () => {
                 input: {
                   type: "source",
                   source: "dataset",
+                  sourceId: "dataset-1",
                   sourceField: "question",
                 },
                 model: { type: "value", value: model },
@@ -377,8 +383,7 @@ describe("given two columns of the same agent", () => {
       await run({ cell: columnWith("gpt-5"), dispatch });
 
       const models = dispatch.mock.calls.map(
-        (call) =>
-          (call[0] as Parameters<ConnectedDispatch>[0]).call.params.model,
+        (call) => call[0].call.params.model,
       );
       expect(models).toEqual(["gpt-5-mini", "gpt-5"]);
     });

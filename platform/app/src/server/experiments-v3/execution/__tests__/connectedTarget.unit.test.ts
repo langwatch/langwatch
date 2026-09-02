@@ -3,8 +3,8 @@
  *
  * @see specs/experiments-v3/connected-agent-target.feature
  */
-import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+import { AgentOfflineError } from "~/server/connected-agents/errors";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   buildConnectedCall,
@@ -131,9 +131,9 @@ describe("given the call failed", () => {
   describe("when the platform named the failure", () => {
     it("records the code, so the cell renders the copy of that code", () => {
       const failure = connectedCallFailure(
-        new HandledError("agent_offline", "No instance is connected", {
-          httpStatus: 503,
-          fault: "customer",
+        new AgentOfflineError({
+          agentName: "Support agent",
+          environment: "production",
         }),
       );
 
