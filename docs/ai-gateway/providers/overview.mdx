@@ -12,7 +12,11 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON. See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with RPM, TPM and RPD fields, a fallback priority and a provider config JSON. The gateway does not enforce the TPM field.
+
+<Frame caption="Advanced (Gateway) on a Bedrock row: RPM, TPM, RPD, fallback priority and provider config.">
+  <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
+</Frame> See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
 ## Supported providers
 

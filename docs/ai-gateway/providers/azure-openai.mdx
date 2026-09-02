@@ -16,6 +16,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **A
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="An Azure OpenAI row with the API version set and two deployment names under Custom Models.">
+  <img src="/images/ai-gateway/model-provider-azure-form.png" alt="The Azure OpenAI provider drawer with AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION 2025-01-01-preview and two custom models" />
+</Frame>
+
 Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure API Management. The form then asks for `AZURE_API_GATEWAY_BASE_URL` and an optional `AZURE_API_GATEWAY_VERSION` (default `2024-05-01-preview`) instead of the endpoint.
 
 ## Deployments and model names

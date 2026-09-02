@@ -21,7 +21,15 @@ You need:
 5. Keep **Provider access** on **All providers**, or select the providers this key may reach.
 6. Click **Create**.
 
+<Frame caption="The New virtual key drawer: name, ownership on the project, a $50 monthly budget with the inherited organization budget below it, and provider access.">
+  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer filled in for acme-support-agent with Project ownership, a 50 dollar monthly budget and all providers selected" />
+</Frame>
+
 The secret is shown once. Copy it and store it in your secret manager. LangWatch stores a hash, and the list shows only the prefix, for example `vk-lw-01HZX9N`.
+
+<Frame caption="The secret dialog, shown once, with a copy button and a usage example for the OpenAI SDK.">
+  <img src="/images/ai-gateway/vk-secret-once.png" alt="The Save your virtual key secret dialog with the masked secret and a Python usage example" />
+</Frame>
 
 ## 2. Send a request
 
@@ -91,6 +99,10 @@ Open **Trace Explorer** in the project you selected under Ownership. The request
 | `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header. |
 | `langwatch.model_provider_id` | The provider credential that served the request. |
 | `langwatch.end_user_id` | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
+
+<Frame caption="One gateway request in Trace Explorer: duration, cost, tokens and model in the header, the gateway attributes under Metadata.">
+  <img src="/images/ai-gateway/trace-gateway-request.png" alt="Trace Explorer with a gen_ai.chat span open, showing cost, tokens, the model and the langwatch.virtual_key_id, gateway_request_id and model_provider_id attributes" />
+</Frame>
 
 ## 4. See the spend
 

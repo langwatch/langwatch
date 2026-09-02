@@ -24,6 +24,10 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 | **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
 | **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
 
+<Frame caption="The New budget drawer: Applies to with the six scope types, the provider filter, the window, the limit, the cycle anchor and On breach.">
+  <img src="/images/ai-gateway/budget-create-drawer.png" alt="The New budget drawer with Project selected under Applies to, Per calendar month, a 500 dollar limit and Block on breach" />
+</Frame>
+
 The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
 
 For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.

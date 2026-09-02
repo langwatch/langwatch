@@ -3350,6 +3350,10 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
 | **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
 | **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
 
+<Frame caption="The New budget drawer: Applies to with the six scope types, the provider filter, the window, the limit, the cycle anchor and On breach.">
+  <img src="/images/ai-gateway/budget-create-drawer.png" alt="The New budget drawer with Project selected under Applies to, Per calendar month, a 500 dollar limit and Block on breach" />
+</Frame>
+
 The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
 
 For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
@@ -10127,6 +10131,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **A
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="An Azure OpenAI row with the API version set and two deployment names under Custom Models.">
+  <img src="/images/ai-gateway/model-provider-azure-form.png" alt="The Azure OpenAI provider drawer with AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION 2025-01-01-preview and two custom models" />
+</Frame>
+
 Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure API Management. The form then asks for `AZURE_API_GATEWAY_BASE_URL` and an optional `AZURE_API_GATEWAY_VERSION` (default `2024-05-01-preview`) instead of the endpoint.
 
 ## Deployments and model names
@@ -10187,7 +10195,11 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **B
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
-All three fields are required.
+<Frame caption="The Bedrock row: access key id, secret access key and region.">
+  <img src="/images/ai-gateway/model-provider-bedrock-form.png" alt="The Bedrock provider drawer with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION_NAME eu-central-1" />
+</Frame>
+
+All three fields are required. The form has no field for a VPC endpoint.
 
 ## Model names
 
@@ -10759,7 +10771,11 @@ A provider credential is a row under **Settings > Model Providers**. The row bel
   <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
 </Frame>
 
-Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON. See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
+Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with RPM, TPM and RPD fields, a fallback priority and a provider config JSON. The gateway does not enforce the TPM field.
+
+<Frame caption="Advanced (Gateway) on a Bedrock row: RPM, TPM, RPD, fallback priority and provider config.">
+  <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
+</Frame> See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
 ## Supported providers
 
@@ -10969,7 +10985,15 @@ You need:
 5. Keep **Provider access** on **All providers**, or select the providers this key may reach.
 6. Click **Create**.
 
+<Frame caption="The New virtual key drawer: name, ownership on the project, a $50 monthly budget with the inherited organization budget below it, and provider access.">
+  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer filled in for acme-support-agent with Project ownership, a 50 dollar monthly budget and all providers selected" />
+</Frame>
+
 The secret is shown once. Copy it and store it in your secret manager. LangWatch stores a hash, and the list shows only the prefix, for example `vk-lw-01HZX9N`.
+
+<Frame caption="The secret dialog, shown once, with a copy button and a usage example for the OpenAI SDK.">
+  <img src="/images/ai-gateway/vk-secret-once.png" alt="The Save your virtual key secret dialog with the masked secret and a Python usage example" />
+</Frame>
 
 ## 2. Send a request
 
@@ -11039,6 +11063,10 @@ Open **Trace Explorer** in the project you selected under Ownership. The request
 | `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header. |
 | `langwatch.model_provider_id` | The provider credential that served the request. |
 | `langwatch.end_user_id` | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
+
+<Frame caption="One gateway request in Trace Explorer: duration, cost, tokens and model in the header, the gateway attributes under Metadata.">
+  <img src="/images/ai-gateway/trace-gateway-request.png" alt="Trace Explorer with a gen_ai.chat span open, showing cost, tokens, the model and the langwatch.virtual_key_id, gateway_request_id and model_provider_id attributes" />
+</Frame>
 
 ## 4. See the spend
 
@@ -13896,6 +13924,10 @@ Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has
 | **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
 | **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
 | **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. |
+
+<Frame caption="The create drawer. Inherited budgets lists the organization budget that already applies to a project key.">
+  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing" />
+</Frame>
 
 Click **Create**. The secret is shown once, with a **Copy** button. LangWatch stores only a hash of it. The list shows the prefix, for example `vk-lw-01HZX9N`.
 
