@@ -204,3 +204,79 @@ export {
   VerificationCeremonyService,
   type VerificationCeremonyDeps,
 } from "./verification-ceremony.service";
+
+// ---------------------------------------------------------------------------
+// The composition half the platform application used to own
+//
+// Every module below was `platform/app/src/server/app-layer/identity/`: the
+// Postgres repositories the guards and the fold read and write through, the two
+// ledger writers, the join-request orchestration around the event-sourced
+// lifecycle, and the instance's sign-in method policy. They moved WHOLE — same
+// classes, same rules — with exactly three seams turned into arguments: the
+// event stack (an {@link IdentityEventingPort} rather than a service locator),
+// the shared rate-limit counter, and the deployment's four sign-in facts.
+// ---------------------------------------------------------------------------
+export { IdentityEventingPort } from "./ports/identity-eventing.port";
+export {
+  IDENTITY_CONVERGENCE_POLL_MS,
+  IDENTITY_CONVERGENCE_TIMEOUT_MS,
+  IdentityLedgerWriter,
+  type IdentityLedgerWriterDeps,
+  type IdentityStagedSender,
+} from "./adapters/identity-ledger.adapter";
+export {
+  JOIN_REQUEST_CONVERGENCE_POLL_MS,
+  JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
+  JoinRequestLedgerWriter,
+  type JoinRequestLedgerWriterDeps,
+  type JoinRequestStagedSender,
+} from "./adapters/join-request-ledger.adapter";
+export {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+  PrismaJoinMembership,
+  PrismaJoinSettings,
+} from "./adapters/join-request.adapters";
+export { JoinRequestNotificationMailPort } from "./ports/join-request-notification-mail.port";
+export { InProcessBreakGlassLimiter } from "./adapters/in-process-break-glass-limiter.adapter";
+export { LocalDoorBreakGlassBinding } from "./adapters/local-door-break-glass-binding.adapter";
+export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository";
+export { PrismaIdentityProjectionRepository } from "./repositories/prisma/prisma.identity-projection.repository";
+export {
+  PrismaJoinCandidateRepository,
+  PrismaJoinRequestReadRepository,
+  readDomainJoin,
+} from "./repositories/prisma/prisma.join-request.repository";
+export {
+  PrismaJoinRequestProjectionRepository,
+  rowToJoinRequest,
+} from "./repositories/prisma/prisma.join-request-projection.repository";
+export { LegacySsoDomainRoutingRepository } from "./repositories/prisma/prisma.legacy-sso-domain-routing.repository";
+export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/prisma.sso-connection-routing.repository";
+export {
+  JOIN_REJECTION_COOLDOWN_MS,
+  JoinRequestsService,
+  type JoinMembershipPort,
+  type JoinRequestNotifier,
+  type JoinRequestsServiceDeps,
+  type JoinSettingPort,
+} from "./services/join-requests.service";
+export {
+  deploymentIsFederationCapable,
+  deploymentOffersPasskeys,
+  LOCAL_METHOD_SET,
+  PASSKEY_METHOD,
+  PASSWORD_METHOD,
+  resolveFederatedMethod,
+  resolveSignInMethodPolicy,
+  signInMethodPolicyPortOver,
+  type SignInMethodPolicyInputs,
+} from "./services/signin-method-policy.service";
+export {
+  PrismaIdentityHeadsRepository,
+  type PrismaIdentityHeadsDatabase,
+} from "./repositories/prisma/prisma.identity-heads.repository";
+export {
+  PrismaIdentityReservationRepository,
+  type PrismaIdentityReservationsDatabase,
+} from "./repositories/prisma/prisma.identity-reservations.repository";

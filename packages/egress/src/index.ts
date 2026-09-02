@@ -51,3 +51,24 @@ export {
 
 export { WebhookEgressService } from "./services/webhook-egress.service";
 export type { WebhookSendInput } from "./services/webhook-egress.service";
+
+/**
+ * The corporate proxy a self-hosted deployment's outbound vendor calls leave
+ * through.
+ *
+ * Here rather than in the platform application because it IS the egress fence's
+ * other half: the SSRF policy decides which addresses we may reach, and this
+ * decides how we reach them. Every caller that talks HTTPS to a vendor — the
+ * mail gateways, the AWS clients — resolves it the same way, and a second copy
+ * of the `no_proxy` matching is how one transport starts bypassing a proxy the
+ * others honour.
+ */
+export {
+  configureProcessOutboundProxy,
+  getProcessOutboundProxyConfig,
+  hostnameOf,
+  isProxyBypassed,
+  parseOutboundProxyConfig,
+  resolveProxyForHost,
+  type OutboundProxyConfig,
+} from "./proxy/outbound-proxy";

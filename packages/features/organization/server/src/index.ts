@@ -5,6 +5,60 @@ export {
 } from "./adapters/resource-identifiers.adapter";
 export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter";
 export {
+  PostgresOrganizationMembershipAdapter,
+  type PostgresOrganizationMembershipAdapterOptions,
+} from "./adapters/postgres.organization-membership.adapter";
+export {
+  OrganizationGrantCachePort,
+  OrganizationPromptSeedPort,
+  OrganizationSeatLicensePort,
+  OrganizationSessionRevocationPort,
+  type OrganizationPlanUser,
+  type OrganizationSeatDecision,
+} from "./ports/organization-membership.port";
+export {
+  enrichTeamWithRoleBindings,
+  OrganizationMembershipService,
+} from "./services/organization-membership.service";
+export {
+  CannotDemoteLastAdminError,
+  CannotDisableLastAdminError,
+  CannotDisableSelfError,
+  CannotRemoveLastAdminError,
+  CannotRemoveSelfError,
+  CustomRoleNotAssignableError,
+  MemberNotFoundError,
+  MemberSeatLimitReachedError,
+  NoAdminConfiguredError,
+  OrganizationNotFoundForTeamError,
+  OrganizationSlugTakenError,
+} from "./services/organization-membership.errors";
+export { isCustomRole } from "./services/custom-role-naming";
+export {
+  getAutoCorrectedTeamRoleForOrganizationRole,
+  getDefaultTeamRoleForOrganizationRole,
+  getOrganizationRoleLabel,
+  isBindingRoleAllowedForOrganizationRole,
+  isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+  type TeamRoleValue,
+} from "./services/member-role-constraints";
+export {
+  assertNoPersonalTeamScope,
+  findSharedTeamIds,
+} from "./services/personal-team-scope";
+export type {
+  AuditLogFilters,
+  CreateAndAssignInput,
+  CreateAndAssignResult,
+  EnrichedAuditLog,
+  MemberTeamBinding,
+  OrganizationMemberSummary,
+  OrganizationMemberWithUser,
+  OrganizationRepository,
+  UpdateMemberRoleResult,
+} from "./repositories/organization-membership.repository";
+export {
   PostgresOrganizationAdapter,
   type PostgresOrganizationAdapterOptions,
 } from "./adapters/postgres.organization.adapter";
@@ -68,3 +122,21 @@ export {
 } from "./transport/api-rest/organization-provisioning.api";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./transport/api-rest/organization-provisioning.openapi";
 export { createTeamsRestApp } from "./transport/api-rest/team.api";
+export {
+  buildInviteAcceptUrl,
+  buildMembersSettingsUrl,
+} from "./services/invite-link";
+export {
+  resolveInviteDisplayStatus,
+  type InviteDisplayStatus,
+} from "./services/invite-rules";
+export {
+  AlreadyOrganizationMemberError,
+  DuplicateInviteError,
+  InviteExpiredError,
+  InviteNotFoundError,
+  InviteNotReadyError,
+  InviteThrottledError,
+  InviteWrongAccountError,
+  TeamNotInOrganizationError,
+} from "./services/invite.errors";

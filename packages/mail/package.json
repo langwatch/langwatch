@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/mail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The outbound mail gateways LangWatch sends through, and the transactional messages the identity and organization surfaces send.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.1080.0",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.9",
+    "@sendgrid/mail": "^8.1.6",
+    "nodemailer": "^9.0.3",
+    "react": "^19.2.7",
+    "undici": "^8.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.2.17",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

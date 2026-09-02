@@ -6,6 +6,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { PostgresUserAdapter } from "@langwatch/user-server";
+import type { UserService } from "@langwatch/user-contract";
 import { ApiAuthenticationPort } from "../api-request.policy";
 import { UnavailableApiUserAvatarStorageAdapter } from "./api-user-avatar-storage.adapter";
 
@@ -97,6 +98,17 @@ export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionT
 export type ApiAuthSessionDependencies = Readonly<{
   auth: AuthService;
   sessions: ApiBrowserSessionTransportPort;
+  /**
+   * The user directory the Auth service already resolves a signed-in person
+   * through.
+   *
+   * Published rather than kept private because the identity half of the tRPC
+   * record needs the SAME instance: `user.*` reads a person's account off it,
+   * and the sign-up ceremony creates one through it. A second
+   * `PostgresUserAdapter` would be a second answer to "who is this person",
+   * and the two would disagree the moment one of them caches.
+   */
+  users: UserService;
 }>;
 
 /**
@@ -243,6 +255,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
         users,
       }).build(),
       sessions: options.browserSessions,
+      users,
     });
   }
 
@@ -257,7 +270,16 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
 
 /** Converts one verified browser session into the request actor vocabulary. */
 export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
-  static create(options: ApiAuthSessionDependencies): AuthSessionApiAuthenticationAdapter {
+  /**
+   * Narrower than {@link ApiAuthSessionDependencies} on purpose: turning a
+   * verified session into an actor needs the Auth service and the transport
+   * and nothing else. The user directory travels on the same object because
+   * the identity half needs it, and a caller that only authenticates should
+   * not have to hold one to do it.
+   */
+  static create(
+    options: Pick<ApiAuthSessionDependencies, "auth" | "sessions">,
+  ): AuthSessionApiAuthenticationAdapter {
     return new AuthSessionApiAuthenticationAdapter(options.auth, options.sessions);
   }
 
