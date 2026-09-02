@@ -37,7 +37,9 @@ import {
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
+  lwqlClickHouseSetupStatements,
 } from "../server/analytics/lwql/provisioning";
+import { lwqlSourceTables } from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 
@@ -240,6 +242,45 @@ export default async function execute() {
     // outage able to fail the backfill has already failed those and aborted
     // the deploy one step earlier.
     await backfillKeyMap({ client, names, sourceDatabase });
+
+    // Opt-in only, off by default. In Cloud/SaaS the ClickHouse access model
+    // (restricted user, settings profile, GRANTs, row policies) is Terraform's
+    // job, out of band — issuing CREATE USER/GRANT here would be rejected
+    // against that server-managed identity (see productionProvisioning.ts).
+    // A self-hosted/dev deployment has no such Terraform job, so it can opt in
+    // here instead: this is the exact gap that leaves a newly-catalogued view
+    // (e.g. trace_metrics_by_minute) created but ungranted, failing
+    // ACCESS_DENIED, until someone re-runs the out-of-band job by hand.
+    if (process.env.LWQL_SELF_PROVISION_ACCESS_MODEL === "true") {
+      try {
+        const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
+        if (!password) {
+          throw new Error(
+            "LWQL_SELF_PROVISION_ACCESS_MODEL=true but LWQL_CLICKHOUSE_PASSWORD is unset",
+          );
+        }
+        const lwqlTables = lwqlSourceTables({ names, sourceDatabase });
+        const accessStatements = lwqlClickHouseSetupStatements({
+          names,
+          password,
+          lwqlTables,
+        });
+        for (const statement of accessStatements) {
+          await client.command({ query: statement });
+        }
+        logger.info(
+          "lwql self-provisioning: ClickHouse access model (user, profile, grants, row policies) reconciled",
+        );
+      } catch (error) {
+        // Log-and-continue, never crash boot: queries already fail closed via
+        // lwql_provisioning_incomplete when the access model is missing, so a
+        // ClickHouse hiccup here costs nothing extra in availability terms.
+        logger.error(
+          { error: errorMessage(error) },
+          "lwql self-provisioning: failed to reconcile ClickHouse access model",
+        );
+      }
+    }
   });
 
   logger.info("LangWatchQL provisioning complete");
