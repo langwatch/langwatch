@@ -57,8 +57,8 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 | Header | Value | Set when |
 |---|---|---|
 | `X-LangWatch-Gateway-Request-Id` | `req_` plus 30 hex characters, or the `X-Request-Id` you sent | Every dispatched request |
-| `X-LangWatch-Trace-Id` | 32 hex characters | Every request |
-| `X-LangWatch-Span-Id` | 16 hex characters | Every request |
+| `X-LangWatch-Trace-Id` | 32 hex characters | The gateway exports its own spans (`OTEL_OTLP_ENDPOINT` is set). Absent otherwise |
+| `X-LangWatch-Span-Id` | 16 hex characters | Same condition as `X-LangWatch-Trace-Id` |
 | `Traceparent` | W3C traceparent for the span written to your project | Every dispatched request |
 | `X-LangWatch-Gateway-Version` | Gateway version string | Every request, when the deployment sets a version |
 | `X-LangWatch-Fallback-Count` | Number of failed attempts before the one that served the request | One or more attempts failed |
@@ -89,7 +89,7 @@ Send a `Traceparent` request header and the span written to your project becomes
 
 The `Traceparent` response header names that span. Forward it to the next hop in your system and everything stitches into one trace in Trace Explorer.
 
-`X-LangWatch-Trace-Id` and `X-LangWatch-Span-Id` name the gateway's own operational span, which stays separate from your trace. Use them when you report a problem to LangWatch support.
+`X-LangWatch-Trace-Id` and `X-LangWatch-Span-Id` name the gateway's own operational span, which stays separate from your trace. They are present only on a deployment that exports the gateway's own spans; LangWatch Cloud responses carry `Traceparent` and `X-LangWatch-Gateway-Request-Id` only. Use them when you report a problem to LangWatch support.
 
 ## Metrics (Prometheus)
 

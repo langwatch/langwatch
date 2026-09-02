@@ -38,7 +38,9 @@ A cache rule is an organization-wide match plus an action. Rules apply to every 
 
 Manage rules under **AI Gateway, Cache Rules** in the sidebar (`/gateway/cache-rules`).
 
-{/* screenshot: cache-rules-list.png, the Cache Rules page with two rules: one force on claude-* models, one disable on a tagged key */}
+<Frame caption="The Cache Rules list. The rule with the lower priority number is checked first.">
+  <img src="/images/ai-gateway/cache-rules-list.png" alt="The Cache Rules list with two rules, their match, action and enabled state" />
+</Frame>
 
 ### Matchers
 
@@ -49,7 +51,9 @@ All matchers you set must match for the rule to fire. A matcher you leave empty 
 | Model | The requested model name matches the glob pattern, for example `claude-*` or `openai/gpt-5*`. |
 | Virtual key id | The request's virtual key has this id. |
 | Virtual key prefix | The key's display prefix starts with this text. |
-| Virtual key tags | The key carries every tag in the list. |
+Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+
+The model matcher is compared with the model string as the caller sent it, before any alias or provider prefix is resolved. A rule on `claude-*` matches `claude-haiku-4-5` and does not match `anthropic/claude-haiku-4-5`. Write the pattern for the names your callers send, or add a second pattern with the prefix.
 
 Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
 
@@ -106,6 +110,7 @@ Archive the rule from the row menu on the Cache Rules page. The next change-feed
 
 ## Boundaries
 
+- A cache mode set on a virtual key's own configuration is not applied. The gateway reads cache rules and the provider default only.
 - Rules change the request body only. The gateway has no cache of its own; the provider decides whether a cached prefix is served.
 - OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; the response header and span attributes still record which rule fired.
 - The provider default (`auto`) never overrides a client that manages its own breakpoints. On `/v1/messages` any `cache_control` in the body disables it; on `/v1/chat/completions` only a top-level `cache_control` does, because message-level markers do not survive the translation to the Anthropic shape.

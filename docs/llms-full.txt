@@ -3374,7 +3374,9 @@ A cache rule is an organization-wide match plus an action. Rules apply to every 
 
 Manage rules under **AI Gateway, Cache Rules** in the sidebar (`/gateway/cache-rules`).
 
-{/* screenshot: cache-rules-list.png, the Cache Rules page with two rules: one force on claude-* models, one disable on a tagged key */}
+<Frame caption="The Cache Rules list. The rule with the lower priority number is checked first.">
+  <img src="/images/ai-gateway/cache-rules-list.png" alt="The Cache Rules list with two rules, their match, action and enabled state" />
+</Frame>
 
 ### Matchers
 
@@ -3385,7 +3387,9 @@ All matchers you set must match for the rule to fire. A matcher you leave empty 
 | Model | The requested model name matches the glob pattern, for example `claude-*` or `openai/gpt-5*`. |
 | Virtual key id | The request's virtual key has this id. |
 | Virtual key prefix | The key's display prefix starts with this text. |
-| Virtual key tags | The key carries every tag in the list. |
+Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
+
+The model matcher is compared with the model string as the caller sent it, before any alias or provider prefix is resolved. A rule on `claude-*` matches `claude-haiku-4-5` and does not match `anthropic/claude-haiku-4-5`. Write the pattern for the names your callers send, or add a second pattern with the prefix.
 
 Leave the principal and request metadata fields empty. The gateway does not evaluate them, and a rule that sets either of them never fires.
 
@@ -3442,6 +3446,7 @@ Archive the rule from the row menu on the Cache Rules page. The next change-feed
 
 ## Boundaries
 
+- A cache mode set on a virtual key's own configuration is not applied. The gateway reads cache rules and the provider default only.
 - Rules change the request body only. The gateway has no cache of its own; the provider decides whether a cached prefix is served.
 - OpenAI, Azure OpenAI and Gemini cache automatically on the provider side. `force` and `disable` do not change their behavior; the response header and span attributes still record which rule fired.
 - The provider default (`auto`) never overrides a client that manages its own breakpoints. On `/v1/messages` any `cache_control` in the body disables it; on `/v1/chat/completions` only a top-level `cache_control` does, because message-level markers do not survive the translation to the Anthropic shape.
@@ -3641,7 +3646,7 @@ description: Create a short-lived virtual key, send a real completion through th
 sidebarTitle: CI smoke test
 ---
 
-This guide builds a CI job that proves the whole gateway path works: the management API creates a virtual key, the key resolves at the data plane, a provider answers, and the key is revoked at the end. It needs only the `langwatch` CLI, `curl` and `jq`.
+The job below needs only the `langwatch` CLI, `curl` and `jq`, and it exercises the management API, the data plane and one provider in a single run.
 
 Run it on a schedule so a broken credential or an expired secret shows up before a caller finds it.
 
@@ -3803,7 +3808,7 @@ description: What to do when a LangWatch AI Gateway virtual key leaks, from cont
 sidebarTitle: Credential-leak incident
 ---
 
-A virtual key can leak the way any secret leaks: pushed to a public repository, left on a laptop, printed into a vendor's log by a CI job. This guide covers the three operations the gateway gives you, what each one does to traffic that is already running, and how to read the audit trail after.
+The gateway gives you three operations on a leaked virtual key: disable, revoke and rotate. They differ in what happens to the old secret and in how fast the change reaches every pod.
 
 A leaked provider credential is a different problem. Rotate that one in the provider's own console. See [What not to do](#what-not-to-do).
 
@@ -3811,11 +3816,11 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 
 | Operation | What happens to the old secret | Use it when |
 |---|---|---|
-| Disable | Every request answers `403 virtual_key_disabled`. An administrator can enable the key again, exactly as it was | You need traffic stopped now and you are not yet sure the key leaked |
+| Disable | Every request answers `403 virtual_key_disabled`. An administrator can enable the key again, exactly as it was | You need traffic stopped now and you are unsure whether the key leaked |
 | Revoke | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back | The secret is publicly exposed |
 | Rotate | Keeps working for 24 hours, then fails | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke are the containment operations. Rotate is not: the old secret still works for a day.
+Disable and revoke contain the leak at once. Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
 All three keep the key's id, so its traces, its audit rows and its spend stay attributable.
 
@@ -3881,7 +3886,7 @@ Revocation is terminal, so a revoked key cannot be disabled and cannot be rotate
 
 ### What happens to traffic already in flight
 
-A request that has already been authenticated runs to completion. Nothing cancels it.
+A request that has already been authenticated runs to completion. The three operations do not cancel it.
 
 New requests stop as each gateway pod learns about the change:
 
@@ -3954,7 +3959,9 @@ description: An importable Grafana dashboard for the LangWatch AI Gateway, cover
 sidebarTitle: Grafana dashboard
 ---
 
-Import the JSON below to get one dashboard with every panel an on-call engineer reads during an incident. Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): the alerts say when to look, this dashboard says where, and [Troubleshooting](/ai-gateway/troubleshooting) says what to do.
+The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes `/metrics`.
+
+Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the paging rules, and [Troubleshooting](/ai-gateway/troubleshooting) for the fix behind each row.
 
 ## What it covers
 
@@ -6612,8 +6619,8 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 | Header | Value | Set when |
 |---|---|---|
 | `X-LangWatch-Gateway-Request-Id` | `req_` plus 30 hex characters, or the `X-Request-Id` you sent | Every dispatched request |
-| `X-LangWatch-Trace-Id` | 32 hex characters | Every request |
-| `X-LangWatch-Span-Id` | 16 hex characters | Every request |
+| `X-LangWatch-Trace-Id` | 32 hex characters | The gateway exports its own spans (`OTEL_OTLP_ENDPOINT` is set). Absent otherwise |
+| `X-LangWatch-Span-Id` | 16 hex characters | Same condition as `X-LangWatch-Trace-Id` |
 | `Traceparent` | W3C traceparent for the span written to your project | Every dispatched request |
 | `X-LangWatch-Gateway-Version` | Gateway version string | Every request, when the deployment sets a version |
 | `X-LangWatch-Fallback-Count` | Number of failed attempts before the one that served the request | One or more attempts failed |
@@ -6644,7 +6651,7 @@ Send a `Traceparent` request header and the span written to your project becomes
 
 The `Traceparent` response header names that span. Forward it to the next hop in your system and everything stitches into one trace in Trace Explorer.
 
-`X-LangWatch-Trace-Id` and `X-LangWatch-Span-Id` name the gateway's own operational span, which stays separate from your trace. Use them when you report a problem to LangWatch support.
+`X-LangWatch-Trace-Id` and `X-LangWatch-Span-Id` name the gateway's own operational span, which stays separate from your trace. They are present only on a deployment that exports the gateway's own spans; LangWatch Cloud responses carry `Traceparent` and `X-LangWatch-Gateway-Request-Id` only. Use them when you report a problem to LangWatch support.
 
 ## Metrics (Prometheus)
 
@@ -9245,7 +9252,7 @@ Set `enabled: false` to keep the endpoint in-cluster.
 
 On `SIGTERM` the gateway flips `/readyz` to 503, waits `shutdown.preDrainWaitSeconds` (default 5), closes the listener and gives in-flight requests `shutdown.timeoutSeconds` (default 60). `terminationGracePeriodSeconds` must cover both plus 10 seconds of slack. The sequence, the metrics to watch and the values for long streams are on [Helm chart](/ai-gateway/self-hosting/helm#graceful-drain).
 
-If requests still reach a pod after it flipped to draining during a rollout, raise `shutdown.preDrainWaitSeconds` and `terminationGracePeriodSeconds` together. A `preStop` sleep delays the `SIGTERM` instead, so the pod is not yet reporting 503 during the sleep and the load balancer has no signal to act on.
+If requests still reach a pod after it flipped to draining during a rollout, raise `shutdown.preDrainWaitSeconds` and `terminationGracePeriodSeconds` together. A `preStop` sleep delays the `SIGTERM` instead, so the pod still reports ready during the sleep and the load balancer has no signal to act on.
 
 ## Synthetic request
 
@@ -9636,7 +9643,7 @@ Then confirm the request produced a spend record:
 
 ```bash
 kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/metrics | grep gateway_spend_spool
+  -- curl -sS http://langwatch-gateway/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
 ```
 
 Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.
@@ -9978,7 +9985,7 @@ description: Symptoms you can search for on the LangWatch AI Gateway, with the c
 sidebarTitle: Troubleshooting
 ---
 
-Every section below names a symptom, the cause behind it, the one check that confirms the cause, and the fix.
+Search this page for the status code or the error code your client printed. Each section carries the check to run and the change to make.
 
 ## Start with the request id
 
@@ -9990,7 +9997,7 @@ Error responses share one body shape:
 {"error":{"type":"rate_limited","code":"rate_limited","message":"rate_limited","fault":"customer"}}
 ```
 
-The `code` field is the stable identifier. Match on it, never on the message.
+The `code` field is the stable identifier. Match your client code on `code`; the `message` is copy and it changes.
 
 ## 401 on every request
 
@@ -10009,7 +10016,7 @@ A `401` with an empty `Authorization` value in your own shell means the variable
 
 | Cause | Fix |
 |---|---|
-| The environment variable is empty in the client process | Print it inside the running container, not in your shell |
+| The environment variable is empty in the client process | Print the variable from inside the running container |
 | The client holds a secret that was rotated more than 24 hours ago | Copy the new secret from the rotate response into your secret store |
 | The value is the display prefix, not the secret | A secret is `vk-lw-` plus 26 characters, 32 in total. The 13-character prefix shown in the UI is not a key |
 | The virtual key was deleted or belongs to another organization | Create a key in the organization you are calling |
@@ -10106,11 +10113,11 @@ gateway:
   terminationGracePeriodSeconds: 855
 ```
 
-A `preStop` sleep does not help. It delays the `SIGTERM`, so the pod is not yet reporting 503 while the sleep runs and the load balancer has no signal to act on.
+A `preStop` sleep does not help. It delays the `SIGTERM`, so the pod still reports ready while the sleep runs and the load balancer has no signal to act on.
 
 ## A stream stops mid-way
 
-The client received part of a response and then nothing.
+The client received part of a response and then silence.
 
 **Confirm it:** the gateway never switches providers mid-stream. When an upstream stream fails after the first chunk, the gateway writes one terminal SSE frame and closes:
 
@@ -10122,7 +10129,7 @@ If your client shows silence instead of an error, it is not reading that frame. 
 
 **Streams that end with no error** are usually the provider closing early. Open the request's trace and compare the token counts against the response you got.
 
-**A stream that reports no usage** debits nothing, so it bypasses budget enforcement:
+**A stream that reports no usage** records zero cost, so it bypasses budget enforcement:
 
 ```promql
 sum(rate(gateway_streaming_usage_missing_total[10m]))
@@ -10172,7 +10179,7 @@ The gateway cannot reach the control plane and has no cached bundle for the key.
 
 **What still works.** A key a pod has already resolved keeps serving. When its token expires while the control plane is unreachable, the pod extends the entry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default 300) on each failed refresh, up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry (default 21600, six hours). Past that cap the entry is evicted and the key answers 503.
 
-A key the pod has never seen has nothing to serve from and fails at once. There is no cache warm-up on boot, so a pod added during an outage starts cold, and so does every pod after a rolling deploy.
+A key the pod has never seen has no cached bundle and fails at once. There is no cache warm-up on boot, so a pod added during an outage starts cold, and so does every pod after a rolling deploy.
 
 A `401`, `403` or `404` from the control plane about the key itself is not an outage. It evicts the entry immediately, with no grace.
 
@@ -10181,7 +10188,7 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 | Line | Level | Meaning |
 |---|---|---|
 | `auth_cache_serve_stale` | info | The grace window is active and keys are still being served |
-| `auth_cache_refresh_transport_failure` | warn | Each refresh is failing. This is the outage signal, and customers are not affected yet |
+| `auth_cache_refresh_transport_failure` | warn | Each refresh is failing. This is the outage signal, and cached keys are still serving |
 | `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
