@@ -1,33 +1,45 @@
-import {
-  Button,
-  type ButtonProps,
-  Field,
-  HStack,
-  Input,
-  Textarea,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  getRandomWorkflowIcon,
-  WorkflowCreateDialog as WorkflowCreateDialogView,
-  type WorkflowTemplateCardProps,
-} from "@langwatch/workflow-web";
+/**
+ * Creating a workflow, from a template or from an imported file.
+ *
+ * A MOVE of `platform/app/src/components/workflows/CreateWorkflowButton.tsx`,
+ * which was already an adapter over this package's own `WorkflowCreateDialog`
+ * view: what it added was the transport, the form, the icon picker and the
+ * navigation to the new workflow's studio. All of that is here now.
+ *
+ * THE CREATE ENDS BY LEAVING THIS PAGE, and it is the reason this family's host
+ * port has a `navigate` at all: a created workflow is only useful in the
+ * studio, which `platform/app` still serves at `/:project/studio/:id`. A page
+ * moved into a package and an address still served by the application are the
+ * same product to the reader, and the route table is what makes that true.
+ *
+ * `trackEvent("workflow_create")` did not travel. It is the application's own
+ * product-analytics client, there is no capability that answers for it, and a
+ * feature-web package may not reach a browser singleton. RECORDED rather than
+ * reimplemented.
+ *
+ * `applyHandledErrorToForm` did not travel either — it reads the code-keyed
+ * presentation registry, which is the application's. A refused create reports
+ * through the host's failure notice, so the registry still decides the words;
+ * what is lost is the field-level placement of a validation refusal, and the
+ * only fields here are a name and a description.
+ */
+
+import { Button, Field, HStack, Input, Textarea, useDisclosure, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "~/features/errors";
-import { useRouter } from "~/utils/compat/next-router";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { EmojiPickerModal } from "../../optimization_studio/components/properties/modals/EmojiPickerModal";
-import { api } from "../../utils/api";
-import { trackEvent } from "../../utils/tracking";
-import { Dialog } from "../ui/dialog";
-import { toaster } from "../ui/toaster";
-import { IsolatedErrorBoundary } from "../ui/IsolatedErrorBoundary";
-import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
+import { workflowApi } from "../../behavior/workflow-api";
+import { useWorkflowHost } from "../../model/workflow-host";
+import { getRandomWorkflowIcon } from "../../random-workflow-icon";
+import {
+  WorkflowCreateDialog as WorkflowCreateDialogView,
+  type WorkflowTemplateCardProps,
+} from "../../workflow-create-dialog";
+import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker";
+import { WorkflowErrorBoundary } from "../elements/workflow-error-boundary";
+import { WorkflowListCard } from "./workflow-list-card";
 
 type WorkflowCreationFormData = {
   name: string;
@@ -35,37 +47,27 @@ type WorkflowCreationFormData = {
   description: string;
 };
 
-export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
-  const { open, onClose, onOpen } = useDisclosure();
+export function WorkflowCreateDialogHost({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const host = useWorkflowHost();
 
-  return (
-    <>
-      <Button
-        data-testid="active-create-new-workflow-button"
-        onClick={onOpen}
-        size="sm"
-        variant="outline"
-        {...props}
-      >
-        <Plus size={16} />
-        Create Workflow
-      </Button>
-      <WorkflowCreateDialog open={open} onClose={onClose} />
-    </>
-  );
-};
-
-export function WorkflowCreateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <WorkflowCreateDialogView
       open={open}
       onClose={onClose}
-      onImportError={(error) => {
-        toaster.create({ ...error, type: "error" });
-      }}
-      renderContentBoundary={(children) => (
-        <IsolatedErrorBoundary>{children}</IsolatedErrorBoundary>
-      )}
+      onImportError={(error) =>
+        host.failed({
+          error: new Error(error.description),
+          fallbackTitle: error.title,
+          description: error.description,
+        })
+      }
+      renderContentBoundary={(children) => <WorkflowErrorBoundary>{children}</WorkflowErrorBoundary>}
       renderForm={({ template }) => <NewWorkflowForm template={template} onClose={onClose} />}
       renderTemplateCard={(props) => <WorkflowTemplateCard {...props} />}
     />
@@ -74,19 +76,25 @@ export function WorkflowCreateDialog({ open, onClose }: { open: boolean; onClose
 
 function WorkflowTemplateCard({ testId, dragging, children, ...props }: WorkflowTemplateCardProps) {
   return (
-    <WorkflowCard
+    <WorkflowListCard
       {...props}
       data-testid={testId}
       {...(dragging ? { borderStyle: "dashed", borderColor: "blue.500" } : {})}
     >
       {children}
-    </WorkflowCard>
+    </WorkflowListCard>
   );
 }
 
-function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onClose: () => void }) {
-  const { project } = useOrganizationTeamProject();
-  const router = useRouter();
+function NewWorkflowForm({
+  template,
+  onClose,
+}: {
+  template: StudioWorkflow;
+  onClose: () => void;
+}) {
+  const host = useWorkflowHost();
+  const { projectId, projectSlug } = host.scope();
   const emojiPicker = useDisclosure();
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩" ? template.icon : getRandomWorkflowIcon(),
@@ -106,11 +114,11 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
     setValue,
     formState: { errors },
   } = form;
-  const createWorkflowMutation = api.workflow.create.useMutation();
+  const createWorkflowMutation = workflowApi.workflow.create.useMutation();
   const icon = watch("icon");
 
-  const onSubmit = async (data: WorkflowCreationFormData) => {
-    if (!project) return;
+  const onSubmit = (data: WorkflowCreationFormData) => {
+    if (!projectId) return;
 
     const newWorkflow = studioWorkflowWireSchema.parse({
       ...template,
@@ -122,24 +130,16 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
 
     createWorkflowMutation.mutate(
       {
-        projectId: project.id,
+        projectId,
         dsl: newWorkflow,
         commitMessage: "Workflow creation",
       },
       {
         onSuccess: (createdWorkflow) => {
-          trackEvent("workflow_create", { project_id: project.id });
           onClose();
-          void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
+          host.navigate(`/${projectSlug ?? ""}/studio/${createdWorkflow.workflow.id}`);
         },
-        onError: (error) => {
-          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
-
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't create workflow",
-          });
-        },
+        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create workflow" }),
       },
     );
   };
@@ -161,10 +161,8 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
     <form onSubmit={handleSubmit(onSubmit)}>
       <Dialog.Body>
         <VStack gap={4} align="stretch">
-          <FormServerError form={form} />
-
           <Field.Root invalid={!!errors.name || !!errors.icon}>
-            <EmojiPickerModal
+            <WorkflowEmojiPicker
               open={emojiPicker.open}
               onClose={emojiPicker.onClose}
               onChange={(emoji) => {

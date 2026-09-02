@@ -10,9 +10,10 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
+    "types": ["vitest/globals"],
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
 }
