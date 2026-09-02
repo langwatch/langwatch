@@ -1,0 +1,11 @@
+{
+  "name": "North-star: Stacked Bars",
+  "code": "import { StackedBars } from \"@langwatch/charts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n  if (isError) return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  if (isLoading || data === null) return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  if (data.length === 0) return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n\n  return (\n    <div style={{ height: \"100%\" }}>\n      <StackedBars\n        data={data}\n        x=\"bucket\"\n        series={[\"ok\", \"errors\"]}\n        colors={[\"#22c55e\", \"#ef4444\"]}\n      />\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket,\n  uniqExactIf(TraceId, ContainsErrorStatus) AS errors,\n  uniqExactIf(TraceId, NOT ContainsErrorStatus) AS ok\nFROM traces\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\nGROUP BY bucket\nORDER BY bucket",
+      "parameters": []
+    }
+  ]
+}

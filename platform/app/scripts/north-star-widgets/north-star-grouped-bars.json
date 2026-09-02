@@ -1,0 +1,11 @@
+{
+  "name": "North-star: Grouped Bars",
+  "code": "import { GroupedBars } from \"@langwatch/charts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n  if (isError) return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  if (isLoading || data === null) return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  if (data.length === 0) return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n\n  return (\n    <div style={{ height: \"100%\" }}>\n      <GroupedBars data={data} x=\"model\" series={[\"prompt\", \"completion\"]} />\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT model,\n  sum(PromptTokens) AS prompt,\n  sum(CompletionTokens) AS completion\nFROM (\n  SELECT TraceId, arrayJoin(Models) AS model, PromptTokens, CompletionTokens\n  FROM trace_metrics\n  WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n    AND TotalDurationMs > 0\n)\nGROUP BY model\nORDER BY prompt + completion DESC\nLIMIT 8",
+      "parameters": []
+    }
+  ]
+}

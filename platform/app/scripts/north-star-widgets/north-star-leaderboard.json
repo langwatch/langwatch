@@ -1,0 +1,11 @@
+{
+  "name": "North-star: Leaderboard",
+  "code": "import { Leaderboard } from \"@langwatch/charts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n  if (isError) return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  if (isLoading || data === null) return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  if (data.length === 0) return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n\n  return (\n    <div style={{ height: \"100%\" }}>\n      <Leaderboard\n        data={data}\n        labelKey=\"user\"\n        valueKey=\"traces\"\n        navigateTo={{\n          target: \"traces\",\n          params: function (row) { return { \"metadata.user_id\": String(row.user) }; },\n        }}\n      />\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT UserId AS user, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE UserId IS NOT NULL AND UserId != ''\n  AND OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n  AND TotalDurationMs > 0\nGROUP BY user\nORDER BY traces DESC\nLIMIT 10",
+      "parameters": []
+    }
+  ]
+}

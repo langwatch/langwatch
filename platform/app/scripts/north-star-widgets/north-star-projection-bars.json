@@ -1,0 +1,11 @@
+{
+  "name": "North-star: Projection Bars",
+  "code": "import { ProjectionBars } from \"@langwatch/charts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n  if (isError) return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  if (isLoading || data === null) return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  if (data.length === 0) return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n\n  // The last bucket returned by the query is treated as \"the projection\n  // point\": in this window it is usually a partial (in-progress) day, so\n  // marking it as projected communicates \"still filling in\" rather than\n  // implying it's a complete, comparable day like the ones before it.\n  const lastBucket = data[data.length - 1].bucket;\n  const costs = data.map(function (row) { return Number(row.cost || 0); }).sort(function (a, b) { return a - b; });\n  const median = costs[Math.floor(costs.length / 2)] || 0;\n  const budget = median * 2;\n\n  return (\n    <div style={{ height: \"100%\" }}>\n      <ProjectionBars\n        data={data}\n        x=\"bucket\"\n        y=\"cost\"\n        projectionFrom={lastBucket}\n        budget={budget}\n      />\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket,\n  sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n  AND TotalDurationMs > 0\nGROUP BY bucket\nORDER BY bucket",
+      "parameters": []
+    }
+  ]
+}
