@@ -17,7 +17,7 @@ import {
   CHART_TOOLTIP_CONTENT,
   CHART_TOOLTIP_LABEL,
 } from "./chartTheme";
-import { formatLaneUsd } from "./costLaneFormat";
+import { dayTrustNote, formatLaneUsd, restatementNote } from "./costLaneFormat";
 
 /** The two lanes' colors. Fixed, so a lane keeps its color between renders. */
 const BILLED_COLOR = "#7c3aed";
@@ -37,6 +37,36 @@ function NoReportedDays() {
         No days in this window have reported cost yet.
       </Text>
     </Box>
+  );
+}
+
+/** The restatement note for one day, or null when the day carries neither. */
+function noteForDay(day: GovernanceCostDayDto): string | null {
+  return dayTrustNote({
+    revised: day.billedRevisedAt !== null,
+    previousUsd: day.billedPreviousUsd,
+    provisional: day.billedProvisional,
+  });
+}
+
+/**
+ * The hovered day's label, plus how much to trust its billed figure.
+ *
+ * Written through `labelFormatter` rather than a replacement tooltip body so
+ * the tooltip keeps the chrome recharts gives it — that surface has its own
+ * open defect and this change deliberately does not touch it.
+ */
+function dayLabel(
+  label: unknown,
+  entries: readonly { payload?: GovernanceCostDayDto }[],
+) {
+  const note = entries[0]?.payload ? noteForDay(entries[0].payload) : null;
+  if (!note) return String(label ?? "");
+  return (
+    <>
+      <div>{String(label ?? "")}</div>
+      <div style={{ fontWeight: 400, opacity: 0.8 }}>{note}</div>
+    </>
   );
 }
 
@@ -65,6 +95,7 @@ function LaneAreas({ series }: { series: readonly GovernanceCostDayDto[] }) {
           formatter={(value) =>
             formatLaneUsd(value === null ? null : Number(value))
           }
+          labelFormatter={dayLabel}
           contentStyle={CHART_TOOLTIP_CONTENT}
           labelStyle={CHART_TOOLTIP_LABEL}
         />
@@ -126,6 +157,14 @@ export function CostLanesChart({
       day.billedCellsWithoutAmount > 0 || day.gatewayCellsWithoutAmount > 0,
   );
 
+  // Hover is not a place to keep a caveat about money. The tooltip says which
+  // day changed and what it was; this says the window holds such days at all,
+  // to a reader who has not hovered anything.
+  const revisedDays = series.filter(
+    (day) => day.billedRevisedAt !== null,
+  ).length;
+  const provisionalDays = series.filter((day) => day.billedProvisional).length;
+
   return (
     <VStack
       data-testid="cost-lanes-chart"
@@ -148,6 +187,15 @@ export function CostLanesChart({
         >
           Days with usage billed in a currency other than US dollars are left
           blank rather than drawn at part of what they cost.
+        </Text>
+      ) : null}
+      {revisedDays > 0 || provisionalDays > 0 ? (
+        <Text
+          fontSize="xs"
+          color="fg.subtle"
+          data-testid="cost-lanes-chart-restatement-note"
+        >
+          {restatementNote({ revisedDays, provisionalDays })}
         </Text>
       ) : null}
     </VStack>

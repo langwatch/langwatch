@@ -118,9 +118,41 @@ export interface GovernanceCostRollupState {
    */
   pulledItems: Record<string, PulledContribution>;
 
-  /** How many times a provider has revised this cell, and to what from. */
+  /**
+   * How many times a provider has revised this cell, to what from, and when
+   * it last happened.
+   *
+   * All three move together and only when the cell's dollar figure actually
+   * CHANGES. A re-pull that re-confirms the same amount is an observation, not
+   * a revision: bumping the count for it would make the screen say "revised,
+   * was $X" with X equal to the figure on display, which is a marker that
+   * contradicts itself. What such a re-pull does move is `lastObservedAt`.
+   *
+   * `revisedAt` is epoch ms, taken from the pull that carried the new figure.
+   */
   revisionCount: number;
   previousAmountNanoUsd: number | null;
+  revisedAt: number | null;
+
+  /**
+   * When a pull last TOUCHED this cell, epoch ms — the anchor §15's
+   * provisional marker is derived from at read time.
+   *
+   * Every write that touches the cell moves it, a re-pull confirming an
+   * unchanged figure included, because "the provider has stopped moving this
+   * day" is exactly what such a pull observes and the only thing that can ever
+   * let a day read as settled.
+   *
+   * The value is the PULL'S OWN observation timestamp off the event, never the
+   * wall clock: a clock read would stamp every day with today on replay and
+   * break rebuild-equals-replay. Kept as a running MAX so the fold stays
+   * commutative — it has no re-fold path and events may arrive in any order,
+   * so a late-delivered older observation must not drag the anchor backwards.
+   *
+   * Not `LastEventOccurredAt`, which is provider-side event time and stands
+   * still in precisely the case this exists to see.
+   */
+  lastObservedAt: number;
 
   createdAt: number;
   updatedAt: number;
@@ -477,6 +509,8 @@ export class GovernanceCostRollupFoldProjection
       pulledItems: {},
       revisionCount: 0,
       previousAmountNanoUsd: null,
+      revisedAt: null,
+      lastObservedAt: 0,
     };
   }
 
@@ -515,7 +549,7 @@ export class GovernanceCostRollupFoldProjection
     // currency names its amount `costNanoUsd`, and read literally that amount
     // would be `undefined` here and every total from this cell onward `NaN`.
     const money = readPulledUsageMoney(d);
-    return {
+    const observed: GovernanceCostRollupState = {
       ...state,
       ...dims,
       organizationId: d.organizationId,
@@ -533,10 +567,29 @@ export class GovernanceCostRollupFoldProjection
           exactOrEstimate: d.costStatus,
         },
       },
-      revisionCount: previous ? state.revisionCount + 1 : state.revisionCount,
-      previousAmountNanoUsd: previous
-        ? amountBefore
-        : state.previousAmountNanoUsd,
+      // Every pull that reaches here touched the day, whether or not it moved
+      // the money — that is the whole point of the anchor. MAX rather than
+      // assignment because a second item's older observation must not drag it
+      // back; the early return above only guards re-delivery of the SAME item.
+      lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
+    };
+
+    // A revision is a CHANGE to the day's figure, not merely a second look at
+    // it. The provider re-reporting the same amount is the confirming
+    // observation §15 relies on, and treating it as a revision would put
+    // "revised, was $X" on a cell whose X never moved.
+    const restated =
+      previous !== undefined &&
+      governanceCostRollupTotals(observed).amountNanoUsd !== amountBefore;
+    if (!restated) return observed;
+
+    return {
+      ...observed,
+      revisionCount: state.revisionCount + 1,
+      previousAmountNanoUsd: amountBefore,
+      // The observation time, not the clock, for the same replay reason
+      // `lastObservedAt` takes it.
+      revisedAt: d.observedAtMs,
     };
   }
 
@@ -561,6 +614,14 @@ export class GovernanceCostRollupFoldProjection
       gatewayTokensCacheWrite:
         state.gatewayTokensCacheWrite + usage.cache_creation_input_tokens,
       gatewayRequestCount: state.gatewayRequestCount + 1,
+      // We metered this as we served it, so serving time IS observation time
+      // for this lane — same column, same meaning, no clock read. It never
+      // makes a gateway day render provisional: nothing restates a gateway
+      // outcome, so the read side exempts the lane outright rather than
+      // relying on the arithmetic to come out right (§15).
+      lastObservedAt: Math.max(state.lastObservedAt, d.occurred_at),
+      // `revisedAt`, `revisionCount` and `previousAmountNanoUsd` stay
+      // untouched: one priced outcome per request, never restated.
     };
   }
 }
