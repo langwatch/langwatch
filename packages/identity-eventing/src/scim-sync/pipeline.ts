@@ -62,6 +62,9 @@ export interface ScimSyncPipelineDeps {
  * connection's sync is one lane, so a directory that starts failing cannot
  * hold up the connection beside it.
  */
+/** The directory-sync pipeline as a TYPE, derived from the builder below. */
+export type ScimSyncPipeline = ReturnType<typeof createScimSyncPipeline>;
+
 export function createScimSyncPipeline(deps: ScimSyncPipelineDeps) {
   let builder = definePipeline<ScimSyncEvent>({
     name: SCIM_SYNC_PIPELINE_NAME,

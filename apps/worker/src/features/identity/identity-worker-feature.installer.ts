@@ -1,8 +1,6 @@
+import type { IdentityPipeline } from "@langwatch/identity-eventing";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /** Identity's worker-facing capability: the built pipeline definition. */
 export interface IdentityWorkerCapability {
@@ -10,11 +8,13 @@ export interface IdentityWorkerCapability {
    * The identity pipeline (ADR-101 / D01 identifiers, and D06 two-step
    * verification on the same aggregate).
    *
-   * Built by the composition root rather than here, because every dependency
-   * it takes — the two projection stores and the two guard instances — is a
-   * storage-engine binding the worker does not own.
+   * Built by the composition root rather than here, from
+   * `PostgresIdentityPipelineAdapter` over the one Prisma client this process
+   * opened: the two projection stores and the two guard instances are all
+   * Postgres bindings, and the address lock the guards claim through is the
+   * same instance the fold releases through.
    */
-  readonly pipeline: WorkerPipelineDefinition;
+  readonly pipeline: IdentityPipeline;
 }
 
 /**
@@ -25,12 +25,13 @@ export interface IdentityWorkerCapability {
  * resolve their sender lazily by pipeline NAME on first use rather than
  * closing over a handle at composition time.
  *
- * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
- * this is where it MOVES to rather than where it starts. What keeps the move
- * quiet is the per-user write gate (`app-layer/identity/write-gate.ts`), which
- * ships CLOSED and opens only for a user whose backfill is finalized. Whoever
- * makes the worker composition the live one drops the legacy registration in
- * the same change.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline as
+ * well, and the two definitions are twins until the cutover — the application
+ * keeps its own for the producer surface its writers resolve a sender from,
+ * and this graph is the consumer. What keeps the move quiet is the per-user
+ * write gate (`app-layer/identity/write-gate.ts`), which ships CLOSED and
+ * opens only for a user whose backfill is finalized. Whoever makes the worker
+ * composition the live one drops the legacy registration in the same change.
  */
 export class IdentityWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

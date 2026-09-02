@@ -73,3 +73,31 @@ export function identifierRowToFact(row: IdentifierRow): IdentifierFact {
     detachedAtMs: row.detachedAt?.getTime() ?? null,
   };
 }
+
+/**
+ * One fact as the `Identifier` row that stores it.
+ *
+ * The exact inverse of `identifierRowToFact`, and it has to stay that way: the
+ * fold writes through this and every guard reads back through that, so a
+ * column carried one way and dropped the other is a fact the projection
+ * silently forgets.
+ */
+export function identifierFactToRow(fact: IdentifierFact): IdentifierRow {
+  return {
+    id: fact.identifierId,
+    userId: fact.userId,
+    provider: fact.provider,
+    value: fact.value,
+    domain: fact.domain,
+    identifierHash: fact.identifierHash,
+    accountId: fact.accountId,
+    providerId: fact.providerId,
+    issuer: fact.issuer,
+    providerAccountId: fact.providerAccountId,
+    state: fact.state,
+    connectionId: fact.connectionId,
+    verifiedAt: fact.verifiedAtMs === null ? null : new Date(fact.verifiedAtMs),
+    attachedAt: new Date(fact.attachedAtMs),
+    detachedAt: fact.detachedAtMs === null ? null : new Date(fact.detachedAtMs),
+  };
+}

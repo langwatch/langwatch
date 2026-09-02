@@ -15,13 +15,40 @@
  *
  *   @langwatch/identity  <-  @langwatch/identity-server  <-  @langwatch/identity-eventing
  *
- * Nothing here reads a storage engine. Every projection store, guard and port
- * arrives as a constructor argument, exactly as it did when the registry in
- * `platform/app` supplied them.
+ * Every pipeline factory still takes its stores, guards and ports as
+ * constructor arguments, exactly as it did when the registry in `platform/app`
+ * supplied them. What has been added is the POSTGRES BINDING of the two folds
+ * this package owns outright — the `Identifier` / `MfaEnrollment` head and the
+ * `ScimSyncState` head — under `repositories/prisma` with an
+ * `adapters/postgres.*.adapter.ts` seam over each.
+ *
+ * They live here rather than in `@langwatch/identity-server` because they are
+ * bindings of THIS package's fold state: a projection store is typed by the
+ * state it stores, and a package that named `IdentityFoldState` would have to
+ * depend back on this one, which is the arrow the diagram above forbids. The
+ * guard-side reads, which are `@langwatch/identity-server`'s own ports, stayed
+ * with those ports.
+ *
+ * Nothing above an adapter names Prisma, and no factory reaches for one: a
+ * caller that wants a different engine still composes the pipeline itself.
  */
 
+export {
+  type IdentityPipelineDatabase,
+  PostgresIdentityPipelineAdapter,
+  type PostgresIdentityPipelineOptions,
+} from "./adapters/postgres.identity-pipeline.adapter";
+export {
+  PostgresScimSyncPipelineAdapter,
+  type PostgresScimSyncPipelineOptions,
+  type ScimSyncPipelineDatabase,
+} from "./adapters/postgres.scim-sync-pipeline.adapter";
 export { identityEventsFor, mfaEventsFor } from "./identity/envelope";
-export { createIdentityPipeline, type IdentityPipelineDeps } from "./identity/pipeline";
+export {
+  createIdentityPipeline,
+  type IdentityPipeline,
+  type IdentityPipelineDeps,
+} from "./identity/pipeline";
 export {
   type IdentityFoldState,
   IdentityStateFoldProjection,
@@ -100,7 +127,11 @@ export {
 export { type JoinRequestEvent, joinRequestEventSchema } from "./join-requests/schemas/events";
 
 export { scimSyncEventsFor } from "./scim-sync/envelope";
-export { createScimSyncPipeline, type ScimSyncPipelineDeps } from "./scim-sync/pipeline";
+export {
+  createScimSyncPipeline,
+  type ScimSyncPipeline,
+  type ScimSyncPipelineDeps,
+} from "./scim-sync/pipeline";
 export {
   SCIM_SYNC_PROJECTION_NAME,
   type ScimSyncFoldState,

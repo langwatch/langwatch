@@ -1136,6 +1136,245 @@ describe("WorkerProductionComposition", () => {
    * App reads. A pipeline wired to the wrong client or the wrong prefix
    * registers exactly the same routing keys and is silently alone.
    */
+  describe("when the identity ledgers are composed", () => {
+    function identityDatabase() {
+      const calls: string[] = [];
+      const record =
+        <Result>(name: string, result: Result) =>
+        async (..._args: unknown[]): Promise<Result> => {
+          calls.push(name);
+          return result;
+        };
+      const identifierUpsert = vi.fn(record("identifier.upsert", undefined));
+      const cursorUpsert = vi.fn(record("cursor.upsert", undefined));
+      const reservationDeleteMany = vi.fn(record("reservation.deleteMany", { count: 0 }));
+      const scimUpsert = vi.fn(record("scimSyncState.upsert", undefined));
+      const database = {
+        identifier: {
+          upsert: identifierUpsert,
+          findMany: vi.fn(record("identifier.findMany", [] as unknown[])),
+          findFirst: vi.fn(record("identifier.findFirst", null)),
+        },
+        identityProjectionCursor: {
+          upsert: cursorUpsert,
+          findUnique: vi.fn(record("cursor.findUnique", null)),
+        },
+        identifierReservation: { deleteMany: reservationDeleteMany },
+        account: {
+          upsert: vi.fn(record("account.upsert", undefined)),
+          deleteMany: vi.fn(record("account.deleteMany", { count: 0 })),
+        },
+        user: {
+          findUnique: vi.fn(record("user.findUnique", { id: "user_sam" })),
+          findFirst: vi.fn(record("user.findFirst", null)),
+          updateMany: vi.fn(record("user.updateMany", { count: 0 })),
+        },
+        mfaEnrollment: {
+          findUnique: vi.fn(record("mfa.findUnique", null)),
+          upsert: vi.fn(record("mfa.upsert", undefined)),
+        },
+        scimSyncState: {
+          upsert: scimUpsert,
+          findUnique: vi.fn(record("scimSyncState.findUnique", null)),
+          findFirst: vi.fn(record("scimSyncState.findFirst", null)),
+        },
+        $queryRaw: vi.fn(record("$queryRaw", [] as unknown[])),
+      };
+      return { database, calls, identifierUpsert, cursorUpsert, reservationDeleteMany, scimUpsert };
+    }
+
+    function compositionWith(
+      input: { database?: object; identity?: object } = {},
+    ): WorkerProductionComposition {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: (input.database ?? {}) as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(input.identity ? { identity: input.identity as never } : {}),
+      });
+    }
+
+    async function registeredThrough(
+      composition: WorkerProductionComposition,
+      feature: string,
+    ): Promise<{ names: string[]; definitions: Record<string, unknown>[] }> {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === feature,
+      );
+      expect(installer, `the composition mounted no ${feature} feature`).toBeDefined();
+      const names: string[] = [];
+      const definitions: Record<string, unknown>[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        names.push(definition.metadata.name);
+        definitions.push(definition as unknown as Record<string, unknown>);
+        return {} as never;
+      });
+      await installer!.install();
+      return { names, definitions };
+    }
+
+    /**
+     * The two ledgers whose whole dependency set is Postgres. The other two
+     * are not: the connection ledger's teardown revokes directory tokens
+     * through the SCIM service, and the join ledger's lifecycle sends mail.
+     */
+    /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
+    it("mounts both without being handed a capability", async () => {
+      const composition = compositionWith();
+
+      expect(await registeredThrough(composition, "identity")).toMatchObject({
+        names: ["identity"],
+      });
+      expect(await registeredThrough(composition, "scim-sync")).toMatchObject({
+        names: ["scim-sync"],
+      });
+    });
+
+    /**
+     * A graph that mounted the package-built pair while the application still
+     * owned the other two would be the failure this suite exists to catch, so
+     * both readings are asserted: with the option, four; without it, exactly
+     * the two this process can build.
+     */
+    /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
+    it("still mounts the other two only when the application hands them over", () => {
+      const withoutOption = compositionWith().featureInstallers.map((installer) => installer.name);
+      expect(withoutOption).toContain("identity");
+      expect(withoutOption).toContain("scim-sync");
+      expect(withoutOption).not.toContain("sso-connection");
+      expect(withoutOption).not.toContain("join-request");
+
+      const withOption = compositionWith({
+        identity: {
+          ssoConnection: { pipeline: {} },
+          joinRequest: { pipeline: {} },
+        },
+      }).featureInstallers.map((installer) => installer.name);
+      expect(
+        withOption.filter((name) =>
+          ["identity", "sso-connection", "scim-sync", "join-request"].includes(name),
+        ),
+      ).toEqual(["identity", "sso-connection", "scim-sync", "join-request"]);
+    });
+
+    /** @scenario "The worker builds the identity ledger from its own client" */
+    it("folds identifier heads onto the one Prisma client this process opened", async () => {
+      const recording = identityDatabase();
+      const composition = compositionWith({ database: recording.database });
+      const { definitions } = await registeredThrough(composition, "identity");
+      const store = (
+        definitions[0] as unknown as {
+          stateProjections: Map<string, { store: { store(...args: never[]): Promise<void> } }>;
+        }
+      ).stateProjections.get("identityState")!.store;
+
+      await store.store(
+        ...([
+          {
+            state: {
+              userId: "user_sam",
+              identifiers: {
+                idf_1: {
+                  identifierId: "idf_1",
+                  userId: "user_sam",
+                  provider: "email",
+                  value: "sam@acme.com",
+                  domain: "acme.com",
+                  identifierHash: null,
+                  accountId: null,
+                  providerId: null,
+                  issuer: null,
+                  providerAccountId: null,
+                  connectionId: null,
+                  state: "VERIFIED",
+                  verifiedAtMs: 1_700_000_000_000,
+                  attachedAtMs: 1_600_000_000_000,
+                  detachedAtMs: null,
+                },
+              },
+              CreatedAt: 1_600_000_000_000,
+              UpdatedAt: 1_700_000_000_000,
+              LastEventOccurredAt: 1_700_000_000_000,
+            },
+            cursor: { acceptedAt: 1_700_000_000_500, eventId: "evt_1" },
+            occurredAt: 1_700_000_000_000,
+            createdAt: 1_600_000_000_000,
+            updatedAt: 1_700_000_000_000,
+            version: "1",
+          },
+          { aggregateId: "user_sam", tenantId: createTenantId("user_sam") },
+        ] as never[]),
+      );
+
+      expect(recording.identifierUpsert).toHaveBeenCalledTimes(1);
+      // The address lock the guards claim through, released by the fold.
+      expect(recording.reservationDeleteMany).toHaveBeenCalledWith({
+        where: { userId: "user_sam", identifierId: { notIn: ["idf_1"] } },
+      });
+      // The cursor is the commit marker, so it lands last.
+      expect(recording.calls.at(-1)).toBe("cursor.upsert");
+    });
+
+    /** @scenario "The worker builds the directory-sync ledger from its own client" */
+    it("folds directory-sync state onto that same client", async () => {
+      const recording = identityDatabase();
+      const composition = compositionWith({ database: recording.database });
+      const { definitions } = await registeredThrough(composition, "scim-sync");
+      const store = (
+        definitions[0] as unknown as {
+          stateProjections: Map<string, { store: { store(...args: never[]): Promise<void> } }>;
+        }
+      ).stateProjections.get("scimSyncState")!.store;
+
+      await store.store(
+        ...([
+          {
+            state: {
+              scimSyncId: "scimsync_1",
+              connectionId: "ssoconn_1",
+              organizationId: "organization_acme",
+              state: "ACTIVE",
+              lastPushedAtMs: null,
+              lastFailure: null,
+              deadLetters: [],
+              revokedCause: null,
+              createdAtMs: 1_600_000_000_000,
+              updatedAtMs: 1_700_000_000_000,
+              CreatedAt: 1_600_000_000_000,
+              UpdatedAt: 1_700_000_000_000,
+              LastEventOccurredAt: 1_700_000_000_000,
+            },
+            cursor: { acceptedAt: 1_700_000_000_500, eventId: "evt_1" },
+            occurredAt: 1_700_000_000_000,
+            createdAt: 1_600_000_000_000,
+            updatedAt: 1_700_000_000_000,
+            version: "1",
+          },
+          { aggregateId: "scimsync_1", tenantId: createTenantId("organization_acme") },
+        ] as never[]),
+      );
+
+      expect(recording.scimUpsert).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when suite-run processing is composed", () => {
     function compositionWith(
       input: {

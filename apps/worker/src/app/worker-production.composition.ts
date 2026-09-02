@@ -18,6 +18,12 @@ import {
   PostgresGithubBranchMaintenanceAdapter,
 } from "@langwatch/github-server";
 import {
+  type IdentityPipelineDatabase,
+  PostgresIdentityPipelineAdapter,
+  PostgresScimSyncPipelineAdapter,
+  type ScimSyncPipelineDatabase,
+} from "@langwatch/identity-eventing";
+import {
   type LangySessionKeyReapDatabase,
   OtelLangySessionKeyMetricsAdapter,
   PostgresLangySessionKeyReapAdapter,
@@ -104,18 +110,12 @@ import {
   type ScenarioWorkerCapability,
 } from "../features/scenario/scenario-worker-feature.installer";
 import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
-import {
-  IdentityWorkerFeatureInstaller,
-  type IdentityWorkerCapability,
-} from "../features/identity/identity-worker-feature.installer";
+import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer";
 import {
   JoinRequestWorkerFeatureInstaller,
   type JoinRequestWorkerCapability,
 } from "../features/identity/join-request-worker-feature.installer";
-import {
-  ScimSyncWorkerFeatureInstaller,
-  type ScimSyncWorkerCapability,
-} from "../features/identity/scim-sync-worker-feature.installer";
+import { ScimSyncWorkerFeatureInstaller } from "../features/identity/scim-sync-worker-feature.installer";
 import {
   SsoConnectionWorkerFeatureInstaller,
   type SsoConnectionWorkerCapability,
@@ -182,21 +182,36 @@ export type WorkerLangyConversationCompositionOptions = {
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   BillingTenantOrganizationDatabase &
   GithubBranchMaintenanceDatabase &
-  LangySessionKeyReapDatabase;
+  IdentityPipelineDatabase &
+  LangySessionKeyReapDatabase &
+  ScimSyncPipelineDatabase;
 
 /**
- * The four identity pipelines (ADR-101), which mount as one group.
+ * The two identity ledgers this graph still RECEIVES (ADR-101).
  *
- * One option rather than four because they are one feature's ledger: the app's
- * writers resolve a sender by pipeline NAME on first use, so a graph carrying
- * three of the four would stage commands for the fourth against a pipeline
+ * The other two — `identity` and `scim-sync` — are composed below from
+ * `@langwatch/identity-eventing`'s Postgres seams, because every dependency
+ * they take is a Postgres binding. These two are not: the connection ledger's
+ * teardown port revokes a torn-down connection's directory tokens through the
+ * SCIM service, and the join ledger's lifecycle port sends the reminder and
+ * the expiry notice. Neither the directory service nor an outbound mail
+ * gateway exists as something this process can compose, so their definitions
+ * still come from the application that has both.
+ *
+ * One option rather than two because they are one feature's ledger and the
+ * app's writers resolve a sender by pipeline NAME on first use, so a graph
+ * carrying one of them would stage commands for the other against a pipeline
  * nothing had registered. They have no ordering requirement among themselves —
  * none subscribes to another's events.
+ *
+ * Optional, like every group the legacy registry still owns. A graph without
+ * it routes two of the four identity ledgers and must not claim
+ * `event-sourcing/jobs`; that rule is the composition root's
+ * (`createWorkerDurableComposition` asks for no consumers), and the parity
+ * guard is what proves the packaged consumer routes all four.
  */
 export type WorkerIdentityCompositionOptions = {
-  identity: IdentityWorkerCapability;
   ssoConnection: SsoConnectionWorkerCapability;
-  scimSync: ScimSyncWorkerCapability;
   joinRequest: JoinRequestWorkerCapability;
 };
 
@@ -621,21 +636,37 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
-    const identity = options.identity
-      ? IdentityWorkerFeatureInstaller.create({
-          installer: options.identity.identity,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as the sweeps and the two processing
+    // pipelines above: both ledgers are composed from their own feature
+    // package over the one Prisma client this process opened, so there is no
+    // graph in which they are present but unbuildable.
+    //
+    // The identity ledger carries two-step verification on the same aggregate
+    // (D06), which is why one option builds two folds: an enrollment belongs
+    // to exactly the person the identifiers belong to, and sharing the
+    // aggregate is what puts both in one per-person lane.
+    const identity = IdentityWorkerFeatureInstaller.create({
+      installer: {
+        pipeline: PostgresIdentityPipelineAdapter.create({
+          database: options.database ?? options.topic.database,
+        }).build(),
+      },
+      eventing,
+    });
+    // Unconditional for the same reason, and it needs strictly less: the
+    // directory-sync ledger has no process manager at all, so its whole graph
+    // is one `ScimSyncState` head serving both the fold and its guards.
+    const scimSync = ScimSyncWorkerFeatureInstaller.create({
+      installer: {
+        pipeline: PostgresScimSyncPipelineAdapter.create({
+          database: options.database ?? options.topic.database,
+        }).build(),
+      },
+      eventing,
+    });
     const ssoConnection = options.identity
       ? SsoConnectionWorkerFeatureInstaller.create({
           installer: options.identity.ssoConnection,
-          eventing,
-        })
-      : undefined;
-    const scimSync = options.identity
-      ? ScimSyncWorkerFeatureInstaller.create({
-          installer: options.identity.scimSync,
           eventing,
         })
       : undefined;

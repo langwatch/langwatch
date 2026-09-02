@@ -205,9 +205,7 @@ export function packagedWorkerCapabilities(options: {
       },
     },
     identity: {
-      identity: { pipeline: definition("identity") },
       ssoConnection: { pipeline: definition("sso-connections") },
-      scimSync: { pipeline: definition("scim-sync") },
       joinRequest: { pipeline: definition("join-requests") },
     },
   };

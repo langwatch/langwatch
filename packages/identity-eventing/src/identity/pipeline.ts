@@ -74,6 +74,15 @@ export interface IdentityPipelineDeps {
  * lane exists because many grants share one tenant), and a person holds a
  * handful of identifiers, so a lane never has a batch to coalesce either.
  */
+/**
+ * The identity pipeline as a TYPE, for the seams that hold one.
+ *
+ * Derived rather than restated: the definition's event union, projections and
+ * command names all come from the builder below, and a hand-written twin of it
+ * would be one command rename away from being a lie that still compiles.
+ */
+export type IdentityPipeline = ReturnType<typeof createIdentityPipeline>;
+
 export function createIdentityPipeline(deps: IdentityPipelineDeps) {
   return definePipeline<IdentityEvent | MfaEvent>({
     name: IDENTITY_PIPELINE_NAME,

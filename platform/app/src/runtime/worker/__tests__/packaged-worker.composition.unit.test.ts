@@ -287,8 +287,7 @@ describe("packaged worker composition root", () => {
 
     /**
      * The order is load-bearing rather than incidental, and it is documented on
-     * `orderedFeatureInstallers` next to the reason for each position. The
-     * mapper supplies every group, so anything it drops shortens this list.
+     * `orderedFeatureInstallers` next to the reason for each position.
      */
     it("mounts every feature the legacy registry registers, in mount order", () => {
       const composition = composeRoot(buildLegacyRegistry());

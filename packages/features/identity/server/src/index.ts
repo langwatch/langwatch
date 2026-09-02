@@ -47,10 +47,7 @@ export {
   type BackfillUserRow,
   type IdentityBackfillRepository,
 } from "./identity-backfill.repository";
-export {
-  type PlannedIdentifier,
-  planIdentifiers,
-} from "./identity-backfill-plan";
+export { type PlannedIdentifier, planIdentifiers } from "./identity-backfill-plan";
 export {
   IDENTITY_BACKFILL_ACTOR,
   type IdentityBackfillOutcome,
@@ -68,6 +65,29 @@ export { IdentityEmailService } from "./identity-email.service";
  * the import graph of a composition root that never touches the library.
  */
 export { issuerForProviderId } from "./better-auth/account-queries";
+/**
+ * The row mappings the fold writes through and every guard reads back
+ * through. Exported because the Postgres projection stores that write these
+ * rows live with the fold that owns their shape (`@langwatch/identity-eventing`),
+ * and a second copy of either mapping would eventually disagree with this one
+ * about what a column means.
+ */
+export {
+  type IdentifierRow,
+  identifierFactToRow,
+  identifierRowToFact,
+  parseIdentifierLifecycleState,
+} from "./repositories/prisma/prisma.identifier.mapper";
+export {
+  type MfaEnrollmentRow,
+  mfaEnrollmentRowToState,
+} from "./repositories/prisma/prisma.mfa-enrollment.mapper";
+export {
+  type IdentityGuardsComposition,
+  type IdentityGuardsDatabase,
+  PostgresIdentityGuardsAdapter,
+  type PostgresIdentityGuardsOptions,
+} from "./adapters/postgres.identity-guards.adapter";
 export {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
@@ -87,10 +107,7 @@ export {
   establishUserEmailCommandId,
   newIdentityCommandId,
 } from "./identity-command-id";
-export type {
-  IdentityHeadsReader,
-  IdentityHeadsRepository,
-} from "./identity-heads.repository";
+export type { IdentityHeadsReader, IdentityHeadsRepository } from "./identity-heads.repository";
 export type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
@@ -121,10 +138,7 @@ export type {
   IdentityLinkProposalWrites,
   IdentityVerificationWrites,
 } from "./identity-writes";
-export {
-  IdentityJitDisabledError,
-  IdentityLinkProposedError,
-} from "./signin-callback-errors";
+export { IdentityJitDisabledError, IdentityLinkProposedError } from "./signin-callback-errors";
 export {
   type CallbackAssertion,
   type CallbackAuditRecord,
@@ -135,10 +149,7 @@ export {
   SignInCallbackLinkingService,
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
-export {
-  JoinRequestGuards,
-  type JoinRequestGuardsDeps,
-} from "./join-request-guards";
+export { JoinRequestGuards, type JoinRequestGuardsDeps } from "./join-request-guards";
 export {
   approveJoinCommandId,
   expireJoinCommandId,
@@ -146,15 +157,9 @@ export {
   newJoinRequestId,
 } from "./join-request-id";
 export type { JoinRequestLedger } from "./join-request-ledger";
-export type {
-  JoinCandidateRepository,
-  JoinRequestReadRepository,
-} from "./join-request.repository";
+export type { JoinCandidateRepository, JoinRequestReadRepository } from "./join-request.repository";
 export { JoinRequestService } from "./join-request.service";
-export {
-  SCIM_APPLY_MAX_ATTEMPTS,
-  ScimSyncGuards,
-} from "./scim-sync-guards";
+export { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "./scim-sync-guards";
 export { newScimSyncCommandId } from "./scim-sync-id";
 export type { ScimSyncLedger } from "./scim-sync-ledger";
 export type { ScimSyncReadRepository } from "./scim-sync.repository";
@@ -164,10 +169,7 @@ export {
   type SsoConnectionGrandfatherOutcome,
   SsoConnectionGrandfatherService,
 } from "./sso-connection-grandfather.service";
-export {
-  SsoConnectionGuards,
-  type SsoConnectionGuardsDeps,
-} from "./sso-connection-guards";
+export { SsoConnectionGuards, type SsoConnectionGuardsDeps } from "./sso-connection-guards";
 export {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,

@@ -1,18 +1,17 @@
+import type { ScimSyncPipeline } from "@langwatch/identity-eventing";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /** Directory sync's worker-facing capability: the built pipeline definition. */
 export interface ScimSyncWorkerCapability {
   /**
    * The directory-sync pipeline (D08).
    *
-   * Built by the composition root: its projection store and its guards are
-   * storage bindings the worker does not own.
+   * Built by the composition root from `PostgresScimSyncPipelineAdapter`: its
+   * projection store and its guards are one `ScimSyncState` repository in two
+   * roles, over the one Prisma client this process opened.
    */
-  readonly pipeline: WorkerPipelineDefinition;
+  readonly pipeline: ScimSyncPipeline;
 }
 
 /**
@@ -24,11 +23,13 @@ export interface ScimSyncWorkerCapability {
  * installer registers a fold and five command lanes and nothing that wakes on
  * a timer — an unregistered pipeline here loses writes, not a sweep.
  *
- * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
- * this is where it MOVES to. What keeps the move quiet is `SCIM_V2_GRANTS`,
- * which defaults off, so no SCIM request path dispatches these commands and
- * the previous write path is unchanged. Whoever makes the worker composition
- * the live one drops the legacy registration in the same change.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline as
+ * well, and the two definitions are twins until the cutover — the application
+ * keeps its own for the producer surface, and this graph is the consumer.
+ * What keeps the move quiet is `SCIM_V2_GRANTS`, which defaults off, so no
+ * SCIM request path dispatches these commands and the previous write path is
+ * unchanged. Whoever makes the worker composition the live one drops the
+ * legacy registration in the same change.
  */
 export class ScimSyncWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

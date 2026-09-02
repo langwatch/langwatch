@@ -605,6 +605,9 @@ importers:
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../packages/group-queue
+      '@langwatch/identity-eventing':
+        specifier: workspace:*
+        version: link:../../packages/identity-eventing
       '@langwatch/langy-server':
         specifier: workspace:*
         version: link:../../packages/features/langy/server
@@ -2524,12 +2527,30 @@ importers:
 
   packages/features/authz/web:
     dependencies:
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/enterprise-billing-web':
+        specifier: workspace:*
+        version: link:../../../enterprise/features/billing/web
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
+      '@langwatch/role-contract':
+        specifier: workspace:*
+        version: link:../../role/contract
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
+      react-feather:
+        specifier: ^2.0.10
+        version: 2.0.10(react@19.2.8)
+      react-hook-form:
+        specifier: ^7.66.0
+        version: 7.80.0(react@19.2.8)
     devDependencies:
       '@chakra-ui/react':
         specifier: ^3.36.0
@@ -2537,6 +2558,9 @@ importers:
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -6581,6 +6605,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../prisma-client
       zod:
         specifier: ^4.4.3
         version: 4.4.3

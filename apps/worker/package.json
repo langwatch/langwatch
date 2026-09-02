@@ -47,6 +47,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
+    "@langwatch/identity-eventing": "workspace:*",
     "@langwatch/langy-server": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/log-server": "workspace:*",
