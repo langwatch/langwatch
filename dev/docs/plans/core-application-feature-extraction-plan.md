@@ -958,6 +958,60 @@ span-storage projection, and `createWorkerSpanStorage` has no production caller.
 drives `SpanStorageStore` → port → repository → a fake Eventing ClickHouse client end to end, asserting one insert per batch, tenant
 routing and the retention stamp. Deployment impact: none until step (g).
 
+**Step (d) landed (uncommitted at time of writing): the trace-privacy vertical.** The PII-redaction half of `recordSpanCommand`
+is composable outside the application. Homes were surveyed rather than assumed. `@langwatch/redaction` takes the ENGINES —
+`essentialPii.ts` (the nineteen pattern-and-checksum recognizers, `libphonenumber-js`, the exception veto) and
+`contentRedaction.ts` (the native passes composed for one resolved policy) — plus a new dependency-free `piiEntities.ts` holding
+both split lists. The engines sit behind a `@langwatch/redaction/pii` subpath so the package root stays browser-safe, which is the
+property `markers.ts` already documented and which the settings screen and the trace-view banner both rest on.
+`@langwatch/data-privacy-server` takes the SERVICE (`OtlpSpanPiiRedactionService` plus the shape-independent
+`PiiRedactionPolicyService` it now leans on), the `PiiAnalysisPort` and the OTel metrics twin; trace, log and metric each already
+declare their own narrow redaction port, and the published service satisfies all three structurally — the same reasoning that put
+the tenant-broadcast twin in notification-server rather than inside any one feature. `apps/worker` takes the TRANSPORT
+(`WorkerPiiAnalysisAdapter`: the Presidio batch client and the lazy Google DLP client, config injected, no environment read inside)
+and the composition.
+
+THE SLICE SHRANK ON CONTACT, TWICE, AND BOTH REFUSALS ARE BY NAME. (1) The service's record-shaped half — `redactLog`,
+`lambdaRedactLog`, `applyNativeLogPass`, `redactMetricAttributes`, `lambdaRedactMetricAttributes`, `redactRecordNative`,
+`createRedactionBatch`, `collectRecordEntries`, `applyRedactionBatch` and the `RedactionBatch` type — answers `LogRedactionPort`
+and `MetricRedactionPort`, which belong to the log and metric conversions. `TraceSpanPiiRedactionPort.redact` calls `redactSpan`
+and nothing else, so carrying them now would drag two other features' seams in for nothing and leave two more copies to keep
+aligned. (2) The tokenizer is NOT on this path: `TiktokenClient` serves `OtlpSpanTokenEstimationService` behind
+`TraceSpanTokenEstimationPort`, and `redactSpan` never reaches it. That is also why the survey's count of four new config leaves is
+exactly right — `GOOGLE_APPLICATION_CREDENTIALS`, `LANGWATCH_DISABLE_GOOGLE_DLP`, `LANGEVALS_ENDPOINT` and
+`LANGWATCH_DATA_PRIVACY_ENFORCEMENT`, at the application's spellings and defaults, with `isProduction` coming off the existing
+`NODE_ENV` leaf and the Presidio timeout staying a literal in both graphs. `TIKTOKENS_PATH` and `TIKTOKEN_FETCH_TIMEOUT_MS` belong
+to the token-estimation slice. Likewise `dropKeyCatalog`'s drop machinery serves `TraceSpanContentDropPort`; only the one marker
+the redaction service stamps was carried, into `data-privacy-contract`.
+
+A RECORDED GAP CLOSED. `packages/features/data-privacy/web/src/model/__tests__/pii-entity-labels.unit.test.ts` had dropped three
+assertions "until those lists move into `@langwatch/redaction`" — that the essential map is exactly the native engine's list, that
+the strict-added map is exactly what only the analyzer detects, and that the Brazilian CPF is the one native-only identifier. The
+lists moved; the three are back, and the browser still pulls in no recognizer table.
+
+TWIN-DRIFT PINS, chosen because every one of them fails silently in the direction of storing personal data: both entity lists as
+literals in their own order, the derived strict-only set, the Presidio request (evaluate path, per-level entity map, `min_threshold`,
+the 250,000-character truncation and remainder reassembly), both Google DLP info-type tables, the `[REDACTED]` masking, the
+`langwatch.privacy.pii_incomplete` marker, the `partial`/`none` redaction-status values, the 250,000-character batch ceiling, and
+the three metric series names with their `presidio/pii_detection` label. Nothing in a stored span records which identifiers were
+searched for, so a span scanned for eighteen and a span scanned for nineteen are the same row.
+
+THREE DELIBERATE DIFFERENCES FROM THE TWINS, all mechanical and all proven: the interface `PiiRedactionTransport` becomes an
+abstract `PiiAnalysisPort`; four public methods that can answer `null` take the `try` prefix `fallible-result-naming` requires; and
+the 884-line service splits into the shape-independent decisions and the OTLP-span walker, because `service-quality`'s baseline may
+only shrink and a 626-line module cannot be baselined. The split is the seam the log and metric conversions will want anyway. A
+member-by-member proof shows all thirteen carried bodies identical to the frozen twin modulo visibility, the `curly` brace fix and
+those renames; `essentialPii.ts` and `contentRedaction.ts` diff byte-identical against the oxfmt-normalised twin.
+
+NOT MOUNTED: `apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, the application still owns
+`RecordSpanCommand`'s adapters, and `createWorkerTracePrivacy` has no production caller. It is proven by a composition-capability
+test that drives `TraceSpanPiiRedactionPort` -> service -> engines -> a stubbed analysis transport end to end, including the
+no-analysis-service path behaving exactly as the application's does: native floor at the essential level, floor plus the
+incomplete marker at strict, refusal in production, and pass-through outside production when no policy resolves. Deployment impact:
+none until step (g); at that point the four variables become load-bearing for a standalone worker and must match the
+application's while both graphs ingest.
+
+
 ## How to execute the plan
 
 Use this loop continuously until the final gate passes:

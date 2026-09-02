@@ -1,34 +1,38 @@
 /**
- * The custom PII picker offers every identifier redaction can produce, once.
+ * The custom PII picker offers every identifier redaction can produce, once —
+ * and offers it on the SIDE the engines actually detect it on.
  *
+ * The original pin lived in
  * `platform/app/src/components/settings/__tests__/piiEntityLabels.unit.test.ts`
- * pinned these two maps against the ENGINE lists — `ESSENTIAL_PII_ENTITIES` and
- * `PRESIDIO_STRICT_ENTITIES` — both of which live in `platform/app/src/server`,
- * where a browser package may not reach and which the migration ruling forbids
- * editing to publish them. So the pin is rebuilt on the portable vocabulary
- * instead: `@langwatch/redaction`'s `REDACTION_MARKER_ENTITIES` is the set of
- * entities a redaction marker can ever name, and it is the union of the strict
- * analyzer's list with the one native-only identifier.
+ * and read the two ENGINE lists, `ESSENTIAL_PII_ENTITIES` and
+ * `PRESIDIO_STRICT_ENTITIES`. Both lived under `platform/app/src/server`, where
+ * a browser package may not reach and which the migration ruling forbids
+ * editing to publish them, so this file was rebuilt on
+ * `REDACTION_MARKER_ENTITIES` alone and RECORDED the three assertions it lost:
+ * that essential is exactly the native engine's list, that strict-added is
+ * exactly the analyzer entities the native engine cannot detect, and that the
+ * Brazilian CPF is the one native-only identifier.
  *
- * WHAT THAT KEEPS is the property the picker actually depends on — an entity
- * with no checkbox can never be turned off, and an entity with two is a
- * duplicate row — and it keeps it more completely than the original, which
- * checked coverage of the analyzer list alone.
+ * Those three are back. The two lists moved into `@langwatch/redaction` with
+ * the trace-privacy harvest, into a dependency-free module the browser may
+ * import — the engines that use them stay behind `@langwatch/redaction/pii`,
+ * so this bundle still pulls in no recognizer table and no phone-number
+ * library.
  *
- * WHAT IT LOSES, recorded rather than hidden: the two assertions that pinned
- * WHICH SIDE of the split each entity falls on (essential is exactly the native
- * engine's list; strict-added is exactly the analyzer entities the native
- * engine cannot detect), and the one that named the Brazilian CPF as the
- * native-only case. Those need the two engine lists and return when they move
- * into `@langwatch/redaction`.
+ * What the picker depends on, in one line: an identifier with no checkbox can
+ * never be turned off, an identifier with two is a duplicate row, and an
+ * identifier under the wrong heading tells a customer the essential level
+ * covers something only the strict level does.
  */
 
-import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "@langwatch/redaction";
-import { describe, expect, it } from "vitest";
 import {
-  ESSENTIAL_PII_ENTITY_LABELS,
-  STRICT_ADDED_PII_ENTITY_LABELS,
-} from "../pii-entity-labels";
+  ESSENTIAL_PII_ENTITIES,
+  REDACTION_MARKER_ENTITIES,
+  SECRET_MARKER_ENTITY,
+  STRICT_ONLY_PII_ENTITIES,
+} from "@langwatch/redaction";
+import { describe, expect, it } from "vitest";
+import { ESSENTIAL_PII_ENTITY_LABELS, STRICT_ADDED_PII_ENTITY_LABELS } from "../pii-entity-labels";
 
 const essential = Object.keys(ESSENTIAL_PII_ENTITY_LABELS);
 const strictAdded = Object.keys(STRICT_ADDED_PII_ENTITY_LABELS);
@@ -41,9 +45,7 @@ const redactableIdentities = [...REDACTION_MARKER_ENTITIES].filter(
 describe("given the two PII label maps the custom picker renders", () => {
   describe("when the redaction vocabulary changes", () => {
     it("labels every identity a redaction marker can name", () => {
-      expect([...essential, ...strictAdded].sort()).toEqual(
-        [...redactableIdentities].sort(),
-      );
+      expect([...essential, ...strictAdded].sort()).toEqual([...redactableIdentities].sort());
     });
 
     it("never offers the secrets marker as a PII identity", () => {
@@ -55,6 +57,22 @@ describe("given the two PII label maps the custom picker renders", () => {
     it("keeps the two groups disjoint, so no identity gets two checkboxes", () => {
       const both = essential.filter((entity) => strictAdded.includes(entity));
       expect(both).toEqual([]);
+    });
+
+    /** @scenario "The settings picker offers each identifier under the level that detects it" */
+    it("labels as essential exactly what the native engine detects", () => {
+      expect([...essential].sort()).toEqual([...ESSENTIAL_PII_ENTITIES].sort());
+    });
+
+    /** @scenario "The settings picker offers each identifier under the level that detects it" */
+    it("labels as strict-added exactly what only the analysis service detects", () => {
+      expect([...strictAdded].sort()).toEqual([...STRICT_ONLY_PII_ENTITIES].sort());
+    });
+
+    /** @scenario "The settings picker offers each identifier under the level that detects it" */
+    it("keeps the Brazilian CPF on the essential side, as the one native-only identity", () => {
+      expect(essential).toContain("BR_CPF");
+      expect(strictAdded).not.toContain("BR_CPF");
     });
   });
 });

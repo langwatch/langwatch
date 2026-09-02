@@ -23,10 +23,14 @@
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "safe-regex2": "^5.1.1",
     "zod": "^4.4.3"

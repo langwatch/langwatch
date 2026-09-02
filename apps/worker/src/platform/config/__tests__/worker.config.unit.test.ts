@@ -1,6 +1,6 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { resolveWorkerConfig } from "../worker.config";
+import { resolveWorkerConfig, resolveWorkerTracePrivacyConfig } from "../worker.config";
 
 describe("resolveWorkerConfig", () => {
   it("uses the worker-local environment default", () => {
@@ -29,6 +29,15 @@ describe("resolveWorkerConfig", () => {
       // automation credential has none to read, and the key is omitted rather
       // than carried as an empty string that would look configured.
       automation: { emailHourlyCap: 100, tenantDailyCap: 10_000 },
+      // Redaction is DEFAULT-ON without any of the four variables: the native
+      // floor enforces, and the analysis service is simply absent. The one
+      // knob that turns the floor off has to be spelled `off` to do it.
+      tracePrivacy: {
+        googleDlp: { disabled: false, credentials: undefined },
+        presidio: { endpoint: undefined, timeoutMs: 60_000 },
+        isProduction: false,
+        nativePolicyEnforced: true,
+      },
       stripe: { secretKey: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },
@@ -272,5 +281,104 @@ describe("resolveWorkerConfig", () => {
     expect(resolveWorkerConfig({ LW_SPEND_SETTLEMENT_GRACE_MS: "45000" }).gateway).toEqual({
       spendSettlementGraceMs: "45000",
     });
+  });
+});
+
+describe("given the four privacy variables the ingestion path reads", () => {
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("carries the analysis endpoint and marks a production process as enforcing", () => {
+    const config = resolveWorkerConfig({
+      LANGEVALS_ENDPOINT: "http://langevals",
+      NODE_ENV: "production",
+    });
+
+    expect(config.tracePrivacy.presidio.endpoint).toBe("http://langevals");
+    expect(config.tracePrivacy.isProduction).toBe(true);
+  });
+
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("turns the native floor off only for the application's own spelling", () => {
+    expect(
+      resolveWorkerConfig({ LANGWATCH_DATA_PRIVACY_ENFORCEMENT: "off" }).tracePrivacy
+        .nativePolicyEnforced,
+    ).toBe(false);
+    expect(
+      resolveWorkerConfig({ LANGWATCH_DATA_PRIVACY_ENFORCEMENT: "OFF" }).tracePrivacy
+        .nativePolicyEnforced,
+    ).toBe(true);
+  });
+
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("reads the DLP kill switch the way the application reads it, and no wider", () => {
+    const disabled = (value: string) =>
+      resolveWorkerConfig({ LANGWATCH_DISABLE_GOOGLE_DLP: value }).tracePrivacy.googleDlp.disabled;
+
+    expect(disabled("true")).toBe(true);
+    expect(disabled("false")).toBe(false);
+    // The application treats every other spelling as "not disabled" rather
+    // than refusing to boot, `1` included.
+    expect(disabled("1")).toBe(false);
+    expect(disabled("yes")).toBe(false);
+  });
+
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("keeps the whole service-account document, and requires a project to build a client with", () => {
+    const config = resolveWorkerConfig({
+      GOOGLE_APPLICATION_CREDENTIALS: JSON.stringify({
+        project_id: "privacy-project",
+        client_email: "privacy@example.test",
+        private_key: "private-key",
+      }),
+    });
+
+    expect(config.tracePrivacy.googleDlp.credentials).toEqual({
+      project_id: "privacy-project",
+      client_email: "privacy@example.test",
+      private_key: "private-key",
+    });
+  });
+
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("leaves DLP unavailable after an unusable document rather than failing an unrelated boot", () => {
+    expect(
+      resolveWorkerConfig({ GOOGLE_APPLICATION_CREDENTIALS: "{not-json" }).tracePrivacy.googleDlp
+        .credentials,
+    ).toBeUndefined();
+    expect(
+      resolveWorkerConfig({
+        GOOGLE_APPLICATION_CREDENTIALS: JSON.stringify({ client_email: "privacy@example.test" }),
+      }).tracePrivacy.googleDlp.credentials,
+    ).toBeUndefined();
+  });
+
+  /** @scenario "The four privacy variables are read the way the application reads them" */
+  it("reports why a document was unusable, so a boot can log it", () => {
+    const failures: string[] = [];
+    resolveWorkerTracePrivacyConfig(
+      {
+        tracePrivacy: {
+          googleApplicationCredentials: "{not-json",
+          googleDlpDisabled: undefined,
+          langevalsEndpoint: undefined,
+          dataPrivacyEnforcement: undefined,
+        },
+        nodeEnvironment: "development",
+      },
+      (failure) => failures.push(failure.reason),
+    );
+    resolveWorkerTracePrivacyConfig(
+      {
+        tracePrivacy: {
+          googleApplicationCredentials: JSON.stringify({ project_id: "  " }),
+          googleDlpDisabled: undefined,
+          langevalsEndpoint: undefined,
+          dataPrivacyEnforcement: undefined,
+        },
+        nodeEnvironment: "development",
+      },
+      (failure) => failures.push(failure.reason),
+    );
+
+    expect(failures).toEqual(["invalid-json", "missing-project-id"]);
   });
 });

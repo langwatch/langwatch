@@ -13,13 +13,17 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./pii": "./src/pii.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run",
     "bench": "vitest bench --run"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.7"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

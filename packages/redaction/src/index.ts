@@ -1,4 +1,9 @@
 export {
+  ESSENTIAL_PII_ENTITIES,
+  PRESIDIO_STRICT_ENTITIES,
+  STRICT_ONLY_PII_ENTITIES,
+} from "./piiEntities.js";
+export {
   findRedactionMarkers,
   formatPiiMarker,
   hasRedactionMarker,

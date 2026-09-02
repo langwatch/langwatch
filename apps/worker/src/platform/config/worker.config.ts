@@ -14,6 +14,8 @@ const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";
 const DEFAULT_PRODUCTION_QUEUE_DRAIN_MS = 25_000;
 const DEFAULT_DEVELOPMENT_QUEUE_DRAIN_MS = 5_000;
 const APP_CLOSE_SLACK_MS = 5_000;
+/** The application's own Presidio ceiling; neither graph reads it from the environment. */
+const DEFAULT_PRESIDIO_TIMEOUT_MS = 60_000;
 const PROCESS_CLOSE_SLACK_MS = 15_000;
 
 const optionalEnvironmentString = z.string().optional();
@@ -201,6 +203,48 @@ export const workerConfigDefinition = RuntimeConfig.define({
     credentialsEncryptionKey: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
   },
   /**
+   * What the trace, log and metric ingestion paths need to redact personal
+   * data, read from the application's own four variables.
+   *
+   * These four decide WHETHER content is scrubbed and BY WHAT, so a process
+   * holding a different answer than the one beside it does not fail — it
+   * stores the span with the personal data still in it. `LANGEVALS_ENDPOINT`
+   * absent means the strict analyzer cannot run at all, which is fatal in
+   * production and a marked-incomplete span everywhere else;
+   * `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` is the kill switch that sends
+   * every span down the analysis-service path with no native floor;
+   * `LANGWATCH_DISABLE_GOOGLE_DLP` and `GOOGLE_APPLICATION_CREDENTIALS`
+   * together decide whether the DLP fallback exists when Presidio is down.
+   *
+   * The credentials are carried as the raw document, unparsed, exactly as the
+   * application carries them: `resolveWorkerTracePrivacyConfig` owns the parse
+   * and keeps the application's deliberate behaviour of leaving DLP
+   * unavailable after invalid JSON rather than failing an unrelated boot.
+   */
+  tracePrivacy: {
+    googleApplicationCredentials: Config.secret({
+      optional: true,
+      env: "GOOGLE_APPLICATION_CREDENTIALS",
+    }),
+    /**
+     * Carried as the application carries it — a raw boolean-or-string, not a
+     * parsed boolean. `environmentBooleanSchema` would disagree with the
+     * application twice: it reads `"1"` as true, which the application reads
+     * as false, and it REFUSES any other spelling, which would turn
+     * `LANGWATCH_DISABLE_GOOGLE_DLP=yes` from "DLP stays available" into a
+     * process that will not boot.
+     */
+    googleDlpDisabled: Config.value(z.union([z.boolean(), z.string()]).optional(), {
+      env: "LANGWATCH_DISABLE_GOOGLE_DLP",
+    }),
+    langevalsEndpoint: Config.value(optionalEnvironmentString, {
+      env: "LANGEVALS_ENDPOINT",
+    }),
+    dataPrivacyEnforcement: Config.value(optionalEnvironmentString, {
+      env: "LANGWATCH_DATA_PRIVACY_ENFORCEMENT",
+    }),
+  },
+  /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
    *
    * The raw string is carried rather than a number: `settlementGraceMs` in
@@ -377,6 +421,39 @@ export type WorkerAutomationConfig = Readonly<{
   credentialsEncryptionKey?: string;
 }>;
 
+/**
+ * The Google DLP service-account document, narrowed to the one field the
+ * client cannot be built without.
+ *
+ * `passthrough` on purpose: the whole document is handed to the SDK, and
+ * dropping the private key while keeping the project id would produce a client
+ * that constructs and then fails to authenticate.
+ */
+const googleDlpCredentialsSchema = z.object({ project_id: z.string().trim().min(1) }).passthrough();
+
+export type GoogleDlpCredentials = z.infer<typeof googleDlpCredentialsSchema>;
+
+export type GoogleDlpCredentialsFailure =
+  | Readonly<{ reason: "invalid-json"; error: unknown }>
+  | Readonly<{ reason: "missing-project-id"; error: z.ZodError }>;
+
+/**
+ * The privacy knobs this process ingests under, projected the way
+ * `platform/app/src/runtime/trace-privacy.config.ts` projects the same four
+ * variables. `presidio.timeoutMs` is the application's own constant rather
+ * than a fifth variable: neither graph reads it from the environment, and a
+ * second spelling would be a knob nobody sets and nobody notices.
+ */
+export type WorkerTracePrivacyConfig = Readonly<{
+  googleDlp: Readonly<{
+    disabled: boolean;
+    credentials: GoogleDlpCredentials | undefined;
+  }>;
+  presidio: Readonly<{ endpoint: string | undefined; timeoutMs: number }>;
+  isProduction: boolean;
+  nativePolicyEnforced: boolean;
+}>;
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -402,6 +479,7 @@ export type WorkerConfig = Readonly<{
   /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
   mail?: WorkerMailConfig;
   automation: WorkerAutomationConfig;
+  tracePrivacy: WorkerTracePrivacyConfig;
   stripe: WorkerStripeConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
@@ -434,6 +512,10 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     deployment: value.deployment,
     ...(mail ? { mail } : {}),
     automation: resolveWorkerAutomationConfig(value.automation, value.nextauthSecret),
+    tracePrivacy: resolveWorkerTracePrivacyConfig({
+      tracePrivacy: value.tracePrivacy,
+      nodeEnvironment: value.nodeEnvironment,
+    }),
     stripe: value.stripe,
     gateway: value.gateway,
     github: value.github,
@@ -524,6 +606,55 @@ function resolveWorkerAutomationConfig(
     emailHourlyCap: automation.emailHourlyCap,
     tenantDailyCap: automation.tenantDailyCap,
     ...(credentialsEncryptionKey ? { credentialsEncryptionKey } : {}),
+  };
+}
+
+/**
+ * The privacy knobs, projected once at boot.
+ *
+ * Invalid service-account JSON deliberately preserves the application's
+ * old unavailable-DLP behaviour rather than making an unrelated boot fail:
+ * DLP is a FALLBACK for a Presidio outage, and refusing to start a worker
+ * because the fallback's credentials are malformed would turn a degraded
+ * path into no ingestion at all. The failure is reported to the caller so a
+ * boot can log it.
+ */
+export function resolveWorkerTracePrivacyConfig(
+  input: {
+    tracePrivacy: WorkerConfigProjection["tracePrivacy"];
+    nodeEnvironment: WorkerConfigProjection["nodeEnvironment"];
+  },
+  onInvalidCredentials: (failure: GoogleDlpCredentialsFailure) => void = () => undefined,
+): WorkerTracePrivacyConfig {
+  let credentials: GoogleDlpCredentials | undefined;
+
+  if (input.tracePrivacy.googleApplicationCredentials) {
+    try {
+      const parsedCredentials = JSON.parse(input.tracePrivacy.googleApplicationCredentials);
+      const validatedCredentials = googleDlpCredentialsSchema.safeParse(parsedCredentials);
+      if (validatedCredentials.success) {
+        credentials = validatedCredentials.data;
+      } else {
+        onInvalidCredentials({ reason: "missing-project-id", error: validatedCredentials.error });
+      }
+    } catch (error) {
+      onInvalidCredentials({ reason: "invalid-json", error });
+    }
+  }
+
+  return {
+    googleDlp: {
+      disabled:
+        input.tracePrivacy.googleDlpDisabled === true ||
+        input.tracePrivacy.googleDlpDisabled === "true",
+      credentials,
+    },
+    presidio: {
+      endpoint: input.tracePrivacy.langevalsEndpoint,
+      timeoutMs: DEFAULT_PRESIDIO_TIMEOUT_MS,
+    },
+    isProduction: input.nodeEnvironment === "production",
+    nativePolicyEnforced: input.tracePrivacy.dataPrivacyEnforcement !== "off",
   };
 }
 
