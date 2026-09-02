@@ -908,7 +908,10 @@ export class DatasetService {
     const matches: DatasetRecord[] = [];
     const collect = (record: DatasetRecord) => {
       if (
-        !matchesDatasetSearch(record.entry as Record<string, unknown>, search)
+        !matchesDatasetSearch({
+          entry: record.entry as Record<string, unknown>,
+          search,
+        })
       )
         return;
       if (matchCount >= windowStart && matchCount < windowEnd) {
