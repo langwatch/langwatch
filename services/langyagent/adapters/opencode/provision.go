@@ -492,6 +492,10 @@ func buildWorkerEnv(workerHome, conversationID string, creds domain.Credentials,
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		// Without this, every project-scoped CLI call (playground-widget,
+		// trace search, analytics) fails with "No project is in scope"
+		// unless the worker also passes --project on each invocation.
+		"LANGWATCH_PROJECT_ID="+creds.ProjectID,
 		// The CLI's `ui call` names the conversation it is driving with this.
 		// A claim, not a credential: the control plane verifies the id belongs
 		// to the session key's owning user before doing anything.

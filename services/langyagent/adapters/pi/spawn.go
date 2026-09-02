@@ -394,6 +394,11 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// deliberate stance as the opencode worker env).
 		"LANGWATCH_API_KEY="+in.Creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+in.Creds.LangwatchEndpoint,
+		// Without this, every `langwatch` CLI call that reads/writes
+		// project-scoped data (playground-widget, trace search, analytics)
+		// fails with "No project is in scope" unless the worker also passes
+		// --project on each invocation, which the skill does not instruct.
+		"LANGWATCH_PROJECT_ID="+in.Creds.ProjectID,
 		// Long provider-cache retention: only takes effect on lanes whose
 		// model carries compat.supportsLongCacheRetention (see modelLane) —
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
