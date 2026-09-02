@@ -1,7 +1,7 @@
 @governance @ingestion
 Feature: Azure billing identity — the bill is read with its own credential
 
-  Decision: ADR-128 §21 (v3.4)
+  Decision: ADR-128 §21 (v3.5)
 
   The Copilot Studio connection reads two very different things from
   Microsoft: employees' conversations, and money. Wave 1 read both with
@@ -58,7 +58,10 @@ Feature: Azure billing identity — the bill is read with its own credential
     # Refused at save time so the state "subscription named, bill
     # unreadable forever" cannot exist to need explaining on the spend
     # panel. Half a billing pair is refused the same way — one key of two
-    # is not a sign-in.
+    # is not a sign-in. "A save" means every write that can put the claim
+    # there: a create, and an edit that adds the claim while the stored
+    # secrets ride across sealed. Leaving either open is enough to store
+    # the state, which is why the spend panel carries no sentence for it.
 
   @unit
   Scenario: The billing credential is only ever presented to the sign-in service

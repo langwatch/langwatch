@@ -903,7 +903,7 @@ the third lane.
 | Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
 | Billing credential keys (§21.1) | `billingClientId`, `billingClientSecret` in the existing `credentials` map; tenant reused from `tenantId` | the Azure Resource Manager identity, separate from the bot's `clientId`/`clientSecret` |
 | Prepaid declaration (§21.4) | `azureBillingIsPrepaid: boolean`, customer-set on the connection, default `false` | the only thing that licenses the prepaid sentence; never inferred |
-| Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence); the screen maps each to a sentence, provider text never reaches the browser |
+| Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
 | Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
 
 ## Invariants
@@ -955,7 +955,7 @@ the third lane.
 | Screens behind flags | yes | small | none — ship it |
 | Seat price list edits (admin) | yes (recompute at read heals) | small | none — audit-logged, no approval step |
 | Billing credential keys on the connection form (§21.2) | **no** — a secret echoed to a browser stays echoed | medium | human review of the form diff (both credential builders: `dashboard/pages/inventory.tsx:2647` create and `:2702-2708` edit — a change applied to one and not the other is the failure mode), **plus** `ingestionSourceSecretFields.unit.test.ts` extended to `billingClientSecret` as a merge blocker |
-| Dropping the bot-identity fallback for the cost read (§21.1) | yes (re-add credentials) | large — **every already-connected source's spend lane goes dark on deploy**, because none has billing credentials yet | automated: ships behind `release_ui_governance_billed_cost_enabled`; the lane must read `no_billing_credentials` with its sentence, never `0` and never a stale figure. Existing customers are asked for the billing grant, they are not silently degraded |
+| Dropping the bot-identity fallback for the cost read (§21.1) | yes (re-add credentials) | small — **no connected source can be in this state**: `azureSubscriptionId` has never shipped to `main`, so it arrives in the same release as the save-time refusal and no stored source claims a bill without the pair | automated: ships behind `release_ui_governance_billed_cost_enabled`; the refusal is `assertAzureBillHasItsOwnCredential` on create AND on an edit that adds the claim (v3.5). A source claiming nothing reads no bill, exactly as today |
 | Spend-lane reason states (§21.3) | yes | medium (customer-visible money) | automated: the three-reason table-driven test + the no-currency-amount assertion; behind the existing flag |
 
 ## Schema
@@ -1135,15 +1135,16 @@ rollup. Seat money computed at read means
 exports must run the same multiplication (one shared code path, or
 numbers drift). Read-time identity resolution makes per-person queries
 join-heavy; acceptable at current volume, revisit if drill-downs slow.
-**Every Copilot connection that exists today loses its spend figure the
-day §21 ships** — none of them carries billing credentials, so each
-lands on `no_billing_credentials` until its owner grants the finance
-role. That is the intended trade (a correct blank beats a figure read
-with the wrong permission), but it is a visible regression for existing
-users and needs the flag and a prompt, not a silent deploy (Gates).
-Customers now have two Azure grants to obtain rather than one, and the
-second one has a different approver — the reason it is worth doing is
-also the reason it is slower to adopt.
+**No Copilot connection that exists today loses a spend figure** — this
+was written when §21 was expected to land after the subscription field,
+and it did not: `azureSubscriptionId` has never reached `main`, so it
+ships in the same release as the refusal that requires the billing pair
+beside it. Every connection that exists today claims no subscription,
+reads no bill, and is unchanged. Customers now have two Azure grants to
+obtain rather than one, and the second one has a different approver —
+the reason it is worth doing is also the reason it is slower to adopt.
+That cost lands on the customers who adopt the spend lane next, not as a
+regression for the ones already connected.
 
 **Neutral.** ADR-088's machinery is untouched except Decision 4's
 attribution. Pulled data's home gets a dedicated, permission-gated
@@ -1171,6 +1172,25 @@ money tables, only the identity tables and read paths.
 | Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
+
+- **v3.5 (2026-09-02, captain: Sergio Esteban).** Review pass on the §21
+  implementation. Two corrections, one of them load-bearing:
+  - **The create path was still open.** v3.4 withdrew
+    `no_billing_credentials` from the spend lane's closed reason list
+    because the save-time refusal made the state unstorable. It did not:
+    the guard waved creates through, reasoning that a create carrying no
+    credentials "fails for the louder reason" downstream. Nothing
+    downstream requires credentials, so a direct caller could store a
+    claimed subscription with no billing pair. The refusal now covers
+    create as well as claim-adding edits, which is what makes v3.4's
+    withdrawal true rather than merely intended.
+  - **The rollout consequence was wrong in the other direction.** Two
+    passages said every already-connected source goes dark on deploy.
+    They assumed the subscription field was already live; it has never
+    reached `main`, so it ships alongside the refusal and no existing
+    connection claims a bill at all. The blast radius of dropping the
+    bot-identity fallback is small, not large, and the Gates row and the
+    consequences paragraph now say so.
 
 - **v3.4 (2026-09-02, captain: Sergio Esteban).** Red-team pass on §21
   and its derived scenarios: four independent refuters (reachability,

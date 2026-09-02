@@ -692,7 +692,7 @@ describe("the Azure cost read inside the Dataverse source", () => {
  * re-create the one broad grant the split exists to break.
  *
  * Spec: specs/governance/azure-billing-identity.feature
- * Decision: ADR-128 §21 (v3.4).
+ * Decision: ADR-128 §21 (v3.5).
  */
 describe("the billing identity beside the bot's", () => {
   const signInCalls = () =>
