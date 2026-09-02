@@ -8,8 +8,13 @@
  * identified by holding the transferred port; nothing else is ever read off
  * the window channel.
  *
- * Watchdog: the shim heartbeats every 500ms; 1500ms of silence means the
- * frame is wedged (busy loop, crash) and the bridge tears it down.
+ * Watchdog: the shim heartbeats every 2s; CHART_FRAME_HEARTBEAT_TIMEOUT_MS
+ * (~10s) of silence means the frame is wedged (busy loop, crash) and the
+ * bridge tears it down. While the tab is hidden the watchdog is suspended —
+ * background-tab timer throttling applies to both sides of the bridge, so a
+ * missed beat there proves nothing — and resumes with a fresh grace period
+ * on return to visible so a backlog of throttled misses never triggers an
+ * instant kill.
  */
 
 import type {
@@ -93,11 +98,20 @@ export function createFrameBridge(
     activeAborts.clear();
   };
 
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      // Fresh grace period: a backlog of misses accrued while hidden/
+      // throttled must not read as instant silence.
+      lastHeartbeatAt = Date.now();
+    }
+  };
+
   const stop = () => {
     if (disposed) return;
     disposed = true;
     if (watchdog !== null) clearInterval(watchdog);
     iframe.removeEventListener("load", onFrameLoad);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     abortAll();
     port?.close();
     port = null;
@@ -189,16 +203,22 @@ export function createFrameBridge(
       [channel.port2],
     );
     lastHeartbeatAt = Date.now();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     watchdog = setInterval(() => {
+      // Suspended while hidden: background-tab timer throttling hits both
+      // sides of the bridge, so silence here is not evidence of a wedged
+      // frame. onVisibilityChange resets lastHeartbeatAt on return, giving a
+      // fresh window before the check below can fire again.
+      if (document.visibilityState === "hidden") return;
       if (Date.now() - lastHeartbeatAt > CHART_FRAME_HEARTBEAT_TIMEOUT_MS) {
         onLog({
           level: "error",
           source: "bridge",
-          text: "No heartbeat for 1.5s — frame torn down.",
+          text: "No heartbeat for 10s — frame torn down.",
         });
         teardown();
       }
-    }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 3);
+    }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
   };
 
   if (

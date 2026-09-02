@@ -161,9 +161,16 @@ export type FrameToParentMessage =
 
 export const CHART_FRAME_MIN_HEIGHT_PX = 60;
 export const CHART_FRAME_MAX_HEIGHT_PX = 640;
-/** Frame posts one every 500ms; parent tears down after this much silence. */
-export const CHART_FRAME_HEARTBEAT_INTERVAL_MS = 500;
-export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 1500;
+/**
+ * Frame posts one every 2s; parent tears down after ~10s of silence (a few
+ * consecutive missed beats, not a single miss) — tolerant of main-thread
+ * jitter across ~25 live iframes and of browser timer throttling. The
+ * watchdog additionally pauses while the tab is hidden (see frameBridge.ts),
+ * since a backgrounded tab throttles both sides' timers and misses there are
+ * meaningless.
+ */
+export const CHART_FRAME_HEARTBEAT_INTERVAL_MS = 2000;
+export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 10000;
 
 /**
  * The one structural mapping from the server's result to the wire payload.

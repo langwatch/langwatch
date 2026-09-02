@@ -6,8 +6,9 @@
  * Widgets live in the same 2-column grid the reports dashboard uses — drag to
  * reorder, pick a size preset, delete, flip a card to Code to edit its file
  * in place, or edit both the file and its queries in a drawer. The
- * frame's bridge tears itself down 1.5s after its last heartbeat, so widgets
- * stay mounted while the page is up; a Save re-keys only the touched frame.
+ * frame's bridge tears itself down after ~10s of missed heartbeats (paused
+ * while the tab is hidden), so widgets stay mounted while the page is up; a
+ * Save re-keys only the touched frame.
  */
 
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
