@@ -278,3 +278,72 @@ describe("given the Copilot Studio licence switch", () => {
     });
   });
 });
+
+describe("given the Copilot Studio create form", () => {
+  describe("when the form first renders", () => {
+    /** @scenario "The fields stand in labelled groups, choices last" */
+    it("stands in labelled groups with the billing choice last", () => {
+      renderFields("copilot_studio_dataverse");
+
+      const headings = screen
+        .getAllByText(/^(Connection|Cost|Conversation access|Billing)$/)
+        .map((el) => el.textContent);
+      expect(headings).toEqual([
+        "Connection",
+        "Cost",
+        "Conversation access",
+        "Billing",
+      ]);
+    });
+
+    /** @scenario "The fields stand in labelled groups, choices last" */
+    it("keeps the prepaid declaration folded away under Advanced", async () => {
+      renderFields("copilot_studio_dataverse");
+
+      expect(
+        screen.queryByText("This Copilot runs on prepaid message packs"),
+      ).toBeNull();
+      await expandAdvanced();
+      expect(
+        screen.getByText("This Copilot runs on prepaid message packs"),
+      ).toBeTruthy();
+    });
+
+    /** @scenario "A new source starts with one app registration for everything" */
+    it("starts with the one-app switch on and no billing fields in sight", () => {
+      renderFields("copilot_studio_dataverse");
+
+      const oneApp = screen.getByTestId(
+        "parser-switch-azureBillingUsesSameApp",
+      ) as HTMLInputElement;
+      expect(oneApp.checked).toBe(true);
+      expect(
+        screen.queryByText(/Billing app registration client ID/),
+      ).toBeNull();
+      expect(
+        screen.queryByText(/Billing app registration client secret/),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the admin turns the one-app switch off", () => {
+    /** @scenario "Turning the switch off reveals the billing credential fields" */
+    it("reveals the billing credential fields", async () => {
+      renderFields("copilot_studio_dataverse");
+      const user = userEvent.setup();
+
+      await user.click(
+        screen.getByTestId("parser-switch-azureBillingUsesSameApp"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Billing app registration client ID/),
+        ).toBeTruthy();
+      });
+      expect(
+        screen.getByText(/Billing app registration client secret/),
+      ).toBeTruthy();
+    });
+  });
+});
