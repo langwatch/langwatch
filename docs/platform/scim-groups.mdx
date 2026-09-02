@@ -1,162 +1,130 @@
 ---
 title: "SCIM Groups & Role Mapping"
-description: "Automatically assign roles to users in LangWatch based on groups pushed from your identity provider."
+description: "Bind roles to the groups your identity provider pushes over SCIM, so every member of a group holds the same access."
 sidebarTitle: SCIM Groups
 keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, identity provider, rbac, access control
 ---
 
-SCIM Groups allow your identity provider to push group memberships into LangWatch. Admins can then map those groups to specific roles at the organization, team, or project level, so users automatically get the right access the moment they are provisioned.
-
-Whether the group is SCIM-synced or created manually in the UI, groups are an **Enterprise** feature in LangWatch.
+A SCIM group is a group that your identity provider pushes into LangWatch. You bind roles to the group at the organization, team or project scope, and every member of the group holds those roles.
 
 <Info>
-  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up user provisioning first.
+  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up [SCIM Provisioning](/platform/scim) for users first.
 </Info>
 
 ---
 
-## How It Works
+## How it works
 
-1. Your identity provider pushes groups to LangWatch via the SCIM `/Groups` endpoint
-2. Groups appear in **Settings → Groups** in LangWatch
-3. Admins assign role bindings to each group (e.g. _MEMBER on Team Engineering_)
-4. When a user is added to the group in the IdP, they inherit all roles assigned to that group
-5. When a user is removed from the group (or deprovisioned), access is revoked automatically
+1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
+2. The groups appear at **Settings > Groups**
+3. You bind roles to each group, for example Member on the Engineering team
+4. A user added to the group in the identity provider holds every binding of the group
+5. A user removed from the group, or deprovisioned, loses them
 
 ---
 
-## Viewing Groups
+## View groups
 
-Navigate to **Settings → Groups** to see all groups pushed from your identity provider. Each row shows:
+**Settings > Groups** lists every group. Each row shows:
 
 | Column | Description |
 |--------|-------------|
-| **Group** | The group name as defined in your IdP |
-| **Source** | `SCIM` for IdP-managed groups, `Manual` for manually created groups |
-| **Access** | The role bindings assigned to this group |
-| **Members** | Number of users currently in the group |
+| **Group** | The group name from the identity provider |
+| **Source** | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
+| **Access** | The role bindings of the group |
+| **Members** | The number of users in the group |
 
-Click any group row to open the detail panel where you can manage bindings and members.
+Click a row to open the group dialog, where you manage the bindings and, for manual groups, the members.
 
 ---
 
-## Assigning Roles to a Group
+## Bind roles to a group
 
-Open a group and use the **Access granted** section to add role bindings:
+Open a group. In the **Access granted** section:
 
 1. Select a **role** (Admin, Member, Viewer, or a custom role)
 2. Select the **scope**: Organization, Team, or Project
-3. Select the specific team or project (for Team/Project scope)
-4. Click **Add**
+3. Select the team or the project for a Team or Project scope
+4. Click **Add**, then **Save**. The binding is written when you save
 
-<Tip>
-  You can add multiple bindings to a single group, for example, _Member on the whole organization_ plus _Admin on Team Platform_.
-</Tip>
+A group can hold several bindings, for example Member on the organization plus Admin on the Platform team.
 
-### Role Scopes
+### Binding scopes
 
 | Scope | What it grants |
 |-------|---------------|
-| **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
+| **Organization** | The role on every team and project in the organization |
+| **Team** | The role on one team and all its projects |
+| **Project** | The role on one project |
 
 ---
 
-## Role Resolution
+## How bindings add up
 
-A user may belong to multiple groups, each with different role assignments. LangWatch resolves the effective role using the **highest privilege wins** rule:
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Members**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
-**Hierarchy:** `ADMIN > MEMBER > VIEWER`
+For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
-If a user is in:
-- Group A → Member on Team Engineering
-- Group B → Admin on Team Engineering
-
-They receive **Admin** on Team Engineering.
-
-For custom roles: if a user only has custom role assignments (no built-in roles), the custom role is used. If they have both built-in and custom roles, the built-in hierarchy takes precedence.
-
-The most specific scope always applies, a project-level binding overrides a team-level binding for that project.
+**Also check:** [Access Control (RBAC)](/platform/rbac) for how a request is authorized.
 
 ---
 
-## User Lifecycle with Groups
+## User lifecycle with groups
 
-### When a User is Added to a Group
+### When a user is added to a group
 
-The user immediately inherits all role bindings assigned to that group. If they were not yet a member of your LangWatch organization, they are provisioned as a **Member** first (see [User Provisioning](/platform/scim#provisioning-create)).
+The user holds every binding of the group at once. Group membership never creates a user: a member id that is not yet in your organization is skipped, so provision the user through `/Users` first (see [User Provisioning](/platform/scim#provisioning-create)).
 
-### When a User is Removed from a Group
+### When a user is removed from a group
 
-Their group-inherited roles are removed. If they have no other active bindings, they will have no project or team access but remain in the organization.
+The group's bindings no longer apply to the user. With no other binding, the user stays in the organization and sees no team or project.
 
-### When a User is Deprovisioned (DELETE)
+### When a group is deleted
 
-When your IdP sends a SCIM DELETE for a user:
+LangWatch removes the group, its memberships and its role bindings.
 
-- Their org membership and all role bindings are **removed**
-- Their account is **deactivated**: they can no longer sign in
-- Their data (traces, annotations, datasets) is **preserved**
+### When a user is deprovisioned (DELETE)
 
-A second DELETE for the same user returns `404 Not Found`, the operation is idempotent.
-
-### When a User is Suspended (PATCH active=false)
-
-When your IdP suspends a user (sets `active: false`):
-
-- Their account is **deactivated**: they can no longer sign in
-- Their org membership and role bindings are **preserved**
-- Re-activating (`active: true`) immediately restores access
-
-<Info>
-  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE for permanent offboarding. The distinction matters because DELETE removes all role bindings and group memberships, re-provisioning the user starts from scratch.
-</Info>
+A `DELETE` on a user removes the organization membership and every role binding, deactivates the account and keeps the user's data. A `PATCH` with `active: false` deactivates the account and keeps the membership and the bindings. Both are described in [SCIM Provisioning](/platform/scim#user-lifecycle).
 
 ---
 
-## Manual Groups
+## Manual groups
 
 You can also create groups manually without an identity provider:
 
-1. In **Settings → Groups**, click **Add manual group** at the bottom of the table
+1. At **Settings > Groups**, click **Add manual group** at the bottom of the table
 2. Enter a group name
-3. Optionally add role bindings and members in the creation dialog
+3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
 
-Manual groups behave identically to SCIM groups for role assignment. Members must already be in your organization to be added.
-
-<Note>
-  Manual groups are not synced with any identity provider. Membership must be managed from within LangWatch.
-</Note>
+Bindings work the same way on manual and SCIM groups. Members must already be in your organization. A manual group is not synced with an identity provider, and the `/Groups` endpoint does not list it.
 
 ---
 
-## SCIM Group Endpoints
-
-LangWatch supports the following SCIM group operations:
+## SCIM group endpoints
 
 | Endpoint | Methods |
 |----------|---------|
 | `/api/scim/v2/Groups` | `GET`, `POST` |
 | `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
 
-### Supported PATCH Operations
+`POST` with the `displayName` of an existing group returns `409 Conflict`. `GET /Groups` returns SCIM groups only, at most 100 per page.
+
+### Supported PATCH operations
 
 | Operation | Example | Effect |
 |-----------|---------|--------|
-| `add members` | Add users to group | Users inherit group's roles |
-| `remove members` | Remove users from group | Roles revoked for removed users |
-| `replace displayName` | Rename the group | Group name updated in LangWatch |
-| `replace members` | Full member replacement | Adds new, removes old members |
+| `add members` | Add users to the group | The users hold the group's bindings |
+| `remove members` | Remove users from the group | The group's bindings no longer apply to them |
+| `replace displayName` | Rename the group | The name changes in LangWatch |
+| `replace members` | Replace the member list | Adds the new members and removes the old ones |
 
-A `replace` that carries no member list leaves the group's membership alone. Replacing an unrelated attribute never removes anyone. Sending `members` as an empty list is a member list, and does clear the group, as does an explicit `null`.
+A `replace` clears the membership only when `members` is an empty list or an explicit `null`. A `replace` with no `members` value, a `members` value that is not a list, or a list with entries that have no usable string `value` leaves the membership unchanged, so a malformed payload cannot revoke access. The other attributes in the same operation, such as `displayName`, still apply, and the unapplied part is written to the server log.
 
-To clear a group you have to say so, either with an empty list or with an explicit `null`. A missing `members` value, a non-`null` value that is not a list, or a list holding entries without a usable id (no string `value`, or a blank one) does not change membership, so a malformed payload cannot revoke anyone's access. Only the member replacement is left unapplied: any other recognized attribute in the same operation, such as `displayName`, still takes effect. The unapplied part is recorded in the server logs.
+### Supported filter
 
-### Supported Filter
-
-Groups can be filtered by `displayName` using a case-insensitive `eq` filter:
+`GET /Groups` filters by `displayName` with a case-insensitive `eq`:
 
 ```
 GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
@@ -166,44 +134,37 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 ## Troubleshooting
 
-**Groups are not appearing in LangWatch**
+**Groups do not appear in LangWatch**
 
-- Confirm that group push (SCIM provisioning of groups) is enabled in your IdP's application settings
-- Check your IdP's provisioning logs for errors on the Groups endpoint
-- Verify your bearer token has not been revoked
+- Group push is enabled in the identity provider's application settings
+- The provisioning log of the identity provider shows no error on the Groups endpoint
+- The bearer token is not revoked
 
 **Users in a group have no access**
 
-- Open the group in **Settings → Groups** and check the **Access granted** section
-- If empty, add at least one role binding to the group
-- Confirm the user appears in the group's **Members** list
+- Open the group at **Settings > Groups**. The **Access granted** section needs at least one binding
+- The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
-**User has more access than expected**
+**A user has more access than expected**
 
-- The user may be in multiple groups, check all group memberships in your IdP
-- Direct role bindings on the user (from **Settings → Members**) also apply and are combined with group bindings
+- The user is in several groups. Bindings add up across groups
+- Bindings set on the user at **Settings > Members** add up with the group bindings
 
-**Removing a user from a group in the IdP has no effect**
+**Removing a user from a group in the identity provider has no effect**
 
-- Ensure your IdP is configured to push group membership changes (not just user changes)
-- Check provisioning logs for any errors on the PATCH groups endpoint
+- The identity provider pushes group membership changes, not only user changes
+- The provisioning log shows no error on the group `PATCH`
 
 ---
 
-## Managing Groups via REST API
+## Manage groups through the REST API
 
-In addition to the UI and SCIM provisioning, groups can be managed programmatically via the [Groups REST API](/api-reference/groups/overview). This is useful for:
-
-- Automating group creation and membership management
-- Scripting role binding assignments
-- Integrating with custom provisioning workflows
-
-See the [Groups API Reference](/api-reference/groups/overview) for full endpoint documentation.
+The [Groups REST API](/api-reference/groups/overview) creates groups, sets their bindings and members, and deletes them, so you can script provisioning outside SCIM.
 
 <Info>
-SCIM-managed groups cannot have their members or names modified via the REST API. Those operations are reserved for the identity provider.
+  The name and the members of a SCIM group belong to the identity provider. The REST API and the settings page refuse to change them.
 </Info>
 
 ---
 
-For additional help, contact us at [support@langwatch.ai](mailto:support@langwatch.ai).
+For help, contact [support@langwatch.ai](mailto:support@langwatch.ai).

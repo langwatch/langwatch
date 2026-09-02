@@ -1,141 +1,102 @@
 ---
 title: Model Providers
-description: Configure LLM credentials once at the organisation, team, or project scope, and let every project that needs them inherit.
+description: Store the LLM credentials that LangWatch uses for evaluators, Workflows, the playground, Agent Testing and Langy once, at the organization, team or project scope.
 sidebarTitle: Model Providers
+keywords: model providers, api keys, openai, anthropic, azure, bedrock, vertex, gemini, scope, default models, langwatch
 ---
 
-LangWatch Model Providers are the credentials the platform uses to make real LLM calls on your behalf, from online evaluators, the prompt playground, the Optimization Studio, and the AI Gateway's bound provider credentials.
+## What a model provider is
 
-Historically every project carried its own copy of every provider credential. That's fine for one project but painful at enterprise scale: ten projects in one org meant ten copies of the same OpenAI key, ten rotation chores, and ten places to audit. The **scoped model providers** model replaces that with a single ladder.
+A model provider is a saved credential for one LLM vendor, with the scopes that can use it. LangWatch uses it whenever a feature calls a model on your behalf: online evaluators, Workflows, the prompt playground, Agent Testing, topic clustering, embeddings, trace AI search, Langy and the LangWatch AI Gateway.
 
-<CardGroup cols={3}>
-  <Card title="Organisation scope" icon="building">
-    One credential; every project in the org can use it. The common case for enterprise accounts with a single billing entity.
-  </Card>
-  <Card title="Team scope" icon="users">
-    One credential; every project under a team inherits. For teams with their own model budget or fine-tuning account.
-  </Card>
-  <Card title="Project scope" icon="folder">
-    One credential; only this project uses it. For test projects, per-customer isolation, or narrow experiments.
-  </Card>
-</CardGroup>
+Manage them at **Settings > Model Providers**. The table lists each configuration with its **Scope** chips, broadest scope first. The row menu has **Edit Provider**, **Test Connection** and **Delete Provider**. On a self-hosted deployment, a vendor whose key is set in the server environment shows as a row with a **System** chip and no menu.
 
-## How inheritance works
+<Frame>
+<img src="/images/platform/model-providers-add-menu.png" alt="The Add Model Provider menu with the provider types" />
+</Frame>
 
-A provider configured at a wider scope is automatically available to every narrower scope. A project sees the union of:
+## Supported providers
 
-1. Its own project-scoped providers,
-2. Every team-scoped provider on teams it belongs to,
-3. Every organisation-scoped provider on its parent org.
+**Add Model Provider** opens a menu with one entry per vendor:
 
-When multiple scopes offer "the same kind" of provider (e.g. two OpenAI credentials, one org-wide, one project-specific), the **narrowest scope wins** for that provider's bound features. The org-wide credential stays visible but tagged as "inherited"; the project credential is the effective one.
+| Provider | Credentials |
+|----------|-------------|
+| OpenAI | API key, or a base URL for an endpoint that needs none |
+| Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
+| Anthropic | API key, or a base URL |
+| Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
+| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
+| Bedrock | AWS access key id, secret access key and region |
+| Vertex AI | Service account JSON, project and location |
+| DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
+| ElevenLabs | API key, optional webhook secret |
+| Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
+| Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
-```
-Project "acme-api" sees:
-  ✓ OpenAI (Org: acme)             ← org-wide, inherited
-  ✓ Anthropic (Team: acme-platform) ← team-wide, inherited
-  ✓ OpenAI (Project: acme-api)      ← project-specific, OVERRIDES the org OpenAI
-  ✓ Azure (Project: acme-api)       ← project-specific, no org or team equivalent
-```
+You can save several configurations of the same vendor, for example one OpenAI account per region, and tell them apart by **Name**.
 
-## Creating a provider
+## Add a provider
 
-**Settings → Model Providers → New provider** opens the create drawer with an **Availability** radio group near the bottom of the form, three options: Project, Team, Organization.
+<Steps>
+  <Step title="Pick the vendor">
+    Click **Add Model Provider** and choose the vendor. The drawer opens.
+  </Step>
+  <Step title="Name it">
+    **Name** is required, up to 128 characters. It is how the configuration appears in model pickers and in the LangWatch AI Gateway.
+  </Step>
+  <Step title="Pick the scope">
+    **Scope** is a multi-select of the organization, teams and projects. It starts on the widest scope you can manage. The helper text states who can use the configuration, for example "Only this project can use this provider." You need `organization:manage`, `team:manage` or `project:manage` for each scope you pick.
+  </Step>
+  <Step title="Enter the credentials">
+    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, a **Routing handle** for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
+  </Step>
+  <Step title="Save and test">
+    Save, then open the row menu and click **Test Connection**. The verdict is **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
+  </Step>
+</Steps>
 
-| Option | Requires | Available to |
-|---|---|---|
-| **Project** | project-admin on the selected project | that project only |
-| **Team** | team-admin on the selected team | every project under the team |
-| **Organisation** | org-admin | every project in the org |
+<Frame>
+<img src="/images/platform/model-providers-scope.png" alt="The provider drawer with the Scope picker open" />
+</Frame>
 
-Radio options that your role doesn't cover are hidden (not greyed-out), e.g. a user on a personal org with no team sees only Project + Organization; a user who doesn't belong to a team sees the Team option omitted. Default selection is **Project**: least-privilege by default. Helper text under the radio describes each scope's blast radius:
+<Frame>
+<img src="/images/platform/model-providers-test-connection.png" alt="Test Connection on a saved provider reports Connection works" />
+</Frame>
 
-- **Project**: Only this project can use this provider.
-- **Team**: Every project in the team inherits this provider.
-- **Organization**: Every project in the organization inherits this provider.
+Bedrock, Vertex AI, Azure OpenAI, Azure Safety, Voyage AI and Codex cannot be tested automatically. Their settings are checked the first time a feature uses them.
 
-Once you've picked the scope, the rest of the form is the same as before: provider type (OpenAI, Anthropic, Azure, Bedrock, Vertex, Gemini, Custom OpenAI-compatible), credential fields, optional rotation policy.
+Scope is fixed after create. To move a configuration to another scope, delete it and create it again at the new scope.
 
-## Changing a provider's scope
+Keys are encrypted at rest with AES-GCM. After save the drawer shows a masked placeholder instead of the key; type a new value to replace it, or leave the placeholder to keep it.
 
-<Note>**v1 behaviour**: scope is set at create time and is immutable in the edit drawer. To change a provider's scope, create a new row at the desired scope, then delete the original. In-place widen/narrow with automatic binding reconciliation is a v1.1 follow-up. The design for that flow is described below for forward reference.</Note>
+## Custom models
 
-### v1.1 plan: Widening (Project → Team → Organisation)
+Every LLM provider has a **Custom Models** section with **Add model** and **Add embeddings model**. Each entry has a model id and a display name, and appears in the model pickers next to the vendor's known models. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
 
-Strictly additive. The provider becomes available to more projects; existing bindings continue to work unchanged (they reference the provider by id, not by scope). The edit drawer will surface a warning: "This provider will become available to every project in the org."
+## Who can see and use a configuration
 
-### v1.1 plan: Narrowing (Organisation → Team → Project)
+A project sees every configuration scoped to the project itself, to its team or to its organization. Each one is a separate entry in the model pickers under its own name.
 
-Narrowing can orphan downstream bindings. The edit drawer will show a confirmation modal listing every binding that will be archived before saving. Archival is explicit, each archived binding emits an audit-log entry so you can reconstruct exactly what happened.
+| Scope | Create, edit and delete | See |
+|-------|------------------------|-----|
+| Organization | `organization:manage` | `organization:view` |
+| Team | `team:manage` | `team:view` |
+| Project | `project:manage` | `project:view` |
 
-<Warning>Narrowing scope never silent-revokes. When shipped, the flow will show you exactly which bindings fall outside the new scope before you confirm.</Warning>
+The scope filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
 
-## Overriding an inherited provider at a narrower scope
+## Default models
 
-If a project needs its own OpenAI key, different rate limits, different region, a dedicated billing account, you don't have to remove the inherited one. Create a new provider with the same type at **Project** scope; the narrower row takes precedence and is the effective credential. The inherited row remains visible in the list (so you understand where it came from) but is no longer used for resolution on that project.
+The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
 
-<Note>In v1 the inherited row shows its scope badge (Org, Team) but does not have an **Override at project scope** action in its kebab menu, you create the project-scoped row directly from **New provider**. The inline override affordance is a v1.1 follow-up.</Note>
+Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-## AI Gateway provider bindings
+<Frame>
+<img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
+</Frame>
 
-Every `GatewayProviderCredential` (the thing a VK is bound to) references a `ModelProvider` by id, independent of the provider's scope. So **scope changes never break bindings**, and binding creation works identically whether the bound provider is org, team, or project.
+## Self-hosted deployments
 
-<Note>**Provider scope ≠ binding scope.** A binding is always **per-project** (it belongs to a project's VK). What an org-scoped provider enables is (a) **visibility**: every project in the org sees the provider in Settings + the Bind drawer, (b) **credential sharing**: the decrypted API key comes from the one org row, so rotation at the org level propagates everywhere. Each project still creates its own binding because gateway-specific knobs (rate limits, slot, fallback priority) are per-project decisions. An org-scoped provider visible across 5 projects that all want gateway routing still needs 5 binding operations, that's intentional, preserves governance and budget attribution.</Note>
+Set vendor keys as environment variables to get **System** configurations available to every project. See [self-hosting](/self-hosting/overview) for the variable names. Configurations added in the settings page work alongside them.
 
-The AI Gateway → Providers → Bind provider drawer groups the Select options by scope origin:
-
-```
-─ Organisation (acme) ─
-  OpenAI-ent
-─ Team (acme-platform) ─
-  OpenAI-plat
-─ This project (acme-api) ─
-  OpenAI-prod-only
-```
-
-Hovering any option shows why it's visible at the current project, the scope-ladder rationale, one line.
-
-## Permissions
-
-The scope ladder reuses the existing RBAC model with three new manage permissions:
-
-| Permission | Who gets it by default | Lets you |
-|---|---|---|
-| `modelProviders:manage:organization` | org-admin | Create, edit, delete org-scoped providers |
-| `modelProviders:manage:team` | team-admin | Create, edit, delete providers scoped to any team you admin |
-| `modelProviders:manage:project` | project-admin | Create, edit, delete project-scoped providers |
-
-See [RBAC](/platform/rbac) for the full permission model.
-
-## Default Model: the same ladder
-
-`DefaultModel` configs mirror the exact same scope ladder. An org admin can pin `openai/gpt-5-mini` as the default for the whole organisation; teams and projects override only when they need to. Resolution walks project → team → org, first-match-wins, narrower overrides win.
-
-## Migration from project-scoped to scoped
-
-If you've been using LangWatch for a while, every existing provider lives at **Project** scope. The scoped-providers migration is **zero-drift**: every existing row gets `scopeType=PROJECT` and `scopeId = current projectId` automatically, with identical behaviour.
-
-You opt into wider scopes on your timeline. A practical migration path for an org with N projects and duplicated credentials:
-
-1. Identify the provider you have N copies of (e.g. OpenAI).
-2. Create one new Org-scoped provider with the canonical credentials.
-3. For each of the N projects, verify the inherited org provider is the one now in use (the project-scoped copy can stay visible; the narrower one wins unless you delete it).
-4. Rotate the N project-scoped keys to the org row over a window you control.
-5. Delete the (now-superseded) project-scoped copies. Existing bindings on any VK still reference specific credential IDs, they follow the VK's `providerCredentialId`, not the name, so be careful when deleting to preserve the binding path.
-
-See [AI Gateway → Provider Bindings](/ai-gateway/provider-bindings#scope--access) for the gateway-side story.
-
-## Trade-offs and guardrails
-
-**Wider isn't always better.** Org-scoped credentials share a rate limit across every project. If one team's traffic spike starves another team's evaluator runs, narrower scopes are the right lever. Scope for the boundary that matches your blast-radius tolerance, not the broadest one that works.
-
-**Rotation at scope.** Rotating an org-scoped credential rotates it for every project that inherits it, on the next bundle refresh (≤ 30 s on the gateway path). Plan your rotation windows accordingly, don't rotate a hot org credential at peak traffic.
-
-**Audit trails.** Every create, edit, scope change, and delete emits an audit-log entry, see [Audit Log](/platform/audit-log). For enterprise compliance, this is the single source of truth for "who changed this credential, when, and from what to what."
-
-## See also
-
-- [RBAC](/platform/rbac): the permission model that gates scope changes.
-- [Audit Log](/platform/audit-log): every scope change shows up here.
-- [AI Gateway → Provider Bindings](/ai-gateway/provider-bindings): how the gateway resolves a VK's bound provider across scopes.
-- [Custom Models](/integration/custom-models): connecting local or OpenAI-compatible endpoints (the same dialog now has a scope picker).
+**Also check:** [Access Control (RBAC)](/platform/rbac) for the permissions above, [Custom Models](/integration/custom-models) for OpenAI-compatible endpoints, and [LangWatch AI Gateway providers](/ai-gateway/provider-bindings) for routing traffic through a saved configuration.

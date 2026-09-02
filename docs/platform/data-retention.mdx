@@ -1,82 +1,84 @@
 ---
 title: Data Retention
-description: Control how long LangWatch keeps your event data before it's deleted.
+description: Set how long LangWatch keeps traces, scenario runs and experiment runs per organization, team or project before it deletes them.
 keywords: data retention, retention policy, delete data, ttl, retention period, enterprise, self-hosting
 ---
 
-Data retention sets how long LangWatch keeps your event data before deleting it automatically. Retention applies to the events LangWatch ingests (the spans within your traces and your scenario runs) along with their associated data.
-
-You can tighten or extend retention per scope: the organization, a team, or a single project.
-
 <Note>
-  Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
+  **Available on paid plans.** Configuring retention needs a paid plan. On the Free plan every project keeps data for the platform default of 49 days. Enterprise plans and self-hosted deployments with a license also get the longer presets and a custom period. Retained data over the plan volume is billed per extra GB, see the [pricing page](/pricing).
 </Note>
 
-## How it works
+## What retention covers
 
-Retention is configured with **retention policies**. Each policy has two parts:
+A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data, and one policy sets the same period for all three:
 
-- **Scope**: the level the policy applies to. Policies cascade most-specific-first, so a more specific scope overrides a broader one:
-  - **Organization**: the default that applies to every project in the org.
-  - **Team**: overrides the organization default for projects in that team.
-  - **Project**: overrides both the team and organization defaults for that project only.
-- **Retention period**: how long data is kept before deletion.
+| Category | Data |
+|----------|------|
+| Traces & Spans | Spans, log records, metrics, trace summaries, analytics, evaluation runs and Langy analytics events |
+| Scenarios | Scenario runs and suite runs |
+| Experiments | Experiment runs and their items |
 
-Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
+Data stored in Postgres is not covered: annotations, datasets, prompts, and the settings pages keep their rows.
 
-<Note>
-  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB**. You only pay for what you store.
-</Note>
+The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13 month lifetime, so you can reconcile invoices after the traces behind them are gone.
 
-## Configuration
+## Scopes
 
-Organization owners and administrators manage policies under **Settings → Data Retention** at [app.langwatch.ai/settings/data-retention](https://app.langwatch.ai/settings/data-retention).
+Write a policy at the organization, a team or a project. A project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
 
-To add a scoped policy:
+<Frame>
+<img src="/images/platform/data-retention.png" alt="Settings > Data Retention with one policy and the Add retention policy button" />
+</Frame>
+
+## Periods
+
+Periods are whole weeks. The presets round up so that the label is always covered:
+
+| Preset | Days | Plans |
+|--------|------|-------|
+| 1 month | 35 | Paid, Enterprise, self-hosted |
+| 2 months | 63 | Paid, Enterprise, self-hosted |
+| 3 months | 91 | Enterprise, self-hosted |
+| 1 year | 371 | Enterprise, self-hosted |
+| 5 years | 1827 | Enterprise, self-hosted |
+| Custom | 49 days or more, in weeks, months (28 days) or years (364 days), rounded to whole weeks | Enterprise, self-hosted |
+
+The longest period is 65,534 days.
+
+## Add a policy
+
+Open **Settings > Data Retention**. Reading the page needs `project:view`. Writing a policy needs `organization:manage` for the organization, `team:manage` for a team and `project:update` for a project. The scope picker only offers the scopes you can write.
 
 <Steps>
-  <Step title="Open the drawer">
-    Click **Add retention policy**.
+  <Step title="Click Add retention policy">
+    The drawer opens with the **Scope** picker and the **Retention** select.
   </Step>
-  <Step title="Choose a scope">
-    Pick the organization, a team, or a single project. A more specific scope overrides the broader defaults.
+  <Step title="Pick one or more scopes">
+    The picker is multi-select. One **Create** writes the same period to every scope you pick.
   </Step>
-  <Step title="Pick a retention period">
-    Choose one of the preset windows or enter a custom value in weeks, months, or years.
+  <Step title="Pick the retention period">
+    Choose a preset, or **Custom...** on Enterprise and self-hosted, and enter an amount and a unit.
   </Step>
-  <Step title="Create">
-    Click **Create** to save the policy.
+  <Step title="Decide about existing data">
+    **Apply this change to existing data** is off by default. Off: the period applies to data ingested from now on. On: LangWatch also restamps the rows already stored for the current project, and rows older than the new period become eligible for deletion.
+  </Step>
+  <Step title="Click Create">
+    The policy appears in the table. The row menu has **Edit**, which reopens the drawer with the scope locked and saves with **Save changes**, and **Remove**, after which the scope falls back to the next policy in the chain.
   </Step>
 </Steps>
 
-### Applying the change to existing data
-
-When you create or update a policy, you choose whether it applies only going forward or also to data you've already stored:
-
-- **Off**: the new retention applies to newly ingested data only.
-- **On** (*"Apply this change to existing data"*): LangWatch rewrites the scope's existing rows so the new retention takes effect immediately. Data that is already older than the new window is removed on the next cleanup.
-
-## How deletion works
-
-LangWatch periodically removes any events that fall outside the configured retention window. Because retention is partition-aligned, data is cleaned up in whole-week partitions rather than row-by-row at the exact second it expires.
-
-A few things to keep in mind:
-
 <Warning>
-  **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to keep data beyond your retention window, export it before it expires.
+  Deletion is permanent. Export data you need to keep before its period ends.
 </Warning>
 
-- **Retention applies to the underlying data, regardless of references.** If another object, for example a dataset or an evaluation, references an event that has since been deleted, that reference points to data that no longer exists.
-- **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
+## How deletion runs
 
-## Billing records are exempt
+Every stored row carries its retention period. ClickHouse deletes expired rows during its background merges through a TTL expression, so a row disappears some time after its period ends, not at the exact second.
 
-[Gateway spend records](/ai-gateway/billing-events), the per-request billing events platforms use to rebill their own customers, are deliberately **outside** tenant retention. They keep a **fixed 13-month** lifetime regardless of any policy configured here.
+Shortening a period without **Apply this change to existing data** leaves stored rows on their old period. Lengthening a period never brings back deleted rows.
 
-Retention policies are customer-shrinkable to weeks and can rewrite existing data retroactively; billing records are invoiceable evidence and must survive both. Shortening your trace retention never deletes spend records, and no policy can extend or shorten their 13-month window. The practical effect: your billing reconciliation window is always 13 months, even when operational traces are kept for far less, and a spend event remains queryable after its underlying trace has aged out (only the trace drill-through is gone).
+## Self-hosted deployments
 
-## Self-hosted and hybrid instances
+Retention works the same way on your own ClickHouse. Files that traces reference in object storage, for example images, are not deleted by retention.
 
-Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
-
-If you use versioned object storage, removing an object leaves earlier versions and delete markers in place. Clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.
+**Also check:** [Data Privacy](/platform/data-privacy) for what LangWatch stores in the first place, and [self-hosting](/self-hosting/overview) for the storage setup.

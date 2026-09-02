@@ -35,7 +35,7 @@ The seat panel above the table shows **Team Members** and **Lite Members** in us
 
 ## Invite people
 
-Click **Add members**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer, and an invite with no team is warned about, because a Lite Member with no team sees no project.
+Click **Add members**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
 
 Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
 
@@ -47,7 +47,7 @@ Pending invites are listed under the members table with their status: Invited, E
 
 ### Let colleagues join by domain
 
-The **Domain join** card on the members page sets how people with a verified email address on your domain get in:
+The **Who can join your organization** section below the members table sets how people with a verified email address on your domain get in:
 
 | Option | Behavior |
 |--------|----------|
@@ -61,16 +61,16 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 
 ## Teams
 
-**Settings > Teams** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
+**Settings > Teams & Projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
 
 <Frame>
-<img src="/images/platform/teams.png" alt="Settings > Teams with two teams, their members and their projects" />
+<img src="/images/platform/teams.png" alt="Settings > Teams & Projects with two teams, their members and their projects" />
 </Frame>
 
 **Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only; for someone already on the team it overrides the team role for that project. A project with overrides is marked, and each override can be reverted to the team role.
 
 <Frame>
-<img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams with the per-member role select" />
+<img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams & Projects with the per-member role select" />
 </Frame>
 
 Click **Edit** on a team to open its page: rename it (the slug is read only), edit the members, add or archive projects. **Archive this team** hides the team and all its projects; contact support to restore it. A team keeps at least one Admin: removing the last one is refused.
@@ -79,7 +79,7 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 
 | Action | Where | Effect |
 |--------|-------|--------|
-| Remove from a team | Settings > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
+| Remove from a team | Settings > Teams & Projects, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
 | Remove a group member | Settings > Groups | The person loses every binding that came from the group |
 | Disable | Settings > Members, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
 | Delete | Settings > Members, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
