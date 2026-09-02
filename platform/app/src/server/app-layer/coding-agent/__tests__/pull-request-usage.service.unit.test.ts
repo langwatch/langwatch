@@ -791,12 +791,10 @@ describe("PullRequestUsageService", () => {
       // With no stamped facts, the whole session prices under the pull
       // request it opened first; the other row is discovered but reports the
       // work that was stamped on it, which is none.
-      expect(
-        usage.rows.find((row) => row.prNumber === 7)?.totalTokens,
-      ).toBe(180);
-      expect(
-        usage.rows.find((row) => row.prNumber === 8)?.totalTokens,
-      ).toBe(0);
+      expect(usage.rows.find((row) => row.prNumber === 7)?.totalTokens).toBe(
+        180,
+      );
+      expect(usage.rows.find((row) => row.prNumber === 8)?.totalTokens).toBe(0);
     });
   });
 
@@ -1258,9 +1256,7 @@ describe("PullRequestUsageService", () => {
           prCreatedAt: new Date(NOW - 8 * HOUR),
         }),
       ],
-      sessions: [
-        sessionRow({ gitBranches: ["feat/linkage", "feat/next"] }),
-      ],
+      sessions: [sessionRow({ gitBranches: ["feat/linkage", "feat/next"] })],
       modelTotals: [
         stampedTotalsRow({
           inputTokens: 20,
@@ -1282,9 +1278,9 @@ describe("PullRequestUsageService", () => {
 
     /** @scenario "A session that drove two pull requests splits its cost between them" */
     it("prices each pull request by the share of tokens stamped on it", async () => {
-      const first = await serviceWith(splitFixture()).service.getPullRequestUsage(
-        QUERY,
-      );
+      const first = await serviceWith(
+        splitFixture(),
+      ).service.getPullRequestUsage(QUERY);
       const second = await serviceWith(
         splitFixture(),
       ).service.getPullRequestUsage({ ...QUERY, prNumber: 8 });
@@ -1313,9 +1309,8 @@ describe("PullRequestUsageService", () => {
         model: "claude-opus-5",
       };
 
-      const first = await serviceWith(fixture).service.getPullRequestUsage(
-        QUERY,
-      );
+      const first =
+        await serviceWith(fixture).service.getPullRequestUsage(QUERY);
       const second = await serviceWith(fixture).service.getPullRequestUsage({
         ...QUERY,
         prNumber: 8,
@@ -1341,18 +1336,15 @@ describe("PullRequestUsageService", () => {
           prCreatedAt: new Date(NOW - 8 * HOUR),
         }),
       ],
-      sessions: [
-        sessionRow({ gitBranches: ["feat/linkage", "feat/next"] }),
-      ],
+      sessions: [sessionRow({ gitBranches: ["feat/linkage", "feat/next"] })],
     });
 
     /** @scenario "Tokens stamped with no context follow the legacy whole-session rule" */
     it("lands the whole total on the first-opened pull request alone", async () => {
       const fixture = { ...legacyFixture(), modelTotals: [modelTotalsRow()] };
 
-      const first = await serviceWith(fixture).service.getPullRequestUsage(
-        QUERY,
-      );
+      const first =
+        await serviceWith(fixture).service.getPullRequestUsage(QUERY);
       const second = await serviceWith(fixture).service.getPullRequestUsage({
         ...QUERY,
         prNumber: 8,
@@ -1367,9 +1359,8 @@ describe("PullRequestUsageService", () => {
     it("prices a session that logged no per-call facts under the legacy rule", async () => {
       const fixture = { ...legacyFixture(), modelTotals: [] };
 
-      const first = await serviceWith(fixture).service.getPullRequestUsage(
-        QUERY,
-      );
+      const first =
+        await serviceWith(fixture).service.getPullRequestUsage(QUERY);
       const second = await serviceWith(fixture).service.getPullRequestUsage({
         ...QUERY,
         prNumber: 8,

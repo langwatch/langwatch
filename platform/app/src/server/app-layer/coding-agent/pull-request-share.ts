@@ -132,7 +132,9 @@ function shareOfPullRequest({
   // The stamps may name branches the session row's bounded branch set no
   // longer holds, so the tenure rule is asked about the union of both.
   const stampedBranches = rows
-    .filter((row) => isStampedOnRepository(row, repositoryHost, repositoryFullName))
+    .filter((row) =>
+      isStampedOnRepository(row, repositoryHost, repositoryFullName),
+    )
     .map((row) => row.branch);
   const headBranches = [
     ...new Set([...branchesOf(session), ...stampedBranches]),

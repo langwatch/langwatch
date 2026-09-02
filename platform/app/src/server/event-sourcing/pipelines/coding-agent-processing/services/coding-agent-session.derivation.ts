@@ -15,16 +15,16 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
-import {
-  SESSION_CONTEXT_ATTR,
-  SESSION_CONTEXT_EVENT,
-} from "./session-context-memo";
 import type {
   CodingAgentSessionData,
   MetricSeriesFact,
   SessionStep,
   SessionTitleSource,
 } from "./coding-agent-session.types";
+import {
+  SESSION_CONTEXT_ATTR,
+  SESSION_CONTEXT_EVENT,
+} from "./session-context-memo";
 
 /**
  * Derive a coding-agent SESSION from its contributions (ADR-056,
