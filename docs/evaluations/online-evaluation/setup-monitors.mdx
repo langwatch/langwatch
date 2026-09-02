@@ -5,7 +5,7 @@ description: Create an online evaluation that scores every incoming trace or thr
 
 A monitor is an evaluator attached to your production traffic. Every trace that matches its preconditions and sampling rate is scored as it arrives, asynchronously, so the score never delays the response to your user.
 
-This guide sets up a PII detection monitor. The same steps apply to any evaluator, including an LLM-as-a-Judge with your own criteria.
+This guide sets up an LLM-as-a-Judge monitor named `Off-topic reply` that flags replies that drift away from the customer's question. The same steps apply to any evaluator, for example PII detection or jailbreak detection.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ This guide sets up a PII detection monitor. The same steps apply to any evaluato
 <Step title="Pick an evaluator category">
 Open [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) and click **New Online Evaluation**. The **Choose Evaluator Category** drawer lists **Expected Answer**, **LLM as Judge**, **RAG Quality**, **Quality Aspects** and **Safety**, plus **Custom (Code)** for a Python evaluator and **Custom (from Workflow)** for a workflow.
 
-For PII, pick **Safety**, then **Presidio PII Detection**.
+Pick **LLM as Judge**, then **LLM-as-a-Judge Boolean Evaluator**.
 
 <Frame>
 <img src="/images/evaluations/online-evaluation-category.png" alt="The Choose Evaluator Category drawer" />
@@ -26,7 +26,7 @@ For PII, pick **Safety**, then **Presidio PII Detection**.
 </Step>
 
 <Step title="Configure the evaluator">
-Name the evaluator and set its options. For Presidio PII Detection, the options are the entity types to flag, for example credit card numbers, email addresses, IBAN codes and phone numbers. Names and locations are off by default.
+Name the evaluator, pick the judge model and write the criteria in **Prompt**, for example: the reply passes only when it answers the customer's question and stays on the topic of the customer's order. A built-in evaluator such as PII Detection shows its own options here instead, for example the entity types to flag.
 
 Under **Variables**, map the evaluator's fields to the trace. `input` maps to the trace input and `output` to the trace output by default. Click **Create Evaluator**.
 </Step>
@@ -66,7 +66,7 @@ Pick **Thread Level** in the drawer. The evaluator's variables now map to the **
 On a trace, the **Evals** section of the trace drawer lists each monitor that ran with its verdict, score and details. The trace table has an **Evals** column too, so you can filter and sort the [Trace Explorer](https://app.langwatch.ai/@project/traces) by the monitor's result.
 
 <Frame>
-<img src="/images/evaluations/trace-evals.png" alt="The Evals section of a trace drawer with the PII detection verdict" />
+<img src="/images/evaluations/trace-evals.png" alt="The Evals section of a trace drawer with the Off-topic reply verdict" />
 </Frame>
 
 The [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) list shows every monitor with its status and **Performance, last 7 days**: the pass rate or the average score with a trend against the previous week. **View analytics** in the row menu opens the evaluations analytics page with the pass rate trend, the average score and the overall pass and fail trend per monitor.

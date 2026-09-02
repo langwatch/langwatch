@@ -61,7 +61,7 @@ Click **Run** in the header. Each row fills with the assistant's answer and the 
 </Step>
 
 <Step title="Read the reasons">
-Click an evaluator chip to open its **Result** block. **Details** holds the judge's reasoning, including the criterion that failed. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
+Click an evaluator chip to open its **Result** block. **Status** is the verdict and **Details** holds the judge's reasoning, including the criterion that failed. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
 
 <Frame>
 <img src="/images/evaluations/workbench-evaluator-result.png" alt="An evaluator chip popover with the score, label, status and the judge's reasoning in Details" />
@@ -79,6 +79,6 @@ A judge is a model with a prompt, so check it before you trust its pass rate.
 
 ## Iterate and compare runs
 
-Change the prompt, click **Run** again, then open **Results** and click **Compare** in the **Experiment Runs** sidebar to see both runs side by side. The pass rate tells you whether the change helped; the reasons on the rows that flipped tell you why.
+Change the prompt, click **Run** again, then open **Results** and tick both runs in the **Experiment Runs** sidebar to see them side by side. The pass rate tells you whether the change helped; the reasons on the rows that flipped tell you why.
 
 **Also check:** [Answer correctness](/evaluations/experiments/ui/answer-correctness) when your dataset has expected outputs, and [Comparison](/evaluations/experiments/ui/pairwise-compare) to let a judge pick the best of two or more prompts per row instead of scoring each one alone.

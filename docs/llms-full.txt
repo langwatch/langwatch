@@ -44100,6 +44100,10 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    ```
    Or open the **Run Options** menu in the experiment toolbar and choose **Run in CI/CD** for ready-to-copy snippets.
 
+<Frame>
+<img src="/images/evaluations/workbench-run-via-api.png" alt="The Run via API dialog with the Python, TypeScript and Shell tabs, the data source tabs and the Python snippet" />
+</Frame>
+
 3. **Run from CI/CD:**
 
 
@@ -44973,7 +44977,11 @@ An experiment is a table. Each row is a dataset entry, each column is a prompt o
 1. Open [Experiments](https://app.langwatch.ai/@project/experiments) and click **New Experiment**, then **Create Experiment**. The workbench opens with a generated name. Click the name to rename it.
 2. Under **Datasets**, click **Add** and pick **Select existing dataset**, **Upload CSV** or **Create new**. You can edit cells inline. A dataset created inside the workbench stays there until you pick **Save as dataset** from its tab menu.
 3. Under **Prompts or Agents**, click **Add**. The **Add to Evaluation** drawer offers four columns: **Prompt**, **Agent**, **Comparison** and **Evaluator**.
-4. On a prompt or agent column, click **Add evaluator** and pick a saved evaluator, or create one from the evaluator categories.
+4. On a prompt or agent column, click **Add evaluator** and pick a saved evaluator, or create one from the evaluator categories: **Expected Answer**, **LLM as Judge**, **RAG Quality**, **Quality Aspects**, **Safety**, **Custom (Code)** and **Custom (from Workflow)**.
+
+<Frame>
+<img src="/images/evaluations/workbench-evaluator-category.png" alt="The Choose Evaluator Category drawer with the five categories and the two custom entries" />
+</Frame>
 
 <Frame>
 <img src="/images/evaluations/workbench-add-to-evaluation.png" alt="The Add to Evaluation drawer with the Prompt, Agent, Comparison and Evaluator cards" />
@@ -45002,9 +45010,9 @@ LangWatch fills the mapping for you when the names match. A dataset column named
 
 ## Read the results
 
-Each cell shows the column output, and each evaluator chip shows its verdict. Click a chip to open its **Result** block with the score, the label, the status and the details the evaluator returned, for example the reason an LLM judge gave.
+Each cell shows the column output, and each evaluator chip shows its verdict. Click a chip to open its **Result** block with the status, the score or the label when the evaluator returns one, and the details, for example the reason an LLM judge gave. The same popover has **Rerun**, **Run on all rows** and **Edit Configuration**.
 
-The column header shows the pass rate for the column. Hover over it to open the summary: **Rows**, **Pass Rate**, **Avg Score**, **Avg Latency**, **Total Cost**, **Execution Time**, and one line per evaluator with its pass rate and average score.
+The column header shows the pass rate for the column. Hover over it to open the summary: **Rows**, **Pass Rate**, **Avg Latency**, **Total Cost**, **Execution Time**, and one line per evaluator with its pass rate or average score.
 
 <Frame>
 <img src="/images/evaluations/workbench-column-summary.png" alt="The column summary popover with rows, pass rate, average score, latency, cost and the per-evaluator breakdown" />
@@ -45012,7 +45020,7 @@ The column header shows the pass rate for the column. Hover over it to open the 
 
 ## Compare runs
 
-**Results** in the header opens the results page for the experiment. The **Experiment Runs** sidebar lists every run, newest first. Click **Compare** and pick a second run to see both side by side, per row and per evaluator, and check that a change fixed the failing rows without breaking the passing ones.
+**Results** in the header opens the results page for the experiment. The **Experiment Runs** sidebar lists every run, newest first. Tick two runs to see them side by side: one chart per metric (cost, latency, and the pass rate of each evaluator) and, per row, both outputs with their evaluator chips, so you can check that a change fixed the failing rows without breaking the passing ones.
 
 <Frame>
 <img src="/images/evaluations/experiment-runs-compare.png" alt="The results page with two experiment runs compared side by side" />
@@ -46270,7 +46278,13 @@ In the **Variables** section, check that `input` maps to the dataset's `input` c
 </Step>
 
 <Step title="Add the evaluator">
-On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **Expected Answer** category and choose one of:
+On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **Expected Answer** category.
+
+<Frame>
+<img src="/images/evaluations/evaluator-type-selector.png" alt="The Expected Answer category with Exact Match Evaluator, LLM Answer Match, LLM Factual Match, ROUGE Score and BLEU Score" />
+</Frame>
+
+Choose one of:
 
 | Evaluator | Use it when |
 |-----------|-------------|
@@ -46299,7 +46313,7 @@ Hover over the summary in the column header. **Pass Rate** is the share of rows 
 
 ## Iterate and compare runs
 
-Edit the prompt to fix the failing rows and click **Run** again. Every run is kept. Click **Results** in the header, then **Compare** in the **Experiment Runs** sidebar and pick the previous run to see both side by side and check that no row that passed before now fails.
+Edit the prompt to fix the failing rows and click **Run** again. Every run is kept. Click **Results** in the header and tick the previous run and the new one in the **Experiment Runs** sidebar to see both side by side, with the pass rate of each run in the chart and both outputs per row, and check that no row that passed before now fails.
 
 <Frame>
 <img src="/images/evaluations/experiment-runs-compare.png" alt="Two experiment runs compared side by side on the results page" />
@@ -46384,7 +46398,7 @@ Click **Run** in the header. Each row fills with the assistant's answer and the 
 </Step>
 
 <Step title="Read the reasons">
-Click an evaluator chip to open its **Result** block. **Details** holds the judge's reasoning, including the criterion that failed. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
+Click an evaluator chip to open its **Result** block. **Status** is the verdict and **Details** holds the judge's reasoning, including the criterion that failed. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
 
 <Frame>
 <img src="/images/evaluations/workbench-evaluator-result.png" alt="An evaluator chip popover with the score, label, status and the judge's reasoning in Details" />
@@ -46402,7 +46416,7 @@ A judge is a model with a prompt, so check it before you trust its pass rate.
 
 ## Iterate and compare runs
 
-Change the prompt, click **Run** again, then open **Results** and click **Compare** in the **Experiment Runs** sidebar to see both runs side by side. The pass rate tells you whether the change helped; the reasons on the rows that flipped tell you why.
+Change the prompt, click **Run** again, then open **Results** and tick both runs in the **Experiment Runs** sidebar to see them side by side. The pass rate tells you whether the change helped; the reasons on the rows that flipped tell you why.
 
 **Also check:** [Answer correctness](/evaluations/experiments/ui/answer-correctness) when your dataset has expected outputs, and [Comparison](/evaluations/experiments/ui/pairwise-compare) to let a judge pick the best of two or more prompts per row instead of scoring each one alone.
 
@@ -47374,7 +47388,7 @@ description: Create an online evaluation that scores every incoming trace or thr
 
 A monitor is an evaluator attached to your production traffic. Every trace that matches its preconditions and sampling rate is scored as it arrives, asynchronously, so the score never delays the response to your user.
 
-This guide sets up a PII detection monitor. The same steps apply to any evaluator, including an LLM-as-a-Judge with your own criteria.
+This guide sets up an LLM-as-a-Judge monitor named `Off-topic reply` that flags replies that drift away from the customer's question. The same steps apply to any evaluator, for example PII detection or jailbreak detection.
 
 ## Prerequisites
 
@@ -47387,7 +47401,7 @@ This guide sets up a PII detection monitor. The same steps apply to any evaluato
 <Step title="Pick an evaluator category">
 Open [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) and click **New Online Evaluation**. The **Choose Evaluator Category** drawer lists **Expected Answer**, **LLM as Judge**, **RAG Quality**, **Quality Aspects** and **Safety**, plus **Custom (Code)** for a Python evaluator and **Custom (from Workflow)** for a workflow.
 
-For PII, pick **Safety**, then **Presidio PII Detection**.
+Pick **LLM as Judge**, then **LLM-as-a-Judge Boolean Evaluator**.
 
 <Frame>
 <img src="/images/evaluations/online-evaluation-category.png" alt="The Choose Evaluator Category drawer" />
@@ -47395,7 +47409,7 @@ For PII, pick **Safety**, then **Presidio PII Detection**.
 </Step>
 
 <Step title="Configure the evaluator">
-Name the evaluator and set its options. For Presidio PII Detection, the options are the entity types to flag, for example credit card numbers, email addresses, IBAN codes and phone numbers. Names and locations are off by default.
+Name the evaluator, pick the judge model and write the criteria in **Prompt**, for example: the reply passes only when it answers the customer's question and stays on the topic of the customer's order. A built-in evaluator such as PII Detection shows its own options here instead, for example the entity types to flag.
 
 Under **Variables**, map the evaluator's fields to the trace. `input` maps to the trace input and `output` to the trace output by default. Click **Create Evaluator**.
 </Step>
@@ -47435,7 +47449,7 @@ Pick **Thread Level** in the drawer. The evaluator's variables now map to the **
 On a trace, the **Evals** section of the trace drawer lists each monitor that ran with its verdict, score and details. The trace table has an **Evals** column too, so you can filter and sort the [Trace Explorer](https://app.langwatch.ai/@project/traces) by the monitor's result.
 
 <Frame>
-<img src="/images/evaluations/trace-evals.png" alt="The Evals section of a trace drawer with the PII detection verdict" />
+<img src="/images/evaluations/trace-evals.png" alt="The Evals section of a trace drawer with the Off-topic reply verdict" />
 </Frame>
 
 The [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) list shows every monitor with its status and **Performance, last 7 days**: the pass rate or the average score with a trend against the previous week. **View analytics** in the row menu opens the evaluations analytics page with the pass rate trend, the average score and the overall pass and fail trend per monitor.

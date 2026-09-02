@@ -46,7 +46,13 @@ In the **Variables** section, check that `input` maps to the dataset's `input` c
 </Step>
 
 <Step title="Add the evaluator">
-On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **Expected Answer** category and choose one of:
+On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **Expected Answer** category.
+
+<Frame>
+<img src="/images/evaluations/evaluator-type-selector.png" alt="The Expected Answer category with Exact Match Evaluator, LLM Answer Match, LLM Factual Match, ROUGE Score and BLEU Score" />
+</Frame>
+
+Choose one of:
 
 | Evaluator | Use it when |
 |-----------|-------------|
@@ -75,7 +81,7 @@ Hover over the summary in the column header. **Pass Rate** is the share of rows 
 
 ## Iterate and compare runs
 
-Edit the prompt to fix the failing rows and click **Run** again. Every run is kept. Click **Results** in the header, then **Compare** in the **Experiment Runs** sidebar and pick the previous run to see both side by side and check that no row that passed before now fails.
+Edit the prompt to fix the failing rows and click **Run** again. Every run is kept. Click **Results** in the header and tick the previous run and the new one in the **Experiment Runs** sidebar to see both side by side, with the pass rate of each run in the chart and both outputs per row, and check that no row that passed before now fails.
 
 <Frame>
 <img src="/images/evaluations/experiment-runs-compare.png" alt="Two experiment runs compared side by side on the results page" />

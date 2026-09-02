@@ -28,7 +28,11 @@ An experiment is a table. Each row is a dataset entry, each column is a prompt o
 1. Open [Experiments](https://app.langwatch.ai/@project/experiments) and click **New Experiment**, then **Create Experiment**. The workbench opens with a generated name. Click the name to rename it.
 2. Under **Datasets**, click **Add** and pick **Select existing dataset**, **Upload CSV** or **Create new**. You can edit cells inline. A dataset created inside the workbench stays there until you pick **Save as dataset** from its tab menu.
 3. Under **Prompts or Agents**, click **Add**. The **Add to Evaluation** drawer offers four columns: **Prompt**, **Agent**, **Comparison** and **Evaluator**.
-4. On a prompt or agent column, click **Add evaluator** and pick a saved evaluator, or create one from the evaluator categories.
+4. On a prompt or agent column, click **Add evaluator** and pick a saved evaluator, or create one from the evaluator categories: **Expected Answer**, **LLM as Judge**, **RAG Quality**, **Quality Aspects**, **Safety**, **Custom (Code)** and **Custom (from Workflow)**.
+
+<Frame>
+<img src="/images/evaluations/workbench-evaluator-category.png" alt="The Choose Evaluator Category drawer with the five categories and the two custom entries" />
+</Frame>
 
 <Frame>
 <img src="/images/evaluations/workbench-add-to-evaluation.png" alt="The Add to Evaluation drawer with the Prompt, Agent, Comparison and Evaluator cards" />
@@ -57,9 +61,9 @@ LangWatch fills the mapping for you when the names match. A dataset column named
 
 ## Read the results
 
-Each cell shows the column output, and each evaluator chip shows its verdict. Click a chip to open its **Result** block with the score, the label, the status and the details the evaluator returned, for example the reason an LLM judge gave.
+Each cell shows the column output, and each evaluator chip shows its verdict. Click a chip to open its **Result** block with the status, the score or the label when the evaluator returns one, and the details, for example the reason an LLM judge gave. The same popover has **Rerun**, **Run on all rows** and **Edit Configuration**.
 
-The column header shows the pass rate for the column. Hover over it to open the summary: **Rows**, **Pass Rate**, **Avg Score**, **Avg Latency**, **Total Cost**, **Execution Time**, and one line per evaluator with its pass rate and average score.
+The column header shows the pass rate for the column. Hover over it to open the summary: **Rows**, **Pass Rate**, **Avg Latency**, **Total Cost**, **Execution Time**, and one line per evaluator with its pass rate or average score.
 
 <Frame>
 <img src="/images/evaluations/workbench-column-summary.png" alt="The column summary popover with rows, pass rate, average score, latency, cost and the per-evaluator breakdown" />
@@ -67,7 +71,7 @@ The column header shows the pass rate for the column. Hover over it to open the 
 
 ## Compare runs
 
-**Results** in the header opens the results page for the experiment. The **Experiment Runs** sidebar lists every run, newest first. Click **Compare** and pick a second run to see both side by side, per row and per evaluator, and check that a change fixed the failing rows without breaking the passing ones.
+**Results** in the header opens the results page for the experiment. The **Experiment Runs** sidebar lists every run, newest first. Tick two runs to see them side by side: one chart per metric (cost, latency, and the pass rate of each evaluator) and, per row, both outputs with their evaluator chips, so you can check that a change fixed the failing rows without breaking the passing ones.
 
 <Frame>
 <img src="/images/evaluations/experiment-runs-compare.png" alt="The results page with two experiment runs compared side by side" />
