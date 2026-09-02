@@ -26,6 +26,7 @@ import {
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { downloadUiFile } from "../../../../behavior/ui-file-download";
+import { UiProjectSwitcher } from "../../../chrome";
 import { UiOrganizationHost } from "../../behavior/organization-host.adapter";
 
 function OrganizationHost({ children }: { children: ReactNode }) {
@@ -81,9 +82,10 @@ function OrganizationHost({ children }: { children: ReactNode }) {
           },
           organization,
           route: reading,
-          // See the adapter: the application has no switcher to offer above a
-          // screen served from here until the chrome layout route lands.
-          projectSwitcher: null,
+          // The recorded gap, closed: the chrome layout route mounts the
+          // navigation host above every settings address, so the switcher the
+          // header draws is the one this screen is handed.
+          projectSwitcher: <UiProjectSwitcher />,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),

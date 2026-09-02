@@ -3,8 +3,7 @@
  *
  * Two things go around `/settings/secrets`: the tRPC Provider the package's own
  * hooks run on, and the host port that answers for the project, the one grant,
- * the two notices and the project switcher this application does not yet have to
- * offer. A screen stays a screen module.
+ * the two notices and the project switcher. A screen stays a screen module.
  *
  * The project NAME is read from the organization graph the shell already holds,
  * on the same `organization.getAll` cache entry every other half of the product
@@ -16,6 +15,7 @@
 import { SecretHostProvider, secretApi } from "@langwatch/secret-web/screens/secret";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { UiProjectSwitcher } from "../../../chrome";
 import { UiSecretHost } from "../../behavior/secret-host.adapter";
 
 function SecretHost({ children }: { children: ReactNode }) {
@@ -30,9 +30,10 @@ function SecretHost({ children }: { children: ReactNode }) {
             projectId: activeScope.projectId ?? void 0,
             projectName: void 0,
           },
-          // See the adapter: the application has no switcher to offer above a
-          // screen served from here until the chrome layout route lands.
-          projectSwitcher: null,
+          // The recorded gap, closed: the chrome layout route mounts the
+          // navigation host above every settings address, so the switcher the
+          // header draws is the one this screen is handed.
+          projectSwitcher: <UiProjectSwitcher />,
         },
         {
           hasPermission: (permission) => session.hasPermission(permission),

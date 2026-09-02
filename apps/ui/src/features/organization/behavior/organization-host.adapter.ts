@@ -90,15 +90,14 @@ export class UiOrganizationHost extends OrganizationHostPort {
   }
 
   /**
-   * A RECORDED GAP, answered honestly rather than faked.
+   * THE RECORDED GAP, NOW CLOSED.
    *
-   * The platform page put `DashboardLayout`'s `ProjectSelector` in its header.
-   * That component is the application shell away — the organization graph, the
-   * router and the shell's own scope memory — and nothing mounts
-   * `DashboardLayout` above a screen served from `apps/ui` until the chrome
-   * layout route exists. `null` is the true answer, and the audit trail loses
-   * least by it of any page that has recorded this gap: its own Project filter
-   * already narrows the table to any project in the organization.
+   * The platform page put `DashboardLayout`'s `ProjectSelector` in its header,
+   * and while nothing mounted `DashboardLayout` above a screen served from
+   * `apps/ui` this had to answer `null`. The chrome layout route mounts the
+   * navigation host above every settings address now, so the answer is the real
+   * control — `@langwatch/navigation-web`'s switcher, offering the teams this
+   * reader may open and landing on the address they are already on.
    */
   projectSwitcher(): ReactNode | null {
     return this.readings.projectSwitcher;

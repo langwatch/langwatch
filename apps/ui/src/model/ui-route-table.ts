@@ -221,6 +221,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
     page: "pages/onboarding/welcome",
   },
 
+  // Everything behind a session, wrapped in the application chrome. The
+  // layout route mounts the navigation host and the header ONCE, above the
+  // two Langy groups, so a screen this package serves gets the project
+  // switcher and the way into settings without asking for them — and the
+  // switcher and the page below it read one workspace graph rather than two.
+  // The front door, the public pages and onboarding stay outside it: those
+  // addresses are reachable with no project to switch between.
+  // See features/chrome/ui/sections/ui-app-chrome.
+  {
+    page: "features/chrome/UiAppChrome",
+    children: [
   // Settings, wrapped in the same Langy layout as the project routes
   // (keyed by the AMBIENT project), so the panel survives hopping between
   // a project page and settings instead of vanishing.
@@ -793,6 +804,8 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         path: "/:project/simulations",
         page: "pages/[project]/simulations/[[...path]]",
       },
+    ],
+  },
     ],
   },
 
