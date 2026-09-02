@@ -106,6 +106,10 @@ export function installClickHouseTestApp({
       personalUsage: new PersonalUsageClickHouseRepository(required),
       activityMonitor: new ActivityMonitorClickHouseRepository(required),
       costRollup: new GovernanceCostRollupClickHouseRepository(required),
+      // The erasure needs Postgres repositories and the ops replay service,
+      // neither of which this ClickHouse-only harness composes. A suite that
+      // drives an erasure builds it directly.
+      identityErasure: undefined,
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,

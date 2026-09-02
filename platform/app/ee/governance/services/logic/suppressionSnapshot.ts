@@ -182,14 +182,37 @@ export class SuppressionSnapshot {
  * composition root between it and the executor. Starts empty, which means a
  * process that never installs one behaves exactly as it did before this
  * existed.
+ *
+ * There is exactly one of these per process, and it is not possible to have
+ * two. That is load-bearing rather than tidy: the erasure flow refreshes the
+ * list and then triggers a replay that the fold serves, so if the object the
+ * erasure refreshed were ever a different object from the one the fold reads,
+ * the replay would re-derive the identifier the erasure had just removed and
+ * write it straight back — silently, and with the erasure reporting success.
+ * Hence {@link installSuppressionSnapshot} takes a loader and constructs the
+ * instance itself: there is no way to hand a foreign instance to anything,
+ * because nothing accepts one.
  */
 let installed: SuppressionSnapshot | null = null;
 
-/** Installs the process's snapshot. Called once from the composition root. */
-export function installSuppressionSnapshot(
-  snapshot: SuppressionSnapshot,
-): void {
-  installed = snapshot;
+/**
+ * Installs the process's snapshot, replacing any previous one.
+ *
+ * Takes the loader rather than a constructed snapshot so that the installed
+ * instance is the only instance anything can reach. Returns it so the caller
+ * can await a first load; nothing else should hold the reference.
+ */
+export function installSuppressionSnapshot({
+  load,
+  now,
+  ttlMs,
+}: {
+  load: SuppressionSnapshotLoader;
+  now?: () => number;
+  ttlMs?: number;
+}): SuppressionSnapshot {
+  installed = new SuppressionSnapshot(load, now, ttlMs);
+  return installed;
 }
 
 /** Removes it again — for tests, which must not leak one into the next file. */
@@ -200,4 +223,16 @@ export function clearSuppressionSnapshot(): void {
 /** The installed snapshot, or null where none was ever installed. */
 export function currentSuppressionSnapshot(): SuppressionSnapshot | null {
   return installed;
+}
+
+/**
+ * Reads the list now, into the snapshot the fold reads.
+ *
+ * The erasure flow's one refresh entry point. It deliberately names no object:
+ * the whole point is that the erasure cannot refresh anything other than what
+ * the fold consults. A no-op where nothing is installed, which is a process
+ * that also does not fold.
+ */
+export async function refreshInstalledSuppressionSnapshot(): Promise<void> {
+  await installed?.refreshNow();
 }

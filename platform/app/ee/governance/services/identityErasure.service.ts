@@ -41,7 +41,7 @@ import type {
 } from "../repositories/governanceIdentity.repository";
 import type { GovernanceRollupErasureClickHouseRepository } from "./governanceRollupErasure.clickhouse.repository";
 import { erasureDigest, readErasureSecret } from "./logic/erasureDigest";
-import type { SuppressionSnapshot } from "./logic/suppressionSnapshot";
+import { refreshInstalledSuppressionSnapshot } from "./logic/suppressionSnapshot";
 
 const logger = createLogger("langwatch:governance:identity-erasure");
 
@@ -100,7 +100,6 @@ export interface IdentityErasureDeps {
   identityMatches: IdentityMatchRepository;
   rollupErasure: GovernanceRollupErasureClickHouseRepository;
   replay: RollupReplayPort;
-  snapshot: SuppressionSnapshot;
   /**
    * How far back the event log still holds events. Days older than this cannot
    * be replayed, so they are reported as not rebuilt instead of being retried
@@ -188,7 +187,13 @@ export class IdentityErasureService {
     // Step 5's precondition: every fold in THIS process must see the new
     // suppression rows before the replay below runs, or the replay re-derives
     // the identifier it is meant to be erasing.
-    await this.deps.snapshot.refreshNow();
+    //
+    // Deliberately not a `deps.snapshot` this service was handed. The thing
+    // refreshed here has to be the same object `actorIdForRollupWrite` reads,
+    // and an injected one could silently be a different instance — which fails
+    // in the worst possible way: the replay writes the erased identifier back
+    // and this method returns a clean outcome.
+    await refreshInstalledSuppressionSnapshot();
 
     // Step 2 — the links keep their dates; only the platform user goes.
     const identityMatchesBlanked =
