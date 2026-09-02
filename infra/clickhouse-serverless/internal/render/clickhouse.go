@@ -95,6 +95,16 @@ func renderNetwork(c *config.Computed, configD string) error {
 	})
 }
 
+// renderCustomSettings writes custom-settings.yaml allowlisting the "custom_" query
+// setting prefix. LWQL self-provisioning (dev/docs/adr/128) issues SET custom_* /
+// custom queries that ClickHouse rejects with UNKNOWN_SETTING(115) unless this
+// prefix is registered — see infra/clickhouse-serverless/README.md.
+func renderCustomSettings(configD string) error {
+	return writeYAML(filepath.Join(configD, "custom-settings.yaml"), map[string]any{
+		"custom_settings_prefixes": "custom_",
+	})
+}
+
 // renderPrometheus writes prometheus.yaml with metrics endpoint configuration.
 func renderPrometheus(configD string) error {
 	return writeYAML(filepath.Join(configD, "prometheus.yaml"), map[string]any{
