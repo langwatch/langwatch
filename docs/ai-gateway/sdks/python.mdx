@@ -6,7 +6,7 @@ sidebarTitle: Python
 
 ## What changes in your code
 
-Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; see [Model naming](/ai-gateway/model-naming).
 
 | SDK | Base URL | Where the key goes |
 |---|---|---|
@@ -67,6 +67,8 @@ response = client.models.generate_content(
 )
 print(response.text)
 ```
+
+The Google GenAI SDK calls the gateway's Gemini passthrough at `/v1beta`, which names the model in Google's own form. Write `gemini-2.5-flash`, not `gemini/gemini-2.5-flash`. The `provider/model` form applies to the OpenAI-shaped and Anthropic-shaped routes.
 
 ## LangChain
 

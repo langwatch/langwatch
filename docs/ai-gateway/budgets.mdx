@@ -69,7 +69,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
 
 The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
-Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#per-end-user-spend).
+Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
 ## Block and warn
 

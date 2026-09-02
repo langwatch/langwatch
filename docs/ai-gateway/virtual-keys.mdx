@@ -134,15 +134,15 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
   }'
 ```
 
-The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret.
+The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret. To do that, LangWatch keeps the first response for 24 hours, encrypted with AES-256-GCM under the deployment's `CREDENTIALS_SECRET`, and deletes it when it expires. A replay carries the `X-Idempotent-Replay` header. Send a different key for every distinct create, and treat the key itself as a secret.
 
 | Method and path | Permission |
 |---|---|
 | `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope the key names |
 | `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
 | `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names |
 | `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
 | `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update` |
 | `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |

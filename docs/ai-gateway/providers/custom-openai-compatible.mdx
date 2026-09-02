@@ -23,6 +23,8 @@ Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/
 
 The endpoint must be reachable from the gateway. The gateway always refuses link-local and cloud metadata addresses, and refuses private and loopback addresses when it runs with `BLOCK_LOCAL_HTTP_CALLS=true`.
 
+On LangWatch Cloud the endpoint must use `https`: a hosted gateway refuses to start without `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`, and with it an `http` endpoint is refused. A self-hosted gateway accepts `http` while that setting stays `false`.
+
 ## Model names
 
 Write `custom/<model>`, for example `custom/qwen3-14b`. Give the row a **Routing handle** when you have several custom endpoints: `acme-gpu/qwen3-14b` pins that row.

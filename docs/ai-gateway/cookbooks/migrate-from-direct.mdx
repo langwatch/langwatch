@@ -88,7 +88,7 @@ Each of these is a setting on the key or the project, with no change in applicat
 
 ## 6. Remove the provider keys from the application
 
-Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**: the gateway has no copy of the old key and starts returning `401 provider_credential_rejected` until the row is updated.
+Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**. Until you do, the gateway sends the old key, and the provider rejects it with `401 provider_credential_rejected`.
 
 ## What to expect in error handling
 

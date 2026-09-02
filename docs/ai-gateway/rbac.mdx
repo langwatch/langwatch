@@ -70,7 +70,7 @@ A personal key needs only membership of the organization. See [Virtual keys](/ai
 |---|---|
 | `GET /api/gateway/v1/virtual-keys`, `GET .../:id` | `virtualKeys:view` |
 | `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope named |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names, and on a trace project the patch names |
 | `POST .../:id/rotate` | `virtualKeys:rotate` |
 | `POST .../:id/disable`, `POST .../:id/enable` | `virtualKeys:update` |
 | `POST .../:id/revoke` | `virtualKeys:delete` |

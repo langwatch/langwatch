@@ -3320,7 +3320,7 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
   <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
 </Frame>
 
-The list labels a `success` event **confirmed** and an `error` event **failed**. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts and leaves out a counter at zero.
+The list labels a `success` event **confirmed**, an `error` event **failed** and a `settled` event **settled**. A realtime session mint stays **admitted** until its outcome arrives, with zero tokens and zero cost, because the call it opened has not started yet. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts. It omits every counter whose value is zero.
 
 <Note>
 **Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.
@@ -3401,7 +3401,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
 
 The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
-Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#per-end-user-spend).
+Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
 ## Block and warn
 
@@ -6015,7 +6015,7 @@ Each of these is a setting on the key or the project, with no change in applicat
 
 ## 6. Remove the provider keys from the application
 
-Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**: the gateway has no copy of the old key and starts returning `401 provider_credential_rejected` until the row is updated.
+Once every deployment runs on the virtual key, delete the provider key from the application's secrets. The gateway keeps using the key stored on the provider row. If you rotate the provider key at the provider, update the row under **Settings > Model Providers**. Until you do, the gateway sends the old key, and the provider rejects it with `401 provider_credential_rejected`.
 
 ## What to expect in error handling
 
@@ -10205,7 +10205,7 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **B
 
 | Field | Value |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user or role session. |
+| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user. |
 | `AWS_SECRET_ACCESS_KEY` | The matching secret access key. |
 | `AWS_REGION_NAME` | The region the models are enabled in, for example `us-east-1`. |
 
@@ -10215,7 +10215,7 @@ Save the row. Every virtual key whose scope can see the row can now dispatch to 
   <img src="/images/ai-gateway/model-provider-bedrock-form.png" alt="The Bedrock provider drawer with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION_NAME eu-central-1" />
 </Frame>
 
-All three fields are required. The form has no field for a VPC endpoint.
+All three fields are required. The form has no field for a session token, so use a long-lived IAM user key and not a temporary role session credential. The form has no field for a VPC endpoint.
 
 ## Model names
 
@@ -10326,6 +10326,8 @@ Save the row. Every virtual key whose scope can see the row can now dispatch to 
 Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
 
 The endpoint must be reachable from the gateway. The gateway always refuses link-local and cloud metadata addresses, and refuses private and loopback addresses when it runs with `BLOCK_LOCAL_HTTP_CALLS=true`.
+
+On LangWatch Cloud the endpoint must use `https`: a hosted gateway refuses to start without `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`, and with it an `http` endpoint is refused. A self-hosted gateway accepts `http` while that setting stays `false`.
 
 ## Model names
 
@@ -10819,7 +10821,9 @@ Each row has a **Name**, the credential fields listed below, optional extra head
 
 <Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority and provider config.">
   <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
-</Frame> See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
+</Frame>
+
+See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
 ## Supported providers
 
@@ -11273,7 +11277,7 @@ A personal key needs only membership of the organization. See [Virtual keys](/ai
 |---|---|
 | `GET /api/gateway/v1/virtual-keys`, `GET .../:id` | `virtualKeys:view` |
 | `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope named |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names, and on a trace project the patch names |
 | `POST .../:id/rotate` | `virtualKeys:rotate` |
 | `POST .../:id/disable`, `POST .../:id/enable` | `virtualKeys:update` |
 | `POST .../:id/revoke` | `virtualKeys:delete` |
@@ -11317,7 +11321,7 @@ sidebarTitle: Python
 
 ## What changes in your code
 
-Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; see [Model naming](/ai-gateway/model-naming).
 
 | SDK | Base URL | Where the key goes |
 |---|---|---|
@@ -11378,6 +11382,8 @@ response = client.models.generate_content(
 )
 print(response.text)
 ```
+
+The Google GenAI SDK calls the gateway's Gemini passthrough at `/v1beta`, which names the model in Google's own form. Write `gemini-2.5-flash`, not `gemini/gemini-2.5-flash`. The `provider/model` form applies to the OpenAI-shaped and Anthropic-shaped routes.
 
 ## LangChain
 
@@ -11492,7 +11498,7 @@ sidebarTitle: TypeScript
 
 ## What changes in your code
 
-Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model`; see [Model naming](/ai-gateway/model-naming).
+Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; the Gemini passthrough at `/v1beta` names the model in Google's own form. See [Model naming](/ai-gateway/model-naming).
 
 | SDK | Base URL | Where the key goes |
 |---|---|---|
@@ -14093,15 +14099,15 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
   }'
 ```
 
-The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret.
+The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret. To do that, LangWatch keeps the first response for 24 hours, encrypted with AES-256-GCM under the deployment's `CREDENTIALS_SECRET`, and deletes it when it expires. A replay carries the `X-Idempotent-Replay` header. Send a different key for every distinct create, and treat the key itself as a secret.
 
 | Method and path | Permission |
 |---|---|
 | `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope the key names |
 | `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
 | `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names |
 | `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
 | `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update` |
 | `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |

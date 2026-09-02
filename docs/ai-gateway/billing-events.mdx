@@ -160,7 +160,7 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
   <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
 </Frame>
 
-The list labels a `success` event **confirmed** and an `error` event **failed**. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts and leaves out a counter at zero.
+The list labels a `success` event **confirmed**, an `error` event **failed** and a `settled` event **settled**. A realtime session mint stays **admitted** until its outcome arrives, with zero tokens and zero cost, because the call it opened has not started yet. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts. It omits every counter whose value is zero.
 
 <Note>
 **Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.

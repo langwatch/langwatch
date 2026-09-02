@@ -10,7 +10,7 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **B
 
 | Field | Value |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user or role session. |
+| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user. |
 | `AWS_SECRET_ACCESS_KEY` | The matching secret access key. |
 | `AWS_REGION_NAME` | The region the models are enabled in, for example `us-east-1`. |
 
@@ -20,7 +20,7 @@ Save the row. Every virtual key whose scope can see the row can now dispatch to 
   <img src="/images/ai-gateway/model-provider-bedrock-form.png" alt="The Bedrock provider drawer with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION_NAME eu-central-1" />
 </Frame>
 
-All three fields are required. The form has no field for a VPC endpoint.
+All three fields are required. The form has no field for a session token, so use a long-lived IAM user key and not a temporary role session credential. The form has no field for a VPC endpoint.
 
 ## Model names
 
