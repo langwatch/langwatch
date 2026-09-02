@@ -8,7 +8,11 @@ vi.mock("../dataset-normalize.queue", () => ({
 }));
 
 import { DatasetService } from "../dataset.service";
-import { DATASET_SEARCH_MAX_ROWS } from "../dataset-search";
+import {
+  DATASET_SEARCH_MAX_BYTES,
+  DATASET_SEARCH_MAX_ROWS,
+  DATASET_SEARCH_SCAN_BATCH,
+} from "../dataset-search";
 import { getDatasetStorage } from "../dataset-storage";
 import { DatasetTooLargeToSearchError } from "../errors";
 
@@ -200,6 +204,103 @@ describe("dataset search (s3_jsonl)", () => {
     expect(readChunk).not.toHaveBeenCalled();
   });
 
+  it("refuses a dataset whose rows occupy more bytes than one search will read", async () => {
+    // Well inside the row cap, and the most expensive scan the search could be
+    // asked to run: rows are as wide as the columns they were given, so a row
+    // count says nothing about how much has to be fetched and parsed to produce
+    // them.
+    //
+    // `sizeBytes` is a bigint here because it is a bigint on the row. Passing a
+    // number would typecheck against this fixture and exercise a comparison the
+    // service never performs.
+    mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          rowCount: 6,
+          sizeBytes: BigInt(DATASET_SEARCH_MAX_BYTES) + 1n,
+        },
+        search: "escalation",
+      }),
+    ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+  });
+
+  it("refuses an over-sized dataset before reading any chunk", async () => {
+    const { readChunk } = mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          rowCount: 6,
+          sizeBytes: BigInt(DATASET_SEARCH_MAX_BYTES) + 1n,
+        },
+        search: "escalation",
+      }),
+    ).rejects.toThrow();
+    expect(readChunk).not.toHaveBeenCalled();
+  });
+
+  it("searches a dataset sitting exactly on the byte limit", async () => {
+    // The limit is what a search will read, not what it refuses: an off-by-one
+    // here withdraws search from a dataset that is precisely allowed.
+    mockChunks();
+    const service = makeService({});
+
+    const result = await searchPage({
+      service,
+      dataset: {
+        ...baseS3Dataset,
+        rowCount: 6,
+        sizeBytes: BigInt(DATASET_SEARCH_MAX_BYTES),
+      },
+      search: "escalation",
+    });
+
+    expect(result.pagination.total).toBe(2);
+  });
+
+  it("still refuses on rows alone when the dataset records no size", async () => {
+    // A dataset written before its size was recorded has none. Read as zero it
+    // would be the smallest dataset in the platform and sail through the byte
+    // limit, so the row limit has to keep holding by itself.
+    mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          rowCount: DATASET_SEARCH_MAX_ROWS + 1,
+          sizeBytes: null,
+        },
+        search: "escalation",
+      }),
+    ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+  });
+
+  it("searches a dataset that records no size and is within the row limit", async () => {
+    // The other half of the missing-size case: absent a size, the byte limit
+    // has nothing to judge and must not refuse on the absence itself.
+    mockChunks();
+    const service = makeService({});
+
+    const result = await searchPage({
+      service,
+      dataset: { ...baseS3Dataset, rowCount: 6, sizeBytes: null },
+      search: "escalation",
+    });
+
+    expect(result.pagination.total).toBe(2);
+  });
+
   it("finds matches in every chunk the offsets index describes", async () => {
     // `chunkOffsets` is what ordinary paging trusts to locate rows, and here it
     // describes three chunks while `chunkCount` says two. Enumerating chunks by
@@ -352,6 +453,58 @@ describe("dataset search (postgres-backed)", () => {
     ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
     // Refused before reading, not part-way through.
     expect(recordRepository.findDatasetRecordsPage).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the walk reads past the cap the count said it would not", async () => {
+    // The up-front check reads a count taken before the walk starts. Records
+    // keep arriving during it, so a dataset sitting just under the cap can be
+    // carried past it by a busy writer — the case a count taken beforehand
+    // cannot see. With nothing bounding the rows actually read, the walk goes
+    // as far as the writer takes it: the unbounded scan the cap exists to
+    // prevent. The chunk branch already holds this backstop; this one did not.
+    //
+    // Twice the cap's worth of batches: enough that a walk bounded by the cap
+    // stops well inside it, and a walk bounded by nothing runs off the end.
+    const MAX_BATCHES_BEFORE_GIVING_UP =
+      (DATASET_SEARCH_MAX_ROWS / DATASET_SEARCH_SCAN_BATCH) * 2;
+    let batchesServed = 0;
+    const recordRepository = {
+      countAndMaxUpdatedAt: vi.fn().mockResolvedValue({
+        count: DATASET_SEARCH_MAX_ROWS - 1,
+        maxUpdatedAt: null,
+      }),
+      // A full batch every time the walk asks, for twice as many rows as the
+      // cap allows, and then a short one. Handing back full batches forever
+      // would be the truer fake, but a walk with no backstop never asks for the
+      // last one — it spins until the heap gives out and takes the whole runner
+      // with it, which reads as an infrastructure failure rather than as this
+      // assertion. Bounded, the same missing backstop shows up as this test
+      // failing and nothing else.
+      findDatasetRecordsPage: vi.fn(({ take }: { take: number }) => {
+        batchesServed += 1;
+        const exhausted = batchesServed > MAX_BATCHES_BEFORE_GIVING_UP;
+        return Promise.resolve(
+          Array.from({ length: exhausted ? 1 : take }, (_, i) => ({
+            // Ids continue across batches: a keyset walk resumes from the last
+            // id it saw, so repeating them would end the walk by accident and
+            // pass this test without the backstop it exists to require.
+            id: `rec_${(batchesServed - 1) * take + i}`,
+            entry: { text: "row" },
+          })),
+        );
+      }),
+    };
+    const service = makeService({ recordRepository });
+
+    await expect(
+      searchPage({ service, dataset: pgDataset, search: "escalation" }),
+    ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
+    // The point is where it stopped, not merely that it did. Reading every
+    // batch the fake will serve and refusing at the end is the unbounded scan
+    // wearing a refusal.
+    expect(
+      recordRepository.findDatasetRecordsPage.mock.calls.length,
+    ).toBeLessThan(MAX_BATCHES_BEFORE_GIVING_UP);
   });
 
   it("counts once for the whole scan, not once per page", async () => {

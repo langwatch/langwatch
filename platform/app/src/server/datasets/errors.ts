@@ -246,32 +246,49 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
- * A search was asked for over more rows than one search will read.
+ * A search was asked for over more of a dataset than one search will read —
+ * more rows, or more bytes of content.
+ *
+ * One error and one code for both limits, because they are one thing to the
+ * user: the dataset is past what a search reads, and the way through is the
+ * same either way. Which limit fired is carried in `meta` for the log, not
+ * shown — "too many bytes" is not a distinction a user can act on differently
+ * from "too many rows".
  *
  * Distinct from DatasetTooLargeToExportError on purpose: the presentation
  * registry is keyed by code, so reusing the export error would show the user a
- * message about exporting a dataset they were trying to search. The limits also
- * differ in kind — export is bounded by bytes held in heap, search by rows read.
+ * message about exporting a dataset they were trying to search.
  */
 export class DatasetTooLargeToSearchError extends HandledError {
   declare readonly code: "dataset_too_large_to_search";
 
-  readonly rowCount: number;
-  readonly maxRows: number;
+  readonly measured: number;
+  readonly limit: number;
+  readonly dimension: "rows" | "bytes";
 
-  constructor({ rowCount, maxRows }: { rowCount: number; maxRows: number }) {
+  constructor(
+    params:
+      | { rowCount: number; maxRows: number }
+      | { sizeBytes: number; maxBytes: number },
+  ) {
+    const isRows = "rowCount" in params;
+    const measured = isRows ? params.rowCount : params.sizeBytes;
+    const limit = isRows ? params.maxRows : params.maxBytes;
+    const dimension = isRows ? "rows" : "bytes";
+
     super(
       "dataset_too_large_to_search",
-      `Dataset has ${rowCount} rows, more than the ${maxRows} a single search will read`,
+      `Dataset holds ${measured} ${dimension}, more than the ${limit} a single search will read`,
       {
-        meta: { rowCount, maxRows },
+        meta: { measured, limit, dimension },
         httpStatus: 413,
         fault: "customer",
       },
     );
     this.name = "DatasetTooLargeToSearchError";
-    this.rowCount = rowCount;
-    this.maxRows = maxRows;
+    this.measured = measured;
+    this.limit = limit;
+    this.dimension = dimension;
   }
 }
 

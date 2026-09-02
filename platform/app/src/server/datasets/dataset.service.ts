@@ -34,6 +34,7 @@ import {
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import {
+  DATASET_SEARCH_MAX_BYTES,
   DATASET_SEARCH_MAX_ROWS,
   DATASET_SEARCH_SCAN_BATCH,
   matchesDatasetSearch,
@@ -760,8 +761,9 @@ export class DatasetService {
     // text, and the pager then pages the MATCHES — so `total` becomes the match
     // count, not the row count. Neither storage layout can locate matches
     // cheaply (there is no index over `entry`), so both scan; both bound that
-    // scan by DATASET_SEARCH_MAX_ROWS and refuse past it rather than return the
-    // matches found so far, which would be a wrong answer that looks right.
+    // scan — by rows, and by bytes where a size was recorded — and refuse past
+    // it rather than return the matches found so far, which would be a wrong
+    // answer that looks right.
     const search = normalizeDatasetSearch(params.search);
     if (search) {
       return await this.searchResolvedDataset({ ...params, search });
@@ -885,11 +887,13 @@ export class DatasetService {
    * window. Heap holds one unit of input plus at most `limit` matched rows,
    * whatever the dataset's size.
    *
-   * Both branches refuse past DATASET_SEARCH_MAX_ROWS BEFORE reading anything,
-   * so a refused search costs no reads and never returns a partial result.
+   * Both branches refuse BEFORE reading anything, so a refused search costs no
+   * reads and never returns a partial result, and both keep counting what they
+   * actually read so a dataset growing during the scan cannot carry it past the
+   * limit it was admitted under.
    *
    * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
-   * @throws {DatasetTooLargeToSearchError} past the row cap
+   * @throws {DatasetTooLargeToSearchError} past the row or byte limit
    */
   private async searchResolvedDataset(params: {
     dataset: Dataset;
@@ -983,7 +987,8 @@ export class DatasetService {
    * `collect`. One chunk is held in the heap at a time.
    *
    * @throws {DatasetNotReadyError} if the dataset is still preparing
-   * @throws {DatasetTooLargeToSearchError} past the row cap
+   * @throws {DatasetTooLargeToSearchError} past the row limit, or past the byte
+   *   limit where a size was recorded
    */
   private async scanChunksForMatches({
     dataset,
@@ -1006,6 +1011,25 @@ export class DatasetService {
       throw new DatasetTooLargeToSearchError({
         rowCount,
         maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    // Rows say nothing about what the scan costs — every chunk is fetched whole
+    // and parsed whole, and how many rows that is depends only on how wide they
+    // happen to be. Checked separately from the row cap rather than folded into
+    // it because neither covers the other: a dataset written before its size was
+    // recorded has none, and reading a missing size as zero would make it the
+    // smallest dataset in the platform and wave it straight through.
+    //
+    // `sizeBytes` is a bigint on the row. Compared as one, then narrowed to a
+    // number only to report it: a byte count large enough to lose precision as
+    // a double is nine petabytes, and the comparison that decides the refusal
+    // has already happened by then.
+    const sizeBytes = dataset.sizeBytes ?? null;
+    if (sizeBytes !== null && sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: Number(sizeBytes),
+        maxBytes: DATASET_SEARCH_MAX_BYTES,
       });
     }
 
@@ -1040,10 +1064,11 @@ export class DatasetService {
    * Walks every record of a Postgres-backed (legacy) dataset once, offering
    * each to `collect`. One batch is held in the heap at a time.
    *
-   * `sizeBytes` is null on these rows, so the export-time byte guard can never
-   * fire here — the row cap is the only thing bounding this scan.
+   * `sizeBytes` is null on these rows, so the byte limit can never fire here —
+   * the row limit is the only thing bounding this scan, checked both against
+   * the count taken up front and against what the walk actually reads.
    *
-   * @throws {DatasetTooLargeToSearchError} past the row cap
+   * @throws {DatasetTooLargeToSearchError} past the row limit
    */
   private async scanPostgresRecordsForMatches({
     dataset,
@@ -1073,6 +1098,7 @@ export class DatasetService {
     // same canonical [createdAt asc, id asc] order the paged read uses — so
     // matches come back in the order the user sees them when not searching.
     let cursorId: string | undefined;
+    let rowsRead = 0;
     for (;;) {
       const records = await this.recordRepository.findDatasetRecordsPage({
         datasetId: dataset.id,
@@ -1080,6 +1106,19 @@ export class DatasetService {
         take: DATASET_SEARCH_SCAN_BATCH,
         cursorId,
       });
+      // The same backstop the chunk walk holds, and for the same reason: the
+      // count above was taken before the walk started, so a dataset sitting just
+      // under the cap can be carried past it by rows written while the walk
+      // runs. Without this the loop's only exits are a short batch and a missing
+      // cursor, neither of which a dataset still being written to ever offers —
+      // so the scan runs as long as the writer does.
+      rowsRead += records.length;
+      if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount: rowsRead,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
       for (const record of records) collect(record);
       if (records.length < DATASET_SEARCH_SCAN_BATCH) break;
       cursorId = records[records.length - 1]?.id;

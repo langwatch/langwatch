@@ -15,13 +15,36 @@
 /**
  * How many rows one search will read.
  *
- * Rows, not bytes: legacy postgres-backed datasets carry a null `sizeBytes`
- * (only the s3_jsonl chunking paths write it), so a byte cap would never fire
- * for them. And the real cost of searching an s3_jsonl dataset is the chunk
- * reads, which scale with rows, not with the heap held at any one moment — the
- * scan keeps one chunk in memory at a time.
+ * Rows because every dataset has a count of them: legacy postgres-backed
+ * datasets carry a null `sizeBytes` (only the s3_jsonl chunking paths write
+ * it), so this is the only limit that can hold on that path at all.
  */
 export const DATASET_SEARCH_MAX_ROWS = 50_000;
+
+/**
+ * How many bytes of dataset content one search will fetch and parse.
+ *
+ * A row count is not a measure of what a scan costs. A row is whatever columns
+ * it was given: an id and a status is ~100 bytes, a stored model response is
+ * tens of kilobytes, and both count as one row. Bounding rows alone therefore
+ * refuses narrow datasets while waving through datasets far more expensive to
+ * read — a 54,000-row dataset of 5 MB is refused while a 9,800-row dataset of
+ * 18 MB is allowed, though the second is more than three times the fetching and
+ * parsing.
+ *
+ * The number matches `DATASET_FULL_EXPORT_MAX_BYTES`, the ceiling the platform
+ * already applies to reading a dataset in one request. It is written out rather
+ * than imported because that constant sits in the router layer and this is the
+ * domain. Search holds one chunk at a time so it is not bounded by heap the way
+ * an export is, but it fetches and parses the same bytes, and there was no
+ * measurement arguing for a second, different number — matching the one already
+ * in use beats inventing one. If they are ever meant to move together, the
+ * export constant is the one to move down here.
+ *
+ * Both limits apply, and neither subsumes the other: this one cannot hold where
+ * no size was recorded, and the row limit cannot see how wide a row is.
+ */
+export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
 
 /**
  * How many postgres-backed rows are read per round of a scan.

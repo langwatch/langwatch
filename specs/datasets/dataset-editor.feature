@@ -243,11 +243,19 @@ Feature: Dataset editor
 
   Rule: A dataset too large to scan is refused, not half-searched
 
-    Finding matches means reading the dataset's rows. Past a number of rows the
-    platform will read for one search, returning the matches found so far would
-    be a wrong answer wearing the clothes of a right one — the user cannot tell
-    an empty result from an abandoned scan. The search is refused with its own
+    Finding matches means reading the dataset's rows. Past what the platform
+    will read for one search, returning the matches found so far would be a
+    wrong answer wearing the clothes of a right one — the user cannot tell an
+    empty result from an abandoned scan. The search is refused with its own
     reason, distinct from the one shown when a dataset is too large to export.
+
+    How much a search reads is two numbers, not one. A row count bounds how many
+    records are offered to the match test; the bytes those rows occupy bound how
+    much has to be pulled out of storage and parsed to produce them. Nothing
+    constrains the two to agree: a row is whatever columns it was given, and the
+    platform accepts rows from a handful of bytes up to a chunk's worth. A row
+    count alone therefore lets a narrow dataset be refused while a dataset many
+    times more expensive to scan is allowed through.
 
     @unit
     Scenario: A dataset over the row limit refuses the search
@@ -255,6 +263,48 @@ Feature: Dataset editor
       When a search is run against it
       Then the search is refused as too large to search
       And no partial set of matches is returned
+
+    @unit
+    Scenario: A dataset within the row limit but over the byte limit refuses the search
+      Given a dataset with few enough rows for one search to read
+      But whose rows occupy more bytes than one search will read
+      When a search is run against it
+      Then the search is refused as too large to search
+      And no partial set of matches is returned
+      # The dimension that costs a search is bytes pulled out of storage and
+      # parsed, not records counted. A dataset of wide rows is under the row
+      # limit and still the most expensive thing the search will be asked to
+      # read.
+
+    @unit
+    Scenario: A dataset too large to search is refused before any of it is read
+      Given a dataset too large for one search to read
+      When a search is run against it
+      Then no chunk of the dataset is read from storage
+      # Both limits are known from what the dataset records about itself, so the
+      # refusal costs nothing. Discovering it partway through means the work the
+      # limit exists to prevent has already been done.
+
+    @unit
+    Scenario: A scan that outgrows the limit while it runs is stopped part-way
+      Given a dataset just inside what one search will read
+      And rows are still being written to it while the search runs
+      When the search has read more than one search will read
+      Then the search is refused as too large to search
+      # The limits are checked against what the dataset said about itself before
+      # the scan started. A dataset filling up during the scan passes that check
+      # and then outgrows it, so what is actually read has to be counted too —
+      # otherwise the scan runs as long as the writer keeps writing.
+
+    @unit
+    Scenario: A chunked dataset that records no size is bounded by the row limit alone
+      Given a chunked dataset that records no size in bytes
+      And with more rows than one search will read
+      When a search is run against it
+      Then the search is refused as too large to search
+      # A dataset written before its size was recorded has none. A byte limit
+      # reading a missing size as zero would wave those through as the smallest
+      # datasets in the platform, so the row limit has to keep holding alone.
 
     @unit
     Scenario: The refusal has its own words, not the export refusal's
