@@ -9,7 +9,7 @@ keywords: members, teams, projects, invites, lite member, seats, langwatch
 
 An organization is the top level: it holds the members, the seats, the billing plan and the organization-wide settings. A team groups projects and the people who work on them. A project is where your traces, evaluations, prompts, datasets and API keys live.
 
-Every member has one organization role. Access to projects comes from a team role: a person on a team holds that role on every project in the team, and a project-level binding can override it for one project.
+Every member has one organization role. Access to projects comes from a team role: a person on a team holds that role on every project in the team, and a project-level binding adds access on one project without removing the team role.
 
 Every member also gets a personal workspace on their first visit to the organization: one personal team with one personal project, listed under **My Workspace** and hidden from the team pickers.
 
@@ -67,7 +67,7 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 <img src="/images/platform/teams.png" alt="Settings > Teams & Projects with two teams, their members and their projects" />
 </Frame>
 
-**Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only; for someone already on the team it overrides the team role for that project. A project with overrides is marked, and each override can be reverted to the team role.
+**Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only. For someone already on the team, the page marks the row **override** and shows their team role next to it; the project role adds to the team role, it does not take permissions away. Remove the project role to leave only the team role.
 
 <Frame>
 <img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams & Projects with the per-member role select" />

@@ -1,14 +1,14 @@
 ---
 title: 'Overview'
-description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).'
+description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (bound to organization, team or project scopes, for automation).'
 ---
 
 ## Intro
 
 The API Keys API lets you create, list, and revoke API keys for your organization. Two key types are supported:
 
-- **Personal keys** — tied to a user, inherit the user's RBAC permissions
-- **Service keys** — no user association, scoped to specific projects with ADMIN access. Ideal for CI/CD, scaffolding tools, and service-to-service integrations
+- **Personal keys**: tied to a user, inherit the user's RBAC permissions
+- **Service keys**: no user association, bound to the organization, one or more teams, or one or more projects, with a role on each. Use them for CI/CD, scaffolding tools, and service-to-service integrations
 
 ## Authentication
 

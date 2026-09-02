@@ -681,6 +681,8 @@ keywords: command bar, command palette, cmd+k, search, shortcuts, langwatch
 
 Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in the top bar. `Esc` closes it. On the project home page the same shortcut focuses the search field in the page.
 
+The command bar is available on every page after you sign in. It does not open on the sign-in pages or while you complete onboarding.
+
 <Frame>
 <img src="/images/platform/command-bar.png" alt="The command bar with prompt typed, showing the Navigation and Actions matches" />
 </Frame>
@@ -816,7 +818,7 @@ Card numbers and Brazilian CPF are checksum-validated before redaction. Attribut
 
 Secrets redaction scrubs API keys, tokens, private keys and database URLs from stored content and replaces them with `[SECRET]`. It is **On** by default and runs at ingestion.
 
-The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor style prefix with a high entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
+The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor-style prefix with a high-entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
 
 **Custom patterns** add your own regular expressions on top, for example `acme_live_[a-z0-9]+`. LangWatch refuses a pattern that also matches ordinary text, and tells you which sample it matched.
 
@@ -833,7 +835,7 @@ Anyone with `project:view` can open the page for a project. Organization and dep
 ## Boundaries
 
 - The policy governs traces. Content already copied elsewhere, for example into a dataset row or an exported file, is not covered.
-- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns the ingestion-time drop off. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
+- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns off ingestion-time dropping. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
 
 **Also check:** [Data Retention](/platform/data-retention) for how long traces are kept, and [Access Control (RBAC)](/platform/rbac) for the roles named in the audience.
 
@@ -853,7 +855,7 @@ keywords: data retention, retention policy, delete data, ttl, retention period, 
 
 ## What retention covers
 
-A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data, and one policy sets the same period for all three:
+A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data:
 
 | Category | Data |
 |----------|------|
@@ -861,13 +863,15 @@ A retention policy sets a number of days for one scope. Data older than that is 
 | Scenarios | Scenario runs and suite runs |
 | Experiments | Experiment runs and their items |
 
+LangWatch resolves each category on its own. A project takes its traces period from the closest policy that sets traces, and its scenarios period from the closest policy that sets scenarios, so the three can differ. The settings page writes all three categories together, so a policy you add there starts with the same period for all three.
+
 Data stored in Postgres is not covered: annotations, datasets, prompts, and the settings pages keep their rows.
 
-The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13 month lifetime, so you can reconcile invoices after the traces behind them are gone.
+The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13-month lifetime, so you can reconcile invoices after the traces behind them are gone.
 
 ## Scopes
 
-Write a policy at the organization, a team or a project. A project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
+Write a policy at the organization, a team or a project. For each category a project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
 
 The **Data Retention** panel at the top of the page shows the period that applies to the current project, and **Data Storage** shows how much space the projects you can see use today. The **All you can see** filter narrows the table to one scope.
 
@@ -943,7 +947,7 @@ keywords: members, teams, projects, invites, lite member, seats, langwatch
 
 An organization is the top level: it holds the members, the seats, the billing plan and the organization-wide settings. A team groups projects and the people who work on them. A project is where your traces, evaluations, prompts, datasets and API keys live.
 
-Every member has one organization role. Access to projects comes from a team role: a person on a team holds that role on every project in the team, and a project-level binding can override it for one project.
+Every member has one organization role. Access to projects comes from a team role: a person on a team holds that role on every project in the team, and a project-level binding adds access on one project without removing the team role.
 
 Every member also gets a personal workspace on their first visit to the organization: one personal team with one personal project, listed under **My Workspace** and hidden from the team pickers.
 
@@ -1001,7 +1005,7 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 <img src="/images/platform/teams.png" alt="Settings > Teams & Projects with two teams, their members and their projects" />
 </Frame>
 
-**Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only; for someone already on the team it overrides the team role for that project. A project with overrides is marked, and each override can be reverted to the team role.
+**Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only. For someone already on the team, the page marks the row **override** and shows their team role next to it; the project role adds to the team role, it does not take permissions away. Remove the project role to leave only the team role.
 
 <Frame>
 <img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams & Projects with the per-member role select" />
@@ -1176,7 +1180,7 @@ A Lite Member uses a Lite seat, which is counted separately from full seats. In 
 
 ## Team roles
 
-A team role applies to one team and, through inheritance, to every project in it. A binding on a single project overrides the team role for that project only. The built-in roles are **Admin**, **Member** and **Viewer**.
+A team role applies to one team and, through inheritance, to every project in it. A binding on a single project adds access on that project only, and never removes what the team role already grants. The built-in roles are **Admin**, **Member** and **Viewer**.
 
 | Resource | Viewer | Member | Admin |
 |----------|--------|--------|-------|
@@ -68894,15 +68898,15 @@ openapi: "GET /api/api-keys"
 
 ---
 title: 'Overview'
-description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).'
+description: 'Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (bound to organization, team or project scopes, for automation).'
 ---
 
 ## Intro
 
 The API Keys API lets you create, list, and revoke API keys for your organization. Two key types are supported:
 
-- **Personal keys** — tied to a user, inherit the user's RBAC permissions
-- **Service keys** — no user association, scoped to specific projects with ADMIN access. Ideal for CI/CD, scaffolding tools, and service-to-service integrations
+- **Personal keys**: tied to a user, inherit the user's RBAC permissions
+- **Service keys**: no user association, bound to the organization, one or more teams, or one or more projects, with a role on each. Use them for CI/CD, scaffolding tools, and service-to-service integrations
 
 ## Authentication
 

@@ -75,7 +75,7 @@ Card numbers and Brazilian CPF are checksum-validated before redaction. Attribut
 
 Secrets redaction scrubs API keys, tokens, private keys and database URLs from stored content and replaces them with `[SECRET]`. It is **On** by default and runs at ingestion.
 
-The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor style prefix with a high entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
+The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor-style prefix with a high-entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
 
 **Custom patterns** add your own regular expressions on top, for example `acme_live_[a-z0-9]+`. LangWatch refuses a pattern that also matches ordinary text, and tells you which sample it matched.
 
@@ -92,6 +92,6 @@ Anyone with `project:view` can open the page for a project. Organization and dep
 ## Boundaries
 
 - The policy governs traces. Content already copied elsewhere, for example into a dataset row or an exported file, is not covered.
-- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns the ingestion-time drop off. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
+- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns off ingestion-time dropping. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
 
 **Also check:** [Data Retention](/platform/data-retention) for how long traces are kept, and [Access Control (RBAC)](/platform/rbac) for the roles named in the audience.

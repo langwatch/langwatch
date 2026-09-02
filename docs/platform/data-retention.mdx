@@ -10,7 +10,7 @@ keywords: data retention, retention policy, delete data, ttl, retention period, 
 
 ## What retention covers
 
-A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data, and one policy sets the same period for all three:
+A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data:
 
 | Category | Data |
 |----------|------|
@@ -18,13 +18,15 @@ A retention policy sets a number of days for one scope. Data older than that is 
 | Scenarios | Scenario runs and suite runs |
 | Experiments | Experiment runs and their items |
 
+LangWatch resolves each category on its own. A project takes its traces period from the closest policy that sets traces, and its scenarios period from the closest policy that sets scenarios, so the three can differ. The settings page writes all three categories together, so a policy you add there starts with the same period for all three.
+
 Data stored in Postgres is not covered: annotations, datasets, prompts, and the settings pages keep their rows.
 
-The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13 month lifetime, so you can reconcile invoices after the traces behind them are gone.
+The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13-month lifetime, so you can reconcile invoices after the traces behind them are gone.
 
 ## Scopes
 
-Write a policy at the organization, a team or a project. A project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
+Write a policy at the organization, a team or a project. For each category a project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
 
 The **Data Retention** panel at the top of the page shows the period that applies to the current project, and **Data Storage** shows how much space the projects you can see use today. The **All you can see** filter narrows the table to one scope.
 
