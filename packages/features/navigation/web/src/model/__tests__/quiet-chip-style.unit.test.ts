@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { QUIET_SIDEBAR_CHIP } from "../quietChipStyle";
+import { QUIET_SIDEBAR_CHIP } from "../quiet-chip-style";
 
 describe("the quiet sidebar chip", () => {
   describe("when a sidebar marks an item with it", () => {

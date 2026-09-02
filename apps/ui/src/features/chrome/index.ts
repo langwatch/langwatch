@@ -44,12 +44,13 @@ import { chromePageLoaders } from "./ui/sections/chrome-routes";
 export { chromePageLoaders };
 
 /**
- * The switcher, and nothing else from the layout module.
+ * The two switchers, and nothing else from the layout module.
  *
  * `ui-app-chrome` is reached ONLY through its lazy loader. It asks
  * `installed-ui-page-keys`, which reads the registry that composes this file, so
  * a static export from here would put the layout inside that cycle at module
  * initialisation and drag the chrome into the bundle a signed-out reader
- * downloads for the front door. The switcher block has no such reach.
+ * downloads for the front door. The switcher blocks have no such reach.
  */
+export { UiProductSwitcher } from "./ui/blocks/ui-product-switcher";
 export { UiProjectSwitcher, projectSwitchHref } from "./ui/blocks/ui-project-switcher";

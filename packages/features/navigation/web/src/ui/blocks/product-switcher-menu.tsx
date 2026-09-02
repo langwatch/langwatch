@@ -2,16 +2,15 @@ import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
-import { useRouter } from "~/utils/compat/next-router";
-import { trackEvent } from "~/utils/tracking";
+import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug";
+import { useReachableProducts } from "../../behavior/use-reachable-products";
+import { useNavigationHost } from "../../model/navigation-host";
 import {
   PRODUCTS,
   type ProductDefinition,
   type ProductId,
   productById,
-} from "../products";
-import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
-import { useReachableProducts } from "../useReachableProducts";
+} from "../../model/products";
 
 /** The trigger reads as a raised pill on the top bar's gray. */
 const productPillStyle = {
@@ -38,10 +37,18 @@ const productPillStyle = {
  * visitor learns what it does, and marks the product the page belongs
  * to. Picking one opens that product's home.
  *
+ * MOVED from `platform/app/src/features/navigation/shell/ProductSwitcherMenu.tsx`.
+ * `trackEvent("navigation_product_switch", …)` did NOT travel, the line
+ * `@langwatch/workflow-web` already drew for `trackEvent("workflow_create")`:
+ * product analytics is the application's — which client, which consent, which
+ * identity — and `platform/app`'s `utils/tracking` no longer exists to import
+ * anyway. A port method the host could only answer with nothing would be worse
+ * than its absence, so this records the loss instead of pretending to keep it.
+ *
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
 export function ProductSwitcherMenu({ activeProductId }: { activeProductId: ProductId }) {
-  const router = useRouter();
+  const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
 
@@ -55,8 +62,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
     if (product.id === activeProductId) return;
     const home = product.homeHref({ projectSlug });
     if (!home) return;
-    trackEvent("navigation_product_switch", { product: product.id });
-    void router.push(home);
+    host.navigate(home);
   };
 
   return (

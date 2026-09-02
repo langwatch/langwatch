@@ -1,4 +1,4 @@
-import { type ProductId, productById, productFromPathname } from "../products";
+import { type ProductId, productById, productFromPathname } from "./products";
 
 const RETURN_KEY = "langwatch:nav:settings-return:v1";
 

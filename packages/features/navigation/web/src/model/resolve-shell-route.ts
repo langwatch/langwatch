@@ -3,7 +3,7 @@ import {
   isSettingsShellRoute,
   type ProductId,
   productFromPathname,
-} from "../products";
+} from "./products";
 
 export interface ShellRoute {
   /**

@@ -19,22 +19,34 @@
  * gets today. The question disappears with the last legacy loader, and so does
  * the branch.
  *
- * WHAT IT IS NOT YET: `CurrentDrawer`. The drawer registry names forty-five
- * `platform/app` components by module path, this package does not depend on
- * that application and must not, and the one place a host could hand the
- * registry over — its shell adapter — may not be edited while `platform/app` is
- * deletes-only. The recorded `?drawer.open=` gap therefore stands; see
- * `features/chrome/index.ts`.
+ * IT MOUNTS `CurrentDrawer`, AND THAT CLOSES THE GAP EIGHTEEN MANIFESTS
+ * RECORDED. Every moved family wrote the same line: a screen asks its host to
+ * open a drawer, the host writes `?drawer.open=<name>`, and nothing opened —
+ * because the mount lived in `platform/app`'s `DashboardLayout` and the
+ * registry it read named forty-five modules of that application. The registry
+ * is composed now (`installed-ui-drawers.ts`) and the mount is here, once,
+ * above the outlet, which is the only place a drawer opened from any page can
+ * render.
+ *
+ * OUTSIDE THE HEADER BRANCH ON PURPOSE. The header is drawn only over pages
+ * this application serves, because a legacy page brings its own. A DRAWER is
+ * not chrome in that sense: it is addressed by the query string, it renders
+ * through a portal, and a reader who follows `?drawer.open=…` onto a legacy
+ * page is asking for the same drawer. So the mount is unconditional and the
+ * header stays conditional.
  */
 
 import { Box, HStack, Spacer } from "@chakra-ui/react";
 import { LogoIcon } from "@langwatch/navigation-web/chrome";
+import { CurrentDrawer } from "@langwatch/ui-drawer";
 import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link as RouterLink, Outlet, useMatches } from "react-router";
+import { installedUiDrawers } from "../../../installed-ui-drawers";
 import { isUiInstalledPage } from "../../../installed-ui-page-keys";
 import { NavigationHostSection } from "../../../navigation";
 import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
+import { UiProductSwitcher } from "../blocks/ui-product-switcher";
 import { UiProjectSwitcher } from "../blocks/ui-project-switcher";
 
 /** The bar's height. */
@@ -58,6 +70,7 @@ function UiAppChromeBar() {
           <LogoIcon width={16} height={22} />
         </Box>
       </RouterLink>
+      <UiProductSwitcher />
       <UiProjectSwitcher />
       <Spacer />
       <RouterLink to="/settings" aria-label="Settings">
@@ -94,6 +107,7 @@ export default function UiAppChrome() {
       ) : (
         <Outlet />
       )}
+      <CurrentDrawer drawers={installedUiDrawers} />
     </NavigationHostSection>
   );
 }

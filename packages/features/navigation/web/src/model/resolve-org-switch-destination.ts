@@ -1,4 +1,4 @@
-import { type ProductId, productById } from "../products";
+import { type ProductId, productById } from "./products";
 
 /**
  * Where an in-place organization switch lands in the new navigation

@@ -1,7 +1,5 @@
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import type { SectionNavItemData } from "./sectionNavItems";
+import { useNavigationHost } from "../model/navigation-host";
+import type { SectionNavItemData } from "../model/section-nav-items";
 
 /**
  * Filters a section nav list down to the items whose `featureFlag` is
@@ -25,27 +23,19 @@ export function useVisibleSectionNavItems(
   items: readonly SectionNavItemData[],
 ): SectionNavItemData[] {
   // Flags roll out per organization (PostHog release conditions / rule
-  // matching fails closed without ctx.organizationId), so the check must
-  // carry the same org context the page guards pass — otherwise a per-org
+  // matching fails closed without ctx.organizationId), so the host answers
+  // them with the same org context the page guards carry — otherwise a per-org
   // enable shows the pages but never their nav items.
-  const { project, organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-  // Gateway pages render this hook too (AiGatewayLayout), and gatewayNavItems
-  // carries no flagged entry — without this the flag round-trips on every
-  // gateway page for a result the filter below never reads.
+  const host = useNavigationHost();
+  // Gateway pages render this hook too, and gatewayNavItems carries no flagged
+  // entry — without this the flag is asked on every gateway page for a result
+  // the filter below never reads.
   const needsBilledCost = items.some(
     (item) => item.featureFlag === "release_ui_governance_billed_cost_enabled",
   );
-  const billedCost = useFeatureFlag(
-    "release_ui_governance_billed_cost_enabled",
-    {
-      projectId: project?.id ?? NOT_TARGETED,
-      organizationId: organization?.id,
-      enabled: !!organization?.id && needsBilledCost,
-    },
-  );
+  const billedCost = needsBilledCost
+    ? host.featureFlag("release_ui_governance_billed_cost_enabled")
+    : { enabled: false, isLoading: false };
 
   const flagEnabled = (
     flag: NonNullable<SectionNavItemData["featureFlag"]>,
