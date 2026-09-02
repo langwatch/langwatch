@@ -18,8 +18,8 @@ import {
   flexRender,
   getCoreRowModel,
   type RowSelectionState,
-  type VisibilityState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import {
   ChevronDown,
@@ -59,8 +59,8 @@ import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { toaster } from "../ui/toaster";
 import { AnnotationColumnsMenu } from "./AnnotationColumnsMenu";
-import { AnnotationQueueFilter } from "./AnnotationQueueFilter";
 import { AnnotationCommentsChip } from "./AnnotationCommentsChip";
+import { AnnotationQueueFilter } from "./AnnotationQueueFilter";
 import { AnnotationSuggestionsChip } from "./AnnotationSuggestionsChip";
 import UserAvatarGroup from "./AvatarGroup";
 import {

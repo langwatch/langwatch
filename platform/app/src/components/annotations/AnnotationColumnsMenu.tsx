@@ -95,67 +95,16 @@ export function AnnotationColumnsMenu({
             </Text>
           </HStack>
 
-          <HStack
-            gap={1.5}
-            paddingX={2}
-            height="36px"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="md"
-            bg="bg.subtle"
-            _focusWithin={{ borderColor: "border.emphasized" }}
-          >
-            <Icon color="fg.subtle" boxSize={3.5}>
-              <Search />
-            </Icon>
-            <Input
-              size="xs"
-              variant="flushed"
-              border="none"
-              height="full"
-              padding={0}
-              placeholder="Search columns…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Escape") e.stopPropagation();
-              }}
-              _focusVisible={{ boxShadow: "none" }}
-            />
-          </HStack>
+          <SearchBox query={query} onQueryChange={setQuery} />
 
           {sections.map(({ title, columns: sectionColumns }) => (
-            <Stack key={title} gap={1}>
-              <Text
-                textStyle="2xs"
-                fontWeight="semibold"
-                color="fg.muted"
-                textTransform="uppercase"
-                letterSpacing="0.06em"
-              >
-                {title}
-              </Text>
-              <Stack gap={0}>
-                {sectionColumns.map((column) => (
-                  <Checkbox
-                    key={column.id}
-                    size="sm"
-                    paddingY={1}
-                    checked={isColumnVisible({ column, choices })}
-                    onCheckedChange={({ checked }) =>
-                      onColumnVisibleChange({
-                        columnId: column.id,
-                        isVisible: checked === true,
-                      })
-                    }
-                  >
-                    <Text textStyle="xs" color="fg">
-                      {column.label}
-                    </Text>
-                  </Checkbox>
-                ))}
-              </Stack>
-            </Stack>
+            <ColumnSection
+              key={title}
+              title={title}
+              columns={sectionColumns}
+              choices={choices}
+              onColumnVisibleChange={onColumnVisibleChange}
+            />
           ))}
 
           {hasChoices && (
@@ -171,5 +120,95 @@ export function AnnotationColumnsMenu({
         </Stack>
       </Popover.Content>
     </Popover.Root>
+  );
+}
+
+function SearchBox({
+  query,
+  onQueryChange,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+}) {
+  return (
+    <HStack
+      gap={1.5}
+      paddingX={2}
+      height="36px"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+      _focusWithin={{ borderColor: "border.emphasized" }}
+    >
+      <Icon color="fg.subtle" boxSize={3.5}>
+        <Search />
+      </Icon>
+      <Input
+        size="xs"
+        variant="flushed"
+        border="none"
+        height="full"
+        padding={0}
+        placeholder="Search columns…"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        // Escape closes the popover; every other key belongs to the box, and
+        // without this the menu's own type-ahead would steal them.
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") e.stopPropagation();
+        }}
+        _focusVisible={{ boxShadow: "none" }}
+      />
+    </HStack>
+  );
+}
+
+function ColumnSection({
+  title,
+  columns,
+  choices,
+  onColumnVisibleChange,
+}: {
+  title: string;
+  columns: AnnotationColumnOption[];
+  choices: AnnotationColumnChoices;
+  onColumnVisibleChange: (change: {
+    columnId: string;
+    isVisible: boolean;
+  }) => void;
+}) {
+  return (
+    <Stack gap={1}>
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+      >
+        {title}
+      </Text>
+      <Stack gap={0}>
+        {columns.map((column) => (
+          <Checkbox
+            key={column.id}
+            size="sm"
+            paddingY={1}
+            checked={isColumnVisible({ column, choices })}
+            onCheckedChange={({ checked }) =>
+              onColumnVisibleChange({
+                columnId: column.id,
+                isVisible: checked === true,
+              })
+            }
+          >
+            <Text textStyle="xs" color="fg">
+              {column.label}
+            </Text>
+          </Checkbox>
+        ))}
+      </Stack>
+    </Stack>
   );
 }
