@@ -121,6 +121,59 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms Langy offered no prose options and invented no id
 
   # ---------------------------------------------------------------------------
+  # Langy changes the customer's code through a shared local folder (ADR-129)
+  # ---------------------------------------------------------------------------
+
+  # These scenarios drive the real CLI in a terminal against a demo
+  # application copied into a temporary git repository, and answer the
+  # permission cards as the user would. Facts are read from the repository
+  # before the judge speaks.
+
+  @e2e
+  Scenario: A scenario checks that Langy instruments tracing through a shared folder
+    Given a Langy dogfood scenario where the user asks to instrument traces and shares the local folder
+    When the scenario runs against Langy
+    Then Langy works in a new branch from the folder's main branch
+    And the application's entry point calls the LangWatch SDK
+    And Langy runs the project's own checks before it commits
+    And Langy opens a pull request or reports the one blocker
+    And the judge confirms Langy explained the two ways to reach the code and asked once
+
+  @e2e
+  Scenario: A scenario checks that a remembered GitHub choice is not asked again
+    Given a Langy dogfood scenario where the user chose GitHub and remembered it
+    When a second conversation needs code access
+    Then no code access card is rendered
+    And the status card reads that Langy uses GitHub
+    And changing the choice clears it for the next conversation
+
+  @e2e
+  Scenario: A scenario checks that Langy adds a run parameter to a connected agent
+    Given a Langy dogfood scenario where the demo agent is connected and the user asks for a free-plan-only case using a named account
+    When the scenario runs against Langy
+    Then the connect call declares a plan parameter with the plans as options
+    And the demo's account store holds the named account
+    And Langy restarts the agent in the background through the folder
+    And the agent registers again with the new parameter in its schema
+    And the scenario runs with the parameter set
+
+  @e2e
+  Scenario: A scenario checks that Langy respects the folder boundary and my denials
+    Given a Langy dogfood scenario where the user asks for a file outside the folder and denies a removal
+    When the scenario runs against Langy
+    Then Langy explains it can only work inside the shared folder and does not retry
+    And the denied removal is not run again
+    And a pattern the user allowed is not asked a second time
+
+  @e2e
+  Scenario: A scenario checks that Langy recovers when the folder disconnects mid-task
+    Given a Langy dogfood scenario where the CLI exits while Langy is working
+    When the scenario runs against Langy
+    Then Langy reports that the folder is no longer connected
+    And Langy offers the code access card again
+    And the judge confirms Langy did not pretend the work continued
+
+  # ---------------------------------------------------------------------------
   # The judge rubric grades outcomes, never the prompt restated
   # ---------------------------------------------------------------------------
 

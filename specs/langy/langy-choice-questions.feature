@@ -107,6 +107,79 @@ Feature: Langy asks a real question with selectable options
     Then the card renders locked with the choice marked
 
   # ===========================================================================
+  # Asked mid-task, the card answers the tool
+  # ===========================================================================
+
+  # While Langy changes the customer's code it sometimes reaches a fork that
+  # is the user's to pick: which file owns the setup, which account to use,
+  # whether to open the pull request now. Ending the turn there would throw
+  # away the plan Langy is in the middle of. So the worker's question tool
+  # waits for the answer while the turn is in flight, through the same user
+  # wait the permission card uses (specs/langy/langy-local-permissions.feature).
+  # The card is the same choices card; only the delivery of the answer differs.
+  # Langy decides routine things itself and asks only when two ways forward
+  # differ for the user. See dev/docs/adr/129-langy-local-control.md.
+
+  Rule: A question asked mid-task keeps the turn and returns the answer to the tool
+
+    @unit
+    Scenario: The worker has a question tool
+      When a worker is provisioned
+      Then it has a question tool that takes a question, a header, options with labels and descriptions, and whether several may be picked
+      And its description says to decide routine things alone and to ask only when the ways forward differ for the user
+
+    @integration
+    Scenario: A question asked by the tool renders while the turn is in flight
+      Given Langy is in the middle of a change
+      When Langy asks which file should own the tracing setup
+      Then the choices card renders with the options
+      And the turn stays in flight, with the tool waiting
+
+    @integration
+    Scenario: Selecting an option returns it to the tool and the turn continues
+      Given an open question card asked by the tool
+      When I select an option
+      Then the tool receives my selection as its result
+      And Langy continues the same turn with the plan it had
+      And the card renders locked with my choice marked
+
+    @integration
+    Scenario: A free-text answer reaches the tool as words
+      Given an open question card asked by the tool that allows a free-text answer
+      When I choose Other and type my own
+      Then the tool receives my text as its result
+
+    @integration
+    Scenario: A question no one answers ends the turn in words
+      Given an open question card asked by the tool
+      When the wait passes its budget
+      Then the tool result reads that no answer arrived
+      And Langy ends the turn saying what it is waiting for
+      And the card stays open
+
+    @integration
+    Scenario: A late answer starts the next turn as my message
+      Given a question card whose tool wait already ended the turn
+      When I select an option
+      Then my choice appears as my own message in the conversation
+      And a new turn starts with Langy acting on it
+
+    @integration
+    Scenario: Stopping the turn closes the open question
+      Given an open question card asked by the tool
+      When I stop the turn
+      Then the card renders superseded
+      And the tool wait ends
+
+    @e2e
+    Scenario: Langy asks a real fork while changing code and continues after the answer
+      Given my local folder is connected and Langy is instrumenting tracing
+      When Langy reaches a choice between two files that could own the setup
+      Then Langy asks it as a question card, not as prose
+      And after my answer Langy edits the file I picked in the same turn
+      And the judge confirms Langy asked nothing it could have decided alone
+
+  # ===========================================================================
   # Staleness is event order, nothing else
   # ===========================================================================
 

@@ -1,13 +1,15 @@
 @unit
-Feature: Agent dev tunnel
+Feature: Agent tunnel
   As a developer with a registered HTTP agent
-  I want `langwatch agent dev` to expose my local agent server through a tunnel
+  I want `langwatch agent tunnel` to expose my local agent server through a tunnel
   So that platform scenarios run against the code on my machine
 
-  # `langwatch agent dev` (alias `langwatch agent tunnel`) starts a public
-  # tunnel to a local server, points the registered HTTP agent at it for the
-  # session, and restores the previous URL on exit. A per-session secret and a
-  # local auth proxy keep the public tunnel URL from being an open relay.
+  # `langwatch agent tunnel` (hidden alias `langwatch agent dev`) starts a
+  # public tunnel to a local server, points the registered HTTP agent at it
+  # for the session, and restores the previous URL on exit. A per-session
+  # secret and a local auth proxy keep the public tunnel URL from being an
+  # open relay. Sharing a folder with Langy is a different command,
+  # `langwatch langy --share-control` (ADR-129).
 
   Scenario: URL write-back replaces the agent URL and stashes the previous one
     Given a registered HTTP agent pointing at a deployed URL

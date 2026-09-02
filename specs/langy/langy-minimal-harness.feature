@@ -13,8 +13,9 @@ Feature: Langy minimal harness
   @unit
   Scenario: The worker does not expose tools the panel cannot show
     When a worker is provisioned
-    Then subagent spawning and interactive questions are denied, because the
-      panel has no way to show either one yet
+    Then subagent spawning is denied, because the panel has no way to show it
+    And the harness's own interactive prompt is denied, because Langy asks
+      through its own question tool, which the panel renders as a choices card
     And the shell, file, skill, todo, and web fetching tools stay available,
       since Langy answers questions whose answers are not in LangWatch's docs
 
