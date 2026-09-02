@@ -203,14 +203,33 @@ Feature: Dataset editor
       And adding rows from a CSV file is not offered
 
     @integration
+    Scenario: The ways to add a row go the moment I start typing
+      When I type a search term but the search has not run yet
+      Then the add-row button is not offered
+      And adding rows from a CSV file is not offered
+      # The search box waits for a pause in typing before it runs. Leaving the
+      # add-row affordances up during that pause offers a row that the search
+      # arriving a moment later will remove from the grid — the user adds a row
+      # and watches it disappear, with nothing on screen connecting the two.
+
+    @integration
     Scenario: An import already open when the search lands is withdrawn too
       Given I have opened the CSV import
       When a search takes effect
       Then the import is withdrawn
-      # Withdrawing only the button leaves the door open behind it: the search
-      # box waits for a pause in typing, so a click landing in that pause opens
-      # the import while no search is in effect yet. Rows imported through it
-      # land at the end of the dataset, outside the matches on screen.
+      # Withdrawing only the button leaves the door open behind it. Rows
+      # imported through it land at the end of the dataset, outside the matches
+      # on screen.
+
+    @integration
+    Scenario: An import withdrawn by a search does not reopen when I clear it
+      Given the CSV import was withdrawn by a search
+      When I clear the search
+      Then the import stays closed until I ask for it again
+      # Withdrawing the import unmounts it without recording that it closed, so
+      # the flag saying it is open outlives the dialog. Clearing the search
+      # would then reopen it on its own, seconds after the user last touched
+      # it, and empty of whatever they had selected in it.
 
     @integration
     Scenario: Clearing the search offers adding rows again

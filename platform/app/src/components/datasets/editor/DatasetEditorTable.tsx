@@ -223,6 +223,14 @@ export function DatasetEditorTable({
       ? debouncedSearch.text.trim() || undefined
       : undefined;
   const isSearching = !!activeSearch;
+  // Whether a search OWNS the grid — the settled one, or the one the user has
+  // already typed and the debounce has not run yet. `isSearching` alone is the
+  // wrong gate for withdrawing the ways of adding a row: it trails the box by
+  // 300ms, so for that long the editor still offers a row that the search
+  // landing a moment later removes from the grid. Presentation of search
+  // RESULTS stays on `isSearching`, which is the right gate for it: there is
+  // nothing to say about matches until the search has actually run.
+  const searchOwnsTheGrid = !!datasetId && (!!searchInput.trim() || isSearching);
 
   // Where the user was before the search started, so clearing it puts them back
   // rather than on page 1 — see `onSearchChange` below, which maintains it.
@@ -531,6 +539,18 @@ export function DatasetEditorTable({
       : undefined,
   });
 
+  // A search withdraws the CSV import (see its render gate at the bottom), but
+  // the gate only unmounts the dialog — the disclosure goes on believing it is
+  // open. Left that way the flag outlives the dialog, and clearing the search
+  // reopens it on its own: a dialog the user last touched a search ago, back on
+  // screen without being asked for and empty of whatever they had chosen in it.
+  // Tell the disclosure it closed, so "withdrawn" and "closed" cannot disagree.
+  const csvModalOpen = addRowsFromCSVModal.open;
+  const closeCsvModal = addRowsFromCSVModal.onClose;
+  useEffect(() => {
+    if (searchOwnsTheGrid && csvModalOpen) closeCsvModal();
+  }, [searchOwnsTheGrid, csvModalOpen, closeCsvModal]);
+
   // ── Table assembly ────────────────────────────────────────────────
 
   const rowCount = records.length;
@@ -538,12 +558,12 @@ export function DatasetEditorTable({
   // the dataset, so on the paged saved view it belongs only on the last page —
   // adding it on an earlier full page would create a row the user can't see.
   // In-memory mode (no datasetId) is one local list, so it always shows it.
-  // ...and never while a search is in effect: a new row is empty, so it would
+  // ...and never once a search owns the grid: a new row is empty, so it would
   // not match the search and would appear to vanish the moment it was created.
   // This one flag covers both the button and the phantom row (via
   // `displayRowCount`); the CSV import is withdrawn alongside them, for the same
   // reason — its rows land at the end of the dataset, outside the matches.
-  const showAddRow = (!datasetId || isLastPage) && !isSearching;
+  const showAddRow = (!datasetId || isLastPage) && !searchOwnsTheGrid;
   // A refused search leaves the rows read BEFORE it on screen: the store is only
   // written from a settled `data` (see the effect above), so an error leaves the
   // previous page in place. Those rows were never matched against the search,
@@ -878,7 +898,7 @@ export function DatasetEditorTable({
             >
               <Download size={16} /> Download as CSV
             </Button>
-            {datasetId && !isSearching && (
+            {datasetId && !searchOwnsTheGrid && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -1091,11 +1111,12 @@ export function DatasetEditorTable({
         />
       )}
 
-      {/* Withdrawn while a search is in effect for the same reason its toolbar
-          button is: a click landing inside the search debounce opens this while
-          `isSearching` is still false, and rows imported here land at the end of
-          the dataset — outside the matches on screen. */}
-      {datasetId && addRowsFromCSVModal.open && !isSearching && (
+      {/* Withdrawn once a search owns the grid, for the same reason its toolbar
+          button is: rows imported here land at the end of the dataset, outside
+          the matches on screen. The effect above is what makes the withdrawal
+          stick — unmounting alone would leave the disclosure believing it is
+          still open, and clearing the search would bring it back. */}
+      {datasetId && addRowsFromCSVModal.open && !searchOwnsTheGrid && (
         <AddRowsFromCSVModal
           isOpen={addRowsFromCSVModal.open}
           onClose={() => {

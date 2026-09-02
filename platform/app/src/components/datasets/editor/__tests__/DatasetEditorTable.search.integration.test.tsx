@@ -556,37 +556,92 @@ describe("given the dataset's own total is not known yet", () => {
   });
 });
 
-describe("given the CSV import was opened just before a search landed", () => {
+describe("given I have typed a search term that has not run yet", () => {
+  /** @scenario The ways to add a row go the moment I start typing */
+  it("withdraws every way of adding a row on the keystroke, not on the debounce", async () => {
+    // The gate used to read the DEBOUNCED term, so for the 300ms between the
+    // keystroke and the search running, the add-row button, the trailing row
+    // and the CSV import were all still offered. A row added in that window is
+    // empty, so the search arriving a moment later removes it from the grid.
+    const requests = serveDataset(singlePageRecords);
+    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+
+    expect(await screen.findByTestId("add-row")).toBeInTheDocument();
+    expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("dataset-row-search"), {
+      target: { value: "escalation" },
+    });
+
+    // Asserted outright rather than waited for: waiting would let the debounce
+    // fire and the test would pass on the old behaviour too.
+    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument();
+    // The self-check that keeps the two assertions above honest: if the search
+    // had already run, they would hold for the wrong reason. No searched read
+    // has gone out, so the debounce is still pending.
+    expect(requests.at(-1)?.search).toBeUndefined();
+  });
+});
+
+describe("given the CSV import was open when a search landed", () => {
   /** @scenario An import already open when the search lands is withdrawn too */
   it("withdraws the import dialog too, not just the button", async () => {
-    // The toolbar button is withdrawn when a search takes effect, but a click
-    // landing inside the debounce opens the dialog while `isSearching` is still
-    // false. Leaving it mounted is the same hole the button gate exists to
-    // close: rows land at the end of the dataset, outside the matches on screen.
+    // Rows imported here land at the end of the dataset, outside the matches on
+    // screen. Withdrawing only the toolbar button leaves the door open behind
+    // it for an import the user started before they started searching.
     const user = userEvent.setup();
     serveDataset(singlePageRecords);
     render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
     await screen.findByText("billing question");
-    // Typed in one event rather than keystroke by keystroke: this is the click
-    // that lands INSIDE the debounce, so the test has to reach the button while
-    // the search is still pending. Typing character by character spends most of
-    // that window, and the dialog traps focus once open — so opening it first
-    // and typing behind it exercises an ordering a user cannot perform.
+    await user.click(await screen.findByTestId("add-rows-from-csv"));
+    await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
+
+    // The dialog traps focus, so the search box cannot be typed into while it
+    // is open — a change event is how this ordering is reachable at all.
     fireEvent.change(screen.getByTestId("dataset-row-search"), {
       target: { value: "escalation" },
     });
-    await user.click(screen.getByTestId("add-rows-from-csv"));
-    await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument(),
-    );
     // Waited for, not asserted outright: the dialog's unmount is animated, so a
     // bare assertion here races the exit transition and fails intermittently.
     await waitFor(() =>
       expect(screen.queryAllByRole("dialog")).toHaveLength(0),
     );
+  });
+
+  /** @scenario An import withdrawn by a search does not reopen when I clear it */
+  it("leaves it closed when the search is cleared, rather than reopening it", async () => {
+    // Withdrawing the import unmounted the dialog without telling the
+    // disclosure it had closed, so the "open" flag outlived it. Clearing the
+    // search then remounted the dialog on its own — seconds after the user last
+    // touched it, and empty of whatever file they had chosen in it.
+    const user = userEvent.setup();
+    serveDataset(singlePageRecords);
+    render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+
+    await screen.findByText("billing question");
+    await user.click(await screen.findByTestId("add-rows-from-csv"));
+    await waitFor(() => expect(screen.getAllByRole("dialog").length).toBe(1));
+
+    fireEvent.change(screen.getByTestId("dataset-row-search"), {
+      target: { value: "escalation" },
+    });
+    await waitFor(() =>
+      expect(screen.queryAllByRole("dialog")).toHaveLength(0),
+    );
+
+    fireEvent.change(screen.getByTestId("dataset-row-search"), {
+      target: { value: "" },
+    });
+
+    // The import button coming back is the witness that the search really has
+    // been cleared — without it this could pass on a search that never lifted.
+    await waitFor(() =>
+      expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument(),
+    );
+    expect(screen.queryAllByRole("dialog")).toHaveLength(0);
   });
 });
 
