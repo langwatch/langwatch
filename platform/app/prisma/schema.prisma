@@ -5239,3 +5239,43 @@ model IdentityMatchSuggestion {
   // The review surface reads one organization's candidates, strongest first.
   @@index([organizationId, score])
 }
+
+/// Which gateway keys a connected provider bill pays for (ADR-128 §7).
+///
+/// Dated, because coverage is read as of the day being drawn: re-pointing a key
+/// from one bill to another in June must leave May filed under the first bill.
+/// An undated column would silently re-file every past month the next time a
+/// chart was drawn.
+///
+/// A separate table rather than a list column on `IngestionSource`, because
+/// that is what lets the DATABASE hold "every dollar has one home" - an
+/// exclusion constraint refuses a second bill claiming an already-covered key
+/// instead of letting the last administrator to hit Save win.
+///
+/// None of its rules are expressible here, so all of them live in the
+/// migration: an exclusion constraint over the validity range, a CHECK that the
+/// range is non-empty, and a trigger tying the row to its key's own
+/// organization (`relationMode = "prisma"` means there are no real foreign keys
+/// to do it).
+model IngestionSourceKeyCoverage {
+  id                String    @id @default(nanoid())
+  organizationId    String
+  /// The connected bill.
+  ingestionSourceId String
+  /// The gateway key that bill pays for.
+  virtualKeyId      String
+  /// UTC midnight only. A day is the finest grain a bill can own, so a mid-day
+  /// instant is not representable and would file a whole day under whichever
+  /// bill the read happened to resolve.
+  validFrom         DateTime
+  /// Open coverage is null. Re-pointing closes this row and opens a successor
+  /// at the same instant, in one transaction - it never rewrites this one.
+  validTo           DateTime?
+  createdAt         DateTime  @default(now())
+
+  // One organization's mapping, and the per-source list shown beside the
+  // source's own configuration.
+  @@index([organizationId, ingestionSourceId])
+  // Resolving which bill covered a key on the day being drawn.
+  @@index([organizationId, virtualKeyId, validFrom])
+}
