@@ -6,7 +6,7 @@ sidebarTitle: Observability
 
 ## Where each signal lands
 
-Every request produces three things you can read.
+Every request through `/v1` produces three things you can read.
 
 | Signal | Where you read it |
 |---|---|
@@ -14,7 +14,7 @@ Every request produces three things you can read.
 | Response headers | On the HTTP response your client already receives |
 | Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
 
-The gateway starts one span per request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
+The gateway starts one span per dispatched request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
 ## Trace attributes
 
@@ -43,8 +43,8 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 | `langwatch.project_id` | Project the span is filed under |
 | `langwatch.virtual_key_id` | Virtual key that authenticated the request |
 | `langwatch.gateway_request_id` | Same value as the `X-LangWatch-Gateway-Request-Id` response header |
-| `langwatch.model_provider_id` | Model provider row the request was dispatched to. Provider-filtered budgets match on it |
-| `langwatch.labels` | The virtual key's tags. Trace Explorer filters these as **Label** |
+| `langwatch.model_provider_id` | Model provider row the request was dispatched to. Provider-filtered budgets match on this id |
+| `langwatch.labels` | The virtual key's tags. Trace Explorer filters on them as **Label** |
 | `langwatch.end_user_id` | End-user id from `X-LangWatch-End-User-Id`, its LiteLLM alias, or the `user` body field |
 | `langwatch.reserved.request_metadata` | The `X-LangWatch-Metadata` JSON object, echoed back verbatim |
 | `http.response.status_code` | Upstream status, set when the provider answered 400 or above |
@@ -72,7 +72,7 @@ The table lists every attribute the gateway sets. An attribute whose value the g
 
 ## Debugging a single request
 
-Read `X-LangWatch-Gateway-Request-Id` off the response or the client's error, then search that value in Trace Explorer. The span it opens carries the model, the provider, the token counts, the cost and the upstream status.
+Read `X-LangWatch-Gateway-Request-Id` off the response or the client's error, then search that value in Trace Explorer. That span shows the model, the provider, the token counts, the cost and the upstream status.
 
 ```bash
 curl -sD- -o /dev/null \
@@ -161,7 +161,7 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted, which is a session count and not a bill |
+| `gateway_realtime_mints_total` | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted at mint time; the vendor's later report decides what a session cost |
 | `gateway_realtime_session_limit_blocks_total` | counter | none | Mints refused because a key already held its maximum open sessions. A rise means the cap is too low for the key's traffic, or its sessions stay open. The key is in the trace and the log line |
 | `gateway_realtime_registry_errors_total` | counter | `operation` | Failed calls to the voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint; a `correlate` failure costs the session its exact join to the vendor's report |
 
@@ -189,14 +189,10 @@ Every request writes a spend record to a bounded on-disk spool, and a background
 sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
 ```
 
-Both counters read `0` on a pod whose spool failed to open. That pod serves traffic and emits no spend at all. It logs the failure at startup, and a flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
+Both counters read `0` on a pod whose spool failed to open. That pod serves traffic and emits no spend at all. It logs the failure at startup, and you can spot it from a scrape by reading these two counters against a live `gateway_http_requests_total`.
 
 The spool is pod-local and stays off a volume. A pod deleted with records still unshipped loses them, bounded by the drain lag of about a second of traffic.
 
 The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
-## Also check
-
-- [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the environment variables that point the gateway at your collector.
-- [Troubleshooting](/ai-gateway/troubleshooting) for reading a failed request end to end.
-- [Security](/ai-gateway/security) for what the gateway records and what it never logs.
+**Also check:** [Troubleshooting](/ai-gateway/troubleshooting) for reading a failed request end to end, [Security](/ai-gateway/security) for what the gateway records and what it never logs, [Self-hosting: Configuration](/ai-gateway/self-hosting/config) for the environment variables.

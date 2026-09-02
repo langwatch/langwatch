@@ -8,7 +8,7 @@ sidebarTitle: Audit log
 
 Gateway mutations write to the same `AuditLog` table as the rest of the platform. Open **Settings, Audit Log** to read them. Gateway rows carry a purple **Gateway** badge; platform rows, such as a member change or a project edit, carry a grey **Platform** badge.
 
-A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. Virtual-key rows leave the hashed secret out of both halves.
+A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. On a virtual-key row, both halves leave the hashed secret out.
 
 The actor is the user who made the change. A write that arrives on a legacy project API key, which carries no user, records the machine actor `svc_<projectId>`.
 
@@ -51,7 +51,7 @@ The Audit Log page is at **Settings, Audit Log**. It needs the `auditLog:view` p
 
 Filter by user name or email, by action code, by project, and by date range. All gateway codes start with `gateway.`, so typing `gateway.` in the action filter narrows the page to gateway rows.
 
-Every virtual key and every budget detail page carries an **Audit history** button. It opens the Audit Log page filtered to that resource, and the filter shows as a chip you can clear. The button stays available on a revoked key and on an archived budget, so a forensic review starts from the resource itself.
+Every virtual key and every budget detail page has an **Audit history** button. It opens the Audit Log page filtered to that resource, and the filter shows as a chip you can clear. The button stays available on a revoked key and on an archived budget, so a forensic review starts from the resource itself.
 
 ## Querying programmatically
 
@@ -68,7 +68,7 @@ Every virtual key and every budget detail page carries an **Audit history** butt
 | `IP Address`, `User Agent` | Request origin, on platform rows |
 | `Error` | Error text, on platform rows |
 | `Args` | Call arguments, on platform rows |
-| `Before`, `After` | The gateway row's state either side of the change |
+| `Before`, `After` | The gateway row's state on each side of the change |
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
@@ -80,8 +80,4 @@ Rows live in the application Postgres database, indexed on `(organizationId, cre
 
 The application only ever inserts into this table. It exposes no update and no delete path, so a row that lands stays as written.
 
-## Also check
-
-- [Virtual keys](/ai-gateway/virtual-keys) for the rotation and revocation operations behind those action codes.
-- [RBAC](/ai-gateway/rbac) for who can read the log.
-- [Security](/ai-gateway/security) for the rest of the gateway's security boundary.
+**Also check:** [Virtual Keys](/ai-gateway/virtual-keys) for the rotation and revocation operations behind those action codes, [RBAC](/ai-gateway/rbac) for who can read the log, [Security](/ai-gateway/security) for the rest of the security boundary.
