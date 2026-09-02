@@ -1,0 +1,11 @@
+{
+  "name": "Legacy: Total Cost Over Time",
+  "code": "import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from \"recharts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n\n  if (isError) {\n    return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  }\n  if (isLoading || data === null) {\n    return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  }\n  if (data.length === 0) {\n    return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n  }\n\n  const rows = data.map(function (row) {\n    return { bucket: String(row.bucket).slice(0, 10), cost: Number(row.cost || 0) };\n  });\n\n  return (\n    <div style={{ height: \"100%\", display: \"flex\", flexDirection: \"column\" }}>\n      <div style={{ fontSize: 11, color: \"#666\", marginBottom: 4, flexShrink: 0 }}>{rows.length} rows</div>\n      <div style={{ flex: 1, minHeight: 0 }}>\n        <ResponsiveContainer width=\"100%\" height=\"100%\">\n          <AreaChart data={rows}>\n            <CartesianGrid strokeDasharray=\"3 3\" />\n            <XAxis dataKey=\"bucket\" tick={{ fontSize: 10 }} />\n            <YAxis unit=\"$\" />\n            <Tooltip formatter={function (value) { return \"$\" + Number(value).toFixed(2); }} />\n            <Area type=\"monotone\" dataKey=\"cost\" stroke=\"#22c55e\" fill=\"#22c55e\" fillOpacity={0.3} />\n          </AreaChart>\n        </ResponsiveContainer>\n      </div>\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket, sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\nGROUP BY bucket\nORDER BY bucket",
+      "parameters": []
+    }
+  ]
+}

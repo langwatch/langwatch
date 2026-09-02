@@ -1,0 +1,11 @@
+{
+  "name": "Legacy: Latency Percentiles",
+  "code": "import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from \"recharts\";\n\nexport default function Widget() {\n  const { data, isLoading, isError, error } = LW.useChartQuery(\"main\", {});\n\n  if (isError) {\n    return <div style={{ fontSize: 11, color: \"#b00\" }}>{error.message}</div>;\n  }\n  if (isLoading || data === null) {\n    return <div style={{ fontSize: 11, color: \"#666\" }}>Loading…</div>;\n  }\n  if (data.length === 0) {\n    return <div style={{ fontSize: 11, color: \"#666\" }}>No data in this window.</div>;\n  }\n\n  const rows = data.map(function (row) {\n    return {\n      bucket: String(row.bucket).slice(0, 10),\n      p50: Number(row.p50),\n      p90: Number(row.p90),\n      p99: Number(row.p99),\n    };\n  });\n\n  return (\n    <div style={{ height: \"100%\", display: \"flex\", flexDirection: \"column\" }}>\n      <div style={{ fontSize: 11, color: \"#666\", marginBottom: 4, flexShrink: 0 }}>{rows.length} rows</div>\n      <div style={{ flex: 1, minHeight: 0 }}>\n        <ResponsiveContainer width=\"100%\" height=\"100%\">\n          <LineChart data={rows}>\n            <CartesianGrid strokeDasharray=\"3 3\" />\n            <XAxis dataKey=\"bucket\" tick={{ fontSize: 10 }} />\n            <YAxis unit=\"ms\" />\n            <Tooltip />\n            <Legend />\n            <Line type=\"monotone\" dataKey=\"p50\" stroke=\"#22c55e\" dot={false} />\n            <Line type=\"monotone\" dataKey=\"p90\" stroke=\"#f59e0b\" dot={false} />\n            <Line type=\"monotone\" dataKey=\"p99\" stroke=\"#ef4444\" dot={false} />\n          </LineChart>\n        </ResponsiveContainer>\n      </div>\n    </div>\n  );\n}\n",
+  "queries": [
+    {
+      "name": "main",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket,\n  quantile(0.5)(TotalDurationMs) AS p50,\n  quantile(0.9)(TotalDurationMs) AS p90,\n  quantile(0.99)(TotalDurationMs) AS p99\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\nGROUP BY bucket\nORDER BY bucket",
+      "parameters": []
+    }
+  ]
+}
