@@ -19,7 +19,7 @@ export function GraphFilterIndicator({ filters }: GraphFilterIndicatorProps) {
           height="100%"
           textWrap="wrap"
         >
-          <FilterDisplay filters={filters} />
+          <FilterDisplay filters={filters} clampValues={false} />
         </VStack>
       }
       positioning={{ placement: "top" }}
