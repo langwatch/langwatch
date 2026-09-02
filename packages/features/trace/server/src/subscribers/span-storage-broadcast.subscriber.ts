@@ -1,6 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceBroadcastSink } from "./trace-update-broadcast.subscriber";
+import type { TraceTenantBroadcastPort } from "../ports/trace-tenant-broadcast.port";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");
@@ -8,7 +8,7 @@ const logger = createLogger("langwatch:trace-processing:span-storage-broadcast")
 export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000; // Debounce — notification only, frontend refetches
 
 export interface SpanStorageBroadcastSubscriberDeps {
-  broadcast: TraceBroadcastSink;
+  broadcast: TraceTenantBroadcastPort;
 }
 
 /**

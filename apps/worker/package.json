@@ -86,6 +86,7 @@
     "@react-email/render": "^2.0.9",
     "@slack/webhook": "^7.1.0",
     "node-fetch-cache": "^5.1.0",
+    "posthog-node": "^5.39.4",
     "react": "^19.2.7",
     "tiktoken": "^1.0.22",
     "zod": "^4.3.6"

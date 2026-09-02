@@ -299,6 +299,7 @@ export { TraceSpanTokenEstimationAdapter } from "./adapters/trace-span-token-est
 export { TraceProjectMetadataPort } from "./ports/trace-project-metadata.port";
 export { TraceModelCostCatalogPort } from "./ports/trace-model-cost-catalog.port";
 export { TraceEvaluationMonitorPort } from "./ports/trace-evaluation-monitor.port";
+export { TraceTenantBroadcastPort } from "./ports/trace-tenant-broadcast.port";
 export {
   TraceProductAnalyticsPort,
   type TraceProductEvent,

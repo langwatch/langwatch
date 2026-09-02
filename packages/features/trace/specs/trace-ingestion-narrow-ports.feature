@@ -38,6 +38,6 @@ Feature: Reading other features from the trace ingestion path
 
   @unit
   Scenario: The first-trace milestone is recorded through a sink, not a function
-    Given a process with no product-analytics client
+    Given a process holding a product-analytics sink
     When the first-trace milestone is recorded
-    Then the event and its properties are surfaced rather than dropped silently
+    Then it reaches that sink rather than a module-level function

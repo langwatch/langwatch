@@ -109,6 +109,34 @@ export const workerConfigDefinition = RuntimeConfig.define({
     secretKey: Config.secret({ optional: true, env: "STRIPE_SECRET_KEY" }),
   },
   /**
+   * The PostHog project this deployment's product analytics belong to.
+   *
+   * Both variables are the application's own spelling and its own parse
+   * (`POSTHOG_KEY` and `POSTHOG_HOST` in `platform/app/src/env-create.mjs`, each
+   * `z.string().optional()`), because the ingest path's one product event —
+   * `first_trace_integrated`, the terminal step of the onboarding funnel — is
+   * emitted by whichever graph owns the trace pipeline, and the funnel is one
+   * funnel. A worker pointed at a different project would file the milestone
+   * where nobody reads it, and a worker holding no key at all would undercount
+   * the funnel on the deployment that paid for the analytics.
+   *
+   * `Config.value` rather than `Config.secret` on BOTH counts. A PostHog
+   * project key is write-only and already public — `apps/ui` serves it to the
+   * browser as public configuration — so it is not a secret; and
+   * `Config.secret` is `z.string().min(1)`, which REFUSES `POSTHOG_KEY=` where
+   * the application accepts it and quietly runs without analytics. A worker
+   * that would not boot on an environment its twin boots on is the drift.
+   *
+   * `host` has NO default here because it has none there: the application
+   * passes `env.POSTHOG_HOST` straight into the client, so an unset variable
+   * means the vendor's own default on both sides. Inventing one here would be
+   * a second answer to which region the events land in.
+   */
+  productAnalytics: {
+    key: Config.value(optionalEnvironmentString, { env: "POSTHOG_KEY" }),
+    host: Config.value(optionalEnvironmentString, { env: "POSTHOG_HOST" }),
+  },
+  /**
    * The one outbound mail gateway this process sends through.
    *
    * Every variable below is the application's own spelling
@@ -528,6 +556,18 @@ export function resolveWorkerTraceTokenizerConfig(
   };
 }
 
+/**
+ * The PostHog project the ingest path's one product event is captured into.
+ *
+ * Both absent is a supported deployment and not a degraded one: it is the
+ * application's own behaviour when `POSTHOG_KEY` is unset, and it means this
+ * install chose not to run product analytics.
+ */
+export type WorkerProductAnalyticsConfig = Readonly<{
+  key?: string;
+  host?: string;
+}>;
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -556,6 +596,7 @@ export type WorkerConfig = Readonly<{
   tracePrivacy: WorkerTracePrivacyConfig;
   tokenizer: WorkerTraceTokenizerConfig;
   stripe: WorkerStripeConfig;
+  productAnalytics: WorkerProductAnalyticsConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
   processing: WorkerProcessingConfig;
@@ -593,6 +634,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     }),
     tokenizer: resolveWorkerTraceTokenizerConfig(value.tokenizer),
     stripe: value.stripe,
+    productAnalytics: value.productAnalytics,
     gateway: value.gateway,
     github: value.github,
     processing: value.processing,

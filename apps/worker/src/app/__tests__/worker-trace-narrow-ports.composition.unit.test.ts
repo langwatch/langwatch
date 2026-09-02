@@ -6,9 +6,10 @@ import {
   TraceModelCostCatalogPort,
   TraceProductAnalyticsPort,
   TraceProjectMetadataPort,
+  type TraceProductEvent,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerLoggedProductAnalyticsAdapter } from "../../platform/infrastructure/worker-product-analytics.adapter";
+import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition";
 import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition";
 
 /**
@@ -59,8 +60,14 @@ describe("createWorkerTraceNarrowPorts", () => {
       /** @scenario "The published project service still satisfies the narrowed port" */
       it("answers each port as the port it declares", () => {
         const { projects, monitors, modelProviders } = services();
+        const productAnalytics = createWorkerTraceProductAnalytics({ config: {} });
 
-        const ports = createWorkerTraceNarrowPorts({ projects, monitors, modelProviders });
+        const ports = createWorkerTraceNarrowPorts({
+          projects,
+          monitors,
+          modelProviders,
+          productAnalytics,
+        });
 
         expect(ports.projects).toBeInstanceOf(TraceProjectMetadataPort);
         expect(ports.monitors).toBeInstanceOf(TraceEvaluationMonitorPort);
@@ -71,7 +78,13 @@ describe("createWorkerTraceNarrowPorts", () => {
       /** @scenario "The project metadata subscriber names three capabilities, not a service" */
       it("reaches all three project capabilities through the one port", async () => {
         const { projects, monitors, modelProviders, calls } = services();
-        const ports = createWorkerTraceNarrowPorts({ projects, monitors, modelProviders });
+        const productAnalytics = createWorkerTraceProductAnalytics({ config: {} });
+        const ports = createWorkerTraceNarrowPorts({
+          projects,
+          monitors,
+          modelProviders,
+          productAnalytics,
+        });
 
         await ports.projects.tryGetById("project-1");
         await ports.projects.updateMetadata({
@@ -91,7 +104,13 @@ describe("createWorkerTraceNarrowPorts", () => {
       /** @scenario "The evaluation trigger names one monitor read" */
       it("lists the project's on-message monitors through the port", async () => {
         const { projects, monitors, modelProviders, calls } = services();
-        const ports = createWorkerTraceNarrowPorts({ projects, monitors, modelProviders });
+        const productAnalytics = createWorkerTraceProductAnalytics({ config: {} });
+        const ports = createWorkerTraceNarrowPorts({
+          projects,
+          monitors,
+          modelProviders,
+          productAnalytics,
+        });
 
         await expect(ports.monitors.getEnabledOnMessageMonitors("project-1")).resolves.toEqual([
           {
@@ -108,7 +127,13 @@ describe("createWorkerTraceNarrowPorts", () => {
       /** @scenario "Record-time cost enrichment reads the project's own cost rules" */
       it("reads the project's own cost rules through the port", async () => {
         const { projects, monitors, modelProviders, calls } = services();
-        const ports = createWorkerTraceNarrowPorts({ projects, monitors, modelProviders });
+        const productAnalytics = createWorkerTraceProductAnalytics({ config: {} });
+        const ports = createWorkerTraceNarrowPorts({
+          projects,
+          monitors,
+          modelProviders,
+          productAnalytics,
+        });
 
         await ports.modelCosts.listCosts({ projectId: "project-1" });
 
@@ -117,18 +142,23 @@ describe("createWorkerTraceNarrowPorts", () => {
     });
   });
 
-  describe("given no product-analytics client", () => {
+  describe("given a composed product-analytics sink", () => {
     describe("when the first-trace milestone is recorded", () => {
       /** @scenario "The first-trace milestone is recorded through a sink, not a function" */
-      it("surfaces the event and says it was not delivered", () => {
-        const logger = { warn: vi.fn() };
+      it("hands the milestone to the sink it was composed with", () => {
         const { projects, monitors, modelProviders } = services();
+        const recorded: TraceProductEvent[] = [];
+        const productAnalytics = new (class extends TraceProductAnalyticsPort {
+          record(event: TraceProductEvent): void {
+            recorded.push(event);
+          }
+        })();
 
         createWorkerTraceNarrowPorts({
           projects,
           monitors,
           modelProviders,
-          productAnalytics: WorkerLoggedProductAnalyticsAdapter.create(logger as never),
+          productAnalytics,
         }).productAnalytics.record({
           userId: "user-1",
           event: "first_trace_integrated",
@@ -136,15 +166,14 @@ describe("createWorkerTraceNarrowPorts", () => {
           projectId: "project-1",
         });
 
-        expect(logger.warn).toHaveBeenCalledWith(
+        expect(recorded).toEqual([
           {
             userId: "user-1",
-            productEvent: "first_trace_integrated",
-            projectId: "project-1",
+            event: "first_trace_integrated",
             properties: { sdk_language: "python", sdk_framework: "unknown" },
+            projectId: "project-1",
           },
-          "Product event was recorded to the log only: this process has no product-analytics sink",
-        );
+        ]);
       });
     });
   });

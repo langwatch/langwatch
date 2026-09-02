@@ -1155,10 +1155,9 @@ a production caller. Zero platform edits. `apps/worker` gained `@langwatch/evalu
 `@langwatch/evaluation-server` (filtered install). Deployment impact: none until the conversion.
 
 **What remains in the step-(g) census:** the conversion itself — the 21-field trace bundle, the 28 byte-frozen
-keys, mounting the ten staged compositions, and the two named absences still open: the
-product-analytics sink (`WorkerLoggedProductAnalyticsAdapter` logs `first_trace_integrated` instead of
-delivering it) and the `RedisTenantBroadcastAdapter`'s three producers. The third — the customer-supplied
-webhook transport for automation's graph half — is CLOSED (below). The collector edge
+keys, and mounting the staged compositions. ALL THREE named absences are now CLOSED: the customer-supplied
+webhook transport for automation's graph half (below), the product-analytics sink and trace's half of the
+tenant-broadcast producers (both below). The collector edge
 (`langwatch_edge_spool_fail_open_total`, `langwatch_edge_media_extract_fail_open_total`,
 `edge-media-extraction`'s use of the drop catalog) stays excluded by name: it is apps/api's conversion, not
 the worker's.
@@ -1272,6 +1271,90 @@ recorded). DEPLOYMENT IMPACT: NONE, and no new configuration leaves — the tran
 `deployment.saas` (`IS_SAAS`) and the Redis the process already opens. `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`
 deliberately did NOT come across: the automations channel never passes the escape hatch, only the Enterprise
 endpoints platform does, so it belongs to that conversion.
+
+**The last two named absences closed (uncommitted at time of writing): the product-analytics sink and trace's
+tenant-broadcast producer.** Both were the ledger's own conditions on mounting step (g), and both are now real
+compositions in `apps/worker`, staged the same way everything else in this wave is.
+
+(1) THE PRODUCT-ANALYTICS SINK. `WorkerLoggedProductAnalyticsAdapter` is DELETED, not kept as a fallback, and
+`WorkerPostHogProductAnalyticsAdapter` stands in its place — a vendor transport adapter in
+`platform/infrastructure/`, the `WorkerTiktokenCounterAdapter` precedent, satisfying `TraceProductAnalyticsPort`
+over `posthog-node` at the version the application already pins. THE SEMANTIC DECISION, and it retires this
+ledger's own objection: key-absent → silent no-op IS parity. The objection was that a background no-op would
+happen on the deployment that runs analytics while the application's happens only on deployments that chose not
+to, and it held only while this process could not read the key at all. It now reads the same two leaves the
+application reads, so both halves decide from the same input — a deployment that named no `POSTHOG_KEY` chose no
+product analytics and neither half records; one that named a key gets a real capture from whichever graph owns
+ingest. On THAT deployment a logged "delivery" is the undercount the objection was about, which is why the
+logged adapter had to go rather than stay as a default. `createWorkerTraceNarrowPorts` now REQUIRES the sink
+instead of defaulting one: the only thing it could default to is a sink that does not deliver, and a caller who
+forgot to pass one would get silence indistinguishable from an unconfigured deployment. Flush is owned by the
+composition's `ResourceScope` (`"worker product analytics"`), mirroring `shutdownPostHog` being called from the
+App's graceful sequence in `start.ts` rather than from a signal handler of its own — the client batches, and the
+one event this path emits is emitted at most once per project, so a dropped one is re-sent by nothing.
+NEW CONFIG LEAVES: `POSTHOG_KEY` and `POSTHOG_HOST`, at the application's spelling and its parse
+(`z.string().optional()` for both in `env-create.mjs`). `Config.value`, NOT `Config.secret`, on two counts: a
+PostHog project key is write-only and already public (`apps/ui` serves it to the browser), and `Config.secret`
+is `z.string().min(1)`, which would REFUSE `POSTHOG_KEY=` on an environment the application boots on. `host` has
+no default here because it has none there — the App passes `env.POSTHOG_HOST` straight into the client, so an
+unset variable means the vendor's own default on both sides and inventing one here would be a second answer to
+which region the funnel lands in. Top-level `import`, not the tiktoken lazy one: `posthog-node` is a hard
+dependency here and the application imports it top-level in the module this twins, whereas tiktoken's laziness
+is load-bearing because tiktoken is optional at runtime and stays external to the production bundle.
+PINS: the `first_trace_integrated` literal, `distinctId` = the org admin's user id (the contract that matters —
+it is the distinct id `posthog-js` identifies the same person with in the browser, so a different key files the
+milestone against somebody who is not in the funnel), the properties spread with `projectId` joining them rather
+than replacing them and ABSENT entirely when the event names no project, key-absent and empty-key building no
+client at all, one client across repeated records, the host passed through unmodified, a capture failure never
+reaching the ingest path, and shutdown flushing. The failure log deliberately carries neither the user id nor
+the customer's properties — the application logs nothing at all here, and this line says a milestone was lost,
+not what it contained.
+
+(2) TRACE'S TENANT-BROADCAST PRODUCER. SURVEY FINDING, and it shrank the work: trace's producer is not in the
+application at all — both halves of it are already packaged as
+`subscribers/trace-update-broadcast.subscriber.ts` and `subscribers/span-storage-broadcast.subscriber.ts`, and
+what was missing was only the port. They named an ad-hoc structural `TraceBroadcastSink` interface, which a
+converting process had nothing to compose against. `TraceTenantBroadcastPort`
+(`ports/trace-tenant-broadcast.port.ts`) replaces it; `TraceBroadcastSink` is deleted rather than aliased. THE
+ARGUMENTS STAY POSITIONAL on purpose, against house style: they are the application's own `broadcastToTenant`
+signature argument for argument, which is what lets `BroadcastService` keep satisfying it structurally with zero
+platform edits. `eventType` is narrowed to the one member Trace publishes, so Trace deliberately cannot reach
+`simulation_updated` or the others. `apps/worker` answers it with `tryCreateWorkerTraceBroadcast`, a rename over
+the packaged `RedisTenantBroadcastAdapter` composed by the existing `tryCreateWorkerTenantBroadcast` — one
+publisher, so the wire format stays single.
+PINS, read as BYTES through the port because both directions of drift are silent (an unknown channel is accepted
+by Redis and delivered to nobody; a body missing a key the far side reads is dropped inside its own
+`JSON.parse`): the channel literal `broadcast:trace_updated`, the envelope's exact key set
+`{tenantId, event, timestamp}`, and each producer's own serialised payload —
+`{"event":"trace_summary_updated","traceId":...}` for the fold and `{"event":"span_stored","traceId":...}` for
+span storage. The far side is
+`platform/app/src/server/app-layer/broadcast/broadcast.service.ts`, which type-checks against none of this.
+WHAT STAYS: scenario's `simulation_updated` and langy's `langy_conversation_updated` producers are NOT this
+slice. They are still the application's and stay there until those features convert, at which point each
+declares its own narrow port over the same `tryCreateWorkerTenantBroadcast`. Said here so the next slice does not
+read the closed absence as covering all three.
+ONE PROPERTY IS DOUBLY GUARDED AND THE TEST SAYS SO: a failed publish is swallowed by the packaged adapter AND
+again by each subscriber's own catch, so neither sabotage alone goes red. The test therefore asserts it at the
+PORT as well as through the subscriber, which is the only assertion that can see the adapter stop absorbing.
+
+EIGHTEEN SABOTAGES, each red then restored, every one driven through the port or the staged composition: the
+channel prefix drifted, the envelope's `tenantId` dropped, the worker adapter hardcoding a different event type,
+the span-stored payload drifting to the summary's, the adapter rethrowing a failed publish, `distinctId` drifting
+off the org admin, `projectId` replacing the properties instead of joining them, `projectId` spread when absent,
+`close()` no longer flushing, a key-absent deployment building a client anyway, an empty key treated as
+configured, a default host invented, the event name rewritten, a capture failure escaping into the ingest path,
+the failure log carrying the customer's properties, the config leaf reading the wrong variable, the narrow-ports
+bundle dropping the sink it was handed, and the composition no longer owning the sink for flush. One
+(the subscriber's own catch removed) was GREEN and is what produced the port-level assertion above.
+
+NOT MOUNTED: `apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, the
+application still registers `projectMetadata`, `traceUpdateBroadcast` and `spanStorageBroadcast`, and neither
+`createWorkerTraceProductAnalytics` nor `tryCreateWorkerTraceBroadcast` has a production caller. Zero platform
+edits. `apps/worker` gained `posthog-node` (filtered install; the lockfile hunk is exactly three lines).
+DEPLOYMENT IMPACT: none until the conversion. At that point `POSTHOG_KEY` and `POSTHOG_HOST` become
+load-bearing for a standalone worker and must match the application's while both graphs ingest — two graphs
+pointed at different PostHog projects split one funnel in two, and a worker holding no key on a deployment that
+configured one undercounts it.
 
 
 ## How to execute the plan

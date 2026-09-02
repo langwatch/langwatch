@@ -2,22 +2,12 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { TraceTenantBroadcastPort } from "../ports/trace-tenant-broadcast.port";
 
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
-/**
- * The connected-client fan-out this subscriber writes to.
- *
- * Structural on purpose: the process supplies its own broadcaster, and Trace
- * needs exactly one method of it. `broadcastToTenant` resolving is
- * non-fatal here either way — see the handler's catch.
- */
-export interface TraceBroadcastSink {
-  broadcastToTenant(tenantId: string, event: string, eventType: "trace_updated"): Promise<void>;
-}
-
 export interface TraceUpdateBroadcastSubscriberDeps {
-  broadcast: TraceBroadcastSink;
+  broadcast: TraceTenantBroadcastPort;
 }
 
 /**

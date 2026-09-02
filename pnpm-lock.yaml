@@ -743,6 +743,9 @@ importers:
       node-fetch-cache:
         specifier: ^5.1.0
         version: 5.1.0
+      posthog-node:
+        specifier: ^5.39.4
+        version: 5.48.1(rxjs@7.8.2)
       react:
         specifier: ^19.2.7
         version: 19.2.8

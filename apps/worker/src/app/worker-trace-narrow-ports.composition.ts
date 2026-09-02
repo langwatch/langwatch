@@ -1,6 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
-import type { Logger } from "@langwatch/observability";
 import type {
   OrgAdminResolution,
   Project,
@@ -14,7 +13,6 @@ import {
   TraceProductAnalyticsPort,
   TraceProjectMetadataPort,
 } from "@langwatch/trace-server";
-import { WorkerLoggedProductAnalyticsAdapter } from "../platform/infrastructure/worker-product-analytics.adapter";
 
 /**
  * The four reads and writes the trace-ingestion subscribers make into other
@@ -34,23 +32,24 @@ import { WorkerLoggedProductAnalyticsAdapter } from "../platform/infrastructure/
  * classes exist to make the direction of the dependency explicit and to give
  * the composition a place to narrow, not to translate anything.
  *
- * THE FOURTH IS A NAMED ABSENCE. `first_trace_integrated` goes to PostHog in
- * the application and this process has no PostHog; see
- * `WorkerLoggedProductAnalyticsAdapter`.
+ * THE FOURTH IS SUPPLIED, NOT DEFAULTED. `first_trace_integrated` goes to
+ * PostHog in the application and now goes to PostHog from here too; the sink is
+ * a required argument because the only thing this composition could default to
+ * is a sink that does not deliver, and a caller who forgot to pass one would
+ * get silence that reads exactly like a deployment with no key. Compose it with
+ * `createWorkerTraceProductAnalytics`.
  */
 export function createWorkerTraceNarrowPorts(options: {
   projects: ProjectService;
   monitors: MonitorService;
   modelProviders: ModelProviderService;
-  productAnalytics?: TraceProductAnalyticsPort;
-  logger?: Logger;
+  productAnalytics: TraceProductAnalyticsPort;
 }): WorkerTraceNarrowPorts {
   return {
     projects: new WorkerTraceProjectMetadataAdapter(options.projects),
     monitors: createWorkerTraceEvaluationMonitorPort(options.monitors),
     modelCosts: createWorkerTraceModelCostCatalogPort(options.modelProviders),
-    productAnalytics:
-      options.productAnalytics ?? WorkerLoggedProductAnalyticsAdapter.create(options.logger),
+    productAnalytics: options.productAnalytics,
   };
 }
 

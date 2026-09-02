@@ -42,6 +42,9 @@ describe("resolveWorkerConfig", () => {
       // application's own 10s remote-fetch ceiling.
       tokenizer: { bpeDirectory: undefined, fetchTimeoutMs: 10_000 },
       stripe: { secretKey: undefined },
+      // Both absent is the application's own behaviour with `POSTHOG_KEY`
+      // unset: this deployment chose not to run product analytics.
+      productAnalytics: { key: undefined, host: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },
       processing: { metricShards: undefined, logShards: undefined },
@@ -70,6 +73,33 @@ describe("resolveWorkerConfig", () => {
         },
         outboundProxy: { https: undefined, http: undefined, noProxy: undefined },
       },
+    });
+  });
+
+  describe("given a deployment that named a PostHog project", () => {
+    /** @scenario "A deployment that configured PostHog delivers the milestone" */
+    it("reads the key and host from the application's own two variables", () => {
+      const config = resolveWorkerConfig({
+        POSTHOG_KEY: "phc_test",
+        POSTHOG_HOST: "https://eu.i.posthog.com",
+      });
+
+      expect(config.productAnalytics).toEqual({
+        key: "phc_test",
+        host: "https://eu.i.posthog.com",
+      });
+    });
+
+    /** @scenario "The host is the deployment's own, never one invented here" */
+    it("leaves an unnamed host absent rather than substituting a default", () => {
+      expect(
+        resolveWorkerConfig({ POSTHOG_KEY: "phc_test" }).productAnalytics.host,
+      ).toBeUndefined();
+    });
+
+    /** @scenario "A deployment that configured no product analytics records nothing" */
+    it("boots on an empty key the way the application boots on one", () => {
+      expect(() => resolveWorkerConfig({ POSTHOG_KEY: "" })).not.toThrow();
     });
   });
 
