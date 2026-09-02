@@ -2140,7 +2140,11 @@ export async function* executeConnectedCell(
     targetId: cell.targetId,
   };
 
-  const turn = await connectedTurn({ input: { ...input, now }, traceId, startedAt });
+  const turn = await connectedTurn({
+    input: { ...input, now },
+    traceId,
+    startedAt,
+  });
 
   if (!turn.ok) {
     yield connectedFailureEvent({
