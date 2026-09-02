@@ -127,8 +127,8 @@ describe("given the agent answered", () => {
 });
 
 describe("given the call failed", () => {
-  /** @scenario "An offline agent names itself in the failure" */
   describe("when the platform named the failure", () => {
+    /** @scenario "An offline agent names itself in the failure" */
     it("records the code, so the cell renders the copy of that code", () => {
       const failure = connectedCallFailure(
         new AgentOfflineError({

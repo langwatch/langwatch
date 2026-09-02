@@ -137,9 +137,12 @@ const gradingEvaluator: EvaluatorConfig = {
 const run = async ({
   cell,
   dispatch,
+  now,
 }: {
   cell: ExecutionCell;
   dispatch: ConnectedDispatch;
+  /** A clock the test moves by hand, so a cell duration is exact. */
+  now?: () => number;
 }): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
   for await (const event of executeConnectedCell({
@@ -149,6 +152,7 @@ const run = async ({
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
     dispatch,
     sleep: async () => undefined,
+    ...(now ? { now } : {}),
   })) {
     events.push(event);
   }
@@ -168,7 +172,14 @@ describe("given a connected agent column", () => {
         answered("Open a return request."),
       );
 
-      const events = await run({ cell: makeCell(), dispatch });
+      // Every read of the clock is 1200ms later, so the duration the row
+      // reports is exact.
+      let clock = 0;
+      const events = await run({
+        cell: makeCell(),
+        dispatch,
+        now: () => (clock += 1200),
+      });
 
       const call = dispatch.mock.calls[0]![0];
       expect(call.call.messages).toEqual([

@@ -2029,7 +2029,7 @@ const connectedTurnParams = ({
   agent: TypedAgent;
   dispatchAgent: ReturnType<typeof dispatchAgentOf>;
   traceId: string;
-}): Parameters<ConnectedDispatch>[0] => {
+}): Omit<Parameters<ConnectedDispatch>[0], "signal"> => {
   const { messages, params } = buildConnectedCall({
     inputs: buildTargetInputs(cell),
     definitions: connectedParameterDefinitions(agent.config),
@@ -2050,9 +2050,6 @@ const connectedTurnParams = ({
       traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
       run: {},
     },
-    signal: AbortSignal.timeout(
-      dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-    ),
   };
 };
 
@@ -2157,7 +2154,9 @@ export async function* executeConnectedCell({
       dispatch,
       sleep,
       now,
+      isAborted,
       budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
+      callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
       params: connectedTurnParams({
         cell,
         projectId,
@@ -2185,7 +2184,9 @@ export async function* executeConnectedCell({
     rowIndex: cell.rowIndex,
     targetId: cell.targetId,
     output,
-    duration: outcome.durationMs,
+    // The whole cell, not only the call that answered: a row that waited out
+    // a busy agent took that time too, and a run comparison reads it.
+    duration: now() - startedAt,
     traceId,
   };
 
@@ -2223,20 +2224,34 @@ const dispatchWithBusyRetry = async ({
   params,
   sleep,
   now,
+  isAborted,
   budgetEndsAt,
+  callTimeoutMs,
 }: {
   dispatch: ConnectedDispatch;
-  params: Parameters<ConnectedDispatch>[0];
+  params: Omit<Parameters<ConnectedDispatch>[0], "signal">;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
+  isAborted?: () => Promise<boolean>;
   budgetEndsAt: number;
+  callTimeoutMs: number;
 }): Promise<CallOutcome> => {
   for (;;) {
     try {
-      return await dispatch(params);
+      // Every attempt gets its own deadline. One shared signal would carry
+      // the time the earlier attempts and their waits already spent, so an
+      // agent that declares a timeout shorter than the retry budget would
+      // abort a later attempt the moment it starts.
+      return await dispatch({
+        ...params,
+        signal: AbortSignal.timeout(callTimeoutMs),
+      });
     } catch (error) {
       const retryAfterMs = busyRetryAfterMs(error);
       if (retryAfterMs === undefined || now() >= budgetEndsAt) throw error;
+      // A stopped run waits for nothing: the row fails now rather than
+      // holding a slot of the run for the rest of the budget.
+      if (isAborted && (await isAborted())) throw error;
       // Jitter spreads the retries of the rows that hit a full agent at once.
       const waitMs = Math.min(
         retryAfterMs + Math.floor(Math.random() * retryAfterMs),

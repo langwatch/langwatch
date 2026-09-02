@@ -176,14 +176,16 @@ function AgentBody({
           variables={connectedTargetFields(agent).inputs}
           onChange={() => {
             // The list is the agent's own contract: the turn to send, and the
-            // parameters the function declares. Mappable, not editable.
+            // parameters the function declares. Mappable, not editable, so
+            // the section stays read-only and only the mapping selector
+            // answers.
           }}
           showMappings={true}
           availableSources={availableSources}
           mappings={inputMappings}
           onMappingChange={onInputMappingsChange}
           canAddRemove={false}
-          readOnly={false}
+          readOnly={true}
         />
       ) : null}
       <ParametersTable agent={agent} />

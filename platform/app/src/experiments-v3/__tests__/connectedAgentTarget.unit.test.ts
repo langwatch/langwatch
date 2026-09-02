@@ -22,8 +22,8 @@ const agent = {
 };
 
 describe("given a connected agent is added as a target", () => {
-  /** @scenario "The declared parameters are column inputs" */
   describe("when the column is built", () => {
+    /** @scenario "The declared parameters are column inputs" */
     it("reads the turn to send and every declared parameter", () => {
       const { inputs } = connectedTargetFields(agent);
 
