@@ -234,6 +234,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = domain.WithDeploymentSelfMap(cred, model)
 
 	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
 	// Voyage). The gateway proxies directly to api.voyageai.com — wire
@@ -621,6 +622,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = domain.WithDeploymentSelfMap(cred, model)
 
 	// The image routes answer with one JSON body, so no credential and no
 	// provider lane streams them. This sits above every provider-specific
