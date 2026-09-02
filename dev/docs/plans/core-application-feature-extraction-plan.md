@@ -4790,16 +4790,28 @@ would put two mounts on one wire name.
 ### Gates
 
 `apps/api`: `tsc -p tsconfig.json` and `tsc -p tsconfig.test.json` both ZERO
-errors. `pnpm exec vitest run` for the new suite —
+errors. The new suite —
 `api-trpc-collaborators.gateway-group.integration.test.ts`, 13 tests over the
 real `/api/trpc` handler: a guardrail read all the way down to a `findMany`, the
 membership-based virtual-key visibility, the budget list, the landing decision
 with and without the governance capability, the GitHub connection status, the
 governance refusals and both billing shapes — green. The record-membership
 assertion in `api-trpc-collaborators.product.integration.test.ts` and the
-namespace list in `app-trpc.features.unit.test.ts` both moved 69 to 91. The
-seven sibling collaborator suites gained the two new stub entries. `packages/features/github/server` 15 files/126 tests green.
-`git diff --numstat -- platform/app` shows zero insertions on every row.
+namespace list in `app-trpc.features.unit.test.ts` both moved 69 to 91; the
+seven sibling collaborator suites gained the two new stub entries, and
+`app-trpc.features.unit.test.ts` composes with `saasBilling: true` so its
+"no namespace without procedures" assertion still means something. Those five
+plus `api-trpc-features.composition.integration.test.ts` run 42/42 green
+together. `packages/features/github/server` 15 files/126 tests green,
+`@langwatch/gateway-server` 36/274 green, the governance server 65/591 green.
+
+The wider `apps/api` run is red on concurrent lanes' in-flight work and moves
+between runs — `@langwatch/identity-server/better-auth` and
+`zod-validation-error` unresolvable mid-install, `src/app/getClientIp` imported
+before it exists, and the execution half's producer-registration count — none of
+it in a file this lane touched, and every file this lane owns passes when the
+workspace is momentarily consistent. `git diff --numstat -- platform/app` shows
+zero insertions on all 194 rows.
 
 
 ## Product REST wave 3b: the analytics, prompt, organization and export doors, 2026-09-02

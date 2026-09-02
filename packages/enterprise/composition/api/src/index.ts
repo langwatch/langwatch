@@ -37,6 +37,24 @@ export {
  */
 export { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-governance-server";
 
+/**
+ * The governance capability itself, and the three shapes an API-role process
+ * reads off it.
+ *
+ * `GovernanceService` and `OrganizationSessionPolicyService` are the two slices
+ * the thirteen governance tRPC surfaces resolve from `ctx.app`;
+ * `PersonaHomeResolverService` is the pure landing decision the process's own
+ * `governance.resolveHome` gathers signals for. All three come through this
+ * seam for the reason the family above does: an api-role application may name
+ * this composition and nothing enterprise below it.
+ */
+export {
+  GovernanceService,
+  OrganizationSessionPolicyService,
+  PersonaHomeResolverService,
+  type PersonaResolution,
+} from "@langwatch/enterprise-governance-server";
+
 export type EnterpriseApiCompositionOptions = {
   licensing?: LicensingService;
   sso?: SsoGate;

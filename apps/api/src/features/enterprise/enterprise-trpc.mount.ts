@@ -13,17 +13,19 @@
  * composition and nothing below it — which is also why the four routers arrive
  * together rather than one mount per feature.
  *
- * ## Why `subscription` and `currency` are not returned
+ * ## Why `subscription` and `currency` are not returned HERE
  *
  * The composition builds all six and this mount forwards four. The two billing
- * surfaces are SaaS-only by the composition's own construction — with
- * `saasBilling` false it hands back an empty router of the served type — and
- * this process composes no Stripe customer, no subscription writer and no
- * request whose CDN headers a currency could be guessed from. Serving an empty
- * router under a real wire name is worse than not serving it: the client
- * cannot tell "this deployment does not bill" from "the call failed". So the
- * two names stay off this process's record, and `saasBilling` is passed as
- * `false` to say the same thing to the composition.
+ * surfaces belong to the gateway group, which mounts them directly from
+ * `@langwatch/enterprise-billing-server` beside the twenty-one gateway and
+ * governance namespaces — see `enterprise-billing-trpc.mount.ts`. They are on
+ * the record: a client asking what this deployment charges has to be able to
+ * tell "this installation does not bill" from "the call failed", and a
+ * namespace that is not there tells it neither.
+ *
+ * `saasBilling` is passed as `false` here because this mount returns neither of
+ * them, so the two routers the composition would build are never read. The
+ * deployment's real answer reaches the billing mount instead.
  */
 import {
   BACK_OFFICE_NO_PERMISSION,

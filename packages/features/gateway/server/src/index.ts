@@ -146,6 +146,7 @@ export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api
  */
 export {
   VirtualKeyService,
+  virtualKeyBudgetInputSchema,
   type CreateVirtualKeyInput,
   type CreatedVirtualKey,
 } from "./services/virtual-key.service";
@@ -154,7 +155,14 @@ export {
   assertActorCanOperateOnAnyScope,
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
+  assertGuardrailAttachmentsAllowed,
+  assertScopesBelongToOrg,
+  assertTraceProjectBelongsToOrg,
+  isVisibleToMembership,
   loadMembershipSet,
+  requireExistingVk,
+  requireVisibleVk,
+  resolveVkProjectId,
   type ActorContext,
   type MembershipSet,
   type RBACContext,
@@ -165,9 +173,11 @@ export {
 } from "./services/virtual-key-authorization.service";
 export { BudgetOverviewService } from "./services/gateway-budget-overview.service";
 export {
+  resolveApplicableBudgetsForDraftKey,
   resolveApplicableBudgetsForTarget,
   type ApplicableBudget,
 } from "./services/gateway-applicable-budgets.service";
+export { loadDirectBudgetsForKeys } from "./services/virtual-key-direct-budget.service";
 export {
   GatewayConfigMaterialiser,
   buildCredentials,
