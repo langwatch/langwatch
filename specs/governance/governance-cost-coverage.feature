@@ -93,7 +93,16 @@ Feature: Every dollar has one home
 
   Rule: The total shown is the bill; gateway detail splits it
 
-    @unit
+    # Every scenario under this rule says what a reader is SHOWN, and nothing
+    # shows it yet: there is no connected view, and no caller of the arithmetic
+    # behind it. What does exist and is proved is `combineProviderDay` — the
+    # split, the variance line, the unclamped refund, the estimated day and the
+    # add-up-exactly invariant are all unit-tested against it. So these are
+    # parked rather than bound: counting them would report a view as delivered
+    # on the strength of tests that draw nothing. They become @unit the day a
+    # reader can see the numbers.
+
+    @unimplemented
     Scenario: Gateway detail splits the bill and the remainder is its own line
       Given a bill of six dollars for a provider day
       And four dollars twenty of gateway spend on keys that bill covers
@@ -102,7 +111,7 @@ Feature: Every dollar has one home
       And four dollars twenty is shown as attributed
       And one dollar eighty is shown as not seen by the gateway
 
-    @unit
+    @unimplemented
     Scenario: Gateway spend above the bill is shown as a variance, never subtracted
       Given a bill of six dollars for a provider day
       And six dollars fifty of gateway spend on keys that bill covers
@@ -111,34 +120,34 @@ Feature: Every dollar has one home
       And fifty cents is shown as metering running over the bill
       And nothing is subtracted from the total
 
-    @unit
+    @unimplemented
     Scenario: A refunded day stays negative
       Given a provider day whose bill is a refund
       When the connected view is drawn
       Then the total shown is negative
       # Clamping it to zero would silently eat money.
 
-    @unit
+    @unimplemented
     Scenario: A day the bill has not reached yet is marked estimated
       Given a key covered by a bill
       And gateway spend on a day no bill has reported yet
       When the connected view is drawn
       Then the day shows the gateway figure marked as estimated
 
-    @unit
+    @unimplemented
     Scenario: The estimate becomes the bill when the bill lands
       Given a day shown as estimated from gateway spend
       When the provider's bill for that day arrives
       Then the day shows the bill and is no longer marked estimated
 
-    @unit
+    @unimplemented
     Scenario: Gateway spend no bill covers stands alone
       Given gateway spend on a key no bill covers
       When the connected view is drawn
       Then that spend is shown on its own as metered
       And it is not counted against any bill
 
-    @unit
+    @unimplemented
     Scenario: A bill and its keys in different currencies are not combined
       Given a bill in euros covering keys metered in dollars
       And the provider published no dollar figure of its own
@@ -146,7 +155,7 @@ Feature: Every dollar has one home
       Then the bill and the gateway spend are shown separately in their own currencies
       And no split is shown for that day
 
-    @unit
+    @unimplemented
     Scenario: The parts of a day always add up to its total
       Given any provider day with a bill
       When the connected view is drawn

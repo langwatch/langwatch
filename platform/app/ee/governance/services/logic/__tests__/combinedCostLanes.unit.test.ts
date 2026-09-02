@@ -3,6 +3,13 @@
 /**
  * The connected view's arithmetic (ADR-128 §2, §7).
  *
+ * The scenarios these bind to are parked `@unimplemented`, so the parity gate
+ * does not count them, and that is deliberate rather than an oversight: each one
+ * describes what a reader is SHOWN, and nothing draws these numbers yet. The
+ * arithmetic is real and this file proves it; the view is the part that is
+ * missing. Binding without parking would report a screen as delivered on the
+ * strength of tests that render nothing.
+ *
  * Spec: specs/governance/governance-cost-coverage.feature
  */
 import { describe, expect, it } from "vitest";
