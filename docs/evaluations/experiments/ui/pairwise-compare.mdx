@@ -4,7 +4,7 @@ sidebarTitle: Comparison
 description: Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation.
 ---
 
-**Comparison** is an evaluator that shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it's a tie. The result is a per-row verdict naming the winning candidate, plus an aggregate win/tie summary across the run. One card, one config form, and one result column handle any number of variants from two upward.
+**Comparison** is an evaluator that shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it's a tie. The result is a per-row verdict naming the winning candidate, plus an aggregate win/tie summary across the run. One evaluator handles any number of variants from two upward.
 
 When you are choosing between two prompts, two models, or several agent configurations, absolute evaluator scores can be hard to calibrate. A score of `0.78` does not always tell you whether one variant is actually better than the others for your users.
 
@@ -48,41 +48,41 @@ It is not the best first tool when:
 1. Open the [Experiments Workbench](https://app.langwatch.ai/@project/experiments).
 2. Add the two or more prompts, agents, models, or other targets you want to compare.
 3. Add **Comparison** from Add to Evaluation. If you already have a saved Comparison evaluator, pick it from the list, or select **New Comparison** to start blank.
-4. Select the targets you want as variants. They lay out in an even grid as you add more (3–4 per row).
+4. Select the targets you want as variants. 
 5. If a variant's target produces a structured output (for example `{answer, confidence}`), pick which field the judge should see for that variant. Each variant chooses its field independently.
-6. If your dataset has a reference answer, keep **Has Golden Answer** on (the default) and select the golden field. If there is no reference answer, turn it off and use judge instructions to define the preference criteria instead.
+6. If your dataset has a reference answer, turn **Has Golden Answer** on and select the golden field. Without a reference answer, leave it off (the default) and use judge instructions to define the preference criteria instead.
 7. Save. Saving is disabled until at least two variants are selected.
-8. Run the experiment. Comparison runs once all variants have produced outputs for a row; a row is skipped (not scored) if any variant hasn't produced output yet.
+8. Run the experiment. Comparison runs once all variants have produced outputs for a row; a row without output from every variant is skipped.
 
-You can compare variants even when they have the same display name. LangWatch numbers same-name variants, for example `bot (1)` and `bot (2)`, so the scoreboard and row verdicts stay readable without guessing whether the difference is model, temperature, prompt text, or another configuration detail.
+You can compare variants even when they have the same display name. LangWatch numbers same-name variants, for example `bot (1)` and `bot (2)`, so the scoreboard and row verdicts stay readable.
 
 ## How the verdict works
 
 By default Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
 
-1. Candidates are presented to the judge in a shuffled order that's stable for that row, so re-evaluating the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
+1. The judge sees the candidates in a shuffled order that is stable for that row, so a re-evaluation of the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you, never the shuffled slot position.
 
-One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner. An answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 
 ## Golden answer vs direct preference
 
-**Has Golden Answer** is on by default. When enabled, the evaluator judges every candidate relative to the reference answer you select. When disabled, the evaluator compares the candidates directly on their own merits, with no reference answer involved. The judge prompt drops golden-answer framing entirely rather than asking about a reference that doesn't exist.
+**Has Golden Answer** is off by default. When enabled, the evaluator judges every candidate relative to the reference answer you select. When disabled, the evaluator compares the candidates directly on their own merits, with no reference answer involved. The judge prompt then has no reference answer section.
 
 Use a golden answer when correctness is the primary question. Use direct preference when the task is open-ended and you care about qualities such as tone, completeness, helpfulness, structure, or policy adherence.
 
 ## Reading the results
 
-Comparison is designed so the result column contains the information you need to review the judgment without opening a separate panel:
+The result column holds what you need to review the judgment:
 
-- **Who won:** each row shows the winning variant's name, a tie when no candidate is clearly better, or no winner at all when the two passes disagreed. No winner is a third outcome, not a tie: a tie says the candidates are equally good, an unsettled row says this row did not separate them.
+- **Who won:** each row shows the winning variant's name, a tie when no candidate is clearly better, or no winner when the two passes disagreed. A tie means the candidates are equally good. No winner means this row did not separate them.
 - **What won:** the cell shows the winning variant's actual output so you can immediately inspect the answer the judge preferred.
 - **Why it won:** the judge reasoning appears below the output.
 
-The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties. Every variant is counted, including ones that never won a single row. An unsettled row is on none of those bars: it is not a win for any variant, and it is not a tie.
+The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties. Every variant is counted, including ones that never won a single row. A row with no winner is on none of those bars.
 
 In the workbench, the Comparison column header names the overall winner across the current run. Hover the header to see the full win tally broken down per variant, including ties.
 
@@ -92,30 +92,32 @@ Review the aggregate result and the row-level explanations together:
 
 - A large win margin usually indicates a clear preference.
 - A high tie count often means the variants are equivalent for the dataset, or the judge instructions are not specific enough.
-- Many unsettled rows mean the judge keeps changing its answer when the candidate order changes. Running more rows will not fix that: change the judge model, or make the instructions more specific.
+- Many rows with no winner mean the judge changes its answer when the candidate order changes. Change the judge model, or make the instructions more specific.
 - Split wins are useful signal: inspect the rows each variant wins to understand which use cases improved or regressed.
 
 ## Settings
 
 | Setting | Default | Description |
 | ------- | ------- | ----------- |
-| `model` | - | The judge model. |
-| `has_golden_answer` | `true` | Compare each candidate against a reference answer. Disable it to compare the candidates directly. |
+| `model` | `openai/gpt-5-mini` | The judge model. |
+| `temperature` | `0.0` | The judge model's temperature. |
+| `max_tokens` | `128000` | The token limit for the judge call. |
+| `has_golden_answer` | `false` | Compare each candidate against a reference answer. Enable it when the dataset has one. |
 | `randomize_order` | `true` | Shuffle candidate order per row (deterministically, seeded by row index) before presenting them to the judge, to reduce position bias. |
 | `allow_tie` | `true` | Allow the judge to return a tie when the candidates are effectively equivalent. |
 | `swap_and_reconcile` | `true` | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
 | `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
-| `prompt` | - | Optional custom judge instructions. |
+| `prompt` | The built-in judge prompt | Custom judge instructions. |
 
 ## Using it from the SDK
 
-Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare()` in TypeScript, which infers the row from the iteration it runs in. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
+Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare()` in TypeScript, which infers the row from the iteration it runs in. The candidates are the targets that recorded an output for that row, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
 
 See [Experiments via SDK](/evaluations/experiments/sdk) for the full set of judge options, including judging against a reference answer and replacing the judge prompt.
 
-The legacy two-candidate `langevals/pairwise_compare` evaluator stays callable for existing integrations and is handled by this same judge, so nothing to change if you already use it. New work should use Comparison, either here or with `compare()` from an SDK.
+The two-candidate `langevals/pairwise_compare` evaluator stays callable for existing integrations and runs on this same judge. Use Comparison for new work, either here or with `compare()` from an SDK.
 
-## What's Next?
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Experiments via SDK" icon="code" href="/evaluations/experiments/sdk">

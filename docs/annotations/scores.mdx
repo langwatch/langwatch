@@ -1,0 +1,42 @@
+---
+title: Annotation scores
+description: Define the score types reviewers fill in on every annotation, as a single choice or a set of checkboxes, each with an optional reason.
+---
+
+A score type is a named question with a fixed set of answers that every annotation can carry, for example **Accuracy** with **Correct**, **Partially correct** and **Wrong**. Reviewers pick an answer and can add a reason. Score types are defined per project.
+
+## Define a score type
+
+Open **Settings**, then **Annotation Scores**, and click **Add new score metric**.
+
+<Frame>
+<img src="/images/annotations/annotation-scores-settings.png" alt="The Annotation Scoring settings page with two score metrics and their Enabled switches" />
+</Frame>
+
+| Field | What it is |
+|-------|------------|
+| **Name** | The label reviewers see on the chip. |
+| **Description** | Shown when the reviewer opens the chip. |
+| **Score Type** | **Multiple choice** lets the reviewer pick one option. **Checkboxes** lets them pick several. |
+| Options | One line per answer. Tick the radio or checkbox next to an option to make it the default. |
+
+<Frame>
+<img src="/images/annotations/annotation-score-drawer.png" alt="The Add Score Metric drawer with the score type and the options filled in" />
+</Frame>
+
+Click **Add Score Metric**. Options must be unique, ignoring case, and at least one is required.
+
+The **Enabled** switch on the settings page turns a score type on or off. A disabled score type stays on the annotations that already carry it and disappears from the composer. **Delete** in the row menu removes it.
+
+## Score an annotation
+
+In the annotation composer, under **Scores**, click a chip. Pick the answer, type a reason in **Reason (optional)**, and click **OK**. A chip with a reason shows a message icon. See [Annotations](/annotations/overview) for the composer.
+
+## Where scores show up
+
+- The annotations inbox, in the folded **Scores** column and, through the **Columns** menu, in one column per score type. Hover over a score to read its reason.
+- The CSV export of the inbox, as `Name: value (reason)`.
+- The **annotations** source when you add a trace to a dataset: `score` and `score.reason` per score type, or all reviews as one text.
+- An annotation queue, which lists the score types its reviewers use. See [Annotation queues](/annotations/queues).
+
+**Also check:** [Annotations](/annotations/overview) for how a review is written, and [Datasets](/datasets/overview) to store the scores with the rows.

@@ -1,86 +1,105 @@
 ---
 title: Datasets
 sidebarTitle: Overview
-description: Create and manage datasets in LangWatch to build evaluation sets for LLMs and structured AI agent testing.
+description: Create a dataset by hand, from a CSV or JSON file, or from your traces, edit it in the grid, and run an experiment on it.
 ---
 
 <Tip>
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-## Create datasets
+A dataset is a table of rows your experiments run on. Each column has a name and a type, and each row is one case: an input, the expected output when you have one, and any other field your prompt or evaluator reads.
 
-LangWatch allows you to create and manage datasets, with a built-in excel-like interface for collaborating with your team.
-
-* Import datasets in any format you want, manage columns and data types
-* Keep populating the dataset with data traced from production
-* Create new datasets from scratch with AI assistance
-* Generate synthetic data from documents
-* Import, export and manage versions
-
-### Usage
-
-To create a dataset, go to the datasets page and click the "Upload or Create Dataset" button. You can then select the type of dataset you want as well as the columns you want to include.
-
-<Frame caption="Create dataset">
-<img
-  className="block"
-  src="/images/dataset-screenshot-new.png"
-  alt="LangWatch"
-/>
-</Frame>
-## Adding data
-
-There are a couple ways to add data to a dataset;
-
-- **Manually**: You can add data on a per message basis.
-- **From traces**: You can fill the dataset by selecting a group of messages already captured.
-- **CSV Upload**: You can fill the dataset by uploading a CSV file.
-- **Continuously populate**: You can continuously populate the dataset with data traced from production.
-- **Via MCP tools**: AI coding agents can create and manage datasets through the [MCP server](/integration/mcp). See [Programmatic Access](/datasets/programmatic-access) for details.
-- **Via SDK**: Use the Python or TypeScript SDK for programmatic dataset management. See [Programmatic Access](/datasets/programmatic-access).
-
-### Manually
-
-To add data manually, click the "Add to Dataset" button on the messages page after selecting a message. You can then choose the dataset type and preview the data before adding it.
-
-<Frame caption="Add to dataset manually">
-<img
-  className="block"
-  src="/images/dataset-screenshot-single.png"
-  alt="LangWatch"
-/>
+<Frame>
+<img src="/images/datasets/dataset-editor.png" alt="A dataset page with rows in the grid and the Download as CSV, Add rows, Edit columns and Run experiment buttons" />
 </Frame>
 
-### From traces
+## Create a dataset
 
-To add data by selecting a group, click the "Add to Dataset" button after choosing the desired messages in the table view. You can then select the type of dataset you wish to add to and preview the data before including it.
+Open [Datasets](https://app.langwatch.ai/@project/datasets) and click **Upload or create dataset**. The menu has two entries:
 
-<Frame caption="Add to dataset from traces">
-<img
-  className="block"
-  src="/images/dataset-screenshot-group.png"
-  alt="LangWatch"
-/>
+| Entry | What it does |
+|-------|--------------|
+| **Upload datasets** | Creates one dataset per file from CSV, JSON or JSONL files. |
+| **Create empty dataset** | Opens the **New Dataset** drawer where you name the dataset and define its columns. |
+
+### Create an empty dataset
+
+In the **New Dataset** drawer, type a **Name** and define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**.
+
+<Frame>
+<img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name filled and the column type select open" />
 </Frame>
 
-### Continuously
+Column names must be unique and cannot be `id` or `selected`. Each column has one of these types:
 
-You can keep continuously populating the dataset with new data arriving from production by using **Automations**. See [Automatically building a dataset from traces](/datasets/automatically-from-traces) for more details.
+| Type | Holds |
+|------|-------|
+| `string` | Text. Use it for `input`, `output` and `expected_output`. |
+| `number` | A number, for example a cost or a token count. |
+| `boolean` | `true` or `false`. |
+| `date` | A timestamp. |
+| `list` | A list of strings, for example retrieved contexts. |
+| `json` | Any JSON value. |
+| `image (URL)` | The URL of an image. The grid renders it as a thumbnail. See [Images in datasets](/datasets/dataset-images). |
+| `json chat messages (OpenAI format)` | A list of chat messages with `role` and `content`. |
+| `json spans` | The spans of a trace, as JSON. |
 
+### Upload files
 
-### CSV Upload
+**Upload datasets** opens a drawer that accepts CSV, JSON and JSONL files, several at a time. Each file becomes one dataset. For each file, edit the dataset name, then check the columns read from the file header: rename a column, change its type, drag it to reorder, or exclude it. Click **Upload all**.
 
-To add data by CSV upload, go to your datasets page and select the dataset you want to update. Click the "Upload CSV" button and upload your CSV or JSONL file. You can then map the columns from your file to the appropriate fields in the dataset based on the dataset type.
-
-<Frame caption="Add dataset from CSV">
-<img
-  className="block"
-  src="/images/dataset-screenshot-csv.png"
-  alt="LangWatch"
-/>
+<Frame>
+<img src="/images/datasets/dataset-upload-drawer.png" alt="The Upload datasets drawer with a CSV file added and its columns listed" />
 </Frame>
 
-## Programmatic Access
+A file can be up to 5 GB. A large file shows **Processing** in the list until its rows are stored.
 
-You can fetch datasets from LangWatch using the SDK for use in offline evaluations and automated workflows. See [Programmatic Access](/datasets/programmatic-access) for details.
+## Edit a dataset
+
+Click a dataset in the list to open its page. The header shows the record count and an autosave status.
+
+| Button | What it does |
+|--------|--------------|
+| **Download as CSV** | Exports every row. |
+| **Add rows** | Opens **Add rows from CSV**. Map each dataset column to a column of your file, or pick **Set empty**, then click **Upload**. |
+| **Edit columns** | Opens the dataset drawer to add, rename, retype or remove columns. |
+| **Run experiment** | Opens the Experiments workbench with this dataset loaded. See [Experiments](/evaluations/experiments/overview). |
+
+<Frame>
+<img src="/images/datasets/dataset-add-rows-csv.png" alt="The Add rows from CSV modal with one select per dataset column" />
+</Frame>
+
+Click a cell to edit it. **Add row** under the grid appends an empty row. Select rows with the checkboxes and click **Delete** to remove them. Every change saves as you make it.
+
+The row menu in the datasets list has **Replicate to another project**, **Edit dataset** and **Delete dataset**. A deleted dataset can be restored from the toast for 10 seconds.
+
+## Add rows from traces
+
+Open the [Trace Explorer](https://app.langwatch.ai/@project/traces), select the traces with the checkboxes, and click **Add to dataset** in the action bar. From an open trace, the header menu has **Add trace to dataset** and, for a multi-turn conversation, **Add conversation to dataset**.
+
+<Frame>
+<img src="/images/datasets/trace-explorer-add-to-dataset.png" alt="The Trace Explorer with rows selected and the action bar showing Add to dataset" />
+</Frame>
+
+The **Add to Dataset** drawer has three parts:
+
+1. **Dataset**: pick an existing dataset, or click **+ Create New**.
+2. **Mapping**: one source per dataset column. **Current Trace** maps each trace to one row. **Thread** groups the selected traces by `thread_id` and maps each conversation to one row. See [Threads in datasets](/datasets/dataset-threads).
+3. **Preview**: the rows that will be added. Double-click a cell to edit it, and untick a row to leave it out.
+
+<Frame>
+<img src="/images/datasets/add-to-dataset-drawer.png" alt="The Add to Dataset drawer with the mapping on Current Trace and the preview rows" />
+</Frame>
+
+Click **Add N rows to dataset**. LangWatch remembers the mapping per dataset, so the next time you add traces to it the mapping is already set.
+
+The sources a column can map to are the trace fields: `trace_id`, `thread_id`, `timestamp`, `input`, `output`, `contexts`, the `metrics` (cost, tokens, timings), `spans`, `metadata` keys, `evaluations` per evaluator, `annotations` (comment, score, reason, expected output), `events`, and **Full Trace (AI-Readable)**, a text rendering of the whole trace for an LLM to read. When a column name matches a source, for example `input` or `output`, the mapping is filled in for you.
+
+To keep adding matching traces as they arrive, use an automation. See [Build datasets from traces automatically](/datasets/automatically-from-traces).
+
+## Manage datasets from code
+
+The Python and TypeScript SDKs, the CLI, the MCP server and the REST API list, create, read and update datasets and their rows. See [Programmatic access](/datasets/programmatic-access).
+
+**Also check:** [Experiments](/evaluations/experiments/overview) to run a dataset through your prompts and score every row, and [Annotations](/annotations/queues) to send reviewed traces to a dataset at the end of a review session.

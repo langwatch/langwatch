@@ -12,7 +12,7 @@ Evaluators are scoring functions that assess the quality of your LLM's outputs. 
 
 ## Choose Your Approach
 
-There are three ways to evaluate your LLM outputs with LangWatch:
+You can score an output in three ways:
 
 <CardGroup cols={3}>
   <Card title="Built-in Evaluators" icon="bolt" href="/evaluations/evaluators/built-in-evaluators">
@@ -62,13 +62,15 @@ LangWatch provides a library of ready-to-use evaluators:
 
 | Category | Examples | Use Case |
 |----------|----------|----------|
-| **RAG Quality** | Faithfulness, Context Precision, Context Recall | Evaluate retrieval-augmented generation |
-| **Safety** | PII Detection, Jailbreak Detection, Content Moderation | Detect harmful content |
-| **Correctness** | Exact Match, LLM Answer Match, Factual Match | Check answer accuracy |
-| **Format** | Valid JSON, Valid Format, SQL Query Equivalence | Validate output structure |
-| **Custom Criteria** | LLM-as-Judge (Boolean, Score, Category) | Custom evaluation prompts |
+| **Expected Answer** | Exact Match, LLM Answer Match, LLM Factual Match, BLEU, ROUGE | Compare the output with a known answer |
+| **LLM as Judge** | LLM-as-a-Judge Boolean, Score and Category, Rubrics Based Scoring | Apply your own criteria with a model |
+| **RAG Quality** | Ragas Faithfulness, Ragas Response Relevancy, Context F1 | Evaluate retrieval-augmented generation |
+| **Quality Aspects** | Valid Format, Language Detection, Sentiment, Query Resolution, SQL Query Equivalence | Check format, language and tone |
+| **Safety** | PII Detection, Jailbreak Detection, Moderation, Off Topic, Competitor Blocklist | Detect harmful or unwanted content |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
+
+The evaluator picker in the platform has two more entries. **Custom (Code)** runs a Python function you write in a sandbox with `requests`, `httpx`, `pydantic` and the LangWatch SDK available, with a 10 minute limit per call. **Custom (from Workflow)** runs one of your workflows as the evaluator.
 
 ## Quick Examples
 
@@ -180,11 +182,11 @@ Different evaluators require different inputs:
 
 | Input | Description | Example Evaluators |
 |-------|-------------|-------------------|
-| `input` | User question/prompt | Jailbreak Detection, Off-Topic |
-| `output` | LLM response | PII Detection, Valid Format |
-| `contexts` | Retrieved documents | Faithfulness, Context Precision |
-| `expected_output` | Ground truth answer | Answer Correctness, Exact Match |
-| `conversation` | Full conversation history | Conversation Relevancy |
+| `input` | User question/prompt | Jailbreak Detection, Off Topic Evaluator |
+| `output` | LLM response | PII Detection, Valid Format Evaluator |
+| `contexts` | Retrieved documents | Ragas Faithfulness, Ragas Response Context Precision |
+| `expected_output` | Ground truth answer | LLM Answer Match, Exact Match Evaluator |
+| `expected_contexts` | The documents that should have been retrieved | Context F1, Ragas Response Context Recall |
 
 Check each evaluator's documentation for required and optional inputs.
 

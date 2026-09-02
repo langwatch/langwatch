@@ -489,12 +489,12 @@ try {
 
 ## REST API (Platform Experiments)
 
-For custom integrations, you can use the REST API directly:
+For custom integrations, you can use the REST API directly. The paths below are also served under `/api/evaluations/v3/`, the prefix earlier SDK versions call.
 
 ### Start a Run
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
+curl -X POST "https://app.langwatch.ai/api/experiments/{slug}/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -511,7 +511,7 @@ Response:
 ### Poll for Status
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -534,11 +534,11 @@ Response (completed):
 ### Fetch Results
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+curl "https://app.langwatch.ai/api/experiments/runs/{runId}/results?experimentSlug={slug}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
-Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run.
+Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run. `experimentSlug` is optional for the first 24 hours after the run and required after that.
 
 ---
 

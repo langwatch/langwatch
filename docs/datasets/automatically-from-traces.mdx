@@ -1,11 +1,14 @@
 ---
-title: Automatically build datasets from real-time traces
-description: Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
+title: Build datasets from traces automatically
+description: Create an automation that adds every new trace matching a filter to a dataset, mapped to the columns you choose.
 ---
 
-You can keep continuously populating the dataset with new data arriving from production by using **Automations**, mapping trace fields to any dataset columns you prefer.
+An automation with the **Add to dataset** action appends a row for every trace that matches its filter, as the trace arrives. Use it to grow a dataset from production, for example every trace an online evaluation failed, or every trace with a given metadata value.
 
-Go to the Messages page and select a filter (for example, by model). The Add Automation button becomes enabled:
+## Create the automation
+
+1. Open the [Trace Explorer](https://app.langwatch.ai/@project/traces) and set the filter that selects the traces you want, for example an evaluation result or a metadata value.
+2. Click **Automate** in the toolbar. The automation drawer opens with the current filter as its subject.
 
 <div style={{ display: "flex", justifyContent: "center" }}>
   <Frame caption="Add Automation" style={{ maxWidth: "300px" }}>
@@ -16,7 +19,8 @@ Go to the Messages page and select a filter (for example, by model). The Add Aut
     />
   </Frame>
 </div>
-For Action, select **Add To Dataset**, and choose the right fields to map from the trace to the dataset:
+
+3. Pick **Add to dataset** as the action, choose the dataset, and map the trace fields to its columns. Columns named `input`, `output`, `expected_output`, `contexts`, `total_cost`, `spans`, `trace_id` and `timestamp` are mapped for you; any other column maps to the metadata key with the same name until you change it.
 
 <Frame caption="Add To Dataset">
 <img
@@ -25,4 +29,7 @@ For Action, select **Add To Dataset**, and choose the right fields to map from t
   alt="LangWatch"
 />
 </Frame>
-Hit save. Every time a new message matches the filter, the automation fires and adds the new row to the dataset.
+
+4. Save. From then on, every trace that matches the filter adds one row to the dataset.
+
+**Also check:** [Automations](/features/automations) for the delivery options and the automation history, and [Datasets](/datasets/overview) for the full list of trace fields a column can map to.

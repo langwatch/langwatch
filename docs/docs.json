@@ -1749,7 +1749,7 @@
     },
     {
       "source": "/evaluations/evaluation-by-thread",
-      "destination": "/evaluations/online-evaluation/by-thread"
+      "destination": "/evaluations/online-evaluation/setup-monitors"
     },
     {
       "source": "/llm-evaluation/overview",
@@ -2037,7 +2037,7 @@
     },
     {
       "source": "/evaluations/online-evaluation/by-thread",
-      "destination": "/evaluations/online-evaluation/setup-monitors#evaluate-whole-threads"
+      "destination": "/evaluations/online-evaluation/setup-monitors"
     },
     {
       "source": "/datasets/ai-dataset-generation",

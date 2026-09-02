@@ -1,0 +1,75 @@
+---
+title: Annotation queues
+description: Create a queue with reviewers and score types, send traces to it, work through the items one by one, correct a trace, and send the reviewed traces to a dataset.
+---
+
+An annotation queue is a list of traces waiting for review, with the people who review them and the score types they score with. A trace can also be sent to one person directly, without a queue.
+
+## Create a queue
+
+Open [Annotations](https://app.langwatch.ai/@project/annotations) and click **+** next to **My queues**. The **Create Annotation Queue** drawer asks for:
+
+| Field | What it is |
+|-------|------------|
+| **Participants** | The members who review this queue. At least one. |
+| **Name Annotation Queue** | The queue name. The slug under it is used in the queue's URL. |
+| **Description** | What the reviewers should look for. |
+| **Score Type** | The score types reviewers fill in. At least one. **Add New** creates a score type from here. |
+
+<Frame>
+<img src="/images/annotations/annotation-queue-create.png" alt="The Create Annotation Queue drawer with Participants, Name, Description and Score Type" />
+</Frame>
+
+Click **Save**. The queue appears in the sidebar for every participant. **Edit queue** in the queue's menu reopens the drawer.
+
+## Add traces to a queue
+
+In the [Trace Explorer](https://app.langwatch.ai/@project/traces), select traces and click **Add to annotation queue** in the action bar. From an open trace, the header menu has the same entry.
+
+<Frame>
+<img src="/images/annotations/add-to-annotation-queue.png" alt="The Add to annotation queue dialog with the Send to field" />
+</Frame>
+
+In **Send to**, pick one or more queues or people, then click **Send**. A trace is queued once per queue and once per person. From the inbox, select rows and click **Add to queue**; on a queue page the button reads **Move to queue**.
+
+## Work the queue
+
+Open a queue in the sidebar, or **Inbox**, and click a pending row. The review page shows the conversation and a bar at the bottom.
+
+<Frame>
+<img src="/images/annotations/annotation-queue-work.png" alt="The review page with Previous, the item counter, Add to dataset at the end, Edit trace and Next" />
+</Frame>
+
+1. Annotate the messages with **Annotate** or **Suggest**, as on any trace. See [Annotations](/annotations/overview).
+2. Click **Next**. The item is marked completed and the next item opens. **Previous** goes back. The counter reads **1 of N**.
+3. On the last item the button reads **Done**.
+
+<Frame>
+<img src="/images/annotations/annotation-queue-complete.png" alt="The All tasks complete screen" />
+</Frame>
+
+An item is **Pending** until you click **Next** or **Done** on it, then **Completed**. The queue page keeps completed items under **Status: Completed**.
+
+<Frame>
+<img src="/images/annotations/annotation-queue-completed-filter.png" alt="A queue page filtered on Status: Completed" />
+</Frame>
+
+## Edit a trace
+
+**Edit trace** in the bar, or in the trace header menu, opens the trace in **Annotation mode**. You can change the trace input, output and metadata, and each span's name, type, input, output, parameters and error, or delete a span. The bar counts the changes, for example **3 fields changed, 1 span deleted**. Click **Save**.
+
+<Frame>
+<img src="/images/annotations/trace-edit-mode.png" alt="The trace drawer in Annotation mode with the changes summary and the Save button" />
+</Frame>
+
+The corrections are stored next to the original trace, never over it. Comments you write while editing are saved as you write them and are not part of the draft.
+
+## Send the reviewed traces to a dataset
+
+Tick **Add to dataset at the end** in the bar. Every trace you annotate during the session is counted; the checkbox next to a turn adds or removes that trace. When you click **Done** on the last item, the **Add to Dataset** drawer opens with those traces.
+
+Map the dataset's `annotations` column to the **annotations** source to store the reviews with the row, and `expected_output` to the trace output: a saved suggestion replaces the output with the corrected text. See [Datasets](/datasets/overview) for the mapping.
+
+From the inbox, **Add to dataset** in the row menu or in the selection bar opens the same drawer for the rows you pick.
+
+**Also check:** [Annotation scores](/annotations/scores) to define the score types a queue uses.

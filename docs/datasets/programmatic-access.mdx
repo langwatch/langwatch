@@ -1,10 +1,10 @@
 ---
 title: Programmatic Access
 sidebarTitle: Programmatic Access
-description: Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
+description: Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
 ---
 
-You can manage datasets from LangWatch using the SDK, MCP tools, or REST API for offline evaluations and automated workflows.
+The SDKs, the CLI and the MCP server list, create, read, update and delete datasets and their records. Every call needs a LangWatch API key.
 
 ## Setup
 
@@ -27,7 +27,7 @@ const langwatch = new LangWatch();
 </Tabs>
 
 <Note>
-  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable (or pass `project_id`/`projectId` to the SDK) so the SDK knows which project to access. You can find the project ID in your project settings.
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable so the SDK knows which project to access. You can find the project ID in your project settings.
 </Note>
 
 ## List Datasets
@@ -420,10 +420,12 @@ Each dataset entry contains:
 |-------|-------------|
 | `id` | Unique identifier for the entry |
 | `entry` | The actual data (e.g., `input`, `expected_output`, `contexts`) |
-| `datasetId` | ID of the parent dataset |
-| `projectId` | ID of the project |
-| `createdAt` | Timestamp of creation |
-| `updatedAt` | Timestamp of last update |
+| `datasetId` | ID of the parent dataset (TypeScript only) |
+| `projectId` | ID of the project (TypeScript only) |
+| `createdAt` | Timestamp of creation (TypeScript only) |
+| `updatedAt` | Timestamp of last update (TypeScript only) |
+
+In Python, `get_dataset` returns entries with `id` and `entry` only. The records returned by `list_records` and `create_records` carry all six fields in both SDKs.
 
 ## Typed Datasets (TypeScript)
 
@@ -445,6 +447,27 @@ for (const entry of dataset.entries) {
 }
 ```
 
+## CLI
+
+The `langwatch` CLI has the same operations. Set `LANGWATCH_API_KEY` and run:
+
+```bash
+langwatch dataset list
+langwatch dataset create "User Feedback" --columns input:string,output:string
+langwatch dataset get user-feedback
+langwatch dataset update user-feedback --name "Support feedback"
+langwatch dataset upload user-feedback ./rows.csv --if-exists append
+langwatch dataset download user-feedback --format jsonl
+langwatch dataset delete user-feedback
+
+langwatch dataset records list user-feedback --page 1 --limit 20
+langwatch dataset records add user-feedback --file ./records.json
+langwatch dataset records update user-feedback RECORD_ID --json '{"input": "..."}'
+langwatch dataset records delete user-feedback RECORD_ID
+```
+
+`--if-exists` takes `append` (default), `replace` or `error`. `records add` reads a JSON array from `--json`, `--file` or `--stdin`. Every command accepts `--format json` for machine-readable output.
+
 ## MCP Tools (AI Coding Agents)
 
 If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWatch MCP server](/integration/mcp), dataset tools are available directly:
@@ -456,18 +479,17 @@ If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWat
 | `platform_create_dataset` | Create a new dataset with optional column definitions |
 | `platform_update_dataset` | Update dataset name or column types |
 | `platform_delete_dataset` | Archive a dataset |
+| `platform_list_dataset_records` | List the records of a dataset, one page at a time |
 | `platform_create_dataset_records` | Add records in batch (max 1000) |
 | `platform_update_dataset_record` | Update a single record |
 | `platform_delete_dataset_records` | Delete records by IDs |
 
-The `platform_list_datasets` and `platform_get_dataset` tools support a `format` parameter, use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
+The `platform_list_datasets`, `platform_get_dataset` and `platform_list_dataset_records` tools support a `format` parameter, use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
 
-## Finding Your Dataset Slug
+## Finding Your Dataset Slug or ID
 
-You can find the dataset slug in the LangWatch UI:
+Every call accepts the dataset slug or its ID.
 
-1. Go to the **Datasets** page
-2. Click on your dataset
-3. The slug is shown in the URL: `app.langwatch.ai/{project}/datasets/{slug}`
-
-You can also use the dataset ID (starting with `dataset_`) which is shown in the dataset details.
+1. Go to the **Datasets** page and click your dataset.
+2. The URL reads `app.langwatch.ai/{project}/datasets/{id}`; the ID starts with `dataset_`.
+3. The slug is shown under the **Name** field when you open **Edit columns**, and in the `slug` field of every SDK and CLI response.

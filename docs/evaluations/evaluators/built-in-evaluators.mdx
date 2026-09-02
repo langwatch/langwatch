@@ -19,14 +19,15 @@ LangWatch provides a library of ready-to-use evaluators for common evaluation ta
 
 ## Available Evaluators
 
-LangWatch offers evaluators across several categories:
+The evaluators are grouped in the same five categories the platform shows:
 
 | Category | Examples | Use Case |
 |----------|----------|----------|
-| **RAG Quality** | `ragas/faithfulness`, `ragas/context_precision` | Evaluate retrieval-augmented generation |
+| **Expected Answer** | `langevals/exact_match`, `langevals/llm_answer_match`, `ragas/factual_correctness` | Compare the output with a known answer |
+| **LLM as Judge** | `langevals/llm_boolean`, `langevals/llm_score`, `langevals/llm_category` | Apply your own criteria with a model |
+| **RAG Quality** | `ragas/faithfulness`, `ragas/response_context_precision` | Evaluate retrieval-augmented generation |
+| **Quality Aspects** | `langevals/valid_format`, `lingua/language_detection`, `langevals/sentiment` | Check format, language and tone |
 | **Safety** | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
-| **Correctness** | `langevals/exact_match`, `langevals/llm_boolean` | Check answer accuracy |
-| **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score` | LLM-as-Judge for custom checks |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
 
@@ -38,7 +39,7 @@ LangWatch offers evaluators across several categories:
 
 PII redaction and secrets redaction run when a trace is ingested, before an evaluation reads the stored content. So redaction does not silently turn these evaluators green, redaction replaces a removed value with a typed marker that names what it was (`[PHONE_NUMBER]`, `[SECRET]`, and so on), and the PII and secrets evaluators read those markers back: a value that was already redacted still counts as a detection. The PII evaluator only counts a marker when its settings still check that entity. The markers are read from every field the evaluation is mapped to, so a secret hidden in a mapped span attribute is covered just like input or output.
 
-If a content category was dropped at ingestion (removed entirely rather than masked) and the evaluation has nothing else to read, the evaluation fails, since a leak cannot be ruled out. If the evaluation is instead mapped to a field that still has content, that field is evaluated normally.
+If a content category was dropped at ingestion (removed entirely rather than masked) and the evaluation reads only that category, the evaluation fails, since a leak cannot be ruled out. If the evaluation is mapped to a field that still has content, that field is evaluated normally.
 
 ## Using Built-in Evaluators
 
@@ -202,11 +203,11 @@ Different evaluators require different inputs. Check the [evaluator list](/evalu
 
 | Input | Description | Example Evaluators |
 |-------|-------------|-------------------|
-| `input` | User question/prompt | Jailbreak Detection, Off-Topic |
-| `output` | LLM response | PII Detection, Valid Format |
-| `contexts` | Retrieved documents (array) | Faithfulness, Context Precision |
-| `expected_output` | Ground truth answer | Answer Correctness, Exact Match |
-| `conversation` | Conversation history | Conversation Relevancy |
+| `input` | User question/prompt | Jailbreak Detection, Off Topic Evaluator |
+| `output` | LLM response | PII Detection, Valid Format Evaluator |
+| `contexts` | Retrieved documents (array) | Ragas Faithfulness, Ragas Response Context Precision |
+| `expected_output` | Ground truth answer | LLM Answer Match, Exact Match Evaluator |
+| `expected_contexts` | The documents that should have been retrieved | Context F1, Ragas Response Context Recall |
 
 ## Configuring Settings
 
@@ -217,7 +218,6 @@ Many evaluators accept configuration settings:
 experiment.evaluate(
     "langevals/llm_boolean",
     index=index,
-    settings={},
     data={"input": question, "output": response},
     settings={
         "model": "openai/gpt-5-mini",

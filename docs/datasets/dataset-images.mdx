@@ -1,32 +1,24 @@
 ---
-title: View images in datasets
-description: View image datasets in LangWatch to support multimodal evaluations and agent testing scenarios.
+title: Images in datasets
+description: Store image URLs in a dataset column of type image (URL), see them as thumbnails in the grid, and pass them to a vision model in an experiment.
 ---
 
-With your images column type set to `image (URL)`, the dataset shows the images themselves, so you can analyze them at a glance.
+Set a column's type to `image (URL)` and put the URL of an image in each cell. The grid renders the image as a thumbnail; click it to see it full size. The cell value stays the URL, so editing the cell edits the URL.
 
-The screenshot below shows how to set the column type to `image (URL)`. You can also set this type when creating a new dataset.
-
-<div style={{ display: "flex", justifyContent: "center" }}>
-  <Frame caption="Image column type" style={{ maxWidth: "300px" }}>
-    <img
-      className="block"
-      src="/images/dataset-image-select.png"
-      alt="LangWatch"
-    />
-  </Frame>
-</div>
-
-Once you select the image type, the dataset shows the image column. You can edit the column value by clicking on the image cell. Keep in mind the column value is the URL of the image.
-
-<Frame  caption="Dataset image preview">
-<img className="block" src="/images/dataset-image-preview.png" alt="LangWatch"  />
+<Frame>
+<img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image (URL) column rendered as thumbnails" />
 </Frame>
 
-## How attachment URLs reach the model
+You set the type in the **New Dataset** drawer, in **Edit columns** on an existing dataset, or in the columns step of a file upload.
 
-When an image URL feeds a vision workflow or evaluation, LangWatch fetches the URL server-side and delivers the actual image to the model as image content, so the model sees the picture instead of the link text. This works across every model provider, whether or not the provider fetches URLs itself. The attachment type is detected from the response rather than the file extension, so extension-less links such as signed S3 or CDN URLs are classified correctly.
+## How the image reaches the model
 
-Audio and PDF URLs are delivered the same way when referenced from a prompt: an audio URL reaches the model as audio for it to hear, and a PDF URL reaches it as a document for it to read.
+A prompt or agent column in the Experiments workbench fetches the URL on the server and sends the image bytes to the model as image content, so the model sees the picture and not the link. This works for every model provider, whether or not the provider fetches URLs itself. The type of the file comes from the response, so a signed S3 or CDN URL without an extension works too.
 
-If a field is declared as an image and its URL cannot be loaded as an image (the URL is unreachable, returns an error status, is too large, or serves something other than an image), the run fails with a clear message naming the URL and the reason, instead of passing the raw link to the model as text. A plain link mentioned in prose is left as text and never fails the run.
+Audio and PDF URLs in a prompt are delivered the same way: an audio file reaches the model as audio, a PDF as a document.
+
+The fetch times out after 30 seconds and a file is limited to 20 MB. A URL that resolves to a private or internal address is refused. When a field is declared as an image and its URL cannot be loaded as an image, the run fails with a message naming the URL and the reason. A link written inside prose is left as text and never fails the run.
+
+An evaluator that takes an image passes the URL to its model provider as an `image_url` part without fetching it, so the URL has to be reachable by the provider.
+
+**Also check:** [Multimodal evaluation](/evaluations/experiments/multimodal-evaluation) for an experiment that scores image outputs.

@@ -1,74 +1,61 @@
 ---
 title: Evaluations Overview
 sidebarTitle: Overview
-description: Ensure quality and safety for your LLM applications with experiments, online evaluation, guardrails, and evaluators.
+description: Score your prompts and agents on a dataset before you ship, score production traffic as it arrives, and block unsafe responses before they reach the user.
 ---
 
 <Tip>
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-LangWatch provides evaluation tools for your LLM applications, both before deployment and in production.
+An evaluation runs an evaluator on an input and an output and returns a verdict: a pass or fail, a score, a label, and the details behind it. LangWatch runs the same evaluators in three places: on a dataset in the Experiments workbench, on production traces as an online evaluation, and inside your request as a guardrail.
 
-## The Agent Evaluation Lifecycle
-
-```
-BUILD → TEST → DEPLOY → MONITOR
-         ↓              ↓
-    Experiments    Online Evaluation
-         ↓              ↓
-    CI/CD Gate      Guardrails
-```
-
-## Core Concepts
+## Where evaluations run
 
 <CardGroup cols={2}>
   <Card
     title="Experiments"
-    description="Batch test your prompts, models, and agents on datasets before deploying to production."
+    description="Run a dataset through your prompts and agents in the workbench and compare runs before a change ships."
     icon="flask"
     href="/evaluations/experiments/overview"
   />
   <Card
     title="Online Evaluation"
-    description="Continuously score and monitor your LLM's production traffic for quality and safety."
+    description="Attach an evaluator to your production traffic and read the pass rate over time."
     icon="chart-line"
     href="/evaluations/online-evaluation/overview"
   />
   <Card
     title="Guardrails"
-    description="Block or modify responses in real-time to enforce safety and policy constraints."
+    description="Call an evaluator from your code and block or change the response before the user sees it."
     icon="shield"
     href="/evaluations/guardrails/overview"
   />
   <Card
     title="Evaluators"
-    description="Scoring functions that assess output quality - from built-in options to your custom configurations."
+    description="The built-in evaluators, LLM judges with your own criteria, and custom code evaluators."
     icon="check-double"
     href="/evaluations/evaluators/overview"
   />
 </CardGroup>
 
-## When to Use What
+## Which one to use
 
-| Use Case | Solution |
-|----------|----------|
-| Test prompt changes before deploying | [Experiments](/evaluations/experiments/overview) |
-| Compare different models or configurations | [Experiments](/evaluations/experiments/overview) |
-| Run quality checks in CI/CD | [Experiments CI/CD](/evaluations/experiments/ci-cd) |
-| Monitor production quality over time | [Online Evaluation](/evaluations/online-evaluation/overview) |
-| Block harmful or policy-violating content | [Guardrails](/evaluations/guardrails/overview) |
-| Get alerts when quality drops | [Online Evaluation](/evaluations/online-evaluation/overview) + [Automations](/features/automations) |
+| Goal | Use |
+|------|-----|
+| Check a prompt change on a dataset before you deploy it | [Experiments](/evaluations/experiments/overview) |
+| Compare two prompts, models or agents on the same rows | [Comparison](/evaluations/experiments/ui/pairwise-compare) |
+| Gate a deployment on a pass rate from your pipeline | [Run experiments from CI/CD](/evaluations/experiments/ci-cd) |
+| Score production traffic and follow the pass rate over time | [Online Evaluation](/evaluations/online-evaluation/overview) |
+| Block a jailbreak or a policy violation before the response is sent | [Guardrails](/evaluations/guardrails/overview) |
+| Get a Slack message or an email when a monitor fails | [Online Evaluation](/evaluations/online-evaluation/overview) with [Automations](/features/automations) |
+| Score outputs by hand and collect the reviews | [Annotations](/annotations/overview) |
 
-## Quick Start
-
-### 1. Run Your First Experiment
-
-Test your LLM on a dataset using the Experiments via UI or via code:
+## Start
 
 <Tabs>
   <Tab title="Platform">
-    Go to [Experiments](https://app.langwatch.ai/@project/experiments) and click "New Experiment" to get started with the UI.
+    Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New Experiment**, add a dataset, a prompt and an evaluator, then click **Run**. See [Experiments](/evaluations/experiments/overview).
   </Tab>
   <Tab title="Python">
 ```python
@@ -96,25 +83,15 @@ await evaluation.run(dataset, async ({ item, index }) => {
   </Tab>
 </Tabs>
 
-### 2. Set Up Online Evaluation
+To score production traffic, open [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations), click **New Online Evaluation**, pick an evaluator, set the trace filter and the sampling rate, and save. See [Setting up monitors](/evaluations/online-evaluation/setup-monitors).
 
-Monitor your production traffic with evaluators that run on every trace:
-
-1. Go to [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations)
-2. Create a new online evaluation with the "When a message arrives" trigger
-3. Select evaluators (e.g., PII Detection, Faithfulness)
-4. Enable monitoring
-
-### 3. Add Guardrails
-
-Protect your users by blocking harmful content in real-time:
+To block a response, call the evaluator from your code with `as_guardrail=True` and check `passed` before you answer the user:
 
 ```python
 import langwatch
 
 @langwatch.trace()
 def my_llm_call(user_input):
-    # Check input before processing
     guardrail = langwatch.evaluation.evaluate(
         "azure/jailbreak",
         name="Jailbreak Detection",
@@ -125,22 +102,24 @@ def my_llm_call(user_input):
     if not guardrail.passed:
         return "I can't help with that request."
 
-    # Continue with normal processing...
+    # Continue with the normal call
 ```
 
-## Supporting Resources
+See [Guardrails](/evaluations/guardrails/overview) for the TypeScript call and the error handling.
+
+## Related
 
 <CardGroup cols={2}>
   <Card
     title="Datasets"
-    description="Create and manage test datasets for your experiments."
+    description="Create the datasets your experiments run on, by hand, from a CSV or from traces."
     icon="table"
     href="/datasets/overview"
   />
   <Card
     title="Annotations"
-    description="Add human feedback and labels to improve quality."
+    description="Review traces by hand with comments, scores and expected outputs."
     icon="pencil"
-    href="/features/annotations"
+    href="/annotations/overview"
   />
 </CardGroup>
