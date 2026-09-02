@@ -248,15 +248,21 @@ describe("given a save that names a subscription and carries credentials", () =>
     // already-validated envelope across, and by the time this guard sees the
     // config the credentials are either absent or an encrypted string.
     // Whether that is fine depends entirely on whether the CLAIM is new.
+    /** @scenario "A subscription cannot be saved without its own billing credential" */
     it.each([
       ["credentials absent", undefined],
       ["credentials already encrypted", "enc:v1:abcdef"],
-    ])("leaves a create alone — %s", (_case, credentials) => {
+    ])("refuses a create that claims the bill — %s", (_case, credentials) => {
+      // Nothing downstream requires credentials: `createSource` checks the
+      // schedule, the plan cap, the source type and the destinations, then
+      // writes. So a create naming a subscription with no readable pair is
+      // STORED unless it is refused right here — the one remaining way to
+      // reach "subscription named, bill unreadable forever".
       const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
       if (credentials !== undefined) parserConfig.credentials = credentials;
       expect(() =>
         assertAzureBillHasItsOwnCredential({ parserConfig }),
-      ).not.toThrow();
+      ).toThrow(/needs its own app registration/i);
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */

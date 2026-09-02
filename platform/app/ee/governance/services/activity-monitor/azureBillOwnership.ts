@@ -98,9 +98,13 @@ export function readPrepaidDeclared(
  *   the form, explained to nobody. Refused; claiming a bill means
  *   re-entering the credentials with the pair inside.
  *
- * On create (`storedParserConfig` absent) unreadable credentials pass
- * through: a create that carries no credentials at all cannot read
- * conversations either, and that save fails for the louder reason.
+ * A CREATE naming a subscription is refused unless this very save carries the
+ * pair. Nothing downstream of this guard requires credentials — `createSource`
+ * validates the schedule, the plan cap, the source type and the destinations,
+ * then writes — so a create that omits the subscribe-time secrets is stored,
+ * not "caught by a louder failure". That path is the only way the state this
+ * guard exists to refuse could still be reached, which is precisely why it
+ * cannot be the one path left open.
  */
 export function assertAzureBillHasItsOwnCredential(params: {
   parserConfig: Record<string, unknown> | null | undefined;
@@ -110,23 +114,32 @@ export function assertAzureBillHasItsOwnCredential(params: {
   const { parserConfig, storedParserConfig } = params;
   if (readClaimedSubscription(parserConfig) === null) return;
 
+  const complaint =
+    "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
+
   const credentials = parserConfig?.credentials;
   if (
     typeof credentials !== "object" ||
     credentials === null ||
     Array.isArray(credentials)
   ) {
+    // Nothing readable to judge. The one save that may pass is an edit
+    // carrying the sealed envelope across for a claim that was already
+    // judged when it was made; a create, or an edit that ADDS the claim,
+    // has never had its pair checked by anyone.
     if (
       storedParserConfig !== undefined &&
-      readClaimedSubscription(storedParserConfig) === null
+      readClaimedSubscription(storedParserConfig) !== null
     ) {
-      const editComplaint =
-        "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
-      throw new ValidationError(editComplaint, {
-        meta: { formErrors: [editComplaint] },
-      });
+      return;
     }
-    return;
+    const editComplaint =
+      "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
+    const message =
+      storedParserConfig === undefined ? complaint : editComplaint;
+    throw new ValidationError(message, {
+      meta: { formErrors: [message] },
+    });
   }
 
   const readBillingKey = (key: string): string => {
@@ -140,8 +153,6 @@ export function assertAzureBillHasItsOwnCredential(params: {
     return;
   }
 
-  const complaint =
-    "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
   throw new ValidationError(complaint, {
     meta: { formErrors: [complaint] },
   });
