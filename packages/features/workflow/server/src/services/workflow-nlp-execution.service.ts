@@ -95,7 +95,7 @@ export class WorkflowNlpExecutionService {
     } catch (error) {
       logger.warn(
         { err: error, projectId: input.projectId, workflowId: input.workflowId },
-        "stripUnsupportedLLMParamsFromWorkflow failed; forwarding original payload",
+        "stripUnsupportedParams failed; forwarding original payload",
       );
     }
 
@@ -184,7 +184,15 @@ export class WorkflowNlpExecutionService {
     );
   }
 
-  private static stripUnsupportedParams(
+  /**
+   * Strips every sampling parameter a node’s model does not list as supported.
+   *
+   * Public because there are TWO dispatch chokepoints, not one: the sync
+   * execute above and the streaming studio run. Both strip, and one
+   * implementation is what keeps them from disagreeing about which knobs a
+   * model accepts.
+   */
+  static stripUnsupportedParams(
     providers: Record<string, ModelProviderSummary>,
     workflow: StudioWorkflow,
   ): void {

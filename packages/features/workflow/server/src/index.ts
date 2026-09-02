@@ -27,6 +27,14 @@ export {
   type NlpOrigin,
 } from "./adapters/workflow-nlp-runtime.adapter";
 export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter";
+export {
+  HttpWorkflowStudioStreamAdapter,
+  UnconfiguredWorkflowStudioStreamAdapter,
+} from "./adapters/workflow-studio-stream.adapter";
+export {
+  WorkflowStudioDispatchService,
+  type WorkflowStudioDispatchInput,
+} from "./services/workflow-studio-dispatch.service";
 export { WorkflowApp, type WorkflowAppDependencies, type WorkflowCaller } from "./app/workflow.app";
 export {
   WorkflowAgentMappingPort,
@@ -36,6 +44,7 @@ export {
   WorkflowExecutionPort,
   WorkflowIdPort,
   WorkflowNlpRuntimePort,
+  WorkflowStudioStreamPort,
   WorkflowRowPort,
   WorkflowStudioDslPort,
   type WorkflowExecutionInput,

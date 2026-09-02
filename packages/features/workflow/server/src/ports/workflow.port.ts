@@ -43,6 +43,33 @@ export abstract class WorkflowNlpRuntimePort {
   abstract dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse>;
 }
 
+/** One STREAMING studio run, opened against the engine. */
+export type WorkflowStudioStreamInput = {
+  projectId: string;
+  body: StudioClientEvent;
+  origin: WorkflowRunOrigin;
+};
+
+/**
+ * The engine's streaming studio route, as bytes.
+ *
+ * Separate from {@link WorkflowNlpRuntimePort} because it is a different
+ * conversation rather than a different address: `execute_sync` answers once
+ * with a result, and `execute` answers continuously until it says `done`. A
+ * process that can do the first cannot necessarily do the second — the
+ * platform app reached the streaming route through per-project Lambda
+ * routing — so a deployment declares them apart.
+ *
+ * The port hands back the raw reader rather than decoded events: the SSE
+ * framing and the abort protocol are the same on any address, and stating them
+ * once in a service is what keeps a second adapter from re-deriving them.
+ */
+export abstract class WorkflowStudioStreamPort {
+  abstract open(
+    input: WorkflowStudioStreamInput,
+  ): Promise<ReadableStreamDefaultReader<Uint8Array>>;
+}
+
 export abstract class WorkflowIdPort {
   abstract next(): string;
 }

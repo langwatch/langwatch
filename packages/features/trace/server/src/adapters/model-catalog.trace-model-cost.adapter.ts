@@ -1,13 +1,15 @@
-import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { TraceModelCostPort } from "../ports/trace-model-cost.port";
+import { computeSpanCost } from "../services/trace-span-cost-matching.service";
 
 /**
  * Fold-time span cost, priced from the platform's immutable model catalog.
  *
- * Frozen twin of the application's `computeSpanCost`
- * (`platform/app/src/server/app-layer/traces/model-cost-matching.ts`), and the
- * SURVEY SHRANK THE WORK TO NOTHING: those 36 lines are
+ * It IS `computeSpanCost` — the application's own function, now this package's
+ * (`services/trace-span-cost-matching.service.ts`), which the legacy span
+ * mapper and the stored-span reader also price through. It was a frozen twin
+ * while both graphs ingested; now there is one, and the SURVEY THAT SHRANK THE
+ * WORK TO NOTHING still explains why: those 36 lines are
  * `estimateModelCost(input, getStaticModelCosts())`, and `getStaticModelCosts`
  * is `getStaticModelCostRates()` with a `projectId: ""` stamped on each rate —
  * a field `estimateModelCost` never reads. Both functions were already in
@@ -45,14 +47,11 @@ export class ModelCatalogTraceModelCostAdapter extends TraceModelCostPort {
     promptTokens: number | null;
     completionTokens: number | null;
   }): number {
-    return estimateModelCost(
-      {
-        attrs: input.attributes,
-        model: input.model,
-        promptTokens: input.promptTokens,
-        completionTokens: input.completionTokens,
-      },
-      getStaticModelCostRates(),
-    );
+    return computeSpanCost({
+      attrs: input.attributes,
+      ...(input.model === undefined ? {} : { model: input.model }),
+      promptTokens: input.promptTokens,
+      completionTokens: input.completionTokens,
+    });
   }
 }

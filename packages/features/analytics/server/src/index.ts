@@ -85,6 +85,7 @@ export {
   type TimeseriesInput,
   type TracesPivotFilters,
 } from "./model/analytics-input";
+export { currentVsPreviousDates } from "./model/current-vs-previous-dates";
 
 /** The four ClickHouse query refusals a caller can act on. */
 export {
@@ -93,3 +94,4 @@ export {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "./clickhouse/query-errors";
+export { generateClickHouseFilterConditions } from "./filters/clickhouse/filter-conditions";

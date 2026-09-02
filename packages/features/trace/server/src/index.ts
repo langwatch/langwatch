@@ -212,7 +212,6 @@ export { TraceLogRecordIOService } from "./services/trace-log-record-io.service"
 export { SpanTimingService } from "./services/span-timing.service";
 
 export { TraceProjectionRuntimeService } from "./services/trace-projection-runtime.service";
-export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
 export {
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
@@ -373,3 +372,180 @@ export {
   type TraceEditIOField,
 } from "./services/trace-edit-overlay.service";
 export { createTraceProcessingProducerPipeline } from "./adapters/trace-processing-producer.adapter";
+
+// ---------------------------------------------------------------------------
+// The ClickHouse trace READ stack
+//
+// Everything a captured trace passes through between the columns it is stored
+// in and the shape a reader is allowed to see: the legacy read and its
+// repository, the explorer's list / sessions / spans / summary / log readers,
+// the offload resolution behind a full read, the redaction and display passes,
+// the coding-agent log join, the AI composer and the reserved-metadata write.
+// ---------------------------------------------------------------------------
+export {
+  ClickHouseTraceService,
+  type TraceLegacyFilterConditions,
+} from "./repositories/clickhouse/trace-legacy-read.repository";
+export {
+  TraceService as TraceLegacyReadService,
+  type BlobResolutionDeps,
+} from "./services/trace-legacy-read.service";
+export type {
+  AggregationFiltersInput,
+  GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
+  TraceDateField,
+  TraceSharedFiltersInput,
+} from "./services/trace-legacy-read.types";
+export { TraceListService } from "./services/trace-list-read.service";
+export { SessionGroupsService } from "./services/trace-session-groups.service";
+export { SpanStorageService } from "./services/trace-span-storage-read.service";
+export { TraceSummaryService } from "./services/trace-summary-read.service";
+export { LogRecordStorageService } from "./services/trace-log-record-read.service";
+export {
+  NullSpanStorageRepository,
+  type SpanStorageRepository,
+} from "./repositories/span-storage.repository";
+export { SpanStorageClickHouseRepository } from "./repositories/clickhouse/span-storage.repository";
+export {
+  NullSessionGroupsRepository,
+  type SessionGroupsRepository,
+} from "./repositories/session-groups.repository";
+export { SessionGroupsClickHouseRepository } from "./repositories/clickhouse/session-groups.repository";
+export {
+  NullLogRecordStorageRepository,
+  type LogRecordStorageRepository,
+} from "./repositories/log-record-storage.repository";
+export { LogRecordStorageClickHouseRepository } from "./repositories/clickhouse/log-record-storage.repository";
+export {
+  BlobStore,
+  type S3ClientResolution,
+  type S3ClientResolver,
+  type SpoolStorage,
+} from "./services/trace-blob-store.service";
+export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
+export {
+  formatSpansDigest,
+  langwatchSpanToReadableSpan,
+} from "./services/trace-readable-span.service";
+export { VisibilityWindowService } from "./services/trace-visibility-window.service";
+export { TraceNotFoundError } from "./services/trace-read-error.service";
+export { setTraceWindowedReadMetrics } from "./services/trace-windowed-read.service";
+export { setTraceCacheRedis, type TraceCacheRedis } from "./services/trace-ttl-cache.service";
+export { TraceSpanIngestPort } from "./ports/trace-span-ingest.port";
+export {
+  traceMetadataUpdateSchema,
+  updateTraceMetadata,
+  type TraceMetadataUpdate,
+} from "./services/trace-metadata-write.service";
+export {
+  generateTraceAction,
+  generateTraceQueryFromPrompt,
+  type AiQueryInput,
+  type AiQueryModelResolver,
+} from "./services/trace-ai-query.service";
+export {
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+} from "./services/trace-log-content-derivation.service";
+export {
+  enrichCodingAgentSpansFromLogs,
+  enrichSingleSpanWithClaudeLogContent,
+  isCodingAgentShapedSpan,
+  mapSummaryRowsToClaudeRefs,
+} from "./services/claude-code-log-enrichment.service";
+export type { ClaudeSpanRef } from "./services/claude-code-span-enrichment.service";
+export {
+  applyDerivedTraceEventProtections,
+  applySpanProtections,
+  extractRedactionsFromAllSpanInputs,
+  extractRedactionsFromAllSpanOutputs,
+  redactObject,
+} from "./services/trace-read-redaction.service";
+export { redactPatchForViewer } from "./services/trace-edit-overlay-redaction.service";
+export { restoreWithheldEdits } from "./services/trace-edit-overlay-restore.service";
+export { CollectorSpanUtils } from "./services/trace-collector-span.service";
+
+// ---------------------------------------------------------------------------
+// The OTLP receiver
+//
+// `POST /api/otel/v1/{traces,logs,metrics}` and the re-dispatcher that serves
+// the paths a misconfigured exporter produces. Each signal's collection is a
+// port, so a process composes the ones it holds and mounts nothing for the
+// rest.
+// ---------------------------------------------------------------------------
+export {
+  classifyTokenType,
+  createOtlpIngestRestApp,
+  peekCustomerTraceIds,
+  type OtlpIngestCredential,
+  type OtlpIngestCredentialPort,
+  type OtlpIngestErrorReportPort,
+  type OtlpIngestIdentity,
+  type OtlpIngestNonBillablePort,
+  type OtlpIngestProject,
+  type OtlpIngestRestPorts,
+  type OtlpIngestUsageLimitPort,
+  type OtlpLogCollectionOutcome,
+  type OtlpLogCollectionPort,
+  type OtlpMetricCollectionOutcome,
+  type OtlpMetricCollectionPort,
+  type OtlpTraceCollectionPort,
+} from "./transport/api-rest/otlp-ingest.api";
+export { createOtlpPathAliasRestApp } from "./transport/api-rest/otlp-path-alias.api";
+export {
+  AI_TOOL_ORIGIN_VALUE,
+  CODING_AGENT_ORIGIN_VALUE,
+  COPILOT_VSCODE_ALLOWED_SCOPES,
+  dropForeignScopesForVscodeKey,
+  enforceApiKeyIdOnLogRequest,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
+  originForIngestSourceType,
+  PROVENANCE_ATTR_API_KEY_ID,
+  PROVENANCE_ATTR_NON_BILLABLE,
+  PROVENANCE_ATTR_ORGANIZATION_ID,
+  PROVENANCE_ATTR_ORIGIN,
+  PROVENANCE_ATTR_SOURCE,
+  PROVENANCE_ATTR_TEMPLATE_ID,
+  stampIngestKeyProvenanceOnLogRequest,
+  stampIngestKeyProvenanceOnMetricRequest,
+  stampIngestKeyProvenanceOnTraceRequest,
+  type IngestKeyProvenance,
+} from "./services/ingest-key-provenance.rules";
+export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service";
+
+// ---------------------------------------------------------------------------
+// The download half of the trace read
+//
+// The streaming CSV / JSONL export: the batched read, the two serialisers, the
+// evaluation merge every reader shares, and the two refusals the transport
+// publishes. `filters` is joined to the analytics schema at the mount; see
+// `trace-export.vocabulary.ts`.
+// ---------------------------------------------------------------------------
+export { TraceExportService, stripCsvHeader } from "./services/trace-export.service";
+export {
+  exportFormatSchema,
+  exportModeSchema,
+  exportProgressSchema,
+  traceExportRequestShape,
+  type ExportFormat,
+  type ExportMode,
+  type ExportProgress,
+  type ExportRequest,
+} from "./services/trace-export.vocabulary";
+export {
+  ExportFailedError,
+  ExportUnauthenticatedError,
+} from "./services/trace-export-error.service";
+export {
+  CSV_NEWLINE,
+  serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
+} from "./services/trace-export-csv.rules";
+export {
+  serializeTraceToFullJson,
+  serializeTraceToSummaryJson,
+} from "./services/trace-export-json.rules";
+export { RESERVED_METADATA_KEYS } from "./services/trace-export-columns.rules";
+export { enrichTracesWithEvaluations } from "./services/trace-evaluation-enrichment.rules";
