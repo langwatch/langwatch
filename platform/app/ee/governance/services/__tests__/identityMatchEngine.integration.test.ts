@@ -505,6 +505,98 @@ describe("Feature: the match engine, against the database that holds its rules",
     });
   });
 
+  describe("given an erasure that finishes while a match pass is mid-flight", () => {
+    /** @scenario "A person erased while a match pass is running is not linked" */
+    it("opens no link, though the pass is holding a list that says the person is live", async () => {
+      const person = await seedPerson({
+        id: "dp_link_race",
+        rawActorId: `m.silva-${ns}@acme.test`,
+        displayText: `m.silva-${ns}@acme.test`,
+      });
+
+      // The interleave, at the one instant it matters: the pass has its list of
+      // people and has not yet written anything. The erasure runs to completion
+      // here — including both of its sweeps — so nothing it does can clean up
+      // after the write that follows.
+      const racing = new DiscoveredPersonRepository();
+      const readAll = racing.findMatchable.bind(racing);
+      // Cast because the repository hands back Prisma's own thenable rather
+      // than a plain promise. Every caller only awaits it, so the two are the
+      // same thing here.
+      racing.findMatchable = ((client, params) =>
+        (async () => {
+          const people = await readAll(client, params);
+          await eraser().erase({
+            organizationId,
+            discoveredPersonId: person.id,
+          });
+          return people;
+        })()) as typeof racing.findMatchable;
+
+      const outcome = await new IdentityMatchService({
+        prisma,
+        now: () => at,
+        discoveredPeople: racing,
+      }).linkProvenMatches({ organizationId });
+
+      // The exclusion constraint is no help here and this is why: the person
+      // held no link before the erasure, so there is no overlapping row for a
+      // new one to collide with. The re-read is the whole of the defence.
+      expect(outcome.linked).toBe(0);
+      await expect(linksFor(person.id)).resolves.toHaveLength(0);
+    });
+  });
+
+  describe("given a link opened between an erasure's two sweeps", () => {
+    /** @scenario "A link opened during an erasure is blanked before the erasure returns" */
+    it("is blanked by the erasure before it returns, and counted", async () => {
+      const person = await seedPerson({
+        id: "dp_midsweep",
+        rawActorId: "midsweep@acme.test",
+        displayText: "midsweep@acme.test",
+      });
+
+      const service = new IdentityErasureService({
+        prisma,
+        tenantHistory: new GovernanceTenantHistoryRepository(),
+        suppression: new ErasedIdentifierSuppressionRepository(),
+        discoveredPeople: new DiscoveredPersonRepository(),
+        identityMatches: new IdentityMatchRepository(),
+        matchSuggestions: new IdentityMatchSuggestionRepository(),
+        rollupErasure: {
+          findDaysCarryingActor: async () => [],
+          // Between the first sweep and the tail. In production this is the
+          // ClickHouse delete, which is where an erasure spends its time — the
+          // window a concurrent pass is most likely to land in.
+          deleteRowsCarryingActor: async () => {
+            await prisma.identityMatch.create({
+              data: {
+                organizationId,
+                discoveredPersonId: person.id,
+                userId: mariaUserId,
+                evidenceKind: "verified_email",
+                validFrom: at,
+              },
+            });
+          },
+        } as never,
+        replay: { replaySince: async () => {} },
+        replayHorizon: () => null,
+        now: () => at,
+      });
+
+      const outcome = await service.erase({
+        organizationId,
+        discoveredPersonId: person.id,
+      });
+
+      expect(outcome.identityMatchesBlanked).toBe(1);
+      const links = await linksFor(person.id);
+      expect(links).toHaveLength(1);
+      expect(links[0]?.userId).toBeNull();
+    });
+  });
+
   describe("given a suggestion belonging to another organization", () => {
     it("cannot be confirmed from this one", async () => {
       const person = await seedPerson({

@@ -48,6 +48,11 @@ function buildService(
     failReplayTimes?: number;
     /** Pending match suggestions the person is sitting in (ADR-128 §12). */
     pendingSuggestions?: number;
+    /**
+     * Links a concurrent match pass opened after the first sweep — what the
+     * second sweep is there to find.
+     */
+    linksOpenedMidErasure?: number;
   } = {},
 ) {
   const failures = {
@@ -144,7 +149,11 @@ function buildService(
     identityMatches: {
       blankUserReferences: vi.fn(async () => {
         calls.push("matches.blank");
-        return 2;
+        // The first sweep finds the links the person actually held. The second
+        // finds whatever a match pass opened while the erasure was running,
+        // which on a quiet system is nothing.
+        const sweep = calls.filter((label) => label === "matches.blank").length;
+        return sweep === 1 ? 2 : (overrides.linksOpenedMidErasure ?? 0);
       }),
     } as unknown as IdentityErasureDeps["identityMatches"],
     matchSuggestions: {
@@ -286,17 +295,75 @@ describe("given a provider-named person an organization has asked us to erase", 
       );
     });
 
-    it("sweeps again after the person is marked, which is when the job can no longer re-add", async () => {
+    it("sweeps again after the person is marked, catching whatever landed in between", async () => {
       const { service, calls } = buildService({ pendingSuggestions: 1 });
 
       await service.erase({ organizationId: ORG, discoveredPersonId: PERSON });
 
-      // Between the first sweep and the mark, the suggestion job still reads
-      // this person as a live candidate. The mark is what closes that door, so
-      // the sweep that lands after it is the one that is final.
+      // Between the first sweep and the mark, both match passes still read this
+      // person as a live candidate. The second sweep is what collects anything
+      // they wrote in that gap. It narrows the window rather than closing it —
+      // a pass that read before the mark can still write after this line, and
+      // what refuses that write is the re-read in `identityMatch.service.ts`.
       expect(calls.lastIndexOf("suggestions.delete")).toBeGreaterThan(
         calls.indexOf("people.pseudonymize"),
       );
+    });
+  });
+
+  describe("when a match pass opens a link while the erasure is running", () => {
+    /** @scenario "A link opened during an erasure is blanked before the erasure returns" */
+    it("blanks it in the second sweep and counts it in the outcome", async () => {
+      const { service, calls } = buildService({ linksOpenedMidErasure: 1 });
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      // Two blanked in the first sweep, one more that appeared after it. The
+      // exclusion constraint would not have stopped this one: the person's own
+      // rows were blanked, so a fresh link on them overlaps nothing.
+      expect(outcome.identityMatchesBlanked).toBe(3);
+      expect(calls.filter((call) => call === "matches.blank")).toHaveLength(2);
+    });
+
+    it("blanks after the person is marked, not only before", async () => {
+      const { service, calls } = buildService({ linksOpenedMidErasure: 1 });
+
+      await service.erase({ organizationId: ORG, discoveredPersonId: PERSON });
+
+      expect(calls.lastIndexOf("matches.blank")).toBeGreaterThan(
+        calls.indexOf("people.pseudonymize"),
+      );
+    });
+
+    it("blanks on the resumed path too, which reaches the tail by a different route", async () => {
+      // An erasure that died after removing the money rows comes back through
+      // `resumeMoneyRows`, and a link opened in the meantime is just as real.
+      // That path used to report zero blanked no matter what it found, because
+      // it never looked.
+      const { service, calls } = buildService({
+        person: {
+          id: PERSON,
+          organizationId: ORG,
+          provider: "openai_admin",
+          rawActorId: "erased_abc",
+          displayText: "erased_abc",
+          erasedAt: new Date("2026-09-01T00:00:00.000Z"),
+          moneyRowsPendingAt: new Date("2026-09-01T00:00:00.000Z"),
+          moneyRebuildSince: "2026-08-20",
+        },
+      });
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(outcome.resumed).toBe(true);
+      expect(calls).toContain("matches.blank");
+      expect(outcome.identityMatchesBlanked).toBeGreaterThan(0);
     });
   });
 

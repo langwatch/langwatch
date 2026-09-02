@@ -258,6 +258,29 @@ export class IdentityMatchService {
     evidenceKind: string;
     at: Date;
   }): Promise<number> {
+    // Re-read immediately before writing, because the people list this pass is
+    // walking was read once at the top and an erasure can finish underneath it.
+    // `findMatchable` already excludes erased people, so this asks the same
+    // question again at the last possible moment rather than a new one.
+    //
+    // It matters more here than anywhere else in the pass: the exclusion
+    // constraint catches a re-link only for somebody who already had a link,
+    // because the erasure leaves that row open and overlapping. A person who
+    // never had one — most of them — has nothing in the database that would
+    // refuse the row, so this read is the only thing standing between an
+    // erasure and a fresh link naming the account it just removed.
+    const person = await this.discoveredPeople.findById(this.prisma, {
+      id: discoveredPersonId,
+      organizationId,
+    });
+    if (!person || person.erasedAt) {
+      logger.info(
+        { organizationId, discoveredPersonId },
+        "The person was erased while this pass was running; leaving them unlinked",
+      );
+      return 0;
+    }
+
     try {
       await this.matches.open(this.prisma, {
         organizationId,

@@ -55,6 +55,7 @@ const build = ({
   suggestions = [],
   openThrows,
   erasedPeople = [],
+  erasedMidPass = [],
 }: {
   people?: Person[];
   /**
@@ -63,6 +64,14 @@ const build = ({
    * answer it was computed from.
    */
   erasedPeople?: Person[];
+  /**
+   * People the pass read as live and who were erased before it got to writing
+   * them: `findMatchable` hands them over, `findById` reports them erased.
+   *
+   * The one shape the exclusion constraint cannot catch, because a person who
+   * never held a link has no row for a new one to overlap.
+   */
+  erasedMidPass?: Person[];
   openLinks?: { discoveredPersonId: string; userId: string | null }[];
   emails?: { userId: string; email: string }[];
   directoryIds?: { userId: string; externalId: string }[];
@@ -83,11 +92,13 @@ const build = ({
   const deletedForPerson: string[] = [];
 
   const discoveredPeople = {
-    findMatchable: vi.fn().mockResolvedValue(people),
+    findMatchable: vi.fn().mockResolvedValue([...people, ...erasedMidPass]),
     findById: vi.fn(async (_client: unknown, params: { id: string }) => {
       const live = people.find((row) => row.id === params.id);
       if (live) return { ...live, erasedAt: null };
-      const erased = erasedPeople.find((row) => row.id === params.id);
+      const erased = [...erasedPeople, ...erasedMidPass].find(
+        (row) => row.id === params.id,
+      );
       if (erased) return { ...erased, erasedAt: at };
       return null;
     }),
@@ -202,6 +213,45 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
       await service.linkProvenMatches({ organizationId });
 
       expect(opened).toHaveLength(1);
+    });
+  });
+
+  describe("given a person erased after the pass read them but before it wrote", () => {
+    /** @scenario "A person erased while a match pass is running is not linked" */
+    it("opens no link, because the read is repeated at the moment of writing", async () => {
+      const { service, opened } = build({
+        erasedMidPass: [person()],
+        emails: [{ userId: "user_42", email: "m.silva@acme.test" }],
+      });
+
+      const outcome = await service.linkProvenMatches({ organizationId });
+
+      expect(opened).toEqual([]);
+      // Not counted as unproven: the proof was there, the person was not.
+      expect(outcome.linked).toBe(0);
+    });
+
+    it("carries on with the rest of the organization rather than stopping", async () => {
+      // A pass that abandoned everybody after the erased person would leave
+      // them unmatched until the next night, for somebody else's erasure.
+      const { service, opened } = build({
+        people: [
+          person({
+            id: "dp_2",
+            rawActorId: "j.bakker@acme.test",
+            displayText: "j.bakker@acme.test",
+          }),
+        ],
+        erasedMidPass: [person()],
+        emails: [
+          { userId: "user_42", email: "m.silva@acme.test" },
+          { userId: "user_7", email: "j.bakker@acme.test" },
+        ],
+      });
+
+      await service.linkProvenMatches({ organizationId });
+
+      expect(opened.map((row) => row.discoveredPersonId)).toEqual(["dp_2"]);
     });
   });
 

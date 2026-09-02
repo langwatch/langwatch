@@ -208,3 +208,24 @@ Feature: Deciding which provider-named person is which LangWatch account
     Then the confirmation is refused
     And the refusal says the person has been erased
     And no link to that account is opened
+
+  # The automatic half of the same rule. The pass reads the whole organization
+  # once and then writes its way through it, so an erasure that finishes in the
+  # middle leaves a pass holding a list that says the person is still live. The
+  # database will not refuse the row either: erasure blanks the person's links
+  # rather than removing them, so a fresh link overlaps nothing.
+
+  @unit
+  Scenario: A person erased while a match pass is running is not linked
+    Given a match pass that read a person before they were erased
+    When the pass reaches the point of opening their link
+    And the person has been erased in the meantime
+    Then no link is opened
+    And the rest of the organization is still matched
+
+  @unit @integration
+  Scenario: A link opened during an erasure is blanked before the erasure returns
+    Given an erasure that has already detached a person's accounts
+    When a match pass opens a link on that person before the erasure finishes
+    Then the erasure blanks that link too
+    And the count it reports includes it
