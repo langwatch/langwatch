@@ -186,3 +186,42 @@ describe("governance_cost_rollup_1d retention exemption", () => {
     expect(migration).not.toContain("_retention_days");
   });
 });
+
+describe("governance_ocsf_events retention exemption", () => {
+  // ADR-128 §16. Four shipped pullers write provider display names and email
+  // addresses into this table, and it declared no TTL at all — rows kept
+  // forever. The holding period for personal data has to be a fixed bound, not
+  // a customer setting, which is why the answer is a 13-month TTL in a
+  // migration and NOT enrolment in the retention map: `MODIFY TTL` replaces the
+  // whole clause atomically (ttlReconciler.ts), so enrolling the table would
+  // overwrite the fixed bound with the tenant's own retention value — and a
+  // tenant who sets a longer one would then hold names and addresses past 13
+  // months.
+  /** @scenario "The SIEM event table holds personal data for a fixed period, not a customer-set one" */
+  it("is absent from tenant retention and from the TTL reconciler config", () => {
+    // The absence assertions below are only worth anything if the populations
+    // they search are the real ones, so name a member of each first.
+    expect(RETENTION_MANAGED_TABLES).toContain("event_log");
+    expect(TABLE_TTL_CONFIG.find((c) => c.table === "event_log")).toBeDefined();
+
+    expect(RETENTION_MANAGED_TABLES).not.toContain("governance_ocsf_events");
+    expect(
+      TABLE_TTL_CONFIG.find((c) => c.table === "governance_ocsf_events"),
+    ).toBeUndefined();
+  });
+
+  /** @scenario "The SIEM event table holds personal data for a fixed period, not a customer-set one" */
+  it("declares its fixed 13-month delete in the migration itself", () => {
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "src/server/clickhouse/migrations/00091_governance_ocsf_events_fixed_ttl.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain(
+      "MODIFY TTL toDateTime(EventTime) + INTERVAL 13 MONTH DELETE",
+    );
+    expect(migration).not.toContain("_retention_days");
+  });
+});
