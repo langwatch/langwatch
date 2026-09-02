@@ -5,6 +5,7 @@ import type {
   TRPCBuiltRouter,
   TRPCMutationProcedure,
   TRPCQueryProcedure,
+  TRPCSubscriptionProcedure,
 } from "@trpc/server";
 
 /**
@@ -17,10 +18,16 @@ import type {
  * declaration without checking `importKind`, so `import type` is rejected too.
  * A feature package therefore cannot name `AnyRouter`, `TRPCQueryProcedure` or
  * its own server's router type. This package has no feature role, so it can.
+ *
+ * A `subscription` names a LIVE procedure — one the platform serves over the
+ * SSE lane rather than as a request. Its `output` is the type of ONE entry on
+ * that stream, not of the stream: that is what `.subscription(path, input,
+ * { onData })` hands the subscriber, one at a time.
  */
 export type ProcedureShape =
   | { query: { input: unknown; output: unknown } }
-  | { mutation: { input: unknown; output: unknown } };
+  | { mutation: { input: unknown; output: unknown } }
+  | { subscription: { input: unknown; output: unknown } };
 
 /**
  * A feature's procedures, nested exactly as the process's root router mounts
@@ -33,7 +40,9 @@ type ProceduresFrom<TMap> = {
     ? TRPCQueryProcedure<{ input: TIn; output: TOut; meta: unknown }>
     : TMap[K] extends { mutation: { input: infer TIn; output: infer TOut } }
       ? TRPCMutationProcedure<{ input: TIn; output: TOut; meta: unknown }>
-      : ProceduresFrom<TMap[K]>;
+      : TMap[K] extends { subscription: { input: infer TIn; output: infer TOut } }
+        ? TRPCSubscriptionProcedure<{ input: TIn; output: TOut; meta: unknown }>
+        : ProceduresFrom<TMap[K]>;
 };
 
 /**
