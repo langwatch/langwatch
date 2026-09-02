@@ -27,6 +27,8 @@ interface GraphCardHeaderProps {
   } | null;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
+  /** Whether this card is a custom-chart-playground widget. */
+  isPlaygroundWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   isDragging: boolean;
@@ -49,6 +51,7 @@ export function GraphCardHeader({
   filters,
   trigger,
   isWorkbenchChart = false,
+  isPlaygroundWidget = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
@@ -105,12 +108,15 @@ export function GraphCardHeader({
 
   // Check if this is a saved graph (has valid database ID).
   //
-  // A workbench chart is excluded on purpose rather than by accident: the alert
-  // path reads a builder payload's `series` to name what it is thresholding,
-  // and a saved statement has no series to read. Offering the bell here would
+  // A workbench chart or playground widget is excluded on purpose rather than
+  // by accident: the alert path reads a builder payload's `series` to name
+  // what it is thresholding, and neither a saved statement nor a sandboxed
+  // author-code widget has a series to read. Offering the bell here would
   // author an alert against a chart the threshold dispatcher cannot evaluate.
   const isSavedGraph =
-    !isWorkbenchChart && !!(graphId && graphId !== "custom" && graph);
+    !isWorkbenchChart &&
+    !isPlaygroundWidget &&
+    !!(graphId && graphId !== "custom" && graph);
 
   // Opens the automations drawer in edit mode for this graph's existing
   // trigger. Shared by the bell's click and keyboard handlers so both entry
@@ -214,6 +220,7 @@ export function GraphCardHeader({
         colSpan={colSpan}
         rowSpan={rowSpan}
         isWorkbenchChart={isWorkbenchChart}
+        isPlaygroundWidget={isPlaygroundWidget}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         onSizeChange={onSizeChange}
         {...(onGranularityChange ? { onGranularityChange } : {})}

@@ -6,7 +6,11 @@ import {
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
-import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+import { PlaygroundDashboardWidget } from "~/features/custom-chart-playground/PlaygroundDashboardWidget";
+import {
+  PLAYGROUND_SRCDOC_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "~/server/analytics/chartKinds";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
@@ -78,6 +82,7 @@ export function DraggableGraphCard({
   };
 
   const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
+  const isPlaygroundWidget = graph.kind === PLAYGROUND_SRCDOC_CHART_KIND;
 
   return (
     <Box ref={setNodeRef} style={style} minWidth={0}>
@@ -100,6 +105,7 @@ export function DraggableGraphCard({
             filters={graph.filters}
             trigger={graph.trigger}
             isWorkbenchChart={isWorkbenchChart}
+            isPlaygroundWidget={isPlaygroundWidget}
             {...(graph.granularitySeconds == null
               ? {}
               : { granularitySeconds: graph.granularitySeconds })}
@@ -123,7 +129,8 @@ export function DraggableGraphCard({
 
 /**
  * The card's chart, routed by the row's kind: a placed workbench chart mounts
- * the live LangWatchQL widget; every other row is a builder graph.
+ * the live LangWatchQL widget, a playground widget mounts its sandboxed
+ * frame, and every other row is a builder graph.
  */
 function GraphCardChartArea({
   graph,
@@ -142,6 +149,18 @@ function GraphCardChartArea({
           ? {}
           : { granularitySeconds: graph.granularitySeconds })}
         name={graph.name}
+      />
+    );
+  }
+
+  if (graph.kind === PLAYGROUND_SRCDOC_CHART_KIND) {
+    return (
+      <PlaygroundDashboardWidget
+        key={graph.id}
+        id={graph.id}
+        graph={graph.graph}
+        projectId={projectId}
+        maxHeight={graph.rowSpan === 2 ? 600 : 300}
       />
     );
   }

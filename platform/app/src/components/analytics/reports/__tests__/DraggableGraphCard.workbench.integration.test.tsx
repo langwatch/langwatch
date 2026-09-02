@@ -20,7 +20,14 @@
  * the row, and mounting the real Vega and tRPC stacks to prove it would test the
  * harness instead.
  *
+ * A playground widget (`playground_srcdoc`) is the same shape of claim once
+ * more: its sandboxed frame reads `{ code, queries }`, not a builder payload
+ * or a saved statement, and its author code has no `series` either — the
+ * alert bell has to stay excluded here for the identical reason it stays
+ * excluded for a workbench row.
+ *
  * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -72,7 +79,29 @@ vi.mock(
   }),
 );
 
-import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+vi.mock(
+  "~/features/custom-chart-playground/PlaygroundDashboardWidget",
+  () => ({
+    PlaygroundDashboardWidget: ({
+      id,
+      graph,
+    }: {
+      id: string;
+      graph: unknown;
+    }) => (
+      <div
+        data-testid="playground-widget"
+        data-id={id}
+        data-graph={JSON.stringify(graph)}
+      />
+    ),
+  }),
+);
+
+import {
+  PLAYGROUND_SRCDOC_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "~/server/analytics/chartKinds";
 
 import { DraggableGraphCard } from "../DraggableGraphCard";
 
@@ -192,6 +221,81 @@ describe("a dashboard grid card", () => {
         "data-granularity",
         "unset",
       );
+    });
+  });
+
+  describe("given a playground widget", () => {
+    const PLAYGROUND_PAYLOAD = {
+      version: 1,
+      code: "export default function Widget() { return null; }",
+      queries: [{ name: "main", sql: "SELECT 1" }],
+    };
+
+    /** @scenario "A playground card draws the sandboxed widget, not the builder" */
+    it("draws the sandboxed playground frame rather than the builder renderer", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: PLAYGROUND_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: PLAYGROUND_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          onSizeChange={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const widget = screen.getByTestId("playground-widget");
+      expect(widget).toBeInTheDocument();
+      expect(widget).toHaveAttribute("data-id", "graph_1");
+      expect(JSON.parse(widget.getAttribute("data-graph") ?? "null")).toEqual(
+        PLAYGROUND_PAYLOAD,
+      );
+      expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("workbench-widget"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A playground card is not offered an alert it cannot evaluate" */
+    it("offers no alert bell", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: PLAYGROUND_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: PLAYGROUND_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          onSizeChange={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /Add alert/ }),
+      ).not.toBeInTheDocument();
     });
   });
 });

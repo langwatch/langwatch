@@ -49,6 +49,12 @@ interface GraphCardMenuProps {
    * no granularity contract to pick against.
    */
   isWorkbenchChart?: boolean;
+  /**
+   * Whether this card is a custom-chart-playground widget. Also decides
+   * where Edit goes — the playground page, which is the only place a
+   * playground widget's sandboxed author code can be edited today.
+   */
+  isPlaygroundWidget?: boolean;
   /** The step this workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
   /**
@@ -69,6 +75,7 @@ export function GraphCardMenu({
   colSpan,
   rowSpan,
   isWorkbenchChart = false,
+  isPlaygroundWidget = false,
   granularitySeconds,
   onEdit,
   onSizeChange,
@@ -79,17 +86,20 @@ export function GraphCardMenu({
   const router = useRouter();
   const currentSize = getCurrentSize(colSpan, rowSpan);
 
-  // A workbench chart is edited in the workbench that wrote it, not in the
-  // builder — the builder cannot read a saved statement.
+  // A workbench chart is edited in the workbench that wrote it, and a
+  // playground widget in the playground that wrote it — neither the builder
+  // nor the other surface can read the other's payload shape.
   //
-  // The workbench opens charts through its own toolbar and has no deep-link
-  // parameter, so this lands on the surface rather than on the chart. Passing a
-  // `?chart=` it does not read would be worse than not passing one: the member
-  // would arrive at an empty workbench with a URL claiming otherwise. Opening
-  // the named chart directly waits on the workbench accepting a chart id.
+  // Neither surface opens through a deep-link parameter naming the card, so
+  // this lands on the surface rather than on the chart. Passing a parameter
+  // neither reads would be worse than not passing one: the member would
+  // arrive at an empty surface with a URL claiming otherwise. Opening the
+  // named chart/widget directly waits on either surface accepting an id.
   const editUrl = isWorkbenchChart
     ? `/${projectSlug}/analytics/query`
-    : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
+    : isPlaygroundWidget
+      ? `/${projectSlug}/dev/custom-chart-playground`
+      : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
   return (
     <Menu.Root>
@@ -114,7 +124,9 @@ export function GraphCardMenu({
             ? "Edit"
             : isWorkbenchChart
               ? "Open in workbench"
-              : "Edit Graph"}
+              : isPlaygroundWidget
+                ? "Open in playground"
+                : "Edit Graph"}
         </Menu.Item>
 
         <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>

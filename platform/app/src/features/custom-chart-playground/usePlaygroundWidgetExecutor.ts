@@ -59,15 +59,28 @@ function toChartQueryError(error: unknown): ChartQueryError {
   };
 }
 
+export interface PlaygroundWidgetExecutorOverrides {
+  /** Replaces the "last 24 hours from mount" default — the dashboard's own period. */
+  readonly timeWindow?: { start: number; end: number };
+  /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
+}
+
 export function usePlaygroundWidgetExecutor(
   projectId: string,
   queries: PlaygroundQuery[],
+  overrides?: PlaygroundWidgetExecutorOverrides,
 ) {
   const utils = api.useUtils();
-  const [pageWindow] = useState<{ start: number; end: number }>(() => {
+  // The playground editor has no period control, so it defaults to a fixed
+  // window computed once at mount; a dashboard card passes its own via
+  // `overrides.timeWindow` instead, tracking the grid's period control.
+  const [mountWindow] = useState<{ start: number; end: number }>(() => {
     const end = Date.now();
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
+  const pageWindow = overrides?.timeWindow ?? mountWindow;
+  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   const execute = useMemo(
     () => createLangWatchQLExecute({ utils, projectId }),
     [utils, projectId],
@@ -89,13 +102,13 @@ export function usePlaygroundWidgetExecutor(
           sql: query.sql,
           parameters: params,
           timeWindow: pageWindow,
-          granularitySeconds: DEFAULT_GRANULARITY,
+          granularitySeconds,
         },
         { signal },
       );
       return toChartQueryResult(result);
     },
-    [execute, pageWindow],
+    [execute, pageWindow, granularitySeconds],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(
@@ -158,9 +171,9 @@ export function usePlaygroundWidgetExecutor(
   const params: ChartFrameParams = useMemo(
     () => ({
       timeWindow: { start: pageWindow.start, end: pageWindow.end },
-      granularitySeconds: DEFAULT_GRANULARITY,
+      granularitySeconds,
     }),
-    [pageWindow],
+    [pageWindow, granularitySeconds],
   );
 
   return { executeQuery, runStandalone, params, lastRuns };
