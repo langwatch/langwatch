@@ -109,6 +109,7 @@ export {
 } from "./ports/trace-summary-projection.port";
 export {
   TraceSpanContentDropPort,
+  type TraceSpanContentDropResult,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
@@ -312,3 +313,11 @@ export {
   EVALUATOR_LOOP_BLOCKED_REASON_LABEL,
   OtelTraceEvaluationLoopMetricsAdapter,
 } from "./adapters/otel.trace-evaluation-loop-metrics.adapter";
+export { OtlpSpanCostEnrichmentService } from "./services/span-cost-enrichment.service";
+export { TraceSpanCostEnrichmentAdapter } from "./adapters/trace-span-cost-enrichment.adapter";
+export { TraceEvaluationDispatchPort } from "./ports/trace-evaluation-dispatch.port";
+export {
+  createEvaluationTriggerSubscriber,
+  detectCausalityLoop,
+  type EvaluationTriggerSubscriberDeps,
+} from "./subscribers/evaluation-trigger.subscriber";

@@ -146,7 +146,21 @@ const normalizeBedrockModelId = (model: string): string => {
   return normalized;
 };
 
-const matchModelCost = (
+/**
+ * The one model-name matching cascade: raw, then normalized, then with the
+ * provider subtype stripped, then with a Bedrock envelope normalized away —
+ * each of those four candidates first as given and then normalized, and each
+ * lookup falling back through `/`-separated prefixes.
+ *
+ * Exported because record-time cost enrichment matches the OPERATOR'S OWN cost
+ * rules with it, not the static catalog `estimateModelCost` reads. Those rules
+ * are regexes a customer wrote, stored per project, team or organization, and
+ * the order the candidates are tried in decides which rule wins when two match.
+ * A second implementation of this cascade would bill a span at a different
+ * rate than the fold projection prices it, with nothing anywhere to show that
+ * the two disagreed — so there is one, and both callers use it.
+ */
+export const matchModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate | undefined => {

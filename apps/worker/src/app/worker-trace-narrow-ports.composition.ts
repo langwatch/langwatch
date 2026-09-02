@@ -47,11 +47,32 @@ export function createWorkerTraceNarrowPorts(options: {
 }): WorkerTraceNarrowPorts {
   return {
     projects: new WorkerTraceProjectMetadataAdapter(options.projects),
-    monitors: new WorkerTraceEvaluationMonitorAdapter(options.monitors),
-    modelCosts: new WorkerTraceModelCostCatalogAdapter(options.modelProviders),
+    monitors: createWorkerTraceEvaluationMonitorPort(options.monitors),
+    modelCosts: createWorkerTraceModelCostCatalogPort(options.modelProviders),
     productAnalytics:
       options.productAnalytics ?? WorkerLoggedProductAnalyticsAdapter.create(options.logger),
   };
+}
+
+/**
+ * The monitor listing on its own.
+ *
+ * The evaluation trigger is the only caller of this read and needs none of the
+ * other three, so it composes this rather than a four-port bundle it would
+ * have to satisfy with placeholders. Same adapter either way — there is one
+ * rename of `getEnabledOnMessageMonitors`, not two.
+ */
+export function createWorkerTraceEvaluationMonitorPort(
+  monitors: MonitorService,
+): TraceEvaluationMonitorPort {
+  return new WorkerTraceEvaluationMonitorAdapter(monitors);
+}
+
+/** The project's own cost rules on their own, for record-time enrichment. */
+export function createWorkerTraceModelCostCatalogPort(
+  modelProviders: ModelProviderService,
+): TraceModelCostCatalogPort {
+  return new WorkerTraceModelCostCatalogAdapter(modelProviders);
 }
 
 export type WorkerTraceNarrowPorts = Readonly<{

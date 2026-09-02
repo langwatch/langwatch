@@ -1089,6 +1089,79 @@ call. Zero platform edits. Deployment impact: none until step (g); at that point
 `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`, `TIKTOKENS_PATH` and `TIKTOKEN_FETCH_TIMEOUT_MS` become load-bearing
 for a standalone worker and must match the application's while both graphs ingest.
 
+**Step (g) census, items 1-3 cleared (uncommitted at time of writing): the last three record-span bodies.**
+The step-(g) census listed ten items; the three record-time bodies are now harvested, all staged, all over
+ports that were already declared.
+
+(1) RECORD-TIME COST ENRICHMENT (`OtlpSpanCostEnrichmentService`, `@langwatch/trace-server`,
+`services/span-cost-enrichment.service.ts`, behind `TraceSpanCostEnrichmentAdapter`) — and the survey found the
+matcher ALREADY HARVESTED. `matchModelCost` in `@langwatch/model-provider-contract` is a behaviour-identical
+private twin of the application's `matchModelCostWithFallbacks`: the same four candidate names in the same
+order, the same normalize-then-retry inside each, the same `/`-prefix recursion, the same 5,000-entry
+safe-regex cache, and `compileSafeRegex` is `new RegExp` + `safe-regex2` on both sides. It was exported rather
+than copied a third time. Two implementations of that cascade would be two answers to "which of a customer's
+rules prices this span", and the disagreement is visible only as a bill. THE ONE MECHANICAL DIFFERENCE: the
+port answers `ModelCost` (nullable rates, from the table) and the matcher takes `ModelCostRate` (optional
+rates), so the service maps rate-for-rate — the same mapping the application's adapter already does between
+the same two shapes, and `?? 0` / `!= null` read `null` and `undefined` identically either way. Twin pins by
+literal: the four generic model keys IN ORDER (`gen_ai.request.model` FIRST, where token estimation reads
+`gen_ai.response.model` first — the two orders are deliberate and a "make them consistent" edit reprices every
+span whose provider answers with a dated id), the bare `model` key scoped to
+`claude_code.llm_request`/`session_task.turn` only, the five stamped attribute keys, the hard zero for an
+unset token rate against the ABSENCE of an unset cache rate, and the raw-name-before-transformed-name pass
+order. `extractModelName` had been duplicated by the tokenizer slice with a comment saying cost enrichment was
+not harvested yet; it is now `SpanModelNameService`, one walk, two callers, two key orders.
+
+(2) SPAN CONTENT DROP (`OtlpSpanContentDropService` + `ContentDropPolicyService` in
+`@langwatch/data-privacy-server`; `CONTENT_KEY_CATALOG`, `CHAT_ARRAY_KEYS` and the two drop markers in
+`@langwatch/data-privacy-contract`). THE CENSUS UNDERCOUNTED IT: `dropKeyCatalog.ts` is 244 lines and inert on
+its own — `TraceSpanContentDropPort.drop` cannot be answered without `applyOtlpSpanContentDrop.ts`'s 150, so
+both moved. HOME FOLLOWS STEP (d) EXACTLY: the redaction slice put the OTLP-span service in
+`data-privacy-server` and satisfied Trace's port from the composition root, because log and metric ingestion
+owe the same answer when they convert; the drop is the same shape and got the same home. The CATALOG went to
+the contract rather than the server, because it is already read by three consumers that are not the drop — the
+LWQL content gate, the trace read path's dropped-category derivation, and the collector edge — and a key
+list those disagree about is a key that survives a `drop`. The service split into the shape-independent policy
+decisions and the OTLP-span walker, the same split step (d) made and for the same `service-quality` reason.
+Twin pins: all 27 catalog keys in their own order, the chat-array set as exactly input+output, both marker
+attribute names, the 20-key cap, and the comma-joined category order. Behaviour pins: the fail-OPEN path
+(a policy that cannot be resolved keeps the content), the enforcement kill switch resolving NO policy at all,
+and the role strip that has to run because canonicalisation re-derives `gen_ai.system_instructions` from a
+system turn left in the conversation.
+
+(3) THE evaluationTrigger SUBSCRIBER (`subscribers/evaluation-trigger.subscriber.ts`, `@langwatch/trace-server`).
+OWNERSHIP WAS SURVEYED, NOT ASSUMED, AND TRACE WINS: the body names six trace things
+(`defineOriginGuardedTraceSubscriber`, `TraceSummarySubscriber`, `TraceSummaryData`, `TraceProcessingEvent`,
+`SYNTHETIC_TRACE_SPAN_NAMES`, `MAX_PROCESSED_SPANS`) against two evaluation things, it is registered on the
+trace summary fold, and its two outside reads were already trace-server ports. A THIRD PORT WAS REQUIRED AND
+IS NOT A PREFERENCE: `architecture-lint`'s `cross-feature` policy forbids a feature server from depending on
+another feature's server package, and no feature server in the repo does. So `TraceEvaluationDispatchPort`
+carries the two things Trace needs out of Evaluation — the payload type and `ExecuteEvaluationCommand.makeJobId`
+— and `apps/worker` wires the real static in. That is the load-bearing half: the queue squashes a redelivery
+against that key, a key spelled twice does not collide, and the same evaluation runs twice for one trace.
+Pins: the loop guard's exact predicate (`depth >= 1`), the `langwatch.reserved.causality_depth` key nlpgo
+stamps, every OTLP `AnyValue` encoding the depth can arrive in, the `ops_es_causality_loop_guard_disabled`
+system flag, the 512-span processing cap, the 360,000 ms trace-level dedup TTL with `shouldSurviveDispatch`,
+the `eval` KSUID prefix, and the reserved metadata prefixes. The redelivery contract test states the real
+idempotency property: this subscriber remembers nothing, so redelivery is safe only while the command identity
+IGNORES the freshly minted `evaluationId` — an identity unique per delivery would never deduplicate and the
+customer would be billed twice.
+
+TWENTY-THREE SABOTAGES, all red then restored, at least one per piece through the staged port. NOT MOUNTED:
+`apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, the application
+still owns `RecordSpanCommand`'s adapters and still registers `evaluationTrigger`, and none of
+`createWorkerTraceCostEnrichment`, `createWorkerTraceContentDrop` or `createWorkerTraceEvaluationTrigger` has
+a production caller. Zero platform edits. `apps/worker` gained `@langwatch/evaluation-contract` and
+`@langwatch/evaluation-server` (filtered install). Deployment impact: none until the conversion.
+
+**What remains in the step-(g) census:** the conversion itself — the 21-field trace bundle, the 28 byte-frozen
+keys, mounting the ten staged compositions, and the three named absences that must be closed first: the
+product-analytics sink (`WorkerLoggedProductAnalyticsAdapter` logs `first_trace_integrated` instead of
+delivering it), the customer-supplied webhook transport for automation's graph half, and the
+`RedisTenantBroadcastAdapter`'s three producers. The collector edge (`langwatch_edge_spool_fail_open_total`,
+`langwatch_edge_media_extract_fail_open_total`, `edge-media-extraction`'s use of the drop catalog) stays
+excluded by name: it is apps/api's conversion, not the worker's.
+
 
 ## How to execute the plan
 

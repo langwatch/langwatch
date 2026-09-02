@@ -48,6 +48,8 @@
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluation-server": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-server": "workspace:*",

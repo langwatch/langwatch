@@ -8,6 +8,12 @@ export {
 } from "./adapters/otel.pii-analysis-metrics.adapter";
 export { PiiAnalysisMetricsPort, type PiiAnalysisOutcome } from "./ports/pii-analysis-metrics.port";
 export { type PIICheckOptions, PiiAnalysisPort } from "./ports/pii-analysis.port";
+export { ContentDropPolicyService } from "./services/content-drop-policy.service";
+export {
+  OtlpSpanContentDropService,
+  type OtlpSpanContentDropServiceOptions,
+  type SpanContentDropResult,
+} from "./services/otlp-span-content-drop.service";
 export { OtlpSpanPiiRedactionService } from "./services/otlp-span-pii-redaction.service";
 export {
   type BatchClearPIIFunction,

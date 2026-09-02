@@ -1,31 +1,7 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import type { TraceTokenCounterPort } from "../ports/trace-token-counter.port";
-
-/**
- * Returns the first non-empty string value found at any of the provided
- * attribute keys, in priority order. Returns null when no key matches.
- *
- * The application shares this with cost enrichment through a `utils/spanModel`
- * module. Cost enrichment has not been harvested, and `utils` is not a
- * directory the strict layout has, so the ten lines live beside their one
- * caller rather than becoming a shared surface with a single consumer.
- */
-function extractModelName(span: OtlpSpan, attributeKeys: readonly string[]): string | null {
-  for (const key of attributeKeys) {
-    for (const attr of span.attributes) {
-      if (
-        attr.key === key &&
-        typeof attr.value.stringValue === "string" &&
-        attr.value.stringValue.length > 0
-      ) {
-        return attr.value.stringValue;
-      }
-    }
-  }
-
-  return null;
-}
+import { SpanModelNameService } from "./span-model-name.service";
 
 /**
  * Attribute keys checked for model name (priority order).
@@ -80,12 +56,15 @@ export class OtlpSpanTokenEstimationService {
    * Both graphs still build the same object from the same two dependencies.
    */
   static create(deps: OtlpSpanTokenEstimationServiceDependencies): OtlpSpanTokenEstimationService {
-    return new OtlpSpanTokenEstimationService(deps);
+    return new OtlpSpanTokenEstimationService(deps, SpanModelNameService.create());
   }
 
   private readonly deps: OtlpSpanTokenEstimationServiceDependencies;
 
-  private constructor(deps: OtlpSpanTokenEstimationServiceDependencies) {
+  private constructor(
+    deps: OtlpSpanTokenEstimationServiceDependencies,
+    private readonly modelNames: SpanModelNameService,
+  ) {
     this.deps = deps;
   }
 
@@ -110,7 +89,7 @@ export class OtlpSpanTokenEstimationService {
       return;
     }
 
-    const model = extractModelName(span, MODEL_ATTRIBUTE_KEYS);
+    const model = this.modelNames.tryExtractModelName(span, MODEL_ATTRIBUTE_KEYS);
     if (!model) {
       return;
     }
