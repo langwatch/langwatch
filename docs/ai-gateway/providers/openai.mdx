@@ -15,6 +15,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **O
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The OpenAI row: name, scope, the two credential fields and the routing handle.">
+  <img src="/images/ai-gateway/model-provider-openai-form.png" alt="The OpenAI model provider drawer with OPENAI_API_KEY filled in and OPENAI_BASE_URL empty" />
+</Frame>
+
 With a base URL set, the gateway treats the row as an OpenAI-compatible endpoint and sends the key as `Authorization: Bearer`.
 
 ## Model names

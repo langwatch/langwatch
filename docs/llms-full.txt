@@ -10697,6 +10697,10 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **O
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
+<Frame caption="The OpenAI row: name, scope, the two credential fields and the routing handle.">
+  <img src="/images/ai-gateway/model-provider-openai-form.png" alt="The OpenAI model provider drawer with OPENAI_API_KEY filled in and OPENAI_BASE_URL empty" />
+</Frame>
+
 With a base URL set, the gateway treats the row as an OpenAI-compatible endpoint and sends the key as `Authorization: Bearer`.
 
 ## Model names
@@ -10742,6 +10746,10 @@ sidebarTitle: Overview
 ## Where credentials live
 
 A provider credential is a row under **Settings > Model Providers**. The row belongs to an organization, a team or a project, and every virtual key whose scope can see the row can dispatch through it. The same rows serve evaluators, the playground and the rest of LangWatch.
+
+<Frame caption="Settings > Model Providers, the Add Model Provider menu.">
+  <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
+</Frame>
 
 Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority and a provider config JSON. See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
 
