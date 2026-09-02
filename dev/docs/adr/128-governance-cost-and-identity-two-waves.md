@@ -590,7 +590,7 @@ anyone whose email a provider put on a cost row — so there is no
 Keying on the platform user would have silently scoped "every erasure
 path" to the minority of discovered people who happen to also be
 customers of ours. (Ruled 2026-09-02 after the red-team panel; the
-earlier v3.3 design drove erasure from the `lw.identity.user_erased`
+earlier v3.8 design drove erasure from the `lw.identity.user_erased`
 event, which is now the optional supplementary trigger described in
 §11.)
 
@@ -833,7 +833,7 @@ trigger and not a queue: subscriber dispatch in the event-sourcing router
 is caught-and-logged with no retry, and subscribers are unreachable from
 replay by construction, so an erasure event missed while the subscriber
 was down is missed permanently. A missed *trigger* costs a manual erase
-action; a missed *driver* would cost the erasure itself. Rejects (v3.3's
+action; a missed *driver* would cost the erasure itself. Rejects (v3.8's
 position): driving erasure from the listener, on the reasoning that
 subscribing covers every erasure path automatically — it covers no path
 at all today, and only ever a minority of the population.
@@ -858,7 +858,7 @@ The match policy for `IdentityMatch`:
   stored rows and never scores anything itself. Confirming one writes an
   `IdentityMatch` row and closes the suggestion.
 
-  This reverses v3.3's compute-at-read ruling, on measurement. Fuzzy
+  This reverses v3.8's compute-at-read ruling, on measurement. Fuzzy
   matching is quadratic and there is no database route to it — the repo
   has no `pg_trgm` (no extension exists in 297 migrations) and no
   edit-distance library in its dependencies, so the scoring would run in
@@ -877,7 +877,7 @@ The match policy for `IdentityMatch`:
   shared-token requirement — and only surviving pairs are scored. The
   job runs when its inputs change (new or updated discovered people, org
   membership changes), never per page view. Suggestion rows are
-  invalidated and recomputed by the same job, so the lifecycle v3.3
+  invalidated and recomputed by the same job, so the lifecycle v3.8
   wanted to avoid is a job's, not a screen's.
 
   Accepted cost: a suggestion can be a few minutes stale after a
@@ -896,7 +896,7 @@ The match policy for `IdentityMatch`:
   and on the discovered person rather than in the suggestion job's
   output, because a halt on automatic linking is worthless if a restart
   or a recompute clears it (`DiscoveredPerson.suspendedAt` /
-  `suspendedReason`, Schema). Unchanged from v3.3.
+  `suspendedReason`, Schema). Unchanged from v3.8.
 - A collision-review screen is future work (Open questions), flagged per
   the framing ruling.
 
@@ -1400,7 +1400,7 @@ drift apart).
 |---|---|---|
 | Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
-| Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNano` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
+| Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNanoUsd` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
 | Dedup-safe reads | every query on the rollup uses `argMax` over `EventTimestamp` — the ReplacingMergeTree's replacement version, *not* the `Version` schema-snapshot stamp — or the IN-tuple pattern (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
 | Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
@@ -1434,7 +1434,7 @@ drift apart).
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds `RevisedAt`, `PreviousAmountNano`, `LastObservedAt`) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt` — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
 | Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the migration is also the repo's first `CREATE EXTENSION` (`btree_gist`, §7) — it must check availability and fail actionably, and the self-host docs and Helm chart must state the requirement |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
@@ -1453,9 +1453,14 @@ Sketches, not DDL — the exact shipped statement is the migration.
 `governance_cost_rollup_1d` **already exists**: it shipped with wave 1 as
 migration `00087`, and the `CREATE TABLE` below is shown whole only
 because a column list is the readable way to say what the table means.
-Wave 2 does not create it. The three columns wave 2 adds — `RevisedAt`,
-`PreviousAmountNano`, `LastObservedAt` — arrive by **`ALTER TABLE … ADD
-COLUMN`**, and their defaults are what a reader should check: existing
+Wave 2 does not create it, and adds **two** columns, not three:
+`RevisedAt` and `LastObservedAt`, by **`ALTER TABLE … ADD COLUMN`**. The
+prior-amount column is *not* one of them — 00087 already ships
+`PreviousAmountNanoUsd Nullable(Int64)` alongside `RevisionCount`, so
+adding a `PreviousAmountNano` would put a second prior-amount money
+column on the table and leave a reader to guess which one is authoritative.
+§15's restatement markers use the shipped column. What a reader should
+check is the defaults of the two that are genuinely new: existing
 rows get `LastObservedAt` = epoch, so every pre-migration day reads as
 long since observed and therefore *settled*. That is the right answer
 rather than a compromise, because the pullers look 30 days back: any day
@@ -1491,6 +1496,7 @@ CREATE TABLE governance_cost_rollup_1d (
     RequestCount       UInt64 DEFAULT 0,
     RevisionCount      UInt32 DEFAULT 0,        -- §15 restatement history
     PreviousAmountNanoUsd Nullable(Int64) DEFAULT NULL,  -- §15 "was $X"
+                                      -- shipped in 00087, not added by wave 2
     RevisedAt          Nullable(DateTime) DEFAULT NULL,  -- §15 marker, wave 2 ADDs it
                                       -- (latest revision only)
     LastObservedAt     DateTime DEFAULT 0,      -- §15: when a pull last TOUCHED this day.
@@ -1908,8 +1914,9 @@ money tables, only the identity tables and read paths.
     sentence calling the two markers opposites is corrected. Gateway rows
     (`IngestionSourceId = ''`) are exempt: metered in real time, never
     restated. Azure and Databricks windows are recorded as unmeasured.
-    §15's restatement mechanics (`RevisedAt`, `PreviousAmountNano`) were
-    not refuted and are unchanged.
+    §15's restatement mechanics (`RevisedAt`, and the prior amount, which
+    is 00087's already-shipped `PreviousAmountNanoUsd`) were not refuted
+    and are unchanged.
   - **Seat events carry PII obligations, inside the same PR** (§16, §20a):
     `governance_ocsf_events` gets a **fixed 13-month `TTL … DELETE`
     declared in its migration** and stays **out** of
@@ -1938,10 +1945,10 @@ money tables, only the identity tables and read paths.
     invariant. The invariant now matches the shipped table exactly and
     states which columns are payload by design rather than implying every
     column belongs in the key; the sketch is **corrected in tenancy, dedup
-    key and replacement version** but remains a sketch — it still names
-    `PreviousAmountNano` where 00087 says `PreviousAmountNanoUsd`, and
-    omits `RevisionCount`, `PulledItemsJson`, `AppliedEventIds`,
-    `CreatedAt` and `LastEventOccurredAt` entirely. **The exact DDL is
+    key, replacement version and prior-amount column** but remains a
+    sketch — it omits `RevisionCount`, `PulledItemsJson`,
+    `AppliedEventIds`, `CreatedAt` and `LastEventOccurredAt` entirely.
+    **The exact DDL is
     00087**, and the Schema section now says so rather than reading like
     a specification of a table wave 2 is about to create. The same pass
     fixed the sketch's `Version UInt64` replacement column: shipped 00087
@@ -1952,8 +1959,14 @@ money tables, only the identity tables and read paths.
     still enumerated `org` as a rollup dimension and asserted every listed
     dimension was in the key; both corrected. And the migration this
     implies is stated for the first time: the rollup **shipped in wave 1**,
-    so wave 2's three columns land by `ALTER TABLE … ADD COLUMN`, not a
-    create — `LastObservedAt` backfilling as epoch, which reads every
+    so wave 2's new columns land by `ALTER TABLE … ADD COLUMN`, not a
+    create — and there are **two** of them, `RevisedAt` and
+    `LastObservedAt`, not three: 00087 already carries
+    `PreviousAmountNanoUsd`, so the ADR's `PreviousAmountNano` would have
+    added a *second* prior-amount money column to the same table, with
+    nothing to tell a reader which one the restatement markers meant. The
+    sketch, the invariant, the Gates row and §15 now all name the shipped
+    column. `LastObservedAt` backfills as epoch, which reads every
     pre-migration day as settled and is correct rather than merely
     tolerable, since a day still in its window is re-stamped by the next
     30-day-lookback pull. The Gates row that promised a "migration adding
