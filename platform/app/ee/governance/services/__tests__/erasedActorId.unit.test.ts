@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   actorIdForRollupWrite,
+  ErasureSecretRequiredError,
   resetErasureSecretCache,
 } from "../logic/erasedActorId";
 import { ERASURE_SECRET_ENV, erasureDigest } from "../logic/erasureDigest";
@@ -68,6 +69,84 @@ describe("given the actor id a money row is about to be written under", () => {
     it("behaves exactly as it did before erasure existed", () => {
       expect(
         actorIdForRollupWrite({ tenantId: TENANT, rawActorId: ACTIVE }),
+      ).toBe(ACTIVE);
+    });
+  });
+
+  describe("when the organization has erasures and this process has no secret", () => {
+    /** @scenario "A process with no secret refuses to write the money row" */
+    it("refuses rather than writing the erased address through in the clear", async () => {
+      const digest = erasureDigest({ secret: SECRET, identifier: ERASED });
+      await install(
+        snapshotHolding(
+          [{ organizationId: "org_a", digests: [digest] }],
+          [{ tenantId: TENANT, organizationId: "org_a" }],
+        ),
+      );
+
+      // The realistic shape: a split deployment where the web side holds the
+      // secret and the worker running the fold does not.
+      vi.stubEnv(ERASURE_SECRET_ENV, undefined);
+      resetErasureSecretCache();
+
+      let written: string | undefined;
+      let refusal: unknown;
+      try {
+        written = actorIdForRollupWrite({
+          tenantId: TENANT,
+          rawActorId: ERASED,
+        });
+      } catch (error) {
+        refusal = error;
+      }
+
+      // Asserted before the refusal, so that a regression reports the address
+      // it was about to write rather than only that it failed to refuse.
+      expect(written).not.toBe(ERASED);
+      expect(written).toBeUndefined();
+      expect(refusal).toBeInstanceOf(ErasureSecretRequiredError);
+    });
+
+    it("names the variable and the tenant, so the fix does not need a code read", async () => {
+      const digest = erasureDigest({ secret: SECRET, identifier: ERASED });
+      await install(
+        snapshotHolding(
+          [{ organizationId: "org_a", digests: [digest] }],
+          [{ tenantId: TENANT, organizationId: "org_a" }],
+        ),
+      );
+      vi.stubEnv(ERASURE_SECRET_ENV, undefined);
+      resetErasureSecretCache();
+
+      expect(() =>
+        actorIdForRollupWrite({ tenantId: TENANT, rawActorId: ACTIVE }),
+      ).toThrow(new RegExp(`${ERASURE_SECRET_ENV}.*is not set`));
+      expect(() =>
+        actorIdForRollupWrite({ tenantId: TENANT, rawActorId: ACTIVE }),
+      ).toThrow(new RegExp(TENANT));
+    });
+
+    it("stays out of the way of every organization that has erased nobody", async () => {
+      const digest = erasureDigest({ secret: SECRET, identifier: ERASED });
+      await install(
+        snapshotHolding(
+          [{ organizationId: "org_a", digests: [digest] }],
+          [
+            { tenantId: TENANT, organizationId: "org_a" },
+            { tenantId: "project_gov_other", organizationId: "org_b" },
+          ],
+        ),
+      );
+      vi.stubEnv(ERASURE_SECRET_ENV, undefined);
+      resetErasureSecretCache();
+
+      // org_b has no erasures, so the missing secret is nothing to it and its
+      // money rows keep being written.
+      expect(
+        actorIdForRollupWrite({
+          tenantId: "project_gov_other",
+          rawActorId: ACTIVE,
+        }),
       ).toBe(ACTIVE);
     });
   });

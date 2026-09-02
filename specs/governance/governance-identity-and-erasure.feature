@@ -157,6 +157,17 @@ Feature: Erasing a person from the governance data, and making it stick
     # A pull that refused would turn a brief outage into missing cost data,
     # and the check is applied again on the next run.
 
+  @unit
+  Scenario: A process with no secret says so instead of quietly ignoring the list
+    Given somebody in the organization has been erased
+    And this process has no erasure secret configured
+    When a pull runs
+    Then it records that it could not check
+    # Without a secret the list cannot be evaluated at all. On a deployment
+    # that has erased nobody that is the ordinary state and stays silent; once
+    # somebody has been erased it is a misconfiguration, and the usual shape is
+    # a split deployment where one side got the secret and the other did not.
+
   # ── The money rows ─────────────────────────────────────────────────────────
 
   @integration
@@ -190,6 +201,18 @@ Feature: Erasing a person from the governance data, and making it stick
     # The rebuild reads the raw records, which still hold the identifier. If the
     # substitution is not already live at that moment, the rebuild faithfully
     # writes the erased identifier back and the erasure reports success.
+
+  @unit
+  Scenario: A process with no secret refuses to write the money row
+    Given somebody in the organization has been erased
+    And this process has no erasure secret configured
+    When a money row for that organization is about to be written
+    Then the write is refused and names the missing setting
+    And an organization that has erased nobody keeps writing its rows
+    # There is no safe value to write here. The identifier is the erased
+    # person's address, and a placeholder would collapse every actor in the
+    # organization into one row and quietly destroy what a total is made of.
+    # So the rows stop until somebody sets the variable.
 
   @integration
   Scenario: Rebuilding twice lands on the same stand-in

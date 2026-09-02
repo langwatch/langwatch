@@ -2,6 +2,17 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+/** One shared error spy, so a test can read what the service actually said. */
+const loggedErrors = vi.hoisted(() => vi.fn());
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: loggedErrors,
+  }),
+}));
+
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   loadErasureSuppression,
@@ -41,6 +52,7 @@ const erasedRow = (provider: string) => ({
 describe("given a pull about to write rows a provider reported", () => {
   beforeEach(() => {
     vi.stubEnv(ERASURE_SECRET_ENV, SECRET);
+    loggedErrors.mockClear();
   });
 
   describe("when one of the reported actors has been erased", () => {
@@ -104,6 +116,43 @@ describe("given a pull about to write rows a provider reported", () => {
     });
   });
 
+  describe("when the organization has erasures and this process has no secret", () => {
+    /** @scenario "A process with no secret says so instead of quietly ignoring the list" */
+    it("says so loudly rather than passing for a deployment with nothing erased", async () => {
+      vi.stubEnv(ERASURE_SECRET_ENV, undefined);
+
+      const suppression = await loadErasureSuppression({
+        prisma: prismaWith([erasedRow("anthropic_admin")]),
+        organizationId: "org_a",
+        provider: "anthropic_admin",
+      });
+
+      // Fails open, like every other unreadable-list case on this path: a pull
+      // that refused would turn a misconfiguration into missing cost data. What
+      // changed is that it is no longer silent about it.
+      expect(suppression.isEmpty).toBe(true);
+      expect(loggedErrors).toHaveBeenCalledTimes(1);
+      expect(loggedErrors.mock.calls[0]?.[1]).toContain("no erasure secret");
+      expect(loggedErrors.mock.calls[0]?.[0]).toMatchObject({
+        organizationId: "org_a",
+        suppressedIdentifiers: 1,
+      });
+    });
+
+    it("stays silent when the list is empty, which is the ordinary deployment", async () => {
+      vi.stubEnv(ERASURE_SECRET_ENV, undefined);
+
+      const suppression = await loadErasureSuppression({
+        prisma: prismaWith([]),
+        organizationId: "org_a",
+        provider: "anthropic_admin",
+      });
+
+      expect(suppression.isEmpty).toBe(true);
+      expect(loggedErrors).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when nobody in the organization has been erased", () => {
     it("does not read the list twice per row, and keeps everything", async () => {
       const prisma = prismaWith([]);
@@ -142,8 +191,9 @@ describe("given a pull about to write rows a provider reported", () => {
 
 describe("given a deployment that has never configured an erasure secret", () => {
   describe("when a pull asks for the suppression list", () => {
-    it("suppresses nothing, because nothing can have been erased", async () => {
+    it("still reads the list, because an absent secret does not prove an empty one", async () => {
       vi.stubEnv(ERASURE_SECRET_ENV, "");
+      loggedErrors.mockClear();
       const prisma = prismaWith([erasedRow("anthropic_admin")]);
 
       const suppression = await loadErasureSuppression({
@@ -152,10 +202,14 @@ describe("given a deployment that has never configured an erasure secret", () =>
         provider: "anthropic_admin",
       });
 
+      // The read is what separates "nobody has been erased here" from "this
+      // process cannot evaluate the erasures somebody asked for". Skipping it
+      // to save a query made both look like the first one.
+      expect(prisma.erasedIdentifierSuppression.findMany).toHaveBeenCalledTimes(
+        1,
+      );
       expect(suppression.isEmpty).toBe(true);
-      expect(
-        prisma.erasedIdentifierSuppression.findMany,
-      ).not.toHaveBeenCalled();
+      expect(loggedErrors).toHaveBeenCalledTimes(1);
     });
   });
 });

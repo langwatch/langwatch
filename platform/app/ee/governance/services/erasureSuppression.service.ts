@@ -76,6 +76,14 @@ export const NO_SUPPRESSION: ErasureSuppressionCheck = {
  * protecting is re-applied on the next run. A pull that silently stopped
  * checking would let an erased identifier back in with nothing to say so —
  * hence the error log rather than a swallow.
+ *
+ * The list is read BEFORE the secret, and that order carries the meaning. An
+ * absent secret is only unremarkable while the list is empty: on a deployment
+ * that has never erased anybody it is the normal state and not worth a line per
+ * run. Once there are rows on the list, the same absent secret means this
+ * process cannot evaluate erasures that somebody has actually asked for, which
+ * is a misconfiguration and gets said out loud. Reading the secret first made
+ * those two cases look identical and answered both with silence.
  */
 export async function loadErasureSuppression({
   prisma,
@@ -86,16 +94,6 @@ export async function loadErasureSuppression({
   organizationId: string;
   provider: string;
 }): Promise<ErasureSuppressionCheck> {
-  let secret: string;
-  try {
-    secret = readErasureSecret();
-  } catch (error) {
-    if (!(error instanceof ErasureSecretMissingError)) throw error;
-    // No secret means no erasure has ever run here, so there is nothing on the
-    // list and nothing to check. Not a fault, and not worth a log line per run.
-    return NO_SUPPRESSION;
-  }
-
   let hashes: Set<string>;
   try {
     const rows = await repository.findAllByOrganization(prisma, {
@@ -114,7 +112,20 @@ export async function loadErasureSuppression({
     return NO_SUPPRESSION;
   }
 
+  // Nothing erased here, so nothing to check and no secret needed.
   if (hashes.size === 0) return NO_SUPPRESSION;
+
+  let secret: string;
+  try {
+    secret = readErasureSecret();
+  } catch (error) {
+    if (!(error instanceof ErasureSecretMissingError)) throw error;
+    logger.error(
+      { error, organizationId, provider, suppressedIdentifiers: hashes.size },
+      "This organization has erased identifiers but this process has no erasure secret, so the list cannot be checked; this run will not suppress anything and an erased identifier may be re-imported. Set the same secret every other process uses — a split deployment where one side has it and the other does not produces exactly this",
+    );
+    return NO_SUPPRESSION;
+  }
 
   return {
     isEmpty: false,
