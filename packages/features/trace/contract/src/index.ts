@@ -159,5 +159,6 @@ export * from "./trace-collector-common";
 export * from "./trace-rag-chunks";
 export * from "./trace-rag-extraction";
 export * from "./trace-mapping";
+export * from "./trace-pcm-to-wav";
 export * from "./trace-metadata-editable-keys";
 export * from "./trace-otel-ids";

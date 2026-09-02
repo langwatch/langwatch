@@ -16,13 +16,26 @@ import type {
 } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
+  DirectEvaluationExecutionReceipt,
   EvaluationEventingAdapter,
   EvaluationExecutionIntentPort,
+  EvaluationExecutionIntentService,
+  EvaluationExecutionPort,
+  EvaluationExecutionService,
   EvaluationRetentionFloorPort,
   EvaluationRunProjectionService,
   ExecuteEvaluationCommand,
   createEvaluationProcessingPipeline,
+  type EvaluationAzureSafetyCredentialsPort,
+  type EvaluationCostRecorderPort,
+  type EvaluationExecutionDeps,
+  type EvaluationInputsOffloadPort,
+  type EvaluationMonitorLookupPort,
+  type EvaluationSettingsRecoveryPort,
+  type EvaluationTraceEvidencePort,
 } from "@langwatch/evaluation-server";
+import type { EvaluationExecutionResult, ExecuteEvaluationCommand as ExecuteEvaluationCommandInput } from "@langwatch/evaluation-contract";
+import { mappingStateSchema } from "@langwatch/trace-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer";
 import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter";
@@ -39,7 +52,39 @@ import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation
  */
 export abstract class WorkerEvaluationAbsenceReportPort {
   abstract withoutEvaluatorExecution(): void;
+
+  /**
+   * Reported when the online path IS composed but its durable execution
+   * receipt is not: a redelivery after a crash calls the evaluator a second
+   * time. The cost row is unaffected — the recorder derives its id from the
+   * operation key — so this is a duplicated provider call, not duplicated
+   * spend.
+   */
+  abstract withoutExecutionReceiptLedger(): void;
 }
+
+/**
+ * Everything the ONLINE evaluation path needs, handed in by the process.
+ *
+ * It is one bundle rather than eight options because the path is all-or-
+ * nothing: an execution that could read the trace but not resolve the model
+ * would score against inputs the customer did not map, and one that could call
+ * the evaluator but not read the monitor would run whatever the command
+ * happened to name. A process that cannot build all of it composes none of it
+ * and says so at boot.
+ */
+export type WorkerEvaluationExecutionCollaborators = Readonly<{
+  /** The monitor the command names, and the trace its preconditions read. */
+  monitors: EvaluationMonitorLookupPort;
+  evidence: EvaluationTraceEvidencePort;
+  azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
+  settingsRecovery: EvaluationSettingsRecoveryPort;
+  inputsOffload: EvaluationInputsOffloadPort;
+  /** Where the run is billed. */
+  costs: EvaluationCostRecorderPort;
+  /** The engine: trace reads, mappings, the evaluator call. */
+  engine: EvaluationExecutionDeps;
+}>;
 
 /**
  * The two collaborators Automation's evaluation subscribers reach, plus the
@@ -72,6 +117,8 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
   /** `LANGWATCH_FOLD_CACHE_TTL_SECONDS`, read once by the process. */
   foldCacheTtlSeconds?: number;
   absence?: WorkerEvaluationAbsenceReportPort;
+  /** Absent on a process that cannot run an evaluator itself. */
+  execution?: WorkerEvaluationExecutionCollaborators;
 }>;
 
 /**
@@ -119,7 +166,7 @@ export function createWorkerEvaluationProcessing(
     retentionDays: options.defaultRetentionDays,
   }).buildStores();
 
-  options.absence?.withoutEvaluatorExecution();
+  const execution = createEvaluationExecutionIntent(options);
 
   const automations = AutomationEvaluationSubscriberService.create({
     triggers: options.automation.triggers,
@@ -139,10 +186,68 @@ export function createWorkerEvaluationProcessing(
           options,
         ),
         evaluationAnalyticsRollupAppendStore: stores.evaluationAnalyticsRollupAppendStore,
-        executeEvaluationCommand: ExecuteEvaluationCommand.create(new AbsentEvaluatorExecution()),
+        executeEvaluationCommand: ExecuteEvaluationCommand.create(execution),
         automations,
       }),
   };
+}
+
+/**
+ * The ONLINE path, composed for real when the process handed in the whole
+ * bundle and refused by name when it did not.
+ *
+ * The chain is the package's own: `EvaluationExecutionIntentService` prepares
+ * (monitor lookup, sampling, preconditions, settings recovery), the receipt
+ * runs `EvaluationExecutionService` and bills it, and the outcome service turns
+ * what came back into the reported event. Nothing here re-implements a step —
+ * this composition only says which substrate each one runs on.
+ */
+function createEvaluationExecutionIntent(
+  options: WorkerEvaluationProcessingOptions,
+): EvaluationExecutionIntentPort {
+  const collaborators = options.execution;
+  if (!collaborators) {
+    options.absence?.withoutEvaluatorExecution();
+
+    return new AbsentEvaluatorExecution();
+  }
+
+  options.absence?.withoutExecutionReceiptLedger();
+
+  const engine = EvaluationExecutionService.create(collaborators.engine);
+
+  return EvaluationExecutionIntentService.create({
+    monitors: collaborators.monitors,
+    traces: collaborators.evidence,
+    azureSafetyCredentials: collaborators.azureSafetyCredentials,
+    settingsRecovery: collaborators.settingsRecovery,
+    inputsOffload: collaborators.inputsOffload,
+    executionReceipt: DirectEvaluationExecutionReceipt.create({
+      execution: new WorkerEvaluationEngine(engine),
+      costs: collaborators.costs,
+    }),
+  });
+}
+
+/**
+ * Adapts the engine's own call shape to the port the receipt drives.
+ *
+ * The one translation is the mappings: the command carries them as an opaque
+ * record because a queue payload is JSON, and the engine reads a parsed
+ * `MappingState`. Parsing here rather than inside the engine keeps the refusal
+ * at the boundary the malformed row actually crosses.
+ */
+class WorkerEvaluationEngine extends EvaluationExecutionPort {
+  constructor(private readonly engine: EvaluationExecutionService) {
+    super();
+  }
+
+  execute(input: ExecuteEvaluationCommandInput): Promise<EvaluationExecutionResult> {
+    return this.engine.executeForTrace({
+      ...input,
+      mappings: input.mappings === null ? null : mappingStateSchema.parse(input.mappings),
+    });
+  }
 }
 
 /**

@@ -20,7 +20,7 @@
  * a part the extractor externalizes but the collector never surfaces is
  * stored bytes nothing renders. `media-walk-parity.unit.test.ts` pins that.
  */
-import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "../../../model/shared/audio/pcm-to-wav";
+import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "@langwatch/trace-contract";
 import { containsMediaMarkers } from "../content-parts/media-markers";
 import {
   parseBase64DataUri,

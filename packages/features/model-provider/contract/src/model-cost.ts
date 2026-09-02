@@ -93,7 +93,7 @@ export const estimateCost = (input: {
   );
 };
 
-const normalizeModelName = (model: string): string => {
+export const normalizeModelName = (model: string): string => {
   let normalized = model.toLowerCase();
   for (const [from, to] of Object.entries({
     "deepseek-ai/": "deepseek/",
@@ -142,7 +142,7 @@ const findModelCost = (
   return undefined;
 };
 
-const normalizeBedrockModelId = (model: string): string => {
+export const normalizeBedrockModelId = (model: string): string => {
   let normalized = model.replace(/^bedrock\//i, "");
   normalized = normalized.replace(/:[0-9a-z.]+$/i, "");
   normalized = normalized.replace(/-v\d+$/i, "");

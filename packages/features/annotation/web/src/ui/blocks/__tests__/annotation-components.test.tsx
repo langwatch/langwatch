@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -8,7 +9,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   AnnotationAvatarGroup,
   AnnotationScoresChip,
-  type AnnotationWithUser,
 } from "../../../index";
 
 afterEach(cleanup);

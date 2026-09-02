@@ -28,6 +28,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'"
   },
   "dependencies": {
+    "date-fns": "^4.4.0",
     "@aws-sdk/client-s3": "^3.1080.0",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",

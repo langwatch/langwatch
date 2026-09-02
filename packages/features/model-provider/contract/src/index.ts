@@ -22,6 +22,7 @@ export * from "./catalog/model-catalog.types";
 export * from "./catalog/model-feature-registry";
 export * from "./catalog/model-id-boundary";
 export * from "./catalog/onboarding-defaults";
+export * from "./catalog/model-max-tokens";
 export * from "./catalog/model-tiers";
 export * from "./catalog/resolve-supported-parameters";
 export * from "./catalog/static-model-costs";

@@ -26,7 +26,7 @@ import {
   TRACE_EXPANSIONS,
   TRACE_MAPPING_LABELS,
   TRACE_MAPPINGS,
-} from "../../../behavior/tracer/traces-mapping";
+} from "@langwatch/trace-contract";
 import { api } from "../trace-api";
 import { Switch } from "@langwatch/design-system/switch";
 

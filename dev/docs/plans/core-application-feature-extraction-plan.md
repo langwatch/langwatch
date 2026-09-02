@@ -3905,7 +3905,8 @@ row). What is left under `app-layer` is 12,901 non-test lines, and all of it
 belongs to another lane: `traces/`, `organizations/`, `langy/`, `authz/`,
 `clients/`, `broadcast/`, `permissions/`, `events/`, `enterprise/`, the three
 NLP-lambda modules and the composition root itself (`app.ts`, `presets.ts`,
-`dependencies.ts`, `config.ts`, `index.ts`).
+`dependencies.ts`, `config.ts`, `index.ts`). **All of it except the
+composition root left in the residue slice recorded below.**
 
 | Subtree | Lines out | Owner it moved to | Shape it landed in |
 | --- | ---: | --- | --- |
@@ -4127,6 +4128,225 @@ failures in the same three files the same concurrent lane owns (every one is
 `No "otlpMetricsExportOptionsFrom" export is defined on the
 "@langwatch/observability/node" mock`, or the config shape that goes with it).
 `git diff --numstat -- platform/app` shows zero insertions on all 355 rows.
+
+
+## The app-layer residue and the ONLINE evaluation path (2026-09-02)
+
+**130 files / 32,236 lines leave `platform/app` at zero insertions**, and what
+is left under `app-layer` is the composition root and nothing else:
+`app.ts`, `config.ts`, `dependencies.ts`, `index.ts`, `presets.ts`,
+`redis-readiness.ts`, `worker-eventing-handoff.ts` — 5,361 non-test lines, down
+from 12,901 — plus three test files another lane owns
+(`__tests__/error-remediation.unit.test.ts`,
+`__tests__/governance-ingestion-template.integration.test.ts` and the
+`identity/__tests__/sso-onboarding-refusals.unit.test.ts` the identity lane
+deliberately left). `server/{traces,filters,license-enforcement,enterprise,
+modelProviders,clickhouse}` are GONE as directories, and `server/event-sourcing`
+is down to one pipeline.
+
+| Subtree | Files / lines out | Owner it moved to | Shape it landed in |
+| --- | ---: | --- | --- |
+| `app-layer/traces/` | 25 / 8,695 | `@langwatch/trace-server`, `-log-server`, `-metric-server`, `-data-privacy-server` | 5 services + 2 ports to trace, the OTLP log and metric collections to their own features, the span PII redactor to data privacy; 8 modules deleted as displaced twins |
+| `server/clickhouse/` | 25 / 5,499 | `@langwatch/clickhouse-client` | the query defaults and the private-route-key grammar; the rest deleted as composition over the package |
+| `server/event-sourcing/` | 14 / 5,765 | `@langwatch/eventing` consumers | 2 replay suites to trace-server; the registry, the global billing meter and the postgres/integration harness deleted as displaced |
+| `server/modelProviders/` | 16 / 2,597 | `@langwatch/model-provider-contract` | 7 catalogue suites and their helper; two re-export shims and a duplicate suite deleted |
+| `app-layer/organizations/` | 3 / 1,967 | `@langwatch/organization-server` | nothing moved — all three are displaced by the package's own successors |
+| `server/traces/` | 9 / 1,314 | `@langwatch/trace-server` | the agent-readable digest and the REST projection compiler; the two usage counters deleted as `getApp()` glue |
+| `app-layer/evaluations/` | 3 / 904 | `@langwatch/evaluation-server` + `apps/worker` | the 676-line execution engine and its 7 new ports; the model-env factory to the worker |
+| `server/filters/` | 1 / 637 | — | deleted: two of its own relative imports were already gone and both consumers are platform |
+| `server/license-enforcement/` | 8 / 581 | `@langwatch/enterprise-licensing-contract` | the limit labels and the two refusals; the rest deleted as displaced by `@langwatch/entitlement-server` |
+| `app-layer/authz/` + `permissions/` | 6 / 821 | `@langwatch/authz-contract` | `MembershipDisabledError` and its suite; the other five modules deleted as displaced |
+| `server/enterprise/scim/` | 2 / 489 | `@langwatch/enterprise-scim-server` | nothing moved — both are Hono mounts over route descriptors the package already exports |
+| `app-layer/clients/` | 6 / 810 | `apps/worker` | nothing moved — `WorkerTiktokenCounterAdapter` is already the verbatim twin |
+| `app-layer/langy/`, `events/`, `enterprise/`, `nlp-lambda.*` | 6 / 651 | — | deleted; see the absences below |
+| `server/stored-objects/` (4 extractors) | 4 / 1,494 | `@langwatch/trace-server` | the content-part, media, array-coercion and binary-part walkers |
+
+### The ONLINE evaluation path, end to end
+
+`withoutEvaluatorExecution()` in
+`apps/worker/src/app/worker-evaluation-processing.composition.ts` **is closed**.
+`createWorkerEvaluationProcessing` takes an optional `execution` bundle; with it
+supplied the composition builds the package's own chain —
+`EvaluationExecutionIntentService` prepares (monitor lookup, sampling,
+preconditions, settings recovery), a receipt runs `EvaluationExecutionService`
+and bills it, and the outcome service turns the result into the reported event —
+and without it the same `AbsentEvaluatorExecution` refuses by name as before.
+Nothing in the composition re-implements a step; it only says which substrate
+each one runs on.
+
+Moved into `@langwatch/evaluation-server`:
+`services/evaluation-execution.service.ts` (the 676-line engine that renders a
+stored trace through its evaluator mappings and runs the evaluator),
+`services/evaluation-thread-mapping.service.ts`, and
+`adapters/http.langevals-evaluator.adapter.ts` (was
+`platform/app/src/runtime/app/langevals.runtime.ts`, retries, timeout, 413 and
+all). Seven new ports in `ports/evaluation-execution.port.ts` replace what the
+engine used to reach for directly: `EvaluationTraceReadPort` (the three legacy
+trace reads), `EvaluationSpanDigestPort`, `EvaluationLangevalsPort`,
+`EvaluationModelEnvPort`, `EvaluationWorkflowExecutorPort`,
+`EvaluationExecutionTelemetryPort` and, narrowed off the preparation service so
+a worker need not compose a whole `MonitorService` or contract `TraceService`
+to answer two reads, `EvaluationMonitorLookupPort` and
+`EvaluationTraceEvidencePort`. `apps/worker/src/app/worker-evaluation-model-env.composition.ts`
+is the model-provider bridge — the same call `apps/api` already made for the
+LiteLLM parameter resolution, kept in a composition root because a feature
+server package may not depend on another feature's.
+
+**The trace-mapping registry moved to `@langwatch/trace-contract`.** It had been
+parked in the BROWSER package `@langwatch/trace-web`, where no server module may
+value-import it, which is why `mappingsSchema` and `coerceMonitorMappings`
+degrade to a permissive parse today. `traces-mapping.ts` (1,418 lines) is now
+`trace-contract/src/trace-mapping.ts`, with the three framework-free helpers it
+needs (`trace-rag-extraction`, `trace-rag-chunks`, `trace-collector-common`) and
+the PCM-to-WAV converter beside it, and the fourteen web importers repointed.
+`AnnotationWithUser` moved from `annotation-web/model/annotation-row.ts` into
+`@langwatch/annotation-contract` in the same pass, because
+`trace-contract -> annotation-web -> trace-web -> trace-contract` would have
+been a package cycle; `AnnotationUser` stayed in the web package, since the
+contract already declares a stricter one under that name and two would be worse
+than one narrowing. `DEFAULT_MAPPINGS`, `mappingsReadEvaluationsSource` and
+`migrateLegacyMappings` moved from `evaluator-web` into
+`@langwatch/evaluator-contract` for the same reason.
+
+Proof: `apps/worker/src/app/__tests__/worker-evaluation-processing.composition.unit.test.ts`
+(4 tests) drives `command:executeEvaluation` through the composed pipeline over
+fakes at every process seam and asserts the Langevals transport received the
+evaluator type, the resolved settings, the model provider's environment AND the
+`input`/`output` the trace mappings produced — then that a
+`lw.evaluation.reported` event came back. Two more pin the absences: the
+refusal when the bundle is absent, and the receipt ledger named at boot.
+
+### Named absences and recorded losses
+
+- **The execution RECEIPT ledger did not move.** The platform wrapped the
+  evaluator call in `withIdempotency` over `~/server/api/idempotency.ts`, a
+  752-line generic receipt table with a claim heartbeat and takeover that no
+  package owns (`@langwatch/api/rest`'s `idempotency.ts` is the WIRE half, and
+  its own docblock says the ledger stays in the process that owns a database).
+  `DirectEvaluationExecutionReceipt` runs the engine and records the cost
+  instead, and `withoutExecutionReceiptLedger()` says so at boot. The MONEY is
+  unaffected — `PrismaEvaluationCostRecorder` derives the cost id from the
+  operation key, so a redelivery finds the row it already wrote — and the
+  evaluator call was already at-least-once by the platform receipt's own
+  docblock, which finalises after the provider has answered. What is lost is the
+  narrower crash window, not the guarantee.
+- **`withoutClusteringModels()` is NOT closed, and it is one composition away.**
+  `ModelProviderExecutionAdapter` in `@langwatch/model-provider-server` already
+  implements `TopicClusteringModelsPort` whole; what it needs is a
+  `ModelProviderService`, which means composing `PostgresModelProviderAdapter`'s
+  six ports in the worker the way `apps/api/src/app/api-model-provider.composition.ts`
+  does. That is the SAME service `EvaluationModelEnvPort` takes, so one
+  composition closes both — and it needs new `infrastructure.modelProvider`
+  leaves on `apps/worker/src/platform/config/worker.config.ts`, a file a
+  concurrent lane holds. Left for that lane rather than edited under it.
+- **`spend-rating.service.ts` and its three unit tests stay in platform.**
+  `GatewaySpendRatingPort` already states the seam in
+  `@langwatch/gateway-server`, but the rule reaches the model-cost catalogue
+  through `getStaticModelCosts` and `matchModelCostWithFallbacks`, whose
+  packaged successors are `@langwatch/model-provider-contract`'s
+  `getStaticModelCostRates` (a different return shape) and
+  `@langwatch/trace-server`'s `trace-span-cost-matching.service.ts` — which a
+  gateway server package may not reach. Filling the port belongs with whoever
+  collapses the two cost catalogues; leaving the module keeps its three
+  money-pricing suites running.
+- **`llmModelCost.tsx` was deleted, not moved.** Its successor is
+  `ModelCostCatalogService` + `postgres.model-cost-catalog.adapter.ts` in
+  `@langwatch/model-provider-server`, a different implementation, so its two
+  suites (`llmModelCost`, `llmModelCostCascade`) are a rewrite rather than a
+  move and are gone. `modelDefaults.collapseDuplicatesMigration.integration.test.ts`
+  went with them: it reads a migration SQL file and belongs with
+  `packages/prisma-client`.
+- **`model-provider-services.test-support.ts` was deleted.** It is stale against
+  the packaged `ModelProviderService` (missing `refreshCodexForGateway`) and
+  both its importers were platform tests.
+- **The langy UI-action modules were deleted.** `pageManifests.ts` and
+  `uiActionBackendExecutor.ts` reach six `~/experiments-v3/**` modules that no
+  longer exist on this branch, their one consumer is
+  `server/routes/langy-ui-actions.ts` (REST wave 2's, already broken), and
+  `LangyUiActionCatalogPort`'s own docblock says the workbench catalogue must
+  NOT move into the langy package. Rebuilding the catalogue over the experiments
+  workbench is the experiments lane's.
+- **The two NLP-Lambda modules were deleted.** They compose
+  `@aws-sdk/client-lambda`, `~/runtime/app/aws-client.composition` and
+  `~/server/s3/stagePayload` — the deployment's AWS graph, not a workflow
+  service — and `@langwatch/workflow-server` already carries the HTTP dispatch
+  the self-hosted and local stacks run. This is the same call the studio-host
+  slice recorded when it declined to carry the per-project Lambda routing.
+- **`app-layer/enterprise/managed-providers.adapter.ts` was deleted.** Every
+  class it assembles is already exported from
+  `@langwatch/enterprise-managed-provider-server`; the file is a `createLogger`
+  binding plus an assembly, which is a composition, not a service.
+- **`app-layer/events/track-event.service.ts` was deleted.**
+  `TrackedEventSpanService` in `@langwatch/trace-server` is the same sha256
+  span-id derivation and OTEL span build, already mounted with its REST family
+  and its sync subscriber.
+- **`app-layer/clients/tokenizer/**` was deleted, its test with it.**
+  `apps/worker/src/platform/infrastructure/worker-token-counter.adapter.ts` is
+  the verbatim `TiktokenClient` behind `TraceTokenCounterPort` — the port's own
+  docblock says the tiktoken implementation stays in the application — and it
+  carries its own suite.
+- **`server/traces/{event,trace}-usage.service.ts` were deleted.** Both are
+  `tryGetApp()` glue over `billingQueries`, and `@langwatch/entitlement-server`
+  already declares `UsageVolumeCounterPort` for exactly the two readings they
+  take. `usage-count.ts` went with them: `USAGE_UNKNOWN` and `UsageCount` are
+  byte-identical in `usage-counter.port.ts`, and nothing outside those two files
+  ever read `ProjectUsageCounts`.
+- **`server/filters/triggerFilter.matcher.ts` was deleted.** It cannot compile —
+  `./precondition-matchers` and `./types` are gone, and their successors are
+  BROWSER modules in `@langwatch/analytics-web` — and `matchesEvaluationFilters`
+  is already an abstract method on `AutomationSettlementPort` with a packaged
+  implementation. Both its consumers are platform.
+- **`server/clickhouse/**`'s suites were deleted, and that is a real loss.**
+  `schemaLock`, `replicatedEngineGuard`, `rmtTtlCompatibility`,
+  `privateClickhouseDataIsolation` and `clickhouseClient.integration` all need a
+  live ClickHouse, and `@langwatch/clickhouse-client`'s `vitest run` is the
+  package gate — moving them would have made that gate require a datastore, the
+  same call the identity lane recorded for its five Postgres suites. The unit
+  suites that went with them (`connectionPool`, `safeClickhouseClient`,
+  `managedClient`, `metrics`) covered the platform's composition rather than the
+  package's own pool, client and statement reporting, which have their own 239
+  tests.
+- **The record-shaped half of the PII redactor came across after all.**
+  `otlp-span-pii-redaction.service.ts` in `@langwatch/data-privacy-server` had
+  deliberately carried only the span half; `redactLog`, `redactMetricAttributes`
+  and their seven helpers are now beside it, delegating the policy resolution to
+  `PiiRedactionPolicyService` rather than re-declaring it. Without them the four
+  path-keyed-log tests — two of which carry `@scenario` annotations — would have
+  had no subject and two spec scenarios would have silently unbound.
+- **`formatTimeAgo` is now stated in `trace-formatting.service.ts`.** The shared
+  helper was `platform/app/src/utils/formatTimeAgo.ts`, which 23 platform
+  modules read and deletes-only forbids repointing, and
+  `@langwatch/evaluator-web` already carries the browser narrowing. A server
+  module may not import a browser package, so the two sides state it separately;
+  the wording and the 24-hour threshold must stay identical, because the digest
+  a customer reads and the list they read it beside are the same sentence.
+  `clampMaxTokens` is the same shape and now lives in
+  `@langwatch/model-provider-contract`; the two `web` copies were left alone.
+- **`DeepPartial` is stated in each of the two collection services.** An OTLP
+  export request is JSON a client assembled, so the transformer's interface
+  describes what a conforming exporter sends rather than what lands.
+- **`EdgeMediaExtractionDeps.hasContentDropRules` became REQUIRED.** It had a
+  default that read `getDataPrivacyPolicyService()` off the platform graph. A
+  default answering `false` would store media at the edge for exactly the
+  projects whose policy is about to discard that content, which is the interlock
+  the hook exists to honour, so the process must state it. The
+  `edge_media_extract_fail_open` counter became
+  `TraceEdgeMediaTelemetryPort`, absent meaning unreported.
+
+### Gates
+
+Every touched package typechecks clean (`tsc -p tsconfig.json --noEmit`) and its
+whole suite is green: evaluation-server 25 files / 193, trace-server 136 / 2,320
+(the same two ClickHouse repository integration files fail to LOAD as they did
+before this lane, on an import of a deleted platform test container), trace-contract
+19 / 322, trace-web 231 / 1,817, annotation-contract 4 / 51, annotation-web 16 /
+200, evaluator-contract 2 / 8, evaluator-web 6 / 41, data-privacy-server 8 / 128,
+log-server 6 / 36, metric-server 18 / 101, authz-contract 8 / 96,
+enterprise-licensing-contract 6 / 67, model-provider-contract 26 / 343,
+model-provider-server 17 / 176, clickhouse-client 15 / 239. **`apps/worker` is
+56 files / 423 tests, all passing** — the 8 observability-lane config failures
+the previous record named are green in this tree. `git diff --numstat --
+platform/app` shows zero insertions on all 280 rows.
 
 
 ### Operational scripts, hosted MCP and instrumentation, 2026-09-02 (bucket 5)
@@ -4972,6 +5192,121 @@ the organization mount that is gone, and the export pair. The rest are the
 concurrent REST wave-3a lane's, removed from the same file in the same
 working tree.
 
+
+## The experiment run loop composed on `apps/api`, 2026-09-02
+
+**`apps/api/src/app/api-experiment-run.composition.ts` fills the bag the
+previous lane left open.** `ExperimentRunPorts` is what
+`@langwatch/experiment-server` states a run may touch; this is where the six
+members come from, and none of them is built twice:
+
+| Port | Composed from |
+| --- | --- |
+| `studio` | `WorkflowStudioDispatchService` over `LANGWATCH_NLP_SERVICE` and this process's model gateway |
+| `cost` | `ModelProviderService.estimateCost`, with the project's own `listCosts` rules matched by `matchModelCost` and passed as the per-token override attributes — the trace-ingest cascade, not the static table alone |
+| `abort` | `RedisExperimentRunAbortAdapter` on the queue's Redis |
+| `experiments` | the execution half's own `ExperimentService` |
+| `evaluationReporting` | the execution half's own `reportEvaluation` sender |
+| `sandboxCredentials` | `tryMintAgentSandboxApiKey` over the process's `ApiKeyService` plus the project's organization |
+
+Beside them: `RedisExperimentRunProgressAdapter` on the same connection, a
+`PostgresExperimentWorkflowDslAdapter` (the four narrow workflow/version reads,
+including the archived-excluding and latest-commit-else-latest-autosave
+selections the evaluate trigger makes), a
+`PostgresExperimentTargetEntityNamesAdapter` (two batched `findMany`s), the
+`ExecutionDataServices` bag taken from the execution fold rather than rebuilt,
+and `BASE_HOST` for `getRunUrl`.
+
+The composition lives INSIDE `composeApiExecutionCollaborators` and is
+published as `ApiExecutionCollaborators.experimentRun`, because every
+collaborator except a Redis connection and the API-key service was already in
+that scope. `api-production.composition.ts` now passes `composeExecution` the
+resolved tenancy and the queue infrastructure for exactly those two. The
+surfaces that START a run are REST routes rather than tRPC procedures — the
+`experiments.*` namespace has no run procedure and never had one — so wave 3b
+takes `experimentRun` and mounts `POST /api/experiments/execute`,
+`POST /api/experiments/{slug}/run`, `GET /api/experiments/runs/{runId}`,
+`POST /api/experiments/abort` and `POST /api/workflows/{id}/evaluate` on it.
+
+**The absence that had to close first: `experiment_run_processing`.** The
+`PostgresExperimentAdapter` was composed without `execution`, and the comment
+called that "a process with no run loop". It is not a soft absence: the
+orchestrator RETHROWS a failed `startExperimentRun` — a run whose first event
+never reached the log would leave a history with a hole at the front — so with
+the packaged `UnavailableExperimentExecutionAdapter` in place every polling run
+dies on its first cell. `composeApiExperimentRunCommands` registers the SAME
+packaged definition the worker drains as a PRODUCER, with two stand-in stores
+that refuse by name if a fold or an append is ever asked of this process, and
+hands back the four dispatchers. This is
+`createEvaluationProcessingProducerPipeline`'s shape built at the composition
+root rather than in the package, because `@langwatch/experiment-server`
+publishes no producer variant of its own and adding one would have put untested
+source into a package this lane is gated to leave alone. **The package is the
+right home for it; moving it there is the next slice.**
+
+**Absences closed.** The run's dispatch (was `studioBackendPostEvent` on a
+process singleton), its price table, its abort flag, its progress store, its
+sandbox credential, its workflow-DSL reads, its column-name reads, and its run
+history. **Absences left, each by name.**
+`ExperimentRunErrorReportingPort` is not composed: the retired application sent
+these to product analytics, nothing downstream reads them, and a null object
+would read as wired. `updates` on the experiment adapter stays absent, so a
+workbench cell lands on the next read rather than as it happens.
+`EVAL_V3_CONCURRENCY` is still unread on this process — the default is stated
+as `API_EXPERIMENT_RUN_DEFAULT_CONCURRENCY = 10`, the same number every
+deployment that never set the variable already runs at, and binding the leaf
+would have changed the `api.config.ts` shape a concurrent lane is editing.
+
+**Two composition decisions worth the words.** A process with **no Redis** has
+no run loop: `ports` and `progress` are `null` and `startRun` /
+`evaluateWorkflow` reject with `ApiExperimentRunUnavailableError`
+(`service_unavailable`, 503, `fault: "platform"`, `meta.capability` naming the
+progress store). That is the ledger's own note said out loud — the retired
+application skipped every progress write when there was no connection and then
+served `GET /runs/:runId` a 404 for every run it had started. **No public base
+URL** refuses the same way for its own reason, because a run answers with a
+shareable results link and a link built on no origin is not one.
+`LoggedApiExperimentRunAbsence` names both at boot rather than leaving a
+deployment to discover it on the first press of Run. The dispatch service is
+built here rather than taken from `api-studio-host.composition.ts`: it holds no
+connection, it strips parameters through the SAME gateway, and the trace group
+that builds the other one composes after the execution half that builds this.
+
+**One behaviour recorded rather than changed.** The engine sees
+`X-LangWatch-Origin: workflow` for a workbench cell, because the run sets
+`origin: "evaluation"` in the EVENT and leaves the dispatch option unset —
+which is what the retired application sent too. The
+`ExperimentStudioDispatchPort` carries the option so the loop can change its
+mind; this lane did not change it on the way past.
+
+**Gates.** `apps/api` 566/566 tests passing across 67 of 68 files; the one
+failing FILE is `src/app/__tests__/api-client-address.unit.test.ts`, which
+imports `../getClientIp` — a module the app-layer-residue lane renamed to
+`api-client-address.ts` mid-run — and no file this lane touched is in it.
+`tsc --noEmit` on `tsconfig.json` is at ZERO errors; `tsconfig.test.json` has
+four, three in `app-trpc.features.unit.test.ts` and the fourth the same
+`getClientIp` import, all another lane's in-flight work.
+`@langwatch/experiment-server` 20 files / 5,246 tests (5,243 passed, 3
+pre-existing skips), unchanged: nothing in that package was edited.
+`git diff --numstat -- platform/app` shows zero insertions on every row.
+
+`api-experiment-run.composition.integration.test.ts` drives a real run: the
+orchestrator, the polling runner, the cell-workflow builder, the studio
+dispatch and its server-sent-event framing, the Redis progress adapter, the
+Experiment service and the producer registration are all the real ones, and the
+doubles are the database, the model gateway, the queue and the engine — the
+engine at `fetch`, one layer OUTSIDE the port, so the dispatch adapter, the
+parameter strip and the frame decoder run for real. It asserts the cell reached
+`http://127.0.0.1:5561/go/studio/execute` carrying the prepared workflow (the
+project's own API key on it, which is what `prepareStudioEvent` is in the path
+for), that the progress store went from `createRun` to `completed`, that
+`startExperimentRun` and `completeExperimentRun` landed on the producer
+registration, and that with no Redis every namespace still mounts while
+`startRun` refuses by name.
+
+The `toHaveLength(1)` on
+`api-trpc-collaborators.execution.integration.test.ts`'s eventing recorder is
+now a lookup by name: this half registers two producer pipelines, not one.
 
 ## Progress accounting
 

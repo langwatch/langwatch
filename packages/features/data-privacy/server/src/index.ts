@@ -51,3 +51,6 @@ export {
   type DataPrivacyTrpcContext,
   type DataPrivacyTrpcPorts,
 } from "./transport/api-trpc/data-privacy.api";
+
+/** The in-memory policy source the ingestion collections drive their PII cases over. */
+export { DataPrivacyServiceFake } from "./fixtures/data-privacy.fixture";

@@ -142,7 +142,7 @@ vi.mock("../../elements/period-picker", () => ({
 const { AnnotationList } = await import("../annotation-list");
 const { groupedAnnotationsToRows } = await import("../../../model/annotation-row");
 const { csvFileName } = await import("../../../model/annotation-export");
-type AnnotationWithUser = import("../../../model/annotation-row").AnnotationWithUser;
+type AnnotationWithUser = import("@langwatch/annotation-contract").AnnotationWithUser;
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
   id: "annotation-1",

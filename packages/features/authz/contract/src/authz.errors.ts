@@ -326,3 +326,19 @@ export class AuthzLedgerUnavailableError extends HandledError {
     this.name = "AuthzLedgerUnavailableError";
   }
 }
+
+/**
+ * The membership itself is switched off, so nothing in the organization is
+ * reachable — distinct from a permission the caller merely lacks.
+ */
+export class MembershipDisabledError extends HandledError {
+  declare readonly code: "membership_disabled";
+
+  constructor() {
+    super("membership_disabled", "Your access to this organization has been disabled", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "MembershipDisabledError";
+  }
+}

@@ -68,5 +68,4 @@ export {
   type AnnotationSuggestionValue,
   type AnnotationTrace,
   type AnnotationUser,
-  type AnnotationWithUser,
 } from "./model/annotation-row";

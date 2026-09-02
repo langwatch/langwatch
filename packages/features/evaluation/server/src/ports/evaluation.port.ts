@@ -40,8 +40,8 @@ export abstract class EvaluationExecutionReceiptPort {
 }
 
 export interface ExecuteEvaluationCommandDeps {
-  monitors: import("@langwatch/monitor-contract").MonitorService;
-  traces: import("@langwatch/trace-contract").TraceService;
+  monitors: import("./evaluation-execution.port").EvaluationMonitorLookupPort;
+  traces: import("./evaluation-execution.port").EvaluationTraceEvidencePort;
   executionReceipt: EvaluationExecutionReceiptPort;
   azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
   settingsRecovery: EvaluationSettingsRecoveryPort;

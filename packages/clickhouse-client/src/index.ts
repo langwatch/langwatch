@@ -130,3 +130,14 @@ export {
   DEFAULT_RETENTION_FLOOR_MARGIN_MS,
   RetentionFloorService,
 } from "./retentionFloor";
+
+/** The per-query and per-insert settings every non-analytics statement carries.
+ * Was `platform/app/src/server/clickhouse/queryDefaults.ts`. */
+export {
+  DEFAULT_CLICKHOUSE_SETTINGS,
+  READ_BACK_FOLD_INSERT_SETTINGS,
+} from "./queryDefaults";
+
+/** The `CLICKHOUSE_URL__<label>__<org>` private-route key grammar.
+ * Was `platform/app/src/server/clickhouse/privateRouteKey.ts`. */
+export * from "./privateRouteKey";

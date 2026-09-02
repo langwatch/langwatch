@@ -1,6 +1,6 @@
 import { Lightbulb } from "lucide-react";
 import { AnnotationHoverChip } from "./annotation-hover-chip";
-import type { AnnotationWithUser } from "../../model/annotation-row";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 
 export function AnnotationSuggestionsChip({
   annotations,

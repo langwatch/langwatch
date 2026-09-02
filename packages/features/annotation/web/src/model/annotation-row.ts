@@ -1,29 +1,12 @@
 import { describeAnnotationAnchor, readableAnnotationAnchor } from "@langwatch/annotation-contract";
-import { z } from "zod";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 
 export type AnnotationUser = {
   id: string;
   name: string | null;
   image?: string | null;
 };
-
-export type AnnotationWithUser = {
-  id: string;
-  projectId: string;
-  traceId: string;
-  userId: string | null;
-  email?: string | null;
-  comment: string | null;
-  isThumbsUp: boolean | null;
-  scoreOptions: unknown;
-  expectedOutput: string | null;
-  anchorKind: string | null;
-  anchorId: string | null;
-  anchorPath: string | null;
-  createdAt: Date | string | null;
-  updatedAt: Date | string | null;
-  user?: AnnotationUser | null;
-};
+import { z } from "zod";
 
 export type AnnotationTrace = {
   trace_id: string;

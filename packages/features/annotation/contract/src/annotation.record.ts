@@ -180,3 +180,31 @@ export const assertAnnotatorReferencesInputSchema = z
 export type AssertAnnotatorReferencesInput = z.infer<
   typeof assertAnnotatorReferencesInputSchema
 >;
+
+/**
+ * A stored annotation with the author the read path resolved for it.
+ *
+ * The author is narrowed to the fields a rendered annotation names rather than
+ * reusing {@link AnnotationUser}: requiring the whole user row forced every
+ * caller to fetch every user column — email, lastLoginAt and the rest — just
+ * to satisfy the type, which is how those columns ended up shipped to the
+ * browser. Timestamps widen to strings because a serialised annotation crosses
+ * the wire before it is rendered.
+ */
+export type AnnotationWithUser = {
+  id: string;
+  projectId: string;
+  traceId: string;
+  userId: string | null;
+  email?: string | null;
+  comment: string | null;
+  isThumbsUp: boolean | null;
+  scoreOptions: unknown;
+  expectedOutput: string | null;
+  anchorKind: string | null;
+  anchorId: string | null;
+  anchorPath: string | null;
+  createdAt: Date | string | null;
+  updatedAt: Date | string | null;
+  user?: { id: string; name: string | null; image?: string | null } | null;
+};

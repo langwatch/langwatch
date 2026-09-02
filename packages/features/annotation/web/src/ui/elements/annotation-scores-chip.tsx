@@ -1,9 +1,9 @@
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Gauge } from "lucide-react";
 import { AnnotationHoverChip } from "./annotation-hover-chip";
 import {
   annotationScoresLine,
   countAnnotationScores,
-  type AnnotationWithUser,
 } from "../../model/annotation-row";
 
 export function AnnotationScoresChip({

@@ -20,3 +20,9 @@ export * from "./registry";
 export * from "./roles";
 export * from "./scope";
 export * from "./vocabulary";
+export {
+  Actions,
+  Resources,
+  type Action,
+  type Resource,
+} from "./permission-vocabulary";

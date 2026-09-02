@@ -1,6 +1,7 @@
 import { configureLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import {
   createProcessObservability,
+  startOtlpMetricsExport,
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
@@ -60,11 +61,17 @@ export class WorkerProcess {
     const resources = new ResourceScope();
     const loggerConfiguration = loggerConfigurationFrom(config);
     configureLogger(loggerConfiguration);
+    // Before anything records: the instruments resolve a meter once at module
+    // scope, so a counter touched ahead of this line writes into a no-op for
+    // the life of the process. This process serves no Prometheus registry, so
+    // without this its metrics exist nowhere.
+    const metrics = startOtlpMetricsExport(config.otlpMetrics);
     const observability = createProcessObservability({
       ...options.observability,
       serviceName: config.serviceName,
       loggerName: config.serviceName,
       setup: options.observability?.setup ?? toObservabilitySetup(config),
+      flushers: [...(options.observability?.flushers ?? []), ...(metrics ? [metrics] : [])],
     });
 
     try {

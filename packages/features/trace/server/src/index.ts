@@ -549,3 +549,51 @@ export {
 } from "./services/trace-export-json.rules";
 export { RESERVED_METADATA_KEYS } from "./services/trace-export-columns.rules";
 export { enrichTracesWithEvaluations } from "./services/trace-evaluation-enrichment.rules";
+
+/**
+ * The EDGE media path: what a span carries inline, lifted into the object
+ * store before the span is folded. Was
+ * `platform/app/src/server/app-layer/traces/edge-media-extraction.ts` and the
+ * four content-part extractors that sat under `server/stored-objects/` — they
+ * walk TRACE content parts and media markers, so they belong to this vertical
+ * rather than to Stored Objects.
+ */
+export {
+  TRACE_MEDIA_PURPOSE,
+  maybeExtractSpanMedia,
+  spanCarriesMediaMarkers,
+  type EdgeMediaExtractionDeps,
+  type EdgeMediaExtractionLogger,
+} from "./services/trace-edge-media-extraction.service";
+export {
+  TraceEdgeMediaTelemetryPort,
+  TraceMediaStorePort,
+  type TraceEdgeMediaFailOpenReason,
+} from "./ports/trace-media-store.port";
+export { coerceContentToArray } from "./services/trace-content-array.service";
+export { binaryInputPartSchema } from "./services/trace-binary-part.service";
+export {
+  processContentPart,
+  type ExtractedRef,
+} from "./services/trace-content-extraction.service";
+export {
+  createExtractionBudget,
+  extractInlineMediaFromValue,
+  type ExtractionBudget,
+} from "./services/trace-value-media-extraction.service";
+
+/** The agent-readable rendering of a trace. Was `server/traces/trace-formatting.ts`. */
+export {
+  formatTraceSummaryDigest,
+  generateAsciiTree,
+  toLLMModeTrace,
+} from "./services/trace-formatting.service";
+
+/** The REST projection compiler. Was `server/traces/projection/**`. */
+export { compileProjection } from "./services/trace-projection-compile.service";
+export {
+  resolveField,
+  type FieldProtection,
+  type ProjectionSource,
+  type ResolvedField,
+} from "./services/trace-projection-catalog.service";

@@ -4,7 +4,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Crosshair, Lightbulb, MessageCircle, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { z } from "zod";
-import type { AnnotationUser, AnnotationWithUser } from "../../model/annotation-row";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import type { AnnotationUser } from "../../model/annotation-row";
 
 interface ScoreEntry {
   name: string;

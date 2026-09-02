@@ -19,7 +19,7 @@ import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
-} from "../../../behavior/tracer/traces-mapping";
+} from "@langwatch/trace-contract";
 import { api } from "../trace-api";
 
 /**

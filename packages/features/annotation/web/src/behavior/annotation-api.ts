@@ -34,7 +34,8 @@ import type {
   AnnotationScore,
 } from "@langwatch/annotation-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
-import type { AnnotationTrace, AnnotationWithUser } from "../model/annotation-row";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import type { AnnotationTrace } from "../model/annotation-row";
 
 /** The project every annotation procedure is scoped to. */
 type ProjectScope = { projectId: string };

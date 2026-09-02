@@ -13,3 +13,8 @@ export * from "./license.commands";
 export * from "./license.errors";
 export * from "./license.queries";
 export * from "./license.service";
+
+/** The enforcement half: what a limit is called, and how it refuses. Was
+ * `platform/app/src/server/license-enforcement/{constants,errors}.ts`. */
+export * from "./license-limit-labels";
+export * from "./license-enforcement.errors";

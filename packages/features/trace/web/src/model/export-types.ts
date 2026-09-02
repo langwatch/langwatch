@@ -1,7 +1,7 @@
 /**
  * What an export of the trace list is, as the browser half knows it.
  *
- * `~/server/export/types` declares these next to a zod schema that composes
+ * `@langwatch/trace-server`'s `trace-export.vocabulary.ts` declares these next to a zod shape that composes
  * `~/server/analytics/types`, which is server-side; a browser package may
  * reach neither. Only the three names below crossed to the client, and they are
  * a union of literals in both places — restated here with the alignment

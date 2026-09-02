@@ -18,7 +18,8 @@ import { z } from "zod";
 import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group";
 import { AnnotationCommentsChip } from "../elements/annotation-comments-chip";
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip";
-import type { AnnotationRow, AnnotationUser, AnnotationWithUser } from "../../model/annotation-row";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row";
 
 const ChakraButton = chakra("button");
 

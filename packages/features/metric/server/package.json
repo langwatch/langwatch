@@ -25,6 +25,13 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/data-privacy-server": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/otlp-transformer": "0.55.0",
+    "langwatch": "workspace:*",
     "@clickhouse/client": "^1.23.0",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",

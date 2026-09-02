@@ -33,6 +33,7 @@
  * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
  */
 
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useMemo } from "react";
@@ -51,7 +52,6 @@ import {
   groupedAnnotationsToRows,
   type AnnotationRow,
   type AnnotationTrace,
-  type AnnotationWithUser,
 } from "../../model/annotation-row";
 import type { AnnotationView } from "../../model/annotation-view";
 import { AnnotationList, type PageQueue } from "../../ui/sections/annotation-list";

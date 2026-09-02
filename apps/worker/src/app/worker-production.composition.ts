@@ -2085,6 +2085,13 @@ export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReport
       "worker composed the evaluation pipeline without an evaluator executor: evaluations reported by a customer are folded, rolled up and alerted on, and evaluations LangWatch would run itself refuse by name",
     );
   }
+
+  withoutExecutionReceiptLedger(): void {
+    this.logger.warn(
+      { reason: "no-execution-receipt-ledger" },
+      "worker composed the online evaluation path without a durable execution receipt: a redelivery after a crash calls the evaluator again, while the cost row stays single because the recorder derives its id from the operation key",
+    );
+  }
 }
 
 /**

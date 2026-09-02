@@ -110,14 +110,6 @@
       "types": "./src/screens/traces/index.ts",
       "default": "./src/screens/traces/index.ts"
     },
-    "./server/tracer/collector/rag": {
-      "types": "./src/behavior/tracer/collector/rag.ts",
-      "default": "./src/behavior/tracer/collector/rag.ts"
-    },
-    "./server/tracer/tracesMapping": {
-      "types": "./src/behavior/tracer/traces-mapping.ts",
-      "default": "./src/behavior/tracer/traces-mapping.ts"
-    },
     "./sse-status.store": {
       "types": "./src/behavior/sse-status.store.ts",
       "default": "./src/behavior/sse-status.store.ts"

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
-import type { MappingState } from "../../../../behavior/tracer/traces-mapping";
+import type { MappingState } from "@langwatch/trace-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";

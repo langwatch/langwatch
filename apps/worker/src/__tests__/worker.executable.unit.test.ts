@@ -20,6 +20,18 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 vi.mock("@langwatch/observability/node", () => ({
   createProcessObservability: mocks.createObservability,
+  // The worker's config resolution folds telemetry leaves through this, and
+  // boot starts the export from the result. Both are named here so the mock
+  // is the whole module the process imports rather than the half it used to.
+  otlpMetricsExportOptionsFrom: () => ({
+    endpoint: undefined,
+    enabled: false,
+    headers: {},
+    resourceAttributes: {},
+    serviceName: "worker",
+    deploymentEnvironment: undefined,
+  }),
+  startOtlpMetricsExport: () => undefined,
 }));
 
 class Host implements WorkerExecutableHost {

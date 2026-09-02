@@ -14,13 +14,13 @@
  * six things, and a per-trace row would report one.
  */
 
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import {
   annotationRatingExportLabel,
   annotationScores,
   suggestionExportLine,
   type AnnotationRow,
   type AnnotationTrace,
-  type AnnotationWithUser,
 } from "./annotation-row";
 
 /** A header row and the rows under it. */

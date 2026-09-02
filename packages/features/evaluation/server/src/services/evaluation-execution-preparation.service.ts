@@ -3,13 +3,17 @@ import {
   isAzureEvaluatorType,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import type { MonitorService, MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import type { EvaluationTraceEvent, TraceService } from "@langwatch/trace-contract";
+import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   EvaluationAzureSafetyCredentialsPort,
   EvaluationSettingsRecoveryPort,
 } from "../ports/evaluation.port";
+import type {
+  EvaluationMonitorLookupPort,
+  EvaluationTraceEvidencePort,
+} from "../ports/evaluation-execution.port";
 import { EvaluationPreconditionService } from "./evaluation-precondition.service";
 import {
   EvaluatorSettingsService,
@@ -33,8 +37,8 @@ export type EvaluationPreparationResult =
 
 export class EvaluationExecutionPreparationService {
   static create(input: {
-    monitors: MonitorService;
-    traces: TraceService;
+    monitors: EvaluationMonitorLookupPort;
+    traces: EvaluationTraceEvidencePort;
     azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
     settingsRecovery: EvaluationSettingsRecoveryPort;
   }): EvaluationExecutionPreparationService {
@@ -47,8 +51,8 @@ export class EvaluationExecutionPreparationService {
 
   private constructor(
     private readonly deps: {
-      monitors: MonitorService;
-      traces: TraceService;
+      monitors: EvaluationMonitorLookupPort;
+      traces: EvaluationTraceEvidencePort;
       azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
       settingsRecovery: EvaluationSettingsRecoveryPort;
     },

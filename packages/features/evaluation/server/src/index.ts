@@ -86,3 +86,38 @@ export {
 /** The Postgres cost ledger an evaluation run writes into. Was
  * `platform/app/src/server/app-layer/evaluations/evaluation-cost.recorder.ts`. */
 export { PrismaEvaluationCostRecorder } from "./adapters/prisma.evaluation-cost-recorder.adapter";
+
+/**
+ * The ONLINE execution path: rendering a stored trace through its evaluator
+ * mappings and running the evaluator over the result. Was
+ * `platform/app/src/server/app-layer/evaluations/evaluation-execution.service.ts`.
+ */
+export {
+  EvaluationExecutionService,
+  type EvaluationExecutionDeps,
+  extractParentTraceForNlpgo,
+  maxCausalityDepthOfSpans,
+} from "./services/evaluation-execution.service";
+export {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+  type GetThreadTraces,
+} from "./services/evaluation-thread-mapping.service";
+export {
+  EvaluationMonitorLookupPort,
+  EvaluationTraceEvidencePort,
+  EvaluationExecutionTelemetryPort,
+  EvaluationLangevalsPort,
+  EvaluationModelEnvPort,
+  EvaluationSpanDigestPort,
+  EvaluationTraceReadPort,
+  EvaluationWorkflowExecutorPort,
+  type EvaluationTraceProtections,
+  type LangevalsEvaluateParams,
+} from "./ports/evaluation-execution.port";
+export {
+  HttpLangevalsEvaluatorAdapter,
+  NullLangevalsEvaluatorClient,
+  type LangevalsRuntimeConfig,
+} from "./adapters/http.langevals-evaluator.adapter";
+export { DirectEvaluationExecutionReceipt } from "./adapters/direct.evaluation-execution-receipt.adapter";

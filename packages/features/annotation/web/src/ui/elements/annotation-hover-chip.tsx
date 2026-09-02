@@ -1,7 +1,8 @@
 import { Box, HStack, HoverCard, Portal, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { annotationAnchorLabel, type AnnotationWithUser } from "../../model/annotation-row";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { annotationAnchorLabel } from "../../model/annotation-row";
 
 export function AnnotationHoverChip({
   annotations,

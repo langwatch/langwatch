@@ -4,16 +4,14 @@
  *
  * BYTE-FAITHFUL, SPAN HALF ONLY. Every member below is the application's
  * `platform/app/src/server/app-layer/traces/span-pii-redaction.service.ts`
- * member of the same name, body for body. What is NOT here is the
- * record-shaped half — `redactLog`, `lambdaRedactLog`, `applyNativeLogPass`,
- * `redactMetricAttributes`, `lambdaRedactMetricAttributes`,
- * `redactRecordNative`, `createRedactionBatch`, `collectRecordEntries`,
- * `applyRedactionBatch` and the `RedactionBatch` type. Those nine members
- * answer `LogRedactionPort` and `MetricRedactionPort`, which belong to the log
- * and metric conversions; the trace conversion reaches this class through
- * `TraceSpanPiiRedactionPort.redact`, which calls `redactSpan` and nothing
- * else. Carrying them now would drag two other features' seams into this
- * slice for nothing, and each would be a second copy to keep aligned.
+ * member of the same name, body for body. The record-shaped half — `redactLog`,
+ * `lambdaRedactLog`, `applyNativeLogPass`, `redactMetricAttributes`,
+ * `lambdaRedactMetricAttributes`, `redactRecordNative`,
+ * `createRedactionBatch`, `collectRecordEntries`, `applyRedactionBatch` and
+ * the `RedactionBatch` type — came across when the application's copy was
+ * deleted, because it is what answers `LogRedactionPort` and
+ * `MetricRedactionPort` for the log and metric conversions and there was
+ * nowhere else left for it to live.
  *
  * THE APPLICATION'S COPY STAYS AS IT IS while both graphs ingest. Everything
  * the two agree about is a data-protection contract between two processes
@@ -34,6 +32,7 @@ import {
 
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+import type { PIICheckOptions } from "../ports/pii-analysis.port";
 import type { OtlpAnyValue, OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
@@ -62,6 +61,17 @@ type StringEntry = {
  * switch set, the analysis-service batch path runs unchanged. This service is
  * applied BEFORE creating immutable events in the event sourcing pipeline.
  */
+/**
+ * Accumulator used by the record-shaped redaction paths (logs, metrics).
+ * Tracks parallel arrays of texts and back-references plus a cumulative
+ * length budget enforced by `tryPush`.
+ */
+type RedactionBatch = {
+  texts: string[];
+  refs: { obj: Record<string, string>; key: string }[];
+  tryPush: (obj: Record<string, string>, key: string, value: string) => void;
+};
+
 export class OtlpSpanPiiRedactionService {
   static create(deps: OtlpSpanPiiRedactionServiceDependencies): OtlpSpanPiiRedactionService {
     return new OtlpSpanPiiRedactionService(deps);
@@ -404,4 +414,303 @@ export class OtlpSpanPiiRedactionService {
 
     return { skipped, collected, totalLength };
   }
+
+  /**
+   * `record` may be keyed by an addressing path rather than by the attribute
+   * name (the log and metric pipelines flatten a decoded OTLP tree into one).
+   * `attributeNames` restores the real name for the sensitive-NAME rules, which
+   * a path can never satisfy; without it those rules silently never fire.
+   */
+  private redactRecordNative({
+    record,
+    policy,
+    compiled,
+    attributeNames,
+  }: {
+    record: Record<string, string>;
+    policy: ResolvedDataPrivacy;
+    compiled: {
+      secrets: readonly RegExp[] | undefined;
+      piiExceptions: readonly RegExp[] | undefined;
+    };
+    attributeNames?: Record<string, string>;
+  }): void {
+    for (const key of Object.keys(record)) {
+      const value = record[key];
+      if (value && value.length > 0) {
+        const { text } = redactAttributeNative({
+          key: attributeNames?.[key] ?? key,
+          value,
+          policy,
+          compiledSecretPatterns: compiled.secrets,
+          compiledPiiExceptions: compiled.piiExceptions,
+        });
+        if (text !== value) record[key] = text;
+      }
+    }
+  }
+
+  /** Native pass over a log record's body + attribute records. */
+  private applyNativeLogPass(
+    log: {
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
+    },
+    policy: ResolvedDataPrivacy,
+  ): void {
+    if (!this.policy.nativePassActive(policy)) return;
+    const compiled = this.policy.compileNativePatterns(policy);
+    if (log.body) {
+      const { text } = redactStringNative({
+        text: log.body,
+        policy,
+        compiledSecretPatterns: compiled.secrets,
+        compiledPiiExceptions: compiled.piiExceptions,
+      });
+      if (text !== log.body) log.body = text;
+    }
+    this.redactRecordNative({
+      record: log.attributes,
+      policy,
+      compiled,
+      attributeNames: log.attributeNames,
+    });
+    this.redactRecordNative({
+      record: log.resourceAttributes,
+      policy,
+      compiled,
+    });
+  }
+
+
+  /**
+   * Redacts the body + attributes of a log record in place. Native secrets +
+   * essential PII run in-process when a policy is resolvable; strict still uses
+   * the analysis-service batch; the no-policy path keeps the legacy behavior.
+   */
+  async redactLog(
+    log: {
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      /**
+       * The real OTLP attribute name behind each key of `attributes`, where the
+       * two differ. Declared here because the native pass reads it: without it
+       * the public signature promises less than the method actually honours,
+       * and a caller building the argument inline could not pass it at all.
+       */
+      attributeNames?: Record<string, string>;
+    },
+    piiRedactionLevel: PIIRedactionLevel,
+    tenantId?: TenantId,
+  ): Promise<void> {
+    const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
+    if (!native) {
+      await this.lambdaRedactLog(log, piiRedactionLevel);
+      return;
+    }
+    this.applyNativeLogPass(log, native.policy);
+    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    if (lambda) {
+      await this.lambdaRedactLog(log, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
+    }
+  }
+
+  private async lambdaRedactLog(
+    log: {
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+    },
+    piiRedactionLevel: PIIRedactionLevel,
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
+  ): Promise<void> {
+    const options = await this.policy.tryBuildOptions(
+      piiRedactionLevel,
+      lambda?.entities,
+      lambda?.exceptPatterns,
+    );
+    if (!options) return;
+
+    const batch = this.createRedactionBatch();
+    if (log.body) {
+      batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
+    }
+    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.resourceAttributes);
+
+    await this.applyRedactionBatch(batch, options);
+  }
+
+  /**
+   * Redacts metric + resource attributes in place. Metric values are numeric;
+   * only the string attributes carry user content. Native secrets + essential
+   * PII run in-process when a policy is resolvable; strict uses the batch.
+   */
+  async redactMetricAttributes(
+    metric: {
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
+    },
+    piiRedactionLevel: PIIRedactionLevel,
+    tenantId?: TenantId,
+  ): Promise<void> {
+    const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
+    if (!native) {
+      await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel);
+      return;
+    }
+    if (this.policy.nativePassActive(native.policy)) {
+      const compiled = this.policy.compileNativePatterns(native.policy);
+      this.redactRecordNative({
+        record: metric.attributes,
+        policy: native.policy,
+        compiled,
+        attributeNames: metric.attributeNames,
+      });
+      this.redactRecordNative({
+        record: metric.resourceAttributes,
+        policy: native.policy,
+        compiled,
+      });
+    }
+    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    if (lambda) {
+      await this.lambdaRedactMetricAttributes(metric, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
+    }
+  }
+
+  private async lambdaRedactMetricAttributes(
+    metric: {
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+    },
+    piiRedactionLevel: PIIRedactionLevel,
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
+  ): Promise<void> {
+    const options = await this.policy.tryBuildOptions(
+      piiRedactionLevel,
+      lambda?.entities,
+      lambda?.exceptPatterns,
+    );
+    if (!options) return;
+
+    const batch = this.createRedactionBatch();
+    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.resourceAttributes);
+
+    await this.applyRedactionBatch(batch, options);
+  }
+
+  /**
+   * Returns PIICheckOptions for the redaction call, or null when redaction
+   * should be skipped (disabled, no langevals in dev, etc). Throws when
+   * langevals is required but unset in production.
+   */
+  private async buildOptions(
+    piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
+    exceptPatterns?: readonly string[],
+  ): Promise<PIICheckOptions | null> {
+    const disabled = this.deps.featureFlags
+      ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
+          kind: "system",
+        })
+      : false;
+    if (disabled) return null;
+    if (piiRedactionLevel === "DISABLED") return null;
+
+    const piiEnforced = this.deps.isProduction;
+
+    if (!this.deps.isLangevalsConfigured) {
+      if (piiEnforced) {
+        throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
+      }
+      return null;
+    }
+
+    return {
+      piiRedactionLevel,
+      enforced: piiEnforced,
+      mainMethod: "presidio",
+      ...(entities && entities.length > 0 ? { entities } : {}),
+      ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
+    };
+  }
+
+  private createRedactionBatch(): RedactionBatch {
+    const texts: string[] = [];
+    const refs: { obj: Record<string, string>; key: string }[] = [];
+    const maxLen = this.deps.piiRedactionMaxAttributeLength;
+    const logger = this.logger;
+    const state = { totalLength: 0 };
+
+    return {
+      texts,
+      refs,
+      tryPush(obj, key, value) {
+        if (state.totalLength + value.length > maxLen) {
+          logger.warn(
+            {
+              key,
+              valueLength: value.length,
+              totalLength: state.totalLength,
+              maxLength: maxLen,
+            },
+            "Skipping PII redaction — cumulative batch size would exceed limit",
+          );
+          return;
+        }
+        texts.push(value);
+        refs.push({ obj, key });
+        state.totalLength += value.length;
+      },
+    };
+  }
+
+  private collectRecordEntries(batch: RedactionBatch, record: Record<string, string>): void {
+    for (const key of Object.keys(record)) {
+      if (record[key]) {
+        batch.tryPush(record, key, record[key]!);
+      }
+    }
+  }
+
+  private async applyRedactionBatch(
+    batch: RedactionBatch,
+    options: PIICheckOptions,
+  ): Promise<void> {
+    if (batch.texts.length === 0) return;
+
+    const results = await this.policy.clearBatch(batch.texts, options);
+
+    if (results.length !== batch.refs.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${batch.refs.length} inputs`,
+      );
+    }
+
+    for (let i = 0; i < batch.refs.length; i++) {
+      const redacted = results[i];
+      if (redacted != null) {
+        batch.refs[i]!.obj[batch.refs[i]!.key] = redacted;
+      }
+    }
+  }
+
 }

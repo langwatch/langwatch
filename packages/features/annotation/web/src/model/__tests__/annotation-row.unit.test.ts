@@ -1,3 +1,4 @@
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { describe, expect, it } from "vitest";
 import {
   annotationAnchorLabel,
@@ -9,7 +10,6 @@ import {
   queueItemsToRows,
   suggestionExportLine,
   toOccurredAtMsHint,
-  type AnnotationWithUser,
 } from "../annotation-row";
 import { readAnnotationScoreOptions } from "../../index";
 
