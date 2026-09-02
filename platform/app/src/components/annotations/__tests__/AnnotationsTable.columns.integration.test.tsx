@@ -770,6 +770,23 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(columnHeaders()).toContain("Input");
       expect(columnHeaders()).toContain("Output");
     });
+
+    /** @scenario "A column added after the reviewer chose still appears" */
+    it("shows a column the stored choice never mentioned", () => {
+      // What an older build wrote: the reviewer hid one column, back when
+      // Suggestions did not exist yet. A store of the visible set would now
+      // read as "Suggestions off"; storing the choice per column instead lets
+      // the new column's own default decide.
+      window.localStorage.setItem(
+        "annotations:columns:project-1",
+        JSON.stringify({ comments: false }),
+      );
+
+      renderQueuePage();
+
+      expect(columnHeaders()).toContain("Suggestions");
+      expect(columnHeaders()).not.toContain("Comments");
+    });
   });
 
   describe("given a row carries suggestions", () => {

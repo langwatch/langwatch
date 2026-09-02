@@ -10,7 +10,13 @@
  * Spec: specs/components/hoverable-big-text-overflow.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -84,8 +90,10 @@ const settleFirstMeasurement = async () => {
 
 const resizeBox = (box: HTMLElement) => {
   const watch = watches.find((candidate) => candidate.element === box);
-  expect(watch, "the box must be watched for this test to mean anything").toBeDefined();
-  act(() => watch!.fire());
+  // A box nobody watches would make every test here pass for the wrong reason,
+  // so say so rather than firing nothing.
+  if (!watch) throw new Error("the box is not watched for resizes");
+  act(() => watch.fire());
 };
 
 describe("HoverableBigText overflow measurement", () => {

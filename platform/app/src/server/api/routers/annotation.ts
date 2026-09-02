@@ -288,6 +288,78 @@ const queuedAtRangeFilter = ({
 };
 
 /**
+ * Which queue items the optimized list reads. The clauses stack rather than
+ * replace: the caller's reach is settled first, and the reviewer's own pick of
+ * queues is applied last, so a queue id from anywhere else can subtract rows
+ * but never add one.
+ */
+const optimizedQueueItemsWhere = ({
+  input,
+  userId,
+  organizationId,
+  userQueueIds,
+}: {
+  input: {
+    projectId: string;
+    selectedAnnotations: string;
+    queueId?: string;
+    queueIds?: string[];
+    startDate?: Date;
+    endDate?: Date;
+  };
+  userId: string;
+  organizationId: string;
+  /** The queues the caller belongs to, where those were looked up. */
+  userQueueIds: string[];
+}) => {
+  const whereCondition: any = {
+    ...queueItemReferenceFilter({
+      projectId: input.projectId,
+      organizationId,
+    }),
+    doneAt: doneAtFilter(input.selectedAnnotations),
+    ...queuedAtRangeFilter(input),
+  };
+
+  if (input.queueId) {
+    // Pin the requested queue to the caller's project so a queue id from
+    // another tenant cannot surface its items here.
+    whereCondition.AND.push({
+      annotationQueue: {
+        id: input.queueId,
+        projectId: input.projectId,
+      },
+    });
+  } else if (userQueueIds.length > 0) {
+    // No specific queue requested: include items from the queues the caller
+    // belongs to, plus items assigned directly to them.
+    whereCondition.AND.push({
+      OR: [{ annotationQueueId: { in: userQueueIds } }, { userId }],
+    });
+  } else {
+    // Default case - just user's items
+    whereCondition.userId = userId;
+  }
+
+  // The reviewer's own pick of which queues to read, applied last so it can
+  // only cut into what the clauses above already allow.
+  if (input.queueIds && input.queueIds.length > 0) {
+    whereCondition.AND.push({
+      annotationQueueId: { in: input.queueIds },
+    });
+  }
+
+  return whereCondition;
+};
+
+/** Pending items have no `doneAt`, completed ones have one, "all" reads both. */
+const doneAtFilter = (selectedAnnotations: string) => {
+  if (selectedAnnotations === "pending") return null;
+  if (selectedAnnotations === "completed") return { not: null };
+  return undefined;
+};
+
+/**
  * The queue items a reviewer is responsible for: assigned to them directly, or
  * sitting in a queue they belong to. Same reach as the pending and assigned
  * counts, so what the queue page walks and what it hands to a dataset agree.
@@ -1049,57 +1121,12 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Build the where condition based on the scenario
-      const whereCondition: any = {
-        ...queueItemReferenceFilter({
-          projectId: input.projectId,
-          organizationId,
-        }),
-        doneAt:
-          input.selectedAnnotations === "pending"
-            ? null
-            : input.selectedAnnotations === "completed"
-              ? { not: null }
-              : undefined,
-        ...queuedAtRangeFilter(input),
-      };
-
-      if (input.queueId) {
-        // Pin the requested queue to the caller's project so a queue id from
-        // another tenant cannot surface its items here.
-        whereCondition.AND.push({
-          annotationQueue: {
-            id: input.queueId,
-            projectId: input.projectId,
-          },
-        });
-      } else if (userQueueIds.length > 0) {
-        // No specific queue requested: include items from the queues the caller
-        // belongs to, plus items assigned directly to them.
-        whereCondition.AND.push({
-          OR: [
-            {
-              annotationQueueId: {
-                in: userQueueIds,
-              },
-            },
-            {
-              userId: userId,
-            },
-          ],
-        });
-      } else {
-        // Default case - just user's items
-        whereCondition.userId = userId;
-      }
-
-      // The reviewer's own pick of which queues to read, applied last so it can
-      // only cut into what the clauses above already allow.
-      if (input.queueIds && input.queueIds.length > 0) {
-        whereCondition.AND.push({
-          annotationQueueId: { in: input.queueIds },
-        });
-      }
+      const whereCondition = optimizedQueueItemsWhere({
+        input,
+        userId,
+        organizationId,
+        userQueueIds,
+      });
 
       // Get total count for pagination
       const totalCount = await ctx.prisma.annotationQueueItem.count({

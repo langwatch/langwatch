@@ -199,6 +199,7 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
       });
     });
 
+    /** @scenario "A picked queue cannot widen what the reviewer may read" */
     it("narrows to the picked queues without widening the caller's reach", async () => {
       await caller.getOptimizedAnnotationQueues({
         projectId: "project_123",
