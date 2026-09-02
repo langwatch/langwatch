@@ -20,6 +20,7 @@
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import {
+  ERASURE_SECRET_ENV,
   ErasureSecretMissingError,
   erasureDigest,
   readErasureSecret,
@@ -27,12 +28,40 @@ import {
 import { currentSuppressionSnapshot } from "./suppressionSnapshot";
 
 /**
+ * Raised when this process has erasures to honour and no secret to honour them
+ * with.
+ *
+ * Fatal on purpose, and the one place in this file that is. Every other
+ * "cannot check" answer here means nobody has been erased, so writing the
+ * identifier verbatim is correct. This one means somebody HAS been erased in
+ * this tenant's organization and the pseudonym cannot be computed — at which
+ * point there is no safe value to write. The identifier is the erased person's
+ * plaintext email; a constant placeholder would collapse every actor in the
+ * organization into one row and silently destroy the attribution behind a
+ * total.
+ *
+ * So the money rows for this tenant stop until somebody sets the variable.
+ * That is a loud, visible outage on a misconfigured deployment — which is the
+ * point, because the alternative is a quiet one nobody discovers until an
+ * erased address is found sitting in a money table.
+ */
+export class ErasureSecretRequiredError extends Error {
+  name = "ErasureSecretRequiredError" as const;
+
+  constructor(tenantId: string) {
+    super(
+      `Governance area ${tenantId} belongs to an organization that has erased somebody, but ${ERASURE_SECRET_ENV} is not set in this process, so the stand-in cannot be computed. Writing the identifier as it stands would put an erased person's address into the daily cost table. Set the same value every other process uses — a split deployment where the web side has it and the worker side does not produces exactly this.`,
+    );
+  }
+}
+
+/**
  * The digest secret, read once per process.
  *
- * Absent is a normal state, not a failure: erasure refuses to run without the
- * secret, so a deployment that has none also has an empty suppression list and
- * nothing to substitute. Caching the absence keeps the fold from re-reading and
- * re-validating an unset variable on every money event.
+ * Absent is a normal state on a deployment that has never erased anybody, so
+ * this answers null rather than throwing and the callers decide. Caching the
+ * absence keeps the fold from re-reading and re-validating an unset variable on
+ * every money event.
  */
 let cachedSecret: string | null | undefined;
 
@@ -59,6 +88,15 @@ export function resetErasureSecretCache(): void {
  *
  * Deterministic in the identifier, so every replay of every day lands on the
  * same key rather than minting a new one per run.
+ *
+ * The secret is read AFTER the suppression list has been consulted, and the
+ * order is the whole safety property. Read first, it looks like a normal
+ * absent-configuration check with an obvious answer — write the identifier
+ * through — and that answer is only correct while nobody has been erased. Past
+ * the check below, somebody has.
+ *
+ * @throws {ErasureSecretRequiredError} when this tenant's organization has
+ * erasures and this process has no secret to compute their stand-ins with.
  */
 export function actorIdForRollupWrite({
   tenantId,
@@ -74,8 +112,10 @@ export function actorIdForRollupWrite({
   // which is every process on a deployment that has never erased anybody.
   if (!snapshot?.hasAnySuppressionForTenant(tenantId)) return rawActorId;
 
+  // Everything below this line runs only for an organization that has erased
+  // somebody.
   const secret = secretOrNull();
-  if (!secret) return rawActorId;
+  if (!secret) throw new ErasureSecretRequiredError(tenantId);
 
   const digest = erasureDigest({ secret, identifier: rawActorId });
   return snapshot.isSuppressedForTenant({ tenantId, identifierHash: digest })
