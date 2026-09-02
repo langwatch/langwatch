@@ -223,7 +223,16 @@ function buildLlmSpan(spanId, isError) {
       cost: Number(cost.toFixed(6)),
     },
     ...(isError
-      ? { error: { message: "upstream model request failed", stack: null } }
+      ? {
+          error: {
+            has_error: true,
+            message: "upstream model request failed",
+            stacktrace: [
+              "Error: upstream model request failed",
+              "    at chatCompletion (demo-traffic-seed.mjs:1:1)",
+            ],
+          },
+        }
       : {}),
   };
 }
@@ -235,8 +244,8 @@ function buildRagSpan(spanId) {
     name: "retrieve-context",
     input: { type: "text", value: pick(USER_QUESTIONS) },
     output: {
-      type: "list",
-      value: [pick(RAG_SNIPPETS), pick(RAG_SNIPPETS)],
+      type: "text",
+      value: `${pick(RAG_SNIPPETS)} ${pick(RAG_SNIPPETS)}`,
     },
   };
 }
@@ -246,8 +255,8 @@ function buildToolSpan(spanId) {
     type: "tool",
     span_id: spanId,
     name: "lookup-account",
-    input: { type: "json", value: { query: "account_lookup" } },
-    output: { type: "json", value: { found: true } },
+    input: { type: "text", value: "account_lookup" },
+    output: { type: "text", value: "found: true" },
   };
 }
 
