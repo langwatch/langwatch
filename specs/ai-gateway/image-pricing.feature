@@ -76,6 +76,34 @@ Feature: Image calls are priced from the image token buckets they report
       Then only the text tokens are charged
       And the image tokens are priced at zero, not at the text rate
 
+  Rule: A custom cost rule prices its own text and leaves the pixels to the catalog
+
+    A custom rule holds text and cache rates only, so an image call under one
+    would price its image tokens at nothing, and a generation is almost all
+    image tokens. The catalog fills the two image buckets the rule cannot
+    state.
+
+    @unit
+    Scenario: a custom text rate does not zero the image tokens
+      Given a project rule that sets a text rate for an image model
+      When a generation or an edit on that model is costed
+      Then the text is priced at the rule's rate
+      And the image tokens are priced at the catalog's image rates
+
+    @unit
+    Scenario: an override that prices nothing keeps the images free
+      Given a rule whose every rate is zero, which states the model is free
+      When an image call on that model is costed
+      Then the charge is zero, because no catalog rate fills a free model
+
+    @unit
+    Scenario: the spend wire prices images from the catalog alone
+      Given a project that set a custom rule for an image model
+      When the spend wire rates a request on that model
+      Then both image buckets price at the catalog rates
+      # The spend wire reads no custom rule, so it never had the gap the
+      # trace wire had.
+
   Rule: The trace and the ledger state one figure
 
     @unit

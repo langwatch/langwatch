@@ -101,6 +101,15 @@ export function computeSpanCost({
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]) ?? 0,
   );
 
+  const resolvedModel =
+    model ??
+    (typeof attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] === "string"
+      ? (attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] as string)
+      : undefined) ??
+    (typeof attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === "string"
+      ? (attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] as string)
+      : undefined);
+
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
   // its own cache rates (customer override); when it does not, cache tokens
   // fall back to the input rate (counted, just not discounted).
@@ -111,6 +120,33 @@ export function computeSpanCost({
     attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
   );
   if (numInputRate !== null || numOutputRate !== null) {
+    const numCacheReadRate = coerceToNumber(
+      attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
+    );
+    const numCacheCreationRate = coerceToNumber(
+      attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
+    );
+    const numCacheCreation1hRate = coerceToNumber(
+      attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN],
+    );
+
+    // A custom rule states text and cache rates and has no image rates to
+    // state, so the registry's image rates fill those two buckets: the
+    // override prices what it names, the registry prices the pixels. An
+    // override whose every rate is zero is a deliberate "this model is free"
+    // and takes no fill, or a free model would start charging for images.
+    const overridePricesSomething = [
+      numInputRate,
+      numOutputRate,
+      numCacheReadRate,
+      numCacheCreationRate,
+      numCacheCreation1hRate,
+    ].some((rate) => (rate ?? 0) > 0);
+    const registryImageRates =
+      overridePricesSomething && resolvedModel
+        ? matchModelCostWithFallbacks(resolvedModel, getStaticModelCosts())
+        : undefined;
+
     // Same arithmetic as every other priority, so a cache TTL split (or any
     // future billable unit) is priced identically whether the rates came from
     // a customer override or the registry.
@@ -128,18 +164,11 @@ export function computeSpanCost({
           regex: "",
           inputCostPerToken: numInputRate ?? 0,
           outputCostPerToken: numOutputRate ?? 0,
-          cacheReadCostPerToken:
-            coerceToNumber(
-              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
-            ) ?? undefined,
-          cacheCreationCostPerToken:
-            coerceToNumber(
-              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
-            ) ?? undefined,
-          cacheCreation1hCostPerToken:
-            coerceToNumber(
-              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN],
-            ) ?? undefined,
+          cacheReadCostPerToken: numCacheReadRate ?? undefined,
+          cacheCreationCostPerToken: numCacheCreationRate ?? undefined,
+          cacheCreation1hCostPerToken: numCacheCreation1hRate ?? undefined,
+          inputImageCostPerToken: registryImageRates?.inputImageCostPerToken,
+          outputImageCostPerToken: registryImageRates?.outputImageCostPerToken,
         },
         inputTokens,
         outputTokens,
@@ -151,8 +180,6 @@ export function computeSpanCost({
         // the audio half of the turn.
         inputAudioTokens,
         outputAudioTokens,
-        // An enrichment override carries no image rates, so image tokens
-        // price at zero here rather than at the override's text rate.
         inputImageTokens,
         outputImageTokens,
       }) ?? 0
@@ -169,15 +196,6 @@ export function computeSpanCost({
   if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
   // Priority 3: Static model registry with fallbacks
-  const resolvedModel =
-    model ??
-    (typeof attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] === "string"
-      ? (attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] as string)
-      : undefined) ??
-    (typeof attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === "string"
-      ? (attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] as string)
-      : undefined);
-
   if (
     resolvedModel &&
     (inputTokens > 0 ||

@@ -217,4 +217,101 @@ describe("image model cost", () => {
       });
     });
   });
+
+  describe("given a custom cost rule on an image model", () => {
+    // The enrichment stamps only the rates a custom rule can hold, which are
+    // text and cache. CustomLLMModelCost has no image columns.
+    const CUSTOM_TEXT_IN = 1e-6;
+    const CUSTOM_TEXT_OUT = 2e-6;
+
+    describe("when a generation is costed", () => {
+      /** @scenario a custom text rate does not zero the image tokens */
+      it("prices the text at the custom rate and the image at the catalog rate", () => {
+        const result = computeSpanCost({
+          attrs: {
+            "gen_ai.operation.name": "image_generation",
+            "gen_ai.request.model": "openai/gpt-image-2",
+            "gen_ai.usage.output_image_tokens": ONE_SQUARE_IMAGE,
+            "gen_ai.usage.image_count": 1,
+            "langwatch.model.inputCostPerToken": CUSTOM_TEXT_IN,
+            "langwatch.model.outputCostPerToken": CUSTOM_TEXT_OUT,
+          },
+          promptTokens: 14,
+          completionTokens: 0,
+        });
+        expect(result).toBeCloseTo(
+          14 * CUSTOM_TEXT_IN + ONE_SQUARE_IMAGE * IMAGE2_IMAGE_OUT,
+          12,
+        );
+      });
+    });
+
+    describe("when an edit is costed", () => {
+      /** @scenario a custom text rate does not zero the image tokens */
+      it("fills both image buckets from the catalog", () => {
+        const result = computeSpanCost({
+          attrs: {
+            "gen_ai.operation.name": "image_edit",
+            "gen_ai.request.model": "openai/gpt-image-1",
+            "gen_ai.usage.input_image_tokens": 323,
+            "gen_ai.usage.output_image_tokens": ONE_SQUARE_IMAGE,
+            "gen_ai.usage.image_count": 1,
+            "langwatch.model.inputCostPerToken": CUSTOM_TEXT_IN,
+            "langwatch.model.outputCostPerToken": CUSTOM_TEXT_OUT,
+          },
+          promptTokens: 20,
+          completionTokens: 0,
+        });
+        expect(result).toBeCloseTo(
+          20 * CUSTOM_TEXT_IN +
+            323 * IMAGE1_IMAGE_IN +
+            ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT,
+          12,
+        );
+      });
+    });
+
+    describe("when the rule zeroes every rate it carries", () => {
+      /** @scenario an override that prices nothing keeps the images free */
+      it("charges nothing, because the zeroes are the policy", () => {
+        const result = computeSpanCost({
+          attrs: {
+            "gen_ai.request.model": "openai/gpt-image-2",
+            "gen_ai.usage.output_image_tokens": ONE_SQUARE_IMAGE,
+            "langwatch.model.inputCostPerToken": 0,
+            "langwatch.model.outputCostPerToken": 0,
+          },
+          promptTokens: 14,
+          completionTokens: 0,
+        });
+        expect(result).toBe(0);
+      });
+    });
+  });
+
+  describe("given the spend wire and a project that set a custom rule", () => {
+    describe("when the request is rated", () => {
+      /** @scenario the spend wire prices images from the catalog alone */
+      it("prices both image buckets at the catalog rates", () => {
+        const { costNanoUsd } = rateSpendNanoUsd({
+          model: "openai/gpt-image-1",
+          usage: {
+            ...EMPTY_SPEND_USAGE,
+            input_tokens: 20,
+            input_image_tokens: 323,
+            output_image_tokens: ONE_SQUARE_IMAGE,
+            image_count: 1,
+          },
+        });
+        expect(costNanoUsd).toBe(
+          Math.round(
+            (20 * IMAGE1_TEXT_IN +
+              323 * IMAGE1_IMAGE_IN +
+              ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT) *
+              NANO_USD_PER_USD,
+          ),
+        );
+      });
+    });
+  });
 });
