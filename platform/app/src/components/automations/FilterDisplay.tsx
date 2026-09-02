@@ -28,7 +28,8 @@ const FilterContainer = ({
     gap={2}
     paddingX={2}
     paddingY={1}
-    border={hasBorder ? "1px solid lightgray" : "none"}
+    border={hasBorder ? "1px solid" : "none"}
+    borderColor={hasBorder ? "border.muted" : undefined}
     borderRadius="md"
   >
     <Box color="fg.subtle">

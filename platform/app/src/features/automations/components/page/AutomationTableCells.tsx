@@ -258,6 +258,13 @@ export function ReportRunCells({
  *  automation tables get their shared polish — a quiet uppercase header on a
  *  tinted strip, generous row height, and a soft hover — so no per-page table
  *  markup has to repeat it. */
+/**
+ * Width below which these tables scroll instead of shrinking. Without a floor,
+ * `width="full"` makes the table fit the shell at any cost, and the cost is the
+ * Name column collapsing to its longest single word.
+ */
+export const TABLE_MIN_WIDTH = "1000px";
+
 export function TableShell({ children }: { children: React.ReactNode }) {
   return (
     <Box

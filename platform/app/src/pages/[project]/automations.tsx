@@ -44,6 +44,7 @@ import {
   ReportRunCells,
   ReportSubjectCell,
   SectionHeader,
+  TABLE_MIN_WIDTH,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
 import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
@@ -571,29 +572,42 @@ function AutomationsPage() {
                     />
                   ) : (
                     <TableShell>
-                      <Table.Root variant="line" width="full">
+                      <Table.Root
+                        variant="line"
+                        width="full"
+                        minWidth={TABLE_MIN_WIDTH}
+                        style={{ tableLayout: "fixed" }}
+                      >
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="20%">
+                              Watches
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
                               Fires when
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="14%">
+                              Notifies
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this alert last crossed its threshold and notified you."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Status"
                                 help="Firing while the metric is past its threshold, back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -766,29 +780,42 @@ function AutomationsPage() {
                     </EmptyHint>
                   ) : (
                     <TableShell>
-                      <Table.Root variant="line" width="full">
+                      <Table.Root
+                        variant="line"
+                        width="full"
+                        minWidth={TABLE_MIN_WIDTH}
+                        style={{ tableLayout: "fixed" }}
+                      >
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="22%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="20%">
+                              Sends
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
                               Schedule
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
                                 help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last run"
                                 help="The last time this was sent."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="9%">
+                              Delivery
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -889,26 +916,39 @@ function AutomationsPage() {
                     />
                   ) : (
                     <TableShell>
-                      <Table.Root variant="line" width="full">
+                      <Table.Root
+                        variant="line"
+                        width="full"
+                        minWidth={TABLE_MIN_WIDTH}
+                        style={{ tableLayout: "fixed" }}
+                      >
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                            <Table.ColumnHeader>Then</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="24%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="25%">
+                              Acts on
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="17%">
+                              Then
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="13%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="10%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Fires (30d)"
                                 help="Times this automation fired in the last 30 days."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -932,8 +972,12 @@ function AutomationsPage() {
                                   <Table.Cell fontWeight="medium">
                                     {trigger.name}
                                   </Table.Cell>
-                                  <Table.Cell maxWidth="360px">
-                                    <VStack gap={2} align="stretch">
+                                  <Table.Cell>
+                                    <VStack
+                                      gap={2}
+                                      align="stretch"
+                                      minWidth={0}
+                                    >
                                       {applyChecks(
                                         trigger.checks?.filter(
                                           (check): check is Monitor => !!check,
@@ -946,8 +990,11 @@ function AutomationsPage() {
                                         <Code
                                           size="sm"
                                           variant="surface"
-                                          whiteSpace="pre-wrap"
+                                          display="block"
+                                          minWidth={0}
+                                          lineClamp={2}
                                           wordBreak="break-word"
+                                          title={trigger.filterQuery}
                                         >
                                           {trigger.filterQuery}
                                         </Code>
@@ -962,11 +1009,17 @@ function AutomationsPage() {
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell>
-                                    <VStack align="start" gap={0}>
+                                    <VStack align="start" gap={0} minWidth={0}>
                                       <Text textStyle="sm" fontWeight="medium">
                                         {triggerActionName(trigger.action)}
                                       </Text>
-                                      <Box textStyle="xs" color="fg.muted">
+                                      <Box
+                                        textStyle="xs"
+                                        color="fg.muted"
+                                        width="full"
+                                        lineClamp={2}
+                                        overflowWrap="anywhere"
+                                      >
                                         {actionItems(
                                           trigger.action,
                                           actionParams,
