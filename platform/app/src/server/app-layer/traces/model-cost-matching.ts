@@ -89,6 +89,18 @@ export function computeSpanCost({
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]) ?? 0,
   );
 
+  // Image token counts, the same disjoint split as the audio buckets. A
+  // generated 1024x1024 image is about 1600 output image tokens at $30 to
+  // $40 per million, which is most of what an image call costs.
+  const inputImageTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]) ?? 0,
+  );
+  const outputImageTokens = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]) ?? 0,
+  );
+
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
   // its own cache rates (customer override); when it does not, cache tokens
   // fall back to the input rate (counted, just not discounted).
@@ -139,6 +151,10 @@ export function computeSpanCost({
         // the audio half of the turn.
         inputAudioTokens,
         outputAudioTokens,
+        // An enrichment override carries no image rates, so image tokens
+        // price at zero here rather than at the override's text rate.
+        inputImageTokens,
+        outputImageTokens,
       }) ?? 0
     );
   }
@@ -172,7 +188,9 @@ export function computeSpanCost({
       inputCharacters > 0 ||
       audioSeconds > 0 ||
       inputAudioTokens > 0 ||
-      outputAudioTokens > 0)
+      outputAudioTokens > 0 ||
+      inputImageTokens > 0 ||
+      outputImageTokens > 0)
   ) {
     const matched = matchModelCostWithFallbacks(
       resolvedModel,
@@ -188,6 +206,8 @@ export function computeSpanCost({
         cacheCreation1hTokens,
         inputAudioTokens,
         outputAudioTokens,
+        inputImageTokens,
+        outputImageTokens,
         inputCharacters,
         audioSeconds,
       });

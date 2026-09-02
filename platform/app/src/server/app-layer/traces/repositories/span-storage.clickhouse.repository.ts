@@ -265,6 +265,8 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
   SpanAttributes['gen_ai.usage.input_audio_tokens'] AS InputAudioTokens,
   SpanAttributes['gen_ai.usage.output_audio_tokens'] AS OutputAudioTokens,
+  SpanAttributes['gen_ai.usage.input_image_tokens'] AS InputImageTokens,
+  SpanAttributes['gen_ai.usage.output_image_tokens'] AS OutputImageTokens,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
@@ -504,6 +506,8 @@ export interface SpanSummaryQueryRow {
   AudioSeconds: string;
   InputAudioTokens: string;
   OutputAudioTokens: string;
+  InputImageTokens: string;
+  OutputImageTokens: string;
   CustomInputRate: string;
   CustomOutputRate: string;
   CustomCacheReadRate: string;
@@ -565,6 +569,10 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.InputAudioTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]:
           row.OutputAudioTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]:
+          row.InputImageTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]:
+          row.OutputImageTokens || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
           row.CustomInputRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
