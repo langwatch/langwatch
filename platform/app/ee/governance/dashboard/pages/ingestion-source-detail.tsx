@@ -229,8 +229,8 @@ function NoDataSinceCallout({ source }: { source: Source }) {
       padding={3}
     >
       <Text fontSize="sm" color="red.700">
-        No data since {fmtRelative(notice.lastSuccessIso)}. This source has
-        stopped pulling, so spend after that point is unknown rather than zero.
+        No data since {fmtRelative(notice.lastSuccessIso)}. This source is
+        failing to pull, so spend after that point is unknown rather than zero.
       </Text>
     </Box>
   );
