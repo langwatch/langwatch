@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { EMAIL_RX, type SlackPayload } from "@langwatch/automation-contract";
+import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
 import {
   AutomationNotificationDeliveryPort,
   SlackWebApiDeliveryAdapter,
@@ -15,13 +15,24 @@ import {
   type WebhookSendResult,
 } from "@langwatch/automation-server";
 import { toDispatchError } from "@langwatch/eventing";
+import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { renderTriggerDigestEmail } from "./trigger-digest-mail.template";
 import { WorkerSlackWebhookClientAdapter } from "./slack-webhook.client.adapter";
 import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter";
 
+/** One settled match, as the digest renders it. */
+type SettlementDigestEntry = {
+  traceId: string;
+  input: string;
+  output: string;
+  projectId: string;
+  fullTrace: TraceRecord;
+};
+
 /**
- * Everything a graph alert can leave this process through.
+ * Everything an automation alert can leave this process through.
  *
  * Automation decides WHEN an alert is sent, to whom, and what it says; this
  * adapter owns the transports, the secrets they carry, and the mail-envelope
@@ -31,12 +42,12 @@ import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.ada
  * ## The two legacy methods
  *
  * `sendLegacyEmail` and `sendLegacySlackWebhook` are the trace-settlement
- * digest's, and they are the only two members of this port that render a
- * React email tree. The graph path reaches neither: `GraphAlertDispatchService`
+ * digest's, and the graph path reaches neither — `GraphAlertDispatchService`
  * calls `sendEmail`, `sendSlackWebhook`, `sendSlackBot` and `sendWebhook`, and
- * nothing else. They are declared here as named refusals rather than
- * implemented, so a process that grows a settlement pipeline fails loudly at
- * the first digest instead of composing a graph that silently sends nothing.
+ * nothing else. They are NOT a legacy corner of settlement, though: they are
+ * its DEFAULT. An automation only takes the rendered path once its author has
+ * written a custom subject or body, so an unedited automation — which is most
+ * of them — sends through these two.
  *
  * ## The webhook transport
  *
@@ -98,20 +109,88 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
     super();
   }
 
-  sendLegacyEmail(): Promise<void> {
-    return Promise.reject(
-      new Error(
-        "This process composes the graph-alert half of Automation, which sends rendered alerts only; the settlement digest's email template is not available here.",
-      ),
-    );
+  /**
+   * The default digest: the deployment's own template rather than the
+   * customer's.
+   *
+   * The render happens INSIDE the `DispatchError` wrap and is classified
+   * non-retryable, because a tree that fails to render fails identically on
+   * every attempt — the outbox has to promote the row to dead rather than loop
+   * on a payload that can never succeed. The send that follows keeps the
+   * default classification, since a provider failure usually is transient.
+   */
+  async sendLegacyEmail(input: {
+    recipients: string[];
+    triggerData: SettlementDigestEntry[];
+    triggerName: string;
+    triggerId: string;
+    projectId: string;
+    projectSlug: string;
+    triggerType: AlertType | null;
+    triggerMessage: string;
+    isRecipientSent(recipientHash: string): Promise<boolean>;
+    recordRecipientSent(recipientHash: string): Promise<void>;
+  }): Promise<void> {
+    let html: string;
+    try {
+      html = await renderTriggerDigestEmail({
+        triggerName: input.triggerName,
+        triggerType: input.triggerType,
+        triggerMessage: input.triggerMessage,
+        projectSlug: input.projectSlug,
+        baseHost: this.baseHost,
+        entries: input.triggerData,
+      });
+    } catch (error) {
+      throw toDispatchError(error, {
+        message: `Trigger email render failed for trigger "${input.triggerName}"`,
+        retryable: false,
+      });
+    }
+
+    try {
+      await this.sendPerRecipient({
+        recipients: input.recipients,
+        triggerId: input.triggerId,
+        projectId: input.projectId,
+        subject: `${input.triggerType ? `(${input.triggerType}) ` : ""}Trigger - ${input.triggerName}`,
+        html,
+        isRecipientSent: input.isRecipientSent,
+        recordRecipientSent: input.recordRecipientSent,
+      });
+    } catch (error) {
+      throw toDispatchError(error, {
+        message: `Trigger email dispatch failed for trigger "${input.triggerName}"`,
+      });
+    }
   }
 
-  sendLegacySlackWebhook(): Promise<void> {
-    return Promise.reject(
-      new Error(
-        "This process composes the graph-alert half of Automation, which sends rendered alerts only; the settlement digest's Slack template is not available here.",
-      ),
-    );
+  /**
+   * The same digest, as a Slack message.
+   *
+   * Rendered by the packaged adapter rather than here: escaping customer text
+   * into Slack mrkdwn is a correctness question — an unescaped `<` forges a
+   * link — and one implementation of it is what keeps two processes from
+   * disagreeing about which characters are safe.
+   */
+  sendLegacySlackWebhook(input: {
+    webhook: string;
+    triggerData: SettlementDigestEntry[];
+    triggerName: string;
+    projectSlug: string;
+    triggerType: AlertType | null;
+    triggerMessage: string;
+    baseHost: string;
+  }): Promise<void> {
+    return this.slackWebhooks.deliver({
+      triggerWebhook: input.webhook,
+      triggerData: input.triggerData,
+      triggerName: input.triggerName,
+      projectSlug: input.projectSlug,
+      triggerType: input.triggerType,
+      triggerMessage: input.triggerMessage,
+      baseHost: input.baseHost,
+    });
   }
 
   /**

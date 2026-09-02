@@ -1,7 +1,8 @@
-import type {
-  EventingServerRuntimeOptions,
-  ProcessRetentionMetricsPort,
+import {
+  OtelProcessRetentionMetricsAdapter,
+  type EventingServerRuntimeOptions,
 } from "@langwatch/eventing/server";
+import { BlobSweeper, type BlobSweepReport } from "@langwatch/group-queue/operational";
 import {
   EnterpriseWorkerComposition,
   type EnterpriseWorkerCompositionOptions,
@@ -29,6 +30,8 @@ import {
   PostgresIdentityPipelineAdapter,
   PostgresJoinRequestPipelineAdapter,
   PostgresScimSyncPipelineAdapter,
+  PostgresSsoConnectionPipelineAdapter,
+  type SsoConnectionPipelineDatabase,
   type ScimSyncPipelineDatabase,
 } from "@langwatch/identity-eventing";
 import {
@@ -68,10 +71,13 @@ import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-
 import {
   type CodingAgentActivityDatabase,
   PostgresCodingAgentActivityAdapter,
+  PostgresGovernanceInternalProjectAdapter,
+  ProjectOldestTeamPort,
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
   TopicServerInstaller,
+  type TopicClusteringDatabase,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import {
@@ -92,17 +98,14 @@ import {
 } from "../features/evaluation/evaluation-worker-feature.installer";
 import {
   EventingMaintenanceWorkerFeatureInstaller,
-  type WorkerBlobSweepPort,
+  WorkerBlobSweepPort,
 } from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
 import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer";
 import {
   GatewaySpendWorkerFeatureInstaller,
   type GatewaySpendWorkerCapability,
 } from "../features/gateway/gateway-spend-worker-feature.installer";
-import {
-  LangyConversationWorkerFeatureInstaller,
-  type LangyConversationWorkerCapability,
-} from "../features/langy/langy-conversation-worker-feature.installer";
+import { LangyConversationWorkerFeatureInstaller } from "../features/langy/langy-conversation-worker-feature.installer";
 import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer";
 import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer";
 import {
@@ -115,10 +118,7 @@ import {
 } from "../features/governance/governance-ingestion-worker-feature.installer";
 import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer";
 import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer";
-import {
-  ScenarioWorkerFeatureInstaller,
-  type ScenarioWorkerCapability,
-} from "../features/scenario/scenario-worker-feature.installer";
+import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer";
 import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
 import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer";
 import {
@@ -152,6 +152,7 @@ import type { WorkerFeatureInstallerPort } from "../features/worker-feature.inst
 import { WorkerApplication } from "./worker.application";
 import type { DatasetContentDatabase } from "@langwatch/dataset-server";
 import {
+  AutomationGraphActivityPort,
   AutomationTriggerMatchRecorderPort,
   PostgresAutomationTraceTriggerCatalogueAdapter,
   type AutomationGraphActivityDatabase,
@@ -163,6 +164,16 @@ import {
   TraceProcessingServerInstaller,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition";
+import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition";
+import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
+import {
+  createWorkerTopicRuntime,
+  WorkerTopicAbsenceReportPort,
+} from "./worker-topic-clustering.composition";
+import {
+  createWorkerEvaluationProcessing,
+  WorkerEvaluationAbsenceReportPort,
+} from "./worker-evaluation-processing.composition";
 import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition";
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition";
@@ -174,10 +185,39 @@ import { createWorkerSpanStorage } from "./worker-span-storage.composition";
 import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter";
 import {
   tryCreateWorkerAutomationGraphComposition,
+  resolveWorkerStoredSecretCipher,
   WorkerAutomationClock,
+  tryCreateWorkerAutomationDelivery,
 } from "./worker-automation-graph.composition";
+import {
+  createWorkerAutomationSettlement,
+  WorkerAutomationSettlementAbsenceReportPort,
+} from "./worker-automation-settlement.composition";
+import {
+  WorkerAutomationHeartbeat,
+  WorkerAutomationSettlementEvaluationReader,
+  WorkerAutomationSettlementTraceReader,
+} from "./worker-automation-settlement-reads.composition";
 import { createWorkerTraceSpool } from "./worker-trace-blob.composition";
 import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition";
+import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition";
+import {
+  createWorkerLangyConversation,
+  WorkerLangyAbsenceReportPort,
+  type WorkerLangyConversationDatabase,
+} from "./worker-langy-conversation.composition";
+import {
+  createWorkerScenarioProcessing,
+  WorkerScenarioAbsenceReportPort,
+} from "./worker-scenario-processing.composition";
+import {
+  createWorkerGatewaySpend,
+  WorkerGatewaySpendAbsenceReportPort,
+} from "./worker-gateway-spend.composition";
+import {
+  createWorkerWebhookEgress,
+  createWorkerWebhookTransport,
+} from "./worker-webhook-egress.composition";
 import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
 import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition";
 import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition";
@@ -213,22 +253,6 @@ export abstract class WorkerTraceAbsenceReportPort {
   abstract withoutDatasetStorage(): void;
 }
 
-/** Automation's package-owned pipeline, mounted before every match producer. */
-export type WorkerAutomationCompositionOptions = {
-  installer: AutomationWorkerCapability;
-};
-
-/** The Eventing substrate's own blob and process-manager retention sweeps. */
-export type WorkerEventingMaintenanceCompositionOptions = {
-  blobSweep: WorkerBlobSweepPort;
-  retentionMetrics: ProcessRetentionMetricsPort;
-};
-
-/** Langy's conversation pipeline, whose own effects append back into it. */
-export type WorkerLangyConversationCompositionOptions = {
-  installer: LangyConversationWorkerCapability;
-};
-
 /**
  * The one Prisma client this process opened.
  *
@@ -240,6 +264,9 @@ export type WorkerLangyConversationCompositionOptions = {
  * another feature's option, and the fallback goes when the platform root does.
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
+  IngestionPullLifecycleDatabase &
+  SsoConnectionPipelineDatabase &
+  TopicClusteringDatabase &
   AuthzGrantPipelineDatabase &
   AutomationGraphActivityDatabase &
   AutomationTraceTriggerCatalogueDatabase &
@@ -252,6 +279,7 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   IdentityPipelineDatabase &
   JoinRequestPipelineDatabase &
   LangySessionKeyReapDatabase &
+  WorkerLangyConversationDatabase &
   ScimSyncPipelineDatabase &
   WorkerFeatureFlagDatabase &
   WorkerProjectStorageDatabase &
@@ -274,10 +302,6 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
  * (`createWorkerDurableComposition` asks for no consumers), and the parity
  * guard is what proves the packaged consumer routes all four.
  */
-export type WorkerIdentityCompositionOptions = {
-  ssoConnection: SsoConnectionWorkerCapability;
-};
-
 /**
  * Reports the composition decision an absent GitHub App would otherwise hide.
  *
@@ -290,36 +314,6 @@ export type WorkerIdentityCompositionOptions = {
 export abstract class WorkerGithubAbsenceReportPort {
   abstract withoutAppCredentials(): void;
 }
-
-/** Evaluation's durable processing pipeline, mounted before its dispatchers. */
-export type WorkerEvaluationCompositionOptions = {
-  installer: EvaluationWorkerCapability;
-};
-
-/**
- * The Governance events and Gateway spend pair.
- *
- * They are ONE option rather than two, because the live registry mounts both
- * under a single guard and neither is meaningful alone: the spend pipeline's
- * debit adapter delivers through Governance's commands, and Governance's
- * webhook delivery process has no producer without spend. Splitting them into
- * two optional fields would make "spend without governance" expressible, and
- * that graph silently drops every debit.
- */
-export type WorkerGatewaySpendCompositionOptions = {
-  governance: GovernanceEventsWorkerCapability;
-  spend: GatewaySpendWorkerCapability;
-};
-
-/** The Scenario (simulation run) pipeline and its durable metrics retry. */
-export type WorkerScenarioCompositionOptions = {
-  installer: ScenarioWorkerCapability;
-};
-
-/** Enterprise Governance's pulled-usage and ingestion-pull pipelines. */
-export type WorkerGovernanceIngestionCompositionOptions = {
-  installer: GovernanceIngestionWorkerCapability;
-};
 
 /** Resolved technical inputs for the Worker-owned transport foundation. */
 export type WorkerInfrastructureCompositionOptions = Omit<
@@ -342,23 +336,14 @@ type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
-  topic: WorkerTopicCompositionOptions;
-  /** The process's Prisma client; taken from `topic` when a root omits it. */
-  database?: WorkerDatabaseCompositionOptions;
+  /** The one Prisma client this process opened. */
+  database: WorkerDatabaseCompositionOptions;
   /**
    * Pipeline groups whose features have moved out of the legacy registry.
    * Each stays optional until every group in Wave 4 has landed: the shared
    * `event-sourcing/jobs` queue still belongs to the legacy worker, so an
    * incomplete graph must be composable without pretending to be complete.
    */
-  automation?: WorkerAutomationCompositionOptions;
-  eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
-  langyConversation?: WorkerLangyConversationCompositionOptions;
-  evaluation?: WorkerEvaluationCompositionOptions;
-  gatewaySpend?: WorkerGatewaySpendCompositionOptions;
-  scenario?: WorkerScenarioCompositionOptions;
-  governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
-  identity?: WorkerIdentityCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 };
@@ -400,10 +385,25 @@ export class WorkerProductionComposition {
         })
       : undefined;
     const eventingOptions = createEventingPersistence(options, infrastructure);
+    // The one Redis this process opened, named once.
+    //
+    // A worker that composed its own foundation has it there; one handed an
+    // already-built substrate reads the queue's. They are the same connection
+    // either way, and naming it once is what stops a feature reaching for a
+    // second: two connections would give one process two fold caches, two
+    // dedup keyspaces and two tenant broadcast channels.
+    const processRedis = infrastructure?.redis ?? eventingOptions.groupQueue.redis;
     const mail = tryCreateWorkerMailComposition({
       config: options.config,
       ...(infrastructure ? { aws: infrastructure.aws } : {}),
       ...(options.resources ? { resources: options.resources } : {}),
+    });
+    // One fenced outbound sender for the whole process: an automation's webhook
+    // alert and a webhook endpoint's delivery count against the same ceiling
+    // and answer to the same address policy.
+    const webhookEgress = createWorkerWebhookEgress({
+      config: options.config,
+      redis: eventingOptions.groupQueue.redis,
     });
     WorkerProductionComposition.requireMailForConsumers({
       mail,
@@ -437,7 +437,7 @@ export class WorkerProductionComposition {
     let billingReportingInstaller: BillingReportingWorkerFeatureInstaller | undefined;
     const saasMeter = options.config.deployment.saas
       ? saasBillableEventsMeter({
-          database: options.database ?? options.topic.database,
+          database: options.database,
           redis: eventingOptions.groupQueue.redis,
           resolveClickHouseClient: options.eventing.resolveClickHouseClient,
           getDispatch: () => {
@@ -457,25 +457,19 @@ export class WorkerProductionComposition {
       ...(saasMeter ? { configureGlobalProjections: saasMeter } : {}),
       ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
-    const automation = options.automation
-      ? AutomationWorkerFeatureInstaller.create({
-          installer: options.automation.installer,
-          eventing,
-        })
-      : undefined;
-    const eventingMaintenance = options.eventingMaintenance
-      ? EventingMaintenanceWorkerFeatureInstaller.create({
-          eventing,
-          blobSweep: options.eventingMaintenance.blobSweep,
-          retentionMetrics: options.eventingMaintenance.retentionMetrics,
-        })
-      : undefined;
-    const langyConversation = options.langyConversation
-      ? LangyConversationWorkerFeatureInstaller.create({
-          installer: options.langyConversation.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, like every other substrate sweep below: both halves are
+    // composed from this package over objects this process already holds. The
+    // blob pass needs the queue's OWN Redis — the sweeper walks the keyspace
+    // the Group Queue offloads payloads into, so a second connection to a
+    // different Redis would report an empty sweep rather than fail — and the
+    // metrics adapter is Eventing's own, because this process has no
+    // prom-client registry to lend it and writes the same two series names
+    // over OTLP that the App writes through its registry.
+    const eventingMaintenance = EventingMaintenanceWorkerFeatureInstaller.create({
+      eventing,
+      blobSweep: WorkerGroupQueueBlobSweep.create(eventingOptions.groupQueue.redis),
+      retentionMetrics: OtelProcessRetentionMetricsAdapter.create(),
+    });
     // Unconditional, unlike the groups still owned by the legacy registry: the
     // sweep is composed from this package and the feature's own service, so
     // there is no graph in which it is present but unbuildable. The metrics
@@ -484,7 +478,7 @@ export class WorkerProductionComposition {
     const langyMaintenance = LangyMaintenanceWorkerFeatureInstaller.create({
       eventing,
       sessionKeyReap: PostgresLangySessionKeyReapAdapter.create({
-        database: options.database ?? options.topic.database,
+        database: options.database,
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
       }).build(),
     });
@@ -494,7 +488,7 @@ export class WorkerProductionComposition {
     const apiKey = ApiKeyWorkerFeatureInstaller.create({
       eventing,
       sandboxKeyReap: PostgresAgentSandboxKeyReapAdapter.create({
-        database: options.database ?? options.topic.database,
+        database: options.database,
       }).build(),
     });
     // Stateless derivation over one span or log record: it reads nothing and
@@ -515,21 +509,15 @@ export class WorkerProductionComposition {
     const github = GithubWorkerFeatureInstaller.create({
       eventing,
       branchMaintenance: PostgresGithubBranchMaintenanceAdapter.create({
-        database: options.database ?? options.topic.database,
+        database: options.database,
         config: {
           appId: githubConfig.appId ?? "",
           privateKey: githubConfig.privateKey ?? "",
         },
-        redis: infrastructure?.redis ?? options.topic.redis,
+        redis: processRedis,
         ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
       }).build(),
     });
-    const evaluation = options.evaluation
-      ? EvaluationWorkerFeatureInstaller.create({
-          installer: options.evaluation.installer,
-          eventing,
-        })
-      : undefined;
     // Unconditional, on the same footing as the sweeps above: every dependency
     // is composed from a feature package over substrates this process already
     // holds — the tenant-keyed ClickHouse client the event store resolves
@@ -555,7 +543,7 @@ export class WorkerProductionComposition {
     // fewer than the producer stages, and the queue rejects an unroutable job
     // for redelivery rather than dropping it.
     const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
-      database: options.database ?? options.topic.database,
+      database: options.database,
     }).build();
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
@@ -566,12 +554,12 @@ export class WorkerProductionComposition {
         traceCanonicalisation,
         projectActivity: codingAgentActivity,
         pullRequestMapping: PostgresGithubBranchDemandAdapter.create({
-          database: options.database ?? options.topic.database,
+          database: options.database,
           config: {
             appId: githubConfig.appId ?? "",
             privateKey: githubConfig.privateKey ?? "",
           },
-          redis: infrastructure?.redis ?? options.topic.redis,
+          redis: processRedis,
           ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
           project: codingAgentActivity,
         }).build(),
@@ -580,18 +568,47 @@ export class WorkerProductionComposition {
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
     });
-    const governanceEvents = options.gatewaySpend
-      ? GovernanceEventsWorkerFeatureInstaller.create({
-          installer: options.gatewaySpend.governance,
-          eventing,
-        })
-      : undefined;
-    const gatewaySpend = options.gatewaySpend
-      ? GatewaySpendWorkerFeatureInstaller.create({
-          installer: options.gatewaySpend.spend,
-          eventing,
-        })
-      : undefined;
+    // The Gateway spend spine and the Governance signal log, composed here
+    // rather than received, and composed as ONE pair.
+    //
+    // UNCONDITIONAL, on the same footing as every other pipeline this process
+    // now owns: ten of the shared registry's routing keys are theirs, and a
+    // consumer that claimed `event-sourcing/jobs` without them would leave
+    // every spend command, every budget debit and every webhook delivery
+    // redelivering forever while the pods stayed up.
+    //
+    // The governance installer is built FIRST, because the spend graph's debit
+    // process appends through its two commands and receives them as the
+    // installer's own late-bound proxies. Ordering is enforced again at install
+    // time by `orderedFeatureInstallers`.
+    const gatewayAbsence = WorkerProductionComposition.gatewayAbsence(options);
+    const governanceEventsInstaller = GovernanceEventsWorkerFeatureInstaller.create({
+      installer: { buildProcessing: () => gatewaySpendGraph.governance.buildProcessing() },
+      eventing,
+    });
+    const gatewaySpendGraph = createWorkerGatewaySpend({
+      config: options.config,
+      database: options.database as never,
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      redis: eventingOptions.groupQueue.redis,
+      ...(options.config.eventing.foldCacheTtlSeconds === undefined
+        ? {}
+        : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      processStore: eventing.processStore,
+      egress: webhookEgress,
+      governanceCommands: {
+        recordVkLifecycle: (data) => governanceEventsInstaller.commands.recordVkLifecycle(data),
+        recordBudgetCrossing: (data) =>
+          governanceEventsInstaller.commands.recordBudgetCrossing(data),
+      },
+      ...(gatewayAbsence ? { absence: gatewayAbsence } : {}),
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
+    const governanceEvents = governanceEventsInstaller;
+    const gatewaySpend = GatewaySpendWorkerFeatureInstaller.create({
+      installer: gatewaySpendGraph.spend,
+      eventing,
+    });
     // Unconditional, on the same footing as the sweeps above: both pipelines
     // are composed from their own feature package over the tenant-keyed
     // ClickHouse client this graph already resolves its event store through,
@@ -655,12 +672,6 @@ export class WorkerProductionComposition {
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
     });
-    const scenario = options.scenario
-      ? ScenarioWorkerFeatureInstaller.create({
-          installer: options.scenario.installer,
-          eventing,
-        })
-      : undefined;
     // Unconditional, on the same footing as suite above: the pipeline is
     // composed from its own feature package over the tenant-keyed ClickHouse
     // client this graph already resolves its event store through, so there is
@@ -695,7 +706,7 @@ export class WorkerProductionComposition {
     // twenty-nine of the shared registry's routing keys, and a consumer that
     // claimed `event-sourcing/jobs` without them would leave every kind of
     // trace work redelivering forever while the pods stayed up.
-    const traceDatabase = options.database ?? options.topic.database;
+    const traceDatabase = options.database;
     const traceAbsence = WorkerProductionComposition.traceAbsence(options);
     const objectStorage = createWorkerObjectStorage({
       config: options.config,
@@ -708,14 +719,52 @@ export class WorkerProductionComposition {
       config: options.config,
       redis: eventingOptions.groupQueue.redis,
     });
-    const traceBroadcast = tryCreateWorkerTraceBroadcast({
-      redis: infrastructure?.redis ?? options.topic.redis,
+    // ONE publisher, three producers. Trace, Langy and Scenario all advance
+    // projections a tenant's tabs are watching, and all three publish the same
+    // object onto the same channel — so the process composes the publisher once
+    // and each feature receives it through its own narrow port. Two publishers
+    // over two connections would be two wire formats to keep aligned.
+    const tenantBroadcast = tryCreateWorkerTenantBroadcast({
+      redis: processRedis,
       ...(options.observability ? { logger: options.observability.logger } : {}),
     });
+    const langyAbsence = WorkerProductionComposition.langyAbsence(options);
+    const traceBroadcast = tenantBroadcast
+      ? tryCreateWorkerTraceBroadcast({
+          redis: processRedis,
+          broadcast: tenantBroadcast,
+          ...(options.observability ? { logger: options.observability.logger } : {}),
+        })
+      : undefined;
     if (!traceBroadcast) traceAbsence?.withoutBroadcast();
     if (options.config.infrastructure.storage.backend === "azure") {
       traceAbsence?.withoutDatasetStorage();
     }
+    // Langy's conversation pipeline, composed here rather than received.
+    //
+    // UNCONDITIONAL, on the same footing as trace processing: the pipeline owns
+    // twenty-four of the shared registry's routing keys, its two operational
+    // folds are Postgres, and there is no deployment in which those keys are
+    // meaningless. What varies is whether this process can reach an agent
+    // manager, generate a title or mint a recovery session key, and each of
+    // those is reported by name rather than inferred from work that never
+    // completes.
+    const langyConversation = LangyConversationWorkerFeatureInstaller.create({
+      installer: createWorkerLangyConversation({
+        config: options.config,
+        database: traceDatabase,
+        redis: eventingOptions.groupQueue.redis,
+        resolveClickHouseClient: options.eventing
+          .resolveClickHouseClient as unknown as Parameters<
+          typeof createWorkerLangyConversation
+        >[0]["resolveClickHouseClient"],
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        ...(tenantBroadcast ? { broadcast: tenantBroadcast } : {}),
+        ...(langyAbsence ? { absence: langyAbsence } : {}),
+        ...(options.observability ? { logger: options.observability.logger } : {}),
+      }),
+      eventing,
+    });
     const trackedEvents = createWorkerTrackedEvents({
       redis: eventingOptions.groupQueue.redis,
       ...(options.observability ? { logger: options.observability.logger } : {}),
@@ -728,34 +777,170 @@ export class WorkerProductionComposition {
         ? {}
         : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
     });
+    // The simulation-run pipeline, composed here rather than received.
+    //
+    // It is built AFTER the trace projection stores because its metrics command
+    // reads the trace summary fold this process already composes — one store,
+    // one cache prefix, one applied-event-id set. Install ORDER is unchanged
+    // and still lives in `orderedFeatureInstallers`: Suite registers before
+    // Scenario because the simulation process reports item starts and
+    // completions into a suite run.
+    const scenarioAbsence = WorkerProductionComposition.scenarioAbsence(options);
+    const scenario = ScenarioWorkerFeatureInstaller.create({
+      installer: createWorkerScenarioProcessing({
+        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        redis: eventingOptions.groupQueue.redis,
+        ...(options.config.eventing.foldCacheTtlSeconds === undefined
+          ? {}
+          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+        traceSummaryStore: traceStores.traceSummaryStore,
+        eventStore: eventing.eventStore,
+        ...(tenantBroadcast ? { broadcast: tenantBroadcast } : {}),
+        suiteRuns: {
+          recordSuiteRunItemStarted: (data) => suite.commands.recordSuiteRunItemStarted(data),
+          completeSuiteRunItem: (data) => suite.commands.completeSuiteRunItem(data),
+        },
+        ...(scenarioAbsence ? { absence: scenarioAbsence } : {}),
+      }),
+      eventing,
+    });
+    // Automation's two halves, sharing one set of transports and one set of
+    // ceilings. Absent exactly when this deployment named no `BASE_HOST`: every
+    // alert and every digest carries links back to the deployment and a sender
+    // address derived from the same host, so a vertical composed without one
+    // would decide correctly and then send mail nobody can act on.
+    const automationDelivery = tryCreateWorkerAutomationDelivery({
+      config: options.config,
+      mail,
+      webhookTransport: createWorkerWebhookTransport({
+        config: options.config,
+        egress: webhookEgress,
+        redis: eventingOptions.groupQueue.redis,
+      }),
+      redis: processRedis,
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
     // The graph-alert vertical `subscriber:graphTriggerActivity` re-evaluates
-    // through. Absent exactly when this deployment named no `BASE_HOST`: every
-    // alert it sends carries links back to the deployment and a sender address
-    // derived from the same host, so a vertical composed without one would
-    // evaluate correctly and then send mail nobody can act on.
-    const graphActivity = mail
-      ? tryCreateWorkerAutomationGraphComposition({
-          config: options.config,
-          prisma: traceDatabase,
-          mail,
-          dependencies: {
-            projects: traceServices.projects,
-            analytics: createWorkerAnalytics({
-              // The deployment's real ClickHouse client, which `@langwatch/eventing`
-              // narrows to the two methods its event store uses and Analytics has
-              // not been narrowed to. The composition root is the one place that
-              // holds both shapes of the same object.
-              resolveClickHouseClient: options.eventing
-                .resolveClickHouseClient as unknown as Parameters<
-                typeof createWorkerAnalytics
-              >[0]["resolveClickHouseClient"],
-              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-            }),
-          },
-          redis: infrastructure?.redis ?? options.topic.redis,
-          ...(options.observability ? { logger: options.observability.logger } : {}),
-        })
-      : undefined;
+    // through.
+    const graphActivity =
+      mail && automationDelivery
+        ? tryCreateWorkerAutomationGraphComposition({
+            config: options.config,
+            delivery: automationDelivery,
+            prisma: traceDatabase,
+            mail,
+            dependencies: {
+              projects: traceServices.projects,
+              analytics: createWorkerAnalytics({
+                // The deployment's real ClickHouse client, which `@langwatch/eventing`
+                // narrows to the two methods its event store uses and Analytics has
+                // not been narrowed to. The composition root is the one place that
+                // holds both shapes of the same object.
+                resolveClickHouseClient: options.eventing
+                  .resolveClickHouseClient as unknown as Parameters<
+                  typeof createWorkerAnalytics
+                >[0]["resolveClickHouseClient"],
+                defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+              }),
+            },
+            redis: processRedis,
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          })
+        : undefined;
+    // Automation's settlement half, composed here rather than received.
+    //
+    // UNCONDITIONAL, and it installs FIRST: `command:recordTriggerMatch` is the
+    // durable write every trigger match from trace, evaluation and governance
+    // lands in, and `subscriber:pm:triggerSettlement` is what turns those
+    // matches into one notification per window. A consumer that claimed
+    // `event-sourcing/jobs` without the pair would leave every match
+    // redelivering forever.
+    //
+    // Its other two process managers — the 30-second graph-alert sweep and the
+    // webhook delivery-log prune — register NO routing key, because a
+    // schedule-only definition declares no event types. They still wake here,
+    // so their collaborators are composed rather than refused.
+    // ONE trace reader for both halves of this process's Automation work.
+    // The settlement digest and Evaluation's alert subscriber ask it the same
+    // two questions — a trace's summary and whether a saved filter reads
+    // evaluations — and two readers would give one process two answers to the
+    // second, which is what decides whether an alert fires at all.
+    const settlementTraceReader = WorkerAutomationSettlementTraceReader.create({
+      traceSummaryStore: traceStores.traceSummaryStore,
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
+        typeof WorkerAutomationSettlementTraceReader.create
+      >[0]["resolveClickHouseClient"],
+    });
+    const automationClock = new WorkerAutomationClock();
+    const automationAbsence = WorkerProductionComposition.automationAbsence(options);
+    const automation = AutomationWorkerFeatureInstaller.create({
+      installer: createWorkerAutomationSettlement({
+        config: options.config,
+        prisma: traceDatabase,
+        clock: automationClock,
+        ...(mail && automationDelivery
+          ? { notifications: { ...automationDelivery, baseHost: mail.baseHost } }
+          : {}),
+        projects: traceServices.projects,
+        traces: settlementTraceReader,
+        evaluations: WorkerAutomationSettlementEvaluationReader.create({
+          resolveClickHouse: options.eventing.resolveClickHouseClient as unknown as Parameters<
+            typeof WorkerAutomationSettlementEvaluationReader.create
+          >[0]["resolveClickHouse"],
+          defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        }),
+        heartbeat: WorkerAutomationHeartbeat.create(
+          options.eventing.resolveClickHouseClient as unknown as Parameters<
+            typeof WorkerAutomationHeartbeat.create
+          >[0],
+        ),
+        ...(graphActivity ? { graphActivity } : {}),
+        redis: eventingOptions.groupQueue.redis,
+        ...(automationAbsence ? { absence: automationAbsence } : {}),
+        ...(options.observability ? { logger: options.observability.logger } : {}),
+      }),
+      eventing,
+    });
+    // Evaluation's durable pipeline, composed here rather than received.
+    //
+    // It is built AFTER Automation and BEFORE the trace producer check because
+    // its two terminal subscribers dispatch through Automation's own recorder
+    // and re-evaluate through the graph vertical composed above, while Trace's
+    // evaluation trigger dispatches into the commands this installer produces.
+    // Installation order is the registry's and is unchanged: Evaluation still
+    // installs before Trace, Metric and Log.
+    const evaluationTriggerCatalogue = PostgresAutomationTraceTriggerCatalogueAdapter.create({
+      prisma: traceDatabase,
+      clock: automationClock,
+    });
+    const evaluation = EvaluationWorkerFeatureInstaller.create({
+      installer: createWorkerEvaluationProcessing({
+        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        analytics: createWorkerAnalytics({
+          resolveClickHouseClient: options.eventing
+            .resolveClickHouseClient as unknown as Parameters<
+            typeof createWorkerAnalytics
+          >[0]["resolveClickHouseClient"],
+          defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        }),
+        traces: settlementTraceReader,
+        automation: {
+          triggers: evaluationTriggerCatalogue,
+          graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
+          triggerMatches: automation.triggerMatches,
+        },
+        redis: eventingOptions.groupQueue.redis,
+        ...(options.config.eventing.foldCacheTtlSeconds === undefined
+          ? {}
+          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+        ...(WorkerProductionComposition.evaluationAbsence(options)
+          ? { absence: WorkerProductionComposition.evaluationAbsence(options)! }
+          : {}),
+      }),
+      eventing,
+    });
     const experimentIdLookup = ExperimentEventingAdapter.createIdLookup({
       resolveClient: options.eventing.resolveClickHouseClient,
       clickhouseEnabled: true,
@@ -834,24 +1019,62 @@ export class WorkerProductionComposition {
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
     trackedEvents.connect(trace.commands.recordSpan);
+    // Topic's runtime, composed here rather than received. Its execution
+    // ports are this process's own — the tenant-keyed ClickHouse client the
+    // event store already resolves through, a direct langevals POST, and an
+    // OTLP metrics adapter that writes the same two series the App writes —
+    // and its one absence is reported by name at boot.
+    const topicRuntime = createWorkerTopicRuntime({
+      config: options.config,
+      database: options.database,
+      redis: processRedis,
+      resolveClickHouseClient: options.eventing
+        .resolveClickHouseClient as unknown as Parameters<
+        typeof createWorkerTopicRuntime
+      >[0]["resolveClickHouseClient"],
+      ...(WorkerProductionComposition.topicAbsence(options)
+        ? { absence: WorkerProductionComposition.topicAbsence(options)! }
+        : {}),
+    });
     const topicServer = TopicServerInstaller.create({
-      database: options.topic.database,
+      database: topicRuntime.database,
       processStore: eventing.processStore,
-      redis: infrastructure?.redis ?? options.topic.redis,
-      execution: options.topic.execution,
-      metrics: options.topic.metrics,
+      redis: topicRuntime.redis,
+      execution: topicRuntime.execution,
+      metrics: topicRuntime.metrics,
     });
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,
       traceAssignments: trace.traceAssignments,
     });
-    const governanceIngestion = options.governanceIngestion
-      ? GovernanceIngestionWorkerFeatureInstaller.create({
-          installer: options.governanceIngestion.installer,
-          eventing,
-        })
-      : undefined;
+    // UNCONDITIONAL, like the two pipelines around it. `pulled_usage_processing`
+    // and `ingestion_pull_processing` carry eight routing keys between them in
+    // the checked-in `job-registry.json`, and the queue rejects an unroutable
+    // job for redelivery rather than dropping it — so a graph that mounted the
+    // rest and left these out would stall every configured customer's usage
+    // pull forever with the pods up and the queue depth simply growing.
+    //
+    // Every collaborator is one this process already holds: its Prisma client,
+    // its tenant-keyed ClickHouse resolver, its AWS client runtime, its
+    // feature-flag store and the one cipher both halves of Automation already
+    // read the App's stored secrets with.
+    const governanceIngestion = GovernanceIngestionWorkerFeatureInstaller.create({
+      installer: createWorkerGovernanceIngestion({
+        config: options.config,
+        database: options.database,
+        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+        projects: PostgresGovernanceInternalProjectAdapter.create({
+          database: options.database as never,
+          teams: PrismaGovernanceOldestTeamAdapter.create(options.database),
+        }).build(),
+        featureFlags: traceFeatureFlags,
+        aws: objectStorage.aws,
+        encryption: resolveWorkerStoredSecretCipher(options.config),
+        ...(options.observability ? { logger: options.observability.logger } : {}),
+      }),
+      eventing,
+    });
     // Unconditional, exactly as the legacy registry registers it, and for the
     // same reason the sweeps above are: every dependency is composed from this
     // package over substrates this process already holds. The roll-up is a
@@ -876,7 +1099,7 @@ export class WorkerProductionComposition {
     // already makes — while a self-hosted process composes none at all, which
     // is what `usageReportingService` is on the App side of the same install.
     const billingReportingPersistence = PostgresBillingReportingAdapter.create({
-      database: options.database ?? options.topic.database,
+      database: options.database,
     }).build();
     const billableEvents = BillableEventsQueryService.create(
       ClickHouseBillingAdapter.create({
@@ -913,7 +1136,7 @@ export class WorkerProductionComposition {
     const authz = AuthzWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresAuthzPipelineAdapter.create({
-          database: options.database ?? options.topic.database,
+          database: options.database,
         }).build(),
       },
       eventing,
@@ -930,7 +1153,7 @@ export class WorkerProductionComposition {
     const identity = IdentityWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresIdentityPipelineAdapter.create({
-          database: options.database ?? options.topic.database,
+          database: options.database,
         }).build(),
       },
       eventing,
@@ -941,17 +1164,34 @@ export class WorkerProductionComposition {
     const scimSync = ScimSyncWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresScimSyncPipelineAdapter.create({
-          database: options.database ?? options.topic.database,
+          database: options.database,
         }).build(),
       },
       eventing,
     });
-    const ssoConnection = options.identity
-      ? SsoConnectionWorkerFeatureInstaller.create({
-          installer: options.identity.ssoConnection,
-          eventing,
-        })
-      : undefined;
+    // UNCONDITIONAL now, like the three ledgers around it. `sso-connections`
+    // names fourteen commands, a state projection and the teardown grace
+    // subscriber in the checked-in `job-registry.json`, and this is the ONLY
+    // graph that can advance TEARDOWN_PENDING to TORN_DOWN — so a process that
+    // claimed the queue without it would leave every requested teardown
+    // pending forever with the pods up and the probe answering.
+    //
+    // What is absent is the DIRECTORY half, by name: a torn-down connection's
+    // SCIM tokens are not deleted here, because this process composes no
+    // directory capability. They stop verifying regardless — every SCIM
+    // request checks the connection this fold has just moved to TORN_DOWN —
+    // so what is lost is the row cleanup, not the security property.
+    WorkerProductionComposition.identityAbsence(options)?.withoutDirectoryTokenRevocation();
+    const ssoConnection = SsoConnectionWorkerFeatureInstaller.create({
+      installer: {
+        pipeline: PostgresSsoConnectionPipelineAdapter.create({
+          database: options.database,
+          eventSourcing: eventing.eventSourcing,
+          adminEmails: options.config.deployment.adminEmails,
+        }).build(),
+      },
+      eventing,
+    });
     // Composed here, on the mail capability this process now owns. Everything
     // else the join ledger takes is Postgres: the `JoinRequest` head serving
     // both the fold and its guards, and the audience its two notices are
@@ -975,7 +1215,7 @@ export class WorkerProductionComposition {
     const joinRequest = JoinRequestWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresJoinRequestPipelineAdapter.create({
-          database: options.database ?? options.topic.database,
+          database: options.database,
           eventSourcing: eventing.eventSourcing,
           mail: mail
             ? JoinRequestMailAdapter.create({
@@ -1138,6 +1378,69 @@ export class WorkerProductionComposition {
   ): WorkerTraceAbsenceReportPort | undefined {
     return options.observability
       ? LoggedWorkerTraceAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place the spend graph's absences are declared. */
+  private static gatewayAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerGatewaySpendAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerGatewaySpendAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Scenario's execution absence is declared. */
+  private static scenarioAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerScenarioAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerScenarioAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Automation settlement's absences are declared. */
+  private static automationAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerAutomationSettlementAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerAutomationSettlementAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Langy's three absences are declared. */
+  private static langyAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerLangyAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerLangyAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Identity's one absence is declared. */
+  private static identityAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerIdentityAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerIdentityAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Topic's one absence is declared. */
+  private static topicAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerTopicAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerTopicAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place Evaluation's one absence is declared. */
+  private static evaluationAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerEvaluationAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerEvaluationAbsence.create(options.observability.logger)
       : undefined;
   }
 
@@ -1425,6 +1728,61 @@ class WorkerProductionLifecycle extends WorkerLifecyclePort {
   }
 }
 
+/**
+ * The Group Queue's own blob keyspace pass.
+ *
+ * The sweeper is handed the queue's Redis rather than a connection of this
+ * composition's own: the keys it walks are written by the queue when it
+ * offloads a payload, so a sweeper pointed anywhere else reports a clean
+ * empty sweep forever while the real keyspace grows. Reclaim destroys bytes,
+ * which is why the connection has to be the same one that wrote them.
+ */
+class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
+  static create(redis: EventingServerRuntimeOptions["groupQueue"]["redis"]): WorkerGroupQueueBlobSweep {
+    return new WorkerGroupQueueBlobSweep(new BlobSweeper({ redis }));
+  }
+
+  private constructor(private readonly sweeper: BlobSweeper) {
+    super();
+  }
+
+  sweep(): Promise<BlobSweepReport> {
+    return this.sweeper.sweep();
+  }
+}
+
+/**
+ * The one organization read the internal governance project mint makes.
+ *
+ * The oldest team is where an organization's internal project is created, and
+ * `OrganizationService` answers it by exactly this query — a `findFirst`
+ * ordered by creation. Composing the whole capability to reach it would name a
+ * members graph, an invite flow and a billing profile this path never touches.
+ */
+class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeamPort {
+  static create(database: { team: { findFirst: (args: never) => Promise<unknown> } }) {
+    return new PrismaGovernanceOldestTeamAdapter(database);
+  }
+
+  private constructor(
+    private readonly database: { team: { findFirst: (args: never) => Promise<unknown> } },
+  ) {
+    super();
+  }
+
+  async getOldestTeamId({ organizationId }: { organizationId: string }): Promise<string> {
+    const team = (await this.database.team.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    } as never)) as { id: string } | null;
+    if (!team) {
+      throw new Error(`Organization ${organizationId} has no team to hold its internal project.`);
+    }
+    return team.id;
+  }
+}
+
 function createEventingPersistence(
   options: WorkerProductionCompositionOptions,
   infrastructure: WorkerInfrastructureAdapter | undefined,
@@ -1498,6 +1856,154 @@ function withoutConsumers<Options extends WorkerEventingConsumerCompositionOptio
   return persistence;
 }
 
+/** Names the spend graph's four absences once, at boot, rather than leaving them inferred. */
+export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerGatewaySpendAbsence {
+    return new LoggedWorkerGatewaySpendAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutSpendSettlement(): void {
+    this.logger.warn(
+      "worker composed the gateway spend pipeline without a settlement sweeper: it needs every configured ClickHouse instance and this process holds a tenant-keyed resolver, so a request whose confirmation never arrives stays admitted rather than being settled as cost-unknown",
+    );
+  }
+
+  withoutSqsWebhookDestinations(): void {
+    this.logger.warn(
+      "worker composed webhook delivery without a queue transport: an endpoint that delivers to SQS is refused by name rather than retried, so its events never arrive",
+    );
+  }
+
+  withoutWebhookEntitlements(): void {
+    this.logger.warn(
+      "worker composed webhook delivery without an entitlement graph: a delivery cannot read its organization's plan, so the batch is refused rather than delivered to an organization that may not have bought the feature",
+    );
+  }
+
+  withoutEndpointSecretKey(): void {
+    this.logger.warn(
+      "worker composed webhook delivery without a credentials key: an endpoint whose secrets this deployment encrypted cannot be read, so no signature is produced for it",
+    );
+  }
+}
+
+/** Names the missing execution pool once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerScenarioAbsence extends WorkerScenarioAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerScenarioAbsence {
+    return new LoggedWorkerScenarioAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutExecutionPool(): void {
+    this.logger.warn(
+      "worker composed the simulation pipeline without an execution pool: a queued run is refused into the outbox rather than started, and the stall wake finishes it as an error if no process ever executes it",
+    );
+  }
+}
+
+/** Names Langy's three conversation absences once, at boot, rather than leaving them inferred. */
+/**
+ * Automation settlement's seven absences, said once at boot.
+ *
+ * They are one class rather than seven checks scattered through the graph
+ * because they answer one question a reader has exactly once — what can this
+ * process NOT do about a match it settles — and because a settlement half that
+ * quietly did most of the job would look identical from outside to one that did
+ * all of it.
+ */
+export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSettlementAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerAutomationSettlementAbsence {
+    return new LoggedWorkerAutomationSettlementAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutLegacyFilterMatching(): void {
+    this.logger.warn(
+      "worker composed automation settlement without the legacy filter matcher: an automation still carrying the pre-query filters map is refused by name at confirmation, and one carrying a filter query confirms normally",
+    );
+  }
+
+  withoutTraceRecordRead(): void {
+    this.logger.warn(
+      "worker composed automation settlement without the full trace read: a digest entry whose summary fold has not landed is refused rather than filled in from the trace record",
+    );
+  }
+
+  withoutDatasetPersist(): void {
+    this.logger.warn(
+      "worker composed automation settlement without the dataset row mapping: an ADD_TO_DATASET automation is refused by name rather than writing rows whose columns disagree with the mapping the customer previewed",
+    );
+  }
+
+  withoutAnnotationQueuePersist(): void {
+    this.logger.warn(
+      "worker composed automation settlement without an annotation queue writer: an ADD_TO_ANNOTATION_QUEUE automation is refused by name",
+    );
+  }
+
+  withoutRunawayContainment(): void {
+    this.logger.warn(
+      "worker composed automation settlement without runaway containment: an automation past its daily ceiling still skips and still logs the breach, but nobody is notified and a misconfigured automation is not paused",
+    );
+  }
+
+  withoutPlanResolvedPersistCap(): void {
+    this.logger.warn(
+      "worker composed automation settlement without an entitlement provider: the daily persist ceiling is the paid tier for every project rather than the one its plan grants",
+    );
+  }
+
+  withoutGraphAlertEvaluation(): void {
+    this.logger.warn(
+      "worker composed automation settlement without the graph-alert vertical: the 30-second sweep still runs and its candidates are refused by name rather than evaluated",
+    );
+  }
+
+  withoutNotificationDelivery(): void {
+    this.logger.warn(
+      "worker composed automation settlement without outbound delivery: BASE_HOST is unset, so matches settle and claim but the digest that would carry links back to the deployment is refused by name",
+    );
+  }
+}
+
+export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerLangyAbsence {
+    return new LoggedWorkerLangyAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutAgentManager(): void {
+    this.logger.warn(
+      "worker composed the langy conversation pipeline without an agent manager: OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET are unset, so every dispatched turn is answered unavailable and fails rather than running",
+    );
+  }
+
+  withoutTitleGeneration(): void {
+    this.logger.warn(
+      "worker composed the langy conversation pipeline without model resolution: conversations keep the title they were given and none is generated from the transcript",
+    );
+  }
+
+  withoutSessionKeyMint(): void {
+    this.logger.warn(
+      "worker composed the langy conversation pipeline without an authorization graph: a turn whose agent manager asks for credentials cannot be recovered and fails instead",
+    );
+  }
+}
+
 /** Names the missing GitHub App once, at boot, rather than leaving it inferred. */
 export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerGithubAbsence {
@@ -1512,6 +2018,95 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
     this.logger.warn(
       { reason: "no-github-app-credentials" },
       "worker composed GitHub branch maintenance without App credentials: pull-request linkage is not re-checked, and only its retention half runs",
+    );
+  }
+}
+
+/**
+ * Reports the composition decision an absent directory capability would
+ * otherwise hide.
+ *
+ * The connection pipeline mounts either way, so all sixteen of its routing
+ * keys are claimed and a requested teardown completes on time.
+ */
+export abstract class WorkerIdentityAbsenceReportPort {
+  abstract withoutDirectoryTokenRevocation(): void;
+}
+
+/** Names Identity's one absence once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerIdentityAbsence extends WorkerIdentityAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerIdentityAbsence {
+    return new LoggedWorkerIdentityAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutDirectoryTokenRevocation(): void {
+    this.logger.warn(
+      { reason: "no-directory-capability" },
+      "worker composed the SSO connection ledger without a directory capability: a torn-down connection completes on time and its SCIM token rows are left in place, where they fail verification against the connection's torn-down state",
+    );
+  }
+}
+
+/** Names Topic's one absence once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerTopicAbsence {
+    return new LoggedWorkerTopicAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutClusteringModels(): void {
+    this.logger.warn(
+      { reason: "no-model-provider-cascade" },
+      "worker composed topic clustering without a model resolver: the schedule, its commands and its projections are live, and every clustering page refuses by name rather than naming a customer's topics with a provider they did not choose",
+    );
+  }
+}
+
+/** Names Evaluation's one absence once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerEvaluationAbsence {
+    return new LoggedWorkerEvaluationAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutEvaluatorExecution(): void {
+    this.logger.warn(
+      { reason: "no-online-evaluation-executor" },
+      "worker composed the evaluation pipeline without an evaluator executor: evaluations reported by a customer are folded, rolled up and alerted on, and evaluations LangWatch would run itself refuse by name",
+    );
+  }
+}
+
+/**
+ * No graph vertical, so Evaluation's graph-alert subscriber has nothing to
+ * re-evaluate against.
+ *
+ * Reached only where `BASE_HOST` is unset, which is the same condition that
+ * already refuses every outbound delivery: a graph alert that fired here could
+ * not be sent anywhere. Listing no triggers is the honest answer — the sweep
+ * finds nothing to evaluate — and the evaluation itself refuses by name rather
+ * than reporting a result nobody asked it to compute.
+ */
+class AbsentEvaluationGraphActivity extends AutomationGraphActivityPort {
+  async getActiveGraphTriggersForProject(): Promise<[]> {
+    return [];
+  }
+
+  evaluateGraphTrigger(input: { triggerId: string }): Promise<never> {
+    return Promise.reject(
+      new Error(
+        `This process cannot evaluate graph automation ${input.triggerId}: it composed no outbound delivery, so no alert it raised could be sent.`,
+      ),
     );
   }
 }

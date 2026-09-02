@@ -6,6 +6,7 @@ export {
   LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter";
+export type { LangyDatabase } from "./repositories/prisma/langy-database.port";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
@@ -117,6 +118,11 @@ export {
   LangyAnalyticsEventStorageAdapter,
   NullLangyAnalyticsEventSinkAdapter,
 } from "./adapters/langy-analytics-event-storage.adapter";
+export {
+  ClickHouseLangyAnalyticsEventAdapter,
+  type LangyAnalyticsClickHouseClientResolver,
+  type LangyAnalyticsClickHouseWriteClient,
+} from "./adapters/clickhouse.langy-analytics-event.adapter";
 export { LangyAnalyticsEventSinkPort } from "./ports/langy-analytics-event-sink.port";
 export type { LangyAnalyticsEventRecord } from "./ports/langy-analytics-event-sink.port";
 export type { LangyEffectPorts } from "./ports/langy-effect.port";
@@ -137,6 +143,7 @@ export type {
   LangyConversationFreshnessRecord,
   LangyConversationLivenessReader,
   LangyConversationLivenessRecord,
+  LangyBroadcastPort,
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommandPort,
 } from "./subscribers/langy-conversation.subscriber";

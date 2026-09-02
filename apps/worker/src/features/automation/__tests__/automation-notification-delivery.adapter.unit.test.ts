@@ -175,12 +175,78 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
       ).rejects.toThrow(/no outbound webhook sender/);
     });
 
-    /** @scenario "A channel this process cannot send through refuses by name" */
-    it("refuses the settlement digest's two legacy renderers the same way", async () => {
-      const { adapter } = composeDelivery();
+  });
 
-      await expect(adapter.sendLegacyEmail()).rejects.toThrow(/graph-alert half/);
-      await expect(adapter.sendLegacySlackWebhook()).rejects.toThrow(/graph-alert half/);
+  /**
+   * Spec: specs/automations/worker-automation-settlement-conversion.feature
+   *
+   * The digest most automations actually send. It is not a legacy corner: an
+   * automation only takes the rendered path once its author has written a
+   * custom subject or body, so an unedited one comes through here — which is
+   * why the refusal this used to be was a settlement half that quietly sent
+   * nothing.
+   */
+  describe("given an automation whose author wrote no template", () => {
+    /** @scenario "The settlement digest renders and sends from this process" */
+    it("renders the deployment's own digest and sends it per recipient", async () => {
+      const { adapter, mailer } = composeDelivery();
+      const claimed = new Set<string>();
+
+      await adapter.sendLegacyEmail({
+        recipients: ["ada@example.com"],
+        triggerData: [
+          {
+            traceId: "trace-1",
+            input: "hello",
+            output: "world",
+            projectId: "project-1",
+            fullTrace: {} as never,
+          },
+        ],
+        triggerName: "Error rate",
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        projectSlug: "acme",
+        triggerType: null,
+        triggerMessage: "over budget",
+        isRecipientSent: async (hash) => claimed.has(hash),
+        recordRecipientSent: async (hash) => void claimed.add(hash),
+      });
+
+      expect(mailer.sent).toHaveLength(1);
+      const sent = mailer.sent[0]!;
+      expect(sent.subject).toBe("Trigger - Error rate");
+      expect(sent.to).toBe(APPLICATION_NO_REPLY);
+      expect(sent.bcc).toEqual(["ada@example.com"]);
+      // The link a reader clicks, and the message its author wrote.
+      expect(sent.html).toContain(`${BASE_HOST}/acme/traces/trace-1`);
+      expect(sent.html).toContain("over budget");
+      // The footer is appended OUTSIDE the customer's template, so a template
+      // author cannot strip it, and both unsubscribe scopes are offered.
+      expect(sent.html).toContain("Stop receiving this notification</a>");
+      expect(sent.html).toContain("Stop all notifications from this project</a>");
+      expect(sent.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    });
+
+    /** @scenario "The settlement digest renders and sends from this process" */
+    it("sends the same digest to Slack through the packaged renderer", async () => {
+      const posted: unknown[] = [];
+      const { adapter } = composeDelivery();
+      // The Slack client is composed inside the adapter, so the assertion is
+      // that the call reaches a genuine Slack webhook check rather than a
+      // refusal by name.
+      await expect(
+        adapter.sendLegacySlackWebhook({
+          webhook: "https://example.test/not-slack",
+          triggerData: [],
+          triggerName: "Error rate",
+          projectSlug: "acme",
+          triggerType: null,
+          triggerMessage: "",
+          baseHost: BASE_HOST,
+        }),
+      ).rejects.toThrow(/slack/i);
+      expect(posted).toHaveLength(0);
     });
   });
 

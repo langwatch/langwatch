@@ -34,7 +34,8 @@ import type {
 import type { EventSourcing } from "@langwatch/eventing";
 import { mapCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
+import { PROJECT_KIND } from "@langwatch/project-contract";
+import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 
 const logger = createLogger("langwatch:enterprise:governance-eventing");
 
@@ -195,14 +196,14 @@ export class AppIngestionPullExecutionRuntime {
 export class AppIngestionPullLifecycleRuntime {
   private constructor(
     readonly database: IngestionPullLifecycleDatabase,
-    readonly projects: ProjectService,
+    readonly projects: GovernanceInternalProjectPort,
     readonly schedule: GovernanceIngestionPullSchedulePort,
     readonly runsWorkers: boolean,
   ) {}
 
   static create(
     database: IngestionPullLifecycleDatabase,
-    projects: ProjectService,
+    projects: GovernanceInternalProjectPort,
     schedule: GovernanceIngestionPullSchedulePort,
     runsWorkers: boolean,
   ): AppIngestionPullLifecycleRuntime {
@@ -325,11 +326,11 @@ class UtcIngestionPullSchedulePort extends IngestionPullSchedulePort {
 }
 
 class AppIngestionPullTenantPort extends IngestionPullTenantPort {
-  private constructor(private readonly projects: ProjectService) {
+  private constructor(private readonly projects: GovernanceInternalProjectPort) {
     super();
   }
 
-  static create(projects: ProjectService): AppIngestionPullTenantPort {
+  static create(projects: GovernanceInternalProjectPort): AppIngestionPullTenantPort {
     return new AppIngestionPullTenantPort(projects);
   }
 

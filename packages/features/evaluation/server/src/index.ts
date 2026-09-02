@@ -2,10 +2,22 @@ export {
   EvaluationAdapter,
   type EvaluationAdapterOptions,
 } from "./adapters/evaluation.clickhouse.adapter";
+/**
+ * The `evaluation_runs` repository, for a process that needs one read and not
+ * the service around it.
+ *
+ * Automation settlement re-checks a matched trace against its evaluation runs;
+ * that is one ClickHouse read, and reaching it through `EvaluationAdapter`
+ * would make the caller synthesise an executor and a whole workflow capability
+ * it never touches. Exported so the read is reused rather than written twice.
+ */
+export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository";
 export {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,
 } from "./adapters/evaluation.eventing.adapter";
+export { EvaluationRunProjectionPort } from "./ports/evaluation-run-projection.port";
+export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service";
 export {
   EvaluationExecutionPort,
   EvaluationExecutionIntentPort,

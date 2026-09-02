@@ -1,10 +1,27 @@
-import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import {
+  Deferred,
+  type CommandDispatcher,
+  type Event,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { scenarioDeferredComputeRunMetricsJob } from "@langwatch/scenario-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+/**
+ * A registrable Eventing definition, left open in its own event union.
+ *
+ * `prepareEventForProjection` is contravariant in the event type, so a
+ * definition pinned to the base `Event` refuses the very definition a feature
+ * publishes over its own discriminated union.
+ */
+type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
+  TEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
 
 /**
  * The scenario package's own description of its delayed metrics retry.
@@ -25,8 +42,9 @@ export interface ScenarioDeferredMetricsJobSpec<
 /** Scenario's worker-facing capability after its server graph is composed. */
 export interface ScenarioWorkerCapability<
   TComputeRunMetrics extends Record<string, unknown> = Record<string, unknown>,
+  TEvent extends Event = Event,
 > {
-  buildProcessing(): WorkerPipelineDefinition;
+  buildProcessing(): WorkerPipelineDefinition<TEvent>;
   /**
    * Resolves the two dispatchers the definition was built against: the
    * self-referencing `computeRunMetrics` its own suite sync re-enters, and the
@@ -37,6 +55,14 @@ export interface ScenarioWorkerCapability<
   connect(bindings: {
     computeRunMetrics: CommandDispatcher<TComputeRunMetrics>;
     scheduleComputeRunMetricsRetry: (payload: TComputeRunMetrics) => Promise<void>;
+    /**
+     * Every command this registration produced, by name.
+     *
+     * The run-execution process manager's `finish` intent appends `finishRun`
+     * back into the pipeline it is mounted on, so the whole map is handed over
+     * rather than a second named binding per command the process may reach.
+     */
+    commands: Record<string, CommandDispatcher<unknown>>;
   }): void;
 }
 
@@ -62,11 +88,14 @@ export interface ScenarioWorkerCapability<
  * key both consumers stage.
  */
 export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
-  static create(options: {
-    installer: ScenarioWorkerCapability;
+  static create<TComputeRunMetrics extends Record<string, unknown>, TEvent extends Event>(options: {
+    installer: ScenarioWorkerCapability<TComputeRunMetrics, TEvent>;
     eventing: WorkerEventingRuntime;
   }): ScenarioWorkerFeatureInstaller {
-    return new ScenarioWorkerFeatureInstaller(options.installer, options.eventing);
+    return new ScenarioWorkerFeatureInstaller(
+      options.installer as unknown as ScenarioWorkerCapability,
+      options.eventing,
+    );
   }
 
   readonly name = "scenario";
@@ -131,6 +160,12 @@ export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       this.installer.connect({
         computeRunMetrics: dispatch,
         scheduleComputeRunMetricsRetry: (payload) => retryQueue.send(payload),
+        commands: Object.fromEntries(
+          Object.entries(commands).map(([name, command]) => [
+            name,
+            (data: unknown) => command.send(data as Record<string, unknown>),
+          ]),
+        ),
       });
       this.installed = true;
     }

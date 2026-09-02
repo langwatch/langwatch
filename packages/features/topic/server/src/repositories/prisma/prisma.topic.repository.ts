@@ -29,7 +29,19 @@ const projectionSchema = z.object({
 
 const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
-export type TopicDatabase = PrismaClient;
+/**
+ * The Prisma capability Topic's read repository consumes.
+ *
+ * A `Pick` rather than the whole client, so a composition root can hand this
+ * package the process's one client without every consumer of the type having
+ * to BE a `PrismaClient` — the client still is one, and the narrowing is what
+ * lets a background process name its database once and pass it to every
+ * feature.
+ */
+export type TopicDatabase = Pick<
+  PrismaClient,
+  "topic" | "topicClusteringRunProjection" | "topicClusteringRunHistoryProjection"
+>;
 
 export class PrismaTopicRepository extends TopicRepository {
   static create(database: TopicDatabase): PrismaTopicRepository {

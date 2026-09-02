@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "pnpm --filter @langwatch/web dev",
     "dev:app": "pnpm --filter @langwatch/web dev:app",
-    "dev:worker": "pnpm --filter @langwatch/web dev:worker",
+    "dev:worker": "pnpm --filter @langwatch/worker dev",
     "dev:concurrent": "pnpm --filter @langwatch/web dev:concurrent",
     "dev:cli": "pnpm --filter @langwatch/server dev",
     "start": "pnpm --filter @langwatch/web start",

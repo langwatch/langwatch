@@ -72,8 +72,13 @@ COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app
 # is copied here.
 COPY platform/app/vendor ./platform/app/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
+COPY apps/worker/package.json ./apps/worker/package.json
+# `@langwatch/worker...` alongside the app: the background worker is its own
+# executable in this image now, and its dependency subtree is not a subset of
+# the app's.
+RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..." --filter "@langwatch/worker..."
 COPY platform/app ./platform/app
+COPY apps/worker ./apps/worker
 # `--filter "@langwatch/web..."` rather than a bare `pnpm run build` in the app
 # directory: the trailing `...` makes pnpm build the app's workspace
 # DEPENDENCIES first, in topological order. The app imports `langwatch` from the
@@ -98,7 +103,7 @@ RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/web..." run
 # openapi-typescript, a devDependency this very command is removing. Nothing
 # needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
-RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/web..."
+RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/web..." --filter "@langwatch/worker..."
 
 # ...and then actually reclaim the disk. The step above rewrites each member's
 # node_modules — the devDependency symlinks go — but it does NOT touch the
@@ -169,6 +174,8 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # is separate and is the only workspace application the app does not import
 # in hundreds.
 COPY --from=builder /app/packages ./packages
+# The worker executable runs from source through tsx, the way apps/api does.
+COPY --from=builder /app/apps/worker ./apps/worker
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 

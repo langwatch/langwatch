@@ -44,6 +44,7 @@ export {
   type SimulationStalledRun,
 } from "./adapters/simulation-eventing.adapter";
 export { SimulationExecutionPort } from "./ports/simulation-execution.port";
+export type { SimulationRunStateData } from "./projections/simulation-run-state.projection";
 export * from "./processes/simulation-run-execution.process";
 export {
   SimulationWindowedReadPort,
@@ -58,6 +59,16 @@ export {
   ComputeRunMetricsCommand,
   scenarioDeferredComputeRunMetricsJob,
 } from "./adapters/compute-run-metrics.adapter";
+export type { ComputeRunMetricsDeps } from "./adapters/compute-run-metrics.adapter";
+export { FinishRunCommand, type FinishRunDeps } from "./adapters/finish-run.adapter";
+export {
+  CANCELLATION_CHANNEL,
+  RedisCancellationPublisherAdapter,
+  UnavailableCancellationPublisherAdapter,
+  type CancellationPublisher,
+} from "./adapters/redis.cancellation-channel.adapter";
+export { SIMULATION_RUN_EXECUTION_PROCESS_NAME } from "./processes/simulation-run-execution.process";
+export { simulationRunExecutionPM } from "./processes/simulation-run-execution.process";
 export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,

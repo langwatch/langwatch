@@ -140,6 +140,7 @@ describe("worker feature installers", () => {
       expect(Object.keys(connect.mock.calls[0]?.[0] ?? {})).toEqual([
         "computeRunMetrics",
         "scheduleComputeRunMetricsRetry",
+        "commands",
       ]);
     });
 

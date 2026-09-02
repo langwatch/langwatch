@@ -24,11 +24,17 @@ describe("resolveWorkerConfig", () => {
         processorType: "batch",
       },
       shutdown: { processDeadlineMs: 25_000 },
-      deployment: { saas: false },
+      deployment: { saas: false, adminEmails: undefined },
       // No `credentialsEncryptionKey`: an install that stored no encrypted
       // automation credential has none to read, and the key is omitted rather
       // than carried as an empty string that would look configured.
-      automation: { emailHourlyCap: 100, tenantDailyCap: 10_000 },
+      automation: {
+        emailHourlyCap: 100,
+        tenantDailyCap: 10_000,
+        persistDailyCapFree: 100,
+        persistDailyCapPaid: 1_000,
+        persistDailyCapEnterprise: 10_000,
+      },
       // Redaction is DEFAULT-ON without any of the four variables: the native
       // floor enforces, and the analysis service is simply absent. The one
       // knob that turns the floor off has to be spelled `off` to do it.
@@ -38,6 +44,16 @@ describe("resolveWorkerConfig", () => {
         isProduction: false,
         nativePolicyEnforced: true,
       },
+      // The same LANGEVALS_ENDPOINT the privacy projection reads, projected a
+      // second time for topic clustering's page POST.
+      langevals: { endpoint: undefined },
+      // The chart's probe port, and no bearer gate: a cluster-local scrape
+      // target has always answered unauthenticated where none is configured.
+      liveness: { metricsPort: 2999, metricsToken: undefined },
+      // The platform default the application stamps event rows with. Two
+      // graphs writing one ClickHouse must agree on it or one expires the
+      // other's rows early.
+      retention: { defaultDays: 49 },
       // The tokenizer knobs default to "no local BPE directory" and the
       // application's own 10s remote-fetch ceiling.
       tokenizer: { bpeDirectory: undefined, fetchTimeoutMs: 10_000 },
@@ -46,10 +62,31 @@ describe("resolveWorkerConfig", () => {
       // unset: this deployment chose not to run product analytics.
       productAnalytics: { key: undefined, host: undefined },
       gateway: { spendSettlementGraceMs: undefined },
+      // Both unsafe opt-ins default OFF, and both are read at the App's own
+      // `"1"`-and-nothing-else spelling.
+      webhooks: { allowInsecureLocalUrls: false, allowAmbientAwsCredentials: false },
       github: { appId: undefined, privateKey: undefined, host: undefined },
-      processing: { metricShards: undefined, logShards: undefined },
+      processing: {
+        metricShards: undefined,
+        logShards: undefined,
+        traceSpanShards: undefined,
+      },
       eventing: { foldCacheTtlSeconds: undefined },
       infrastructure: {
+        // The two connections this process opens for itself, unset by default:
+        // a worker without either refuses at boot rather than coming up green.
+        database: { url: undefined },
+        clickhouse: {
+          url: undefined,
+          privateRoutes: [],
+          poolSizing: {
+            clientsPerProcess: undefined,
+            override: undefined,
+            replicas: undefined,
+            serverMaxConcurrentQueries: undefined,
+            serverNodes: undefined,
+          },
+        },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
           globalConcurrency: undefined,
@@ -197,6 +234,21 @@ describe("resolveWorkerConfig", () => {
     });
 
     expect(config.infrastructure).toEqual({
+      // Neither datastore is named by this case, and both are still projected:
+      // the standalone executable refuses to boot on the absence rather than
+      // on the first query.
+      database: { url: undefined },
+      clickhouse: {
+        url: undefined,
+        privateRoutes: [],
+        poolSizing: {
+          clientsPerProcess: undefined,
+          override: undefined,
+          replicas: undefined,
+          serverMaxConcurrentQueries: undefined,
+          serverNodes: undefined,
+        },
+      },
       redis: {
         configured: true,
         mode: "standalone",

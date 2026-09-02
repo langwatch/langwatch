@@ -5,6 +5,12 @@ import type {
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+
+/** The two models and the transaction the topic-model swap runs inside. */
+export type TopicModelProjectionDatabase = Pick<
+  PrismaClient,
+  "$transaction" | "topic" | "topicModelProjection"
+>;
 import type {
   ProjectedTopic,
   TopicModelData,
@@ -24,10 +30,10 @@ const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";
 export class PrismaTopicModelProjectionRepository
   implements StateProjectionStore<TopicModelData>
 {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: TopicModelProjectionDatabase) {}
 
   static create(options: {
-    database: PrismaClient;
+    database: TopicModelProjectionDatabase;
   }): PrismaTopicModelProjectionRepository {
     return new PrismaTopicModelProjectionRepository(options.database);
   }

@@ -400,7 +400,8 @@ describe("evaluation alert trigger-match subscriber redelivery", () => {
     vi.setSystemTime(occurredAt);
     const recordTriggerMatch = new TestTriggerMatchRecorderPort();
     const service = AutomationEvaluationSubscriberService.create({
-      automation: new TestAutomationService(),
+      triggers: new TestAutomationService(),
+      graphActivity: new TestAutomationService(),
       traces: new TestTraceService(),
       evaluationFilters: AutomationEvaluationTriggerFilterService.create(new TestTraceService()),
       triggerMatches: recordTriggerMatch,

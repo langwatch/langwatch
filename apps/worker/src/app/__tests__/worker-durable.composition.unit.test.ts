@@ -93,12 +93,7 @@ function compose(resources: ResourceScope, overrides?: { defaultRetentionDays?: 
       defaultRetentionDays: overrides?.defaultRetentionDays ?? 30,
     },
     storage: { projects: new NoProjectBuckets() },
-    topic: {
-      database: createWorkerProcessDatabase() as never,
-      redis: null,
-      execution: {} as never,
-      metrics: {} as never,
-    },
+    database: createWorkerProcessDatabase() as never,
   });
 }
 

@@ -18,7 +18,7 @@ import {
 } from "./worker-private-infrastructure.composition";
 import {
   WorkerProductionComposition,
-  type WorkerTopicCompositionOptions,
+  type WorkerDatabaseCompositionOptions,
 } from "./worker-production.composition";
 
 /**
@@ -48,7 +48,8 @@ export type WorkerDurableCompositionOptions = Readonly<{
   persistence: WorkerDurablePersistencePorts;
   /** Project BYOC and Azure capabilities for the Group Queue's blob offload. */
   storage: WorkerPrivateInfrastructurePorts;
-  topic: WorkerTopicCompositionOptions;
+  /** The one Prisma client this process opened. */
+  database: WorkerDatabaseCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 }>;
@@ -94,7 +95,7 @@ export function createWorkerDurableComposition(
         ? { retentionPolicyResolver: options.persistence.retentionPolicyResolver }
         : {}),
     },
-    topic: options.topic,
+    database: options.database,
     ...(options.enterprise ? { enterprise: options.enterprise } : {}),
     ...(options.observability ? { observability: options.observability } : {}),
   });

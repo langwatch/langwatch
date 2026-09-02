@@ -63,6 +63,8 @@ export {
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service";
 export {
+  AutomationEvaluationQueryClassificationPort,
+  AutomationEvaluationTraceSummaryPort,
   AutomationEvaluationTriggerFilterPort,
   AutomationTriggerMatchRecorderPort,
 } from "./ports/automation-evaluation-subscriber.port";
@@ -114,7 +116,26 @@ export {
   AutomationSettlementExecutorPort,
   AutomationSettlementObservabilityPort,
 } from "./ports/automation-settlement.port";
+export { AutomationSettlementLedgerPort } from "./ports/automation-settlement-ledger.port";
+export {
+  AutomationSettlementEvaluationReaderPort,
+  AutomationSettlementTraceReaderPort,
+  AutomationTraceRecordUnavailableError,
+} from "./ports/automation-settlement-read.port";
+export {
+  AutomationSettlementBreachPort,
+  PostgresAutomationSettlementLedgerAdapter,
+  type AutomationSettlementLedgerDatabase,
+  type AutomationSettlementPersistCap,
+} from "./adapters/postgres.automation-settlement-ledger.adapter";
 export { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service";
+export {
+  GraphTriggerHeartbeatService,
+  type GraphTriggerHeartbeatDeps,
+} from "./services/graph-trigger-heartbeat.service";
+export { PrismaTriggerRepository } from "./repositories/prisma/prisma.trigger.repository";
+export { PrismaGraphTriggerSentRepository } from "./repositories/prisma/prisma.graph-trigger-sent.repository";
+export { PrismaWebhookDeliveryRepository } from "./repositories/prisma/prisma.webhook-delivery.repository";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service";
 export { AutomationClockPort } from "./ports/automation-clock.port";

@@ -28,9 +28,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   saasBillableEventsMeter,
   WorkerProductionComposition,
-  type WorkerAutomationCompositionOptions,
-  type WorkerEvaluationCompositionOptions,
-  type WorkerScenarioCompositionOptions,
 } from "../worker-production.composition";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
@@ -46,6 +43,7 @@ import {
   WorkerTransportPort,
 } from "../../platform/lifecycle/worker-runtime.port";
 import { createWorkerProcessDatabase } from "./support/worker-database.double";
+import { createWorkerProcessRedis } from "./support/worker-redis.double";
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);
@@ -270,17 +268,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
       });
 
       expect(create).toHaveBeenCalledWith(expect.objectContaining({ consumersEnabled: false }));
@@ -319,17 +312,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
       });
     }
 
@@ -382,7 +370,7 @@ describe("WorkerProductionComposition", () => {
         database: {
           project: { findUnique: async () => ({ team: { organizationId: "org_private" } }) },
         } as never,
-        redis: { get: async () => null, setex: async () => "OK" } as never,
+        redis: createWorkerProcessRedis() as never,
         resolveClickHouseClient: resolveClickHouseClient as never,
         getDispatch: () => async () => void 0,
       })({
@@ -636,17 +624,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(topicDatabase) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(topicDatabase) as never,
         ...(Object.keys(database).length > 0
           ? { database: createWorkerProcessDatabase(database) as never }
           : {}),
@@ -723,17 +706,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(input.database ?? {}) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(input.database ?? {}) as never,
         ...(input.observability ? { observability: input.observability as never } : {}),
       });
     }
@@ -830,17 +808,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(topicDatabase) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(topicDatabase) as never,
         ...(Object.keys(database).length > 0
           ? { database: createWorkerProcessDatabase(database) as never }
           : {}),
@@ -936,17 +909,12 @@ describe("WorkerProductionComposition", () => {
               insert: async () => undefined,
               query: async () => ({ json: async () => [] }),
             }))) as never,
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
         ...(input.observability ? { observability: input.observability as never } : {}),
       });
       return { composition, commands };
@@ -1167,17 +1135,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(input.database ?? {}) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(input.database ?? {}) as never,
         ...(input.identity ? { identity: input.identity as never } : {}),
       });
     }
@@ -1220,27 +1183,24 @@ describe("WorkerProductionComposition", () => {
     });
 
     /**
-     * A graph that mounted the package-built ledgers while the application
-     * still owned the connection one would be the failure this suite exists to
-     * catch, so both readings are asserted: with the option, all four; without
-     * it, exactly the ones this process can build for itself.
+     * ALL THREE, from nothing but this process's own client.
      *
-     * `join-request` is absent from BOTH readings here because this
-     * composition names no `BASE_HOST`, so it composed no mail capability —
-     * which is the whole subject of the block below.
+     * The connection ledger used to arrive as an option, because its teardown
+     * wake dispatched through a service bound to the application singleton and
+     * then revoked directory tokens through the SCIM capability. Both are seams
+     * now, so there is no reading in which this graph has the other two ledgers
+     * and not this one — and there must not be, since this is the only graph
+     * that can advance a requested teardown to TORN_DOWN.
+     *
+     * `join-request` is absent here because this composition names no
+     * `BASE_HOST`, so it composed no mail capability — which is the whole
+     * subject of the block below.
      */
     /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
-    it("still mounts the connection ledger only when the application hands it over", () => {
-      const withoutOption = compositionWith().featureInstallers.map((installer) => installer.name);
-      expect(withoutOption).toContain("identity");
-      expect(withoutOption).toContain("scim-sync");
-      expect(withoutOption).not.toContain("sso-connection");
-
-      const withOption = compositionWith({
-        identity: { ssoConnection: { pipeline: {} } },
-      }).featureInstallers.map((installer) => installer.name);
+    it("mounts all three identity ledgers without being handed a capability", () => {
+      const mounted = compositionWith().featureInstallers.map((installer) => installer.name);
       expect(
-        withOption.filter((name) => ["identity", "sso-connection", "scim-sync"].includes(name)),
+        mounted.filter((name) => ["identity", "sso-connection", "scim-sync"].includes(name)),
       ).toEqual(["identity", "sso-connection", "scim-sync"]);
     });
 
@@ -1373,7 +1333,7 @@ describe("WorkerProductionComposition", () => {
         redisGet,
         redisSetex,
         resolveClickHouseClient,
-        redis: { get: redisGet, setex: redisSetex },
+        redis: createWorkerProcessRedis({ get: redisGet, setex: redisSetex }),
       };
     }
 
@@ -1390,12 +1350,7 @@ describe("WorkerProductionComposition", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(substrate.database) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(substrate.database) as never,
       });
     }
 
@@ -1505,17 +1460,12 @@ describe("WorkerProductionComposition", () => {
             insert: async () => undefined,
             query: async () => ({ json: async () => [] }),
           }),
-          groupQueue: { redis: {} as never },
+          groupQueue: { redis: createWorkerProcessRedis() as never },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase(database) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase(database) as never,
       });
     }
 
@@ -1629,18 +1579,13 @@ describe("WorkerProductionComposition", () => {
               query: async () => ({ json: async () => [] }),
             }))) as never,
           groupQueue: {
-            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+            redis: (input.redis ?? createWorkerProcessRedis()) as never,
           },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
       });
     }
 
@@ -1750,7 +1695,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "Both graphs cache the run-state fold under one keyspace" */
     it("caches through the Redis its own queue substrate runs on", async () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
-      const redis = { get: vi.fn(async () => null), set };
+      const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(compositionWith({ redis }));
 
@@ -1764,7 +1709,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("honours the fold cache TTL the environment names", async () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
-      const redis = { get: vi.fn(async () => null), set };
+      const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(
         compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
@@ -1808,18 +1753,13 @@ describe("WorkerProductionComposition", () => {
               query: async () => ({ json: async () => [] }),
             }))) as never,
           groupQueue: {
-            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+            redis: (input.redis ?? createWorkerProcessRedis()) as never,
           },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: (input.database ?? createProcessPersistenceDatabase()) as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: (input.database ?? createProcessPersistenceDatabase()) as never,
       });
     }
 
@@ -1950,7 +1890,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "Both graphs cache the session fold under one keyspace" */
     it("caches through the Redis its own queue substrate runs on", async () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
-      const redis = { get: vi.fn(async () => null), set };
+      const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedSession(compositionWith({ redis }));
 
@@ -1991,18 +1931,13 @@ describe("WorkerProductionComposition", () => {
               query: async () => ({ json: async () => [] }),
             }))) as never,
           groupQueue: {
-            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+            redis: (input.redis ?? createWorkerProcessRedis()) as never,
           },
           retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
       });
     }
 
@@ -2119,7 +2054,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "Both graphs cache the run-state fold under one keyspace" */
     it("caches through the Redis its own queue substrate runs on", async () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
-      const redis = { get: vi.fn(async () => null), set };
+      const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(compositionWith({ redis }));
 
@@ -2133,7 +2068,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "Producer and consumer honour one fold cache TTL" */
     it("honours the fold cache TTL the environment names", async () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
-      const redis = { get: vi.fn(async () => null), set };
+      const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(
         compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
@@ -2179,31 +2114,6 @@ describe("given a worker that composes the join-request ledger", () => {
     return entry!.jobs.map((job) => `${entry!.name}:${job}`).sort();
   }
 
-  /**
-   * The three producers trace processing dispatches into.
-   *
-   * A graph that claims `event-sourcing/jobs` must have all three, so a
-   * consuming fixture supplies them: without one, the composition refuses by
-   * name — which is the behaviour these mail tests are NOT about.
-   */
-  function traceProducerCapabilities() {
-    const definition = (name: string) => ({ metadata: { name, aggregateType: "global" } }) as never;
-    return {
-      automation: { installer: { buildPipeline: () => definition("automations") } },
-      evaluation: { installer: { buildProcessing: () => definition("evaluation_processing") } },
-      scenario: {
-        installer: {
-          buildProcessing: () => definition("simulation_processing"),
-          connect: () => undefined,
-        },
-      },
-    } as never as {
-      automation: WorkerAutomationCompositionOptions;
-      evaluation: WorkerEvaluationCompositionOptions;
-      scenario: WorkerScenarioCompositionOptions;
-    };
-  }
-
   function compositionFor(
     input: {
       source?: Record<string, unknown>;
@@ -2212,7 +2122,6 @@ describe("given a worker that composes the join-request ledger", () => {
     } = {},
   ): WorkerProductionComposition {
     return WorkerProductionComposition.create({
-      ...traceProducerCapabilities(),
       config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
       eventing: {
         database: createProcessPersistenceDatabase(),
@@ -2220,18 +2129,13 @@ describe("given a worker that composes the join-request ledger", () => {
           insert: async () => undefined,
           query: async () => ({ json: async () => [] }),
         }),
-        groupQueue: { redis: {} as never },
+        groupQueue: { redis: createWorkerProcessRedis() as never },
         retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
         ...(input.consumers ? { consumers: { enabled: true as const } } : {}),
       },
       lifecycle: new Lifecycle(),
       transport: new Transport(),
-      topic: {
-        database: createWorkerProcessDatabase() as never,
-        redis: null,
-        execution: {} as never,
-        metrics: {} as never,
-      },
+      database: createWorkerProcessDatabase() as never,
       ...(input.resources ? { resources: input.resources } : {}),
     });
   }
@@ -2271,16 +2175,14 @@ describe("given a worker that composes the join-request ledger", () => {
         resources: new ResourceScope(),
       });
 
-      // The option that used to carry it now carries the connection ledger
-      // alone. A graph that still received a join-request definition would
-      // register the application's stores rather than its own, and register
-      // the identical routing keys while doing it.
-      expect(composition.featureInstallers.map((installer) => installer.name)).toContain(
-        "join-request",
-      );
-      expect(composition.featureInstallers.map((installer) => installer.name)).not.toContain(
-        "sso-connection",
-      );
+      // The option that used to carry it is gone entirely, and so is the one
+      // that used to carry the connection ledger beside it. A graph that still
+      // received either definition would register the application's stores
+      // rather than its own, and register the identical routing keys while
+      // doing it.
+      const mounted = composition.featureInstallers.map((installer) => installer.name);
+      expect(mounted).toContain("join-request");
+      expect(mounted).toContain("sso-connection");
     });
 
     /** @scenario "The mail capability is closed with the graph that composed it" */

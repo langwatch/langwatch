@@ -1,6 +1,9 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
-import type { TraceService, TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type {
+  AutomationSettlementEvaluationReaderPort,
+  AutomationSettlementTraceReaderPort,
+} from "../ports/automation-settlement-read.port";
 import {
   AutomationSettlementFilterEvaluatorPort,
   AutomationSettlementMatchConfirmationPort,
@@ -40,16 +43,16 @@ function splitFilters(filters: Record<string, unknown>): {
  * trace evaluator owns only the host's query/filter implementation. */
 export class AutomationSettlementMatchConfirmationService extends AutomationSettlementMatchConfirmationPort {
   private constructor(
-    private readonly evaluations: EvaluationService,
-    private readonly traces: TraceService,
+    private readonly evaluations: AutomationSettlementEvaluationReaderPort,
+    private readonly traces: AutomationSettlementTraceReaderPort,
     private readonly filterEvaluator: AutomationSettlementFilterEvaluatorPort,
   ) {
     super();
   }
 
   static create(input: {
-    evaluations: EvaluationService;
-    traces: TraceService;
+    evaluations: AutomationSettlementEvaluationReaderPort;
+    traces: AutomationSettlementTraceReaderPort;
     filterEvaluator: AutomationSettlementFilterEvaluatorPort;
   }): AutomationSettlementMatchConfirmationService {
     return new AutomationSettlementMatchConfirmationService(

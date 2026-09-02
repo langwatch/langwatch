@@ -59,6 +59,11 @@ export * from "./ports/gateway-open-admissions.port";
 export * from "./adapters/clickhouse.gateway-open-admissions.adapter";
 export * from "./intents/gateway-spend.intent";
 export * from "./adapters/eventing.gateway-spend.adapter";
+export {
+  PostgresGatewayBudgetResolutionAdapter,
+  type GatewayBudgetResolutionDatabase,
+} from "./adapters/postgres.gateway-budget-resolution.adapter";
+export type { GatewaySpendState } from "./projections/gateway-spend.projection";
 export * from "./adapters/gateway-spend-constants.adapter";
 export * from "./adapters/gateway-spend-events.adapter";
 export * from "./adapters/gateway-window.adapter";

@@ -1,20 +1,21 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { EvaluationRunData, EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { EvaluationRunProjectionPort } from "../../ports/evaluation-run-projection.port";
 
-/** Stores Evaluation's folded runs through the canonical service. */
+/** Stores Evaluation's folded runs through the three-method run projection. */
 export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData> {
   static create({
     service,
     defaultRetentionDays,
   }: {
-    service: EvaluationService;
+    service: EvaluationRunProjectionPort;
     defaultRetentionDays: number;
   }): EvaluationRunStore {
     return new EvaluationRunStore(service, defaultRetentionDays);
   }
 
   private constructor(
-    private readonly service: EvaluationService,
+    private readonly service: EvaluationRunProjectionPort,
     private readonly defaultRetentionDays: number,
   ) {}
 

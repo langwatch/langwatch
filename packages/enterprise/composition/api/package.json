@@ -122,9 +122,9 @@
     "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",
-    "@langwatch/enterprise-plan-gate": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-server": "workspace:*",
+    "@langwatch/enterprise-plan-gate": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/enterprise-scim-server": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
@@ -138,6 +138,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/project-server": "workspace:*",
     "@trpc/server": "^11.18.0",
     "ioredis": "^5.8.2",
     "nanoid": "^5.1.6"

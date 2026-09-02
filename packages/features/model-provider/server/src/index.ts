@@ -49,7 +49,26 @@ export {
   CodexAccountService,
   CodexAuthError,
   CodexOAuthModelProviderTokenRefresherAdapter,
+  type CodexDeviceCode,
+  type CodexPollResult,
 } from "./adapters/codex-oauth.model-provider-token-refresher.adapter";
+export {
+  AI_CALL_FAILED_CAUSE,
+  AiCallFailedError,
+  wrapAiCall,
+} from "./services/ai-call-failure.service";
+export {
+  compileSafeRegex,
+  isSafeRegex,
+} from "./services/model-cost-regex-safety.service";
+export { getModelLimits } from "./services/model-limits.service";
+export {
+  deriveUnmappedCostSuggestion,
+  PREVIEW_WINDOW_DAYS,
+  previewCostRuleMatchingSpans,
+  type ModelCostPreviewSpanReader,
+  type ModelCostRuleReader,
+} from "./services/model-cost-preview.service";
 export { WindowedModelProviderConnectionRateLimiterAdapter } from "./adapters/windowed.model-provider-connection-rate-limiter.adapter";
 export {
   SsrfModelProviderEgressAdapter,

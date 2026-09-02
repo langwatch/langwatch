@@ -45,8 +45,74 @@ export type WorkerAutomationGraphDependencies = Readonly<{
   analytics: AnalyticsService;
 }>;
 
+/**
+ * The transports, ceilings and cipher BOTH halves of Automation send through.
+ *
+ * One of each, deliberately. The graph alerts and the settled digests reach the
+ * same customer through the same mailer and count against the same hourly and
+ * daily ceilings, so a process composing two of each would let one half spend
+ * the budget the other was protecting — a burst from one and silence from the
+ * next. The cipher is shared for a blunter reason: both halves read the same
+ * stored Slack token and the same webhook secret, written under one key.
+ */
+export type WorkerAutomationDeliveryComposition = Readonly<{
+  delivery: WorkerAutomationNotificationDeliveryAdapter;
+  emailCaps: AutomationEmailCapService;
+  crypto: AutomationSecretCrypto;
+}>;
+
+/**
+ * Builds that shared trio, or reports that this process can send nothing.
+ *
+ * Nothing exactly when the deployment named no `BASE_HOST`. Every alert and
+ * every digest carries links back to the deployment and a sender address
+ * derived from the same host, so a process composed without one would render
+ * mail nobody can act on.
+ */
+export function tryCreateWorkerAutomationDelivery(options: {
+  config: WorkerConfig;
+  mail: WorkerMailComposition | undefined;
+  redis?: RedisConnection | null;
+  webhookTransport?: WebhookDeliveryTransport;
+  slackApiTransport?: SlackApiTransport;
+  logger?: Logger;
+}): WorkerAutomationDeliveryComposition | undefined {
+  const { config, mail } = options;
+  if (!config.mail || !mail) return undefined;
+
+  const logger = options.logger ?? createLogger("langwatch:graph-trigger-automation");
+
+  return {
+    delivery: WorkerAutomationNotificationDeliveryAdapter.create({
+      mailer: mail.delivery,
+      baseHost: mail.baseHost,
+      ...(config.mail.unsubscribeSigningSecret === undefined
+        ? {}
+        : { unsubscribeSigningSecret: config.mail.unsubscribeSigningSecret }),
+      // Defaulted rather than optional: a webhook destination is a URL the
+      // CUSTOMER typed, and a process that composed delivery with a hole where
+      // the fence goes would refuse every webhook automation by name. A caller
+      // that wants to observe a dispatch without making one supplies its own.
+      webhookTransport:
+        options.webhookTransport ??
+        createWorkerWebhookTransport({
+          config,
+          ...(options.redis === undefined ? {} : { redis: options.redis }),
+        }),
+      ...(options.slackApiTransport ? { slackApiTransport: options.slackApiTransport } : {}),
+      logger,
+    }),
+    emailCaps: AutomationEmailCapService.create({
+      store: options.redis ? new WorkerAutomationEmailCapStore(options.redis) : null,
+    }),
+    crypto: resolveWorkerStoredSecretCipher(config),
+  };
+}
+
 export type WorkerAutomationGraphCompositionOptions = Readonly<{
   config: WorkerConfig;
+  /** The transports and ceilings this process's two Automation halves share. */
+  delivery: WorkerAutomationDeliveryComposition;
   /**
    * The one database client this process opened, narrowed to the tables this
    * vertical touches. Naming generated Prisma is the feature's own business;
@@ -113,25 +179,9 @@ export function tryCreateWorkerAutomationGraphComposition(
     clock,
     projects: options.dependencies.projects,
     analytics: options.dependencies.analytics,
-    delivery: WorkerAutomationNotificationDeliveryAdapter.create({
-      mailer: mail.delivery,
-      baseHost: mail.baseHost,
-      ...(config.mail.unsubscribeSigningSecret === undefined
-        ? {}
-        : { unsubscribeSigningSecret: config.mail.unsubscribeSigningSecret }),
-      webhookTransport:
-        options.webhookTransport ??
-        createWorkerWebhookTransport({
-          config,
-          ...(options.redis === undefined ? {} : { redis: options.redis }),
-        }),
-      ...(options.slackApiTransport ? { slackApiTransport: options.slackApiTransport } : {}),
-      logger,
-    }),
-    crypto: resolveAutomationCrypto(config),
-    emailCaps: AutomationEmailCapService.create({
-      store: options.redis ? new WorkerAutomationEmailCapStore(options.redis) : null,
-    }),
+    delivery: options.delivery.delivery,
+    crypto: options.delivery.crypto,
+    emailCaps: options.delivery.emailCaps,
     logger: new WorkerAutomationLogger(logger),
     dispatchErrors: new WorkerAutomationDispatchErrors(),
     baseHost: mail.baseHost,
@@ -151,7 +201,16 @@ export function tryCreateWorkerAutomationGraphComposition(
  * Slack API an unusable token and produce an error from Slack about the
  * customer's own credentials.
  */
-function resolveAutomationCrypto(config: WorkerConfig): AutomationSecretCrypto {
+/**
+ * The one cipher this process reads the App's stored secrets with.
+ *
+ * Exported because THREE verticals share it and must: an automation's Slack
+ * token, a webhook endpoint's signing secret and a Governance ingestion
+ * source's API credential are all written by the control plane under
+ * `CREDENTIALS_SECRET`, and a second cipher here would not fail — it would
+ * decrypt to noise and authenticate with garbage.
+ */
+export function resolveWorkerStoredSecretCipher(config: WorkerConfig): AutomationSecretCrypto {
   const key = config.automation.credentialsEncryptionKey;
 
   return key ? AesGcmSecretEncryptionAdapter.create({ key }) : new UnconfiguredAutomationCrypto();

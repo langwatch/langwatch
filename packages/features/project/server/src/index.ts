@@ -43,3 +43,9 @@ export {
   type IntegrationsChecksTrpcContext,
   type IntegrationsChecksTrpcPorts,
 } from "./transport/api-trpc/integrations-checks.api";
+export {
+  GovernanceInternalProjectPort,
+  GovernanceInternalProjectService,
+  ProjectOldestTeamPort,
+} from "./services/governance-internal-project.service";
+export { PostgresGovernanceInternalProjectAdapter } from "./adapters/postgres.governance-internal-project.adapter";

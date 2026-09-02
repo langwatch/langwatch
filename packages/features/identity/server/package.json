@@ -33,6 +33,7 @@
     "@langwatch/identity-eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-server": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "nanoid": "^6.0.0",
     "prom-client": "^15.1.3",

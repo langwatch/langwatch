@@ -36,6 +36,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
+    "croner": "^10.0.1",
     "ioredis": "5.10.1",
     "langwatch": "workspace:*",
     "nanoid": "^6.0.0",

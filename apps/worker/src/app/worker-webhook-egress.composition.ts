@@ -37,20 +37,34 @@ export type WorkerWebhookEgressCompositionOptions = Readonly<{
   redis?: RedisConnection | null;
 }>;
 
-export function createWorkerWebhookTransport(
+/**
+ * The one fenced sender this process holds.
+ *
+ * Composed once and shared, because both outbound surfaces — an automation's
+ * webhook alert and a webhook ENDPOINT's delivery — count against the same
+ * dispatch ceiling and answer to the same address policy. Two services over
+ * two counters would let one surface exhaust a budget the other cannot see.
+ */
+export function createWorkerWebhookEgress(
   options: WorkerWebhookEgressCompositionOptions,
+): WebhookEgressService {
+  return WebhookEgressService.create({
+    rateLimiter: options.redis
+      ? new WorkerWebhookDispatchRateLimiter(options.redis)
+      : InMemoryWebhookDispatchRateLimiterAdapter.create(),
+    // The application ties certificate verification to IS_SAAS, not to its
+    // address policy, because an on-prem receiver frequently carries a
+    // self-signed certificate while private addresses stay refused. Reading
+    // the same leaf keeps a self-hosted receiver reachable from both graphs.
+    tls: { rejectUnauthorized: options.config.deployment.saas },
+  });
+}
+
+export function createWorkerWebhookTransport(
+  options: WorkerWebhookEgressCompositionOptions & { egress?: WebhookEgressService },
 ): WebhookDeliveryTransport {
   return WorkerWebhookDeliveryTransportAdapter.create(
-    WebhookEgressService.create({
-      rateLimiter: options.redis
-        ? new WorkerWebhookDispatchRateLimiter(options.redis)
-        : InMemoryWebhookDispatchRateLimiterAdapter.create(),
-      // The application ties certificate verification to IS_SAAS, not to its
-      // address policy, because an on-prem receiver frequently carries a
-      // self-signed certificate while private addresses stay refused. Reading
-      // the same leaf keeps a self-hosted receiver reachable from both graphs.
-      tls: { rejectUnauthorized: options.config.deployment.saas },
-    }),
+    options.egress ?? createWorkerWebhookEgress(options),
   );
 }
 

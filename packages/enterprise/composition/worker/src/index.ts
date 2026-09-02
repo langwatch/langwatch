@@ -38,3 +38,15 @@ export class EnterpriseWorkerComposition {
     return new EnterpriseWorkerComposition(EnterpriseCatalogue.create(), managedProviders);
   }
 }
+
+export {
+  GovernanceIngestionAwsPort,
+  GovernanceIngestionEgressPort,
+  INGESTION_PULL_DURATION_METRIC_NAME,
+  INGESTION_PULL_TOTAL_METRIC_NAME,
+  OtelGovernanceIngestionPullMetrics,
+  UtcGovernanceIngestionPullSchedule,
+  WorkerGovernanceIngestionPullHost,
+  currentRegistryRateVersion,
+  type WorkerGovernanceIngestionPullHostOptions,
+} from "./governance/governance-ingestion-pull.host";

@@ -1,9 +1,9 @@
-import type { AutomationService } from "@langwatch/automation-contract";
+
 import type { IntentContext } from "@langwatch/eventing";
 import { isDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+
+
 import type {
   LogOverflowIntent,
   NotifyDigestIntent,
@@ -21,6 +21,9 @@ import type {
   AutomationSettlementObservabilityPort,
 } from "../ports/automation-settlement.port";
 import { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
 import type { AutomationEmailCapService } from "./email-cap.service";
 import type { AutomationPersistActionService } from "./persist-action.service";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service";
@@ -29,9 +32,9 @@ import { TriggerSettlementPersistenceService } from "./trigger-settlement-persis
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 
 type SettlementComposition = {
-  automation: AutomationService;
-  projects: ProjectService;
-  traces: TraceService;
+  automation: AutomationSettlementLedgerPort;
+  projects: AutomationProjectIdentityPort;
+  traces: AutomationSettlementTraceReaderPort;
   confirmation: AutomationSettlementMatchConfirmationPort;
   persistActions: AutomationPersistActionService;
   delivery: AutomationNotificationDeliveryPort;

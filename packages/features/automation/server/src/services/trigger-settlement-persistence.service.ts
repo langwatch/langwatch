@@ -1,10 +1,11 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import type { AutomationService, TriggerSummary } from "@langwatch/automation-contract";
+import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { Project, ProjectService } from "@langwatch/project-contract";
-import type { TraceService } from "@langwatch/trace-contract";
 import type { AutomationClockPort } from "../ports/automation-clock.port";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
 import type {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
@@ -16,9 +17,9 @@ const CONFIRM_CONCURRENCY = 4;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
-  automation: AutomationService;
-  projects: ProjectService;
-  traces: TraceService;
+  automation: AutomationSettlementLedgerPort;
+  projects: AutomationProjectIdentityPort;
+  traces: AutomationSettlementTraceReaderPort;
   confirmation: AutomationSettlementMatchConfirmationPort;
   persistActions: AutomationPersistActionService;
   clock: AutomationClockPort;
@@ -29,7 +30,7 @@ type PersistPage = {
   projectId: string;
   triggerId: string;
   trigger: TriggerSummary;
-  project: Project;
+  project: { id: string; name: string; slug: string };
   cap: number;
   breachReported: boolean;
   unclaimed: string[];

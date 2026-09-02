@@ -5,6 +5,12 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
+import {
+  parseRoutingTable,
+  poolSizingFromEnv,
+  type PoolSizingInput,
+} from "@langwatch/clickhouse-client";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
@@ -95,6 +101,17 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   deployment: {
     saas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
+    /**
+     * The deployment's operator list, read at the App's own spelling.
+     *
+     * It is what already decides who reaches the back office, and the SSO
+     * connection guards refuse an organization administrator's hand on the
+     * strength of it (ADR-117 D05 tier 1). Unset means nobody, which is the
+     * fail-closed answer the back office also takes — so a worker that read a
+     * different list than the App would let a domain attestation land through
+     * one surface that the other refuses.
+     */
+    adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
   },
   /**
    * The Stripe secret the monthly usage report is sent with.
@@ -230,6 +247,30 @@ export const workerConfigDefinition = RuntimeConfig.define({
       env: "TRIGGER_EMAIL_TENANT_DAILY_CAP",
     }),
     credentialsEncryptionKey: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+    /**
+     * The daily ceiling on CONFIRMED persist-class matches, per project.
+     *
+     * Three numbers rather than one because the application resolves the tier
+     * from the organization's active plan. This process composes no
+     * entitlement provider — that needs the licence handler and the billing
+     * subscription source — so it settles on the paid ceiling and says so by
+     * name at composition. The free and enterprise numbers are still read, so
+     * a deployment that later hands this process a plan provider changes one
+     * composition line rather than three variables.
+     *
+     * They are read under the application's own names because the ceiling is a
+     * FLEET fact: a worker counting against a different ceiling than the API
+     * screen displays would skip matches the customer was told were allowed.
+     */
+    persistDailyCapFree: Config.value(z.coerce.number().int().positive().default(100), {
+      env: "TRIGGER_PERSIST_DAILY_CAP_FREE",
+    }),
+    persistDailyCapPaid: Config.value(z.coerce.number().int().positive().default(1000), {
+      env: "TRIGGER_PERSIST_DAILY_CAP_PAID",
+    }),
+    persistDailyCapEnterprise: Config.value(z.coerce.number().int().positive().default(10000), {
+      env: "TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE",
+    }),
   },
   /**
    * What the trace, log and metric ingestion paths need to redact personal
@@ -295,6 +336,36 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
+   * The two unsafe opt-ins the webhook endpoint policy reads.
+   *
+   * Both default OFF and both are read at the App's own spellings, because
+   * they decide what a customer is ALLOWED to point an endpoint at: a
+   * deployment that answered differently in the two processes would accept an
+   * endpoint through one surface and refuse to deliver it from the other.
+   */
+  webhooks: {
+    allowInsecureLocalUrls: Config.value(optionalEnvironmentString, {
+      env: "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS",
+    }),
+    allowAmbientAwsCredentials: Config.value(optionalEnvironmentString, {
+      env: "WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS",
+    }),
+  },
+  /**
+   * Where this process reaches the Langy agent manager, and the secret it
+   * presents to it.
+   *
+   * Read from the App's own two variables, and refused TOGETHER the way
+   * `resolveLangyWorkerConfig` refuses them: a URL without a secret dispatches
+   * every turn unauthenticated, and a secret without a URL dispatches nowhere.
+   * Both absent is a deployment that runs no agent manager, which is a named
+   * absence rather than a failure.
+   */
+  langy: {
+    agentUrl: Config.value(optionalEnvironmentString, { env: "OPENCODE_AGENT_URL" }),
+    internalSecret: Config.secret({ optional: true, env: "LANGY_INTERNAL_SECRET" }),
+  },
+  /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
    *
    * The raw string is carried rather than a number: `settlementGraceMs` in
@@ -353,7 +424,52 @@ export const workerConfigDefinition = RuntimeConfig.define({
       { env: "LANGWATCH_FOLD_CACHE_TTL_SECONDS" },
     ),
   },
+  /**
+   * The worker's one HTTP listener, and the bearer gate in front of it.
+   *
+   * Read at the application's own spellings and defaulted to the same port
+   * (2999), because the chart's `startupProbe` and `livenessProbe` already
+   * name it: a worker that listened elsewhere would be restarted by the
+   * kubelet on every rollout.
+   */
+  liveness: {
+    metricsPort: Config.value(optionalEnvironmentString, { env: "WORKER_METRICS_PORT" }),
+    metricsToken: Config.secret({ optional: true, env: "METRICS_API_KEY" }),
+  },
+  /**
+   * The fallback retention for event rows whose tenant declares no override.
+   *
+   * The same variable the application reads, and the same platform default
+   * when it is unset: the two graphs stamp rows in one ClickHouse, so a
+   * worker with a different default would expire a tenant's events early.
+   */
+  retention: {
+    defaultDays: Config.value(optionalEnvironmentString, {
+      env: "LANGWATCH_DEFAULT_RETENTION_DAYS",
+    }),
+  },
   infrastructure: {
+    /**
+     * The one Postgres connection this process opens.
+     *
+     * Read at the application's own spelling, because the process store, every
+     * ledger head and every read-side repository in this process live in the
+     * same database the control plane writes.
+     */
+    database: {
+      url: Config.value(optionalEnvironmentString, { env: "DATABASE_URL" }),
+    },
+    /**
+     * The event store's endpoint, plus the per-organization private routes.
+     *
+     * The routes are read off the raw environment rather than declared as
+     * leaves: their names carry the organization id
+     * (`CLICKHOUSE_URL__<label>__<organizationId>`), so there is no fixed set
+     * to declare and the shared parser is what both processes read them with.
+     */
+    clickhouse: {
+      url: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_URL" }),
+    },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
       clusterEndpoints: Config.value(optionalEnvironmentString, {
@@ -472,6 +588,8 @@ export type WorkerStorageConfig = Readonly<{
 }>;
 
 export type WorkerInfrastructureConfig = Readonly<{
+  database: WorkerDatabaseConfig;
+  clickhouse: WorkerClickHouseConfig;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
   storage: WorkerStorageConfig;
@@ -483,6 +601,12 @@ export type WorkerShutdownConfig = Readonly<{
 }>;
 
 /** The command-lane counts the metric and log processing pipelines shard on. */
+/** The worker's one HTTP listener. */
+export type WorkerLivenessConfig = Readonly<{
+  metricsPort: number;
+  metricsToken: string | undefined;
+}>;
+
 export type WorkerProcessingConfig = Readonly<{
   metricShards?: string;
   logShards?: string;
@@ -495,8 +619,22 @@ export type WorkerEventingConfig = Readonly<{
 }>;
 
 /** Which product this deployment is, resolved from the one shared variable. */
+/** The one Postgres connection this process opens. */
+export type WorkerDatabaseConfig = Readonly<{
+  url: string | undefined;
+}>;
+
+/** The event store's endpoints, shared and per-organization. */
+export type WorkerClickHouseConfig = Readonly<{
+  url: string | undefined;
+  privateRoutes: readonly Readonly<{ organizationId: string; url: string; cluster: string }>[];
+  poolSizing: PoolSizingInput;
+}>;
+
 export type WorkerDeploymentConfig = Readonly<{
   saas: boolean;
+  /** `ADMIN_EMAILS`; unset means nobody is a platform operator. */
+  adminEmails: string | undefined;
 }>;
 
 /** The Stripe credentials the SaaS monthly usage report is sent with. */
@@ -519,12 +657,23 @@ export type WorkerMailConfig = Readonly<{
   unsubscribeSigningSecret?: string;
 }>;
 
-/** The graph-alert half of Automation's own knobs, as this process read them. */
+/** Automation's own knobs, as this process read them. */
 export type WorkerAutomationConfig = Readonly<{
   emailHourlyCap: number;
   tenantDailyCap: number;
   /** Absent on a deployment that stored no encrypted automation credentials. */
   credentialsEncryptionKey?: string;
+  /**
+   * The three daily persist ceilings, by plan tier.
+   *
+   * All three are carried even though this process settles on the paid one:
+   * the tier is chosen by an entitlement provider it does not compose, and
+   * carrying only the number in use would hide from a reader that the choice
+   * exists at all.
+   */
+  persistDailyCapFree: number;
+  persistDailyCapPaid: number;
+  persistDailyCapEnterprise: number;
 }>;
 
 /**
@@ -605,6 +754,31 @@ export type WorkerProductAnalyticsConfig = Readonly<{
   host?: string;
 }>;
 
+/**
+ * The webhook endpoint policy's two unsafe opt-ins, as booleans.
+ *
+ * `"1"` and nothing else, which is the App's own reading: it compares the raw
+ * variable to the string `"1"`, so `true`, `yes` and `TRUE` all mean off on
+ * both sides.
+ */
+export type WorkerWebhookConfig = Readonly<{
+  allowInsecureLocalUrls: boolean;
+  allowAmbientAwsCredentials: boolean;
+}>;
+
+/**
+ * Where the Langy conversation pipeline dispatches a turn.
+ *
+ * Absent exactly when this deployment named neither variable. The pipeline
+ * still mounts without it — a turn dispatched into no manager is answered
+ * `unavailable`, which the process manager already treats as a failed turn
+ * rather than a lost one.
+ */
+export type WorkerLangyConfig = Readonly<{
+  agentUrl: string;
+  internalSecret: string;
+}>;
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -631,12 +805,27 @@ export type WorkerConfig = Readonly<{
   mail?: WorkerMailConfig;
   automation: WorkerAutomationConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
+  /**
+   * Where the evaluator service answers, for the callers that are not privacy.
+   *
+   * The SAME `LANGEVALS_ENDPOINT` the privacy projection reads, projected a
+   * second time rather than read a second time: one variable names one
+   * service, and two leaves over it could be answered differently by a future
+   * default. Topic clustering posts its pages here.
+   */
+  langevals: Readonly<{ endpoint: string | undefined }>;
   tokenizer: WorkerTraceTokenizerConfig;
   stripe: WorkerStripeConfig;
   productAnalytics: WorkerProductAnalyticsConfig;
   gateway: WorkerGatewayConfig;
+  webhooks: WorkerWebhookConfig;
+  /** Absent when this deployment named no Langy agent manager. */
+  langy?: WorkerLangyConfig;
   github: WorkerGithubConfig;
   processing: WorkerProcessingConfig;
+  liveness: WorkerLivenessConfig;
+  /** The event store's fallback retention, in days. */
+  retention: Readonly<{ defaultDays: number }>;
   eventing: WorkerEventingConfig;
   infrastructure: WorkerInfrastructureConfig;
   /**
@@ -659,6 +848,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     source: normalizeWorkerConfigSource(source),
   }).value;
   const mail = resolveWorkerMailConfig(value.mail, value.nextauthSecret);
+  const langy = resolveWorkerLangyConfig(value.langy);
 
   return {
     processRole: value.processRole,
@@ -680,14 +870,31 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       tracePrivacy: value.tracePrivacy,
       nodeEnvironment: value.nodeEnvironment,
     }),
+    langevals: { endpoint: value.tracePrivacy.langevalsEndpoint },
     tokenizer: resolveWorkerTraceTokenizerConfig(value.tokenizer),
     stripe: value.stripe,
     productAnalytics: value.productAnalytics,
     gateway: value.gateway,
+    webhooks: {
+      allowInsecureLocalUrls: value.webhooks.allowInsecureLocalUrls === "1",
+      allowAmbientAwsCredentials: value.webhooks.allowAmbientAwsCredentials === "1",
+    },
+    ...(langy ? { langy } : {}),
     github: value.github,
     processing: value.processing,
+    liveness: {
+      metricsPort: resolveWorkerMetricsPort(value.liveness.metricsPort),
+      metricsToken: value.liveness.metricsToken,
+    },
+    retention: { defaultDays: resolveWorkerRetentionDays(value.retention.defaultDays) },
     eventing: value.eventing,
     infrastructure: {
+      database: { url: value.infrastructure.database.url },
+      clickhouse: {
+        url: value.infrastructure.clickhouse.url?.trim() || undefined,
+        privateRoutes: resolveWorkerPrivateClickHouseRoutes(source),
+        poolSizing: poolSizingFromEnv(environmentStrings(source)),
+      },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
       storage: {
@@ -705,6 +912,28 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     },
     featureFlags: resolveFeatureFlagConfig(source),
   };
+}
+
+/**
+ * The Langy agent manager's address and secret, or nothing.
+ *
+ * The pair is refused TOGETHER, at the App's own spelling of the refusal:
+ * either both are configured or neither is. Half a pair is not a smaller
+ * deployment — a URL without a secret would dispatch every turn without
+ * authentication, and the manager would reject it turn by turn rather than at
+ * boot.
+ */
+function resolveWorkerLangyConfig(
+  langy: WorkerConfigProjection["langy"],
+): WorkerLangyConfig | undefined {
+  const agentUrl = langy.agentUrl?.trim();
+  const internalSecret = langy.internalSecret?.trim();
+  if (!agentUrl && !internalSecret) return undefined;
+  if (!agentUrl || !internalSecret) {
+    throw new Error("OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together");
+  }
+
+  return { agentUrl, internalSecret };
 }
 
 /**
@@ -775,6 +1004,9 @@ function resolveWorkerAutomationConfig(
     emailHourlyCap: automation.emailHourlyCap,
     tenantDailyCap: automation.tenantDailyCap,
     ...(credentialsEncryptionKey ? { credentialsEncryptionKey } : {}),
+    persistDailyCapFree: automation.persistDailyCapFree,
+    persistDailyCapPaid: automation.persistDailyCapPaid,
+    persistDailyCapEnterprise: automation.persistDailyCapEnterprise,
   };
 }
 
@@ -921,4 +1153,61 @@ export function resolveWorkerDataplaneS3Config(
   }
 
   return routes;
+}
+
+/**
+ * The per-organization ClickHouse endpoints this deployment declared.
+ *
+ * Parsed by the shared helper rather than by a second reader here: the
+ * variable names carry the organization id, and a worker that split them
+ * differently from the application would route one organization's folds to
+ * another organization's cluster.
+ */
+function resolveWorkerPrivateClickHouseRoutes(
+  source: Readonly<Record<string, unknown>>,
+): readonly Readonly<{ organizationId: string; url: string; cluster: string }>[] {
+  const table = parseRoutingTable(environmentStrings(source));
+  return [...table.routes].map(([organizationId, url]) => ({
+    organizationId,
+    url,
+    cluster: organizationId,
+  }));
+}
+
+/** The environment bag as the shared ClickHouse helpers read it. */
+function environmentStrings(
+  source: Readonly<Record<string, unknown>>,
+): Record<string, string | undefined> {
+  const strings: Record<string, string | undefined> = {};
+  for (const [name, value] of Object.entries(source)) {
+    if (typeof value === "string") strings[name] = value;
+  }
+  return strings;
+}
+
+/** The chart's probe port; overridable, and refused rather than coerced. */
+export const DEFAULT_WORKER_METRICS_PORT = 2999;
+
+function resolveWorkerMetricsPort(value: string | undefined): number {
+  if (value === undefined || value === "") return DEFAULT_WORKER_METRICS_PORT;
+  const port = Number.parseInt(value, 10);
+  if (Number.isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `Invalid WORKER_METRICS_PORT: "${value}". Must be a number between 1 and 65535.`,
+    );
+  }
+  return port;
+}
+
+/**
+ * The platform default, unless this deployment named another.
+ *
+ * Unparseable is the default rather than a refusal, which is the reading the
+ * application takes: a retention override is an operator convenience, and a
+ * typo in it must not stop the fleet folding.
+ */
+function resolveWorkerRetentionDays(value: string | undefined): number {
+  if (value === undefined || value === "") return PLATFORM_DEFAULT_RETENTION_DAYS;
+  const days = Number.parseInt(value, 10);
+  return Number.isFinite(days) && days > 0 ? days : PLATFORM_DEFAULT_RETENTION_DAYS;
 }

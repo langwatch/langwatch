@@ -110,12 +110,7 @@ describe("WorkerProductionComposition infrastructure seam", () => {
         },
         lifecycle: new Lifecycle(),
         transport: new Transport(),
-        topic: {
-          database: createWorkerProcessDatabase() as never,
-          redis: null,
-          execution: {} as never,
-          metrics: {} as never,
-        },
+        database: createWorkerProcessDatabase() as never,
       });
       const infrastructure = composition.infrastructure;
       if (!infrastructure) {

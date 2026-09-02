@@ -142,3 +142,12 @@ export {
   type WorkerExecutableHost,
   type WorkerExecutableOptions,
 } from "./worker.executable";
+export {
+  WorkerStandaloneComposition,
+} from "./app/worker-standalone.composition";
+export {
+  describeWorkerFailure,
+  startStandaloneWorker,
+  type WorkerExecutableProcessHost,
+  type WorkerStandaloneExecutableOptions,
+} from "./app/worker-standalone.executable";

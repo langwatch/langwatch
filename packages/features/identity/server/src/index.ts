@@ -179,6 +179,11 @@ export {
 } from "./sso-connection-grandfather.service";
 export { SsoConnectionGuards, type SsoConnectionGuardsDeps } from "./sso-connection-guards";
 export {
+  AdminEmailPlatformOperators,
+  SystemActorPlatformOperators,
+  type PrismaSsoPlatformOperatorDatabase,
+} from "./repositories/prisma/prisma.sso-platform-operators.repository";
+export {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
   newSsoConnectionCommandId,

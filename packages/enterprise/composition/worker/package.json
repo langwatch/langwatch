@@ -18,6 +18,10 @@
     "./governance/spend-spike-anomaly.worker": {
       "types": "./src/governance/spend-spike-anomaly.worker.ts",
       "default": "./src/governance/spend-spike-anomaly.worker.ts"
+    },
+    "./governance/ingestion-pull-host": {
+      "types": "./src/governance/governance-ingestion-pull.host.ts",
+      "default": "./src/governance/governance-ingestion-pull.host.ts"
     }
   },
   "scripts": {
@@ -26,9 +30,13 @@
   },
   "dependencies": {
     "@langwatch/enterprise": "workspace:*",
+    "@langwatch/enterprise-api": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-server": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*"
   },

@@ -130,9 +130,9 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/platform/app
+          workingDir: /app/apps/worker
           command: ['pnpm']
-          args: ['run', 'start:workers']
+          args: ['run', 'start']
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
             {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}

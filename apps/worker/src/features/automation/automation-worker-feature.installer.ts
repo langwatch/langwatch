@@ -1,8 +1,27 @@
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
 import { AutomationTriggerMatchRecorderPort } from "@langwatch/automation-server";
 import type { AutomationIntentRetentionPort } from "@langwatch/automation-server";
+import type {
+  Event,
+  Projection,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+
+/**
+ * A registrable Eventing definition, left open in its own event union.
+ *
+ * `prepareEventForProjection` is contravariant in the event type, so a field
+ * pinned to the base `Event` refuses the very definition a feature publishes
+ * over its own discriminated union.
+ */
+type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
+  TEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
 
 type RecordTriggerMatchInput = TriggerMatchRecordedEventData & {
   tenantId: string;
@@ -52,7 +71,7 @@ class RegisteredAutomationTriggerMatches extends AutomationTriggerMatchRecorderP
 }
 
 /** Automation's worker-facing capability after its server graph is composed. */
-export interface AutomationWorkerCapability {
+export interface AutomationWorkerCapability<TEvent extends Event = Event> {
   /**
    * Builds the pipeline definition against the worker's own process store.
    * Retention is supplied by the installer rather than the composition root so
@@ -61,7 +80,7 @@ export interface AutomationWorkerCapability {
    */
   buildPipeline(options: {
     retention: AutomationIntentRetentionPort;
-  }): Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+  }): WorkerPipelineDefinition<TEvent>;
 }
 
 /**
@@ -74,11 +93,28 @@ export interface AutomationWorkerCapability {
  * those matches into one notification per window.
  */
 export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
-  static create(options: {
-    installer: AutomationWorkerCapability;
+  /**
+   * The registration is captured as a closure, and that is what erases the
+   * event union.
+   *
+   * A definition is generic in the union its feature owns, and
+   * `prepareEventForProjection` is contravariant in it — so a field typed
+   * against the base `Event` would refuse the very definition Automation
+   * publishes, and a class generic in the union would make two instantiations
+   * of this installer mutually unassignable wherever the composition root names
+   * it. Registering inside `create`, where the union is still known, leaves the
+   * class itself free of it.
+   */
+  static create<TEvent extends Event>(options: {
+    installer: AutomationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
   }): AutomationWorkerFeatureInstaller {
-    return new AutomationWorkerFeatureInstaller(options.installer, options.eventing);
+    return new AutomationWorkerFeatureInstaller(
+      () =>
+        options.eventing.eventSourcing.register(
+          options.installer.buildPipeline({ retention: options.eventing.processStore }),
+        ).commands,
+    );
   }
 
   readonly name = "automation";
@@ -86,19 +122,14 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
   readonly triggerMatches = new WorkerAutomationTriggerMatches();
   private installed = false;
 
-  private constructor(
-    private readonly installer: AutomationWorkerCapability,
-    private readonly eventing: WorkerEventingRuntime,
-  ) {
+  private constructor(private readonly registerPipeline: () => unknown) {
     super();
   }
 
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
-      const pipeline = this.eventing.eventSourcing.register(
-        this.installer.buildPipeline({ retention: this.eventing.processStore }),
-      );
-      const recordTriggerMatch = pipeline.commands.recordTriggerMatch;
+      const commands = this.registerPipeline() as Record<string, unknown>;
+      const recordTriggerMatch = commands.recordTriggerMatch;
       if (!recordTriggerMatch) {
         throw new Error("Automation pipeline must register a recordTriggerMatch command.");
       }

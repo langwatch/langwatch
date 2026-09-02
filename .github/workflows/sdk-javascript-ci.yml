@@ -323,7 +323,7 @@ jobs:
           NODE_ENV=production pnpm run start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
-          pnpm run start:workers > /tmp/langwatch-workers.log 2>&1 &
+          pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"

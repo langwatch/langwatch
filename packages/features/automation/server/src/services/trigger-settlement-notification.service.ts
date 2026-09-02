@@ -9,12 +9,16 @@ import {
   type TemplateContext,
   type TriggerSummary,
 } from "@langwatch/automation-contract";
-import type { AutomationService } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
-import { TraceNotFoundError, type TraceRecord, type TraceService } from "@langwatch/trace-contract";
+import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import type { AutomationClockPort } from "../ports/automation-clock.port";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
+import {
+  AutomationTraceRecordUnavailableError,
+  type AutomationSettlementTraceReaderPort,
+} from "../ports/automation-settlement-read.port";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
 import type {
   AutomationSlackProviderPort,
@@ -33,9 +37,9 @@ import {
 const logger = createLogger("langwatch:automation:settlement-notification");
 
 type NotificationComposition = {
-  automation: AutomationService;
-  projects: ProjectService;
-  traces: TraceService;
+  automation: AutomationSettlementLedgerPort;
+  projects: AutomationProjectIdentityPort;
+  traces: AutomationSettlementTraceReaderPort;
   confirmation: AutomationSettlementMatchConfirmationPort;
   delivery: AutomationNotificationDeliveryPort;
   emailCaps: AutomationEmailCapService;
@@ -282,6 +286,20 @@ export class TriggerSettlementNotificationService {
       });
     } catch (error) {
       if (error instanceof TraceNotFoundError) {
+        return input.fallback;
+      }
+
+      // A process that composes no full-record read still notifies. The record
+      // ENRICHES a candidate the fold state already produced — it supplies the
+      // metadata a custom template can interpolate and the event list a Slack
+      // digest lists — so losing it costs those fields, while failing here
+      // would cost the notification itself.
+      if (error instanceof AutomationTraceRecordUnavailableError) {
+        logger.debug(
+          { projectId: input.projectId, traceId: input.traceId },
+          "This process composes no full trace read; the digest continues on the settled fold state alone",
+        );
+
         return input.fallback;
       }
 

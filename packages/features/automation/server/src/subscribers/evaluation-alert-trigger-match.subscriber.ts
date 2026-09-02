@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
-import type { TraceService } from "@langwatch/trace-contract";
 import type {
+  AutomationEvaluationTraceSummaryPort,
   AutomationEvaluationTriggerFilterPort,
   AutomationTriggerMatchRecorderPort,
 } from "../ports/automation-evaluation-subscriber.port";
@@ -31,7 +31,7 @@ interface ActiveTraceTriggerReader {
 
 type EvaluationAlertTriggerMatchDeps = {
   automation: ActiveTraceTriggerReader;
-  traces: TraceService;
+  traces: AutomationEvaluationTraceSummaryPort;
   triggerMatches: AutomationTriggerMatchRecorderPort;
   evaluationFilters: AutomationEvaluationTriggerFilterPort;
 };

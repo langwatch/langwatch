@@ -1,6 +1,7 @@
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { EvaluationRunData, EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { EvaluationRunProjectionPort } from "../ports/evaluation-run-projection.port";
 import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-fold.projection";
 import type { EvaluationAnalyticsRollupRow } from "../projections/evaluation-analytics-rollup.projection";
 import type { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port";
@@ -21,7 +22,7 @@ export interface EvaluationEventingStores {
  */
 export class EvaluationEventingAdapter {
   static createRunStore(input: {
-    evaluation: EvaluationService;
+    evaluation: EvaluationRunProjectionPort;
     retentionDays: number;
   }): FoldProjectionStore<EvaluationRunData> {
     return EvaluationRunStore.create({
@@ -31,7 +32,7 @@ export class EvaluationEventingAdapter {
   }
 
   static create(input: {
-    evaluation: EvaluationService;
+    evaluation: EvaluationRunProjectionPort;
     analytics: AnalyticsService;
     attributePolicy: EvaluationAnalyticsAttributePolicy;
     retentionDays: number;
@@ -41,7 +42,7 @@ export class EvaluationEventingAdapter {
 
   private constructor(
     private readonly input: {
-      evaluation: EvaluationService;
+      evaluation: EvaluationRunProjectionPort;
       analytics: AnalyticsService;
       attributePolicy: EvaluationAnalyticsAttributePolicy;
       retentionDays: number;

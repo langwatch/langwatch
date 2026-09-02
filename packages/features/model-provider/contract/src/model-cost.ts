@@ -37,7 +37,15 @@ const coerceToNumber = (value: unknown): number | null => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const estimateCost = (input: {
+/**
+ * One observed invocation priced under ONE rate.
+ *
+ * Exported because the cost-rule preview prices its sample spans under the
+ * rate a customer is still typing, which has no catalogue entry to look up.
+ * A second implementation of this arithmetic would show a customer a price
+ * their rule does not actually charge.
+ */
+export const estimateCost = (input: {
   rate: ModelCostRate;
   inputTokens: number;
   outputTokens: number;

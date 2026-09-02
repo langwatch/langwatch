@@ -1,4 +1,4 @@
-import type { TraceService } from "@langwatch/trace-contract";
+import type { AutomationEvaluationQueryClassificationPort } from "../ports/automation-evaluation-subscriber.port";
 import { AutomationEvaluationTriggerFilterPort } from "../ports/automation-evaluation-subscriber.port";
 
 /**
@@ -7,11 +7,11 @@ import { AutomationEvaluationTriggerFilterPort } from "../ports/automation-evalu
  * app filter implementation cannot drift from the feature's trigger contract.
  */
 export class AutomationEvaluationTriggerFilterService extends AutomationEvaluationTriggerFilterPort {
-  static create(traces: TraceService): AutomationEvaluationTriggerFilterService {
+  static create(traces: AutomationEvaluationQueryClassificationPort): AutomationEvaluationTriggerFilterService {
     return new AutomationEvaluationTriggerFilterService(traces);
   }
 
-  private constructor(private readonly traces: TraceService) {
+  private constructor(private readonly traces: AutomationEvaluationQueryClassificationPort) {
     super();
   }
 

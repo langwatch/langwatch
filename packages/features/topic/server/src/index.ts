@@ -18,7 +18,13 @@ export {
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
 } from "./adapters/topic-server.adapter";
+export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository";
 export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter";
+export {
+  OtelTopicClusteringMetricsAdapter,
+  TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME,
+  TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
+} from "./adapters/otel.topic-clustering-metrics.adapter";
 export {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
   RedisTopicClusteringBootstrapAdapter,

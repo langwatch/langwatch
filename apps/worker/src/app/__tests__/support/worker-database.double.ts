@@ -43,6 +43,15 @@ export function createWorkerProcessDatabase(overrides: object = {}) {
     datasetRecord: {},
     // The project's trace automations.
     trigger: {},
+    // Langy's conversation graph: two operational folds, the per-message
+    // projection, the turn admission ledger and the session-key reap.
+    apiKey: {},
+    virtualKey: {},
+    langyConversationProjection: {},
+    langyConversationTurnProjection: {},
+    langyMessageProjection: {},
+    langyTurnRequest: {},
+    langyActiveTurn: {},
     ...overrides,
   };
 }

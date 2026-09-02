@@ -78,3 +78,12 @@ export {
   ProcessRetentionMetricsPort,
   type RetentionFamily,
 } from "./maintenance/retention-metrics.port";
+export {
+  OtelProcessRetentionMetricsAdapter,
+  PROCESS_RETENTION_FAILURES_METRIC_NAME,
+  PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME,
+} from "./maintenance/otel.retention-metrics.adapter";
+export {
+  computeCatchUp,
+  computeNextRunAt,
+} from "./schedule/next-run-at";

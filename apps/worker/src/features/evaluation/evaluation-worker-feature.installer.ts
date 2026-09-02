@@ -1,9 +1,27 @@
-import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import {
+  Deferred,
+  type CommandDispatcher,
+  type Event,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+/**
+ * A registrable Eventing definition, left open in its own event union.
+ *
+ * `prepareEventForProjection` is contravariant in the event type, so a
+ * definition pinned to the base `Event` refuses the very definition Evaluation
+ * publishes over `EvaluationProcessingEvent`. The capability below carries the
+ * union as a parameter and the installer never names it.
+ */
+type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
+  TEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
 
 /**
  * The two Evaluation command senders other pipelines dispatch to.
@@ -23,13 +41,13 @@ export interface EvaluationWorkerCommands<
 }
 
 /** Evaluation's worker-facing capability after its server graph is composed. */
-export interface EvaluationWorkerCapability {
+export interface EvaluationWorkerCapability<TEvent extends Event = Event> {
   /**
    * Builds the processing definition. The execution-intent service, the
    * analytics stores and the automation subscriber runtime are already bound
    * by the composition root; this seam only decides when registration happens.
    */
-  buildProcessing(): WorkerPipelineDefinition;
+  buildProcessing(): WorkerPipelineDefinition<TEvent>;
 }
 
 /**
@@ -43,11 +61,13 @@ export interface EvaluationWorkerCapability {
  * instead of dispatching into a pipeline that does not exist yet.
  */
 export class EvaluationWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
-  static create(options: {
-    installer: EvaluationWorkerCapability;
+  static create<TEvent extends Event>(options: {
+    installer: EvaluationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
   }): EvaluationWorkerFeatureInstaller {
-    return new EvaluationWorkerFeatureInstaller(options.installer, options.eventing);
+    return new EvaluationWorkerFeatureInstaller(() =>
+      options.eventing.eventSourcing.register(options.installer.buildProcessing()).commands,
+    );
   }
 
   readonly name = "evaluation";
@@ -70,17 +90,16 @@ export class EvaluationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
 
   private installed = false;
 
-  private constructor(
-    private readonly installer: EvaluationWorkerCapability,
-    private readonly eventing: WorkerEventingRuntime,
-  ) {
+  private constructor(private readonly registerPipeline: () => unknown) {
     super();
   }
 
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
-      const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
-      const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
+      const commands = this.registerPipeline() as Record<
+        string,
+        { send(data: unknown): Promise<void> }
+      >;
       const executeEvaluation = commands.executeEvaluation;
       const reportEvaluation = commands.reportEvaluation;
       if (!executeEvaluation || !reportEvaluation) {

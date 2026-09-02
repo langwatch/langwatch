@@ -3,7 +3,8 @@ import type {
   NormalizedPullEvent,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
+import { PROJECT_KIND } from "@langwatch/project-contract";
+import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSinkPort,
@@ -78,7 +79,7 @@ export class IngestionPullWorkerService {
     private readonly sources: IngestionPullSourcePort,
     private readonly registry: PullerRegistryService,
     private readonly credentials: IngestionCredentialsService,
-    private readonly projects: ProjectService,
+    private readonly projects: GovernanceInternalProjectPort,
     private readonly sink: GovernanceOcsfEventSinkPort,
     private readonly usageEntitlement: PulledUsageEntitlementPort,
     private readonly usageRecords: PulledUsageRecordService,
@@ -92,7 +93,7 @@ export class IngestionPullWorkerService {
     sources: IngestionPullSourcePort;
     registry: PullerRegistryService;
     credentials: IngestionCredentialsService;
-    projects: ProjectService;
+    projects: GovernanceInternalProjectPort;
     sink: GovernanceOcsfEventSinkPort;
     usageEntitlement: PulledUsageEntitlementPort;
     usageRecords: PulledUsageRecordService;

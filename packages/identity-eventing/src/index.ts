@@ -129,6 +129,34 @@ export {
   type PostgresJoinRequestPipelineOptions,
 } from "./adapters/postgres.join-request-pipeline.adapter";
 export {
+  PostgresSsoConnectionPipelineAdapter,
+  type PostgresSsoConnectionPipelineOptions,
+  type SsoConnectionPipelineDatabase,
+} from "./adapters/postgres.sso-connection-pipeline.adapter";
+export {
+  EventingSsoConnectionTeardownAdapter,
+  SsoConnectionDirectoryRevocationPort,
+  UnrevokedSsoConnectionDirectory,
+} from "./adapters/eventing.sso-connection-teardown.adapter";
+export {
+  SSO_CONNECTION_CONVERGENCE_POLL_MS,
+  SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS,
+  SsoConnectionLedgerWriter,
+  type SsoConnectionLedgerWriterDeps,
+  type SsoConnectionStagedSender,
+} from "./adapters/eventing.sso-connection-ledger.adapter";
+export {
+  PrismaSsoConnectionProjectionRepository,
+  rowToConnection,
+  type PrismaSsoConnectionProjectionDatabase,
+} from "./repositories/prisma/prisma.sso-connection-projection.repository";
+export {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+  type PrismaSsoConnectionReadDatabase,
+  type PrismaSsoConnectionStrandingDatabase,
+} from "./repositories/prisma/prisma.sso-connection-reads.repository";
+export {
   JOIN_REQUEST_EXPIRY_MS,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
   JOIN_REQUEST_REMINDER_MS,

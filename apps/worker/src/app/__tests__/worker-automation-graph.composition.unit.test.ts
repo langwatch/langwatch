@@ -11,7 +11,10 @@ import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-se
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
-import { tryCreateWorkerAutomationGraphComposition } from "../worker-automation-graph.composition";
+import {
+  tryCreateWorkerAutomationDelivery,
+  tryCreateWorkerAutomationGraphComposition,
+} from "../worker-automation-graph.composition";
 import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition";
 
 /**
@@ -66,16 +69,24 @@ function composeGraph(
   const database = createGraphActivityPrismaDouble(seed);
   const mailer = new RecordingMailer();
   const slackApi = new RecordingSlackApi();
-  const graph = tryCreateWorkerAutomationGraphComposition({
+  const mail = { delivery: mailer, baseHost: config.mail?.baseHost ?? "" };
+  const delivery = tryCreateWorkerAutomationDelivery({
     config,
-    prisma: database.prisma as never,
-    mail: { delivery: mailer, baseHost: config.mail?.baseHost ?? "" },
-    dependencies: {
-      projects: new OneProject(),
-      analytics: new BreachingAnalytics() as unknown as AnalyticsService,
-    },
+    mail,
     slackApiTransport: slackApi,
   });
+  const graph = delivery
+    ? tryCreateWorkerAutomationGraphComposition({
+        config,
+        delivery,
+        prisma: database.prisma as never,
+        mail,
+        dependencies: {
+          projects: new OneProject(),
+          analytics: new BreachingAnalytics() as unknown as AnalyticsService,
+        },
+      })
+    : undefined;
 
   return { config, graph, mailer, slackApi, database };
 }
@@ -123,14 +134,9 @@ describe("tryCreateWorkerAutomationGraphComposition", () => {
     it("leaves a supplied transport alone, so a test can observe a dispatch", () => {
       const created = vi.spyOn(WebhookEgressService, "create");
 
-      tryCreateWorkerAutomationGraphComposition({
+      tryCreateWorkerAutomationDelivery({
         config: resolveWorkerConfig(ENVIRONMENT),
-        prisma: createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] }).prisma as never,
         mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
-        dependencies: {
-          projects: new OneProject(),
-          analytics: new BreachingAnalytics() as unknown as AnalyticsService,
-        },
         webhookTransport: {
           send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
           assertDelivered: () => undefined,
@@ -244,6 +250,9 @@ describe("resolveWorkerConfig automation leaves", () => {
         emailHourlyCap: 7,
         tenantDailyCap: 70,
         credentialsEncryptionKey: "ab".repeat(32),
+        persistDailyCapFree: 100,
+        persistDailyCapPaid: 1000,
+        persistDailyCapEnterprise: 10000,
       });
       expect(config.mail?.unsubscribeSigningSecret).toBe("0f".repeat(32));
     });
@@ -256,6 +265,9 @@ describe("resolveWorkerConfig automation leaves", () => {
         emailHourlyCap: 100,
         tenantDailyCap: 10000,
         credentialsEncryptionKey: "0f".repeat(32),
+        persistDailyCapFree: 100,
+        persistDailyCapPaid: 1000,
+        persistDailyCapEnterprise: 10000,
       });
     });
   });
@@ -268,11 +280,21 @@ describe("resolveWorkerConfig automation leaves", () => {
       // own Prisma client, and only `AnalyticsService` is still handed in.
       /** @scenario "The graph vertical takes the project reads this process composes" */
       it("accepts the composed project metadata service as its project reads", () => {
+        const config = resolveWorkerConfig(ENVIRONMENT);
+        const mail = { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST };
         const graph = tryCreateWorkerAutomationGraphComposition({
-          config: resolveWorkerConfig(ENVIRONMENT),
+          config,
+          delivery: tryCreateWorkerAutomationDelivery({
+            config,
+            mail,
+            webhookTransport: {
+              send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
+              assertDelivered: () => undefined,
+            },
+          })!,
           prisma: createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] })
             .prisma as never,
-          mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
+          mail,
           dependencies: {
             projects: createWorkerTraceCapabilityServices({
               database: {
@@ -284,10 +306,6 @@ describe("resolveWorkerConfig automation leaves", () => {
               } as never,
             }).projects,
             analytics: new BreachingAnalytics() as unknown as AnalyticsService,
-          },
-          webhookTransport: {
-            send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
-            assertDelivered: () => undefined,
           },
         });
 

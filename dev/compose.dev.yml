@@ -276,7 +276,7 @@ services:
 
   workers:
     image: node:24
-    working_dir: /platform/app
+    working_dir: /apps/worker
     profiles: [workers, scenarios, full]
     volumes:
       # See the init service for why the layout is rooted at `/` (ADR-076).
@@ -296,7 +296,7 @@ services:
       - root_modules:/node_modules
       - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
-    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/workers.ts; sleep 1; done"
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/worker.entrypoint.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here

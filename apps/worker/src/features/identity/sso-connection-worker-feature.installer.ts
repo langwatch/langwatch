@@ -1,11 +1,27 @@
+import type {
+  Event,
+  Projection,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
+/**
+ * A registrable Eventing definition, left open in its own event union.
+ *
+ * `prepareEventForProjection` is contravariant in the event type, so a
+ * definition pinned to the base `Event` refuses the very definition the
+ * connection ledger publishes over its own discriminated union.
+ */
+type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
+  TEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
 
 /** SSO connections' worker-facing capability: the built pipeline definition. */
-export interface SsoConnectionWorkerCapability {
+export interface SsoConnectionWorkerCapability<TEvent extends Event = Event> {
   /**
    * The SSO connection pipeline (D04, ADR-117 §5), teardown grace timer
    * included.
@@ -13,7 +29,7 @@ export interface SsoConnectionWorkerCapability {
    * Built by the composition root: its projection store, its guards and the
    * teardown port are storage and delivery bindings the worker does not own.
    */
-  readonly pipeline: WorkerPipelineDefinition;
+  readonly pipeline: WorkerPipelineDefinition<TEvent>;
 }
 
 /**
@@ -32,26 +48,25 @@ export interface SsoConnectionWorkerCapability {
  * same change.
  */
 export class SsoConnectionWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
-  static create(options: {
-    installer: SsoConnectionWorkerCapability;
+  static create<TEvent extends Event>(options: {
+    installer: SsoConnectionWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
   }): SsoConnectionWorkerFeatureInstaller {
-    return new SsoConnectionWorkerFeatureInstaller(options.installer, options.eventing);
+    return new SsoConnectionWorkerFeatureInstaller(() =>
+      options.eventing.eventSourcing.register(options.installer.pipeline),
+    );
   }
 
   readonly name = "sso-connection";
   private installed = false;
 
-  private constructor(
-    private readonly installer: SsoConnectionWorkerCapability,
-    private readonly eventing: WorkerEventingRuntime,
-  ) {
+  private constructor(private readonly registerPipeline: () => unknown) {
     super();
   }
 
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
-      this.eventing.eventSourcing.register(this.installer.pipeline);
+      this.registerPipeline();
       this.installed = true;
     }
     return SsoConnectionWorkerFeatureHandle.create();

@@ -5,15 +5,19 @@ import {
   PERSIST_TRIGGER_ACTIONS,
   type TriggerSummary,
 } from "@langwatch/automation-contract";
-import type { AutomationService } from "@langwatch/automation-contract";
-import type { Project, ProjectService } from "@langwatch/project-contract";
-import { TraceNotFoundError, type TraceRecord, type TraceService } from "@langwatch/trace-contract";
+import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
 import {
   AutomationDatasetMapperPort,
   AutomationPersistActionWriterPort,
 } from "../ports/automation-persist-action.port";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
+
+/** The project read this path makes: an existence check, and nothing else. */
+type PersistActionProject = { id: string; name: string; slug: string };
 
 const logger = createLogger("langwatch:automation:persist-action");
 
@@ -30,17 +34,17 @@ function sanitizeRecord(record: Record<string, string | number>): Record<string,
  * project/trace services and named write/mapping ports. */
 export class AutomationPersistActionService {
   private constructor(
-    private readonly automation: AutomationService,
-    private readonly projects: ProjectService,
-    private readonly traces: TraceService,
+    private readonly automation: AutomationSettlementLedgerPort,
+    private readonly projects: AutomationProjectIdentityPort,
+    private readonly traces: AutomationSettlementTraceReaderPort,
     private readonly mapper: AutomationDatasetMapperPort,
     private readonly writer: AutomationPersistActionWriterPort,
   ) {}
 
   static create(input: {
-    automation: AutomationService;
-    projects: ProjectService;
-    traces: TraceService;
+    automation: AutomationSettlementLedgerPort;
+    projects: AutomationProjectIdentityPort;
+    traces: AutomationSettlementTraceReaderPort;
     mapper: AutomationDatasetMapperPort;
     writer: AutomationPersistActionWriterPort;
   }): AutomationPersistActionService {
@@ -57,7 +61,7 @@ export class AutomationPersistActionService {
     trigger: TriggerSummary;
     traceId: string;
     tenantId: string;
-    project?: Project;
+    project?: PersistActionProject;
   }): Promise<void> {
     const { trigger, traceId, tenantId } = input;
     const project = input.project ?? (await this.projects.tryGetById(tenantId));

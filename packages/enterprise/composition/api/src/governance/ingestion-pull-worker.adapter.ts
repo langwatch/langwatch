@@ -6,7 +6,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import {
   BuiltInPullerRegistryService,
   GovernanceHttpPort,
@@ -298,14 +298,14 @@ export class AppIngestionPullWorkerAdapter {
   private constructor(
     private readonly sources: IngestionPullSourcePort,
     private readonly host: GovernanceIngestionPullHost,
-    private readonly projects: ProjectService,
+    private readonly projects: GovernanceInternalProjectPort,
     private readonly events: AppGovernanceOcsfEventsAdapter | undefined,
   ) {}
 
   static create(options: {
     sources: IngestionPullSourcePort;
     host: GovernanceIngestionPullHost;
-    projects: ProjectService;
+    projects: GovernanceInternalProjectPort;
     events: AppGovernanceOcsfEventsAdapter | undefined;
   }): AppIngestionPullWorkerAdapter {
     return new AppIngestionPullWorkerAdapter(

@@ -179,7 +179,6 @@ const define = {
 
 const ENTRIES = [
   { name: "server", entry: "src/server.mts" },
-  { name: "workers", entry: "src/workers.ts" },
   { name: "task", entry: "src/task.ts" },
   {
     // Spawned per scenario run by the Scenario server child-process adapter,

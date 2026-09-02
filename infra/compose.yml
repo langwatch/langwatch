@@ -32,8 +32,8 @@ services:
 
   workers:
     image: langwatch/langwatch:latest
-    command: ["pnpm", "run", "start:workers"]
-    working_dir: /app/platform/app
+    command: ["pnpm", "run", "start"]
+    working_dir: /app/apps/worker
     environment:
       SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
