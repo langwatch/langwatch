@@ -2,11 +2,19 @@
  * The application chrome, as this package serves it.
  *
  * WHAT IT IS. One layout route above the two project-scoped groups of the route
- * table. It mounts the navigation host once and draws a header — the mark, the
- * project switcher, the way into settings — around every page THIS package
- * serves. A page `platform/app` still serves keeps its own `DashboardLayout`
- * and gets the bare outlet, so no address ends up with two headers; the branch
- * that decides goes away with the last legacy loader.
+ * table. It mounts the navigation host once and draws the WHOLE SHELL — the top
+ * bar with both switchers, the product sidebar, the content card and the page
+ * body inside it — around every page THIS package serves. A page `platform/app`
+ * still serves keeps its own `DashboardLayout` and gets the bare outlet, so no
+ * address ends up with two of everything; the branch that decides goes away
+ * with the last legacy loader.
+ *
+ * THE SHELL ITSELF IS `@langwatch/navigation-web`'s. It moved there whole out
+ * of `platform/app`'s `components/DashboardLayout`, `MainMenu`,
+ * `PersonalSidebar`, `components/sidebar/**`, `AppHeaderUserMenu`,
+ * `DashboardPageBody` and the ten `features/navigation/shell/*` modules. What
+ * stays here is the composition: which page keys this half serves, the host
+ * port that answers for the workspace, and the drawer mount.
  *
  * WHY IT IS HERE AND NOT IN A PACKAGE, the same argument the settings chrome
  * already makes for itself: it is host chrome shared by every family, so no one
@@ -56,6 +64,10 @@ export { chromePageLoaders };
  * a static export from here would put the layout inside that cycle at module
  * initialisation and drag the chrome into the bundle a signed-out reader
  * downloads for the front door. The switcher blocks have no such reach.
+ *
+ * They are still exported because they are handed ACROSS seams: a screen's own
+ * host port carries the project switcher as a `ReactNode`, so the screen
+ * decides where in its header it goes. The shell draws its own.
  */
 export { UiProductSwitcher } from "./ui/blocks/ui-product-switcher";
-export { UiProjectSwitcher, projectSwitchHref } from "./ui/blocks/ui-project-switcher";
+export { UiProjectSwitcher } from "./ui/blocks/ui-project-switcher";

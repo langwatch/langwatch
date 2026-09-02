@@ -16,8 +16,19 @@ import type { ComponentType } from "react";
 
 export type NavigationScreenLoader = () => Promise<{ default: ComponentType }>;
 
+/**
+ * The three addresses this package serves.
+ *
+ * `landing` is `/`. `notFound` is the address that names no page, and
+ * `projectRedirect` is `/@project/<rest>` — the link that means "this page, in
+ * whichever project I am in". All three are navigation decisions rather than
+ * product surfaces, which is why they share one entry point and one host port
+ * rather than an export path each.
+ */
 export const navigationScreens = {
   landing: () => import("./landing.screen"),
+  notFound: () => import("../not-found/not-found.screen"),
+  projectRedirect: () => import("../project-redirect/project-redirect.screen"),
 } as const satisfies Record<string, NavigationScreenLoader>;
 
 export type NavigationScreenName = keyof typeof navigationScreens;
@@ -28,10 +39,19 @@ export {
   NavigationHostPort,
   NavigationHostProvider,
   useNavigationHost,
+  useOptionalNavigationHost,
+  type NavigationAccountMenu,
+  type NavigationCommandBar,
+  type NavigationDeployment,
   type NavigationFlagReading,
+  type NavigationOpsAccess,
   type NavigationOrganization,
+  type NavigationPlanReading,
   type NavigationProject,
+  type NavigationScopeWrite,
+  type NavigationSupportChat,
   type NavigationTeam,
+  type NavigationUser,
 } from "../../model/navigation-host";
 export {
   resolveHomeDestination,

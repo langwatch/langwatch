@@ -32,6 +32,16 @@ export const UI_SESSION_QUERY_KEY: readonly string[] = ["langwatch-ui", "auth", 
  */
 export type UiAuthClient = {
   $fetch: (path: string) => Promise<{ data?: unknown; error?: unknown }>;
+  /**
+   * Ends the session.
+   *
+   * Declared here because this client is the ONE identity instance in the
+   * document: a second `createAuthClient` would keep its own base URL and its
+   * own view of the session, and a governed web package may not construct one
+   * at all (`frontend-ui-boundaries` names `better-auth` by name). So the
+   * account menu asks its host, and the host asks this.
+   */
+  signOut: () => Promise<unknown>;
 };
 
 let sharedClient: UiAuthClient | undefined;
@@ -81,6 +91,18 @@ export function toUiActor(payload: unknown): UiActor | null {
     email: readableString(user.email),
     image: readableString(user.image),
   };
+}
+
+/**
+ * Ends the session on this device.
+ *
+ * Fire-and-forget on purpose: the endpoint clears the cookie, and what the
+ * reader sees next is decided by the address they are sent to rather than by
+ * this promise. A refusal leaves them signed in, which the next session read
+ * reports on its own.
+ */
+export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<void> {
+  await client.signOut();
 }
 
 /** One session read, over the client's own transport. */

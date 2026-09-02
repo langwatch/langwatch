@@ -29,11 +29,42 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
 
+/** What a live procedure hands its subscriber, one entry at a time. */
+export type UiRpcSubscriptionHandlers = {
+  onData?: (value: unknown) => void;
+  onError?: (error: unknown) => void;
+  onStarted?: () => void;
+  onStopped?: () => void;
+};
+
+/** A live procedure, while somebody is listening to it. */
+export type UiRpcSubscription = { unsubscribe: () => void };
+
 /** A procedure call addressed by path rather than by a typed hook. */
 export abstract class UiRpcPort {
   abstract query(path: string, input: unknown): Promise<unknown>;
 
   abstract mutate(path: string, input: unknown): Promise<unknown>;
+
+  /**
+   * A LIVE procedure, opened from outside React.
+   *
+   * The typed hooks cover every subscription a component watches;
+   * this is for the one that is driven from outside the tree — Langy bridges
+   * `langy.onTurnStream` into a `ReadableStream` an `useChat` transport reads,
+   * which is a plain async function and cannot hold a hook. It rides the SAME
+   * transport, so it takes the same SSE lane and the same session cookie a
+   * hook-driven subscription would.
+   *
+   * Nothing is cached: a stream of entries is not a query result, and writing
+   * one into the QueryClient would give the last entry the standing of an
+   * answer.
+   */
+  abstract subscribe(
+    path: string,
+    input: unknown,
+    handlers: UiRpcSubscriptionHandlers,
+  ): UiRpcSubscription;
 }
 
 export class BrowserUiRpc extends UiRpcPort {
@@ -58,6 +89,14 @@ export class BrowserUiRpc extends UiRpcPort {
     });
   }
 
+  subscribe(
+    path: string,
+    input: unknown,
+    handlers: UiRpcSubscriptionHandlers,
+  ): UiRpcSubscription {
+    return this.transport.subscription(path, input, handlers);
+  }
+
   async mutate(path: string, input: unknown): Promise<unknown> {
     const output = await this.transport.mutation(path, input);
     // Everything, because this dispatches whatever procedure the caller names
@@ -78,6 +117,12 @@ class UnavailableUiRpc extends UiRpcPort {
   }
 
   mutate(): never {
+    throw new Error(
+      "No UI transport is mounted above this screen; render it inside the application shell.",
+    );
+  }
+
+  subscribe(): never {
     throw new Error(
       "No UI transport is mounted above this screen; render it inside the application shell.",
     );

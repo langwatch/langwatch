@@ -4,110 +4,82 @@
  * A LAYOUT ROUTE, not a wrapper a screen opts into. It sits above the two
  * project-scoped groups of the route table, so everything behind a session
  * renders inside it and a screen that moved out of `platform/app` gets the
- * header without knowing it exists — which is the whole point, since a screen
+ * chrome without knowing it exists — which is the whole point, since a screen
  * in a feature package may not import this application at all.
  *
  * IT MOUNTS THE NAVIGATION HOST ONCE, above the swapping page. That is what
- * lets `projectSwitcher()` be a real answer instead of the `null` the
- * organization and secret families had to record: the control needs a workspace
- * graph, and one host above the outlet is one graph for every screen below it.
+ * lets the sidebar, the two switchers and the screen below them read ONE
+ * workspace graph. One host above the outlet is one graph for every surface.
  *
- * WHY IT ASKS WHICH HALF SERVES THE PAGE. A page `platform/app` still serves
- * renders its own `DashboardLayout`, header and all. Drawing this header above
- * that one would give those pages two. So the chrome is drawn over the pages
- * whose loader is registered HERE, and a legacy page gets the bare outlet it
- * gets today. The question disappears with the last legacy loader, and so does
- * the branch.
+ * IT DRAWS THE WHOLE SHELL NOW, not a header strip. `@langwatch/navigation-web`
+ * carries the application shell — the top bar with the product and project
+ * switchers, the product sidebar, the settings menu, the content card and the
+ * page body inside it — moved whole out of `platform/app`'s `DashboardLayout`
+ * and its navigation-v2 shell. What is left here is the composition: which page
+ * keys this half serves, and the drawer mount.
+ *
+ * WHY IT STILL ASKS WHICH HALF SERVES THE PAGE. A page `platform/app` still
+ * serves renders its own `DashboardLayout`, sidebar and all. Drawing this shell
+ * above that one would give those addresses two of everything. So the shell is
+ * drawn over the pages whose loader is registered HERE, and a legacy page gets
+ * the bare outlet it gets today. The question disappears with the last legacy
+ * loader, and so does the branch.
  *
  * IT MOUNTS `CurrentDrawer`, AND THAT CLOSES THE GAP EIGHTEEN MANIFESTS
  * RECORDED. Every moved family wrote the same line: a screen asks its host to
  * open a drawer, the host writes `?drawer.open=<name>`, and nothing opened —
  * because the mount lived in `platform/app`'s `DashboardLayout` and the
- * registry it read named forty-five modules of that application. The registry
- * is composed now (`installed-ui-drawers.ts`) and the mount is here, once,
- * above the outlet, which is the only place a drawer opened from any page can
- * render.
+ * registry it read named modules of that application. The registry is composed
+ * now (`installed-ui-drawers.ts`) and the mount is here, once, above the
+ * outlet, which is the only place a drawer opened from any page can render.
  *
- * OUTSIDE THE HEADER BRANCH ON PURPOSE. The header is drawn only over pages
- * this application serves, because a legacy page brings its own. A DRAWER is
- * not chrome in that sense: it is addressed by the query string, it renders
- * through a portal, and a reader who follows `?drawer.open=…` onto a legacy
- * page is asking for the same drawer. So the mount is unconditional and the
- * header stays conditional.
+ * OUTSIDE THE SHELL BRANCH ON PURPOSE. The shell is drawn only over pages this
+ * application serves, because a legacy page brings its own. A DRAWER is not
+ * chrome in that sense: it is addressed by the query string, it renders through
+ * a portal, and a reader who follows `?drawer.open=…` onto a legacy page is
+ * asking for the same drawer. So the mount is unconditional and the shell stays
+ * conditional.
  */
 
-import { Box, HStack, Spacer } from "@chakra-ui/react";
-import { LogoIcon } from "@langwatch/navigation-web/chrome";
+import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-web/chrome";
 import { CurrentDrawer } from "@langwatch/ui-drawer";
-import { Settings } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link as RouterLink, Outlet, useMatches } from "react-router";
+import { Outlet, useMatches } from "react-router";
 import { installedUiDrawers } from "../../../installed-ui-drawers";
 import { isUiInstalledPage } from "../../../installed-ui-page-keys";
 import { NavigationHostSection } from "../../../navigation";
 import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
-import { UiProductSwitcher } from "../blocks/ui-product-switcher";
-import { UiProjectSwitcher } from "../blocks/ui-project-switcher";
-
-/** The bar's height. */
-const UI_APP_CHROME_HEIGHT = 48;
-
-function UiAppChromeBar() {
-  return (
-    <HStack
-      as="header"
-      height={`${UI_APP_CHROME_HEIGHT}px`}
-      flexShrink={0}
-      width="full"
-      paddingX={3}
-      gap={2}
-      borderBottomWidth="1px"
-      borderColor="border"
-      background="bg.panel"
-    >
-      <RouterLink to="/" aria-label="LangWatch home">
-        <Box display="flex" alignItems="center" paddingX={1}>
-          <LogoIcon width={16} height={22} />
-        </Box>
-      </RouterLink>
-      <UiProductSwitcher />
-      <UiProjectSwitcher />
-      <Spacer />
-      <RouterLink to="/settings" aria-label="Settings">
-        <Box display="flex" alignItems="center" color="fg.muted" padding={2}>
-          <Settings size={16} />
-        </Box>
-      </RouterLink>
-    </HStack>
-  );
-}
-
-function UiAppChromeFrame({ children }: { children: ReactNode }) {
-  return (
-    <Box display="flex" flexDirection="column" width="full" height="full" minHeight="100vh">
-      <UiAppChromeBar />
-      <Box flex={1} minHeight={0} width="full">
-        {children}
-      </Box>
-    </Box>
-  );
-}
 
 export default function UiAppChrome() {
+  return (
+    <NavigationHostSection>
+      <UiAppChromeBody />
+      <CurrentDrawer drawers={installedUiDrawers} />
+    </NavigationHostSection>
+  );
+}
+
+/**
+ * Everything that has to be INSIDE the host, which is the two write points as
+ * much as the shell.
+ *
+ * `useNavigationTracking` keeps the per-organization product memory current and
+ * captures the page a reader left when they enter Settings. Both are what the
+ * sidebar's own "Back to {product}" entry reads, so a chrome that draws that
+ * entry without mounting this offers a way back that never learns where back
+ * is. It sits here rather than in the layout above because it asks the host,
+ * and the host is mounted by the layout above.
+ */
+function UiAppChromeBody() {
+  useNavigationTracking();
   const matches = useMatches();
   const page = uiMatchedPageKey(matches);
   const servedHere = page !== void 0 && isUiInstalledPage(page);
 
+  if (!servedHere) return <Outlet />;
+
   return (
-    <NavigationHostSection>
-      {servedHere ? (
-        <UiAppChromeFrame>
-          <Outlet />
-        </UiAppChromeFrame>
-      ) : (
-        <Outlet />
-      )}
-      <CurrentDrawer drawers={installedUiDrawers} />
-    </NavigationHostSection>
+    <NavigationShell>
+      <Outlet />
+    </NavigationShell>
   );
 }

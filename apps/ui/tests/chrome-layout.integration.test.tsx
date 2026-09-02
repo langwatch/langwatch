@@ -1,31 +1,108 @@
 /**
  * @vitest-environment jsdom
  *
- * The chrome layout route: which pages it draws a header around, and where a
+ * The chrome layout route: which pages it draws the SHELL around, and where a
  * project pick lands.
  *
- * The header is drawn over the pages THIS package serves and not over the ones
- * `platform/app` still serves, because those bring their own `DashboardLayout`
- * and would otherwise show two. The rule is exact rather than heuristic — a
- * package screen cannot import `platform/app`, so it cannot have brought a
- * header — and both directions are asserted here.
+ * The shell — the top bar, the product sidebar and the content card — is drawn
+ * over the pages THIS package serves and not over the ones `platform/app`
+ * still serves, because those bring their own `DashboardLayout` and would
+ * otherwise show two of everything. The rule is exact rather than heuristic —
+ * a package screen cannot import `platform/app`, so it cannot have brought a
+ * chrome — and both directions are asserted here.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { projectSwitchHref } from "../src/features/chrome/ui/blocks/ui-project-switcher";
+import { projectSwitchHref } from "@langwatch/navigation-web/chrome";
 import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
 
 vi.mock("../src/features/navigation", () => ({
-  NavigationHostSection: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  NavigationHostSection: ({ children }: { children: React.ReactNode }) => (
+    <ShellTransport>
+      <WithStubNavigationHost readings={SHELL_READINGS}>{children}</WithStubNavigationHost>
+    </ShellTransport>
+  ),
 }));
 
-// Both switchers read the navigation host, which the stubbed section above does
-// not mount. Their own "no host, no switcher" path is what renders here, and it
-// is what the header would show on a page the chrome reaches before the graph
-// lands — so the header assertions below are about the frame, not the controls.
+/**
+ * The Providers the shell's own reads run on.
+ *
+ * The shell asks four procedures for itself — the usage meter, the pending
+ * annotation count, the personal-workspace features and the per-organization
+ * product flags — so a suite that stubs the host still has to give those hooks
+ * a client to be mounted under. Nothing answers: every query fails against no
+ * server, which is exactly the frame this suite is about, since each of those
+ * reads renders nothing until it has data.
+ */
+/**
+ * A desktop viewport, because jsdom does not implement `matchMedia` at all.
+ *
+ * Without it every Chakra breakpoint query reports false, `base` wins, and the
+ * shell draws its PHONE chrome — one compact bar and a full-screen menu, with
+ * no sidebar column to find. The stub answers every `min-width` query yes,
+ * which is what a wide window looks like.
+ */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+function ShellTransport({ children }: { children: React.ReactNode }) {
+  useDesktopViewport();
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <navigationApi.Provider client={client} queryClient={queryClient}>
+        {children}
+      </navigationApi.Provider>
+    </QueryClientProvider>
+  );
+}
+
+/**
+ * Enough workspace for the shell to draw itself.
+ *
+ * The shell waits on the graph before it renders anything — a chrome drawn
+ * against half a workspace is how a reader ends up looking at another
+ * organization's sidebar — so a suite about the LAYOUT has to hand it a
+ * resolved one. `organization:view` is what puts the Settings entry in the
+ * column, which is the assertion below.
+ */
+const TEAM = {
+  id: "team-1",
+  name: "Core",
+  members: [{ userId: "user-1" }],
+  projects: [{ id: "project-1", name: "Acme App", slug: "acme-app" }],
+};
+const ORGANIZATION = { id: "org-1", name: "Acme", teams: [TEAM] };
+const SHELL_READINGS = {
+  organizations: [ORGANIZATION],
+  organization: ORGANIZATION,
+  team: TEAM,
+  project: TEAM.projects[0],
+  currentUser: { id: "user-1", name: "Ada", email: "ada@example.com", image: null },
+  permissions: ["organization:view"],
+  pathname: "/here",
+};
 
 vi.mock("../src/features/installed-ui-page-keys", () => ({
   isUiInstalledPage: (key: string) => key === "pages/served-here",
@@ -79,25 +156,30 @@ function renderAt(path: string) {
 
 describe("given the chrome layout route", () => {
   describe("when the matched page is one this package serves", () => {
-    it("draws the header around it", async () => {
+    it("draws the shell around it", async () => {
       renderAt("/here");
 
       await waitFor(() => {
         expect(screen.getByText("packaged screen")).toBeTruthy();
       });
-      expect(screen.getByLabelText("LangWatch home")).toBeTruthy();
+      // The sidebar column and the content card are the two halves of the
+      // shell the page renders inside; the entry proves the column is the real
+      // one rather than an empty frame.
+      expect(screen.getByTestId("product-sidebar")).toBeTruthy();
+      expect(screen.getByTestId("shell-content-column")).toBeTruthy();
       expect(screen.getByLabelText("Settings")).toBeTruthy();
     });
   });
 
   describe("when the matched page is one platform/app still serves", () => {
-    it("renders the page bare, so its own DashboardLayout is the only header", async () => {
+    it("renders the page bare, so its own DashboardLayout is the only chrome", async () => {
       renderAt("/legacy");
 
       await waitFor(() => {
         expect(screen.getByText("legacy screen")).toBeTruthy();
       });
-      expect(screen.queryByLabelText("LangWatch home")).toBeNull();
+      expect(screen.queryByTestId("product-sidebar")).toBeNull();
+      expect(screen.queryByTestId("shell-content-column")).toBeNull();
     });
   });
 });

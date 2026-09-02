@@ -50,8 +50,27 @@ export type NavigationApiMap = {
             id: string;
             name: string;
             isPersonal?: boolean | null;
+            /**
+             * Whose personal workspace a personal team is.
+             *
+             * A `Team` column the procedure already returns; the chrome reads
+             * it to tell the reader's own workspace from somebody else's,
+             * opened with administrative reach.
+             */
+            ownerUserId?: string | null;
             members?: Array<{ userId: string }>;
-            projects: Array<{ id: string; name: string; slug: string }>;
+            projects: Array<{
+              id: string;
+              name: string;
+              slug: string;
+              /**
+               * `Project` columns the procedure already returns. The project
+               * column offers a Sessions and a Pull requests destination only
+               * while these are recent (`coding-agent-activity`).
+               */
+              lastCodingAgentSessionAt?: string | Date | null;
+              lastCodingAgentPullRequestAt?: string | Date | null;
+            }>;
           }>;
         }>;
       };
@@ -65,6 +84,106 @@ export type NavigationApiMap = {
         input: { organizationId: string };
         output: NavigationHomeResolution;
       };
+    };
+
+    /**
+     * Records that an administrator opened somebody else's workspace.
+     *
+     * The shell's page body fires it once per project the administrator drills
+     * into, which is the only place the product knows a cross-scope read
+     * happened at all. Fail-quiet on the client: a refused emission must not
+     * stop the page rendering.
+     */
+    recordWorkspaceView: {
+      mutation: {
+        input: {
+          organizationId: string;
+          targetTeamId: string;
+          kind: "personal";
+          workspaceLabel: string;
+        };
+        output: unknown;
+      };
+    };
+  };
+
+  limits: {
+    /**
+     * The organization's plan and what it has spent this month.
+     *
+     * THE SAME PATH AND INPUT the application shell asks with, so the sidebar
+     * meter, the shell's limit banners and `apps/ui`'s own plan read all land
+     * on one cache entry rather than three requests for one answer.
+     *
+     * `currentMonthMessagesCount` is null on unlimited and legacy answers,
+     * which is why the meter reads it before dividing by anything.
+     */
+    getUsage: {
+      query: {
+        input: { organizationId: string };
+        output: {
+          activePlan: {
+            type?: string;
+            free: boolean;
+            maxMessagesPerMonth: number;
+          };
+          currentMonthMessagesCount: number | null;
+          currentMonthCost: number;
+          maxMonthlyUsageLimit: number;
+          usageUnit?: string;
+          messageLimitInfo?: { status: string; message: string };
+        };
+      };
+    };
+  };
+
+  annotation: {
+    /** The badge on the Annotations entry: how many items still want a look. */
+    getPendingItemsCount: {
+      query: { input: { projectId: string }; output: number };
+    };
+  };
+
+  personalWorkspaceFeatures: {
+    /**
+     * Which library entries the reader unlocked in their personal workspace.
+     *
+     * Default-empty rather than default-on: an existing reader sees Traces
+     * alone until the bundle is turned on in `/me/configure`.
+     */
+    get: {
+      query: {
+        input: { projectId: string };
+        output: {
+          evaluations?: boolean;
+          datasets?: boolean;
+          annotations?: boolean;
+          automations?: boolean;
+        };
+      };
+    };
+  };
+
+  featureFlag: {
+    /**
+     * One flag, answered for several organizations at once.
+     *
+     * The organization switch needs the TARGET organization's reachable
+     * products before it can pick a landing address, and a per-organization
+     * flag read is the only gate resolvable from the top bar.
+     */
+    isEnabledForEachOrganization: {
+      query: {
+        input: { flag: string; organizationIds: string[] };
+        output: { enabledByOrganizationId?: Record<string, boolean> };
+      };
+    };
+  };
+
+  user: {
+    /** Whether the reader still owes their organization an SSO link. */
+    getSsoStatus: {
+      query: { input: Record<string, never>; output: { pendingSsoSetup?: boolean } };
     };
   };
 };

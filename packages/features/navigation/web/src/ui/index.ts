@@ -11,6 +11,14 @@
  * answer rather than a null.
  */
 
+export { NavigationShell } from "./sections/navigation-shell";
+export { ShellPageBody, planManagementHref } from "./sections/shell-page-body";
+export { ProductSidebar, SidebarContent, type SidebarSurface } from "./sections/product-sidebar";
+export { MainMenuSections, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./sections/main-menu";
+export { PersonalSidebarLinks } from "./sections/personal-sidebar";
+export { AppHeaderUserMenu } from "./sections/app-header-user-menu";
+export { NavigationLink } from "./elements/navigation-link";
+export { SideMenuDensityProvider, useSideMenuDensity } from "./elements/side-menu-density";
 export { ProductSwitcherMenu } from "./blocks/product-switcher-menu";
 export { ProjectSwitcherCombobox } from "./blocks/project-switcher-combobox";
 export { ProjectAvatar } from "./elements/project-avatar";
@@ -26,11 +34,47 @@ export {
   NavigationHostProvider,
   useNavigationHost,
   useOptionalNavigationHost,
+  type NavigationAccountMenu,
+  type NavigationCommandBar,
+  type NavigationDeployment,
+  type NavigationFlagReading,
+  type NavigationOpsAccess,
   type NavigationOrganization,
+  type NavigationPlanReading,
   type NavigationProject,
+  type NavigationScopeWrite,
+  type NavigationSupportChat,
   type NavigationTeam,
+  type NavigationUser,
 } from "../model/navigation-host";
 export { useNavigationMode, type NavigationModeResolution } from "../behavior/use-navigation-mode";
+export { useNavigationTracking } from "../behavior/use-navigation-tracking";
+export {
+  isNavigationV2ShellRoute,
+  useNavigationV2ShellActive,
+} from "../behavior/use-navigation-shell-active";
+export {
+  projectSwitchHref,
+  useProjectPickGroups,
+} from "../behavior/use-project-pick-groups";
+export { useSettingsMenu } from "../behavior/use-settings-menu";
+export {
+  settingsMenu,
+  isSettingsMenuItemActive,
+  opsGroup,
+  backofficeGroup,
+  type SettingsMenuGates,
+  type SettingsMenuGroup,
+  type SettingsMenuItem,
+} from "../model/settings-menu";
+export { featureIcons, type FeatureKey } from "../model/feature-icons";
+export { APP_HEADER_HEIGHT } from "../model/menu-widths";
+export {
+  projectNavItems,
+  projectNavItemAt,
+  toProjectRoutePattern,
+  type ProjectNavItem,
+} from "../model/project-nav-items";
 export { useReachableProducts } from "../behavior/use-reachable-products";
 export { useLlmOpsProjectSlug, resolveLlmOpsProjectSlug } from "../behavior/use-llm-ops-project-slug";
 export { useIsMobileViewport } from "../behavior/use-is-mobile-viewport";

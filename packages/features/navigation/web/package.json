@@ -2,7 +2,7 @@
   "name": "@langwatch/navigation-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe navigation: the product registry, the landing redirect, and the project switcher the application chrome renders.",
+  "description": "Browser-safe navigation: the application shell, the product registry, the landing redirect and the switchers the chrome renders.",
   "files": [
     "src"
   ],
@@ -32,7 +32,10 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "lucide-react": "^1.22.0",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "next-themes": "^0.4.6",
+    "react-icons": "^5.7.0",
+    "react-error-boundary": "^6.1.2"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
