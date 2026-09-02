@@ -26,6 +26,7 @@ describe("resolveWorkerConfig", () => {
       shutdown: { processDeadlineMs: 25_000 },
       github: { appId: undefined, privateKey: undefined, host: undefined },
       processing: { metricShards: undefined, logShards: undefined },
+      eventing: { foldCacheTtlSeconds: undefined },
       infrastructure: {
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {

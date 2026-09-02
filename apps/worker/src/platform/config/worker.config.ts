@@ -86,6 +86,30 @@ export const workerConfigDefinition = RuntimeConfig.define({
     metricShards: Config.value(optionalEnvironmentString, { env: "METRIC_PROCESSING_SHARDS" }),
     logShards: Config.value(optionalEnvironmentString, { env: "LOG_PROCESSING_SHARDS" }),
   },
+  /**
+   * The Eventing fold cache's consistency TTL (ADR-066).
+   *
+   * Read from the same variable the App reads. The App still produces into the
+   * pipelines this process folds, and both graphs cache one Redis keyspace, so
+   * two TTLs would expire each other's entries early — and a fold-cache miss is
+   * treated as authoritative, which makes an early expiry a stale read rather
+   * than an error. An unparseable value is no value: the store's own default
+   * already sits at the replication-lag floor, and it clamps anything below it.
+   */
+  eventing: {
+    foldCacheTtlSeconds: Config.value(
+      z
+        .string()
+        .optional()
+        .transform((value) => {
+          if (value === undefined || value === "") return void 0;
+
+          const parsed = Number.parseInt(value, 10);
+          return Number.isFinite(parsed) ? parsed : void 0;
+        }),
+      { env: "LANGWATCH_FOLD_CACHE_TTL_SECONDS" },
+    ),
+  },
   infrastructure: {
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
@@ -175,6 +199,11 @@ export type WorkerProcessingConfig = Readonly<{
   logShards?: string;
 }>;
 
+/** The Eventing substrate's own knobs, as this process resolved them. */
+export type WorkerEventingConfig = Readonly<{
+  foldCacheTtlSeconds?: number;
+}>;
+
 /** The GitHub App credentials the branch sweep mints installation tokens with. */
 export type WorkerGithubConfig = Readonly<{
   appId?: string;
@@ -193,6 +222,7 @@ export type WorkerConfig = Readonly<{
   shutdown: WorkerShutdownConfig;
   github: WorkerGithubConfig;
   processing: WorkerProcessingConfig;
+  eventing: WorkerEventingConfig;
   infrastructure: WorkerInfrastructureConfig;
 }>;
 
@@ -218,6 +248,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     }),
     github: value.github,
     processing: value.processing,
+    eventing: value.eventing,
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),

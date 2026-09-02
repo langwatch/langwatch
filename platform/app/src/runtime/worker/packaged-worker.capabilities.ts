@@ -187,7 +187,6 @@ export function packagedWorkerCapabilities(options: {
       },
     },
     trace: { installer: TraceProcessingServerInstaller.create(capabilities.trace) },
-    suite: { installer: { buildProcessing: () => definition("suite_run_processing") } },
     scenario: {
       installer: {
         buildProcessing: () => definition("simulation_processing"),

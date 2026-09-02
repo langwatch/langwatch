@@ -11,6 +11,10 @@ export {
   type ClickHouseSuiteEventingAdapterOptions,
 } from "./adapters/clickhouse.suite-eventing.adapter";
 export {
+  ClickHouseSuiteRunProcessingAdapter,
+  type ClickHouseSuiteRunProcessingAdapterOptions,
+} from "./adapters/clickhouse.suite-run-processing.adapter";
+export {
   SuiteExecutionPort,
   SuiteRunCommandsPort,
   SuiteRunIdPort,
@@ -25,6 +29,7 @@ export {
 } from "./adapters/suite-run-commands.adapter";
 export {
   createSuiteRunProcessingPipeline,
+  type SuiteRunProcessingPipeline,
   type SuiteRunProcessingPipelineDeps,
 } from "./adapters/suite-run-processing.adapter";
 export {

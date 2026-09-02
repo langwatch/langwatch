@@ -1,9 +1,7 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import type { SuiteRunProcessingPipeline } from "@langwatch/suite-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
-
-/** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /**
  * The two suite-run senders the Scenario pipeline's suite sync dispatches to.
@@ -29,7 +27,7 @@ export interface SuiteWorkerCapability {
    * redelivered item event double-counts a suite run's progress and can flip
    * its status to SUCCESS or FAILURE before the run has finished.
    */
-  buildProcessing(): WorkerPipelineDefinition;
+  buildProcessing(): SuiteRunProcessingPipeline;
 }
 
 /**

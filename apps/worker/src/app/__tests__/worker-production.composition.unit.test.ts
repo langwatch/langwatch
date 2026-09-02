@@ -1,8 +1,10 @@
 import {
+  createTenantId,
   InMemoryProcessStore,
   type AppendStore,
   type EventSourcedQueueProcessor,
   type EventSourcing,
+  type FoldProjectionStore,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
@@ -1016,6 +1018,186 @@ describe("WorkerProductionComposition", () => {
         "metric:3",
       ]);
       expect([...lanes.get("log_processing")!].sort()).toEqual(["log:0", "log:1"]);
+    });
+  });
+
+  /**
+   * Suite-run processing, composed here rather than handed over built.
+   *
+   * The pipeline itself was never the App's to own — it folds three commands
+   * into one ClickHouse table — but its fold store was assembled from three
+   * places at once (the projection store on the suite runtime, the version in
+   * the contract, the Redis cache on the registry), so no other process could
+   * put one together. What these cases hold is that THIS graph assembles it,
+   * from the tenant-keyed client, the retention and the Redis its own
+   * substrate already resolved, and that the cache lands in the keyspace the
+   * App reads. A pipeline wired to the wrong client or the wrong prefix
+   * registers exactly the same routing keys and is silently alone.
+   */
+  describe("when suite-run processing is composed", () => {
+    function compositionWith(
+      input: {
+        resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        redis?: object;
+        source?: Record<string, unknown>;
+      } = {},
+    ) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: (input.resolveClickHouseClient ??
+            (async () => ({
+              insert: async () => undefined,
+              query: async () => ({ json: async () => [] }),
+            }))) as never,
+          groupQueue: {
+            redis: (input.redis ?? { get: async () => null, set: async () => "OK" }) as never,
+          },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: {} as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+    }
+
+    /**
+     * What `eventSourcing.register` hands back for this pipeline.
+     *
+     * The installer resolves its two deferred senders out of the returned
+     * commands and refuses a registration missing either, so a bare
+     * `{ commands: {} }` would fail these cases for a reason none of them is
+     * about.
+     */
+    function registeredSuitePipeline() {
+      return {
+        commands: {
+          recordSuiteRunItemStarted: { send: async () => undefined },
+          completeSuiteRunItem: { send: async () => undefined },
+        },
+      } as never;
+    }
+
+    async function storeFoldedRunState(composition: WorkerProductionComposition): Promise<void> {
+      const stores: FoldProjectionStore<Record<string, unknown>>[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        if (definition.metadata.name !== "suite_run_processing") return registeredSuitePipeline();
+        for (const fold of definition.foldProjections.values()) {
+          stores.push(
+            (
+              fold.definition as unknown as {
+                store: FoldProjectionStore<Record<string, unknown>>;
+              }
+            ).store,
+          );
+        }
+        return registeredSuitePipeline();
+      });
+      await composition.featureInstallers
+        .find((candidate) => candidate.name === "suite")!
+        .install();
+
+      await stores[0]!.store(
+        {
+          SuiteRunId: "run_1",
+          BatchRunId: "batch_1",
+          ScenarioSetId: "suite:set_1",
+          SuiteId: "suite_1",
+          Status: "IN_PROGRESS",
+          Total: 2,
+          StartedCount: 1,
+          CompletedCount: 0,
+          FailedCount: 0,
+          Progress: 1,
+          PassRateBps: null,
+          PassedCount: 0,
+          GradedCount: 0,
+          CreatedAt: 100,
+          UpdatedAt: 200,
+          LastEventOccurredAt: 190,
+          StartedAt: 110,
+          FinishedAt: null,
+        },
+        { aggregateId: "batch_1", tenantId: createTenantId("project_alpha") },
+      );
+    }
+
+    /** @scenario "The worker mounts the pipeline rather than being handed one" */
+    it("mounts suite without being handed a capability, and registers its pipeline", async () => {
+      const composition = compositionWith();
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "suite",
+      );
+      expect(installer, "the composition mounted no suite feature").toBeDefined();
+      const registered: string[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push(definition.metadata.name);
+        return registeredSuitePipeline();
+      });
+
+      await installer!.install();
+
+      expect(registered).toEqual(["suite_run_processing"]);
+    });
+
+    /** @scenario "Suite-run state is written through the client this graph resolved" */
+    it("writes run state through the ClickHouse client this graph resolved", async () => {
+      const insert = vi.fn(
+        async (_request: { table: string; values: readonly unknown[] }) => undefined,
+      );
+      const resolveClickHouseClient = vi.fn(async () => ({
+        insert,
+        query: async () => ({ json: async () => [] }),
+      }));
+
+      await storeFoldedRunState(compositionWith({ resolveClickHouseClient }));
+
+      expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
+      // 49 is the substrate's own `retention.defaultRetentionDays` above, not
+      // a number configured a second time here. Two graphs stamping different
+      // retentions on the same table expire each other's rows.
+      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+        TenantId: "project_alpha",
+        _retention_days: 49,
+      });
+    });
+
+    /** @scenario "Both graphs cache the run-state fold under one keyspace" */
+    it("caches through the Redis its own queue substrate runs on", async () => {
+      const set = vi.fn(async () => "OK");
+      const redis = { get: vi.fn(async () => null), set };
+
+      await storeFoldedRunState(compositionWith({ redis }));
+
+      // The connection this graph's queue already holds, under the prefix the
+      // App's registry also caches by. A second connection would work and a
+      // drifted prefix would not fail — each side would simply read a cache
+      // the other never wrote, which is a stale read rather than an error.
+      expect(set.mock.calls[0]![0]).toBe("fold:suite_runs:project_alpha:batch_1");
+    });
+
+    /** @scenario "Producer and consumer honour one fold cache TTL" */
+    it("honours the fold cache TTL the environment names", async () => {
+      const set = vi.fn(async () => "OK");
+      const redis = { get: vi.fn(async () => null), set };
+
+      await storeFoldedRunState(
+        compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
+      );
+
+      // The same variable the App reads. Two graphs caching one keyspace under
+      // different TTLs expire each other's entries early, and a fold-cache miss
+      // is treated as authoritative.
+      expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", 900]);
     });
   });
 });

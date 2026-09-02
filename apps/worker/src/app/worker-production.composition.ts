@@ -31,6 +31,7 @@ import {
   ClickHouseMetricProcessingAdapter,
   resolveMetricCommandShardCount,
 } from "@langwatch/metric-server";
+import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
@@ -92,10 +93,7 @@ import {
   ScenarioWorkerFeatureInstaller,
   type ScenarioWorkerCapability,
 } from "../features/scenario/scenario-worker-feature.installer";
-import {
-  SuiteWorkerFeatureInstaller,
-  type SuiteWorkerCapability,
-} from "../features/suite/suite-worker-feature.installer";
+import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
 import {
   IdentityWorkerFeatureInstaller,
   type IdentityWorkerCapability,
@@ -245,11 +243,6 @@ export type WorkerGatewaySpendCompositionOptions = {
   spend: GatewaySpendWorkerCapability;
 };
 
-/** The Suite run pipeline, mounted before the Scenario pipeline that reports into it. */
-export type WorkerSuiteCompositionOptions = {
-  installer: SuiteWorkerCapability;
-};
-
 /** The Scenario (simulation run) pipeline and its durable metrics retry. */
 export type WorkerScenarioCompositionOptions = {
   installer: ScenarioWorkerCapability;
@@ -325,7 +318,6 @@ type WorkerProductionCompositionBaseOptions = {
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
   gatewaySpend?: WorkerGatewaySpendCompositionOptions;
-  suite?: WorkerSuiteCompositionOptions;
   scenario?: WorkerScenarioCompositionOptions;
   experiment?: WorkerExperimentCompositionOptions;
   governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
@@ -540,12 +532,28 @@ export class WorkerProductionComposition {
       eventing,
       traceAssignments: trace.traceAssignments,
     });
-    const suite = options.suite
-      ? SuiteWorkerFeatureInstaller.create({
-          installer: options.suite.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as metric and log: the pipeline is
+    // composed from its own feature package over the tenant-keyed ClickHouse
+    // client this graph already resolves its event store through, so there is
+    // no graph in which it is present but unbuildable.
+    //
+    // The fold cache rides `eventingOptions.groupQueue.redis` — the one Redis
+    // this process's queue substrate runs on, rather than a second connection
+    // — because the cache is not optional here: it carries the applied-event
+    // ids a redelivered item is dropped on, and the run-state fold accumulates
+    // by addition. Its TTL comes from the same variable the App reads, so the
+    // two graphs cannot expire each other's entries early.
+    const suite = SuiteWorkerFeatureInstaller.create({
+      eventing,
+      installer: ClickHouseSuiteRunProcessingAdapter.create({
+        resolveClient: options.eventing.resolveClickHouseClient,
+        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        redis: eventingOptions.groupQueue.redis,
+        ...(options.config.eventing.foldCacheTtlSeconds === undefined
+          ? {}
+          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      }),
+    });
     const scenario = options.scenario
       ? ScenarioWorkerFeatureInstaller.create({
           installer: options.scenario.installer,

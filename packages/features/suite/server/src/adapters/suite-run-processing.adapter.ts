@@ -116,3 +116,9 @@ export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelin
     })
     .build();
 }
+
+/**
+ * The definition this feature registers, named so a composition root can hold
+ * one without restating its shape.
+ */
+export type SuiteRunProcessingPipeline = ReturnType<typeof createSuiteRunProcessingPipeline>;

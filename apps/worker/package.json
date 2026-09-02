@@ -57,6 +57,7 @@
     "@langwatch/scenario-server": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/stored-object-server": "workspace:*",
+    "@langwatch/suite-server": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
