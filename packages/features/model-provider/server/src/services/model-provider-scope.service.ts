@@ -1,9 +1,10 @@
-import type {
-  OrganizationService,
-  OrganizationTeam,
-} from "@langwatch/organization-contract";
+import type { OrganizationService, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import {
+  ModelProviderProjectScopeService,
+  type ModelProviderProjectSystemContext,
+} from "./model-provider-project-scope.service";
 
 type ScopeReference = { id: string; name: string };
 
@@ -21,22 +22,24 @@ export type ModelProviderAvailableScopes = {
   projects: Array<ScopeReference & { teamId: string }>;
 };
 
-export type ModelProviderProjectSystemContext = {
-  scopes: ModelDefaultScope[];
-  referenceCreatedAt: Date;
-};
+export type { ModelProviderProjectSystemContext };
 
 export class ModelProviderScopeService {
   private constructor(
     private readonly projects: ProjectService,
     private readonly organizations: OrganizationService,
+    private readonly projectScopeFacts: ModelProviderProjectScopeService,
   ) {}
 
   static create(options: {
     projects: ProjectService;
     organizations: OrganizationService;
   }): ModelProviderScopeService {
-    return new ModelProviderScopeService(options.projects, options.organizations);
+    return new ModelProviderScopeService(
+      options.projects,
+      options.organizations,
+      ModelProviderProjectScopeService.create({ projects: options.projects }),
+    );
   }
 
   async getProjectContext(projectId: string): Promise<ModelProviderProjectContext> {
@@ -54,20 +57,12 @@ export class ModelProviderScopeService {
     };
   }
 
-  async getProjectScopes(projectId: string): Promise<ModelDefaultScope[]> {
-    const project = await this.projects.getWithTeam(projectId);
-    return projectScopes(project.id, project.teamId, project.team.organizationId);
+  getProjectScopes(projectId: string): Promise<ModelDefaultScope[]> {
+    return this.projectScopeFacts.getProjectScopes(projectId);
   }
 
-  async getProjectSystemContext(
-    projectId: string,
-  ): Promise<ModelProviderProjectSystemContext> {
-    const project = await this.projects.getWithTeam(projectId);
-
-    return {
-      scopes: projectScopes(project.id, project.teamId, project.team.organizationId),
-      referenceCreatedAt: project.createdAt,
-    };
+  getProjectSystemContext(projectId: string): Promise<ModelProviderProjectSystemContext> {
+    return this.projectScopeFacts.getProjectSystemContext(projectId);
   }
 
   async tryGetOrganizationSystemReference(organizationId: string): Promise<Date | null> {
@@ -91,26 +86,12 @@ export class ModelProviderScopeService {
     return lastPage.data[0]?.createdAt ?? null;
   }
 
-  async tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
-    const project = await this.projects.tryGetWithTeam(projectId);
-    return project
-      ? projectScopes(project.id, project.teamId, project.team.organizationId)
-      : null;
+  tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
+    return this.projectScopeFacts.tryGetProjectScopes(projectId);
   }
 
-  async tryResolveAnchor(input: {
-    projectId?: string;
-    organizationId?: string;
-  }): Promise<string | null> {
-    if (input.organizationId) {
-      return input.organizationId;
-    }
-    if (!input.projectId) {
-      return null;
-    }
-
-    const project = await this.projects.tryGetWithTeam(input.projectId);
-    return project?.team.organizationId ?? null;
+  tryResolveAnchor(input: { projectId?: string; organizationId?: string }): Promise<string | null> {
+    return this.projectScopeFacts.tryResolveAnchor(input);
   }
 
   async getOrganizationIdForScope(scope: ModelDefaultScope): Promise<string> {
@@ -148,9 +129,7 @@ export class ModelProviderScopeService {
     return organizationId;
   }
 
-  async listAvailableScopes(
-    organizationId: string,
-  ): Promise<ModelProviderAvailableScopes> {
+  async listAvailableScopes(organizationId: string): Promise<ModelProviderAvailableScopes> {
     const [organization, teams, projectIds] = await Promise.all([
       this.organizations.getBillingProfile({ organizationId }),
       this.listTeams(organizationId),
@@ -188,16 +167,4 @@ export class ModelProviderScopeService {
       page += 1;
     }
   }
-}
-
-function projectScopes(
-  projectId: string,
-  teamId: string,
-  organizationId: string,
-): ModelDefaultScope[] {
-  return [
-    { scopeType: "PROJECT", scopeId: projectId },
-    { scopeType: "TEAM", scopeId: teamId },
-    { scopeType: "ORGANIZATION", scopeId: organizationId },
-  ];
 }

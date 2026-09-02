@@ -27,6 +27,7 @@ import {
 } from "@langwatch/monitor-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorRepository } from "../repositories/monitor.repository";
+import { MonitorCatalogService } from "./monitor-catalog.service";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
@@ -46,10 +47,16 @@ function slugify(value: string): string {
 
 export class MonitorService extends MonitorServiceContract {
   static create(options: MonitorServiceOptions): MonitorService {
-    return new MonitorService(options);
+    return new MonitorService(
+      options,
+      MonitorCatalogService.create({ repository: options.repository }),
+    );
   }
 
-  private constructor(private readonly options: MonitorServiceOptions) {
+  private constructor(
+    private readonly options: MonitorServiceOptions,
+    private readonly catalog: MonitorCatalogService,
+  ) {
     super();
   }
 
@@ -58,7 +65,7 @@ export class MonitorService extends MonitorServiceContract {
   }
 
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
-    return this.options.repository.findEnabledOnMessage(projectId);
+    return this.catalog.getEnabledOnMessageMonitors(projectId);
   }
 
   listEnabledGuardrailMonitors(

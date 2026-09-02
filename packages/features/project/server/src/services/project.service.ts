@@ -48,12 +48,14 @@ import {
   type ProjectStoredObjectsPort,
 } from "../ports/project.port";
 import type { ProjectRepository } from "../repositories/project.repository";
+import { ProjectMetadataService } from "./project-metadata.service";
 import { ProjectSlugService } from "./project-slug.service";
 
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 
 export class ProjectService extends ProjectServiceContract {
   private constructor(
+    private readonly metadata: ProjectMetadataService,
     private readonly repository: ProjectRepository,
     private readonly credentials: ProjectCredentialsPort,
     private readonly organizations: OrganizationService,
@@ -73,6 +75,10 @@ export class ProjectService extends ProjectServiceContract {
     diagnostics?: ProjectDiagnosticsPort;
   }): ProjectService {
     return new ProjectService(
+      ProjectMetadataService.create({
+        repository: options.repository,
+        ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
+      }),
       options.repository,
       options.credentials,
       options.organizations,
@@ -198,7 +204,7 @@ export class ProjectService extends ProjectServiceContract {
   }
 
   tryGetById(projectId: string): Promise<Project | null> {
-    return this.repository.tryGetById(projectId);
+    return this.metadata.tryGetById(projectId);
   }
 
   async tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> {
@@ -207,17 +213,12 @@ export class ProjectService extends ProjectServiceContract {
     return project ? { name: project.name, slug: project.slug } : null;
   }
 
-  async getWithTeam(id: string): Promise<ProjectWithTeam> {
-    const project = await this.repository.tryGetWithTeam(id);
-    if (!project) {
-      throw new ProjectNotFoundError("Project not found");
-    }
-
-    return project;
+  getWithTeam(id: string): Promise<ProjectWithTeam> {
+    return this.metadata.getWithTeam(id);
   }
 
   tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    return this.repository.tryGetWithTeam(id);
+    return this.metadata.tryGetWithTeam(id);
   }
 
   private async assertTeamCanHoldANewProject(input: {
@@ -418,7 +419,7 @@ export class ProjectService extends ProjectServiceContract {
     id: string;
     data: { firstMessage: boolean; integrated: boolean; language: string };
   }): Promise<void> {
-    return this.repository.updateMetadata(input);
+    return this.metadata.updateMetadata(input);
   }
 
   touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void> {
@@ -447,30 +448,7 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.tryGetTraceSharingConfig(projectId);
   }
 
-  async resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution> {
-    try {
-      const result = await this.repository.tryGetWithOrgAdmin(projectId);
-      if (!result) {
-        return { userId: null, organizationId: null, firstMessage: false };
-      }
-
-      return {
-        userId: result.adminUserId,
-        organizationId: result.organizationId,
-        firstMessage: result.firstMessage,
-      };
-    } catch (error) {
-      const resolution = {
-        projectId,
-        error,
-      };
-      this.diagnostics?.error(
-        resolution,
-        "Failed to resolve org admin — returning null resolution",
-      );
-      this.diagnostics?.capture(new Error("Failed to resolve org admin"), resolution);
-
-      return { userId: null, organizationId: null, firstMessage: false };
-    }
+  resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution> {
+    return this.metadata.resolveOrgAdmin(projectId);
   }
 }

@@ -27,6 +27,7 @@ import {
   type ModelDefaultFeature,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
+import type { ProjectWithTeam } from "@langwatch/project-contract";
 export type ModelProviderRecord = ModelProvider;
 export type ModelDefaultConfigSaveInput = {
   id: string;
@@ -304,4 +305,30 @@ export abstract class ModelTranslationPort {
 /** Generates identifiers for records owned by Model Provider. */
 export abstract class ModelProviderIdService {
   abstract generate(input: { type: "provider" | "default" | "cost" }): string;
+}
+
+/**
+ * The project read the scope facts are derived from.
+ *
+ * Model Provider scopes a cost, a default and a credential to a project, its
+ * team and its organization, and all three ids are on the project row read
+ * with its team. That one read is the only thing the derivation needs, so it
+ * is named here rather than taken as a whole `ProjectService` — which would
+ * put the project write graph, an organization service and an authz service in
+ * a process that only prices a span. `ProjectService` and
+ * `ProjectMetadataService` both satisfy this.
+ */
+export abstract class ModelCostProjectPort {
+  abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  abstract getWithTeam(id: string): Promise<ProjectWithTeam>;
+}
+
+/**
+ * The scope derivation the cost listing asks for.
+ *
+ * `ModelProviderProjectScopeService` answers it, and so does the wider
+ * `ModelProviderScopeService` that composes it.
+ */
+export abstract class ModelCostProjectScopePort {
+  abstract tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null>;
 }

@@ -51,3 +51,23 @@ export abstract class AutomationGraphActivityPort {
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult>;
 }
+
+/**
+ * The project read a graph alert is addressed with.
+ *
+ * A dispatched alert names the project it is about — its name in the subject
+ * line, its slug in every link back to the deployment — and that is the entire
+ * project question the graph path asks. Naming it here rather than taking a
+ * whole `ProjectService` is the same narrowing this file already does for
+ * Automation itself: the write graph behind `ProjectService` drags a
+ * credentials port, an organization service and, through it, an authz service
+ * into a process that only sends an alert. `ProjectService` and
+ * `ProjectMetadataService` both satisfy this.
+ */
+export abstract class AutomationProjectIdentityPort {
+  abstract tryGetById(projectId: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+  } | null>;
+}

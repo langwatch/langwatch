@@ -9,10 +9,10 @@ import type { SlackApiTransport } from "@langwatch/automation-server";
 import { WebhookEgressService } from "@langwatch/egress";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import type { ProjectService } from "@langwatch/project-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import { tryCreateWorkerAutomationGraphComposition } from "../worker-automation-graph.composition";
+import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition";
 
 /**
  * Spec: packages/features/automation/specs/graph-alert-worker-composition.feature
@@ -71,7 +71,7 @@ function composeGraph(
     prisma: database.prisma as never,
     mail: { delivery: mailer, baseHost: config.mail?.baseHost ?? "" },
     dependencies: {
-      projects: new OneProject() as unknown as ProjectService,
+      projects: new OneProject(),
       analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     },
     slackApiTransport: slackApi,
@@ -128,7 +128,7 @@ describe("tryCreateWorkerAutomationGraphComposition", () => {
         prisma: createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] }).prisma as never,
         mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
         dependencies: {
-          projects: new OneProject() as unknown as ProjectService,
+          projects: new OneProject(),
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
         },
         webhookTransport: {
@@ -256,6 +256,42 @@ describe("resolveWorkerConfig automation leaves", () => {
         emailHourlyCap: 100,
         tenantDailyCap: 10000,
         credentialsEncryptionKey: "0f".repeat(32),
+      });
+    });
+  });
+
+  describe("given the project reads this process composes for itself", () => {
+    describe("when the graph vertical is composed over them", () => {
+      // The half of this vertical's recorded dependency that (g2) clears. It
+      // was two capability services no background process could build; the
+      // project half is now a one-method port this process answers from its
+      // own Prisma client, and only `AnalyticsService` is still handed in.
+      /** @scenario "The graph vertical takes the project reads this process composes" */
+      it("accepts the composed project metadata service as its project reads", () => {
+        const graph = tryCreateWorkerAutomationGraphComposition({
+          config: resolveWorkerConfig(ENVIRONMENT),
+          prisma: createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] })
+            .prisma as never,
+          mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
+          dependencies: {
+            projects: createWorkerTraceCapabilityServices({
+              database: {
+                project: { findUnique: async () => null, update: async () => null },
+                team: {},
+                dataPrivacyPolicy: { findMany: async () => [] },
+                customLLMModelCost: { findMany: async () => [] },
+                monitor: { findMany: async () => [] },
+              } as never,
+            }).projects,
+            analytics: new BreachingAnalytics() as unknown as AnalyticsService,
+          },
+          webhookTransport: {
+            send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
+            assertDelivered: () => undefined,
+          },
+        });
+
+        expect(graph).toBeDefined();
       });
     });
   });

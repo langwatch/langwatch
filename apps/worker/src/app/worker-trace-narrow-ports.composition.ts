@@ -1,9 +1,7 @@
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
+import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type {
   OrgAdminResolution,
   Project,
-  ProjectService,
   UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
 import type { ModelCost } from "@langwatch/model-provider-contract";
@@ -27,6 +25,15 @@ import {
  * exactly what blocked the conversion: the subscribers named the services, so
  * a process that wanted one capability had to be able to build all of them.
  *
+ * WHAT EACH PARAMETER ASKS FOR IS NOW WHAT EACH ADAPTER CALLS, spelled out
+ * below rather than named as a whole service. `ProjectService`,
+ * `MonitorService` and `ModelProviderService` each satisfy their parameter,
+ * and so do the read-side services their own features publish
+ * (`ProjectMetadataService`, `MonitorCatalogService`,
+ * `ModelCostCatalogService`) — which is what `createWorkerTraceCapabilityServices`
+ * composes and what makes this reachable from a process with a database and
+ * nothing else.
+ *
  * Each adapter is a rename and nothing else. The published services satisfy the
  * ports structurally — the method names and signatures are identical — so these
  * classes exist to make the direction of the dependency explicit and to give
@@ -40,9 +47,9 @@ import {
  * `createWorkerTraceProductAnalytics`.
  */
 export function createWorkerTraceNarrowPorts(options: {
-  projects: ProjectService;
-  monitors: MonitorService;
-  modelProviders: ModelProviderService;
+  projects: TraceProjectMetadataReader;
+  monitors: TraceEvaluationMonitorReader;
+  modelProviders: TraceModelCostReader;
   productAnalytics: TraceProductAnalyticsPort;
 }): WorkerTraceNarrowPorts {
   return {
@@ -62,17 +69,39 @@ export function createWorkerTraceNarrowPorts(options: {
  * rename of `getEnabledOnMessageMonitors`, not two.
  */
 export function createWorkerTraceEvaluationMonitorPort(
-  monitors: MonitorService,
+  monitors: TraceEvaluationMonitorReader,
 ): TraceEvaluationMonitorPort {
   return new WorkerTraceEvaluationMonitorAdapter(monitors);
 }
 
 /** The project's own cost rules on their own, for record-time enrichment. */
 export function createWorkerTraceModelCostCatalogPort(
-  modelProviders: ModelProviderService,
+  modelProviders: TraceModelCostReader,
 ): TraceModelCostCatalogPort {
   return new WorkerTraceModelCostCatalogAdapter(modelProviders);
 }
+
+/**
+ * The three project reads and the one project write the subscribers make.
+ *
+ * A structural type rather than a service, so the feature's read-side service
+ * and its wide sibling both answer it and this file names neither.
+ */
+export type TraceProjectMetadataReader = {
+  tryGetById(id: string): Promise<Project | null>;
+  updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
+  resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+};
+
+/** The one monitor listing the evaluation trigger reads. */
+export type TraceEvaluationMonitorReader = {
+  getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
+};
+
+/** The one cost listing record-time enrichment reads. */
+export type TraceModelCostReader = {
+  listCosts(input: { projectId: string }): Promise<ModelCost[]>;
+};
 
 export type WorkerTraceNarrowPorts = Readonly<{
   projects: TraceProjectMetadataPort;
@@ -82,7 +111,7 @@ export type WorkerTraceNarrowPorts = Readonly<{
 }>;
 
 class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadataPort {
-  constructor(private readonly projects: ProjectService) {
+  constructor(private readonly projects: TraceProjectMetadataReader) {
     super();
   }
 
@@ -100,7 +129,7 @@ class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadataPort {
 }
 
 class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitorPort {
-  constructor(private readonly monitors: MonitorService) {
+  constructor(private readonly monitors: TraceEvaluationMonitorReader) {
     super();
   }
 
@@ -110,7 +139,7 @@ class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitorPort {
 }
 
 class WorkerTraceModelCostCatalogAdapter extends TraceModelCostCatalogPort {
-  constructor(private readonly modelProviders: ModelProviderService) {
+  constructor(private readonly modelProviders: TraceModelCostReader) {
     super();
   }
 

@@ -13,6 +13,7 @@ import {
 import safe from "safe-regex2";
 import type { DataPrivacyPolicyRepository } from "../ports/data-privacy.repository";
 import { DataPrivacyPolicyCache } from "./data-privacy.cache";
+import { DataPrivacyResolutionService } from "./data-privacy-resolution.service";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
@@ -20,6 +21,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
     private readonly cache: DataPrivacyPolicyCache,
+    private readonly resolution: DataPrivacyResolutionService,
     private readonly projects: ProjectService,
     private readonly organizations: OrganizationService,
   ) {
@@ -33,41 +35,30 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyService {
-    const cache = new DataPrivacyPolicyCache(
-      options.repository,
-      options.ttlMs,
-      options.now,
-    );
+    const cache = new DataPrivacyPolicyCache(options.repository, options.ttlMs, options.now);
     return new DataPrivacyService(
       options.repository,
       cache,
+      DataPrivacyResolutionService.create({
+        repository: options.repository,
+        projects: options.projects,
+        cache,
+      }),
       options.projects,
       options.organizations,
     );
   }
 
-  async getResolvedForProject(input: {
-    projectId: string;
-  }): Promise<ResolvedDataPrivacy> {
-    const project = await this.projects.getWithTeam(input.projectId);
-    return this.cache.resolve({
-      projectId: project.id,
-      facts: {
-        organizationId: project.team.organizationId,
-        teamId: project.teamId,
-        projectId: project.id,
-        departmentId: project.departmentId,
-        isPersonal: project.isPersonal,
-      },
-    });
+  getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
+    return this.resolution.getResolvedForProject(input);
   }
 
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
-    return this.repository.findAllInOrganization(input);
+    return this.resolution.listOrganizationRules(input);
   }
 
   tryGetById(input: { id: string }): Promise<DataPrivacyPolicy | null> {
-    return this.repository.tryFindById(input);
+    return this.resolution.tryGetById(input);
   }
 
   async setForScope(input: {
@@ -110,18 +101,14 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   }): Promise<string> {
     if (input.scope.scopeType === "ORGANIZATION") {
       if (input.scope.scopeId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError(
-          "The policy organization does not match its scope.",
-        );
+        throw new ScopeTargetNotFoundError("The policy organization does not match its scope.");
       }
       return input.organizationId;
     }
     if (input.scope.scopeType === "TEAM") {
       const team = await this.organizations.getTeamById({ teamId: input.scope.scopeId });
       if (team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError(
-          "The policy team does not belong to its organization.",
-        );
+        throw new ScopeTargetNotFoundError("The policy team does not belong to its organization.");
       }
       return team.organizationId;
     }
@@ -138,10 +125,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   }
 
   private validatePatterns(config: DataPrivacyConfig): void {
-    this.assertSafePatterns(
-      config.secrets?.customPatterns ?? [],
-      "Custom secret pattern",
-    );
+    this.assertSafePatterns(config.secrets?.customPatterns ?? [], "Custom secret pattern");
     for (const pattern of config.secrets?.customPatterns ?? []) {
       const ordinaryText = overBroadSecretPatternProbe(pattern);
       if (ordinaryText !== null) {

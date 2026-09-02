@@ -24,22 +24,30 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import {
-  mapProjectIdentityRow,
-  PROJECT_IDENTITY_SELECT,
-} from "./prisma.project.mapper";
+import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper";
 import {
   ProjectRepository,
   type ProjectWithOrgAdmin,
   type TouchCodingAgentActivityInput,
 } from "../project.repository";
 
+/**
+ * The two models this repository reads and writes, and nothing else in the
+ * client.
+ *
+ * The composition root already holds a typed `PrismaClient`; naming the models
+ * here is what lets a root that composes only the ingestion seam hand its
+ * client straight down without describing the whole client at the seam. A full
+ * `PrismaClient` still satisfies it, so every existing caller is unchanged.
+ */
+export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
+
 export class PrismaProjectRepository extends ProjectRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: PrismaProjectDatabase) {
     super();
   }
 
-  static create(database: PrismaClient): PrismaProjectRepository {
+  static create(database: PrismaProjectDatabase): PrismaProjectRepository {
     return new PrismaProjectRepository(database);
   }
 

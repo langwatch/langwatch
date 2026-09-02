@@ -1,4 +1,5 @@
 import { AutomationClockPort } from "../ports/automation-clock.port";
+import { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
 import {
   AutomationDispatchErrorPort,
   AutomationLoggerPort,
@@ -162,8 +163,10 @@ export class BreachingAnalytics {
   }
 }
 
-export class OneProject {
-  async tryGetById(projectId: string): Promise<unknown> {
+export class OneProject extends AutomationProjectIdentityPort {
+  async tryGetById(
+    projectId: string,
+  ): Promise<{ id: string; name: string; slug: string } | null> {
     return { id: projectId, name: "Acme", slug: "acme" };
   }
 }

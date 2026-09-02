@@ -3,6 +3,11 @@ export {
   type PostgresMonitorAdapterOptions,
 } from "./adapters/postgres.monitor.adapter";
 export {
+  PostgresMonitorCatalogAdapter,
+  type MonitorCatalogDatabase,
+} from "./adapters/postgres.monitor-catalog.adapter";
+export { MonitorCatalogService } from "./services/monitor-catalog.service";
+export {
   MonitorApp,
   type MonitorAppDependencies,
   type MonitorCheckFailure,

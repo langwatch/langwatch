@@ -73,6 +73,22 @@ describe("resolveWorkerConfig", () => {
         },
         outboundProxy: { https: undefined, http: undefined, noProxy: undefined },
       },
+      // A deployment that set no flag variable overrides nothing and force-
+      // enables nothing, which is a process that runs every flag on its stored
+      // rules. The names belong to the flags themselves, so this leaf carries
+      // no variable of its own.
+      featureFlags: { overrides: new Map(), forceEnabled: new Set() },
+    });
+  });
+
+  describe("given a deployment that threw a flag's environment override", () => {
+    /** @scenario "The worker reads the same flag overrides the application reads" */
+    it("carries the force-enable list into the resolved configuration", () => {
+      const config = resolveWorkerConfig({
+        FEATURE_FLAG_FORCE_ENABLE: "release_ui_ai_gateway_menu_enabled",
+      });
+
+      expect([...config.featureFlags.forceEnabled]).toEqual(["release_ui_ai_gateway_menu_enabled"]);
     });
   });
 

@@ -68,13 +68,22 @@ import {
  * application-only on top of them. All four are now package code, and this is
  * the two modules as one.
  *
- * WHAT IT STILL AWAITS is `command:recordSpan`'s service cascade, which is
- * (g2): `ProjectService`, and through it `DataPrivacyService` and
- * `ModelProviderService`, plus `MonitorService` and `AnalyticsService`. Those
- * arrive as `recordSpanCommand` and as the subscriber handlers below, which
- * this composition takes by parameter rather than building — exactly as the
- * application's own module does. The wave order inverts because of it: the
- * ProjectService wave precedes Trace rather than following it.
+ * WHAT IT AWAITED WAS `command:recordSpan`'s service cascade, and (g2) has
+ * cleared it. `recordSpanCommand` is now buildable in this process:
+ * `createWorkerRecordSpanCommand` composes the whole command from the one
+ * Prisma client, this deployment's own variables and the stored-object runtime,
+ * because each of the four features publishes the READ half the record path
+ * uses — `ProjectMetadataService`, `DataPrivacyResolutionService`,
+ * `ModelCostCatalogService` and `MonitorCatalogService` — rather than only the
+ * wide service its write half needs. It stays a parameter here for the same
+ * reason every store does: this composition owns the DEFINITION, not the graph.
+ *
+ * WHAT IS STILL OUTSTANDING for the conversion, none of it this file's:
+ * `reactor:trackedEventSync`'s `getApp()` (g4),
+ * `subscriber:codingAgentSpanFactsDispatch`'s normalized-span read (g3),
+ * `job:datasetNormalize`'s composition (g7), `reactor:triggerMatch` (g5), the
+ * two EE governance rollups (g6), and `AnalyticsService`, which the graph
+ * subscriber reads through and which was never a wall.
  *
  *     WorkerTraceProcessingPipeline
  *       |- EventingTracePipelineAdapter        (trace-server owns it)

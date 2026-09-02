@@ -15,6 +15,7 @@ import type {
   ModelProviderCatalog,
   ModelProviderIdService,
 } from "../ports/model-provider.port";
+import { ModelCostCatalogService } from "./model-cost-catalog.service";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
 import type { ModelProviderScopeService } from "./model-provider-scope.service";
 
@@ -27,20 +28,24 @@ type ModelProviderCostsOptions = {
 };
 
 export class ModelProviderCostsService {
-  private constructor(private readonly options: ModelProviderCostsOptions) {}
+  private constructor(
+    private readonly options: ModelProviderCostsOptions,
+    private readonly catalogue: ModelCostCatalogService,
+  ) {}
 
   static create(options: ModelProviderCostsOptions): ModelProviderCostsService {
-    return new ModelProviderCostsService(options);
+    return new ModelProviderCostsService(
+      options,
+      ModelCostCatalogService.create({ costs: options.costs, scopes: options.scopes }),
+    );
   }
 
   estimate(input: ModelCostEstimateInput): number {
     return estimateModelCost(input, this.options.catalog.staticCostRates());
   }
 
-  async list(input: { projectId: string }): Promise<ModelCost[]> {
-    const projectId = modelCostListInputSchema.parse(input).projectId;
-    const projectScopes = await this.options.scopes.tryGetProjectScopes(projectId);
-    return projectScopes ? this.options.costs.listForProject(projectScopes) : [];
+  list(input: { projectId: string }): Promise<ModelCost[]> {
+    return this.catalogue.listCosts(input);
   }
 
   async upsert(input: ModelCostWriteInput): Promise<ModelCost> {
@@ -54,17 +59,14 @@ export class ModelProviderCostsService {
       scopeType: parsed.scopeType ?? "PROJECT",
       scopeId: parsed.scopeId ?? parsed.projectId,
     } as const;
-    const organizationId =
-      await this.options.scopes.getOrganizationIdForScope(targetScope);
+    const organizationId = await this.options.scopes.getOrganizationIdForScope(targetScope);
     if (existing && existing.organizationId !== organizationId) {
       throw new ModelProviderInvalidError("Cost cannot move between organizations");
     }
 
     await this.assertWritable({
       actorId: parsed.actorId,
-      currentScope: existing
-        ? { scopeType: existing.scopeType, scopeId: existing.scopeId }
-        : null,
+      currentScope: existing ? { scopeType: existing.scopeType, scopeId: existing.scopeId } : null,
       targetScope,
     });
 

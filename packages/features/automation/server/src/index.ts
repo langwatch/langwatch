@@ -118,7 +118,10 @@ export { AutomationSettlementDispatchService } from "./services/trigger-settleme
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service";
 export { AutomationClockPort } from "./ports/automation-clock.port";
-export { AutomationGraphActivityPort } from "./ports/automation-graph-activity.port";
+export {
+  AutomationGraphActivityPort,
+  AutomationProjectIdentityPort,
+} from "./ports/automation-graph-activity.port";
 export {
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,

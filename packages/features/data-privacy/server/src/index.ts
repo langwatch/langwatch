@@ -1,5 +1,11 @@
 export { PrismaDataPrivacyAdapter } from "./adapters/prisma.data-privacy.adapter";
 export {
+  PrismaDataPrivacyResolutionAdapter,
+  type DataPrivacyResolutionDatabase,
+} from "./adapters/prisma.data-privacy-resolution.adapter";
+export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port";
+export { DataPrivacyResolutionService } from "./services/data-privacy-resolution.service";
+export {
   OtelPiiAnalysisMetricsAdapter,
   PII_ANALYSIS_DURATION_METRIC_NAME,
   PII_ANALYSIS_EVALUATOR_TYPE,

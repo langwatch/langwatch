@@ -25,11 +25,8 @@
  * seam rather than in a comment.
  */
 
-import type {
-  DataPrivacyService,
-  PiiLevel,
-  ResolvedDataPrivacy,
-} from "@langwatch/data-privacy-contract";
+import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
@@ -83,7 +80,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * lazily defaulted to the process-wide service, so callers that never pass a
    * tenant (and most tests) don't need to provide it.
    */
-  dataPrivacy: DataPrivacyService;
+  dataPrivacy: DataPrivacyResolutionPort;
   featureFlags?: FeatureFlagService;
 }
 

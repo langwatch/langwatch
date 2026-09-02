@@ -3,6 +3,14 @@ export {
   type PostgresModelProviderAdapterOptions,
 } from "./adapters/postgres.model-provider.adapter";
 export {
+  PostgresModelCostCatalogAdapter,
+  type ModelCostCatalogDatabase,
+} from "./adapters/postgres.model-cost-catalog.adapter";
+export { ModelCostCatalogService } from "./services/model-cost-catalog.service";
+export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service";
+export {
+  ModelCostProjectPort,
+  ModelCostProjectScopePort,
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,

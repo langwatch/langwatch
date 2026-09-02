@@ -1,5 +1,7 @@
-import type { DataPrivacyService } from "@langwatch/data-privacy-contract";
-import { OtlpSpanContentDropService } from "@langwatch/data-privacy-server";
+import {
+  OtlpSpanContentDropService,
+  type DataPrivacyResolutionPort,
+} from "@langwatch/data-privacy-server";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceSpanContentDropPort, type TraceSpanContentDropResult } from "@langwatch/trace-server";
 
@@ -18,7 +20,7 @@ import { TraceSpanContentDropPort, type TraceSpanContentDropResult } from "@lang
  *       └─ OtlpSpanContentDropService      (data-privacy-server owns it)
  *            ├─ ContentDropPolicyService   policy → keys, roles, matchers
  *            ├─ CONTENT_KEY_CATALOG        (data-privacy-contract owns it)
- *            └─ DataPrivacyService         resolves the scope's policy
+ *            └─ DataPrivacyResolutionPort  resolves the scope's policy
  *
  * SEPARATE FROM THE REDACTION COMPOSITION ON PURPOSE, even though both rest on
  * the same policy source: a drop removes a whole attribute and a redaction
@@ -27,7 +29,16 @@ import { TraceSpanContentDropPort, type TraceSpanContentDropResult } from "@lang
  * customer's `drop`.
  */
 export function createWorkerTraceContentDrop(options: {
-  dataPrivacy: DataPrivacyService;
+  /**
+   * Resolves the scope's policy.
+   *
+   * The port and not the whole `DataPrivacyService`: a drop reads a policy and
+   * never writes one, and writing is what puts an `OrganizationService` behind
+   * the service. `DataPrivacyService` satisfies this, and so does the
+   * resolution-only service the feature publishes for a process that holds a
+   * database and nothing else.
+   */
+  dataPrivacy: DataPrivacyResolutionPort;
   nativePolicyEnforced: boolean;
 }): WorkerTraceContentDrop {
   return new WorkerTraceContentDrop(

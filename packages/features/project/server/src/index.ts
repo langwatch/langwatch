@@ -6,6 +6,11 @@ export {
   PostgresProjectAdapter,
   type PostgresProjectAdapterOptions,
 } from "./adapters/postgres.project.adapter";
+export {
+  PostgresProjectMetadataAdapter,
+  type ProjectMetadataDatabase,
+} from "./adapters/postgres.project-metadata.adapter";
+export { ProjectMetadataService } from "./services/project-metadata.service";
 export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter";
 export {
   ProjectApp,

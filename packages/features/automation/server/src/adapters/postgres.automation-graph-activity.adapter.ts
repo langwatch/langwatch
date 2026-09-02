@@ -5,10 +5,12 @@ import type {
   SlackActionParams,
   TriggerSummary,
 } from "@langwatch/automation-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port";
+import {
+  AutomationGraphActivityPort,
+  type AutomationProjectIdentityPort,
+} from "../ports/automation-graph-activity.port";
 import type { AutomationClockPort } from "../ports/automation-clock.port";
 import {
   AutomationSlackBotTokenDecryptorPort,
@@ -81,7 +83,7 @@ export class PostgresAutomationGraphActivityAdapter extends AutomationGraphActiv
     /** The one database client the composing process opened. */
     prisma: AutomationGraphActivityDatabase;
     clock: AutomationClockPort;
-    projects: ProjectService;
+    projects: AutomationProjectIdentityPort;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
     delivery: AutomationNotificationDeliveryPort;

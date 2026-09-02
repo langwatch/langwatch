@@ -6,6 +6,7 @@ import {
   AutomationEmailCapStorePort,
   AutomationGraphActivityPort,
   AutomationLoggerPort,
+  AutomationProjectIdentityPort,
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
   type AutomationSecretCrypto,
@@ -14,7 +15,6 @@ import {
 } from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automation/automation-notification-delivery.adapter";
@@ -25,15 +25,23 @@ import type { WorkerConfig } from "../platform/config/worker.config";
 /**
  * What this process still has to be HANDED before the graph vertical composes.
  *
- * Both are capability services no background process can build yet:
- * `ProjectService` needs organizations, the LWQL key map and stored objects,
- * and `AnalyticsService` reads through the same graph. They are parameters
- * rather than something resolved here so that the day they become composable
- * is a change in one composition root and nothing else — and so that a test can
- * compose the whole vertical today.
+ * ONE OF THE TWO CLEARED. `projects` was recorded here as a capability service
+ * no background process could build — `ProjectService` needs a credentials
+ * port, an organization service, the LWQL key map and stored objects. The
+ * graph path asks it for one thing: the name and slug of the project an alert
+ * is about. It is now `AutomationProjectIdentityPort`, which
+ * `createWorkerTraceCapabilityServices` answers from a Prisma client and which
+ * `ProjectService` still satisfies, so the application's own composition is
+ * unchanged.
+ *
+ * `AnalyticsService` stays a parameter. It was never the wall — it is
+ * `AnalyticsAdapter` over the ClickHouse resolver this process already holds —
+ * and it arrives with the conversion that gives this process a reason to open
+ * one, so that the day it does is a change in one composition root and nothing
+ * else, and so that a test can compose the whole vertical today.
  */
 export type WorkerAutomationGraphDependencies = Readonly<{
-  projects: ProjectService;
+  projects: AutomationProjectIdentityPort;
   analytics: AnalyticsService;
 }>;
 

@@ -896,7 +896,7 @@ answers will be needed before the named later boundary can close:
 
 ### Worker blocker graph (2026-09-02, all 8 remaining wrappers blocked)
 
-Shared prerequisites, by leverage: (1) **ProjectService worker-composable** — gates langy-conversation (via ApiKeyService), scenario (prefetcher), gateway-spend (debit graph) and part of automation; it needs organizations, the LWQL ClickHouse key-map and S3 stored-objects. (2) **Packaged mail capability** — LANDED in baca75a26b; join-request converted on it, automation and evaluation can consume the same EmailDeliveryPort once their template placement is decided. (3) **Trace conversion** — surveyed 2026-09-02 (in the a3147dbb slice report): all-or-nothing, 28 byte-frozen keys, 21-field bundle census recorded; the binding wall is field 9, subscriber:graphTriggerActivity needing AutomationService.evaluateGraphTrigger. TWO CORRECTIONS: scenario's traceSummaryStore blocker clears WITHOUT trace converting (createAppTraceSummaryStore is 60 lines of purely packaged imports over substrates the worker holds), and the evaluator-engine path does not gate trace (its reactors close over command dispatchers the evaluation installer already defers). The trace↔automation cycle breaks at automation's GRAPH half: an AutomationGraphActivityPort backed by the packaged AutomationGraphService/GraphAlertDispatchService over the now-packaged EmailDeliveryPort + harvested encrypt/decrypt, Slack/webhook delivery, PrismaScheduledJobStore, unsubscribe-token verifier. Landing order: (a) the graph vertical, (b) a shared RedisTenantBroadcastAdapter frozen twin (trace/scenario/langy all need it), (c) the 1,970-line span-storage write repository, (d) the trace-privacy vertical (~2,700 lines + tiktoken), (e) blob store onto StoredObjectStorageRuntime, (f) four narrow ports + three OTel twins + the 13-line evaluationNameAutoslug move, (g) the conversion itself. (4) Model-provider resolution (getVercelAIModel) harvested with explicit params. (5) The all-instance ClickHouse directory (gateway-spend settlement) — endgame. Wave order: mail+join-request → Trace → scenario/evaluation → ProjectService wave → automation/langy-conversation/gateway-spend. **CORRECTED 2026-09-02 by the step-(g) attempt: the wave order inverts to mail+join-request → ProjectService wave → Trace.** Trace needs `ProjectService` three ways directly (`projectMetadata`, `graphTriggerActivity`, the narrow-ports bundle) and two more transitively — `PrismaDataPrivacyAdapter` and `PostgresModelProviderAdapter` both require it, and both are on `recordSpan`'s path — so ProjectService gates five conversions rather than four, and Trace is one of them. Step (g)'s halt record at the end of this section carries the evidence.
+Shared prerequisites, by leverage: (1) **ProjectService worker-composable** — gates langy-conversation (via ApiKeyService), scenario (prefetcher), gateway-spend (debit graph) and part of automation; it needs organizations, the LWQL ClickHouse key-map and S3 stored-objects. **CORRECTED AND LANDED FOR THE TRACE PATH 2026-09-02 by (g2): none of those three is reached by ingestion. The key map is called only in `ProjectService.create` and the stored-object deleter only in `archive`, both already optional constructor arguments, and `OrganizationService` is reached only by `create`/`ensureInternal`. `apps/worker` composes the read halves of Project, Data Privacy, Model Provider and Monitor from one Prisma client and builds `command:recordSpan` whole. The other four gated conversions must be re-surveyed by counting CALLS rather than constructors; see the (g2) record.** (2) **Packaged mail capability** — LANDED in baca75a26b; join-request converted on it, automation and evaluation can consume the same EmailDeliveryPort once their template placement is decided. (3) **Trace conversion** — surveyed 2026-09-02 (in the a3147dbb slice report): all-or-nothing, 28 byte-frozen keys, 21-field bundle census recorded; the binding wall is field 9, subscriber:graphTriggerActivity needing AutomationService.evaluateGraphTrigger. TWO CORRECTIONS: scenario's traceSummaryStore blocker clears WITHOUT trace converting (createAppTraceSummaryStore is 60 lines of purely packaged imports over substrates the worker holds), and the evaluator-engine path does not gate trace (its reactors close over command dispatchers the evaluation installer already defers). The trace↔automation cycle breaks at automation's GRAPH half: an AutomationGraphActivityPort backed by the packaged AutomationGraphService/GraphAlertDispatchService over the now-packaged EmailDeliveryPort + harvested encrypt/decrypt, Slack/webhook delivery, PrismaScheduledJobStore, unsubscribe-token verifier. Landing order: (a) the graph vertical, (b) a shared RedisTenantBroadcastAdapter frozen twin (trace/scenario/langy all need it), (c) the 1,970-line span-storage write repository, (d) the trace-privacy vertical (~2,700 lines + tiktoken), (e) blob store onto StoredObjectStorageRuntime, (f) four narrow ports + three OTel twins + the 13-line evaluationNameAutoslug move, (g) the conversion itself. (4) Model-provider resolution (getVercelAIModel) harvested with explicit params. (5) The all-instance ClickHouse directory (gateway-spend settlement) — endgame. Wave order: mail+join-request → Trace → scenario/evaluation → ProjectService wave → automation/langy-conversation/gateway-spend. **CORRECTED 2026-09-02 by the step-(g) attempt: the wave order inverts to mail+join-request → ProjectService wave → Trace.** Trace needs `ProjectService` three ways directly (`projectMetadata`, `graphTriggerActivity`, the narrow-ports bundle) and two more transitively — `PrismaDataPrivacyAdapter` and `PostgresModelProviderAdapter` both require it, and both are on `recordSpan`'s path — so ProjectService gates five conversions rather than four, and Trace is one of them. Step (g)'s halt record at the end of this section carries the evidence.
 
 **Steps (a) and (b) landed (uncommitted at time of writing).** (a) `AutomationGraphActivityPort` is the two methods
 `subscriber:graphTriggerActivity` actually calls, and `createGraphTriggerActivityHandler` now names it instead of the whole
@@ -1613,13 +1613,165 @@ serialisation, the eventref pointer and the fold-time cost order become shared w
 graphs while both ingest — which is why all three are pinned as literals here rather than as reads of the
 application's source.
 
-(g2) THE ProjectService WAVE, WHICH NOW PRECEDES TRACE RATHER THAN FOLLOWING IT. This is the correction that
+(g2) THE ProjectService WAVE, WHICH NOW PRECEDES TRACE RATHER THAN FOLLOWING IT. **LANDED 2026-09-02 — full
+record after (g2) below. The wave turned out to be eight method calls rather than five services: the reach
+census found `OrganizationService`, `AuthzService`, `EvaluatorService`, the LWQL key map and the S3 deleter
+all DEAD on the ingestion path, and `command:recordSpan` now composes whole in `apps/worker`.** This is the
+correction that
 matters most and it inverts a recorded order. The blocker graph's wave order reads
 `mail+join-request → Trace → scenario/evaluation → ProjectService wave`; the evidence above says Trace needs
 `ProjectService` three ways directly and two more transitively (`DataPrivacyService` and `ModelProviderService`
 both require it), so the wave order is `mail+join-request → ProjectService wave → Trace`. Nothing about
 `ProjectService` changes — it still needs organizations, the LWQL ClickHouse key-map and S3 stored-objects — but
 it stops being a prerequisite of four conversions and becomes a prerequisite of five.
+**(g2) LANDED 2026-09-02 (uncommitted at time of writing): the recordSpan service cascade is worker-composable,
+and the cascade was mostly not there.** `apps/worker` now composes `command:recordSpan` WHOLE — the four
+record-time ports and the command over them — from the one Prisma client, this deployment's own variables and
+the stored-object runtime it already held. Staged, not mounted: `job-registry.json` and every `catalogue.json`
+are byte-identical, the application still assembles `capabilities.trace`, still builds all six capability
+services and still records every span, and a test asserts by walking `apps/worker/src` that the new
+compositions have no production caller but each other. Zero platform edits.
+
+THE REACH CENSUS, which is what the halt was missing and what turned a five-service wave into eight method
+calls. The halt recorded the CONSTRUCTORS. Nobody had counted the CALLS.
+
+| service | what the record path calls | where | collaborators the constructor demanded that this path never reaches |
+| --- | --- | --- | --- |
+| `ProjectService` | `tryGetById`, `updateMetadata`, `resolveOrgAdmin` | `worker-trace-narrow-ports.composition.ts:87-103` | `ProjectCredentialsPort`, `OrganizationService`, `ProjectKeyMapPort`, `ProjectStoredObjectsPort` |
+| `ProjectService` (via privacy) | `getWithTeam` | `data-privacy.service.ts:52` | the same four |
+| `ProjectService` (via costs) | `tryGetWithTeam` | `model-provider-scope.service.ts` `tryGetProjectScopes` | the same four |
+| `ProjectService` (via graph) | `tryGetById` | `graph-trigger-alert-delivery.service.ts:46` | the same four |
+| `DataPrivacyService` | `getResolvedForProject` | `otlp-span-content-drop.service.ts:82`, `pii-redaction-policy.service.ts:201` | `OrganizationService` |
+| `ModelProviderService` | `listCosts` | `worker-trace-narrow-ports.composition.ts` `WorkerTraceModelCostCatalogAdapter` | `OrganizationService`, `AuthzService`, catalog, translation port, id service, credential codec, Codex token refresher, connection rate limiter |
+| `MonitorService` | `getEnabledOnMessageMonitors` | `worker-trace-narrow-ports.composition.ts` `WorkerTraceEvaluationMonitorAdapter` | `EvaluatorService`, the id generator |
+| `AnalyticsService` | `getTimeseries` | `graph-trigger-series-evaluation.service.ts:61` | — (never a wall) |
+
+EIGHT OPERATIONS OVER FOUR PRISMA MODELS. Every one of them is a repository read or a repository write plus, in
+two cases, a cache and a shape. THE FOUR SUPPOSED PREREQUISITES ARE ALL DEAD ON THIS PATH, and each answers a
+question the blocker graph asked:
+
+- **`OrganizationService` is not needed anywhere.** `ProjectService` reaches it in `ensureInternal`
+  (`getOldestTeamId`) and `create` (`createTeam`, `addTeamMember`); `DataPrivacyService` reaches it in
+  `resolveOrganizationId`, a private helper of `setForScope`/`removeForScope`; `ModelProviderScopeService`
+  reaches it in `getProjectContext`, `getOrganizationIdForScope` and `listAvailableScopes`. Ingestion creates
+  no project, writes no policy and authors no cost.
+- **The LWQL ClickHouse key-map is `ProjectKeyMapPort.syncProject({projectId, lwqlKey})`, and it is called in
+  exactly one place: `ProjectService.create` (`project.service.ts:298`).** It is already an OPTIONAL
+  constructor argument. The trace path never creates a project, so it is not in this wave's scope and is not in
+  the conversion's either — it belongs to whichever process serves project creation.
+- **S3 stored-objects is `ProjectStoredObjectsPort.deleteOwnedBy`, called only in `ProjectService.archive`
+  (`project.service.ts:365`), also already optional.** Same disposition.
+- **`AuthzService` inside `PostgresModelProviderAdapter` is dead on this path**, as every prior wave predicted.
+  `listCosts` → `ModelProviderCostsService.list` → `scopes.tryGetProjectScopes` + `costs.listForProject`. No
+  authorization decision is made, and correctly so: the reader is already inside the tenant whose rules it is
+  reading. The same is true of `EvaluatorService` inside `PostgresMonitorAdapter` —
+  `getEnabledOnMessageMonitors` is `repository.findEnabledOnMessage` and names no evaluator.
+
+SO THE WAVE IS NOT "COMPOSE ProjectService". It is: each of the four features publishes the READ half its
+ingestion callers use, beside the wide adapter its write half needs. REUSED RATHER THAN INVENTED — the pattern
+was already in this repo, in this package: `PostgresCodingAgentActivityAdapter`
+(`packages/features/project/server/src/adapters/postgres.coding-agent-activity.adapter.ts`) is the same seam
+for the coding-agent fold, with the same header reasoning ("Reaching those through `ProjectService` meant
+composing the App"). ONE DELIBERATE DIFFERENCE FROM THAT PRECEDENT: it is a frozen TWIN — a second repository
+with a `CODING_AGENT_ACTIVITY_TOUCH_MS` comment pinning it to the service's copy. These four are DELEGATIONS,
+not twins. The wide service composes the narrow one and calls it, so there is one implementation of
+`resolveOrgAdmin`'s swallow, one of the privacy chain's fact mapping and one of the cost scope triple. A twin
+is the right price across the platform boundary and the wrong one inside a package.
+
+WHAT LANDED, five verticals, each with the wide adapter's signature untouched so the application compiles
+unchanged:
+
+1. `ProjectMetadataService` + `PostgresProjectMetadataAdapter` (`@langwatch/project-server`). Five operations
+   over `Pick<PrismaClient, "project" | "team">`. `ProjectService` delegates all five.
+   `PrismaProjectRepository`'s constructor was narrowed from `PrismaClient` to that same `Pick`, which is a
+   widening for callers — a full client still satisfies it.
+2. `DataPrivacyResolutionService` + `PrismaDataPrivacyResolutionAdapter` (`@langwatch/data-privacy-server`),
+   with `DataPrivacyProjectPort` (`getWithTeam`) and `DataPrivacyResolutionPort` (`getResolvedForProject`) in
+   `ports/data-privacy.port.ts`. `OtlpSpanContentDropService` and `PiiRedactionPolicyService` now name the
+   resolution port instead of the whole service; `DataPrivacyService` satisfies it structurally and delegates.
+   The two write methods keep the organization service and mean it.
+3. `ModelCostCatalogService` + `PostgresModelCostCatalogAdapter` (`@langwatch/model-provider-server`), over
+   `ModelCostProjectPort` (`tryGetWithTeam`, `getWithTeam`) and `ModelCostProjectScopePort`
+   (`tryGetProjectScopes`). `ModelProviderScopeService` split along the line the code drew rather than a
+   convenient one: `ModelProviderProjectScopeService` holds the four derivations that come off a project row,
+   and the four that resolve a billing profile, list teams or page an organization's projects stayed. One of
+   them — `tryGetOrganizationSystemReference` — was moved into the new service in a first pass and moved back,
+   because it pages `listByOrganization` and putting it in the narrow half would have widened
+   `ModelCostProjectPort` to carry a pagination read the cost listing never makes. The typecheck is what
+   caught it.
+4. `MonitorCatalogService` + `PostgresMonitorCatalogAdapter` (`@langwatch/monitor-server`). One operation over
+   `Pick<PrismaClient, "monitor">`.
+5. `AutomationProjectIdentityPort` (`@langwatch/automation-server`), the same narrowing this file already did
+   for `AutomationGraphActivityPort` itself. `GraphTriggerEvaluationDeps.projects` and
+   `PostgresAutomationGraphActivityAdapter.create`'s `projects` are now the one-method port.
+   `WorkerAutomationGraphDependencies` is down from two capability services to one: `analytics` alone.
+
+AND THE SIXTH THING, which the halt had already cleared as composable and which turns "the four services
+compose" into "the command composes": `createWorkerFeatureFlags` builds `FeatureFlagService` from the Prisma
+client, the queue's Redis (or none — the adapter's own memory tier is what the application falls back to when
+Redis is down) and `resolveFeatureFlagConfig(source)`. NO NEW CONFIGURATION LEAF: the names are the flags'
+own, one variable per flag plus `FEATURE_FLAG_FORCE_ENABLE`, all of them already read by the application. Two
+of `recordSpan`'s four ports are behind kill switches, so without it a standalone worker would have kept
+estimating and kept redacting after an operator threw one. `AnalyticsService` is deliberately NOT composed:
+nothing on the record path reads it, only the graph subscriber does, and it arrives with the conversion.
+
+WHAT THE STAGED COMPOSITION NOW PROVES. `createWorkerRecordSpanCommand({config, services, featureFlags,
+spool?})` builds `RecordSpanCommand` whole, and a test FOLDS A REAL SPAN THROUGH IT: the recorded event carries
+the customer's own input and output rates, keeps the content the customer did not ask to be dropped, loses the
+content they did, and every project read on the way names the tenant on the command while the cost rules are
+read under exactly that project's own three scopes. `WorkerTraceProcessingPipeline`'s `recordSpanCommand`
+parameter is now satisfiable from this process; it stays a parameter because that composition owns the
+DEFINITION, not the graph, exactly as the stores do.
+
+PINS. The cost scope triple in `PROJECT`/`TEAM`/`ORGANIZATION` order and read as one `OR`. The privacy chain
+read inside the project's OWN organization. `resolveOrgAdmin` answering an empty resolution and reporting to
+diagnostics rather than failing the fold that asked. `listCosts` answering `[]` for a project that no longer
+resolves, rather than raising and failing a span mid-flight. The flag force-enable honoured with no stored row.
+And, for each of the four features, the wide service and the read half answering IDENTICALLY over the same
+client — which is a delegation assertion, not a twin-drift one.
+
+THIRTEEN SABOTAGES, each red then restored, every one driven through the port or the composed command. Project:
+the read always absent, the metadata stamp silently dropped, the org-admin failure raised instead of reported,
+the wide service keeping its own copy of the org-admin read. Monitor: the listing answering nothing. Cost:
+every span priced at zero, the scopes narrowed to the project alone. Privacy: the chain resolved under another
+organization, the policy cache re-reading on every span. Composition: the record command wired without its drop
+port, the project port renaming the wrong read onto `tryGetById`, the flag overrides never reaching the
+service, and the staged record path mounted by the production composition.
+TWO OF THOSE CAME BACK GREEN ON THE FIRST PASS — the S6-egress lesson and g1's, a third time — and both are now
+assertions. The privacy sabotage passed because the test's Prisma double answered every `dataPrivacyPolicy`
+query with the same rows, so a policy chain resolved under ANOTHER TENANT'S organization was invisible: the
+double now filters on `where.organizationId` the way the table does, and the drop scenario asserts every read
+named this project's organization. The flag sabotage passed because the flag the test chose was already ON by
+default in the registry, so it answered `true` whether or not the deployment's overrides ever reached the
+service: it now uses `token-estimation-killswitch`, which is off by default, and asserts both the unset and the
+force-enabled answers.
+
+GATES, measured before and after. `pnpm test:unit run src/runtime/worker` 8 files / 42 tests, unchanged.
+`@langwatch/worker` 42/348 → 45/365. `@langwatch/project-server` 8/124 → 9/128. `@langwatch/monitor-server`
+5/58 → 6/60. `@langwatch/model-provider-server` 14/144 → 15/146. `@langwatch/data-privacy-server` 5/59 → 6/62.
+`@langwatch/automation-server` 27/210 unchanged. `@langwatch/trace-server` 95/1590 unchanged — not one line of
+it was touched. architecture-lint 21 files / 332 tests unchanged. Whole-tree `pnpm typecheck` 14 errors in 11
+files, all in `platform/app`, identical before and after. `tsc --noEmit` clean for all five touched packages,
+for `@langwatch/feature-flag-server`, and for `apps/worker` under both `tsconfig.json` and `tsconfig.test.json`.
+`git diff --numstat -- platform/app` carries no entry of this slice's. Five new `.feature` files report
+16/16, 4/4, 3/3, 2/2 and 2/2 scenarios bound.
+
+DEPLOYMENT IMPACT: NONE, and no new configuration leaf. Nothing is mounted; the application still builds every
+wide service and still records every span through them. The one thing that changed for the running system is
+that four services now call a collaborator they compose themselves instead of inlining the same code, which is
+a delegation with no behavioural difference and is pinned by the identical-answer tests above.
+
+WHAT REMAINS BEFORE TRACE CAN CONVERT, unchanged by this slice except where noted: (g3) the one normalized-span
+read, (g4) `recordTrackedEventSpan`'s `getApp()`, (g5) automation's `recordTriggerMatch` proxy and
+`TraceAlertTriggerPort`, (g6) the EE governance subscriber runtime, (g7) `DatasetNormalizationService`. Plus
+`AnalyticsService`, which is `AnalyticsAdapter` over the ClickHouse resolver this process holds and needs only
+the package dependency the conversion will add. THE FOUR OTHER GATED CONVERSIONS ARE CORRECTED: the blocker
+graph's shared prerequisite (1) said `ProjectService` gates langy-conversation (via `ApiKeyService`), scenario
+(prefetcher), gateway-spend (debit graph) and part of automation. Each of those must now be re-surveyed the way
+this one was, by counting CALLS rather than constructors — automation's graph half needed one method and got
+it, and there is no reason to expect the other three to be shaped differently. What none of them needs is an
+organization service, an LWQL key map or an S3 deleter on the ingestion path.
+
 (g3) Harvest the ONE normalized-span read (`findNormalizedSpanById`, its windowed read and the stored-span
 codec, which is already packaged) so `CodingAgentTraceProcessingPort` composes; it is ONE query out of the
 1,970-line repository, not its whole read half.

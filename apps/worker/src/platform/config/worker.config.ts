@@ -5,6 +5,7 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
+import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
@@ -602,6 +603,17 @@ export type WorkerConfig = Readonly<{
   processing: WorkerProcessingConfig;
   eventing: WorkerEventingConfig;
   infrastructure: WorkerInfrastructureConfig;
+  /**
+   * The flag overrides this deployment set in its environment.
+   *
+   * Resolved from the raw source rather than from the projection above,
+   * because the names are the flags' own — one variable per flag plus the
+   * `FEATURE_FLAG_FORCE_ENABLE` list — and the feature owns that vocabulary.
+   * Absent variables give an empty override map, which is a deployment that
+   * runs every flag on its stored rules. No new configuration leaf: these are
+   * the same variables the application already reads.
+   */
+  featureFlags: FeatureFlagConfig;
 }>;
 
 export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): WorkerConfig {
@@ -654,6 +666,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       },
       outboundProxy: value.infrastructure.outboundProxy,
     },
+    featureFlags: resolveFeatureFlagConfig(source),
   };
 }
 

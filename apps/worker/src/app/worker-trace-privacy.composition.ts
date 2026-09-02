@@ -1,7 +1,7 @@
-import type { DataPrivacyService } from "@langwatch/data-privacy-contract";
 import {
   OtelPiiAnalysisMetricsAdapter,
   OtlpSpanPiiRedactionService,
+  type DataPrivacyResolutionPort,
   type PiiAnalysisMetricsPort,
   type PiiAnalysisPort,
 } from "@langwatch/data-privacy-server";
@@ -26,7 +26,7 @@ import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config"
  *
  *     TraceSpanPiiRedactionPort            (trace-server declares it)
  *       └─ OtlpSpanPiiRedactionService     (data-privacy-server owns it)
- *            ├─ DataPrivacyService         resolves the scope's policy
+ *            ├─ DataPrivacyResolutionPort  resolves the scope's policy
  *            ├─ @langwatch/redaction       the native secrets + PII floor
  *            └─ PiiAnalysisPort            names + locations, out of process
  *                 └─ WorkerPiiAnalysisAdapter   Presidio, Google DLP fallback
@@ -39,7 +39,14 @@ import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config"
  */
 export function createWorkerTracePrivacy(options: {
   config: WorkerTracePrivacyConfig;
-  dataPrivacy: DataPrivacyService;
+  /**
+   * Resolves the scope's policy.
+   *
+   * The port and not the whole `DataPrivacyService`, for the same reason the
+   * content drop takes one: redaction reads a policy and never writes one, and
+   * writing is what puts an `OrganizationService` behind the service.
+   */
+  dataPrivacy: DataPrivacyResolutionPort;
   featureFlags: FeatureFlagService;
   metrics?: PiiAnalysisMetricsPort;
 }): WorkerTracePrivacy {

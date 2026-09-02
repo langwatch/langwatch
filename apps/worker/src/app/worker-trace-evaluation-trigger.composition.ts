@@ -2,7 +2,6 @@ import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contrac
 import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
 import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
 import {
   OtelTraceEvaluationLoopMetricsAdapter,
   TraceEvaluationDispatchPort,
@@ -11,7 +10,10 @@ import {
   type TraceEvaluationMonitorPort,
   type TraceSummarySubscriber,
 } from "@langwatch/trace-server";
-import { createWorkerTraceEvaluationMonitorPort } from "./worker-trace-narrow-ports.composition";
+import {
+  createWorkerTraceEvaluationMonitorPort,
+  type TraceEvaluationMonitorReader,
+} from "./worker-trace-narrow-ports.composition";
 
 /**
  * The online evaluations this process would dispatch for an ingested trace.
@@ -26,7 +28,7 @@ import { createWorkerTraceEvaluationMonitorPort } from "./worker-trace-narrow-po
  *     TraceSummarySubscriber "evaluationTrigger"   (trace-server owns it)
  *       ├─ FeatureFlagService                      the loop-guard kill switch
  *       ├─ TraceEvaluationMonitorPort              the enabled on-message monitors
- *       │    └─ MonitorService                     narrowed to one listing
+ *       │    └─ TraceEvaluationMonitorReader      narrowed to one listing
  *       ├─ TraceEvaluationLoopMetricsPort          the guard's own counter
  *       │    └─ OtelTraceEvaluationLoopMetricsAdapter
  *       └─ TraceEvaluationDispatchPort             one evaluation run
@@ -49,7 +51,15 @@ import { createWorkerTraceEvaluationMonitorPort } from "./worker-trace-narrow-po
  * which of the two the customer is looking at.
  */
 export function createWorkerTraceEvaluationTrigger(options: {
-  monitors: MonitorService;
+  /**
+   * The one monitor listing this path reads.
+   *
+   * Not the whole `MonitorService`: creating and replicating a monitor is what
+   * puts an `EvaluatorService` behind it, and this asks which of a project's
+   * monitors run on every message. `MonitorService` satisfies it, and so does
+   * the catalogue-only service the feature publishes.
+   */
+  monitors: TraceEvaluationMonitorReader;
   featureFlags: FeatureFlagService;
   sendEvaluation: (
     data: ExecuteEvaluationCommandData,
