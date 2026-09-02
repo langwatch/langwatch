@@ -1012,6 +1012,84 @@ none until step (g); at that point the four variables become load-bearing for a 
 application's while both graphs ingest.
 
 
+**Steps (e) and (f) landed (uncommitted at time of writing), together with the tokenizer and the
+13-line autoslug move.** (e) The 748-line `BlobStore` is TWO independent halves and was harvested as two:
+the SPOOL half (`TraceSpoolService` in `@langwatch/trace-server`, `services/trace-spool.service.ts`) and the
+`event_log` CLAIM-CHECK READ (`ClickHouseTraceEventPayloadRepository`, `repositories/clickhouse/`). Neither
+half calls the other — `getFromEventLog` never touches object storage and `getSpool` never touches ClickHouse
+— so composing them separately is what lets a process that can read one and not the other keep ingesting.
+HOME CHOSEN OVER `@langwatch/stored-object-server`, deliberately: the prefix is `trace-blobs/spool`, the key
+is `(projectId, traceId, spanId)`, the consumer is `TraceSpanSpoolPort`, and the destination guard is a rule
+about THIS consumer's eager-delete-plus-lifecycle discipline. Putting it in stored-object-server would have
+taught that package about trace ids. Everything trace-server needs from stored objects
+(`mintStoredObjectUri`, `StoredObjectStorageDestination`) is in `@langwatch/stored-object-contract`, which is
+the direction ten other contract dependencies already point. Both halves attach to ports the package ALREADY
+declared (`TraceSpanSpoolPort`, `TracePayloadReaderPort`), so no new seam was invented. THREE DELIBERATE
+DIFFERENCES, all mechanical: the `SpoolStorage` interface becomes an abstract `TraceSpoolStoragePort`; the raw
+`S3Client` v1 read becomes an injected `TraceSpoolLegacyObjectPort` (a feature package cannot name a vendor
+SDK, and the branch is a one-release window — absent, it refuses by name); and the `event_log` SELECT goes
+through the package's existing `TraceClickHousePort`, which is `JSONEachRow`, where the application uses the
+default JSON envelope. One `String` column renders identically in both. `streamToBuffer` was copied beside
+its one caller rather than becoming a shared surface. apps/worker takes the transports
+(`WorkerTraceSpoolStorageAdapter` over the stored-objects runtime it already holds, and
+`WorkerTraceSpoolLegacyObjectAdapter`, which REFUSES a non-S3 destination by name: the v1 format predates the
+stored-objects move that added Azure at all, so a v1 key can only ever be an S3 key) and one config leaf,
+`AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`, read through `environmentOneOrTrueSchema` — which is already exactly
+the App's `"1"`-or-case-insensitive-`"true"` rule. `environmentBooleanSchema` would have disagreed twice, and
+both ways are silent: it refuses `TRUE`, which the App accepts, and it refuses `yes`, which the App reads as
+"not confirmed" while carrying on.
+
+(f) FOUR NARROW PORTS, all in trace-server because Trace is the consumer that declares what it needs:
+`TraceProjectMetadataPort` (the three capabilities `projectMetadata` uses out of a fourteen-method
+`ProjectService` — and this one was applied, not merely declared: `ProjectMetadataSubscriberDeps.projects` now
+names the port, which the published service satisfies structurally, so the application compiles unchanged),
+`TraceEvaluationMonitorPort` (`getEnabledOnMessageMonitors`; the App narrows the TYPE inline with `Pick<>` but
+a process still had to build the whole service), `TraceModelCostCatalogPort` (`listCosts`) and
+`TraceProductAnalyticsPort`. THE CODING-AGENT COST PRECEDENT DOES NOT TRANSFER, and the reason is worth
+recording: `CodingAgentCostEstimatorPort.estimateCost` is pure, synchronous and over a STATIC catalog, and
+Trace already has that shape in `TraceModelCostPort` for fold-time cost. Record-time enrichment reads the
+operator's per-project, per-team and per-organization overrides out of a table and matches them by regex; a
+span enriched from the static catalog when an override exists is billed at the wrong rate with nothing to show
+it. THE PRODUCT-ANALYTICS SINK IS A NAMED ABSENCE, reported as asked. The trace path emits exactly one event,
+`first_trace_integrated`, at most once per project — the onboarding funnel's terminal step, keyed by the org
+admin's user id because that is the distinct_id posthog-js identifies the same person with in the browser.
+This process has no PostHog and acquiring one for a single event is a vendor dependency this slice has no
+mandate for, so `WorkerLoggedProductAnalyticsAdapter` writes the whole event to the log and says in its name
+and its message that this is not delivery. A silent no-op was rejected: the App's no-op happens on deployments
+that chose not to run product analytics, whereas this one would happen on the deployment that does,
+undercounting the funnel forever. THE CONVERSION MUST REPLACE IT BEFORE MOUNTING `projectMetadata`.
+
+THE THREE-METRIC CENSUS WAS CORRECTED. The third prom-client counter on the trace path is `pii_checks`, and
+step (d) ALREADY twinned it as `PII_CHECKS_METRIC_NAME` in `OtelPiiAnalysisMetricsAdapter` — so this slice
+adds the two that remained: `OtelTraceEvaluationLoopMetricsAdapter` in trace-server
+(`langwatch_evaluator_loop_blocked_total`, label `reason`) and `OtelTraceAlertMetricsAdapter` in
+governance-server, which satisfies the `TraceAlertMetricsPort` that package already declared
+(`automation_match_records_total`, no labels, and the `count > 0` guard is carried because the subscriber
+calls it on every trace). TWO MORE PROM COUNTERS WERE PROVED OFF THIS PATH and deliberately not dragged in:
+`langwatch_edge_spool_fail_open_total` and `langwatch_edge_media_extract_fail_open_total` are incremented in
+`AppTraceRuntime.createIngressPayloadPort` — the collector edge, which is apps/api's future, not the worker's.
+
+THE TOKENIZER split the way step (d) split redaction: the ENGINE (`OtlpSpanTokenEstimationService`, 281 lines,
+plus the ten-line `extractModelName` it shared with the un-harvested cost enrichment) into trace-server behind
+`TraceTokenCounterPort`, and the vendor TRANSPORT (`TiktokenClient`, 170 lines byte-identical) into apps/worker
+as `WorkerTiktokenCounterAdapter`. Its lazy `import()` calls are load-bearing and were kept: `tiktoken` and
+`node-fetch-cache` are optional at runtime and the two JSON imports need the `with` attribute under the
+production bundle. Two config leaves at the App's spellings, `TIKTOKENS_PATH` and `TIKTOKEN_FETCH_TIMEOUT_MS`,
+with the App's `Number.parseInt` fallback carried verbatim — `z.coerce.number()` would refuse `10s`, which the
+App reads as 10, and accept `-1`, which the App replaces with the default. `evaluationNameAutoslug` moved to
+`@langwatch/evaluation-server` as its consumer's comment already asked, with the `~/utils/slugify` wrapper's
+pre-replacement inlined and pinned: without it `answer_relevancy` slugs to `answerrelevancy`, which is a
+DIFFERENT evaluator id for the same evaluation name, and the id is the key.
+
+NOT MOUNTED: `apps/worker/src/features/job-registry.json` and every `catalogue.json` are byte-identical, the
+application still owns every one of these subscribers and adapters, and none of `createWorkerTraceSpool`,
+`createWorkerTracePayloadReader`, `createWorkerTraceTokenEstimation` or `createWorkerTraceNarrowPorts` has a
+production caller. Each is proven by a composition-capability test driven THROUGH the port the conversion will
+call. Zero platform edits. Deployment impact: none until step (g); at that point
+`AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`, `TIKTOKENS_PATH` and `TIKTOKEN_FETCH_TIMEOUT_MS` become load-bearing
+for a standalone worker and must match the application's while both graphs ingest.
+
+
 ## How to execute the plan
 
 Use this loop continuously until the final gate passes:

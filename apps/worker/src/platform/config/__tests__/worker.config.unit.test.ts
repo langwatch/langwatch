@@ -38,6 +38,9 @@ describe("resolveWorkerConfig", () => {
         isProduction: false,
         nativePolicyEnforced: true,
       },
+      // The tokenizer knobs default to "no local BPE directory" and the
+      // application's own 10s remote-fetch ceiling.
+      tokenizer: { bpeDirectory: undefined, fetchTimeoutMs: 10_000 },
       stripe: { secretKey: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       github: { appId: undefined, privateKey: undefined, host: undefined },
@@ -54,6 +57,7 @@ describe("resolveWorkerConfig", () => {
         },
         storage: {
           backend: "s3",
+          azureSpoolRetentionConfirmed: false,
           localFilesystemRoot: "/var/lib/langwatch/objects",
           s3: {
             bucket: undefined,
@@ -163,6 +167,7 @@ describe("resolveWorkerConfig", () => {
       },
       storage: {
         backend: "s3",
+        azureSpoolRetentionConfirmed: false,
         localFilesystemRoot: "/worker/objects",
         s3: {
           bucket: "worker-bucket",
@@ -306,6 +311,24 @@ describe("given the four privacy variables the ingestion path reads", () => {
       resolveWorkerConfig({ LANGWATCH_DATA_PRIVACY_ENFORCEMENT: "OFF" }).tracePrivacy
         .nativePolicyEnforced,
     ).toBe(true);
+  });
+
+  /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
+  it("reads the Azure spool retention assertion the way the application reads it", () => {
+    const confirmed = (value: string) =>
+      resolveWorkerConfig({ AZURE_BLOB_SPOOL_RETENTION_CONFIRMED: value }).infrastructure.storage
+        .azureSpoolRetentionConfirmed;
+
+    // The application opts in for `1` or a case-insensitive `true`, and treats
+    // every other spelling as "not confirmed" rather than refusing to boot.
+    expect(confirmed("1")).toBe(true);
+    expect(confirmed("true")).toBe(true);
+    expect(confirmed("TRUE")).toBe(true);
+    expect(confirmed("True")).toBe(true);
+    expect(confirmed("0")).toBe(false);
+    expect(confirmed("false")).toBe(false);
+    expect(confirmed("yes")).toBe(false);
+    expect(resolveWorkerConfig({}).infrastructure.storage.azureSpoolRetentionConfirmed).toBe(false);
   });
 
   /** @scenario "The four privacy variables are read the way the application reads them" */

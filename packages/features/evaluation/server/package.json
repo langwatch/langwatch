@@ -44,6 +44,7 @@
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "safe-regex2": "^5.1.1",
+    "slugify": "^1.6.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {

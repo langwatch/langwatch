@@ -61,6 +61,8 @@
     "@langwatch/log-server": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/metric-server": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/notification-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -80,7 +82,9 @@
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@slack/webhook": "^7.1.0",
+    "node-fetch-cache": "^5.1.0",
     "react": "^19.2.7",
+    "tiktoken": "^1.0.22",
     "zod": "^4.3.6"
   },
   "devDependencies": {

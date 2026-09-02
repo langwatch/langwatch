@@ -64,6 +64,11 @@ export * from "./ports/routing-policy.port";
 export * from "./ports/session-policy.port";
 export * from "./ports/spend-spike-anomaly.port";
 export * from "./ports/governance-subscriber.port";
+export {
+  AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
+  AUTOMATION_MATCH_RECORDS_METRIC_NAME,
+  OtelTraceAlertMetricsAdapter,
+} from "./adapters/otel.trace-alert-metrics.adapter";
 
 export { IngestionPullEventingAdapter } from "./adapters/ingestion-pull.adapter";
 export { PostgresAnomalyRuleAdapter } from "./adapters/postgres.anomaly-rule.adapter";

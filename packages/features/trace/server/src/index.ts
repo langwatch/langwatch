@@ -270,3 +270,45 @@ export {
   serializeAttributes,
 } from "./repositories/clickhouse/stored-span-row.codec";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service";
+export {
+  TraceSpoolLegacyObjectPort,
+  TraceSpoolStoragePort,
+  type TraceSpoolObjectStore,
+} from "./ports/trace-spool-storage.port";
+export {
+  MAX_SPOOL_BYTES,
+  SPOOL_REF_V2,
+  SpoolDestinationUnsupportedError,
+  SpoolStreamTooLargeError,
+  TraceSpoolService,
+  type TraceSpoolIdentity,
+  type TraceSpoolServiceOptions,
+} from "./services/trace-spool.service";
+export { TraceSpanSpoolAdapter } from "./adapters/trace-span-spool.adapter";
+export {
+  ClickHouseTracePayloadReaderAdapter,
+  TRACE_PAYLOAD_AGGREGATE_TYPE,
+} from "./adapters/clickhouse.trace-payload-reader.adapter";
+export { TraceTokenCounterPort } from "./ports/trace-token-counter.port";
+export {
+  OtlpSpanTokenEstimationService,
+  type OtlpSpanTokenEstimationServiceDependencies,
+} from "./services/span-token-estimation.service";
+export { TraceSpanTokenEstimationAdapter } from "./adapters/trace-span-token-estimation.adapter";
+export { TraceProjectMetadataPort } from "./ports/trace-project-metadata.port";
+export { TraceModelCostCatalogPort } from "./ports/trace-model-cost-catalog.port";
+export { TraceEvaluationMonitorPort } from "./ports/trace-evaluation-monitor.port";
+export {
+  TraceProductAnalyticsPort,
+  type TraceProductEvent,
+} from "./ports/trace-product-analytics.port";
+export {
+  TraceEvaluationLoopMetricsPort,
+  type TraceEvaluationLoopBlockReason,
+} from "./ports/trace-evaluation-loop-metrics.port";
+export {
+  EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION,
+  EVALUATOR_LOOP_BLOCKED_METRIC_NAME,
+  EVALUATOR_LOOP_BLOCKED_REASON_LABEL,
+  OtelTraceEvaluationLoopMetricsAdapter,
+} from "./adapters/otel.trace-evaluation-loop-metrics.adapter";

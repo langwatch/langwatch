@@ -245,6 +245,27 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
+   * Where this process finds the BPE tables it counts tokens with, and how long
+   * it will wait to fetch one it has not got.
+   *
+   * The App reads these two in the same projection as the four privacy
+   * variables (`platform/app/src/runtime/trace-privacy.config.ts`), but they
+   * decide a different thing — whether a span that arrived without usage
+   * attributes gets estimated ones — so they are their own leaf here.
+   *
+   * The timeout is carried as a raw string-or-number, not a coerced number.
+   * `z.coerce.number()` refuses `TIKTOKEN_FETCH_TIMEOUT_MS=10s`, where the App
+   * reads it as 10 through `Number.parseInt` and carries on; and it accepts
+   * `-1`, where the App falls back to the default. `resolveWorkerTraceTokenizerConfig`
+   * owns the parse so both processes wait the same number of milliseconds.
+   */
+  tokenizer: {
+    bpeDirectory: Config.value(optionalEnvironmentString, { env: "TIKTOKENS_PATH" }),
+    fetchTimeoutMs: Config.value(z.union([z.string(), z.number()]).optional(), {
+      env: "TIKTOKEN_FETCH_TIMEOUT_MS",
+    }),
+  },
+  /**
    * The AI Gateway knobs this process resolves for the pipelines it consumes.
    *
    * The raw string is carried rather than a number: `settlementGraceMs` in
@@ -336,6 +357,24 @@ export const workerConfigDefinition = RuntimeConfig.define({
         }),
         sessionToken: Config.value(optionalEnvironmentSecret, { env: "S3_SESSION_TOKEN" }),
       },
+      /**
+       * The operator's assertion that the Azure container reaps orphaned trace
+       * spool objects.
+       *
+       * Read through `environmentOneOrTrueSchema` because that is exactly how
+       * the App reads it (`"1"` or a case-insensitive `"true"`, and nothing
+       * else). `environmentBooleanSchema` would disagree twice: it refuses
+       * `TRUE`, which the App accepts, and it refuses every other spelling
+       * outright, so `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=yes` would stop this
+       * process booting where the App reads it as "not confirmed" and carries
+       * on. Both disagreements are silent in the direction that matters: a
+       * process that reads the assertion differently from its twin either
+       * writes spool objects nothing will ever reap, or refuses to write them
+       * and quietly ingests every oversized span inline.
+       */
+      azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
+        env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
+      }),
     },
     outboundProxy: {
       https: Config.value(optionalProxyValue, { env: "HTTPS_PROXY" }),
@@ -356,6 +395,8 @@ export type WorkerOutboundProxyConfig = Readonly<{
 export type WorkerStorageConfig = Readonly<{
   backend: "azure" | "s3";
   localFilesystemRoot: string;
+  /** Whether the Azure container has the trace spool's orphan-reaping rule. */
+  azureSpoolRetentionConfirmed: boolean;
   s3: Readonly<{
     bucket?: string;
     endpoint?: string;
@@ -454,6 +495,39 @@ export type WorkerTracePrivacyConfig = Readonly<{
   nativePolicyEnforced: boolean;
 }>;
 
+/**
+ * The tokenizer knobs this process estimates missing token counts under,
+ * projected the way `platform/app/src/runtime/trace-privacy.config.ts` projects
+ * the same two variables.
+ */
+export type WorkerTraceTokenizerConfig = Readonly<{
+  bpeDirectory: string | undefined;
+  fetchTimeoutMs: number;
+}>;
+
+/**
+ * The application's default and its parse, both.
+ *
+ * `Number.parseInt` on a non-numeric string yields NaN and on `"10s"` yields
+ * 10; anything not finite or not positive falls back. Copied rather than
+ * tightened: a process that refused a value its twin accepts would not boot,
+ * and one that accepted a value its twin rejects would wait a different time
+ * for the same download.
+ */
+const DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS = 10_000;
+
+export function resolveWorkerTraceTokenizerConfig(
+  tokenizer: WorkerConfigProjection["tokenizer"],
+): WorkerTraceTokenizerConfig {
+  const raw = tokenizer.fetchTimeoutMs;
+  const parsed = typeof raw === "number" ? raw : Number.parseInt(raw ?? "", 10);
+  return {
+    bpeDirectory: tokenizer.bpeDirectory,
+    fetchTimeoutMs:
+      Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS,
+  };
+}
+
 /** The AI Gateway knobs this process resolves, carried unparsed on purpose. */
 export type WorkerGatewayConfig = Readonly<{
   spendSettlementGraceMs?: string;
@@ -480,6 +554,7 @@ export type WorkerConfig = Readonly<{
   mail?: WorkerMailConfig;
   automation: WorkerAutomationConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
+  tokenizer: WorkerTraceTokenizerConfig;
   stripe: WorkerStripeConfig;
   gateway: WorkerGatewayConfig;
   github: WorkerGithubConfig;
@@ -516,6 +591,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       tracePrivacy: value.tracePrivacy,
       nodeEnvironment: value.nodeEnvironment,
     }),
+    tokenizer: resolveWorkerTraceTokenizerConfig(value.tokenizer),
     stripe: value.stripe,
     gateway: value.gateway,
     github: value.github,
@@ -528,6 +604,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         backend: value.infrastructure.storage.backend ?? "s3",
         localFilesystemRoot:
           value.infrastructure.storage.localFilesystemRoot ?? DEFAULT_LOCAL_STORAGE_ROOT,
+        azureSpoolRetentionConfirmed: value.infrastructure.storage.azureSpoolRetentionConfirmed,
         s3: {
           ...value.infrastructure.storage.s3,
           region: resolveS3Region(value.infrastructure.storage.s3),
