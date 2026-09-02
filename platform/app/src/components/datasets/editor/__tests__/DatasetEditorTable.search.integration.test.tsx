@@ -332,9 +332,18 @@ describe("given a saved dataset", () => {
 
       await typeSearch(user, "zzzznope");
 
-      const empty = await screen.findByTestId("dataset-search-empty");
+      // Waited for by its full text, not asserted on the first appearance of
+      // the message. `typeSearch` enters one character at a time and the search
+      // waits 300ms after each, so an early prefix — "z", "zz" — can settle
+      // mid-typing and put up its own "no records match" first. Asserting on
+      // whichever message appeared first is a race, and it is the one that
+      // failed this file on CI.
+      const empty = await waitFor(() => {
+        const message = screen.getByTestId("dataset-search-empty");
+        expect(message).toHaveTextContent("zzzznope");
+        return message;
+      });
       expect(empty).toHaveTextContent(/no records match/i);
-      expect(empty).toHaveTextContent("zzzznope");
       // "in the grid", not under it: rendered below, the reader is left with a
       // blank bordered box and a sentence that looks unattached to it.
       const grid = screen.getByTestId("dataset-editor-grid");
