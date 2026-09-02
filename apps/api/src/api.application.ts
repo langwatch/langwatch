@@ -14,6 +14,7 @@ import { Hono } from "hono";
 import superjson from "superjson";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
+import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
 
 export type ApiActor = Readonly<{ id: string }>;
 export type ApiServices = Readonly<{ agents: AgentApp; secrets: SecretApp }>;
@@ -38,6 +39,16 @@ type ApiErrorFormatter = (options: {
   error: { cause?: unknown; message?: string; code?: string };
 }) => TRPCDefaultErrorShape;
 
+/**
+ * The subscription lane, built against the caller this application resolves.
+ *
+ * A function rather than a Hono, because the lane cannot exist before the
+ * caller does: the process's REST security declares the route's access policy,
+ * and only the application holds the tRPC root a path is looked up on. Handing
+ * over the ports is what lets those two be composed in either order.
+ */
+export type ApiSubscriptionMount = (ports: SseSubscriptionPorts) => Hono;
+
 export type ApiHttpOptions = Readonly<{
   createContext(request: Request): Promise<ApiRequestContext>;
   audit?(event: ApiAuditEvent): Promise<void>;
@@ -45,6 +56,12 @@ export type ApiHttpOptions = Readonly<{
   logger?: Pick<Logger, "error" | "info">;
   errorCapture?: ApiRequestFailureCapturePort;
   errorFormatter?: ApiErrorFormatter;
+  /**
+   * Absent for a process that serves no subscriptions. Present, it is mounted
+   * beside the tRPC endpoint on the same origin, which is the whole reason the
+   * browser's `EventSource` carries its session cookie at all.
+   */
+  subscriptions?: ApiSubscriptionMount;
 }>;
 
 type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
@@ -349,6 +366,19 @@ export class ApiApplication {
     });
     hono.get(`${endpoint}/*`, (context) => handler(context.req.raw));
     hono.post(`${endpoint}/*`, (context) => handler(context.req.raw));
+    // The subscription lane runs the SAME router these two endpoints serve, so
+    // a procedure is reachable live exactly when it is reachable at all — one
+    // root, two transports, rather than a second surface that could drift.
+    const subscriptions = http.subscriptions?.({
+      createCaller: async ({ request, signal }) =>
+        this.trpc.createCaller(
+          this.withServices(await http.createContext(request)),
+          signal ? { signal } : {},
+        ),
+    });
+    if (subscriptions) {
+      hono.route("/", subscriptions);
+    }
     if (rest) {
       hono.route("/", rest);
     }

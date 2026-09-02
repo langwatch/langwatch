@@ -40,6 +40,7 @@ import type {
 import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
+import type { ExportTrpcContext } from "../../features/export/export-trpc.mount";
 import type { BugReportTrpcContext } from "@langwatch/ops-server";
 import type {
   GroupTrpcContext,
@@ -71,6 +72,7 @@ type TestContext = AnalyticsTrpcContext &
   DataPrivacyTrpcContext &
   EvaluationTrpcContext &
   ExperimentTrpcContext &
+  ExportTrpcContext &
   FrontDoorTrpcContext &
   GraphTrpcContext &
   GroupTrpcContext &
@@ -295,6 +297,7 @@ describe("the app tRPC feature list", () => {
         "dataPrivacy",
         "evaluations",
         "experiments",
+        "export",
         "frontDoor",
         "graphs",
         "group",
@@ -348,6 +351,14 @@ describe("the app tRPC feature list", () => {
         "getSnapshot",
         "removeForScope",
         "setForScope",
+      ]);
+      // The export-progress relays. Both names are what the traces grid and the
+      // simulations screen subscribe to, and they are the two of this list's
+      // procedures that STREAM — so a rename here is a live view that silently
+      // stops updating rather than a call that fails.
+      expect(procedureNamesOf(features.export)).toEqual([
+        "onExportProgress",
+        "onScenarioRunExportProgress",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
       // The sign-up ceremony. Its follow-ups all answer through ports, so what

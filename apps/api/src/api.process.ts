@@ -5,7 +5,11 @@ import {
 } from "@langwatch/observability/node";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import { ApiApplication, type ApiHttpOptions } from "./api.application";
+import {
+  ApiApplication,
+  type ApiHttpOptions,
+  type ApiSubscriptionMount,
+} from "./api.application";
 import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener";
 import {
   ApiMetricsPort,
@@ -43,6 +47,12 @@ export class ApiProcess {
     http?: Omit<ApiHttpOptions, "logger">;
     requestPolicy?: ApiRequestPolicy;
     rest?: Hono;
+    /**
+     * The subscription lane, when this process serves one. Separate from
+     * `rest` because it is not a REST family: it needs the tRPC caller only
+     * the application holds, so it is handed the ports rather than built here.
+     */
+    subscriptions?: ApiSubscriptionMount;
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
     graph?: ApiProcessGraphPort;
@@ -64,6 +74,7 @@ export class ApiProcess {
       secrets: options.secrets,
       http: {
         ...http,
+        ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
         logger: observability.logger,
         errorCapture:
           http.errorCapture ??

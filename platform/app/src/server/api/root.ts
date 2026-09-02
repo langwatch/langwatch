@@ -6,7 +6,6 @@ import {
   createAutomationTrpcRouter,
   createCodingAgentTrpcRouter,
   createEmailSuppressionTrpcRouter,
-  createExportTrpcRouter,
   createGatewayTrpcRouters,
   createHomeTrpcRouter,
   createHttpProxyTrpcRouter,
@@ -344,7 +343,6 @@ const appTrpcMount = {
 };
 
 const shareRouter = createShareTrpcRouter(appTrpcMount);
-const exportRouter = createExportTrpcRouter(appTrpcMount);
 const pinnedTraceRouter = createPinnedTraceTrpcRouter(appTrpcMount);
 const suiteRouter = createSuiteTrpcRouter(appTrpcMount);
 const storedObjectsRouter = createStoredObjectTrpcRouter(appTrpcMount);
@@ -2160,7 +2158,6 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   home: homeRouter,
-  export: exportRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,

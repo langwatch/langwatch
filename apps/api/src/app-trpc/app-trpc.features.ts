@@ -98,6 +98,10 @@ import {
   type EvaluationMountPorts,
 } from "../features/evaluation/evaluation-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
+import {
+  createExportTrpcRouter,
+  type ExportTrpcContext,
+} from "../features/export/export-trpc.mount";
 import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
 import {
   createGroupTrpcRouter,
@@ -312,6 +316,7 @@ export function createAppTrpcFeatures<
     DataPrivacyTrpcContext &
     EvaluationTrpcContext &
     ExperimentTrpcContext &
+    ExportTrpcContext &
     FrontDoorTrpcContext &
     GraphTrpcContext &
     GroupTrpcContext &
@@ -401,6 +406,13 @@ export function createAppTrpcFeatures<
       ports: ports.evaluations,
     }),
     experiments: createExperimentTrpcRouter({ ...mount, ports: ports.experiments }),
+    // The two export-progress relays. This one surface owns its procedures
+    // rather than delegating to a feature package — one relay over a channel
+    // the PROCESS owns, distinguished only by the permission each demands —
+    // so it takes no ports; see the mount's own docblock. It is in this list
+    // because a subscription mounted beside the list would serve traffic from
+    // outside every audit that reads it.
+    export: createExportTrpcRouter(mount),
     frontDoor: createFrontDoorTrpcRouter({ ...mount, ports: ports.auth }),
     graphs: createGraphTrpcRouter({ ...mount, ports: ports.graphs }),
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),

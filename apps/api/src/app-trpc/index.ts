@@ -40,6 +40,13 @@ export {
   createTracesV2TrpcRouter,
 } from "../features/trace/traces-v2-trpc.mount";
 export { declaredCheckFrom, type AppAuthzMiddlewareBuilders } from "./app-trpc.declared-check";
+export {
+  createSseSubscriptionApp,
+  sseErrorFrame,
+  SSE_KEEPALIVE_INTERVAL_MS,
+  type SseSubscriptionCaller,
+  type SseSubscriptionPorts,
+} from "./app-trpc.sse";
 export { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "./app-trpc.features";
 export {
   createOrganizationTrpcRouter,

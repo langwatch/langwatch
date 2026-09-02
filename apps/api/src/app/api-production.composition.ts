@@ -74,6 +74,8 @@ import {
 } from "./api-auth.composition";
 import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
+import type { ApiSubscriptionMount } from "../api.application";
+import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
 
 /**
  * The `AppRestFeaturePorts` entries the API process supplies out of its own
@@ -258,7 +260,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       agents,
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
-      rest: this.composeRest(authz, tenancy),
+      ...this.composeDoors(authz, tenancy),
       observability: options.observability,
       graph: options.graph,
       featureDrain: this.options.featureDrain,
@@ -426,7 +428,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The public REST door: each family is the packaged builder over the one
+   * The two doors this process opens on one credential resolution: the public
+   * REST families, and the subscription lane beside them.
+   *
+   * Each REST family is the packaged builder over the one
    * {@link ApiRestSecurity}. Secret rides the additive public-REST builder,
    * so it takes the four-callable projection; API keys is a packaged
    * framework family, so it takes the `AppRestSecurity` directly.
@@ -434,7 +439,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The secret family is mounted only when a service was resolved, for the
    * reason {@link ApiProductionComposition.resolveSecrets} gives.
    */
-  private composeRest(authz: AuthzService, tenancy: ApiResolvedTenancy): Hono {
+  private composeDoors(
+    authz: AuthzService,
+    tenancy: ApiResolvedTenancy,
+  ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
     const secrets = this.secrets;
     // One credential resolution for both doors: the framework-shaped
     // `AppRestSecurity` every packaged REST family is built from, and the
@@ -451,22 +459,30 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       observability: ApiRestObservabilityComposition.create(),
     });
     const projectRestPolicy: ApiRestProjectPolicy = ApiRestSecurity.projectPolicy(credentials);
-    return new Hono()
-      .route(
-        "/",
-        secrets
-          ? ApiSecretRestFeature.create({ secrets, security: projectRestPolicy })
-          : new Hono(),
-      )
-      .route(
-        "/",
-        createApiKeysRestApp({
-          security: restSecurity,
-          apiKeys: () => tenancy.apiKeys,
-          permissions: () => authz,
-          audit: this.composeManagementAudit(),
-        }).hono,
-      );
+    return {
+      rest: new Hono()
+        .route(
+          "/",
+          secrets
+            ? ApiSecretRestFeature.create({ secrets, security: projectRestPolicy })
+            : new Hono(),
+        )
+        .route(
+          "/",
+          createApiKeysRestApp({
+            security: restSecurity,
+            apiKeys: () => tenancy.apiKeys,
+            permissions: () => authz,
+            audit: this.composeManagementAudit(),
+          }).hono,
+        ),
+      // The subscription lane declares its access policy on the same security
+      // every REST family does, so the one streaming route on this process is
+      // a registry entry rather than an unaccounted-for endpoint. It is a
+      // function because only the application holds the caller a path is
+      // resolved on; see `ApiSubscriptionMount`.
+      subscriptions: (ports) => createSseSubscriptionApp({ security: restSecurity, ports }).hono,
+    };
   }
 
   /**
