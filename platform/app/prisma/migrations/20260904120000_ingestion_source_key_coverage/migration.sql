@@ -95,7 +95,16 @@ RETURNS TRIGGER AS $$
 DECLARE
     key_org TEXT;
 BEGIN
-    SELECT "organizationId" INTO key_org FROM "VirtualKey" WHERE "id" = NEW."virtualKeyId";
+    -- FOR KEY SHARE, and it is the whole difference between this check holding
+    -- and merely appearing to. A plain SELECT reads a key that a concurrent
+    -- session is about to delete, finds it, and lets the insert through; that
+    -- session's delete then fires the orphan-drop trigger below and finds
+    -- nothing, because this row is not committed yet. Both transactions commit,
+    -- and the coverage row outlives its key. The share lock makes the deleting
+    -- session wait for this insert instead, so the orphan-drop trigger runs
+    -- after the row exists and does see it. (Reproduced and the fix verified on
+    -- PostgreSQL 16.14.)
+    SELECT "organizationId" INTO key_org FROM "VirtualKey" WHERE "id" = NEW."virtualKeyId" FOR KEY SHARE;
     IF key_org IS NULL THEN
         RAISE EXCEPTION 'Gateway key % does not exist, so no bill can be recorded as covering it.', NEW."virtualKeyId"
             USING ERRCODE = 'foreign_key_violation';
@@ -115,6 +124,11 @@ CREATE TRIGGER "IngestionSourceKeyCoverage_key_org_check"
 -- The same absence of real foreign keys means nothing removes coverage when its
 -- key is deleted. An orphaned open row holds that key's one open slot forever,
 -- so a key later created with the same id could never be covered by anything.
+--
+-- This trigger only reaches rows that exist when the delete runs, which is why
+-- the check above takes FOR KEY SHARE: without that lock an insert racing this
+-- delete commits a row neither statement ever sees, and the pair of triggers
+-- covers every ordering except the one that matters.
 CREATE OR REPLACE FUNCTION "ingestion_source_key_coverage_drop_orphans"()
 RETURNS TRIGGER AS $$
 BEGIN
