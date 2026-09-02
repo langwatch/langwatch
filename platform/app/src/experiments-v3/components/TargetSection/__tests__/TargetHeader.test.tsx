@@ -74,8 +74,12 @@ describe("TargetHeader", () => {
     cleanup();
   });
 
-  describe("Agent target", () => {
-    const agentTarget = (agentType: AgentTypeEnum): TargetConfig => ({
+  describe("given an agent target", () => {
+    const agentTarget = ({
+      agentType,
+    }: {
+      agentType: AgentTypeEnum;
+    }): TargetConfig => ({
       id: "support-agent",
       type: "agent",
       agentType,
@@ -89,7 +93,7 @@ describe("TargetHeader", () => {
       it("marks the column with the agent icon, not the code icon", () => {
         renderWithProviders(
           <TargetHeader
-            target={agentTarget("connected")}
+            target={agentTarget({ agentType: "connected" })}
             onEdit={mockOnEdit}
             onRemove={mockOnRemove}
           />,
@@ -105,7 +109,7 @@ describe("TargetHeader", () => {
         for (const agentType of agentTypeEnum.options) {
           const { unmount } = renderWithProviders(
             <TargetHeader
-              target={agentTarget(agentType)}
+              target={agentTarget({ agentType })}
               onEdit={mockOnEdit}
               onRemove={mockOnRemove}
             />,
