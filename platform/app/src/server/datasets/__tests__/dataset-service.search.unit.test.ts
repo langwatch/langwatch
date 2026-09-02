@@ -14,7 +14,10 @@ import {
   DATASET_SEARCH_SCAN_BATCH,
 } from "../dataset-search";
 import { getDatasetStorage } from "../dataset-storage";
-import { DatasetTooLargeToSearchError } from "../errors";
+import {
+  DatasetChunkCountMissingError,
+  DatasetTooLargeToSearchError,
+} from "../errors";
 
 const makeService = (overrides: {
   repository?: Record<string, unknown>;
@@ -418,6 +421,30 @@ describe("dataset search (s3_jsonl)", () => {
 
     expect(readChunk).toHaveBeenCalledTimes(3);
     expect(result.pagination.total).toBe(2);
+  });
+
+  it("refuses a dataset whose offsets are malformed and whose chunkCount has gone null", async () => {
+    // The other end of the fallback above: rejecting the offsets leaves
+    // `chunkCount` to say how many chunks there are, and on a dataset where
+    // that has gone null too there is nothing left to ask. Reading it as zero
+    // would scan no chunks and answer "no matches" for a dataset that has them
+    // — a wrong answer the user cannot tell from a right one, which is why this
+    // throws instead.
+    const { readChunk } = mockChunks();
+    const service = makeService({});
+
+    await expect(
+      searchPage({
+        service,
+        dataset: {
+          ...baseS3Dataset,
+          chunkOffsets: [{ index: 0 }],
+          chunkCount: null,
+        },
+        search: "escalation",
+      }),
+    ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
+    expect(readChunk).not.toHaveBeenCalled();
   });
 
   it("leaves the unsearched page read on its bounded windowed path", async () => {

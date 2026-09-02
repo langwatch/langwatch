@@ -230,7 +230,7 @@ export function DatasetEditorTable({
   // landing a moment later removes from the grid. Presentation of search
   // RESULTS stays on `isSearching`, which is the right gate for it: there is
   // nothing to say about matches until the search has actually run.
-  const searchOwnsTheGrid =
+  const hasSearchTakenTheGrid =
     !!datasetId && (!!searchInput.trim() || isSearching);
 
   // Where the user was before the search started, so clearing it puts them back
@@ -353,13 +353,19 @@ export function DatasetEditorTable({
   // back to page 1 — undoing the restore it was meant to protect.
   //
   // Floored at 1, so it never drives the page to 0.
-  const searchSettling = (searchInput.trim() || undefined) !== activeSearch;
+  const isSearchSettling = (searchInput.trim() || undefined) !== activeSearch;
   useEffect(() => {
-    if (serverRecordCount == null || holdingPreviousData || searchSettling)
+    if (serverRecordCount == null || holdingPreviousData || isSearchSettling)
       return;
     const count = Math.max(1, Math.ceil(serverRecordCount / pageSize));
     if (page > count) setPage(count);
-  }, [serverRecordCount, pageSize, page, holdingPreviousData, searchSettling]);
+  }, [
+    serverRecordCount,
+    pageSize,
+    page,
+    holdingPreviousData,
+    isSearchSettling,
+  ]);
 
   const datasetName = datasetId
     ? databaseDataset.data?.name
@@ -546,11 +552,11 @@ export function DatasetEditorTable({
   // reopens it on its own: a dialog the user last touched a search ago, back on
   // screen without being asked for and empty of whatever they had chosen in it.
   // Tell the disclosure it closed, so "withdrawn" and "closed" cannot disagree.
-  const csvModalOpen = addRowsFromCSVModal.open;
+  const isCsvModalOpen = addRowsFromCSVModal.open;
   const closeCsvModal = addRowsFromCSVModal.onClose;
   useEffect(() => {
-    if (searchOwnsTheGrid && csvModalOpen) closeCsvModal();
-  }, [searchOwnsTheGrid, csvModalOpen, closeCsvModal]);
+    if (hasSearchTakenTheGrid && isCsvModalOpen) closeCsvModal();
+  }, [hasSearchTakenTheGrid, isCsvModalOpen, closeCsvModal]);
 
   // ── Table assembly ────────────────────────────────────────────────
 
@@ -564,13 +570,13 @@ export function DatasetEditorTable({
   // This one flag covers both the button and the phantom row (via
   // `displayRowCount`); the CSV import is withdrawn alongside them, for the same
   // reason — its rows land at the end of the dataset, outside the matches.
-  const showAddRow = (!datasetId || isLastPage) && !searchOwnsTheGrid;
+  const showAddRow = (!datasetId || isLastPage) && !hasSearchTakenTheGrid;
   // A refused search leaves the rows read BEFORE it on screen: the store is only
   // written from a settled `data` (see the effect above), so an error leaves the
   // previous page in place. Those rows were never matched against the search,
   // and leaving them under a search box reads as "here is what matched" — a
   // complete, confident, false answer. Withdraw them and say what happened.
-  const searchFailed = isSearching && !!databaseDatasetError;
+  const hasSearchFailed = isSearching && !!databaseDatasetError;
   // A number of matches is the search's OWN answer, so it can only be reported
   // once the search's own read has settled. Two states have no such answer and
   // both used to report one anyway:
@@ -584,8 +590,8 @@ export function DatasetEditorTable({
   //
   // In both, fall back to the dataset's own size, which is what the chip says
   // with no search in effect and is true either way.
-  const matchCountKnown = !searchFailed && !holdingPreviousData;
-  const displayRowCount = searchFailed
+  const isMatchCountKnown = !hasSearchFailed && !holdingPreviousData;
+  const displayRowCount = hasSearchFailed
     ? 0
     : showAddRow
       ? Math.max(rowCount + 1, 3)
@@ -846,12 +852,12 @@ export function DatasetEditorTable({
           title
         )}
         <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
-          {/* With no match count to report (see `matchCountKnown`), the count
+          {/* With no match count to report (see `isMatchCountKnown`), the count
               on hand describes unsearched rows, so reporting it as the result
               of the search would be false. Report the dataset's own size
               instead, and say nothing at all when even that is not known. */}
           {isSearching
-            ? matchCountKnown
+            ? isMatchCountKnown
               ? formatSearchRecordCount({
                   matched: totalRecordCount,
                   total: unsearchedRecordCount.current,
@@ -912,7 +918,7 @@ export function DatasetEditorTable({
             >
               <Download size={16} /> Download as CSV
             </Button>
-            {datasetId && !searchOwnsTheGrid && (
+            {datasetId && !hasSearchTakenTheGrid && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -1003,7 +1009,7 @@ export function DatasetEditorTable({
               missing rows would have been: below it, the reader gets a blank
               box with an unattached sentence under it. Held until the read
               settles so the message does not flash between keystrokes. */}
-          {searchFailed && (
+          {hasSearchFailed && (
             <Text
               fontSize="13px"
               color="fg.muted"
@@ -1016,7 +1022,7 @@ export function DatasetEditorTable({
           )}
 
           {isSearching &&
-            !searchFailed &&
+            !hasSearchFailed &&
             !databaseDataset.isLoading &&
             !holdingPreviousData &&
             rowCount === 0 && (
@@ -1130,7 +1136,7 @@ export function DatasetEditorTable({
           the matches on screen. The effect above is what makes the withdrawal
           stick — unmounting alone would leave the disclosure believing it is
           still open, and clearing the search would bring it back. */}
-      {datasetId && addRowsFromCSVModal.open && !searchOwnsTheGrid && (
+      {datasetId && addRowsFromCSVModal.open && !hasSearchTakenTheGrid && (
         <AddRowsFromCSVModal
           isOpen={addRowsFromCSVModal.open}
           onClose={() => {

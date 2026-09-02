@@ -601,22 +601,24 @@ describe("given the search's own read has not come back yet", () => {
       // What react-query serves during a key change: the previous key's result,
       // flagged as a placeholder, with the new key's read still in flight.
       const inFlight = { ...unsearched, isPlaceholderData: true };
+      const requests: { search?: string }[] = [];
       listPaginatedQuery.mockImplementation(
-        (input: { search?: string } | undefined) =>
-          input?.search ? inFlight : unsearched,
+        (input: { search?: string } | undefined) => {
+          requests.push(input ?? {});
+          return input?.search ? inFlight : unsearched;
+        },
       );
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       await screen.findByText("question 0");
       await typeSearch(user, "escalation");
 
-      // The self-check: without it, an editor that never ran the search at all
-      // would satisfy the assertion below by simply never entering search mode.
-      await waitFor(() =>
-        expect(
-          screen.queryByTestId("add-rows-from-csv"),
-        ).not.toBeInTheDocument(),
-      );
+      // The self-check, asserted on the read rather than on the toolbar: the
+      // searched read has to have actually gone out, or the assertion below
+      // holds for the wrong reason — the chip still sitting in its unsearched
+      // state. The add-row affordances are no use for this, because they now go
+      // on the keystroke; their absence proves only that the term was typed.
+      await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
       expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
         "120 of 120",
       );
