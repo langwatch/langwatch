@@ -3499,234 +3499,154 @@ Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your 
 
 ---
 title: Budgets
-description: Hierarchical, windowed spend limits enforced at the gateway.
+description: Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
 sidebarTitle: Budgets
 ---
 
-A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it: any hard-block breach rejects the request, any warn breach adds a header.
+## What a budget is
 
-## Creating a budget
+A budget is a spend cap in USD on one scope over one window. The gateway checks every request against every budget that applies to it. A `block` budget at its limit rejects the request. A `warn` budget lets it through and adds a warning header.
 
-**AI Gateway > Budgets > New budget**, or over the API:
+Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider do not count.
+
+## Create a budget
+
+Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fields:
+
+| Field | Values |
+|---|---|
+| **Name**, **Description** | The name is required. |
+| **Target** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
+| **Provider** | **All providers**, or one provider credential. Only requests served by that credential count. |
+| **Window** | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
+| **Limit (USD)** | The cap. |
+| **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
+| **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
+
+The budget is in force at once: the next request counts against it.
+
+If no active key sends traffic to the target, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
+
+Per-end-user budgets are created over the API. See [Per end user](#per-end-user).
+
+## Scopes
+
+| Scope | Counts |
+|---|---|
+| `organization` | Every request in the organization. |
+| `team` | Every request on the team's projects and on keys scoped to the team. |
+| `project` | Every request whose traces land in the project. |
+| `virtual_key` | Every request on this key. |
+| `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
+| `group` | Each member of the group, individually. One budget, one allowance per member. |
+| `attributed_user` | Each end user of your product, individually, on one key or one project. |
+
+One request is checked against all of them. For example, a request on key `acme-support-agent` in project `support` of team `platform` counts against the key's, the project's, the team's and the organization's budgets, and against the principal and group budgets when the key has a principal.
+
+A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal.
+
+### Per end user
+
+An `attributed_user` budget is a template on one virtual key or one project: each distinct end user seen there gets the limit per window. You create one budget, and buckets appear per end user on first spend.
 
 ```bash
 curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "scope": { "kind": "project", "project_id": "proj_01HZ..." },
-    "name": "project-monthly-cap",
+    "scope": { "kind": "attributed_user", "anchor_virtual_key_id": "vk_..." },
+    "name": "acme per-user cap",
     "window": "month",
-    "limit_usd": "5000",
+    "limit_usd": "25",
     "on_breach": "block"
   }'
 ```
 
+The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
+
+Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#per-end-user-spend).
+
+## Block and warn
+
+| `on_breach` | At the limit | From 80 percent |
+|---|---|---|
+| `block` | HTTP 402 `budget_exceeded` | `X-LangWatch-Budget-Warning` header |
+| `warn` | Request served, header set | `X-LangWatch-Budget-Warning` header |
+
+The 402 body is an OpenAI-shaped error with the budget in `error.meta`:
+
+```json
+{
+  "error": {
+    "type": "budget_exceeded",
+    "code": "budget_exceeded",
+    "message": "...",
+    "meta": {
+      "budget_id": "bgt_...",
+      "budget_scope": "virtual_key",
+      "budget_window": "month"
+    }
+  }
+}
+```
+
+`budget_scope` tells your application which allowance ran out: `attributed_user` is the end user's own cap, `virtual_key` is the tenant's cap.
+
+The warning header lists every budget at or past 80 percent as `scope:percent`, comma separated, for example `X-LangWatch-Budget-Warning: project:84,virtual_key:100`. A provider-filtered budget appears as `scope/provider_id:percent`.
+
+A `block` budget with a **Provider** filter removes that provider from the request's provider chain instead of rejecting the request. The request is rejected only when no provider is left.
+
+Two webhook events fire once per period: `gateway.budget.threshold_crossed` at 80 percent and `gateway.budget.breached` at the limit, on `warn` budgets too. See [Webhooks](/features/webhooks).
+
+## Windows and cycles
+
+The cycling windows (`minute`, `hour`, `day`, `week`, `month`) roll on the calendar in UTC: a day resets at 00:00, a week on Monday 00:00, a month on the first.
+
+Set **Start cycle on** (`cycle_anchor_at` on the API) to roll from your own date instead. Anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly anchor past the 28th clamps into shorter months. The anchor is fixed at creation; `total` and `manual` refuse one with `gateway_budget_cycle_anchor_invalid`.
+
+`total` never resets. `manual` accrues until you reset it:
+
+```bash
+curl -sS -X POST https://app.langwatch.ai/api/gateway/v1/budgets/<budget_id>/reset \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+A reset moves the period boundary to now. Recorded spend and emitted spend events never change. On an `attributed_user` budget, add `?end_user_id=<id>` to reset one end user's bucket.
+
+## See the spend
+
+**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset. Click a budget for the recent debits with amount, model, key and gateway request id.
+
+**AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
+
+## Manage budgets from the CLI
+
 ```bash
 langwatch gateway-budgets create \
-  --name project-monthly-cap \
-  --scope project --project proj_01HZ... \
+  --name "engineering monthly cap" \
+  --scope team --team <team_id> \
   --window month --limit 5000 --on-breach block
+
+langwatch gateway-budgets list --scope-type team,project
+langwatch gateway-budgets update <budget_id> --limit 6000
+langwatch gateway-budgets reset <budget_id> --reason "new billing period"
+langwatch gateway-budgets archive <budget_id>
 ```
 
-The budget is in force immediately; the next request counts against it. Everything else is optional: a provider filter, a [cycle anchor](#anchoring-a-cycle-to-your-own-date), a `timezone`, and your own [`external_id` and `metadata`](/ai-gateway/api/management#your-own-ids-and-metadata).
+`create` takes `--scope organization|team|project|virtual-key|principal|group` with the matching `--organization`, `--team`, `--project`, `--virtual-key`, `--principal` or `--group <id>`, plus `--provider-key <id>` and `--cycle-anchor-at <rfc3339>`.
 
-<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
-  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
-</Frame>
+## Manage budgets over REST
 
-<Tip>**Detect spikes before a budget breach**: pair budgets with [AI Governance > Anomaly Rules](/ai-governance/anomaly-rules) so spend-spike, geo-mismatch, and off-hours patterns surface as alerts *before* they hit a hard cap.</Tip>
-
-## Scopes
-
-| Scope | Applies to |
+| Method and path | Permission |
 |---|---|
-| `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
-| `project` | All gateway traffic in this project. |
-| `virtual_key` | This specific VK. |
-| `principal` | This user or service account across any VK they use. |
-| `group` | Each member of the group individually (see below). |
-| `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
+| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
+| `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
+| `GET /api/gateway/v1/budgets/:id` | `gatewayBudgets:view` |
+| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
+| `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
+| `DELETE /api/gateway/v1/budgets/:id` (archive) | `gatewayBudgets:delete` |
 
-A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
-
-### A budget has to reach the traffic it names
-
-Which team and project a request belongs to is decided by the key that served it: the teams the key is scoped to, plus the team of the project its traces land in. So a `team`, `project` or `group` budget can be written, look correct on both sides, and match nothing at all, for instance a `project` budget on a project none of your keys send traffic to.
-
-A budget that could never accrue is refused when you create it, with `gateway_budget_scope_unreachable`. The refusal lists the projects your active keys do reach, in `error.meta.reachable_project_ids`. Two ways forward:
-
-- Point a key at the target: give it a scope on that team or project, or set the key's trace project.
-- Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
-
-An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that has not been breached.
-
-### Group budgets are per member
-
-A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve.
-
-Two consequences worth knowing:
-
-- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the allowance to, so cap it with `project`, `team`, or `virtual_key` budgets instead.
-- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. Deployments reading budget spend from Postgres only refuse the create with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
-
-### Per-end-user budgets (attributed-user templates)
-
-An `attributed_user` budget is a **template**, not a cap on one person: anchored on a virtual key or a project, it means "each distinct end user seen here: this limit per window". One row covers every current and future end user; per-user buckets appear lazily on first spend, keyed `<anchor_id>:<end_user_id>`, and there is nothing to provision or delete per user. This is the cap layer for [platforms that rebill their own customers](/ai-gateway/cookbooks/metering-and-rebilling), whose end users are not LangWatch users (for real LangWatch accounts, use `principal` or `group`).
-
-- The end-user id is resolved from the request: the `x-langwatch-end-user-id` header, then the `x-litellm-end-user-id` alias, then the OpenAI `user` body field. Headers win over the body. The same resolution feeds [spend events](/ai-gateway/billing-events#attribution-what-the-request-carries), so metering and enforcement always agree about who a request was.
-- **Fail closed**: while a template is active on the anchor, a request carrying no end-user id anywhere is rejected with `error.code = "end_user_required"`, naming both accepted wire fields. A cap evadable by omitting a field is not a cap. The rejection is still recorded per key, and it produces no provider spend.
-- Enforcement is per bucket: one end user at their limit blocks only that user; every other user on the anchor passes. Breaches name `budget_scope: "attributed_user"` so your product can tell "this user's cap" from the tenant cap.
-- Like group budgets, templates require the ClickHouse spend ledger.
-- Read one user's current spend and applicable cap in one call: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend).
-- **How a template reports itself.** One template covers many people, so there is no single total to measure anyone against. The Budgets list and detail page headline the per-person cap ("$1.00 per person") and put the standing underneath as a headcount: "3 of 10 people over cap", the bar filled to the same ratio and red as soon as anyone is over. "Seen" means an end user with at least one successful request in the current period, so somebody served entirely by an unpriced model still counts, while somebody whose every request failed does not. Over-cap uses the same `>=` the gateway blocks on, so a person the page calls over is a person being refused. The same two figures ride the API as `end_users_seen` and `end_users_over`.
-
-### Provider-filtered budgets
-
-Any budget, on any scope, can additionally be filtered to a **single provider**: "OpenAI $200/month for this team" is one budget with a provider filter, not a new kind of scope. With a filter set:
-
-- Only requests dispatched to that provider debit the budget. Every ledger debit stamps the provider that actually served the request, so two budgets on the same target with different filters never share spend.
-- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
-
-## Windows
-
-`minute`, `hour`, `day`, `week`, `month`, `total`, `manual`.
-
-- The five cycling windows roll on a schedule, computed in **UTC**. By default they align to the calendar: `day` resets at 00:00, `week` on Monday 00:00 (ISO 8601), `month` on day 1 at 00:00. The `timezone` field exists on the API for forward compatibility, but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
-- `total` never resets, which suits one-off grant-style budgets.
-- `manual` accrues until **you** reset it: the period boundary moves only when your system says so. Without it a reset endpoint alone would not help you, because a `month` budget would still calendar-reset mid-cycle.
-
-### Anchoring a cycle to your own date
-
-Set `cycle_anchor_at` on a cycling window and the period rolls from that instant instead of the calendar. This is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00.
-
-```bash
-curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scope": { "kind": "virtual_key", "virtual_key_id": "vk_01HZX..." },
-    "name": "customer-acme",
-    "window": "month",
-    "limit_usd": "250",
-    "cycle_anchor_at": "2026-01-17T09:00:00Z"
-  }'
-```
-
-- **The anchor day is never rewritten.** A monthly cycle anchored past the 28th clamps into shorter months and springs back: anchored on Jan 31, the periods start Feb 28 (Feb 29 in a leap year), then Mar 31, then Apr 30, then May 31.
-- **Fixed windows are pure modulo** from the anchor. A week anchored on a Saturday rolls Saturdays; the ISO Monday plays no part.
-- **A future anchor is allowed.** The budget reads zero and reports the anchor as its reset until the anchor arrives, which is how you say "start cycling on the 1st of next month".
-- **`total` and `manual` refuse an anchor**, with `400 gateway_budget_cycle_anchor_invalid`. Those windows do not cycle, so an anchor would be a silently ignored instruction.
-- **The anchor is fixed at creation.** Changing the clock mid-period is a reset in disguise, and [reset](#resetting-a-period) already exists. Update requests carrying `cycle_anchor_at` leave it untouched.
-
-`current_period_started_at` and `resets_at` are computed when you read the budget, for every budget, so the pair always describes the period you are actually in.
-
-### Resetting a period
-
-`POST /api/gateway/v1/budgets/:id/reset` moves the boundary to now and recomputes the next reset:
-
-- Recorded spend is **never mutated**. The ledger and every emitted [billing event](/ai-gateway/billing-events) are immutable, so reconciliation is unaffected. What changes is the lower bound of "spend inside the current period".
-- On a cycling window, reset truncates the running period and the next boundary stays on its schedule, calendar or anchored. On `manual` the new period stays open until the next reset.
-- On attributed-user templates, `?end_user_id=` resets **one** end user's bucket and leaves the template period untouched.
-- Resets take the same permission as edits (`gatewayBudgets:update`) and are audit-logged with the actor and an optional `reason`.
-
-## on_breach
-
-- `block`, hard-cap. The next request after `spent_usd >= limit_usd` returns `402 budget_exceeded` with an OpenAI-compatible error envelope.
-- `warn`, soft-cap. The request passes but the response gains `X-LangWatch-Budget-Warning: <scope>:<pct_used>`. Multiple soft caps can fire on one request.
-
-### Breaches, warnings, and budget events
-
-Three signals fire around a limit, each with a distinct consumer:
-
-- **The `402`** is for the caller whose request was rejected. Its `error.meta` is machine-readable: `budget_id` (which allowance to raise), `budget_scope` (lowercase), `budget_window`, and `budget_provider` when a provider filter emptied the chain. `budget_scope` is the branch a rebilling platform's copy needs: `attributed_user` means the end user's own allowance, `virtual_key` means the tenant cap.
-- **The warning header** is for the caller whose request still passed: any budget at or past **80 percent** contributes `X-LangWatch-Budget-Warning: <scope>:<pct_used>`, whatever its `on_breach`. A `warn` budget past its limit stays a warning; a `block` budget warns on approach before it starts rejecting.
-- **The webhook events** are for your backend, so it learns without polling: crossing 80 percent emits `gateway.budget.threshold_crossed`, reaching the limit emits `gateway.budget.breached` (on `warn` budgets too). Each fires **once per crossing per period**: re-crossing inside the same period is deduplicated, and a new period starts the cycle fresh. See [Webhooks](/features/webhooks#family-gateway).
-
-One more rejection belongs to this catalog: `end_user_required`, the fail-closed refusal when an attributed-user template is active and the request carried no end-user id. It is a request-shape problem, not a breach: the fix is sending the id, not raising a limit.
-
-## Multiple tiers on the same scope
-
-A single scope can carry several budgets with different `on_breach` values. Common pattern:
-
-- Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
-- Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
-
-The UI surfaces this as "Warning thresholds" on a single budget row.
-
-## Viewing budget spend
-
-<Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
-  ![Budgets list](/images/ai-gateway/budgets-page.png)
-</Frame>
-
-**/gateway/budgets** lists every budget with a utilization bar, its cap, and what remains. The bar and its percentage badge are colour-graded, so "which budgets are hot" is a one-glance read, and the Resets column shows a relative time with the exact UTC timestamp on hover. Clicking a row opens the detail page: utilization, enforcement mode, the resolved scope target, a link to this budget's audit history, and the 20 most recent debits with amount, model, originating key, and the gateway request id for trace search.
-
-<Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
-  ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
-</Frame>
-
-**/gateway/usage** pairs with it for the time series: spend by day, top virtual keys, and a **This month** preset covering the same UTC month-to-date window the keys list reports.
-
-<Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
-  ![Usage this month](/images/ai-gateway/usage-this-month.png)
-</Frame>
-
-The same figures over the API:
-
-```bash
-langwatch gateway-budgets list
-
-curl -sS https://app.langwatch.ai/api/gateway/v1/budgets/<id> \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY"
-```
-
-## How spend is counted
-
-<Accordion title="The debit model, the pre-request check, and what they trade off">
-
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` and is **idempotent** by that id, so a retry or a redelivered batch never double-bills.
-
-1. The gateway admits the request before any budget or guardrail gating runs, recording who it belongs to. Admission is a local, non-blocking write to a bounded on-disk spool, so the request path never waits on the control plane.
-2. The gateway streams the response. When it closes, it records the provider's token counts as a confirmation, or the failure with its error class. Both go to the same spool.
-3. A background drainer ships spooled batches to the control plane, which prices each outcome once from tokens times the pricing catalog.
-4. The debits process resolves every applicable budget and writes one ledger row per budget, rolled up by a materialised view. It is the only writer of that ledger.
-5. The same debit emits a change event, so the gateway drops its cached bundle for that project and the next request enforces against fresh spend.
-
-Because admission happens before gating, a request the gateway refused is a record rather than a silence. Those rows land with the reason (`PROVIDER_ERROR`, or `BLOCKED_BY_GUARDRAIL`) and show in a budget's activity list, but they do **not** count toward a cap: only successful requests accrue enforcement spend. A platform failure should be visible to you without charging your customer for it.
-
-**The pre-request check.** Before dispatching, the gateway evaluates the key's in-memory budget snapshot, which arrives baked into its cached bundle. No control-plane round trip on the hot path: a `block` scope with nothing remaining is rejected outright, saving the provider spend and the round trip, and anything at or over 80% is allowed and flagged as a warning.
-
-The exception is an attributed-user template, where one row governs a separate allowance for every end user the anchor will ever see. That fan-out cannot be baked into a bundle, so the gateway reads the request's own bucket from the control plane, cached 15 seconds per (budget, end user). A bucket it cannot read skips that scope: unreadable allows, it never blocks.
-
-**The stale-snapshot trade-off.** Because the check is local and the snapshot lags the ledger by one refresh, two replicas can each see `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 against a $25 cap. This is deliberate: a control-plane call on every near-limit request would put the gateway's availability at the mercy of the control plane, and the overshoot is bounded by one refresh interval of traffic. Precheck is permissive by design, so a control-plane outage degrades enforcement accuracy, never availability, and spend reconciles once the ledger catches up.
-
-**What "USD cost" means.** Tokens times unit price, per provider, from their published pricing. Cache reads and writes are priced separately per provider: Anthropic cache reads are about 10% of regular input tokens and cache writes 125%. See [Caching passthrough](/ai-gateway/caching-passthrough).
-
-</Accordion>
-
-<Note>
-The ClickHouse ledger is the primary read wherever it is enabled; the Postgres `spentUsd` column is the fallback for self-hosted installs without it. A $1 budget blocks at $1 of spend on either.
-</Note>
-
-## Permissions
-
-| Action | Permission |
-|---|---|
-| View budgets | `gatewayBudgets:view` |
-| Create | `gatewayBudgets:create` |
-| Edit and reset | `gatewayBudgets:update` |
-| Archive | `gatewayBudgets:delete` |
-| All of the above | `gatewayBudgets:manage` |
-
-See [RBAC](/ai-gateway/rbac).
-
-## Trace attributes
-
-- `langwatch.cost_usd`, cost of this single request.
-- `langwatch.budget.breached_scope`, present when the request was blocked; format `scope:window` (for example `project:month`).
-- `langwatch.budget.warnings`, comma-separated `scope:pct_used` entries for soft breaches.
+Field by field: [Budgets API reference](/api-reference/gateway-budgets/overview). A virtual key's own budget can also be set inline on the key: see [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest).
 
 ---
 
@@ -4927,182 +4847,59 @@ If your CLI sees one of these response shapes, the gateway is healthy. End-to-en
 
 ---
 title: Concepts
-description: The mental model for the LangWatch AI Gateway, virtual keys, budgets, guardrails, fallback, caching.
+description: The nouns of the LangWatch AI Gateway, each defined once, virtual key, scope, provider credential, routing policy, budget, spend event and gateway request id.
 sidebarTitle: Concepts
 ---
 
-A short tour of every primitive the gateway introduces, how they compose, and where the boundaries are with the rest of LangWatch.
+## Virtual key
 
-## Virtual key (VK)
+A virtual key is the credential your application presents to the gateway in place of a provider API key. A virtual key is like a virtual credit card that you can attach a budget to.
 
-A LangWatch-issued credential of the form `vk-lw-{live|test}_<26-char-ULID>` (40 chars total). Used in:
+The key has the form `vk-lw-` followed by a 26-character ULID. Send it as `Authorization: Bearer vk-lw-...` or in the `X-Api-Key` header. The gateway resolves the key to its organization, its scopes, the providers it may reach, its routing, its budgets and its expiry.
 
-- `Authorization: Bearer vk-lw-…` (OpenAI-style clients and most CLIs).
-- `x-api-key: vk-lw-…` (Anthropic-style clients, including Claude Code).
-- `api-key: vk-lw-…` (Azure-style clients).
+See [Virtual keys](/ai-gateway/virtual-keys).
 
-Every gateway request **must** carry a VK. The VK resolves at the gateway to:
+## Scope
 
-- An **owning organisation** (`organizationId`, always present) plus a **set of scope rows** (`VirtualKeyScope[]`) at any combination of `ORGANIZATION`, `TEAM`, `PROJECT`. The scope set drives the VK's eligible provider set and budget cascade; see [Virtual key scoping](/ai-gateway/virtual-keys#scoping).
-- An optional **principal** (`principalUserId`): present on personal-access VKs minted via the CLI device-flow, orthogonal to the scope set.
-- A **set of provider credentials**: the underlying OpenAI, Anthropic, Bedrock, etc. keys the VK may use. Resolved at bundle-time by walking the VK's scopes upward and unioning every visible **ModelProvider**. These are **reused** from LangWatch's existing Model Provider settings; the gateway does not duplicate credential storage.
-- A **routing policy** (ordered list of ModelProvider ids the VK may dispatch through, with fallback semantics). The VK may pin a specific policy, or fall back to the org's default policy ordered by `fallbackPriorityGlobal` then `createdAt`.
-- **Model aliases**: a map like `{"gpt-4o": "azure/my-deployment"}` that lets the VK redirect a client-friendly model name to a specific provider/deployment.
-- **Cache policy**, **guardrail attachments**, **blocked patterns**, and **budgets** (see below).
+A scope is the place in your LangWatch hierarchy that a virtual key or a budget belongs to. The scope types are organization, team and project.
 
-**Show-once secret:** the full key is displayed exactly once at creation and stored as a peppered HMAC-SHA256 hash (see [Security → Virtual keys](/ai-gateway/security#virtual-keys) for the hashing-scheme rationale). Only a short prefix (`vk-lw-01HZX9`) remains visible in the UI. Rotation replaces the secret (old secret valid 24 h grace); revocation propagates to gateway caches within 60 seconds.
+A key owned by a project reaches the provider credentials configured on that project, its team and the organization. A personal key is a key with a principal, the person behind it, and its scopes still decide which providers it reaches. Every key has one trace project where its traces and costs land.
 
-See [Virtual Keys](/ai-gateway/virtual-keys) for CRUD, rotation, and revocation details.
+## Provider credential
+
+A provider credential is the row you configure under **Settings > Model Providers**: an OpenAI API key, an Azure OpenAI endpoint with its key, AWS Bedrock access keys with a region, and so on. The gateway reads the same rows that the rest of LangWatch uses.
+
+The credential also carries gateway settings on its **Advanced (Gateway)** section: a routing handle, a fallback priority and a provider config JSON. See [Providers](/ai-gateway/providers/overview).
+
+## Routing policy
+
+A routing policy is an ordered list of provider credentials that a virtual key dispatches through. A key with no routing does not fail over: a provider error goes back to the caller. A key set to **Fall back to all eligible providers** retries the next credential it can reach. A key bound to a policy follows the policy's order.
+
+See [Routing policies](/ai-gateway/governance/routing-policies) and [Fallback chains](/ai-gateway/providers/fallback-chains).
+
+## Model name
+
+A model name selects the provider and the model. Write it as `provider/model`, for example `openai/gpt-5-mini` or `anthropic/claude-sonnet-4-5`. A bare name such as `gpt-5-mini` works when one of the key's credentials serves it. A routing handle set on a credential, for example `eu`, pins that exact credential: `eu/claude-sonnet-4-5`.
+
+See [Model naming](/ai-gateway/model-naming).
 
 ## Budget
 
-A spending limit attached to a scope. Scopes:
+A budget is a spend cap in USD on a scope, over a window. The scope is an organization, a team, a project, a virtual key, a member, each member of a group, or each end user of your product. The window is a minute, an hour, a day, a week, a month, the total lifetime, or manual.
 
-- `organization` (all traffic in the org)
-- `team` (all traffic in a team)
-- `project` (all traffic in a project)
-- `virtual_key` (this specific VK)
-- `principal` (one user or service account)
-- `group` (each member of a group, individually)
-- `attributed_user` (each end user seen on a key or project, individually)
-
-Windows: `minute`, `hour`, `day`, `week`, `month`, `total`, `manual`. The cycling windows align to the calendar unless you anchor them to your own start instant. See [Budgets](/ai-gateway/budgets#windows).
-
-`on_breach`:
-
-- `block`, 402 `budget_exceeded` returned once the limit is reached.
-- `warn`, request passes but the response carries `X-LangWatch-Budget-Warning: <scope>:<pct>`.
-
-Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
-
-Spend is debited after the response completes, using the token counts the provider reported, from the spend commands the gateway emits for every request. Redeliveries of the same `gateway_request_id` collapse, so a retry never double-bills.
+A `block` budget rejects the request at the limit with HTTP 402 `budget_exceeded`. A `warn` budget lets the request through and sets the `X-LangWatch-Budget-Warning` header. Every budget adds that header from 80 percent of its limit.
 
 See [Budgets](/ai-gateway/budgets).
 
-## Principal
+## Spend event
 
-The identity attributed to a request, the user or service account who owns the VK on this call. Matters for three things:
+A spend event is the record of one request: token counts per class, cost in nano-USD, the virtual key, the end user and the metadata your request carried. LangWatch delivers spend events to your webhook endpoints and serves them over REST for reconciliation.
 
-- **Attribution in traces** (`langwatch.principal_id`).
-- **Principal-scoped budgets** (cap spend per-person).
-- **RBAC**: the principal must have permission to *use* the VK at all.
+See [Billing and spend events](/ai-gateway/billing-events).
 
-Personal-access VKs bind to a user principal; shared VKs bind to a service-account principal.
+## Gateway request id
 
-## Model alias
-
-A per-VK name → provider redirect. Two use cases:
-
-- **Abstraction.** Point `gpt-4o` at `azure/my-deployment` so code doesn't need to know about the Azure deployment name.
-- **Migration.** Point `claude-haiku` at `anthropic/claude-haiku-4-5-20251001` to pin a version; swap the alias to migrate every caller at once.
-
-Aliases always win over explicit `provider/model` form if both are defined for the same model name on a VK.
-
-## Fallback chain
-
-Ordered list of **ModelProvider** ids (not models) the VK can dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every key. Triggered by:
-
-- `5xx` from upstream.
-- `timeout` from upstream.
-- `429 rate_limit_exceeded` from upstream.
-- `network_error` (connection reset, DNS, TLS).
-- Upstream `404`. In a chain with more than one provider, this usually means that this provider does not serve that model.
-- `circuit_breaker`, gateway-internal tripped after N consecutive failures.
-
-**Does not** trigger fallback:
-
-- Upstream `400 / 401 / 403`. These stop the request. A `400` points to the request itself. A `401` or `403` usually points to the provider credential. A different provider would hide the fault that you must repair.
-- A caller that disconnected, or a caller deadline that ended. This tells nothing about the provider.
-- Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
-
-For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.
-
-## ModelProvider (gateway-side)
-
-The same **ModelProvider** record you configure under **Settings → Model Providers** is the only credential entity the gateway knows about. There is no separate gateway-binding wrapper; gateway-specific fields (RPM, TPM, RPD, fallback priority, providerConfig overrides) live on the ModelProvider itself, on the **Advanced (Gateway)** tab of the editor.
-
-A ModelProvider lives at `ORGANIZATION`, `TEAM`, or `PROJECT` scope. Multiple deployments of the same provider family (e.g. OpenAI US vs OpenAI EU) are sibling ModelProvider rows with distinct names; VKs and routing policies reference them by id.
-
-See [Gateway provider settings](/ai-gateway/provider-bindings) for the field list and [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) for how the eligible-provider set is derived from a VK's scope rows.
-
-## Cache rule
-
-A **Cache rule** (`GatewayCacheRule`) is an org-scoped operator override that changes cache behaviour without touching client code. Rules are evaluated in priority order (highest-first); the first match wins. Each rule has:
-
-- **Matchers** (ANDed within a rule): `vk_id`, `vk_tags`, `vk_prefix`, `principal_id`, `model`, `request_metadata`.
-- **Action**: `force`, `respect`, `disable`, with optional `ttl_seconds` and `action_metadata`.
-
-Precedence, from highest to lowest: per-request `X-LangWatch-Cache` header → matching rule → VK default `config.cache.mode`. Rules compile into the VK bundle at `/changes-refresh` time so the hot path stays at the ~700 ns target.
-
-## Caching passthrough
-
-By default the gateway forwards Anthropic `cache_control` blocks, OpenAI cached-prompt markers, and Gemini implicit caches **byte-identically**. Prompt caching saves up to 90% on input tokens, and a gateway that reformats the payload loses that saving.
-
-Overrides per-request:
-
-- `X-LangWatch-Cache: respect` (default), pass through.
-- `X-LangWatch-Cache: force`, inject `cache_control` markers on large stable prefixes even if the client didn't.
-- `X-LangWatch-Cache: disable`, strip every cache marker. Forces cold calls.
-- `X-LangWatch-Cache: ttl=3600`, same as `force` with a TTL hint.
-
-Per-VK default set via VK config `cache.mode`. Per-request header wins.
-
-Cache outcome is reported back in `X-LangWatch-Cache: hit|miss|bypass|force` response header and recorded in the trace with separate `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` counters (OTel GenAI semconv).
-
-## Guardrails
-
-LangWatch evaluators invoked inline on gateway traffic. Each VK can attach guardrails in three directions:
-
-- `pre`, run on the **request** before dispatch. Decision `block` fails with 403 `guardrail_blocked`. Decision `modify` rewrites the payload (e.g. PII redaction) before dispatch.
-- `post`, run on the **full response** after dispatch. Flag-only for streaming responses (decision recorded but response already delivered); blocking for non-streaming.
-- `stream_chunk`, run on **each SSE chunk** before emission. Decision `block` terminates the stream with an SSE error. Decision `modify` rewrites the chunk. Budget ≤50 ms per chunk or the guardrail is bypassed with an OTel warning.
-
-Guardrails reuse your existing LangWatch evaluators; nothing new to author for the gateway.
-
-## Policy rules
-
-Per-VK regex allow/deny lists for:
-
-- **Tool calls**: matched against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). Denied tools → 403 `tool_not_allowed`.
-- **MCP servers**: matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
-- **Outbound URLs**: heuristically matched against every `http(s)://` URL in the request body. Denied URLs → 403 `url_not_allowed`.
-
-Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Gateway-Request-Id` response header → trace correlation.
-
-## Traces (per-tenant observability)
-
-Every request emits a LangWatch trace. The gateway is a shared multi-tenant service, and it routes each trace to the **owning tenant's project**: tenant A never sees tenant B's traffic.
-
-Attributes always present (source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`):
-
-- `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.organization_id`, `langwatch.principal_id`.
-- `langwatch.model`, `langwatch.provider`, `langwatch.model_source`, `langwatch.streaming`.
-- `langwatch.usage.input_tokens`, `langwatch.usage.output_tokens` + OTel GenAI semconv `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens`.
-- `langwatch.cost_usd`, `langwatch.duration_ms`, `langwatch.status`, `langwatch.budget.decision`.
-
-When a bundle-baked cache rule matches: `langwatch.cache.rule_id`, `.rule_priority`, `.mode_applied`.
-
-<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
-
-## Request id
-
-Once a request is authenticated, its response carries `X-LangWatch-Gateway-Request-Id: req_<30 hex characters>`. Use it to:
-
-- Deep-link into the LangWatch trace from logs.
-- File a support ticket, the first thing we ask for.
-- Debug CLI integrations, the Codex, Claude Code logs echo these.
-
-The id also flows into the CH ledger as the idempotency key for debit replays, so a single request is billed exactly once even across gateway restarts.
-
-## What's intentionally *not* here
-
-- **SDK migration of existing litellm callsites**: the LangWatch playground and evaluators continue to use the litellm path. The gateway serves new traffic; existing internal call sites don't change. This is deliberate scope control for v1.
-- **Semantic caching across unrelated requests**: Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.
-- **Per-region provider routing for data residency**: tracked as an open question in the contract; not in v1.
-
-Once these concepts are in your head the rest of the docs are detail views on the same primitives: [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), and [CLI Integrations](/ai-gateway/cli/overview).
-
-If you rebill this traffic to your own customers, two more read next: [Billing and spend events](/ai-gateway/billing-events) for the per-request record you reconcile against, and [Webhooks](/features/webhooks) for having it pushed to you instead of polling.
+The gateway request id identifies one request across the response, the trace and the spend event. The response carries it as `X-LangWatch-Gateway-Request-Id`, the trace as `langwatch.gateway_request_id`, and the spend event as `gateway_request_id`. Quote it when you contact support.
 
 ---
 
@@ -9927,147 +9724,94 @@ See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for 
 # FILE: ./ai-gateway/overview.mdx
 
 ---
-title: LangWatch AI Gateway Overview
-description: A governed, observable, sub-millisecond-overhead AI Gateway for enterprise LLM usage.
+title: LangWatch AI Gateway
+description: One OpenAI- and Anthropic-compatible endpoint for every LLM call in your company, with provider keys kept in LangWatch, a virtual key per application, team or person, budgets that block or warn, and a trace for every request.
 sidebarTitle: Overview
+keywords: ai gateway, llm gateway, virtual keys, llm budgets, openai compatible gateway, anthropic compatible gateway
 ---
 
-The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request, and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
+## What the gateway does for you
 
-<Info>**~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi + in-process JWT verification. The hot path sits in front of every LLM call, it has to be close to free.</Info>
+Your provider API keys stay in LangWatch. You add OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Google Gemini and the other [providers](/ai-gateway/providers/overview) once, under **Settings > Model Providers**.
 
-## Try it in 30 seconds
+Every application, team or person gets a **virtual key** instead of a provider key. A virtual key is like a virtual credit card that you can attach a budget to: it is scoped to a project, a team, an organization or one person, it reaches only the providers you allow, and you can rotate, disable or revoke it without touching the provider account.
 
-Swap your OpenAI `base_url` + `api_key` and you're done. Don't have a virtual key yet? Two paths:
+Your code points the OpenAI SDK or the Anthropic SDK at `https://gateway.langwatch.ai` and sends the virtual key as the API key. The request body stays the same.
 
-- **Developer using a coding CLI** (Claude Code, Codex, Cursor, Gemini): run `langwatch login --device` and a personal VK is auto-issued, see [Personal IDE keys](/ai-gateway/governance/personal-keys).
-- **Service, app traffic** (server-to-server): mint one in the LangWatch app under **AI Gateway → Virtual Keys**: see the [Quickstart](/ai-gateway/quickstart).
+The gateway then gives you, on every request:
 
-<CodeGroup>
+- **Spend per key, person, team and project**, in the Usage page and as a spend event you can pull or receive by webhook.
+- **Budgets** on any of those scopes, and per end user of your product, that block the request or add a warning header.
+- **A trace** in Trace Explorer with the model, the tokens, the cost, the virtual key and the end user.
+- **Rate limits, routing, caching and guardrails** configured on the key, with no change in application code.
 
-```bash curl
-curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer vk-lw-..." \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
-```
+## Endpoints the gateway serves
 
-```python Python
-from openai import OpenAI
-client = OpenAI(
-    base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-...",
-)
-client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "ping"}],
-)
-```
+| Family | Route | Wire format |
+|---|---|---|
+| Chat completions | `POST /v1/chat/completions` | OpenAI |
+| Responses API | `POST /v1/responses` | OpenAI |
+| Messages | `POST /v1/messages` | Anthropic |
+| Embeddings | `POST /v1/embeddings` | OpenAI |
+| Speech | `POST /v1/audio/speech` | OpenAI |
+| Transcription | `POST /v1/audio/transcriptions` | OpenAI |
+| Realtime session credentials | `POST /v1/realtime/client_secrets` | OpenAI |
+| Model list | `GET /v1/models` | OpenAI |
+| Gemini native | `/v1beta/*` | Google |
+| ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | ElevenLabs |
 
-```typescript TypeScript
-import OpenAI from "openai";
-const client = new OpenAI({
-  baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: "vk-lw-...",
-});
-await client.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "ping" }],
-});
-```
+The gateway translates between wire formats where the provider differs. For example, an OpenAI SDK call to `/v1/chat/completions` with `model: "anthropic/claude-sonnet-4-5"` reaches Anthropic's Messages API and comes back as an OpenAI chat completion.
 
-</CodeGroup>
+## Get started
 
-See [Quickstart](/ai-gateway/quickstart) for the full five-minute walkthrough, minting a VK, wiring a provider, calling the gateway, inspecting the trace.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/ai-gateway/quickstart">
+    Create a virtual key, send one request, open the trace, see the spend.
+  </Card>
+  <Card title="Concepts" icon="compass" href="/ai-gateway/concepts">
+    Virtual key, scope, budget, provider credential, routing policy, spend event.
+  </Card>
+  <Card title="Python SDK" icon="python" href="/ai-gateway/sdks/python">
+    OpenAI and Anthropic Python SDKs, LangChain, LlamaIndex, trace propagation.
+  </Card>
+  <Card title="TypeScript SDK" icon="js" href="/ai-gateway/sdks/typescript">
+    OpenAI and Anthropic TypeScript SDKs, Vercel AI SDK, LangChain.js.
+  </Card>
+</CardGroup>
 
-Prefer to self-host? See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm). The same image and config shape run in both modes.
+## Control spend
 
-## Why an AI Gateway?
+<CardGroup cols={2}>
+  <Card title="Virtual keys" icon="key" href="/ai-gateway/virtual-keys">
+    Scopes, provider access, expiry, rotation, disable and revoke, CLI and REST.
+  </Card>
+  <Card title="Budgets" icon="wallet" href="/ai-gateway/budgets">
+    Caps per organization, team, project, key, person, group or end user. Block or warn.
+  </Card>
+  <Card title="Rate limits" icon="gauge-high" href="/ai-gateway/rate-limits">
+    Requests per minute and per day on a key.
+  </Card>
+  <Card title="Billing and spend events" icon="file-invoice-dollar" href="/ai-gateway/billing-events">
+    One spend event per request, by webhook or by REST, for rebilling your customers.
+  </Card>
+</CardGroup>
 
-The simplest setup is "one app, one provider API key, one language SDK." That stops working the moment a second team, a second app, or a second model provider shows up:
+## Connect providers and tools
 
-- Credentials proliferate (developer laptops, CI environments, Kubernetes secrets) with no revocation story.
-- Cost governance becomes guesswork, no one owns the team-level or project-level budget.
-- Observability is fragmented, each app emits traces differently (or not at all).
-- Reliability suffers, one provider outage takes down every surface that hard-coded that provider.
-
-The LangWatch AI Gateway replaces every direct provider call with a single call to `gateway.langwatch.ai` (or your self-hosted URL) carrying a LangWatch **virtual key**. From the application's perspective, nothing else changes, the OpenAI SDK still works, the Anthropic SDK still works, Claude Code and Codex still work, but every request now carries policy, budget enforcement, and observability.
-
-## What it gives you
-
-- **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=vk-lw-…` and every existing OpenAI-SDK codebase works unchanged.
-- **Anthropic-compatible endpoint** at `/v1/messages` so Claude Code and native Anthropic SDKs work by setting `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to your gateway URL and a LangWatch virtual key.
-- **Virtual keys**: LangWatch-issued credentials (`vk-lw-<ulid>`) with project/team/org scope. Show-once secrets, peppered-HMAC-SHA256 hashed, rotatable, revokable within 60 seconds.
-- **Hierarchical budgets**: enforce spend limits at organisation, team, project, virtual-key, principal, group, or per-end-user scope, with periods from a minute to a whole grant, calendar-aligned or anchored to your own billing date, and soft-warn or hard-block semantics.
-- **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
-- **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
-- **Caching passthrough**: Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
-- **Fallback, when the key asks for it**: per-virtual-key routing is an explicit choice. New keys default to no fallback (a provider failure surfaces to the caller); a key set to fall back walks its eligible chain (e.g. OpenAI → Anthropic → Bedrock) on 5xx, timeout, 429, network error, 404, or circuit-breaker-open. Terminal 4xx client errors like 400 and 401 never trigger fallback.
-- **Per-tenant observability**: every request emits a LangWatch trace to the owning project with `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.principal_id`, `langwatch.cost_usd`, cache-hit token breakdown, and status. Shared multi-tenant gateway, per-tenant trace routing.
-- **Coding-CLI integrations**: preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
-- **Self-hostable**: ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
-
-## Architecture at a glance
-
-```
-┌─────────────────────┐        Authorization: Bearer vk-lw-…
-│  Customer SDK /     │  ──────────────────────────────────────────▶
-│  Coding CLI         │                                              │
-└─────────────────────┘                                              │
-                                                                     ▼
-                                                ┌───────────────────────────────────┐
-                                                │   LangWatch AI Gateway (Go)       │
-                                                │   - auth / JWT cache (in-process) │
-                                                │   - virtual-key resolution        │
-                                                │   - budget pre-check              │
-                                                │   - guardrail pre-call            │
-                                                │   - dispatch via bifrost/core     │
-                                                │   - guardrail post-call           │
-                                                │   - spend record (spooled)         │
-                                                │   - per-tenant OTel emit          │
-                                                └───────┬───────────────┬───────────┘
-                                                        │               │
-                                                        ▼               ▼
-                                          ┌────────────────────┐   ┌──────────────────────┐
-                                          │  LangWatch app     │   │  Provider APIs       │
-                                          │  (control plane)   │   │  OpenAI / Anthropic  │
-                                          │  - VK CRUD         │   │  Azure / Bedrock     │
-                                          │  - budgets         │   │  Vertex / Gemini     │
-                                          │  - guardrails eng  │   │  Custom OpenAI-compat│
-                                          │  - analytics       │   └──────────────────────┘
-                                          └────────────────────┘
-```
-
-The gateway is written in Go and embeds [`github.com/maximhq/bifrost/core`](https://github.com/maximhq/bifrost) as a library for provider-specific dispatch (Azure deployment name quirks, Bedrock regional inference profiles, Vertex OAuth refresh, streaming format divergences across providers). LangWatch owns everything above the dispatch line: auth, policy, budgets, guardrails, per-tenant observability.
-
-**Why a separate Go service?** Sub-millisecond overhead on the hot path matters when the gateway sits in front of every LLM call. Go with chi + in-process JWT verification gives us ~11 µs gateway-side overhead at 5k RPS sustained. A Python/FastAPI or Node/Hono gateway cannot reach those numbers.
-
-**Why embed, not fork?** Bifrost's provider dispatch is where hundreds of engineer-hours per provider have been invested (native SDKs for every provider, streaming format normalisation, tool-call delta reassembly, reasoning-token handling). That's the part we consume as a library. The policy, governance, observability layers on top are ours.
-
-## When to use the gateway vs. the LangWatch SDK directly
-
-Both ship in LangWatch. They solve different problems:
-
-| Need | Use |
-|---|---|
-| "Trace my existing provider calls without changing credentials" | **LangWatch SDK**: point it at your app, it instruments. Keep your provider keys. |
-| "Give the marketing team an LLM key they can't leak, with a $500/month cap" | **AI Gateway**: mint a virtual key with a budget, share the VK. |
-| "Switch all internal apps from OpenAI to Anthropic for a week" | **AI Gateway**: flip `model_aliases` on the VKs involved. Zero code change. |
-| "Ship a coding CLI to every engineer with observability" | **AI Gateway + CLI integration**: set `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` on every dev machine. |
-| "Guardrail the production chat surface for PII and prompt injection" | **AI Gateway** guardrail attachments, inline without touching application code. |
-| "Call 50+ providers from a single eval script" | **LangWatch SDK's existing litellm path** still works unchanged for playground/evaluators (not migrated to gateway in v1). |
-
-The gateway and the existing LangWatch SDK live in the same project: the VK you mint in the gateway can reuse the same provider credentials configured under **Settings → Model Providers**. No duplication.
-
-## Next steps
-
-1. **[Quickstart](/ai-gateway/quickstart)**: five minutes to your first gateway request.
-2. **[Concepts](/ai-gateway/concepts)**: virtual keys, budgets, fallback, guardrails, caching.
-3. **[CLI Integrations](/ai-gateway/cli/overview)**: Claude Code, Codex, opencode, Cursor, Aider.
-4. **[Self-Hosting](/ai-gateway/self-hosting/helm)**: ship the gateway with your LangWatch Helm chart.
-5. **[Budgets](/ai-gateway/budgets)** and **[Billing and spend events](/ai-gateway/billing-events)**: cap spend per scope, and pull the per-request record to rebill your own customers.
-6. **[Webhooks](/features/webhooks)**: get budget breaches and the spend stream pushed to your systems instead of polling.
-7. **[AI Governance](/ai-governance/overview)**: once the gateway is in place, layer on org-wide controls: anomaly detection, OCSF/SIEM export, per-user workspaces, IngestionSources for non-gateway telemetry.
+<CardGroup cols={2}>
+  <Card title="Providers" icon="plug" href="/ai-gateway/providers/overview">
+    OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Vertex AI, Gemini, xAI, Groq, Cerebras, DeepSeek, Voyage AI, ElevenLabs, custom endpoints.
+  </Card>
+  <Card title="Coding CLI integrations" icon="terminal" href="/ai-gateway/cli/overview">
+    Claude Code, Codex, Gemini CLI, OpenCode, Cursor and Aider through the gateway.
+  </Card>
+  <Card title="Guardrails" icon="shield-halved" href="/ai-gateway/guardrails">
+    Run LangWatch evaluators on the request or the response.
+  </Card>
+  <Card title="Self-hosting" icon="server" href="/ai-gateway/self-hosting/helm">
+    Run the gateway next to your LangWatch installation with the Helm chart.
+  </Card>
+</CardGroup>
 
 ---
 
@@ -11151,174 +10895,105 @@ No JSON-key rotation chores; Google rotates tokens per-pod.
 
 ---
 title: Quickstart
-description: Make your first request through the LangWatch AI Gateway in five minutes.
+description: Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
 sidebarTitle: Quickstart
 ---
 
-This walkthrough takes you from zero to a traced, budget-gated LLM response.
+## Before you start
 
-## Are you a developer or an admin?
+You need:
 
-The fastest path depends on which side of the rollout you're on. **Pick one before continuing**:
-
-<CardGroup cols={2}>
-  <Card title="I'm a developer" icon="laptop-code" href="/ai-gateway/governance/personal-keys">
-    Your admin already wired up the gateway and you got an SSO sign-in link or asked to install `langwatch`.
-
-    Skip ahead to **Personal IDE keys**: `langwatch login --device` provisions your virtual key automatically. You don't need to set up providers, budgets, or routing.
-  </Card>
-  <Card title="I'm an org admin" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
-    Your company just bought governance and you're rolling it out for the team.
-
-    Skip ahead to **Admin setup**: connect SSO, providers, and routing policies once, every developer auto-onboards from there.
-  </Card>
-</CardGroup>
-
-The rest of this page uses a **service virtual key**, the flow for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.).
-
-<Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there, the AI Gateway reuses those credentials.</Note>
-
-<CardGroup cols={2}>
-  <Card title="Python, TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
-    Drop-in for the OpenAI, Anthropic SDKs, swap `base_url` and `api_key`.
-  </Card>
-  <Card title="Use it from your coding assistant" icon="terminal" href="/ai-gateway/cli/overview">
-    Wire Claude Code, Codex, OpenCode, Cursor, or Aider through the gateway.
-  </Card>
-  <Card title="Core concepts" icon="compass" href="/ai-gateway/concepts">
-    Virtual keys, budgets, ModelProvider gateway settings, routing policies, cache rules, fallback chains.
-  </Card>
-  <Card title="API reference" icon="book" href="/ai-gateway/api/chat-completions">
-    OpenAI-compatible `/v1/chat/completions` + Anthropic-shape `/v1/messages`.
-  </Card>
-</CardGroup>
+- A LangWatch account with a project.
+- One provider credential under **Settings > Model Providers**, for example your OpenAI API key. The gateway uses the credentials already configured there. See [Providers](/ai-gateway/providers/overview).
+- The `virtualKeys:create` permission in the project. Project admins and members have it by default. See [RBAC](/ai-gateway/rbac).
 
 ## 1. Create a virtual key
 
-1. Open **AI Gateway → Virtual Keys** in the LangWatch app.
-2. Click **New virtual key**.
-3. Name it, e.g. `my-first-vk`.
-4. Select which provider credentials it may use. The first one becomes the **primary**; later ones become the fallback chain.
-5. (Optional) Attach a budget, pick a cache mode, attach guardrails.
+1. Open **AI Gateway > Virtual Keys** and click **New virtual key**.
+2. Enter a name, for example `acme-support-agent`.
+3. Keep **Ownership** on **Project**. Traces and costs of this key land in the selected project.
+4. Optionally set a **Budget**, for example `$50` per month. The key is blocked at the limit.
+5. Keep **Provider access** on **All providers**, or select the providers this key may reach.
 6. Click **Create**.
 
-The full secret (`vk-lw-01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again, only the prefix `vk-lw-01HZX9` remains visible in the list.
+The secret is shown once. Copy it and store it in your secret manager. LangWatch stores a hash, and the list shows only the prefix, for example `vk-lw-01HZX9N`.
 
-## 2. Call the gateway (OpenAI-compatible)
+## 2. Send a request
 
-Using `curl`:
+Point the OpenAI SDK at the gateway and use the virtual key as the API key. Name the model as `provider/model`, for example `openai/gpt-5-mini`. A bare `gpt-5-mini` also works when one of the key's providers serves it.
 
-```bash
+<CodeGroup>
+
+```bash curl
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer $LW_VK" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-        "model": "gpt-5-mini",
-        "messages": [{"role": "user", "content": "Say hi in one word"}]
-      }'
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-The response is OpenAI-shaped. Response headers tell you what happened inside the gateway:
-
-```
-X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
-X-LangWatch-Provider: openai
-X-LangWatch-Model: gpt-5-mini
-X-LangWatch-Cache: miss
-X-LangWatch-Fallback-Count: 0
-```
-
-### Using the OpenAI SDKs
-
-**Python:**
-
-```python
+```python Python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-...",
+    api_key="vk-lw-...",  # your virtual key
 )
 
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
-print(resp.choices[0].message.content)
+print(response.choices[0].message.content)
 ```
 
-**TypeScript:**
-
-```ts
+```typescript TypeScript
 import OpenAI from "openai";
 
-const openai = new OpenAI({
+const client = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
+const response = await client.chat.completions.create({
+  model: "openai/gpt-5-mini",
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
+console.log(response.choices[0].message.content);
 ```
 
-### Anthropic-compatible (Claude SDK, Claude Code)
+</CodeGroup>
 
-```bash
-curl https://gateway.langwatch.ai/v1/messages \
-  -H "x-api-key: $LW_VK" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 64,
-        "messages": [{"role": "user", "content": "Hi"}]
-      }'
-```
+The response is a normal OpenAI chat completion. The gateway adds these response headers:
 
-## 3. See the trace in LangWatch
+| Header | Value |
+|---|---|
+| `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support. |
+| `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id` | The trace and span the gateway recorded for this request. |
+| `X-LangWatch-Budget-Warning` | Present when a budget on this key is at 80 percent or more, as `scope:percent`. |
 
-Within ~30 seconds the request appears in the project the virtual key belongs to:
+For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. The SDK sends the key in the `X-Api-Key` header, which the gateway accepts. See [Python SDK](/ai-gateway/sdks/python) and [TypeScript SDK](/ai-gateway/sdks/typescript).
 
-- **Messages** view shows the prompt, response, tokens, cost, provider, cache outcome, and the full trace.
-- **Analytics** aggregates across all VKs in the project.
-- **Evaluations** can run on the traffic passing through the gateway.
+## 3. Open the trace
 
-Every gateway trace carries these attributes:
+Open **Trace Explorer** in the project you selected under Ownership. The request appears as a `gen_ai.chat` span with the model, the tokens, the cost and these attributes:
 
 | Attribute | Meaning |
 |---|---|
-| `langwatch.vk_id` | Virtual key id. |
-| `langwatch.project_id` | Owning project. |
-| `langwatch.team_id` | Owning team. |
-| `langwatch.org_id` | Owning organisation. |
-| `langwatch.principal_id` | User or service account that made the call. |
-| `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
-| `langwatch.fallback.attempt` | 0 on primary success, N for fallback attempts. |
+| `langwatch.virtual_key_id` | The key that served the request. |
+| `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header. |
+| `langwatch.model_provider_id` | The provider credential that served the request. |
+| `langwatch.end_user_id` | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
 
-## 4. Add a budget
+## 4. See the spend
 
-Budgets live one level up from the key, they govern spend across whatever scope you attach them to.
+Open **AI Gateway > Usage** for total spend, requests, cost per request, top virtual keys and top models over the selected period. The **Virtual Keys** list shows a **Spent this month** column per key, and clicking it opens Usage filtered to that key.
 
-1. Open **AI Gateway → Budgets**.
-2. Click **New budget**.
-3. Pick scope = `project`, target = the project your VK is in.
-4. Set window = `month`, limit = `$100`, `on_breach = block`.
-5. Save.
-
-Once spend reaches the limit, the next request through any VK in that project returns `402 budget_exceeded`. Flip `on_breach` to `warn` if you'd rather have a `X-LangWatch-Budget-Warning` header instead of a hard cut-off.
-
-See [Budgets](/ai-gateway/budgets) for full scoping details.
-
-## Next steps
-
-- [Concepts](/ai-gateway/concepts): how VKs, budgets, guardrails, and fallback fit together.
-- [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
-- [Caching passthrough](/ai-gateway/caching-passthrough): the rule that keeps your 90% Anthropic cache discount.
-- [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.
-- [Budgets](/ai-gateway/budgets): cap spend per organization, team, project, key, person, or end user.
-- [Billing and spend events](/ai-gateway/billing-events): the per-request record, for reconciliation and rebilling.
+<Note>
+**Also check:** [Budgets](/ai-gateway/budgets) to cap the key, the team or the project, and [Virtual keys](/ai-gateway/virtual-keys) for scopes, expiry, rotation and the CLI.
+</Note>
 
 ---
 
@@ -11326,110 +11001,53 @@ See [Budgets](/ai-gateway/budgets) for full scoping details.
 
 ---
 title: Rate limits
-description: How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bindings, and providers, including the precedence model and the 429 envelope.
+description: Requests per minute and requests per day on a virtual key, enforced by each LangWatch AI Gateway replica.
 sidebarTitle: Rate limits
 ---
 
-The gateway enforces rate limits at two independent layers, the **VK** and the **ModelProvider** (Advanced/Gateway tab): with cross-dimension token-bucket accounting so a request only needs enough tokens in *every* applicable bucket to pass.
+## What a rate limit is
 
-## Dimensions
+A rate limit is a cap on how many requests a virtual key may send: requests per minute (RPM) and requests per day (RPD). Rate limits protect a provider account from a flood and give a key a known ceiling. They do not cap spend; use [Budgets](/ai-gateway/budgets) for that.
 
-### RPM: requests per minute <a id="rpm"></a>
+## Set a rate limit
 
-Classic Leaky-bucket, token-bucket: a counter that refills at `limit / 60` tokens per second, caps at `limit`. Every request consumes 1 token. Bucket empty → the request returns `429 rate_limit_exceeded` with `Retry-After` seconds to refill.
+Open the key under **AI Gateway > Virtual Keys**, click **Edit**, and fill in **Rate limits**: `rpm` and `rpd`. Leave a field empty for no limit on that dimension.
 
-**Good for:** protecting providers from a flood, enforcing a fair-share per customer, giving CI pipelines a known cap.
+Over the API, set `config.rateLimits` on the key:
 
-**Not for:** cost enforcement, use [budgets](/ai-gateway/budgets) for spend caps.
+```bash
+curl -sS -X PATCH https://app.langwatch.ai/api/gateway/v1/virtual-keys/<vk_id> \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "config": { "rateLimits": { "rpm": 60, "rpd": 5000 } } }'
+```
 
-### RPD: requests per day <a id="rpd"></a>
+## How the gateway enforces it
 
-Rolling-24-hour window. Every request consumes 1; counter resets at the first request after the window ticks. RPD and RPM are enforced **jointly**: a request that fits under RPM still fails if RPD is exhausted.
+Each dimension is a token bucket per key: the RPM bucket refills at `rpm / 60` requests per second up to `rpm`, the RPD bucket at `rpd / 86400` per second up to `rpd`. A request must fit in both.
 
-**Good for:** capping long-tail daily spend (cheaper than budgets for simple per-user limits), rate-limiting evaluation runs to stay under a provider's daily quota.
+The buckets live in memory on each gateway replica. With N replicas behind a load balancer, a key can send up to N times its configured limit across the cluster.
 
-### TPM: tokens per minute (v1.1) <a id="tpm"></a>
+A rejected request gets HTTP 429 with the code `rate_limited`:
 
-<Warning>TPM is a v1.1 feature. In v1 the limit is **accepted and stored** on VK + binding config but not enforced, requests pass through and the trace + budget ledger still record the real token count. Implementation blocker: the streaming-usage accumulator needs to be wired into the limiter before per-stream token counts can pressure the bucket.</Warning>
-
-When v1.1 ships, TPM will consume tokens based on actual usage reported by the provider (or estimated on request body for pre-dispatch shaping). The accounting will be cross-dimension with RPM + RPD, so a request fits if every applicable bucket has room.
-
-## Precedence
-
-The gateway evaluates limits in the order it touches them:
-
-1. **Per-ModelProvider** (configured on Settings → Model Providers → Advanced (Gateway) tab), protects a single upstream account from all traffic.
-2. **Per-VK** (configured on the VK drawer), protects a specific key from over-sending.
-
-A request must fit under **every** applicable bucket. No override mechanism, combining them is always AND.
-
-## 429 envelope
-
-When the bucket rejects, the response is:
-
-```http
-HTTP/1.1 429 Too Many Requests
-Retry-After: 4
-X-LangWatch-RateLimit-Dimension: rpm
-Content-Type: application/json
-
+```json
 {
   "error": {
-    "type": "rate_limit_exceeded",
-    "code": "rate_limit_exceeded",
-    "message": "Rate limit exceeded on dimension=rpm"
+    "type": "rate_limited",
+    "code": "rate_limited",
+    "message": "rpm 60 exceeded"
   }
 }
 ```
 
-`X-LangWatch-RateLimit-Dimension` identifies which bucket tripped:
-
-- `rpm`, minute bucket full
-- `rpd`, daily bucket full (only when both RPM and RPD are configured and RPD tripped first)
-- `tpm`, v1.1 only
-
-The client key-switches on this header to show the right error in their own UI (e.g., "daily quota reached, reset at midnight UTC" vs "slow down, try again in a minute").
-
-## Setting limits
-
-**Per VK**: VK drawer → "Rate limits (per-VK)" section. See the drawer's `(i)` tooltips for per-field guidance.
-
-**Per ModelProvider**: Settings → Model Providers → row → **Advanced (Gateway)** tab → "Rate limit (rpm)", "Rate limit (rpd)", "Rate limit (tpm)" fields. See [Gateway provider settings → RPM](/ai-gateway/provider-bindings#rate-limit-rpm).
-
-Leave a field blank to inherit the upstream provider's own limit (i.e., no gateway-side throttle on that dimension).
-
-## Observability
-
-Rate-limit events surface via a dedicated counter plus the gateway's standard observability primitives:
-
-- **Rate-limit metric** `gateway_rate_limit_denied_total{dimension, vk_id}`, increments once per gateway-enforced denial. `dimension` is `rpm` or `rpd`, `vk_id` identifies the virtual key that hit the limit.
-- **HTTP metric** `gateway_http_requests_total{status="429"}`, counts 429s including both gateway-enforced and upstream-reported.
-- **Upstream attempt metric** `gateway_provider_attempts_total{outcome="rate_limit"}`, increments when a 429 came back from the provider (not from gateway-side enforcement). Joining on `status="429"` vs `outcome="rate_limit"` distinguishes gateway-enforced (status 429, no provider_attempts increment on that dimension) from upstream-enforced.
-- **Response header** `X-LangWatch-RateLimit-Dimension`, the downstream key-switch signal (also included in the span error message for trace-level analysis).
-- **Trace error**: the rejected request's span carries `error.type="rate_limit_exceeded"` with the dimension in the message string.
-
-<Info>`gateway_rate_limit_denied_total` is the metric to build dashboards on: `sum by (dimension) (rate(gateway_rate_limit_denied_total[5m]))` slices gateway-enforced denials by dimension without parsing the trace stream, and adding `vk_id` pinpoints the noisy key. Subtracting it from `gateway_http_requests_total{status="429"}` leaves the 429s that came back from the provider.</Info>
-
-## Cross-replica coordination
-
-In multi-replica deployments the buckets are **per-replica by default**: the gateway's limiter is an in-memory `golang.org/x/time/rate` token bucket stored in an LRU cache, zero external dependency on the hot path. If your cluster runs N replicas, the effective org-wide RPM is `N × configured_rpm` (explicit design trade: zero-dependency on the hot path over strict cluster-wide correctness).
-
-<Warning>Redis-coordinated counters for strict cross-replica enforcement are a **v1.1 follow-up** (tracked in `services/gateway/internal/ratelimit/limiter.go` package doc). Deployments that need exact org-wide caps today can set the per-replica limit to `configured / N` and rely on the LB's round-robin to keep pods equally loaded, imperfect but usually fine.</Warning>
+A 429 that comes from the provider is forwarded as the provider sent it, with the provider's `Retry-After` header and `X-LangWatch-Provider` naming the provider.
 
 ## Permissions
 
 | Action | Permission |
 |---|---|
-| View rate-limit settings | `virtualKeys:view` + `modelProviders:view` |
-| Edit per-VK rate limits | `virtualKeys:update` |
-| Edit per-ModelProvider rate limits | `modelProviders:update` |
-
-## See also
-
-- [Virtual keys](/ai-gateway/virtual-keys#rate-limits): per-VK limit configuration.
-- [Provider bindings → RPM](/ai-gateway/providers#rate-limit-rpm): per-binding limit configuration.
-- [Budgets](/ai-gateway/budgets): spend caps (different shape; use both).
-- [Concepts → Rate limits vs budgets](/ai-gateway/concepts): when to reach for which.
+| View a key's rate limits | `virtualKeys:view` |
+| Edit a key's rate limits | `virtualKeys:update` |
 
 ---
 
@@ -14340,218 +13958,140 @@ Restart the entry point (the validator runs at import time, so no incremental re
 
 ---
 title: Virtual Keys
-description: Mint, rotate, revoke, and scope virtual API keys for the LangWatch AI Gateway.
+description: Create, scope, rotate, disable and revoke the keys your applications use to call the LangWatch AI Gateway.
 sidebarTitle: Virtual Keys
 ---
 
-A **virtual key** (VK) is a LangWatch-issued credential that a downstream client (SDK, coding CLI, production app) presents to the gateway in place of a provider-native API key. The gateway resolves the VK to an owning organisation, a set of scope rows (`VirtualKeyScope[]` at any combination of ORGANIZATION, TEAM, PROJECT), a set of provider credentials, a routing policy, a cache policy, guardrails, blocked patterns, and budgets, everything the VK is allowed to do and how it is observed.
+## What a virtual key is
 
-VKs replace raw provider keys in your applications. The provider keys themselves stay inside LangWatch (configured under **Settings → Model Providers**, the same surface you already use for evaluators and playground) and are never shared with downstream clients.
+A virtual key is the credential your application presents to the gateway in place of a provider API key. A virtual key is like a virtual credit card that you can attach a budget to: it belongs to a project, a team, an organization or one person, it reaches only the providers you allow, and you can rotate, disable or revoke it without touching the provider account.
 
-<CardGroup cols={2}>
-  <Card title="Quickstart, first request in 5 min" icon="rocket" href="/ai-gateway/quickstart">
-    Create a VK, call `/v1/chat/completions`, read correlation headers.
-  </Card>
-  <Card title="Use your VK from Python, TypeScript" icon="code" href="/ai-gateway/sdks/python">
-    OpenAI, Anthropic SDK drop-in, just swap `base_url` and `api_key`.
-  </Card>
-  <Card title="Plug your VK into Claude Code, Codex, Cursor" icon="terminal" href="/ai-gateway/cli/overview">
-    Route coding-assistant traffic through the gateway for budget + audit.
-  </Card>
-  <Card title="Manage VKs from the terminal" icon="keyboard" href="/integration/cli#virtual-keys">
-    `langwatch virtual-keys create | list | rotate | revoke`, scriptable.
-  </Card>
-</CardGroup>
+The provider keys stay in LangWatch, under **Settings > Model Providers**. Your application never sees them.
 
-## Format
+## Create a virtual key
 
-`vk-lw-{live|test}_<26-char-ULID>`, 40 characters total.
+Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has these fields:
 
-- `vk-lw-`, fixed prefix, grep-friendly, scans well in DLP, GitGuardian.
-- `live` or `test`, environment prefix. Prevents accidentally using a test key against production or vice versa.
-- 26-char Crockford-base32 ULID, time-prefixed, monotonic, renders sensibly in the dashboard and in your logs.
-
-The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again, only the first 12 characters (`vk-lw-01HZX9`) are visible in the list.
-
-Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. Peppered HMAC-SHA256 is the right primitive for API keys (as opposed to passwords), the VK body already carries 130 bits of entropy as a ULID, so argon2id-style stretching would just add 50–100 ms of pointless latency on every cold resolve-key call. A short prefix is stored alongside for grep/lookup.
-
-## Creating a VK
-
-Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walks four decisions, top to bottom: where the key lives, what it may spend, which providers it may reach, and whether it fails over.
-
-<Frame caption="The create drawer: ownership with the trace destination stated inline, the budget field with the budgets the draft already inherits, provider access and routing below.">
-  ![New virtual key drawer](/images/ai-gateway/vk-create-drawer.png)
-</Frame>
-
-### Ownership
-
-Who can see and manage the key, and where its traces and costs land:
-
-- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
-- **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
-- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. The destination is stored as the key's `trace_project_id`, not as a scope: it decides where traces land and nothing else, so administering that project grants no visibility into the key and no right to change it. The drawer always requires the choice; the API additionally accepts omission, in which case traces land in the org's governance project, and refuses creation only when no destination resolves at all.
-
-Ownership decides which budgets the key inherits and which providers it can reach; changing it re-resolves both live in the drawer.
-
-### Budget
-
-A dollar amount and a period (`per day`, `per week`, `per month`). Leave it empty for no cap on the key itself. The annotation states exactly what a filled budget does, for example "Max $30/day, resets 00:00 UTC" (resets are computed in UTC; see [Budgets → Windows](/ai-gateway/budgets#windows)).
-
-Creating the key with a budget creates both in one transaction, so the key never exists without the cap its creator asked for. Clearing the field later, or revoking the key, archives the budget instead of deleting it: its ledger stays as the audit trail of what the key cost.
-
-Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a principal, the person behind the key; personal ownership is the usual way a draft gains one, but any key with a principal qualifies. A shared service key has no member to charge a per-member allowance to.
-
-### Provider access
-
-A checkbox list of every provider the key's ownership can reach, each with a chip naming where the provider is configured.
-
-- **All providers** (default) persists as the absence of a list: providers added to the key's scope later become reachable **without editing the key**. This is what keeps a long-lived key current.
-- An explicit selection stays exactly as picked: a provider added later is not reachable until someone edits the key. At least one provider must stay selected.
-- Expanding a provider row shows its models; checking models restricts the key to exactly those. The restriction is per **vendor**, not per provider row: two providers of the same vendor (say, two Anthropic accounts) share one model list, and the drawer mirrors a change made under either row in both. A per-row restriction for same-vendor providers is not supported yet.
-
-<Frame caption="Provider access with a model accordion expanded: every provider carries a chip naming where it is configured, and the routing decision sits directly below.">
-  ![Provider access section](/images/ai-gateway/vk-provider-access.png)
-</Frame>
-
-### Routing
-
-What happens when the provider serving a request fails:
-
-- **Default: no fallback** (new keys): the error surfaces to the caller. No silent retry on a different vendor.
-- **Fall back to all eligible providers**: the request retries on the next eligible provider, ordered by `fallbackPriorityGlobal` then `createdAt`. Keys created before routing became an explicit choice keep this behavior.
-- **A routing policy**: pins an explicit ordered provider list.
-
-Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
-
-The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
-
-<Frame caption="Spent this month on the keys list. The figures come from the cost path, so uncapped keys report real spend too.">
-  ![Spend column](/images/ai-gateway/vk-spend-column.png)
-</Frame>
-
-## VK detail page
-
-Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>`). Four sections, top-to-bottom:
-
-1. **Header**: name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
-2. **Identity, Activity**: id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero, increments on every `gateway.virtual_key.updated` audit row.
-3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). It shows which provider serves the request first and the order the others are tried in.
-4. **Configuration summary**: compact read-only view (no drawer needed) of the runtime config that's actually in effect:
-   - **Tags**: colored subtle badges, the same strings shown on the list row.
-   - **Cache mode**: badge (`respect`, `force`, `disable`) + TTL on force.
-   - **Rate limits**: `rpm` + `rpd` outline badges (or em-dash if unset).
-   - **Model aliases**: expanded as `alias → target` pairs, up to 5 visible with "+N more" overflow.
-   - **Blocked patterns**: grouped by dimension (`tools`, `mcp`, `urls`, `models`) with red-tinted regex chips; click-through opens the edit drawer at that section.
-   - **Guardrails**: count + direction breakdown (`N pre / M post / K stream_chunk`), each clickable to the guardrail config.
-5. **Usage (last 30 days)**: stat tiles (Total spend, Requests, Avg $/request), a 30-day filled area sparkline, Spend-by-model row, and the top 10 recent debits table (When relative, Model, Tokens in→out, Amount smart-decimals, Latency ms). Guarded on `virtualKeys:view` + `gatewayUsage:view`.
-
-Everything on this page is read-only except the four header actions, edits happen in the drawer (`Edit`) or dedicated flows (`Rotate`, `Revoke`).
-
-## Rotation
-
-Rotate a VK when you believe the secret may have leaked or as part of routine hygiene.
-
-1. Open the VK in the list.
-2. Click **Rotate secret**.
-3. LangWatch mints a new secret and displays it exactly once.
-4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
-5. After the grace window ends, only the new secret works.
-
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation. Rotation emits `gateway.virtual_key.rotated` to your [webhook endpoints](/features/webhooks#family-gateway), so a provisioning backend can mirror the new secret while the previous one is still inside its grace window.
-
-## Disable and enable: the reversible stop
-
-Disabling a VK stops it without destroying anything: requests on the key are rejected with the **distinct** `virtual_key_disabled` error (`403`) until it is enabled again, so tenant tooling can tell a paused key from a revoked one. Use it as the kill switch for non-payment, abuse, or incident containment, anywhere you may want the key back.
-
-- Budgets, scopes, configuration, key material, and **any rotation grace that was running** stay intact. Enable restores the key exactly as it was.
-- Both calls are idempotent, take an optional `reason` (recorded in the audit log and on the lifecycle event), and propagate to the gateway in seconds through the change feed.
-- `POST /api/gateway/v1/virtual-keys/:id/disable` and `.../enable`, permission `virtualKeys:update`.
-- Each transition emits a webhook event (`gateway.virtual_key.disabled`, `gateway.virtual_key.enabled`) alongside `created` and `revoked`, so a provisioning backend can mirror key state without polling. See [Webhooks](/features/webhooks#family-gateway).
-
-If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
-
-## Expiration
-
-A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
-
-- Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
-- The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
-- The key stops at its date even while the control plane is unreachable. The gateway is told the date on the token it holds and on the key's config, and both of its cache deadlines stop there, so the stale-while-error grace (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, 6 hours by default) never carries a key past its own date.
-- A date you change reaches the gateway within 60 seconds through the change feed. If the change feed is unavailable, the key's config refresh brings the new date on the same 60-second clock, in both directions: a shortened date stops the key, and an extended one keeps it serving. A control plane the gateway cannot reach at all leaves the last date it was told in force.
-- Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
-
-The virtual keys list badges a key past its date as **expired**. The key detail page states the date, and how long is left while the key is still active.
-
-## Revocation
-
-Revocation immediately invalidates the secret. There is **no grace period** on revoke, and it is one-way: re-activating means minting a new key. Revoking also archives the key's own budgets and discards any rotation grace.
-
-Gateway caches are invalidated within 60 seconds via the `/internal/gateway/changes` long-poll. If you need instant invalidation everywhere (e.g. incident response), restart the gateway pods, the next request that hits them will pull fresh state before serving.
-
-Revoked VKs remain in the database (soft-delete) for audit. Their traces still appear in analytics.
-
-## Scoping
-
-A VK belongs to exactly one **organisation** and carries one or more **scope rows** (`VirtualKeyScope`). Each row pins the VK to an ORGANIZATION, TEAM, or PROJECT. The scope set drives:
-
-- **Eligible provider set**: union of every ModelProvider visible from any of the VK's scopes (upward cascade). A VK scoped to PROJECT `demo` sees `demo`'s ModelProviders, the parent team's, and the org's.
-- **Budget cascade**: every applicable budget at any of the VK's scopes is checked. Hard-block at any scope blocks.
-- **Trace attribution**: the gateway tags spans with the most-specific scope match (PROJECT > TEAM > ORG).
-
-For the full semantics, including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span, see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
-
-Trace attribution on every request:
-
-- `langwatch.virtual_key_id`
-- `langwatch.organization_id` (always present)
-- `langwatch.project_id`, resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. The create drawer requires org- and team-owned keys to pick their trace project explicitly (spend that lands nowhere could not be capped by any budget); the governance fallback remains for API callers and pre-existing keys.
-- `langwatch.team_id` (present when the VK has a TEAM scope, or a unique team containing the resolved project)
-- `langwatch.principal_id` (present when `principalUserId` is set on the VK)
-
-## Personal vs shared
-
-Two flavours, distinguished by whether `principalUserId` is set:
-
-- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on the first gateway call, not at login.
-- **Shared VK** (`principalUserId` null): service-account-style credential. Budget cascade runs only through scope-driven budgets. Visibility follows the standard `virtualKeys:view` perm at the VK's scopes.
-
-Both use the same `vk-lw-…` format and the same multi-scope semantics; the principal column is orthogonal to scope.
-
-## Permissions
-
-Acting on VKs requires the following permissions (2-segment `resource:action`):
-
-| Action | Permission |
+| Field | What it sets |
 |---|---|
-| View list (own + scope-visible) | `virtualKeys:view` |
-| View another user's personal VK | `virtualKeys:viewOtherPersonal` |
-| Create | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
-| Update config | `virtualKeys:update` |
-| Disable, enable | `virtualKeys:update` |
-| Rotate | `virtualKeys:rotate` |
-| Delete, revoke | `virtualKeys:delete` |
-| All of the above | `virtualKeys:manage` |
+| **Name** | The name shown in the list, up to 128 characters. |
+| **Description**, **Tags** | Optional. Tags are `key=value` pairs shown on the list row. |
+| **Ownership** | **Project**, **Personal**, **Team** or **Organization**. See [Ownership and scopes](#ownership-and-scopes). |
+| **Budget** | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
+| **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
+| **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
+| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. |
 
-See [RBAC](/ai-gateway/rbac) for default role mappings.
+Click **Create**. The secret is shown once, with a **Copy** button. LangWatch stores only a hash of it. The list shows the prefix, for example `vk-lw-01HZX9N`.
 
-## How the gateway resolves your VK
+**All providers** means the key reaches every provider its scopes can see, including providers you add later. An explicit selection stays as picked until you edit the key.
 
-The first time the gateway sees a presented VK:
+## Ownership and scopes
 
-1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
-2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in an in-memory LRU, private to that gateway pod.
-4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
+Ownership decides who can see and manage the key, which providers it reaches and where its traces and costs land.
 
-Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.
+| Ownership | Scope | Traces and costs land in |
+|---|---|---|
+| **Project** | The project | That project |
+| **Personal** | The organization, with you as the principal | Your personal workspace |
+| **Team** | The team | A project you pick in the drawer |
+| **Organization** | The organization | A project you pick in the drawer |
 
-This means:
+A key reaches the provider credentials configured on its scope and above it: a project key sees the project's, the team's and the organization's credentials.
 
-- **First request** on a cold cache: 2-4 ms of control-plane overhead.
-- **Warm request** after first: tens of microseconds of overhead.
-- **Control-plane offline**: gateway continues serving a warm key past its JWT TTL (15 min default) up to the auth-cache hard grace (6 hours by default), and never past the key's own expiration date. A key the pod has never resolved still fails, because the cache is per pod and starts empty.
+A personal key carries a principal, the person behind it. Personal and group budgets apply to keys with a principal. You always see your own personal keys; seeing other people's personal keys needs `virtualKeys:viewOtherPersonal`.
 
-See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.
+## The key format and how to send it
+
+A key is `vk-lw-` followed by a 26-character Crockford base32 ULID, 32 characters in total. The prefix makes keys easy to find with secret scanners. LangWatch stores an HMAC-SHA256 hash of the secret and the first 13 characters for display.
+
+Send the key in one of these headers:
+
+| Header | Used by |
+|---|---|
+| `Authorization: Bearer vk-lw-...` | OpenAI SDKs, curl, most tools |
+| `X-Api-Key: vk-lw-...` | Anthropic SDKs and Claude Code |
+| `X-Goog-Api-Key: vk-lw-...` | Gemini SDKs and Gemini CLI |
+| `Xi-Api-Key: vk-lw-...` | ElevenLabs SDKs |
+
+## Edit a key
+
+Open the key from the list and click **Edit**. The edit drawer has the same fields as the create drawer plus **Rate limits**: requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits).
+
+Two settings live in the key's configuration and are set with the CLI (`vk update <id> --config-json`) or the API (`config` on `PATCH`):
+
+- `model_aliases`: a map from a name your code sends to the model the gateway calls, for example `{"gpt-4o": "azure/gpt-4o-eu"}`. See [Model aliases](/ai-gateway/model-aliases).
+- `models_allowed`: the list of models the key may call. The drawer sets the same list per provider under **Provider access**.
+
+Guardrails and cache rules attach to keys from their own pages. See [Guardrails](/ai-gateway/guardrails) and [Cache control](/ai-gateway/cache-control).
+
+The key detail page shows the spend of the last 30 days, the provider chain in the order it is tried, and the configuration in effect.
+
+## Rotate, disable, expire and revoke
+
+| Action | Effect | Error the caller gets |
+|---|---|---|
+| **Rotate** | A new secret is shown once. The old secret keeps working for 24 hours. The key id, scopes and budgets stay the same. | None during the grace period |
+| **Disable** | Requests are rejected until you click **Enable**. Budgets, configuration and a running rotation grace stay intact. | 403 `virtual_key_disabled` |
+| **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
+| **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
+
+Each transition emits a webhook event: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.virtual_key.disabled`, `gateway.virtual_key.enabled` and `gateway.virtual_key.revoked`. See [Webhooks](/features/webhooks).
+
+## Manage keys from the CLI
+
+The `langwatch` CLI has a `virtual-keys` command group, alias `vk`. It uses the `LANGWATCH_API_KEY` environment variable.
+
+```bash
+# Create a project key with a monthly budget
+langwatch vk create \
+  --name acme-support-agent \
+  --scope project:<project_id> \
+  --budget-limit 50 --budget-window month --budget-breach block
+
+# List, inspect and read spend
+langwatch vk list
+langwatch vk get <vk_id>
+langwatch vk spend <vk_id> --from 2026-09-01T00:00:00Z
+
+# Lifecycle
+langwatch vk rotate <vk_id>
+langwatch vk disable <vk_id> --reason "payment overdue"
+langwatch vk enable <vk_id>
+langwatch vk revoke <vk_id>
+```
+
+`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the same fields, and `--config-json` sets the key's configuration.
+
+## Manage keys over REST
+
+The management API lives under `/api/gateway/v1` and takes a LangWatch API key in the `X-Auth-Token` header.
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "acme-support-agent",
+    "budget": { "limit_usd": "50", "window": "month", "on_breach": "block" },
+    "expires_at": "2026-12-31T23:59:59Z"
+  }'
+```
+
+The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret.
+
+| Method and path | Permission |
+|---|---|
+| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
+| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
+| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
+| `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
+
+Field by field: [Virtual keys API reference](/api-reference/gateway-virtual-keys/overview). Roles and permissions: [RBAC](/ai-gateway/rbac).
 
 ---
 

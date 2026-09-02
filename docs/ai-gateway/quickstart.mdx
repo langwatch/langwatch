@@ -1,170 +1,101 @@
 ---
 title: Quickstart
-description: Make your first request through the LangWatch AI Gateway in five minutes.
+description: Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
 sidebarTitle: Quickstart
 ---
 
-This walkthrough takes you from zero to a traced, budget-gated LLM response.
+## Before you start
 
-## Are you a developer or an admin?
+You need:
 
-The fastest path depends on which side of the rollout you're on. **Pick one before continuing**:
-
-<CardGroup cols={2}>
-  <Card title="I'm a developer" icon="laptop-code" href="/ai-gateway/governance/personal-keys">
-    Your admin already wired up the gateway and you got an SSO sign-in link or asked to install `langwatch`.
-
-    Skip ahead to **Personal IDE keys**: `langwatch login --device` provisions your virtual key automatically. You don't need to set up providers, budgets, or routing.
-  </Card>
-  <Card title="I'm an org admin" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
-    Your company just bought governance and you're rolling it out for the team.
-
-    Skip ahead to **Admin setup**: connect SSO, providers, and routing policies once, every developer auto-onboards from there.
-  </Card>
-</CardGroup>
-
-The rest of this page uses a **service virtual key**, the flow for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.).
-
-<Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there, the AI Gateway reuses those credentials.</Note>
-
-<CardGroup cols={2}>
-  <Card title="Python, TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
-    Drop-in for the OpenAI, Anthropic SDKs, swap `base_url` and `api_key`.
-  </Card>
-  <Card title="Use it from your coding assistant" icon="terminal" href="/ai-gateway/cli/overview">
-    Wire Claude Code, Codex, OpenCode, Cursor, or Aider through the gateway.
-  </Card>
-  <Card title="Core concepts" icon="compass" href="/ai-gateway/concepts">
-    Virtual keys, budgets, ModelProvider gateway settings, routing policies, cache rules, fallback chains.
-  </Card>
-  <Card title="API reference" icon="book" href="/ai-gateway/api/chat-completions">
-    OpenAI-compatible `/v1/chat/completions` + Anthropic-shape `/v1/messages`.
-  </Card>
-</CardGroup>
+- A LangWatch account with a project.
+- One provider credential under **Settings > Model Providers**, for example your OpenAI API key. The gateway uses the credentials already configured there. See [Providers](/ai-gateway/providers/overview).
+- The `virtualKeys:create` permission in the project. Project admins and members have it by default. See [RBAC](/ai-gateway/rbac).
 
 ## 1. Create a virtual key
 
-1. Open **AI Gateway → Virtual Keys** in the LangWatch app.
-2. Click **New virtual key**.
-3. Name it, e.g. `my-first-vk`.
-4. Select which provider credentials it may use. The first one becomes the **primary**; later ones become the fallback chain.
-5. (Optional) Attach a budget, pick a cache mode, attach guardrails.
+1. Open **AI Gateway > Virtual Keys** and click **New virtual key**.
+2. Enter a name, for example `acme-support-agent`.
+3. Keep **Ownership** on **Project**. Traces and costs of this key land in the selected project.
+4. Optionally set a **Budget**, for example `$50` per month. The key is blocked at the limit.
+5. Keep **Provider access** on **All providers**, or select the providers this key may reach.
 6. Click **Create**.
 
-The full secret (`vk-lw-01HZX9K3M…`) is displayed **exactly once**. Copy it now and store it in a secret manager. After you dismiss the dialog, LangWatch can never show it again, only the prefix `vk-lw-01HZX9` remains visible in the list.
+The secret is shown once. Copy it and store it in your secret manager. LangWatch stores a hash, and the list shows only the prefix, for example `vk-lw-01HZX9N`.
 
-## 2. Call the gateway (OpenAI-compatible)
+## 2. Send a request
 
-Using `curl`:
+Point the OpenAI SDK at the gateway and use the virtual key as the API key. Name the model as `provider/model`, for example `openai/gpt-5-mini`. A bare `gpt-5-mini` also works when one of the key's providers serves it.
 
-```bash
+<CodeGroup>
+
+```bash curl
 curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer $LW_VK" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-        "model": "gpt-5-mini",
-        "messages": [{"role": "user", "content": "Say hi in one word"}]
-      }'
+    "model": "openai/gpt-5-mini",
+    "messages": [{"role": "user", "content": "Say hi in one word"}]
+  }'
 ```
 
-The response is OpenAI-shaped. Response headers tell you what happened inside the gateway:
-
-```
-X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
-X-LangWatch-Provider: openai
-X-LangWatch-Model: gpt-5-mini
-X-LangWatch-Cache: miss
-X-LangWatch-Fallback-Count: 0
-```
-
-### Using the OpenAI SDKs
-
-**Python:**
-
-```python
+```python Python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.langwatch.ai/v1",
-    api_key="vk-lw-...",
+    api_key="vk-lw-...",  # your virtual key
 )
 
-resp = client.chat.completions.create(
-    model="gpt-5-mini",
-    messages=[{"role": "user", "content": "Hi"}],
+response = client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Say hi in one word"}],
 )
-print(resp.choices[0].message.content)
+print(response.choices[0].message.content)
 ```
 
-**TypeScript:**
-
-```ts
+```typescript TypeScript
 import OpenAI from "openai";
 
-const openai = new OpenAI({
+const client = new OpenAI({
   baseURL: "https://gateway.langwatch.ai/v1",
-  apiKey: process.env.LW_VK,
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
 });
 
-const resp = await openai.chat.completions.create({
-  model: "gpt-5-mini",
-  messages: [{ role: "user", content: "Hi" }],
+const response = await client.chat.completions.create({
+  model: "openai/gpt-5-mini",
+  messages: [{ role: "user", content: "Say hi in one word" }],
 });
+console.log(response.choices[0].message.content);
 ```
 
-### Anthropic-compatible (Claude SDK, Claude Code)
+</CodeGroup>
 
-```bash
-curl https://gateway.langwatch.ai/v1/messages \
-  -H "x-api-key: $LW_VK" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 64,
-        "messages": [{"role": "user", "content": "Hi"}]
-      }'
-```
+The response is a normal OpenAI chat completion. The gateway adds these response headers:
 
-## 3. See the trace in LangWatch
+| Header | Value |
+|---|---|
+| `X-LangWatch-Gateway-Request-Id` | The id of this request. Search it in Trace Explorer or quote it to support. |
+| `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id` | The trace and span the gateway recorded for this request. |
+| `X-LangWatch-Budget-Warning` | Present when a budget on this key is at 80 percent or more, as `scope:percent`. |
 
-Within ~30 seconds the request appears in the project the virtual key belongs to:
+For the Anthropic SDK, set `base_url="https://gateway.langwatch.ai"` and the virtual key as `api_key`. The SDK sends the key in the `X-Api-Key` header, which the gateway accepts. See [Python SDK](/ai-gateway/sdks/python) and [TypeScript SDK](/ai-gateway/sdks/typescript).
 
-- **Messages** view shows the prompt, response, tokens, cost, provider, cache outcome, and the full trace.
-- **Analytics** aggregates across all VKs in the project.
-- **Evaluations** can run on the traffic passing through the gateway.
+## 3. Open the trace
 
-Every gateway trace carries these attributes:
+Open **Trace Explorer** in the project you selected under Ownership. The request appears as a `gen_ai.chat` span with the model, the tokens, the cost and these attributes:
 
 | Attribute | Meaning |
 |---|---|
-| `langwatch.vk_id` | Virtual key id. |
-| `langwatch.project_id` | Owning project. |
-| `langwatch.team_id` | Owning team. |
-| `langwatch.org_id` | Owning organisation. |
-| `langwatch.principal_id` | User or service account that made the call. |
-| `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
-| `langwatch.fallback.attempt` | 0 on primary success, N for fallback attempts. |
+| `langwatch.virtual_key_id` | The key that served the request. |
+| `langwatch.gateway_request_id` | The same id as the `X-LangWatch-Gateway-Request-Id` header. |
+| `langwatch.model_provider_id` | The provider credential that served the request. |
+| `langwatch.end_user_id` | The end user of your product, when the request carried one. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries). |
 
-## 4. Add a budget
+## 4. See the spend
 
-Budgets live one level up from the key, they govern spend across whatever scope you attach them to.
+Open **AI Gateway > Usage** for total spend, requests, cost per request, top virtual keys and top models over the selected period. The **Virtual Keys** list shows a **Spent this month** column per key, and clicking it opens Usage filtered to that key.
 
-1. Open **AI Gateway → Budgets**.
-2. Click **New budget**.
-3. Pick scope = `project`, target = the project your VK is in.
-4. Set window = `month`, limit = `$100`, `on_breach = block`.
-5. Save.
-
-Once spend reaches the limit, the next request through any VK in that project returns `402 budget_exceeded`. Flip `on_breach` to `warn` if you'd rather have a `X-LangWatch-Budget-Warning` header instead of a hard cut-off.
-
-See [Budgets](/ai-gateway/budgets) for full scoping details.
-
-## Next steps
-
-- [Concepts](/ai-gateway/concepts): how VKs, budgets, guardrails, and fallback fit together.
-- [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
-- [Caching passthrough](/ai-gateway/caching-passthrough): the rule that keeps your 90% Anthropic cache discount.
-- [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.
-- [Budgets](/ai-gateway/budgets): cap spend per organization, team, project, key, person, or end user.
-- [Billing and spend events](/ai-gateway/billing-events): the per-request record, for reconciliation and rebilling.
+<Note>
+**Also check:** [Budgets](/ai-gateway/budgets) to cap the key, the team or the project, and [Virtual keys](/ai-gateway/virtual-keys) for scopes, expiry, rotation and the CLI.
+</Note>

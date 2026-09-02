@@ -373,9 +373,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [LangWatch AI Gateway Overview](https://langwatch.ai/docs/ai-gateway/overview.md): A governed, observable, sub-millisecond-overhead AI Gateway for enterprise LLM usage.
-- [Quickstart](https://langwatch.ai/docs/ai-gateway/quickstart.md): Make your first request through the LangWatch AI Gateway in five minutes.
-- [Concepts](https://langwatch.ai/docs/ai-gateway/concepts.md): The mental model for the LangWatch AI Gateway, virtual keys, budgets, guardrails, fallback, caching.
+- [LangWatch AI Gateway](https://langwatch.ai/docs/ai-gateway/overview.md): One OpenAI- and Anthropic-compatible endpoint for every LLM call in your company, with provider keys kept in LangWatch, a virtual key per application, team or person, budgets that block or warn, and a trace for every request.
+- [Quickstart](https://langwatch.ai/docs/ai-gateway/quickstart.md): Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
+- [Concepts](https://langwatch.ai/docs/ai-gateway/concepts.md): The nouns of the LangWatch AI Gateway, each defined once, virtual key, scope, provider credential, routing policy, budget, spend event and gateway request id.
 
 ## SDK Integration
 
@@ -417,10 +417,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Virtual Keys & Budgets
 
-- [Virtual Keys](https://langwatch.ai/docs/ai-gateway/virtual-keys.md): Mint, rotate, revoke, and scope virtual API keys for the LangWatch AI Gateway.
-- [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Hierarchical, windowed spend limits enforced at the gateway.
+- [Virtual Keys](https://langwatch.ai/docs/ai-gateway/virtual-keys.md): Create, scope, rotate, disable and revoke the keys your applications use to call the LangWatch AI Gateway.
+- [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
 - [Gateway provider settings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md): Gateway-specific settings (rate limits, fallback priority, provider config overrides) now live on each ModelProvider's Advanced tab.
-- [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bindings, and providers, including the precedence model and the 429 envelope.
+- [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): Requests per minute and requests per day on a virtual key, enforced by each LangWatch AI Gateway replica.
 - [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): Role-based access control for the LangWatch AI Gateway, resources, actions, and default role mappings.
 
 ## Billing & Metering
