@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +13,30 @@ import {
 const SECRET = "a".repeat(32);
 
 describe("given the digest that stands in for an erased identifier", () => {
+  describe("when the construction itself is pinned", () => {
+    it("is HMAC, not the secret prefixed to the identifier", () => {
+      const digest = erasureDigest({
+        secret: SECRET,
+        identifier: "m@acme.test",
+      });
+
+      // Pinned rather than recomputed, because a stored suppression list is only
+      // as portable as this construction: change it and every digest already
+      // written stops matching, with no way back — the identifiers needed to
+      // recompute them are exactly what the erasure destroyed.
+      expect(digest).toBe(
+        "83b2fef62d746c83cdde05c05cef34cdf0552ce0a826ced06d5f3231ce0d911b",
+      );
+      expect(digest).toBe(
+        createHmac("sha256", SECRET).update("m@acme.test").digest("hex"),
+      );
+      // The construction this replaced, spelled out so a revert cannot pass.
+      expect(digest).not.toBe(
+        createHash("sha256").update(SECRET).update("m@acme.test").digest("hex"),
+      );
+    });
+  });
+
   describe("when the same identifier is hashed twice", () => {
     it("produces the same value both times", () => {
       const first = erasureDigest({

@@ -18,7 +18,7 @@
  *
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 /**
  * The environment variable holding the digest's secret.
@@ -78,7 +78,14 @@ export function readErasureSecret(
 }
 
 /**
- * `SHA-256(secret ‖ identifier)`, lowercase hex.
+ * `HMAC-SHA256(secret, identifier)`, lowercase hex.
+ *
+ * HMAC rather than `SHA-256(secret ‖ identifier)`, which is the construction
+ * HMAC exists to replace: a plain hash of a secret followed by a message is
+ * length-extendable, so anyone holding one digest can derive the digest of a
+ * longer identifier sharing that prefix without knowing the secret. Email
+ * addresses share prefixes constantly. Every other keyed digest in this
+ * codebase is an HMAC — both peppers included — and this is the same job.
  *
  * Deterministic in the identifier, which is what lets a replay of any day land
  * on the same key without anything having been stored: replay the same events
@@ -99,5 +106,5 @@ export function erasureDigest({
   secret: string;
   identifier: string;
 }): string {
-  return createHash("sha256").update(secret).update(identifier).digest("hex");
+  return createHmac("sha256", secret).update(identifier).digest("hex");
 }
