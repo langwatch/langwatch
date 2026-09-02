@@ -147,8 +147,8 @@ describe("Feature: the governance project is refused by the generic project rout
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],
+      ["user", { id: adminId }],
     ]);
-    if (adminId) await prisma.user.deleteMany({ where: { id: adminId } });
     await prisma.organization.delete({ where: { id: organizationId } });
   });
 

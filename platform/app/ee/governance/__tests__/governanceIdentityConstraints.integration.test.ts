@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { IdentityMatchRepository } from "../repositories/governanceIdentity.repository";
 import {
   recordGovernanceTenantUse,
@@ -462,18 +463,21 @@ describe("Feature: organizations that already ingested are backfilled", () => {
     });
   });
 
-  afterAll(async () => {
-    await prisma.governanceTenantHistory.deleteMany({
-      where: { organizationId: backfillOrg },
-    });
-    await prisma.project.deleteMany({
-      where: {
-        id: { in: [liveGovernanceId, retiredGovernanceId, ordinaryProjectId] },
-      },
-    });
-    await prisma.team.deleteMany({ where: { organizationId: backfillOrg } });
-    await prisma.organization.deleteMany({ where: { id: backfillOrg } });
-  });
+  afterAll(() =>
+    cleanupTestRows(prisma, [
+      ["governanceTenantHistory", { organizationId: backfillOrg }],
+      [
+        "project",
+        {
+          id: {
+            in: [liveGovernanceId, retiredGovernanceId, ordinaryProjectId],
+          },
+        },
+      ],
+      ["team", { organizationId: backfillOrg }],
+      ["organization", { id: backfillOrg }],
+    ]),
+  );
 
   describe("given organizations that ingested before any of this was recorded", () => {
     /** @scenario "Organizations that already ingested keep their area when the records are introduced" */
