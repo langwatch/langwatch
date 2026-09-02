@@ -5,12 +5,14 @@ import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/service
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 
 type ClickHouseClientLike = ClickHouseClient;
 
@@ -110,6 +112,10 @@ export function installClickHouseTestApp({
       // neither of which this ClickHouse-only harness composes. A suite that
       // drives an erasure builds it directly.
       identityErasure: undefined,
+      // The matcher, unlike the erasure, needs only Postgres — which this
+      // harness already has behind `createTestApp` — so it is the real service
+      // rather than a hole a route test would trip into.
+      identityMatch: new IdentityMatchService({ prisma }),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,
