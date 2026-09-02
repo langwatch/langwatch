@@ -223,9 +223,9 @@ function shareOfPullRequest({
 }
 
 /** The bucket a row falls in, named without reference to any pull request. */
-const UNSTAMPED_BUCKET = " unstamped";
-const ELSEWHERE_BUCKET = " elsewhere";
-const BRANCH_BUCKET_PREFIX = "branch ";
+const UNSTAMPED_BUCKET = "\0unstamped";
+const ELSEWHERE_BUCKET = "\0elsewhere";
+const BRANCH_BUCKET_PREFIX = "branch\0";
 
 function bucketKeyOf({
   row,
