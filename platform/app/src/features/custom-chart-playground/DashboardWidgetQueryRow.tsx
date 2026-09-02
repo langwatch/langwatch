@@ -135,6 +135,9 @@ export function DashboardWidgetQueryRow({
                   language="sql"
                   value={query.sql}
                   onChange={(sql) => onChange({ ...query, sql })}
+                  declaredParamNames={(query.parameters ?? []).map(
+                    (p) => p.name,
+                  )}
                 />
               </Box>
 

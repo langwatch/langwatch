@@ -46,12 +46,35 @@ const MAX_CODE_LENGTH = 200_000;
  * the `lwql-charts` skill's SQL does; declaring a parameter under one of
  * these names would silently never receive the value a caller passes, since
  * the executor's own binding always wins.
+ *
+ * Exported (not just the name set below) so the client-side parameters editor
+ * can list these as built-in rows without hand-duplicating the names, types,
+ * or ClickHouse binding, and without importing anything server-only — this
+ * module is already safe for the client (zod + constants only).
  */
-const RESERVED_PARAMETER_NAMES = new Set([
-  "period_start",
-  "period_end",
-  "period_granularity_seconds",
-]);
+export const RESERVED_PARAMETERS = [
+  {
+    name: "period_start",
+    type: "DateTime",
+    description:
+      "Start of the dashboard's selected time range — bound automatically.",
+  },
+  {
+    name: "period_end",
+    type: "DateTime",
+    description: "End of the selected time range (exclusive).",
+  },
+  {
+    name: "period_granularity_seconds",
+    type: "UInt32",
+    description:
+      "Suggested bucket size in seconds for the selected range.",
+  },
+] as const;
+
+const RESERVED_PARAMETER_NAMES = new Set(
+  RESERVED_PARAMETERS.map((p) => p.name),
+);
 
 /**
  * The JS types a bound parameter's value may take. Scalars only, matching
