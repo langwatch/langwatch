@@ -49,24 +49,20 @@ Re-running the script is safe:
 
 No duplicates are created on a re-run.
 
-## Move semantics (important tradeoff)
+## Pin semantics
 
-Pinning a widget to a dashboard **moves** it: the widget's `dashboardId` is
-set, and the widget leaves the custom-chart playground's own (unpinned)
-view. There is no "create straight onto a dashboard" — the widget-create
-route deliberately sets no `dashboardId` (a playground widget lives on the
-playground page until pinned), so pin-reuse of the pack seeders' widgets is
-the simple path here.
+Pinning a widget to a dashboard does **not** move it: the widget's
+`dashboardId` is set and it renders on the dashboard, but it stays fully
+visible and editable on the custom-chart playground too — the widget now
+has a second home. There is no "create straight onto a dashboard" — the
+widget-create route deliberately sets no `dashboardId` (a playground widget
+lives on the playground page until pinned), so pin-reuse of the pack
+seeders' widgets is the simple path here.
 
-If you want playground copies of these widgets back (e.g. to keep exploring
-them unpinned), just re-run the pack seeders
-(`platform/app/scripts/north-star-widgets/seed.mjs` and
-`platform/app/scripts/legacy-parity-widgets/seed.mjs`) — they skip by name
-too, so this script's pack widgets stay in place and only genuinely missing
-ones get recreated. Note the pack seeders create by name-not-found, so if
-this script already pinned e.g. "North-star: Metric" onto the dashboard,
-re-running the pack seeder will NOT create a fresh unpinned copy under the
-same name (name already exists) — you'd need to rename or delete first.
+Note the pack seeders create by name-not-found, so if this script already
+pinned e.g. "North-star: Metric" onto the dashboard, re-running the pack
+seeder will NOT create a fresh copy under the same name (name already
+exists) — you'd need to rename or delete first.
 
 ## Verify
 

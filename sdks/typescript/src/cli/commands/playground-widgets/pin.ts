@@ -75,10 +75,12 @@ export const pinPlaygroundWidgetCommand = async (
   const spinner = createSpinner(`Adding "${widgetRef}" to dashboard...`).start();
 
   try {
-    const widget = await resolveWidgetRef(widgets, widgetRef);
+    const widgetBefore = await resolveWidgetRef(widgets, widgetRef);
     const dashboard = await resolveDashboardRef(dashboards, options.dashboard);
 
-    await widgets.assignDashboard(widget.id, { dashboardId: dashboard.id });
+    const widget = await widgets.assignDashboard(widgetBefore.id, {
+      dashboardId: dashboard.id,
+    });
 
     spinner.succeed(
       `Added "${widget.name}" to dashboard "${dashboard.name}"`,

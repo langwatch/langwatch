@@ -6,8 +6,9 @@
  *
  * This does NOT replace the pack seeders — it reuses their env contract and
  * fetch style, but pins pre-existing (or newly created) playground widgets
- * onto a dashboard. Pinning MOVES a widget: the widget's dashboardId is set,
- * so it leaves the playground's unpinned view. See README.md.
+ * onto a dashboard. Pinning does NOT move a widget: the widget's dashboardId
+ * is set so it renders on the dashboard, but it stays visible and editable
+ * on the playground too. See README.md.
  *
  * Env vars:
  *   LW_ENDPOINT  Base URL of the LangWatch app, e.g. https://app.langwatch.ai
