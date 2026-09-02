@@ -420,6 +420,18 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
      * The six agent surfaces, stubbed with only what the record reads while it
      * is being BUILT. Their own suite is what proves they answer.
      */
+    /**
+     * The twenty-one gateway and governance surfaces, stubbed with only what
+     * the record reads while it is BUILT: the virtual-key budget parser and
+     * the SaaS-billing decision, which chooses which router the two billing
+     * namespaces ARE. Their own suite is what proves they answer.
+     */
+    gatewayGroup: {
+      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+      governanceHome: stub("gatewayGroup.governanceHome"),
+      saasBilling: false,
+    },
+    github: stub("github"),
     agentGroup: {
       scenarios: stub("agentGroup.scenarios"),
       langy: stub("agentGroup.langy"),
@@ -689,12 +701,18 @@ describe("given the execution collaborators composed over this process's own gra
     it("registers the packaged evaluation pipeline as a producer", () => {
       const { eventing } = composeApplication();
 
-      expect(eventing.registered).toHaveLength(1);
-      expect(eventing.registered[0]?.name).toBe("evaluation_processing");
+      // Two producer registrations, because this half composes two things that
+      // send commands: the re-score, and the workbench run loop beside it.
+      // `experiment_run_processing` has its own suite in
+      // `api-experiment-run.composition.integration.test.ts`.
+      const evaluation = eventing.registered.find(
+        (entry) => entry.name === "evaluation_processing",
+      );
+      expect(evaluation).toBeDefined();
       // The whole definition, not a producer's subset: the routing triple a job
       // carries is derived from these names, and a fork would send commands the
       // worker's registry does not claim.
-      expect(eventing.registered[0]?.commands).toEqual(
+      expect(evaluation?.commands).toEqual(
         expect.arrayContaining([
           "executeEvaluation",
           "startEvaluation",

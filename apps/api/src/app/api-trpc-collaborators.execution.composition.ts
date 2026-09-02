@@ -19,6 +19,14 @@
  * version of this workflow", and the one that drifts is always the copy — so
  * it is built here once and handed out.
  *
+ * A fifth thing is composed here and reached from outside tRPC: the workbench
+ * RUN LOOP. The surfaces that start a run are REST routes rather than
+ * procedures, but every collaborator a run needs — the Experiment service, the
+ * workflow service, the dataset, prompt, agent and evaluator services, and the
+ * `reportEvaluation` sender — is already in this scope, so the run is composed
+ * beside them (`api-experiment-run.composition.ts`) rather than over a second
+ * graph that could disagree with what the namespaces answer.
+ *
  * ## The NLP engine is one address, and everything runs on it
  *
  * A Studio run, a code evaluator and the evaluator keep-alive all reach the
@@ -65,6 +73,7 @@ import { EventEmitter } from "node:events";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { TupleParam } from "@clickhouse/client";
 import type { AgentService } from "@langwatch/agent-contract";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { DatasetService } from "@langwatch/dataset-contract";
@@ -99,7 +108,9 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PromptService } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
+import type { RedisConnection } from "@langwatch/redis-client";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
@@ -130,6 +141,12 @@ import { z } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
+import {
+  composeApiExperimentRun,
+  composeApiExperimentRunCommands,
+  type ApiExperimentRun,
+  type ApiExperimentRunAbsenceReport,
+} from "./api-experiment-run.composition";
 
 /**
  * The retention floor a DSPy run read is bounded by when a project names no
@@ -202,6 +219,23 @@ export type ApiExecutionCollaboratorsOptions = Readonly<{
   captureException?: (error: unknown) => void;
   /** The process environment, for the evaluator-install questions. */
   environment?: Readonly<Record<string, string | undefined>>;
+  /**
+   * The queue's Redis, where a run's abort flag and its progress both live.
+   *
+   * Absent means this process composes no RUN LOOP: it still mounts all four
+   * namespaces and answers every read, and only starting a run refuses by
+   * name. See `api-experiment-run.composition.ts` for why the progress store
+   * is the thing that decides it.
+   */
+  redis?: RedisConnection | null;
+  /**
+   * The API-key service a run mints its sandbox credential through. Absent
+   * means a run lends the code it executes no key and every row does its own
+   * work, which is what a failed mint already means.
+   */
+  apiKeys?: ApiKeyService;
+  /** Names the run loop's own absences at boot rather than leaving them inferred. */
+  experimentRunReport?: ApiExperimentRunAbsenceReport;
 }>;
 
 /** The three application slices and the three port groups, composed together. */
@@ -247,6 +281,19 @@ export type ApiExecutionCollaborators = Readonly<{
    * dataset application asks for it.
    */
   experimentLookup: DatasetExperimentLookup;
+  /**
+   * The workbench RUN LOOP, over the same graph the four namespaces answer
+   * from.
+   *
+   * Published rather than kept private because the surfaces that START a run
+   * are REST routes, not tRPC procedures: `POST /api/experiments/execute`
+   * streams one, `POST /api/experiments/{slug}/run` polls one, and
+   * `POST /api/workflows/{id}/evaluate` triggers one. All three take this, and
+   * they take THIS one so a run dispatches through the same studio, prices
+   * against the same rate table and reports onto the same pipeline the
+   * namespaces beside them already use.
+   */
+  experimentRun: ApiExperimentRun;
 }>;
 
 /**
@@ -350,6 +397,23 @@ export function composeApiExecutionCollaborators(
     generateId: () => `monitor_${nanoid()}`,
   });
 
+  // The run-history dispatchers, from a PRODUCER-only registration of the same
+  // packaged definition the worker drains. Composed BEFORE the Experiment
+  // service because the service is what validates and sends on them.
+  const experimentRunCommands = composeApiExperimentRunCommands({
+    eventing: options.eventing,
+    processName: options.processName,
+  });
+
+  // Built once and handed to both the experiment application's reference set
+  // and the run loop's data load: a prompt handle a run resolves and one the
+  // workbench read resolves have to be the same version, and two services over
+  // the same rows are two answers to which.
+  const prompts: PromptService = PostgresPromptAdapter.create({
+    database: options.prisma,
+    modelProvider: options.modelProviders,
+  }).build();
+
   const experiments = PostgresExperimentAdapter.create({
     database: options.prisma,
     // The adapter's own contract: `null` is a deployment without ClickHouse,
@@ -363,19 +427,21 @@ export function composeApiExecutionCollaborators(
     slugify,
     newId: () => nanoid(8),
     references: {
-      prompts: PostgresPromptAdapter.create({
-        database: options.prisma,
-        modelProvider: options.modelProviders,
-      }).build(),
+      prompts,
       agents: options.agents,
       evaluators,
       workflows,
       dataset: datasets,
     },
-    // No `execution` and no `updates`: this process starts no experiment run
-    // and broadcasts no cell. Both have documented fallbacks in the adapter —
-    // an unavailable execution that refuses by name, and a no-op update
-    // channel — and both are the honest answer for a process with no run loop.
+    // The run's history, written through this process's own producer-only
+    // registration. Absent only where the process composed no command queue,
+    // and then the packaged `UnavailableExperimentExecutionAdapter` refuses by
+    // name — which is what stops a run at its first cell rather than letting
+    // it produce a history with a hole at the front.
+    ...(experimentRunCommands ? { execution: experimentRunCommands } : {}),
+    // Still no `updates`: this process broadcasts no cell, so a workbench cell
+    // lands on the next read rather than as it happens. That is the packaged
+    // no-op's documented shape, not a gap this composition is papering over.
   });
 
   const experimentApp = ExperimentApp.create({
@@ -391,6 +457,29 @@ export function composeApiExecutionCollaborators(
     processName: options.processName,
   });
 
+  // The run loop, over the SAME six services composed above. It is built here
+  // rather than in the production root because everything it needs except a
+  // Redis connection and the API-key service is already in this scope, and a
+  // second Experiment service, workflow service or dataset service built for a
+  // run would be a second answer to what an experiment holds.
+  const experimentRun = composeApiExperimentRun({
+    prisma: options.prisma,
+    processName: options.processName,
+    modelProviders: options.modelProviders,
+    nlpServiceUrl: options.nlpServiceUrl,
+    publicBaseUrl: options.publicBaseUrl,
+    redis: options.redis,
+    experiments,
+    workflows,
+    reportEvaluation,
+    datasets,
+    prompts,
+    agents: options.agents,
+    evaluators,
+    apiKeys: options.apiKeys,
+    ...(options.experimentRunReport ? { report: options.experimentRunReport } : {}),
+  });
+
   const mappingsSchema = options.mappingsSchema ?? permissiveMappingsSchema;
   const captureException =
     options.captureException ??
@@ -404,6 +493,7 @@ export function composeApiExecutionCollaborators(
     monitors,
     datasets,
     experimentLookup: experiments,
+    experimentRun,
 
     workflowPorts: {
       lifecycle: {
