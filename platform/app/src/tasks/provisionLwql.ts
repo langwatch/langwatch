@@ -43,7 +43,11 @@ import {
   type LangWatchQLNames,
   lwqlClickHouseSetupStatements,
 } from "../server/analytics/lwql/provisioning";
-import { lwqlSourceTables } from "../server/analytics/lwql/views";
+import {
+  lwqlSourceTables,
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 import { env } from "~/env.mjs";
@@ -282,8 +286,20 @@ export default async function execute() {
         for (const statement of accessStatements) {
           await client.command({ query: statement });
         }
+        // Must run *after* accessStatements above: the per-view GRANTs point
+        // at the restricted user accessStatements just (re)created, so a
+        // grant issued before the user still points at the replaced access
+        // entity (see views.ts's lwqlViewSetupStatements doc comment).
+        const viewStatements = lwqlViewSetupStatements({
+          names,
+          sourceDatabase,
+          dedup: SHIPPED_LWQL_DEDUP,
+        });
+        for (const statement of viewStatements) {
+          await client.command({ query: statement });
+        }
         logger.info(
-          "lwql self-provisioning: ClickHouse access model (user, profile, grants, row policies) reconciled",
+          "lwql self-provisioning: ClickHouse access model (user, profile, grants, row policies) and view grants reconciled",
         );
       } catch (error) {
         // Log-and-continue, never crash boot: queries already fail closed via
