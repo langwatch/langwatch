@@ -232,7 +232,14 @@ export {
   type ScenarioRoleSpanInput,
 } from "./services/scenario-role-metrics.rules";
 
-export { TraceApp } from "./app/trace.app";
+export {
+  TraceApp,
+  type TraceAppDependencies,
+  type TraceProjectReader,
+  type TraceShareReader,
+  type TracesTopicReader,
+  type TracesTrpcEmitters,
+} from "./app/trace.app";
 export {
   SpansTrpcApi,
   type SpansTrpcContext,

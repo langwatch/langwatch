@@ -84,7 +84,7 @@ type LlmModelCostTrpcProcedures<
  * concrete return shapes the process wires in survive into the router's
  * inferred output types instead of collapsing to the loose shape here.
  */
-type LlmModelCostTrpcPorts = Readonly<{
+export type LlmModelCostTrpcPorts = Readonly<{
   /**
    * Whether a caller-supplied pattern is free of catastrophic backtracking.
    * A port rather than a local copy so the form, this schema and the

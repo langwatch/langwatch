@@ -90,10 +90,12 @@ export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.
 export {
   ModelProviderTrpcApi,
   type ModelProviderTrpcContext,
+  type ModelProviderTrpcPorts,
 } from "./transport/api-trpc/model-provider.api";
 export {
   LlmModelCostTrpcApi,
   type LlmModelCostTrpcContext,
+  type LlmModelCostTrpcPorts,
 } from "./transport/api-trpc/llm-model-cost.api";
 export {
   TranslateTrpcApi,

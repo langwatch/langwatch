@@ -8,3 +8,8 @@ export {
   type LimitsTrpcContext,
   type LimitsTrpcPorts,
 } from "./transport/api-trpc/limits.api";
+export {
+  CostTrpcApi,
+  type CostTrpcContext,
+  type CostTrpcPorts,
+} from "./transport/api-trpc/cost.api";

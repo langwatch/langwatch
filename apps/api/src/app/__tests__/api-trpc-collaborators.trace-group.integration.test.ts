@@ -1,0 +1,611 @@
+/**
+ * The observability half of the packaged record, served by the API process.
+ *
+ * What this pins is what the migration turns on for the trace group: all
+ * sixteen namespaces built on THIS process's root, with THIS process's policy
+ * chain, reachable over the real `/api/trpc` handler — and the two
+ * subscriptions inside the record, watchable over the real `/api/sse` lane.
+ *
+ * One procedure per namespace, over fakes at the ports. That is one call per
+ * namespace rather than per procedure on purpose: a namespace is either in the
+ * record or it does not exist, and the shape of every procedure inside it is
+ * its own feature package's suite to hold.
+ *
+ * The last two suites are about the composition rather than the record: what a
+ * process that composed NO trace read stack answers (each read refuses by name,
+ * both subscriptions still stream), and that the absence is written down rather
+ * than discovered by clicking into it.
+ */
+import { EventEmitter } from "node:events";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaConnection } from "@langwatch/prisma-client";
+import type { PresenceEmitterPort } from "@langwatch/presence-server";
+import type { ProjectService } from "@langwatch/project-contract";
+import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
+import superjson from "superjson";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import { ApiApplication } from "../../api.application";
+import { ApiRestSecurity } from "../../api-rest.security";
+import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
+import type { AnyAppTraceGroupTrpcPorts } from "../../app-trpc/app-trpc.trace-group";
+import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+import {
+  composeApiTraceGroupCollaborators,
+  LoggedApiTraceGroupAbsence,
+} from "../api-trpc-collaborators.trace-group.composition";
+
+/**
+ * The sixteen namespaces this half owns, as the wire names them.
+ *
+ * Written out rather than derived from the record under test: derived, the
+ * assertion would pass for whatever the record happened to contain, including
+ * a record that had silently lost half its surfaces.
+ */
+const TRACE_GROUP_NAMESPACES = [
+  "costs",
+  "httpProxy",
+  "limits",
+  "llmModelCost",
+  "modelProvider",
+  "pinnedTrace",
+  "plan",
+  "savedViews",
+  "share",
+  "sharedTrace",
+  "spans",
+  "topics",
+  "traceEditOverlay",
+  "traces",
+  "tracesV2",
+  "translate",
+] as const;
+
+const noop = () => undefined;
+
+/** A schema that accepts whatever a test sends it. */
+const anySchema = z.any();
+
+/**
+ * A port group whose members refuse by name unless the test named them.
+ *
+ * The `buildTime` split matters for the same reason it does in the record's own
+ * suite: a router is assembled at composition time, so a schema that threw on
+ * property access would fail the MOUNT rather than the call, and the test could
+ * not tell a missing port from an unexercised one.
+ */
+function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
+  return new Proxy(buildTime, {
+    get(target, property) {
+      if (property in target) return target[property as string];
+      return () => {
+        throw new Error(`the test reached ${group}.${String(property)}, which it does not stub`);
+      };
+    },
+    has: () => true,
+  }) as T;
+}
+
+const trace = {
+  trace_id: "trace-1",
+  project_id: "project-1",
+  spans: [
+    { span_id: "span-b", timestamps: { started_at: 20, finished_at: 30 } },
+    { span_id: "span-a", timestamps: { started_at: 10, finished_at: 40 } },
+  ],
+};
+
+const overlay = { traceId: "trace-1", patch: { trace: {} }, updatedAt: new Date(0) };
+
+/** The trace readers `TraceApp` is composed from, as far as this suite drives them. */
+function testTraceReaders(): TraceAppDependencies["traces"] {
+  return stub<TraceAppDependencies["traces"]>("traces", {
+    read: {
+      getById: async () => trace,
+      getTracesWithSpans: async () => [trace],
+    },
+    list: { getNewCount: async () => 7 },
+    editOverlay: { getByTraceId: async () => overlay },
+    summary: { getByTraceId: async () => ({ redactedByVisibilityWindow: false }) },
+  });
+}
+
+/** The process's broadcast fabric, with the emitter the suite drives by hand. */
+function testBroadcast() {
+  const emitters = new Map<string, EventEmitter>();
+  const broadcast = {
+    getTenantEmitter: (tenantId: string) => {
+      const existing = emitters.get(tenantId);
+      if (existing) return existing;
+      const created = new EventEmitter();
+      emitters.set(tenantId, created);
+      return created;
+    },
+    cleanupTenantEmitter: () => undefined,
+  } as unknown as PresenceEmitterPort;
+  return { broadcast, emitterFor: (tenantId: string) => broadcast.getTenantEmitter(tenantId) };
+}
+
+function testTraceApp(broadcast: PresenceEmitterPort): TraceApp {
+  return TraceApp.create({
+    traces: testTraceReaders(),
+    topics: { getAll: async () => [{ id: "topic-1", name: "Refunds", parentId: null }] },
+    broadcast: broadcast as unknown as TraceAppDependencies["broadcast"],
+    evaluations: stub<TraceAppDependencies["evaluations"]>("evaluations"),
+    codingAgents: stub<TraceAppDependencies["codingAgents"]>("codingAgents"),
+    share: stub<TraceAppDependencies["share"]>("share"),
+    projects: { tryGetById: async () => null },
+  });
+}
+
+/** The six application slices this half fills, plus the ones the record needs. */
+function testApplication(broadcast: PresenceEmitterPort): ApiTrpcFeatureApplication {
+  return {
+    ...stub<ApiTrpcFeatureApplication>("app"),
+    ops: { isAdmin: () => true },
+    config: {},
+    broadcast,
+    traces: testTraceApp(broadcast),
+    share: { listForResource: async () => [{ id: "share-1", token: "tok" }] },
+    dataRetention: { listByProject: async () => [{ traceId: "trace-1" }] },
+    topics: { getAll: async () => [{ id: "topic-1", name: "Refunds" }] },
+    modelProviders: {
+      getForProject: async () => ({}),
+      listCosts: async () => [{ id: "cost-1", model: "gpt-5-mini" }],
+    },
+    planProvider: { getActivePlan: async () => ({ type: "OPEN_SOURCE", name: "Developer" }) },
+  } as unknown as ApiTrpcFeatureApplication;
+}
+
+/** The group's ports, every one of them a fake this suite can observe. */
+function testTraceGroupPorts(): AnyAppTraceGroupTrpcPorts {
+  const protections = { visibilityCutoffMs: null, canSeeCosts: true };
+  return {
+    traces: stub("traces", {
+      listInputSchema: anySchema,
+      filterInputSchema: anySchema,
+      evaluatorTypeSchema: anySchema,
+      preconditionSchema: anySchema,
+      getViewerProtections: async () => protections,
+    }),
+    tracesV2: stub("tracesV2", { getViewerProtections: async () => protections }),
+    spans: { getViewerProtections: async () => protections },
+    traceEditOverlay: stub("traceEditOverlay", {
+      getViewerProtections: async () => protections,
+      redactPatchForViewer: ({ patch }: { patch: unknown }) => patch,
+      restoreWithheldEdits: ({ incoming }: { incoming: unknown }) => incoming,
+    }),
+    sharedTrace: stub("sharedTrace", {
+      mappers: {},
+      rateLimit: async () => ({ allowed: true }),
+      getClientIp: () => "127.0.0.1",
+      isTraceNotFound: () => false,
+      tryGetShareViewerProtections: async () => null,
+    }),
+    savedViews: { savedViews: stub("savedViews", { getAll: async () => [{ id: "view-1" }] }) },
+    costs: { readOrganizationSpend: async () => [{ project: { id: "project-1" }, costs: [] }] },
+    llmModelCost: stub("llmModelCost", { isSafeRegex: () => true, getModelLimits: () => null }),
+    modelProvider: stub("modelProvider", { recordAudit: () => undefined }),
+    modelProviderChecks: {
+      tenantWrite: () => passthroughCheck,
+      credentialProbe: passthroughCheck,
+    },
+    translate: { wrapAiCall: (_feature: unknown, call: () => unknown) => call() },
+    httpProxy: stub("httpProxy"),
+    limits: stub("limits", { getUsageStats: async () => ({ currentMonthMessagesCount: 3 }) }),
+  } as unknown as AnyAppTraceGroupTrpcPorts;
+}
+
+/**
+ * A custom check that lets the call through and marks it checked.
+ *
+ * The two real gates are the composition's own, and their refusal path is that
+ * composition's suite; here they only have to satisfy the fail-closed backstop
+ * so the surface under test is the ROUTER rather than the gate.
+ */
+const passthroughCheck = Object.assign(
+  async ({ ctx, next }: { ctx: { permissionChecked?: boolean }; next(): unknown }) => {
+    ctx.permissionChecked = true;
+    return next();
+  },
+  {
+    authzDeclaration: {
+      kind: "custom" as const,
+      reason: "the suite drives the router, not the tenant gate",
+      permissions: ["project:update" as const],
+    },
+  },
+);
+
+/** Permits everything: the refusal path is the declared check's own suite. */
+function testAuthz(): AuthzService {
+  return {
+    hasPermission: async () => true,
+    getDecision: async () => ({ permitted: true, organizationRole: null }),
+    getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+  } as unknown as AuthzService;
+}
+
+function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborators {
+  return {
+    application: testApplication(broadcast),
+    analytics: {
+      reads: stub("analytics.reads", {
+        timeseriesInputSchema: anySchema,
+        sharedFiltersSchema: anySchema,
+        filterFieldSchema: anySchema,
+      }),
+      workbench: stub("analytics.workbench", {
+        requireWorkbenchEnabled: <T>(p: T) => p,
+        maxStatementLength: 4_000,
+        timeWindowSchema: anySchema,
+        granularityStepSchema: anySchema,
+      }),
+      savedCharts: stub("analytics.savedCharts", {
+        requireWorkbenchEnabled: <T>(p: T) => p,
+        timeWindowSchema: anySchema,
+        granularityStepSchema: anySchema,
+      }),
+    },
+    annotation: stub("annotation"),
+    auth: stub("auth"),
+    bugReports: stub("bugReports"),
+    dataPrivacy: stub("dataPrivacy"),
+    evaluations: stub("evaluations", { mappingsSchema: anySchema }),
+    experiments: stub("experiments", { workbenchStateSchema: anySchema }),
+    graphs: stub("graphs", { filterFieldSchema: anySchema }),
+    group: stub("group"),
+    home: stub("home"),
+    identity: stub("identity"),
+    integrationsChecks: stub("integrationsChecks"),
+    joinRequests: stub("joinRequests"),
+    onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
+    prompts: stub("prompts"),
+    team: stub("team"),
+    traceGroup: testTraceGroupPorts(),
+    user: stub("user"),
+    workflows: {
+      lifecycle: stub("workflows.lifecycle"),
+      optimization: stub("workflows.optimization"),
+    },
+  } as unknown as AnyApiTrpcCollaborators;
+}
+
+/** A REST security whose credential services are never reached on this lane. */
+function subscriptionSecurity() {
+  return ApiRestSecurity.create({
+    apiKeys: stub("apiKeys"),
+    authz: stub("authz"),
+    organizations: stub("organizations"),
+    observability: ApiRestObservabilityComposition.create(),
+  } as never);
+}
+
+function composeApplication() {
+  const { broadcast, emitterFor } = testBroadcast();
+  const features = ApiTrpcFeaturesComposition.tryCompose({
+    database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
+    authz: testAuthz(),
+    audit: undefined,
+    collaborators: testCollaborators(broadcast),
+  });
+  if (!features) throw new Error("the record refused to compose against its test collaborators");
+
+  const session = { user: { id: "user-1", email: "person@example.com" } };
+  const application = ApiApplication.create({
+    features,
+    http: {
+      createContext: async () => ({
+        actor: () => ({ id: "user-1" }),
+        tryActor: () => ({ id: "user-1" }),
+        authorize: async () => undefined,
+        session,
+      }),
+      subscriptions: (ports) =>
+        createSseSubscriptionApp({
+          security: subscriptionSecurity(),
+          ports,
+          // The suite ENDS each stream by aborting it, which is a stream
+          // failure as far as the lane is concerned. Silenced so a deliberate
+          // teardown does not print a stack per subscription assertion.
+          logger: { debug: noop, info: noop, warn: noop, error: noop },
+        }).hono,
+    },
+  });
+
+  return { application, emitterFor };
+}
+
+async function callTrpc(
+  application: ApiApplication,
+  path: string,
+  input: Record<string, unknown>,
+): Promise<{ status: number; body: unknown }> {
+  if (!application.hono) throw new Error("HTTP composition was not created.");
+  const encoded = encodeURIComponent(JSON.stringify({ json: input }));
+  const response = await application.hono.request(
+    `http://127.0.0.1/api/trpc/${path}?input=${encoded}`,
+  );
+  return { status: response.status, body: await response.json() };
+}
+
+/**
+ * Drives one subscription: opens the stream, waits for the procedure's own
+ * listener to attach, emits one event, and reads the frames back.
+ *
+ * The wait is on the LISTENER rather than on a timer because a tRPC
+ * subscription's generator body only runs on the first pull, so an event
+ * emitted before that lands on nobody and the test would hang for a reason
+ * that has nothing to do with the wiring.
+ */
+async function watchSse(options: {
+  application: ApiApplication;
+  path: string;
+  input: Record<string, unknown>;
+  emitter: EventEmitter;
+  channel: string;
+  event: unknown;
+}) {
+  const { application, path, input, emitter, channel, event } = options;
+  if (!application.hono) throw new Error("HTTP composition was not created.");
+
+  const controller = new AbortController();
+  const encoded = encodeURIComponent(superjson.stringify(input));
+  const response = await application.hono.request(
+    `http://127.0.0.1/api/sse/${path}?input=${encoded}`,
+    { signal: controller.signal },
+  );
+
+  await vi.waitFor(() => {
+    if (emitter.listenerCount(channel) === 0) throw new Error("no listener yet");
+  });
+  emitter.emit(channel, event);
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("the subscription answered no stream");
+  const decoder = new TextDecoder();
+  const frames: unknown[] = [];
+  let buffered = "";
+  try {
+    while (frames.length < 2) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffered += decoder.decode(chunk.value, { stream: true });
+      const blocks = buffered.split("\n\n");
+      buffered = blocks.pop() ?? "";
+      for (const block of blocks) {
+        const payload = block
+          .split("\n")
+          .filter((line) => line.startsWith("data: "))
+          .map((line) => line.slice("data: ".length))
+          .join("\n");
+        if (payload.length > 0) frames.push(superjson.parse(payload));
+      }
+    }
+  } finally {
+    controller.abort();
+    await reader.cancel().catch(() => undefined);
+  }
+
+  return { status: response.status, contentType: response.headers.get("Content-Type"), frames };
+}
+
+describe("given an API process composed with the observability collaborators", () => {
+  it("mounts all sixteen of its namespaces beside the rest of the record", () => {
+    const { application } = composeApplication();
+
+    const mounted = Object.keys(
+      (application.trpc as unknown as { _def: { record: Record<string, unknown> } })._def.record,
+    );
+
+    for (const namespace of TRACE_GROUP_NAMESPACES) {
+      expect(mounted).toContain(namespace);
+    }
+  });
+
+  describe("when one procedure of each namespace is called through the real handler", () => {
+    const calls: ReadonlyArray<
+      readonly [string, Record<string, unknown>, (body: unknown) => void]
+    > = [
+      [
+        "traces.getById",
+        { projectId: "project-1", traceId: "trace-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: { trace_id: "trace-1" } } } }),
+      ],
+      [
+        "tracesV2.newCount",
+        { projectId: "project-1", timeRange: { from: 0, to: 1 }, since: 0 },
+        (body) => expect(body).toMatchObject({ result: { data: { json: { count: 7 } } } }),
+      ],
+      [
+        "spans.getAllForTrace",
+        { projectId: "project-1", traceId: "trace-1" },
+        (body) =>
+          expect(body).toMatchObject({
+            // The waterfall order is the application's: earliest first, and the
+            // longer of two that start together first.
+            result: { data: { json: [{ span_id: "span-a" }, { span_id: "span-b" }] } },
+          }),
+      ],
+      [
+        "traceEditOverlay.getByTraceId",
+        { projectId: "project-1", traceId: "trace-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: { traceId: "trace-1" } } } }),
+      ],
+      [
+        "share.listForResource",
+        { projectId: "project-1", resourceType: "TRACE", resourceId: "trace-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "share-1" }] } } }),
+      ],
+      [
+        "pinnedTrace.listByProject",
+        { projectId: "project-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: [{ traceId: "trace-1" }] } } }),
+      ],
+      [
+        "savedViews.getAll",
+        { projectId: "project-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "view-1" }] } } }),
+      ],
+      [
+        "topics.getAll",
+        { projectId: "project-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "topic-1" }] } } }),
+      ],
+      [
+        "costs.getAggregatedCostsForOrganization",
+        { organizationId: "org-1", startDate: 0, endDate: 1 },
+        (body) =>
+          expect(body).toMatchObject({
+            result: { data: { json: [{ project: { id: "project-1" } }] } },
+          }),
+      ],
+      [
+        "llmModelCost.getAllForProject",
+        { projectId: "project-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "cost-1" }] } } }),
+      ],
+      [
+        "modelProvider.getAllForProject",
+        { projectId: "project-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: {} } } }),
+      ],
+      [
+        "limits.getUsage",
+        { organizationId: "org-1" },
+        (body) =>
+          expect(body).toMatchObject({
+            result: { data: { json: { currentMonthMessagesCount: 3 } } },
+          }),
+      ],
+      [
+        "plan.getActivePlan",
+        { organizationId: "org-1" },
+        (body) => expect(body).toMatchObject({ result: { data: { json: { name: "Developer" } } } }),
+      ],
+    ];
+
+    for (const [path, input, assertBody] of calls) {
+      it(`answers ${path}`, async () => {
+        const { application } = composeApplication();
+
+        const { status, body } = await callTrpc(application, path, input);
+
+        expect(status).toBe(200);
+        assertBody(body);
+      });
+    }
+  });
+
+  describe("when the anonymous share read is called with no session at all", () => {
+    it("still resolves it on the public procedure, and refuses the token", async () => {
+      const { application } = composeApplication();
+
+      // The token is rejected by the share ledger the stub refuses on, which is
+      // the point: what is under test is that ADR-057's public surface is
+      // MOUNTED and reachable, not what a valid token resolves to.
+      const { status, body } = await callTrpc(application, "sharedTrace.get", { token: "nope" });
+
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(JSON.stringify(body)).toContain("share");
+    });
+  });
+
+  describe("when the two live-update subscriptions are watched over /api/sse", () => {
+    it("streams a trace update on the same root the tRPC endpoint serves", async () => {
+      const { application, emitterFor } = composeApplication();
+
+      const watched = await watchSse({
+        application,
+        path: "traces.onTraceUpdate",
+        input: { projectId: "project-1" },
+        emitter: emitterFor("project-1") as unknown as EventEmitter,
+        channel: "trace_updated",
+        event: { traceId: "trace-1" },
+      });
+
+      expect(watched.status).toBe(200);
+      expect(watched.contentType).toBe("text/event-stream; charset=utf-8");
+      expect(watched.frames[0]).toEqual({ type: "connected" });
+      expect(watched.frames[1]).toMatchObject({ traceId: "trace-1" });
+    });
+
+    it("streams a facet recomputation the same way", async () => {
+      const { application, emitterFor } = composeApplication();
+
+      const watched = await watchSse({
+        application,
+        path: "tracesV2.onDiscoverUpdate",
+        input: { projectId: "project-1" },
+        emitter: emitterFor("project-1") as unknown as EventEmitter,
+        channel: "discover_updated",
+        event: { facets: 3 },
+      });
+
+      expect(watched.status).toBe(200);
+      expect(watched.frames[0]).toEqual({ type: "connected" });
+      expect(watched.frames[1]).toMatchObject({ facets: 3 });
+    });
+  });
+});
+
+describe("given a process that composed no trace read stack", () => {
+  function composeGroup(report?: LoggedApiTraceGroupAbsence) {
+    const { broadcast, emitterFor } = testBroadcast();
+    const group = composeApiTraceGroupCollaborators({
+      prisma: {} as unknown as PrismaClient,
+      authz: testAuthz(),
+      grants: stub<AuthzGrantsService>("grants"),
+      projects: stub<ProjectService>("projects"),
+      organizations: stub("organizations"),
+      broadcast,
+      defaultRetentionDays: 49,
+      resolveClickHouseClient: null,
+      redis: null,
+      modelProviders: undefined,
+      processName: "langwatch-api",
+      ...(report ? { report } : {}),
+    });
+    return { group, emitterFor };
+  }
+
+  it("refuses every trace read by name rather than answering an empty one", async () => {
+    const { group } = composeGroup();
+
+    await expect(
+      group.ports.traces.getViewerProtections({}, { projectId: "project-1" }),
+    ).rejects.toMatchObject({ code: "service_unavailable" });
+  });
+
+  it("still hands out the tenant emitter both subscriptions stream off", () => {
+    const { group, emitterFor } = composeGroup();
+
+    expect(group.traces.getTenantEmitter("project-1")).toBe(emitterFor("project-1"));
+  });
+
+  it("answers a cost-rule pattern conservatively rather than allowing everything", () => {
+    const { group } = composeGroup();
+
+    expect(group.ports.llmModelCost.isSafeRegex("^gpt-5")).toBe(true);
+    expect(group.ports.llmModelCost.isSafeRegex("(a+)+$")).toBe(false);
+  });
+
+  it("names every capability it did not compose", () => {
+    const warn = vi.fn();
+
+    composeGroup(LoggedApiTraceGroupAbsence.create({ warn }));
+
+    expect(warn.mock.calls.map(([data]) => (data as { capability: string }).capability)).toEqual([
+      "trace-reads",
+      "model-provider-host",
+      "studio",
+      "usage",
+      "plans",
+    ]);
+  });
+});
