@@ -1441,7 +1441,9 @@ are composed from `AppGovernanceSubscriberRuntime`, a private class at `pipeline
 `PipelineRegistryDeps` repositories.
 
 THE CLEARING DESIGN, in the order the evidence puts it.
-(g1) HARVEST THE PROJECTION RUNTIME'S FOUR COLLABORATORS, homes surveyed rather than assumed.
+(g1) HARVEST THE PROJECTION RUNTIME'S FOUR COLLABORATORS, homes surveyed rather than assumed. **LANDED
+2026-09-02 — full record after (g1) below; three homes confirmed, `leanForProjection`'s corrected by a split,
+and scenario's cost-matching blocker corrected rather than cleared.**
 `TraceIOExtractionService` goes to `@langwatch/trace-server` behind the `TraceIoExtractionPort` it already
 answers. `media-refs` goes to `@langwatch/trace-contract`, not the server, on step (g) item 2's own catalog
 reasoning: the serialised column is read by the trace read path and by `trace-list.service` as well as by the
@@ -1455,6 +1457,162 @@ policy shared by two graphs (`eventing`'s `replayExecutor` re-runs it at materia
 Then `AppTraceProjectionsAdapter` and `createTraceProcessingPipeline` become one
 `WorkerTraceProcessingPipeline` in `apps/worker` with no platform import left, staged and capability-tested like
 everything else in this wave.
+**(g1) LANDED 2026-09-02 (uncommitted at time of writing): the projection runtime's four collaborators are
+package code and the pipeline definition composes in `apps/worker`.** Staged, not mounted: `job-registry.json`
+and every `catalogue.json` are byte-identical, the application still assembles `capabilities.trace` and still
+registers all 29 keys, and `WorkerTraceProcessingPipeline` has no caller in this process but its own tests —
+which a test asserts by walking `apps/worker/src` rather than by saying so. Zero platform edits.
+
+HOMES SURVEYED, NOT ASSUMED: three confirmed, one corrected by a split, one that shrank to nothing.
+
+(1) `TraceIOExtractionService` → `@langwatch/trace-server` (`services/trace-io-extraction.service.ts`, 619
+lines plus a twin header). CONFIRMED and cheaper than it reads: the whole file names four imports —
+`@opentelemetry/api`, `getLangWatchTracer` from `langwatch`, and `ATTR_KEYS`/`TraceCanonicalisationService`
+from the contract — and trace-server already depends on all of them and already opens tracer spans in three
+other modules. No new dependency. `TraceIoExtractionAdapter` answers the port that was already declared, doing
+the same `extract*` → `tryExtract*` rename the application's own adapter does.
+
+(2) `media-refs` → `@langwatch/trace-contract`. HOME CONFIRMED, WORK BIGGER THAN THE CENSUS SAID. The 201-line
+format module is only half of it: `collectMediaRefs` stands on `collectAnnotatedMediaParts`, the 451-line
+media WALK in `~/shared/traces/mediaParts`, which stands on `media-markers` (42) and `pcmToWav` (183). The
+format alone would have given a standalone worker a parser and no way to produce anything to parse, so the
+walk came too — `trace-media-part.collector.ts`, plus `trace-media-markers.ts`, plus `trace-media-role.ts`
+(the role vocabulary, its own module because the walk reads a role and the reference shape carries one, and
+left in either file the two import each other in a cycle). The five RENDER-side helpers in that file
+(`isSafeMediaUrl`, `parseNotCapturedMedia`, `mediaRefToMediaData`, `audioPartToMediaData`,
+`collectAudioParts`) are reached by neither the walk nor reference collection and stay for the trace web
+conversion.
+THE ONE DELIBERATE DIFFERENCE, and the code decided it rather than a preference: `pcmToWav` did NOT come
+across. The application wraps a raw, header-less realtime turn into a playable WAV before surfacing it, which
+is byte work over `Buffer` and `atob`/`btoa` — and `@langwatch/trace-contract` is environment-neutral by
+construction. Its tsconfig names `lib: ["es2022"]` and no runtime types, and not one of its sixty modules
+reaches for either; the typecheck said so the moment the file landed. The packaged branch refuses a raw-PCM
+part where the application wraps one, and the difference CANNOT be seen through the port: reference
+collection admits only `/api/files/` addresses and a wrapped WAV is an inline `data:` source, so both copies
+contribute exactly no reference for such a turn. Pinned as a test, not as a claim.
+
+(3) `computeSpanCost` → `@langwatch/trace-server` behind `TraceModelCostPort`. CONFIRMED, AND THE MOVE SHRANK
+TO NOTHING: the 36 lines are `estimateModelCost(input, getStaticModelCosts())`, and `getStaticModelCosts` is
+`getStaticModelCostRates()` with a `projectId: ""` stamped on each rate — a field `estimateModelCost` never
+reads. Both functions were already in `@langwatch/model-provider-contract`, so
+`ModelCatalogTraceModelCostAdapter` is the `ModelCatalogCostEstimatorAdapter` shape coding-agent already uses.
+THE SCENARIO BLOCKER IS CORRECTED, NOT CLOSED-BY-PORT. This ledger records scenario's third blocker as
+"`deriveScenarioRoleMetrics` is the App's per-project span-cost matching, not the static-catalog trick" and
+schedules "move span-cost matching into trace-server behind a `ScenarioRoleMetricsPort`". It IS the
+static-catalog trick and no such port is needed. `TraceReadDerivationService`
+(`platform/app/src/runtime/app/trace-read-derivation.adapter.ts:78`) builds its `SpanCostService` over
+`computeSpanCost`, which reaches `getStaticModelCosts()` and no database at all; its own comment ("the app's
+own model-price matching") is what the census read as per-project. Per-project, per-team and
+per-organization override rules are read by RECORD-TIME enrichment (`getCustomLLMModelCosts` →
+`OtlpSpanCostEnrichmentService`), a different pass, already harvested by step (g) item 1, and correctly still
+needing Postgres. `deriveScenarioRoleMetricsFromSpans` is ALREADY this package's
+(`services/scenario-role-metrics.rules.ts`) and takes a `SpanCostService`, which now composes from packages
+anywhere. WHAT ACTUALLY REMAINS of that blocker is the SPAN READER — `getNormalizedSpansByTraceId` and the
+per-fold-version memo around it — which is (g3)'s neighbourhood, not cost matching. No scenario package was
+edited; its suite is unchanged (2 pre-existing datastore failures, 765 passing).
+
+(4) `leanForProjection` "beside the offload contract" → CORRECTED BY A SPLIT, and the split is the design's
+own reasoning applied to what the code shows. `@langwatch/eventing` cannot host the transform: it would need
+the contract's event-type literals and this package's `TraceAttributeCap`, which is a cycle — and eventing
+never READS the format, it only calls an injected function (`ReplayEventLean`,
+`prepareEventForProjection`, which silently defaults to identity). What DOES have more readers than writers is
+the OFFLOAD CONTRACT itself, and four places each carried their own copy of the same string:
+`lean-for-projection.ts`, `trace-full-record.mapper.ts:12`, `trace-full-record.repository.ts:270` and
+platform's `offloaded-eventref-parsing.ts`. A prefix one reader spells differently is an offloaded value that
+resolves to nothing — the customer sees the 64 KB preview and is told nothing was truncated. So the CONTRACT
+half (`EVENTREF_ATTR_PREFIX`, the `{field, eventId}` pointer and its codec, `COMMAND_INLINE_THRESHOLD`, which
+`trace.constants.ts:249` already names in prose without defining) went to `@langwatch/trace-contract` as
+`trace-offload.contract.ts`, and the two packaged readers now import it instead of retyping it. The POLICY
+half — which keys earn the wide budget, how big it is, the structure-preserving preview, the transform — went
+to `@langwatch/trace-server` as `services/trace-projection-lean.service.ts`, beside the `TraceAttributeCap` it
+stands on, with `leanReplayEvent` in `adapters/eventing.trace-projection-lean.adapter.ts` because it alone
+needs `@langwatch/eventing/server`.
+
+(5) `AppTraceProjectionsAdapter` (168) + `createTraceProcessingPipeline` (278) → ONE
+`WorkerTraceProcessingPipeline` in `apps/worker/src/app/worker-trace-processing-pipeline.composition.ts`, with
+no platform import and no new dependency — `@langwatch/trace-server`, `@langwatch/trace-contract`,
+`@langwatch/automation-server` and `@langwatch/eventing` were all already there, so the lockfile carries not
+one line of this slice. A SIXTH COLLABORATOR WAS MISSING FROM THE CENSUS AND IS HARVESTED TOO:
+`AppTraceSpanNormalizationAdapter`, a port rename over the already-packaged
+`SpanNormalizationPipelineService`. Without it the pipeline still could not be built from packages, and a
+rename is the last thing that should keep a process from composing its own definition.
+
+WHAT THE STAGED PIPELINE PROVES AND WHAT IT AWAITS. It registers 27 of the 29 byte-frozen routing keys, read
+from `job-registry.json` rather than restated, and a test asserts the two it does not are exactly
+`job:deferredOriginResolution` (the installer's own) and `job:datasetNormalize` ((g7)'s) — a subtraction
+cannot hide a key that quietly stopped registering. It registers nothing the registry does not list. The two
+EE governance rollups stay unregistered when nobody supplies them, which is asserted rather than assumed. What
+it awaits is (g2): `recordSpanCommand` and the fifteen subscriber handlers are still parameters, because
+`command:recordSpan`'s service cascade needs `ProjectService` and, through it, `DataPrivacyService` and
+`ModelProviderService`, plus `MonitorService` and `AnalyticsService`.
+
+PINS, all literals in the packages' own tests rather than reads of the application's source. Media: both
+reserved attribute names, the exact serialised JSON for a two-reference list including key order and role, the
+cap of 4, prepend/append precedence with url-identity dedup, the assistant-only-on-output side rule with
+roleless media reachable from both sides, and four refusals on the way back in (external address, `..`
+traversal, unlisted kind, unknown role degrading to no role rather than hiding the reference). Offload:
+`langwatch.reserved.eventref.`, `{"field":…,"eventId":…}` byte for byte on both the span-attribute and the
+log-body path, `IO_PREVIEW_BYTES` = 64 KiB and `COMMAND_INLINE_THRESHOLD` = 256 KiB, the four IO keys, and the
+preview being budget PLUS the ellipsis the byte cut appends — which is the twin's real arithmetic and was
+wrong in the first draft of the test. Cost: the FOLD-TIME order, `gen_ai.response.model` before
+`gen_ai.request.model`, asserted as a price difference rather than an array; record-time reads the request
+model first and the two orders are deliberate. Also the customer's own `langwatch.model.inputCostPerToken`
+winning over the catalog, and an unpublished model costing nothing rather than a guess. Extraction: the GenAI
+convention before the LangWatch attribute on both sides, each with its own reported `source`, and the
+stringified fallback answering only where the rich pass found nothing.
+
+TWENTY-SIX SABOTAGES, each red then restored, every one driven through a port or the staged composition. Media
+format: the reserved attribute name drifted, the url policy admitting an external address, the cap raised, the
+assistant's reply landing on the input strip too, merge precedence ignored. Extraction: the LangWatch
+attribute preferred over the GenAI convention, the output side reading the input key, the fallback shadowing a
+real semantic match. Cost: matched from the request model first, the adapter dropping the customer's rates.
+Offload: the pointer losing its `eventId`, the prefix leaving the reserved namespace, the lean mutating the
+event it was handed, an over-budget attribute earning no pointer, the wide budget no longer covering the GenAI
+message keys, the log body leaned without its pointer. Composition: the pipeline wired inert, the pipeline
+named something the queue does not route, a subscriber registration dropped, the governance rollups mounted as
+absent, the origin gate registered under the installer's job name, the staged pipeline mounted by the
+production composition, and the four collaborators each replaced by a do-nothing stand-in.
+THREE OF THOSE CAME BACK GREEN ON THE FIRST PASS and are the reason three assertions exist — the S6-egress
+lesson again. Handing the pipeline a media port that collects nothing, a cost port that prices everything at
+zero, or an extraction port that finds no input or output left the DEFINITION structurally identical, so every
+registration assertion stayed green while a trace lost its thumbnails, appeared free, and showed `<empty>` in
+the list. The composition test now folds a real span through the built `traceSummary` projection and asserts
+the computed IO, the serialised media reference and a non-zero cost.
+
+TWO SERVICE-QUALITY CEILINGS RECORDED, deliberately and with a shelf life:
+`services/trace-io-extraction.service.ts` (636 lines, longest method 90) and
+`services/trace-projection-lean.service.ts` (longest method 98) are frozen twins that cannot be split while
+the application holds the other copy — splitting one side is exactly the silent drift the twin discipline
+exists to prevent. Both are entries in `service-quality-baseline.json`, which may only shrink, and both should
+be split and the entries removed at the conversion, when platform's copies go. FOUR
+`fallible-result-naming` findings are left standing rather than baselined: `extractFirstInput`,
+`extractLastOutput`, `extractRichIOFromSpan` and `extractFallbackIOFromSpan` expose absence without the `try`
+prefix on the harvested twin, and the repo's own answer to that is already in place — the PORT is
+`tryExtract*` and the adapter is the rename, exactly as the application's adapter does it. Renaming inside the
+twin would make the diff between the two copies noisy precisely where drift review needs it quiet. ONE
+inherited oxlint warning likewise stands: `no-useless-fallback-in-spread` on the log-record lean fires
+identically on `platform/app/src/server/app-layer/traces/lean-for-projection.ts:324`.
+
+GATES, measured before and after. `pnpm test:unit run src/runtime/worker` 8 files / 42 tests, unchanged.
+`@langwatch/worker` 41/337 → 42/348. `@langwatch/trace-server` 94/1576 → 95/1590.
+`@langwatch/trace-contract` 18/310 → 19/322. `@langwatch/scenario-server` unchanged at 58 passed / 2
+pre-existing datastore failures, 765 tests. architecture-lint 21 files / 332 tests unchanged; CLI findings
+817 → 821, and every one of the four is the `fallible-result-naming` class above (the 817 baseline is itself
+805 plus twelve the concurrent UI-family move introduced). Whole-tree `pnpm typecheck` 14 errors in 11 files,
+all in `platform/app`, identical before and after. `tsc --noEmit` clean for `@langwatch/trace-contract` (both
+tsconfigs), `@langwatch/trace-server`, `@langwatch/architecture-lint` and `apps/worker` (both `tsconfig.json`
+and `tsconfig.test.json`). `git diff --numstat -- platform/app` identical to the pre-slice baseline — the
+fourteen entries there are the concurrent UI agent's evaluator/evaluation deletions, none of them this
+slice's. `specs/trace-processing/worker-trace-projection-runtime.feature` reports 14/14 scenarios bound.
+The lockfile's 76 changed lines are entirely the UI agent's `evaluator/web` and `monitor/web` manifests; this
+slice installed nothing.
+
+DEPLOYMENT IMPACT: NONE, and no new configuration leaves. Nothing is mounted, both graphs still compute
+exactly what they computed, and no leaf became load-bearing. At the conversion the media-reference
+serialisation, the eventref pointer and the fold-time cost order become shared wire contracts between the two
+graphs while both ingest — which is why all three are pinned as literals here rather than as reads of the
+application's source.
+
 (g2) THE ProjectService WAVE, WHICH NOW PRECEDES TRACE RATHER THAN FOLLOWING IT. This is the correction that
 matters most and it inverts a recorded order. The blocker graph's wave order reads
 `mail+join-request → Trace → scenario/evaluation → ProjectService wave`; the evidence above says Trace needs
@@ -1910,7 +2068,7 @@ builds the pipeline):
 | Real (worker builds from raw deps) | 2 | eventing-maintenance, topic |
 | Extracted (this programme) | 14 | api-key (`e3ebed7963` — sandbox key sweep as repository/service/typed adapter in `@langwatch/api-key-server`; platform keeps a passive copy only while `pipelineRegistry.ts:790` names it); scenario deferred-metrics rider (`396a3d742e` — the job description lives beside its delay constant in `@langwatch/scenario-server`, the worker installer binds it through its own consumer-side interface, and a package test pins name/dedup-id/span literals against platform's frozen twin, which may only change together); github (`ec485ec46d` — the blocker was false coupling: sweep split from demand behind GithubBranchInstallationsPort, Prisma seams typed, worker builds the pipeline with no org/project service, credential absence declared by name; standalone deployments need the three GITHUB_LANGY_* env vars); langy-maintenance (`2cc56987f6` — session-key reap split from the wide service that demanded ApiKeyService/AuthzService it never called, narrow Pick<PrismaClient,"apiKey"> repository, package OTel metrics adapter pinning the identical series name); metric+log (`caee89b857` — append repositories split from reads whose demands only dead or narrow paths used; worker mounts both from the tenant-keyed substrate it already carries); suite (`3d6eba224f` — the coupling was a three-way assembly split across runtime/contract/registry; the package adapter owns it, redis required so a double-counting cacheless graph is inexpressible); identity+scim-sync (`54ba504b0d` — clean harvests: seven platform-only Prisma repositories landed at their honest homes, projection stores in identity-eventing beside the fold states that type them); authz+billing-reporting (`f397ac37ac` — the grants ledger split producer-from-consumer with connect deleted rather than stubbed; billing harvested its organization read, cache, Stripe twin and error reporter, mounting unconditionally with the SaaS shape in the sender); coding-agent+experiment (`e6a5d0fcda` — experiment was the suite assembly pattern; coding-agent dissolved ModelProviderService-for-one-pure-function and ProjectService-for-one-column-touch into three narrow ports, and composed the PR demand path its byte-frozen subscriber key requires); join-request (`baca75a26b` — the packaged mail capability in notification-server is the substrate, four provider gateways with the App's config spellings, templates in the application tier proven byte-identical to react-email's output; mounts unconditionally with absent mail declared by name, and a queue-claiming scoped graph refuses to compose without BASE_HOST) |
 | Hybrid (package installer, platform-built option bundle) | 2 | trace (**STAYS HYBRID; conversion attempted 2026-09-02 and halted, unreachable at zero platform insertions.** Steps (a)-(f) and the three named absences all landed and every staged composition is capability-tested, but `trace_processing`'s 29 byte-frozen routing keys are all-or-nothing and fourteen do not route from this process. Two groups are the halt: the PIPELINE DEFINITION was never in the census — `EventingTracePipelineAdapter` needs `ioExtraction`, `mediaReferences`, `modelCosts` and `prepareEventForProjection`, whose four implementations are 1,199 un-harvested platform lines, and the two modules that register the keys are platform's `AppTraceProjectionsAdapter` + `createTraceProcessingPipeline`; and `recordSpan`'s four staged ports each take a capability service by parameter, none of the six constructible here — `DataPrivacyService` and `ModelProviderService` both require `ProjectService`, which is shared prerequisite (1). THE WAVE ORDER INVERTS: ProjectService wave now precedes Trace. Three more keys have bounded gaps — `trackedEventSync`'s `getApp()`, the coding-agent normalized-span read step (c) handed forward, `datasetNormalize`'s unbuilt composition — and three belong to the automation and governance conversions. Full record, per-key disposition and clearing design at the end of the Worker blocker graph section), governance-ingestion |
-| Synthesized wrapper (platform builds, worker receives) | 7 | automation (blocked: subscriber:pm:triggerSettlement is in the byte-frozen registry and its notifyDigest intent IS outbound mail — the join-request wall, reached three ways: settlement digests, AutomationRunawayPort.sendLimitEmail, AutomationTestFirePort. Clearing: the packaged mail capability, then unsubscribe/no-reply + the four delivery transports + PrismaScheduledJobStore + triggerFilter.matcher behind the ports that already exist, OTel twins for four prom-client counters, eight WorkerConfig leaves — and persistMatch puts Annotation/Dataset/Trace services on the critical path, so it converts with the trace vertical, not before), evaluation (blocked twice: command:executeEvaluation reaches EvaluationExecutionService — 676 lines over ~2.4k more platform-only lines including tracesMapping (1,414) — a platform service graph, not the composable langevals HTTP client; and subscriber:graphTriggerActivity inherits automation's mail wall via evaluateGraphTrigger. The other three deps ARE reachable — EvaluationRunStore demands exactly three packaged methods, both analytics stores compose on AnalyticsAdapter. Clearing: automation's clearing, a worker-reachable TraceService, then the evaluator engine behind EvaluationExecutionPort), governance-events (blocked with gateway-spend), gateway-spend (blocked), scenario (blocked three ways, surveyed 2026-09-02: the execute intent reaches the in-process child-process pool whose runner only the App connects — clearing needs scenario-child-process.ts out of platform and the prefetcher's nine services worker-composable; traceSummaryStore comes from the unconverted Trace pipeline — dissolves when Trace converts, so TRACE PRECEDES SCENARIO in wave order; deriveScenarioRoleMetrics is the App's per-project span-cost matching, not the static-catalog trick — clearing: move span-cost matching into trace-server behind a ScenarioRoleMetricsPort. Six of nine deps compose today; the unused simulations field should delete with the conversion), langy-conversation (blocked twice, nine of eleven deps compose: the title generator needs getVercelAIModel's model-resolution cascade worker-reachable — harvest it into model-provider-server with explicit params, platform copy stays frozen; the session-key mint needs ApiKeyService which needs ProjectService. Preparation pieces named: ClickHouse analytics sink twin, OTel dispatch metrics twin, and a shared RedisTenantBroadcastAdapter both scenario and langy need as one frozen twin), sso-connection (blocked: teardown drags ScimService whose composition needs the better-auth instance — clearing split: ScimTokenRevocationPort over the existing repository method + the lifecycle call, then harvest SsoConnectionLedgerWriter with injected store/sender), |
+| Synthesized wrapper (platform builds, worker receives) | 7 | automation (blocked: subscriber:pm:triggerSettlement is in the byte-frozen registry and its notifyDigest intent IS outbound mail — the join-request wall, reached three ways: settlement digests, AutomationRunawayPort.sendLimitEmail, AutomationTestFirePort. Clearing: the packaged mail capability, then unsubscribe/no-reply + the four delivery transports + PrismaScheduledJobStore + triggerFilter.matcher behind the ports that already exist, OTel twins for four prom-client counters, eight WorkerConfig leaves — and persistMatch puts Annotation/Dataset/Trace services on the critical path, so it converts with the trace vertical, not before), evaluation (blocked twice: command:executeEvaluation reaches EvaluationExecutionService — 676 lines over ~2.4k more platform-only lines including tracesMapping (1,414) — a platform service graph, not the composable langevals HTTP client; and subscriber:graphTriggerActivity inherits automation's mail wall via evaluateGraphTrigger. The other three deps ARE reachable — EvaluationRunStore demands exactly three packaged methods, both analytics stores compose on AnalyticsAdapter. Clearing: automation's clearing, a worker-reachable TraceService, then the evaluator engine behind EvaluationExecutionPort), governance-events (blocked with gateway-spend), gateway-spend (blocked), scenario (blocked three ways, surveyed 2026-09-02: the execute intent reaches the in-process child-process pool whose runner only the App connects — clearing needs scenario-child-process.ts out of platform and the prefetcher's nine services worker-composable; traceSummaryStore comes from the unconverted Trace pipeline — dissolves when Trace converts, so TRACE PRECEDES SCENARIO in wave order; deriveScenarioRoleMetrics was recorded as the App's per-project span-cost matching; **(g1) surveyed it and that is wrong — it IS the static-catalog trick**, `computeSpanCost` reaches `getStaticModelCosts()` and no database, per-project overrides belong to record-time enrichment, and `deriveScenarioRoleMetricsFromSpans` was already trace-server's. No `ScenarioRoleMetricsPort` is needed and none was added; what remains of this blocker is the SPAN READER `getNormalizedSpansByTraceId`, which travels with (g3). Six of nine deps compose today; the unused simulations field should delete with the conversion), langy-conversation (blocked twice, nine of eleven deps compose: the title generator needs getVercelAIModel's model-resolution cascade worker-reachable — harvest it into model-provider-server with explicit params, platform copy stays frozen; the session-key mint needs ApiKeyService which needs ProjectService. Preparation pieces named: ClickHouse analytics sink twin, OTel dispatch metrics twin, and a shared RedisTenantBroadcastAdapter both scenario and langy need as one frozen twin), sso-connection (blocked: teardown drags ScimService whose composition needs the better-auth instance — clearing split: ScimTokenRevocationPort over the existing repository method + the lifecycle call, then harvest SsoConnectionLedgerWriter with injected store/sender), |
 | Riders (platform production code inside the mapper) | 0 | SaaS `globalProjections` EXTRACTED (`18c28be00e` — the wall was thinner than mapped: routing already packaged, the tenant directory answers an organization id as a tenant of itself, so the worker needed only the IS_SAAS deployment leaf; meter pair harvested to enterprise billing, gated on the worker's own leaf, refusing to compose SaaS without a reporting sender). Historical record follows: SaaS `globalProjections` (billing meter projection + dispatch subscriber). **Extraction attempted 2026-09-02 and reverted: unreachable at zero platform insertions.** The worker cannot build the pair — it has no `isSaas` leaf in `WorkerConfig`, and the meter's store writes through the organization-keyed ClickHouse client (`getClickHouseClientForOrganization`, billing routes private instances to their own cluster) plus the Redis-cached `resolveOrganizationId` directory, all platform-owned — so the mapper would have to gain port-passing lines. Sequencing instead: (1) package an organization-keyed ClickHouse/store seam and the org directory the worker can compose (the Redis cache is shared state, so both graphs read the same keys); (2) give `WorkerConfig` a deployment leaf; then the mapper's whole conditional spread deletes as a pure deletion. Until then the rider stays platform-built — it converts with the endgame either way. **gateway-spend + governance-events clearing order after 18c28be00e shrinks to three steps: (1) an all-instance ClickHouse directory (no organization id names the shared instance — needs a packaged managed-client factory or it stays with the endgame), (2) packaged plan source over the new deployment leaf, (3) webhook deliveryLog/destinations harvest + debit-path split. Original mapping: they hit the wall three ways (2026-09-02, survey in `3d6eba224f`): settlement needs an org-keyed ClickHouse instance directory, webhook delivery needs the isSaas leaf, the debit graph needs Project/Evaluator/Monitor or a false-coupling split of AppGatewayGovernancePort; both process managers are in the byte-frozen job registry so no half-mount exists. Clearing order: (1) package the org-keyed instance directory (also clears the billing rider), (2) WorkerConfig deployment leaf + packaged plan source, (3) harvest webhooks deliveryLog/destinations into enterprise-webhook-server, (4) split the debit path behind a narrow port.** |
 
 Transitional seam flagged in `e3ebed7963`: the worker composition's top-level

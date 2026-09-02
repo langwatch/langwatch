@@ -104,6 +104,22 @@
       "statements": 24,
       "complexity": 24,
       "lineLength": 160
+    },
+    {
+      "file": "packages/features/trace/server/src/services/trace-io-extraction.service.ts",
+      "moduleLines": 636,
+      "methodLines": 90,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/trace/server/src/services/trace-projection-lean.service.ts",
+      "moduleLines": 500,
+      "methodLines": 98,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
     }
   ]
 }

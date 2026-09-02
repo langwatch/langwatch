@@ -192,6 +192,19 @@ export { TraceLogRecordIOService } from "./services/trace-log-record-io.service"
 export { SpanTimingService } from "./services/span-timing.service";
 
 export { TraceProjectionRuntimeService } from "./services/trace-projection-runtime.service";
+export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
+export {
+  IO_ATTR_KEYS,
+  IO_PREVIEW_BYTES,
+  leanForProjection,
+  structuredIoPreview,
+  utf8Preview,
+} from "./services/trace-projection-lean.service";
+export { leanReplayEvent } from "./adapters/eventing.trace-projection-lean.adapter";
+export { TraceIoExtractionAdapter } from "./adapters/trace-io-extraction.adapter";
+export { TraceSpanNormalizationAdapter } from "./adapters/trace-span-normalization.adapter";
+export { TraceMediaReferenceAdapter } from "./adapters/trace-media-reference.adapter";
+export { ModelCatalogTraceModelCostAdapter } from "./adapters/model-catalog.trace-model-cost.adapter";
 export {
   aggregateScenarioRoleMetrics,
   deriveScenarioRoleMetricsFromSpans,

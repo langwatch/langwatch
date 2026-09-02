@@ -1,4 +1,5 @@
 import {
+  EVENTREF_ATTR_PREFIX,
   TraceNotFoundError,
   type NormalizedSpan,
   type TraceFullRecord,
@@ -267,7 +268,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
   private static eventReferences(
     attributes: NormalizedSpan["spanAttributes"],
   ): Array<{ attrKey: string; eventId: string; field: string }> {
-    const prefix = "langwatch.reserved.eventref.";
+    const prefix = EVENTREF_ATTR_PREFIX;
     return Object.entries(attributes).flatMap(([key, value]) => {
       if (!key.startsWith(prefix)) return [];
       const decoded =

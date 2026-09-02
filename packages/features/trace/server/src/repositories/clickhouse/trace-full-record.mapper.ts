@@ -1,4 +1,5 @@
 import {
+  EVENTREF_ATTR_PREFIX,
   NormalizedSpanKind,
   NormalizedStatusCode,
   type NormalizedAttributes,
@@ -9,7 +10,6 @@ import {
 } from "@langwatch/trace-contract";
 
 const decimalNumber = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
-const eventReferencePrefix = "langwatch.reserved.eventref.";
 const droppedMarker = "langwatch.privacy.dropped";
 const droppedCategoryOrder = ["input", "output", "system", "tools"];
 const dangerousPathKeys = new Set(["__proto__", "constructor", "prototype"]);
@@ -558,7 +558,7 @@ export class TraceFullRecordMapper {
 
   static withoutEventReferences(attributes: NormalizedAttributes): NormalizedAttributes {
     return Object.fromEntries(
-      Object.entries(attributes).filter(([key]) => !key.startsWith(eventReferencePrefix)),
+      Object.entries(attributes).filter(([key]) => !key.startsWith(EVENTREF_ATTR_PREFIX)),
     );
   }
 }
