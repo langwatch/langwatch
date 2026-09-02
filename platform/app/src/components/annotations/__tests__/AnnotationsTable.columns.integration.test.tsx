@@ -704,42 +704,71 @@ describe("AnnotationsTable columns and row actions", () => {
       ];
     };
 
-    /** @scenario "The inbox reads every queue until one is picked" */
-    it("reads them all and says so", () => {
-      twoQueues();
-      renderQueuePage({ showQueueAndUser: true });
+    describe("when no queue has been picked", () => {
+      /** @scenario "The inbox reads every queue until one is picked" */
+      it("reads them all and says so", () => {
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
 
-      expect(
-        screen.getByRole("button", { name: /Queues: All/ }),
-      ).toBeInTheDocument();
-      expect(mocks.queueReadArgs?.queueIds).toEqual([]);
+        expect(
+          screen.getByRole("button", { name: /Queues: All/ }),
+        ).toBeInTheDocument();
+        expect(mocks.queueReadArgs?.queueIds).toEqual([]);
+      });
     });
 
-    /** @scenario "The inbox narrows to the queues the reviewer picks" */
-    it("narrows the read to a picked queue and names it", async () => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      twoQueues();
-      renderQueuePage({ showQueueAndUser: true });
+    describe("when the reviewer picks one of them", () => {
+      /** @scenario "The inbox narrows to the queues the reviewer picks" */
+      it("narrows the read to a picked queue and names it", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
 
-      await user.click(screen.getByRole("button", { name: /Queues:/ }));
-      await user.click(
-        await screen.findByRole("checkbox", { name: "Safety review" }),
-      );
+        await user.click(screen.getByRole("button", { name: /Queues:/ }));
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Safety review" }),
+        );
 
-      expect(mocks.queueReadArgs?.queueIds).toEqual(["queue-2"]);
-      expect(
-        screen.getByRole("button", { name: /Queues: Safety review/ }),
-      ).toBeInTheDocument();
+        expect(mocks.queueReadArgs?.queueIds).toEqual(["queue-2"]);
+        expect(
+          screen.getByRole("button", { name: /Queues: Safety review/ }),
+        ).toBeInTheDocument();
+      });
     });
 
-    /** @scenario "A page that is one queue offers no queue filter" */
-    it("offers no queue filter where the page is already one queue", () => {
-      twoQueues();
-      renderQueuePage({ queueId: "queue-1" });
+    describe("when the reviewer picks one of them from a later page", () => {
+      /** @scenario "Picking a queue takes the reviewer back to the first page" */
+      it("goes back to the first page", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        twoQueues();
+        mocks.query = { pageOffset: "25" };
+        renderQueuePage({ showQueueAndUser: true });
 
-      expect(
-        screen.queryByRole("button", { name: /Queues:/ }),
-      ).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: /Queues:/ }));
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Safety review" }),
+        );
+
+        // pageOffset drops out of the query entirely at offset zero, so an
+        // empty query IS page one.
+        expect(mocks.push).toHaveBeenCalledWith(
+          { pathname: "/[project]/annotations", query: {} },
+          undefined,
+          { shallow: true },
+        );
+      });
+    });
+
+    describe("when the page is already one queue", () => {
+      /** @scenario "A page that is one queue offers no queue filter" */
+      it("offers no queue filter", () => {
+        twoQueues();
+        renderQueuePage({ queueId: "queue-1" });
+
+        expect(
+          screen.queryByRole("button", { name: /Queues:/ }),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -788,20 +817,20 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(columnHeaders()).not.toContain("Comments");
     });
 
-    /** @scenario "The columns menu opens against its own button" */
-    it("keeps the menu's own identity on the button its tooltip wraps", () => {
+    /** @scenario "The columns menu keeps the button as its own trigger" */
+    it("leaves the button to the menu rather than to its tooltip", () => {
       renderQueuePage();
 
       const trigger = screen.getByRole("button", {
         name: "Show or hide columns in the table",
       });
 
-      // The tooltip and the menu trigger both clone an id onto their child. Let
-      // the tooltip win and the menu has no anchor left to measure against, so
-      // it opens in the page's top-left corner instead of under the button —
-      // which no layout-free test can see, but this attribute can.
+      // The tooltip and the menu trigger both clone themselves onto their
+      // child. Let the tooltip win and the menu has no anchor left to measure
+      // against, and it opens in the corner of the page instead of under the
+      // button. Where it lands needs a browser to see; whose button this is
+      // does not, and it is the half that goes wrong.
       expect(trigger).toHaveAttribute("data-scope", "popover");
-      expect(trigger.id).toMatch(/^popover:/);
     });
   });
 

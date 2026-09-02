@@ -327,6 +327,15 @@ Rule: The inbox can be narrowed to the queues being worked on
     When a single queue's page renders
     Then it carries no queue filter
 
+  # Narrowing the queues narrows the rows, so the page they were on may not
+  # exist any more: from page three, a queue with five items would show the
+  # empty state for a queue that plainly has work in it.
+  @integration
+  Scenario: Picking a queue takes the reviewer back to the first page
+    Given the reviewer is reading a later page of the inbox
+    When the reviewer picks one queue
+    Then the list goes back to the first page
+
   @unit
   Scenario: A picked queue cannot widen what the reviewer may read
     Given the reviewer may read only their own items
@@ -359,10 +368,21 @@ Rule: The reviewer chooses which columns the list shows
   # The button carries a tooltip as well as the menu. Both want to name the
   # button as their own, and if the tooltip wins the menu has nothing left to
   # measure against: it opens in the corner of the page, over the navigation.
+  #
+  # Where the menu lands is the behaviour that matters, and only a browser can
+  # see it — nothing about placement is observable without layout, so the
+  # scenario for it is parked rather than bound to a test that cannot look.
+  # What a test can hold is the cause: whether the button is still the menu's.
   @integration
-  Scenario: The columns menu opens against its own button
+  Scenario: The columns menu keeps the button as its own trigger
+    When the columns menu renders its button
+    Then the button belongs to the menu rather than to its tooltip
+
+  @e2e @unimplemented
+  Scenario: The columns menu opens under its button
     When the reviewer opens the columns menu
-    Then it is the menu's own button that it opens against
+    Then it appears against the button they pressed
+    And not in the corner of the page over the navigation
 
 Rule: The row's actions are always within reach
 
