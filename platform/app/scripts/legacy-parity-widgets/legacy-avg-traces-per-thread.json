@@ -4,7 +4,7 @@
   "queries": [
     {
       "name": "main",
-      "sql": "SELECT day, avg(trace_count) AS avg_traces_per_thread\nFROM (\n  SELECT toStartOfDay(OccurredAt) AS day, ConversationId, count() AS trace_count\n  FROM trace_metrics\n  WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n    AND ConversationId IS NOT NULL\n  GROUP BY day, ConversationId\n)\nGROUP BY day\nORDER BY day",
+      "sql": "SELECT day, avg(trace_count) AS avg_traces_per_thread\nFROM (\n  SELECT toStartOfDay(OccurredAt) AS day, ConversationId, count() AS trace_count\n  FROM trace_metrics\n  WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n    AND ConversationId IS NOT NULL\n    AND TotalDurationMs > 0\n  GROUP BY day, ConversationId\n)\nGROUP BY day\nORDER BY day",
       "parameters": []
     }
   ]

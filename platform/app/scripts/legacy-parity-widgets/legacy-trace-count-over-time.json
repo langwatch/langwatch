@@ -4,7 +4,7 @@
   "queries": [
     {
       "name": "main",
-      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\nGROUP BY bucket\nORDER BY bucket",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n  AND TotalDurationMs > 0\nGROUP BY bucket\nORDER BY bucket",
       "parameters": []
     }
   ]
