@@ -22,7 +22,18 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { AgentTestPanel } from "~/components/agents/AgentTestPanel";
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  VariablesSection,
+} from "~/components/variables";
+import { connectedTargetFields } from "~/experiments-v3/utils/connectedAgentTarget";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -34,14 +45,38 @@ import {
 
 export type ConnectedAgentDrawerProps = {
   agentId?: string;
+  /**
+   * The columns a workbench row can map from. Present only when the drawer is
+   * opened from a workbench column, which is the one place an agent's inputs
+   * are mapped to something.
+   */
+  availableSources?: AvailableSource[];
+  /** What the column maps today. */
+  inputMappings?: Record<string, FieldMapping>;
+  /** Records a mapping the moment it changes; the workbench has no Save. */
+  onInputMappingsChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
 };
 
 export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
+  const complexProps = getComplexProps();
+  const flowCallbacks = getFlowCallbacks("agentConnectedDetail");
   const { project } = useOrganizationTeamProject();
   const agentId = props.agentId ?? drawerParams.agentId;
   const projectId = project?.id ?? "";
+
+  const availableSources =
+    props.availableSources ??
+    (complexProps.availableSources as AvailableSource[] | undefined);
+  const inputMappings =
+    props.inputMappings ??
+    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
+  const onInputMappingsChange =
+    props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId },
@@ -64,6 +99,9 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
             agent={agent}
             isLoading={agentQuery.isLoading}
             projectId={projectId}
+            availableSources={availableSources}
+            inputMappings={inputMappings}
+            onInputMappingsChange={onInputMappingsChange}
           />
         </Drawer.Body>
         <Drawer.Footer>
@@ -102,10 +140,19 @@ function AgentBody({
   agent,
   isLoading,
   projectId,
+  availableSources,
+  inputMappings,
+  onInputMappingsChange,
 }: {
   agent: ConnectedAgentView | null | undefined;
   isLoading: boolean;
   projectId: string;
+  availableSources?: AvailableSource[];
+  inputMappings?: Record<string, FieldMapping>;
+  onInputMappingsChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
 }) {
   if (isLoading) {
     return (
@@ -123,6 +170,24 @@ function AgentBody({
 
   return (
     <VStack align="stretch" gap={6} paddingBottom={6}>
+      {onInputMappingsChange ? (
+        <VariablesSection
+          title="Input Variables"
+          variables={connectedTargetFields(agent).inputs}
+          onChange={() => {
+            // The list is the agent's own contract: the turn to send, and the
+            // parameters the function declares. Mappable, not editable, so
+            // the section stays read-only and only the mapping selector
+            // answers.
+          }}
+          showMappings={true}
+          availableSources={availableSources}
+          mappings={inputMappings}
+          onMappingChange={onInputMappingsChange}
+          canAddRemove={false}
+          readOnly={true}
+        />
+      ) : null}
       <ParametersTable agent={agent} />
       <InstancesTable agent={agent} />
       <AgentTestPanel

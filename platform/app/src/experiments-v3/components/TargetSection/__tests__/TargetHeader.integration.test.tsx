@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../../hooks/useTargetName";
 import {
+  type AgentTypeEnum,
+  agentTypeEnum,
   createInitialResults,
   createInitialUIState,
   type TargetConfig,
@@ -70,6 +72,67 @@ describe("TargetHeader", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("given an agent target", () => {
+    const agentTarget = ({
+      agentType,
+    }: {
+      agentType: AgentTypeEnum;
+    }): TargetConfig => ({
+      id: "support-agent",
+      type: "agent",
+      agentType,
+      dbAgentId: "agent_1",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    describe("when the agent runs in the customer's own process", () => {
+      it("marks the column with the agent icon, not the code icon", () => {
+        renderWithProviders(
+          <TargetHeader
+            target={agentTarget({ agentType: "connected" })}
+            onEdit={mockOnEdit}
+            onRemove={mockOnRemove}
+          />,
+        );
+
+        expect(screen.getByTestId("icon-connected")).toBeInTheDocument();
+        expect(screen.queryByTestId("icon-code")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when a new agent type is added", () => {
+      // Restated here rather than read off the component, so a type that
+      // silently takes another type's icon fails instead of passing.
+      const EXPECTED_ICON: Record<AgentTypeEnum, string> = {
+        code: "icon-code",
+        signature: "icon-code",
+        http: "icon-globe",
+        workflow: "icon-workflow",
+        connected: "icon-connected",
+      };
+
+      it("gives every declared agent type the icon it is meant to carry", () => {
+        for (const agentType of agentTypeEnum.options) {
+          const { unmount } = renderWithProviders(
+            <TargetHeader
+              target={agentTarget({ agentType })}
+              onEdit={mockOnEdit}
+              onRemove={mockOnRemove}
+            />,
+          );
+
+          expect(
+            screen.getByTestId(EXPECTED_ICON[agentType]),
+            `the ${agentType} agent type carries the wrong icon`,
+          ).toBeInTheDocument();
+          unmount();
+        }
+      });
+    });
   });
 
   describe("Prompt target", () => {

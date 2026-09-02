@@ -250,6 +250,12 @@ Feature: Connected agents
     And the refusal carries a retry delay
 
   @unit
+  Scenario: An instance that refuses a call as busy keeps the busy code
+    Given one live instance that answers with the busy code
+    When a call is dispatched to it
+    Then the call fails with "agent_busy"
+
+  @unit
   Scenario: The instance with the most free slots is picked
     Given two live instances, one with a call in flight and one idle
     When a call is dispatched
