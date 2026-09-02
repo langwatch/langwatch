@@ -614,8 +614,14 @@ function figureFor(rows: readonly LaneRow[]): number | null {
 }
 
 /**
- * What the billed lane said a day cost before its latest restatement, under
- * the same withholding rule as the figure it will be shown beside.
+ * What the billed lane said a day cost in the moment before its latest
+ * restatement, under the same withholding rule as the figure it is shown
+ * beside.
+ *
+ * "Before the latest one", not "before all of them": a day restated twice
+ * shows only the most recent move, and the repository pins the prior total to
+ * that same moment. The full chain lives in the event log, never in this
+ * figure (ADR-128 §15).
  *
  * Null when the day was never revised: there is no earlier figure to name, and
  * the marker that would carry it is not rendered anyway.
